@@ -26,7 +26,7 @@ class ApiEndpoints {
     if (kIsWeb) {
       return 'http://localhost:5001';
     }
-    return 'http://192.168.1.143:5001';
+    return 'https://f2hfresh.com';
   }
 
   /// Root host (scheme + host + port), no trailing slash.

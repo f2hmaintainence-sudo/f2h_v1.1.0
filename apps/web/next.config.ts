@@ -6,7 +6,7 @@ import type { NextConfig } from "next";
  * For static export only, set output: "export" and images.unoptimized: true (images served raw).
  */
 const nextConfig: NextConfig = {
-  output: 'standalone',           // enables minimal Docker production image
+// output: 'standalone',           // enables minimal Docker production image
   images: {
     formats: ["image/avif", "image/webp"],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
@@ -25,6 +25,9 @@ const nextConfig: NextConfig = {
         pathname: '/uploads/**',
       },
     ],
+  },
+  turbopack: {
+    root: '/home/f2hfresh/htdocs/f2hfresh.com',
   },
   experimental: {
     optimizePackageImports: ["react-icons", "lucide-react"],

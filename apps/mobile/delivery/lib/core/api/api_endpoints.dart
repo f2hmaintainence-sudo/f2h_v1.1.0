@@ -16,7 +16,7 @@ class ApiEndpoints {
   ApiEndpoints._();
 
   static const String _envBaseUrl = String.fromEnvironment('F2H_API_BASE_URL');
-  static const String _devBaseUrl = 'http://192.168.1.143:5001';
+  static const String _devBaseUrl = 'https://f2hfresh.com';
 
   static String get host {
     if (_envBaseUrl.isNotEmpty) return _envBaseUrl;
