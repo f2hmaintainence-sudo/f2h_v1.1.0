@@ -49,7 +49,7 @@ export class UsersController {
     const user = this.fieldEncryption.decryptRow('users', rawUser);
 
     let roles = await this.db.query(
-      `SELECT ra.role_id, r.name as role_name
+      `SELECT DISTINCT ra.role_id, r.name as role_name
        FROM role_assignments ra
        JOIN roles r ON UPPER(ra.role_id) = UPPER(r.role_id) 
        WHERE ra.user_id = ? AND ra.is_active = 1 AND ra.deleted_at IS NULL
