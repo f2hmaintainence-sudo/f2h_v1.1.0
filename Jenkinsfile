@@ -9,7 +9,7 @@ pipeline {
                 cd apps/api
                 npm install --no-audit --no-fund
                 npm run build
-                pm2 restart api-f2hfresh || pm2 start dist/main.js --name api-f2hfresh
+                pm2 restart api-f2hfresh || pm2 start npm --name "api-f2hfresh" -- run start
                 echo "========== BACKEND DEPLOYMENT SUCCESS =========="
                 '''
             }
