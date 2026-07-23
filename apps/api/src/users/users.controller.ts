@@ -48,14 +48,21 @@ export class UsersController {
     if (!rawUser) return { error: 'User not found' };
     const user = this.fieldEncryption.decryptRow('users', rawUser);
 
-    let roles = await this.db.query(
-      `SELECT DISTINCT ra.role_id, r.name as role_name
+    let rawRoles = await this.db.query(
+      `SELECT ra.role_id, r.name as role_name
        FROM role_assignments ra
        JOIN roles r ON UPPER(ra.role_id) = UPPER(r.role_id) 
        WHERE ra.user_id = ? AND ra.is_active = 1 AND ra.deleted_at IS NULL
        ORDER BY CASE UPPER(ra.role_id) WHEN 'ADMIN' THEN 1 WHEN 'DELIVERY_PARTNER' THEN 2 WHEN 'CUSTOMER' THEN 3 ELSE 4 END`,
       [userId],
     );
+
+    const seenRoles = new Set();
+    let roles = (rawRoles || []).filter((r: any) => {
+      if (!r.role_id || seenRoles.has(r.role_id)) return false;
+      seenRoles.add(r.role_id);
+      return true;
+    });
 
     const isMaintenanceOrAdminUser =
       user.email === 'f2hmaintainence@gmail.com' ||
