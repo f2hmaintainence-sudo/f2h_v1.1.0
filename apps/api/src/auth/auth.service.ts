@@ -335,7 +335,7 @@ export class AuthService {
               customer_id: userId,
               first_name: body.first_name || body.user_name || 'Customer',
               last_name: body.last_name || '',
-              phone: phone || '',
+              mobile: phone || '',
               email: email || null,
               created_at: now,
               updated_at: now,

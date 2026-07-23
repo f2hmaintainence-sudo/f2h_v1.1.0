@@ -58,6 +58,7 @@ import { DeliveryPartnerProfileModule } from './panels/delivery-partner/profile/
 import { SupportTicketsModule } from './support-tickets/support-tickets.module';
 import { CustomerBillingModule } from './panels/admin/customers-orders/customer-billing/customer-billing.module';
 import { ApiIntegrationsModule } from './developer/api-integrations/api-integrations.module';
+import { CustomerAppAssetsModule } from './panels/customer/app_assets/app_assets.module';
 @Module({
   imports: [
     ApiIntegrationsModule,
@@ -114,7 +115,7 @@ import { ApiIntegrationsModule } from './developer/api-integrations/api-integrat
     DeviceInformationModule,
     SharedDatabaseModule,
     CustomerSubscriptionsModule,
-
+    CustomerAppAssetsModule,
     WalletModule,
     CustomerPackageModule,
     DashboardModule,
