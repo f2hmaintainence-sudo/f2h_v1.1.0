@@ -745,7 +745,7 @@ export class SectorService {
   // Warehouse summary — how many customers per sector + boy
   // ═══════════════════════════════════════════════════════════════
 
-  async getWarehouseSummary(branchId: string, date?: string) {
+   async getWarehouseSummary(branchId: string, date?: string) {
     try {
       const targetDate = date || new Date().toISOString().split('T')[0];
 
@@ -760,10 +760,10 @@ export class SectorService {
           COUNT(DISTINCT CASE WHEN c.route_id IS NULL THEN c.id END)::int AS unrouted_customers,
           COUNT(DISTINCT r.id)::int AS route_count,
           COALESCE((
-            SELECT SUM(si.default_m_quantity + si.default_e_quantity)::int
+            SELECT SUM(ss.m_quantity + ss.e_quantity)::int
             FROM customers cust
             JOIN subscriptions sub ON sub.customer_id = cust.customer_id AND sub.status = 'active'
-            JOIN subscription_items si ON si.subscription_id = sub.subscription_id AND si.status = 'active'
+            JOIN subscription_weekly_schedule ss ON ss.subscription_id = sub.subscription_id
             WHERE cust.branch_id = $1 AND cust.sector_index = bs.sector_index
           ), 0) AS total_items
         FROM branch_sectors bs

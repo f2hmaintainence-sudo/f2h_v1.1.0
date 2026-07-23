@@ -193,32 +193,42 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
     }
   }
 
+  // ══════════════════════════════════════════════════════════
+  //  CREATE SUBSCRIPTION — supports morning/evening split,
+  //  paymentType, autoRenew from the SubscriptionSetupScreen.
+  //  Returns the full response Map so the bloc can extract
+  //  the subscription ID for the success screen.
+  // ══════════════════════════════════════════════════════════
   @override
-  Future<bool> createSubscription({
+  Future<Map<String, dynamic>> createSubscription({
     required String customerId,
     required String branchId,
     required String variantId,
     required int quantity,
+    required int morningQty,
+    required int eveningQty,
     required String scheduleType,
     required String deliverySlot,
     required String startDate,
     required double unitPrice,
     required List<String> customDays,
+    required String paymentType,
+    required bool autoRenew,
   }) async {
     try {
-      final schedules = _buildSchedules(
+      final schedules = _buildSchedulesWithSplit(
         scheduleType: scheduleType,
-        deliverySlot: deliverySlot,
-        quantity: quantity,
+        morningQty: morningQty,
+        eveningQty: eveningQty,
         customDays: customDays,
       );
       final data = {
         'customer_id': customerId,
         'branch_id': branchId,
-        'schedule_type': scheduleType == 'custom_dates' ? 'custom_dates' : 'weekly',
-        'payment_type': 'prepaid',
-        'auto_renew': true,
-        'custom_dates': scheduleType == 'custom_dates' ? customDays : <String>[],
+        'schedule_type': scheduleType == 'custom' ? 'custom_days' : 'weekly',
+        'payment_type': paymentType,
+        'auto_renew': autoRenew,
+        'custom_dates': scheduleType == 'custom' ? customDays : <String>[],
         'items': [
           {
             'product_variant_id': variantId,
@@ -229,10 +239,68 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
         'start_date': startDate,
       };
       final res = await remoteDataSource.createSubscription(data);
-      return res['status'] == true;
+      return res;
     } catch (e) {
       print('Error creating subscription: $e');
-      return false;
+      rethrow;
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  CHECKOUT SUBSCRIPTION — with payment validation
+  //  Wallet deduction (prepaid/wallet) or credit limit check
+  //  (postpaid) is handled server-side at this endpoint.
+  // ══════════════════════════════════════════════════════════
+  @override
+  Future<Map<String, dynamic>> checkoutSubscription({
+    required String customerId,
+    required String branchId,
+    String? addressId,
+    required String variantId,
+    required int quantity,
+    required int morningQty,
+    required int eveningQty,
+    required String scheduleType,
+    required String deliverySlot,
+    required String startDate,
+    required double unitPrice,
+    required List<String> customDays,
+    required String paymentType,
+    required String paymentMethod,
+    required bool autoRenew,
+    required double estimatedTotal,
+  }) async {
+    try {
+      final schedules = _buildSchedulesWithSplit(
+        scheduleType: scheduleType,
+        morningQty: morningQty,
+        eveningQty: eveningQty,
+        customDays: customDays,
+      );
+      final data = {
+        'customer_id': customerId,
+        'branch_id': branchId,
+        if (addressId != null && addressId.isNotEmpty) 'address_id': addressId,
+        'schedule_type': scheduleType == 'custom' ? 'custom_days' : 'weekly',
+        'payment_type': paymentType,
+        'payment_method': paymentMethod,
+        'auto_renew': autoRenew,
+        'estimated_total': estimatedTotal,
+        'custom_dates': scheduleType == 'custom' ? customDays : <String>[],
+        'items': [
+          {
+            'product_variant_id': variantId,
+            'unit_price': unitPrice,
+            'schedules': schedules,
+          }
+        ],
+        'start_date': startDate,
+      };
+      final res = await remoteDataSource.checkoutSubscription(data);
+      return res;
+    } catch (e) {
+      print('Error during subscription checkout: $e');
+      rethrow;
     }
   }
 
@@ -341,31 +409,41 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
     }
   }
 
+  // ── Legacy schedule builder (kept for placeOrder compatibility) ────
   List<Map<String, dynamic>> _buildSchedules({
     required String scheduleType,
     required String deliverySlot,
     required int quantity,
     required List<String> customDays,
   }) {
+    final isMorning = deliverySlot.toLowerCase().contains('morning');
+    return _buildSchedulesWithSplit(
+      scheduleType: scheduleType,
+      morningQty: isMorning ? quantity : 0,
+      eveningQty: isMorning ? 0 : quantity,
+      customDays: customDays,
+    );
+  }
+
+  // ── Primary schedule builder — supports morning/evening split ──────
+  List<Map<String, dynamic>> _buildSchedulesWithSplit({
+    required String scheduleType,
+    required int morningQty,
+    required int eveningQty,
+    required List<String> customDays,
+  }) {
     if (scheduleType == 'custom_dates') {
       return [];
     }
 
-    final isMorning = deliverySlot.toLowerCase().contains('morning');
-    final mQuantity = isMorning ? quantity : 0;
-    final eQuantity = !isMorning ? quantity : 0;
-
     final schedules = <Map<String, dynamic>>[];
-
     List<int> deliveryDaysIndices = [];
 
     if (scheduleType == 'daily') {
       deliveryDaysIndices = List.generate(7, (index) => index);
     } else if (scheduleType == 'alternate') {
-      // This is an assumption. 'alternate' could be handled differently.
-      // For a weekly schedule, it could mean Mon, Wed, Fri.
       deliveryDaysIndices = [1, 3, 5]; // Mon, Wed, Fri
-    } else if (scheduleType == 'custom_days') {
+    } else if (scheduleType == 'custom_days' || scheduleType == 'custom') {
       const dayMap = {
         'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
       };
@@ -379,11 +457,20 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
           .where((d) => d != null)
           .cast<int>()
           .toList();
+    } else {
+      // 'weekly' or unknown — deliver Mon–Sun
+      deliveryDaysIndices = List.generate(7, (index) => index);
     }
 
     for (final dayIndex in deliveryDaysIndices) {
-      schedules.add(
-          {'day_of_week': dayIndex, 'm_qty': mQuantity, 'e_qty': eQuantity});
+      schedules.add({
+        'day': dayIndex,
+        'day_of_week': dayIndex,
+        'm_quantity': morningQty,
+        'm_qty': morningQty,
+        'e_quantity': eveningQty,
+        'e_qty': eveningQty,
+      });
     }
 
     return schedules;

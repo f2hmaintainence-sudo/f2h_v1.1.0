@@ -1,12 +1,10 @@
 import {
   IsArray,
-  IsBoolean,
   IsIn,
   IsNumber,
   IsOptional,
   IsString,
   Matches,
-  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -14,57 +12,21 @@ import { Type } from 'class-transformer';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-// ── Weekly Schedule DTO ──
-export class DeveloperWeeklyScheduleDto {
-  @IsNumber()
-  @Min(0)
-  @Max(6)
-  day: number;
-
-  @IsNumber()
-  @Min(0)
-  m_quantity: number;
-
-  @IsNumber()
-  @Min(0)
-  e_quantity: number;
-}
-
-// ── Subscription Details DTO (for cart sync) ──
-export class SubscriptionDetailsDto {
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => DeveloperWeeklyScheduleDto)
-  schedules: DeveloperWeeklyScheduleDto[];
-
-  @IsOptional()
-  @IsString()
-  @Matches(DATE_PATTERN)
-  start_date?: string;
-
-  @IsOptional()
-  @IsString()
-  @Matches(DATE_PATTERN)
-  end_date?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  auto_renew?: boolean;
-}
-
-// ── One-Time Details DTO (for cart sync) ──
+// ── One-Time Details DTO (for cart sync & checkout) ──
 export class OnetimeDetailsDto {
   @IsNumber()
   @Min(1)
   quantity: number;
 
+  @IsOptional()
   @IsString()
   @Matches(DATE_PATTERN)
-  delivery_date: string;
+  delivery_date?: string;
 
+  @IsOptional()
   @IsString()
   @IsIn(['Morning', 'Evening'])
-  delivery_slot: string;
+  delivery_slot?: string;
 }
 
 // ── Individual Sync Item DTO ──
@@ -75,9 +37,9 @@ export class CartSyncItemDto {
   @IsString()
   product_variant_id: string;
 
+  @IsOptional()
   @IsString()
-  @IsIn(['onetime', 'subscription'])
-  purchase_type: 'onetime' | 'subscription';
+  purchase_type?: string;
 
   @IsOptional()
   @ValidateNested()
@@ -85,9 +47,8 @@ export class CartSyncItemDto {
   onetime_details?: OnetimeDetailsDto;
 
   @IsOptional()
-  @ValidateNested()
-  @Type(() => SubscriptionDetailsDto)
-  subscription_details?: SubscriptionDetailsDto;
+  @IsNumber()
+  quantity?: number;
 }
 
 // ── Cart Sync API Request DTO ──
@@ -97,111 +58,40 @@ export class CartDto {
   @Type(() => CartSyncItemDto)
   items: CartSyncItemDto[];
 
-  @IsString()
   @IsOptional()
+  @IsString()
   customer_id?: string;
 }
 
-// ── Subscription Creation / Checkout Item DTO ──
-export class DeveloperSubscriptionItemDto {
-  @IsString()
-  product_variant_id: string;
+export { CartDto as CreateCartDto };
 
-  @IsNumber()
-  @Min(0)
-  unit_price: number;
-
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => DeveloperWeeklyScheduleDto)
-  schedules: DeveloperWeeklyScheduleDto[];
-}
-
-// ── Subscription Creation / Checkout Request DTO ──
-export class CreateCartDto {
-  @IsString()
-  customer_id: string;
-
-  @IsIn(['weekly', 'custom_dates'])
-  schedule_type: 'weekly' | 'custom_dates';
-
-  @IsIn(['prepaid', 'postpaid'])
-  payment_type: 'prepaid' | 'postpaid';
-
-  @Matches(DATE_PATTERN)
-  start_date: string;
-
-  @IsOptional()
-  @Matches(DATE_PATTERN)
-  end_date?: string;
-
-  @IsBoolean()
-  auto_renew: boolean;
-
-  @IsOptional()
-  @IsString()
-  branch_id?: string;
-
-  @IsOptional()
-  @IsString()
-  notes?: string;
-
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => DeveloperSubscriptionItemDto)
-  items: DeveloperSubscriptionItemDto[];
-
-  @IsArray()
-  @IsString({ each: true })
-  custom_dates: string[];
-}
-
-// ── Checkout Item DTOs ──
-export abstract class CheckoutItemDto {
+// ── Checkout Item DTO ──
+export class OnetimeCheckoutItemDto {
   @IsString()
   product_id: string;
 
   @IsString()
   product_variant_id: string;
 
+  @IsOptional()
   @IsString()
-  purchase_type: string;
-}
+  purchase_type?: string;
 
-export class OnetimeCheckoutItemDto extends CheckoutItemDto {
-  @IsString()
-  @IsIn(['onetime'])
-  declare purchase_type: 'onetime';
-
+  @IsOptional()
   @ValidateNested()
   @Type(() => OnetimeDetailsDto)
-  onetime_details: OnetimeDetailsDto;
-}
+  onetime_details?: OnetimeDetailsDto;
 
-export class SubscriptionCheckoutItemDto extends CheckoutItemDto {
-  @IsString()
-  @IsIn(['subscription'])
-  declare purchase_type: 'subscription';
-
-  @ValidateNested()
-  @Type(() => SubscriptionDetailsDto)
-  subscription_details: SubscriptionDetailsDto;
+  @IsOptional()
+  @IsNumber()
+  quantity?: number;
 }
 
 export class CheckOutDto {
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => CheckoutItemDto, {
-    keepDiscriminatorProperty: true,
-    discriminator: {
-      property: 'purchase_type',
-      subTypes: [
-        { value: OnetimeCheckoutItemDto, name: 'onetime' },
-        { value: SubscriptionCheckoutItemDto, name: 'subscription' },
-      ],
-    },
-  })
-  items: (OnetimeCheckoutItemDto | SubscriptionCheckoutItemDto)[];
+  @Type(() => OnetimeCheckoutItemDto)
+  items: OnetimeCheckoutItemDto[];
 
   @IsString()
   @IsOptional()
@@ -220,4 +110,3 @@ export class CheckOutDto {
   @IsIn(['prepaid', 'postpaid'])
   payment_type?: 'prepaid' | 'postpaid';
 }
-

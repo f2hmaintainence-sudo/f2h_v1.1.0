@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:f2h_customer/app.dart';
+import '../../../../app.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
-import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
-import 'package:f2h_customer/features/catalog/presentation/widgets/product_tile.dart';
-import 'package:f2h_customer/features/catalog/presentation/screens/cart_screen.dart';
+import '../../data/models/product_model.dart';
+import '../widgets/product_tile.dart';
+import 'cart_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/catalog_bloc.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/catalog_state.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/catalog_event.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_bloc.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_state.dart';
-import 'package:f2h_customer/core/widgets/custom_button.dart';
+import '../bloc/catalog_bloc.dart';
+import '../bloc/catalog_state.dart';
+import '../bloc/catalog_event.dart';
+import '../bloc/cart/cart_bloc.dart';
+import '../bloc/cart/cart_state.dart';
+import '../../../../core/widgets/custom_button.dart';
 
 // ══════════════════════════════════════════════════════════
 //  BROWSE SCREEN — Blinkit-style top chips + sidebar + grid

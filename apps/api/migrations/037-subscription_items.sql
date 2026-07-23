@@ -6,15 +6,14 @@
 CREATE TABLE subscription_items (
     id VARCHAR(30) PRIMARY KEY,
 
+    subscription_item_id VARCHAR(30) NOT NULL,
+    
     subscription_id VARCHAR(30) NOT NULL
-    REFERENCES subscriptions(id)
+    REFERENCES subscriptions(subscription_id)
     ON DELETE CASCADE,
 
     product_variant_id VARCHAR(30) NOT NULL,
 
-    default_m_quantity NUMERIC(10,2) DEFAULT 0,
-
-    default_e_quantity NUMERIC(10,2) DEFAULT 0,
 
     unit_price NUMERIC(10,2) NOT NULL,
 
@@ -41,6 +40,7 @@ CREATE TABLE subscription_items (
     status subscription_status_enum DEFAULT 'active',
 
     start_date DATE,
+    
     end_date DATE,
 
     created_at TIMESTAMPTZ DEFAULT now(),

@@ -1,43 +1,40 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/catalog_bloc.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/catalog_state.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/catalog_event.dart';
-import 'package:f2h_customer/app.dart';
-import 'package:f2h_customer/core/session/customer_session_cubit.dart';
+import '../bloc/catalog_bloc.dart';
+import '../bloc/catalog_state.dart';
+import '../bloc/catalog_event.dart';
+import '../../../../app.dart';
+import '../../../../core/session/customer_session_cubit.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
-import 'package:f2h_customer/core/widgets/custom_button.dart';
-import 'package:f2h_customer/core/widgets/app_refresh_indicator.dart';
-import 'package:f2h_customer/core/session/customer_session_state.dart';
-import 'package:f2h_customer/core/widgets/hot_toast.dart';
-import 'package:f2h_customer/core/network/network_bloc.dart';
-import 'package:f2h_customer/core/network/network_state.dart';
+import '../../../../core/widgets/custom_button.dart';
+import '../../../../core/widgets/app_refresh_indicator.dart';
+import '../../../../core/session/customer_session_state.dart';
+import '../../../../core/widgets/hot_toast.dart';
+import '../../../../core/network/network_bloc.dart';
+import '../../../../core/network/network_state.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
-import 'package:f2h_customer/core/di/injection.dart';
-import 'package:f2h_customer/core/services/notification_service.dart';
-import 'package:f2h_customer/features/profile/presentation/screens/profile_screen.dart';
-import 'package:f2h_customer/features/notifications/presentation/screens/notifications_screen.dart';
-import 'package:f2h_customer/features/address/presentation/widgets/address_selector_drawer.dart';
-import 'package:f2h_customer/features/address/data/models/profile_address.dart';
-import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
-import 'package:f2h_customer/features/catalog/presentation/widgets/product_tile.dart';
-import 'package:f2h_customer/features/catalog/presentation/widgets/cart_widgets.dart';
-import 'package:f2h_customer/features/catalog/presentation/widgets/offer_banner.dart';
-import 'package:f2h_customer/features/catalog/presentation/widgets/image_banner.dart';
-import 'package:f2h_customer/features/catalog/presentation/screens/cart_screen.dart';
-import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_view_screen.dart';
-import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_screen.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_bloc.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_state.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_event.dart';
-import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_bloc.dart';
-import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_state.dart';
-import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_event.dart';
+import '../../../profile/presentation/screens/profile_screen.dart';
+import '../../../notifications/presentation/screens/notifications_screen.dart';
+import '../../../address/presentation/widgets/address_selector_drawer.dart';
+import '../../../address/data/models/profile_address.dart';
+import '../../data/models/product_model.dart';
+import '../widgets/product_tile.dart';
+import '../widgets/cart_widgets.dart';
+import '../widgets/offer_banner.dart';
+import '../widgets/image_banner.dart';
+import 'cart_screen.dart';
+import 'product_detail_view_screen.dart';
+import 'product_detail_screen.dart';
+import '../bloc/cart/cart_bloc.dart';
+import '../bloc/cart/cart_state.dart';
+import '../bloc/cart/cart_event.dart';
+import '../../../notifications/presentation/bloc/notifications_bloc.dart';
+import '../../../notifications/presentation/bloc/notifications_state.dart';
+import '../../../notifications/presentation/bloc/notifications_event.dart';
 
 // ══════════════════════════════════════════════════════════
 //  HOME SCREEN
@@ -121,12 +118,12 @@ class _HomeScreenState extends State<HomeScreen>
               }
               
               await Future.wait([
-                context.read<CatalogBloc>().stream.firstWhere((s) => s is CatalogLoaded || s is CatalogError).timeout(const Duration(seconds: 3), onTimeout: () => context.read<CatalogBloc>().state),
+                context.read<CatalogBloc>().stream.firstWhere((s) => s is CatalogLoaded || s is CatalogError),
                 if (customerId != null) ...[
-                  context.read<CartBloc>().stream.firstWhere((s) => s is CartLoadedState || s is CartErrorState).timeout(const Duration(seconds: 3), onTimeout: () => context.read<CartBloc>().state),
-                  context.read<NotificationsBloc>().stream.firstWhere((s) => s is NotificationsLoaded || s is NotificationsError).timeout(const Duration(seconds: 3), onTimeout: () => context.read<NotificationsBloc>().state),
+                  context.read<CartBloc>().stream.firstWhere((s) => s is CartLoadedState || s is CartErrorState),
+                  context.read<NotificationsBloc>().stream.firstWhere((s) => s is NotificationsLoaded || s is NotificationsError),
                 ]
-              ]).catchError((_) => []);
+              ]);
             },
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -274,8 +271,8 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
 
 
-                // 5. Promotional Offer Banners Carousel
-                SliverToBoxAdapter(child: const OfferBanner()),
+                // 5. Video Banner
+                // SliverToBoxAdapter(child: const OfferBanner()),
 
                 // 6. One time Product
                 SliverToBoxAdapter(
@@ -412,10 +409,6 @@ class _HomeScreenState extends State<HomeScreen>
         }
         return GestureDetector(
           onTap: () {
-            sl<NotificationService>().showLocalNotification(
-              title: 'Farm Fresh Alert 🥦🥛',
-              body: 'Your A2 Cow Milk & Fresh Paneer order is confirmed!',
-            );
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const NotificationsScreen()),
@@ -938,16 +931,16 @@ class _HomeScreenState extends State<HomeScreen>
                 child: Container(
                   height: 26,
                   decoration: const BoxDecoration(
-                    color: Color(0xFFDCFCE7), // Soft Light Mint Background
+                    color: Color(0xFF16653A), // Premium Green Background
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.autorenew_rounded, size: 11, color: Color(0xFF15803D)),
+                      const Icon(Icons.autorenew_rounded, size: 10, color: Colors.white),
                       const SizedBox(width: 3),
                       Text(
                         'Subscribe @ ₹${p.subscriptionPrice!.toStringAsFixed(0)}',
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF15803D)),
+                        style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: Colors.white),
                       ),
                     ],
                   ),
@@ -2015,29 +2008,62 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
     final double shrinkFactor = delta > 0 ? (shrinkOffset / delta).clamp(0.0, 1.0) : 0.0;
 
     return Container(
-      color: Colors.white,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: shrinkFactor > 0.8
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                )
+              ]
+            : [],
+      ),
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // 1. Home Intro Background Image (full view showing blue sky at top)
+          // 1. Farm Background Image (fades out as header collapses)
           Opacity(
             opacity: (1.0 - shrinkFactor).clamp(0.0, 1.0),
             child: Image.asset(
-              'assets/bg/home_intro.jpg',
+              'assets/icon/home_bg.jpg',
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
-              errorBuilder: (_, __, ___) => Container(color: kBg),
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  color: const Color(0xFFE8F5E9),
+                );
+              },
             ),
           ),
 
-          // 2. Pure clean white transition on scroll (NO dark/tinted gradient lines or shadows)
+          // 2. Solid color background overlay (smooth fade to solid color as collapses)
           Positioned.fill(
             child: Container(
               color: Colors.white.withValues(alpha: shrinkFactor),
             ),
           ),
 
-          // 3. Top Row (App Logo, Title, Actions) - crisp top spacing
+          // 3. Darker bottom gradient for expanded state
+          Opacity(
+            opacity: (1.0 - shrinkFactor).clamp(0.0, 1.0),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: const [0.0, 1.0],
+                  colors: [
+                    Colors.transparent,
+                    kBg.withValues(alpha: 0.85),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // 4. Top Row (App Logo, Title, Actions) - fades out
           Positioned(
             top: topPadding + 10,
             left: 16,
@@ -2047,27 +2073,29 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
               child: Row(
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      color: Colors.white.withValues(alpha: 0.9),
-                      child: Image.asset(
-                        'assets/icon/app_icon.png',
-                        width: 36,
-                        height: 36,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.spa, color: kPrimary, size: 26),
-                      ),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.asset(
+                      'assets/icon/app_icon.png',
+                      width: 32,
+                      height: 32,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: 32,
+                          height: 32,
+                          color: const Color(0xFF16653A),
+                          child: const Icon(Icons.eco_rounded, color: Colors.white, size: 20),
+                        );
+                      },
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Text(
+                  const SizedBox(width: 10),
+                  const Text(
                     'Farm to Home',
-                    style: GoogleFonts.outfit(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF16653A),
-                      letterSpacing: -0.3,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF16653A),
                     ),
                   ),
                   const Spacer(),
@@ -2079,36 +2107,42 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
             ),
           ),
 
-          // 4. Floating Search Bar - floating over hero background
+          // 5. Search Bar (slides up to stick at top)
           Positioned(
             left: 16,
             right: 16,
-            top: topPadding + 205 - (shrinkFactor * 197),
+            top: topPadding + 170 - (shrinkFactor * 162), // Interpolates from topPadding+170 to topPadding+8
             child: GestureDetector(
               onTap: onSearchTap,
               child: Container(
-                height: 48,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                height: 46,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(28),
                   border: Border.all(
-                    color: kPrimary.withValues(alpha: 0.15),
-                    width: 1.2,
+                    color: const Color(0xFF16653A).withValues(alpha: 0.12),
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF16653A).withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Row(
                   children: [
                     const Icon(
                       Icons.search_rounded,
-                      color: kPrimary,
-                      size: 22,
+                      color: Color(0xFF16653A),
+                      size: 20,
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         searchHint,
-                        style: GoogleFonts.inter(
+                        style: const TextStyle(
                           color: kTextSub,
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
@@ -2117,7 +2151,7 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
                     ),
                     const Icon(
                       Icons.tune_rounded,
-                      color: kPrimary,
+                      color: Color(0xFF16653A),
                       size: 20,
                     ),
                   ],
@@ -2131,10 +2165,10 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
   }
 
   @override
-  double get maxExtent => topPadding + 280;
+  double get maxExtent => 300;
 
   @override
-  double get minExtent => topPadding + 64;
+  double get minExtent => topPadding + 62;
 
   @override
   bool shouldRebuild(covariant HomeHeaderDelegate oldDelegate) {

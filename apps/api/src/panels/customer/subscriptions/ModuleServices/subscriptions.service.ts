@@ -4,12 +4,12 @@ import { DatabaseService } from 'src/shared/database/Database.service';
 import { DataService } from 'src/shared/database/Data.service';
 import { DeveloperService } from 'src/shared/logger/Developer.service';
 import {
-  CreateDeveloperSubscriptionDto,
-  DeveloperSubscriptionItemDto,
-} from '../dto/create-developer-subscription.dto';
+  CreateSubscriptionDto,
+  SubscriptionItemDto,
+} from '../dto/subscription.dto';
 
-const ROUTE_CAPACITY = 120;
 const DEFAULT_BRANCH_ID = 'ALL';
+const DEFAULT_ADDRESS_ID = 'ADDR_DEFAULT';
 
 @Injectable()
 export class SubscriptionsService {
@@ -19,7 +19,488 @@ export class SubscriptionsService {
     private readonly developer: DeveloperService,
   ) { }
 
+  async checkout(body: CreateSubscriptionDto) {
+    this.developer.debug('SubscriptionsService.checkout called', { body });
+
+    const customerId = body.customer_id?.trim();
+    const estimatedTotal = Number(body.estimated_total || 0);
+
+    if (!customerId) {
+      this.developer.error('SubscriptionsService.checkout missing customer_id', { body });
+      throw new BadRequestException('customer_id is required');
+    }
+
+    
+
+    // 1. Fetch customer details
+    const customerResult = await this.data.query('customers', {
+      select: ['customer_id', 'wallet_balance', 'is_postpaid_enabled', 'postpaid_credit_limit'],
+      where: [{ column: 'customer_id', operator: '=', value: customerId }],
+      limit: 1,
+    });
+    const customer = customerResult?.data?.[0];
+    if (!customer) {
+      this.developer.error('SubscriptionsService.checkout customer profile not found', { customerId });
+      throw new BadRequestException('Customer profile not found');
+    }
+
+    this.developer.debug('SubscriptionsService.checkout customer details fetched', {
+      customerId,
+      wallet_balance: customer.wallet_balance,
+      is_postpaid_enabled: customer.is_postpaid_enabled,
+      postpaid_credit_limit: customer.postpaid_credit_limit,
+      estimatedTotal,
+    });
+
+    const paymentType = (body.payment_type || 'prepaid').toLowerCase();
+    const paymentMethod = (body.payment_method || 'wallet').toLowerCase();
+    const walletBalance = Number(customer.wallet_balance || 0);
+
+    // 2. PREPAID validation & wallet deduction
+    if (paymentType === 'prepaid') {
+      if (paymentMethod === 'wallet') {
+        if (walletBalance < estimatedTotal) {
+          this.developer.warn('SubscriptionsService.checkout insufficient wallet balance', {
+            customerId,
+            walletBalance,
+            estimatedTotal,
+          });
+          return {
+            status: false,
+            error_code: 'insufficient wallet',
+            message: 'Insufficient wallet balance',
+            wallet_balance: walletBalance,
+            required: estimatedTotal,
+          };
+        }
+
+      }else{
+        // TODO: Implement other payment methods
+      }
+    }
+
+    // 3. POSTPAID validation
+    if (paymentType === 'postpaid') {
+      const isPostpaidEnabled = Boolean(customer.is_postpaid_enabled === 't' ||customer.is_postpaid_enabled === true || customer.is_postpaid_enabled === 'true');
+      const creditLimit = Number(customer.postpaid_credit_limit || 0);
+
+      if (!isPostpaidEnabled) {
+        return {
+          status: false,
+          error_code: 'postpaid not enabled',
+          message: 'Postpaid facility is not enabled on your account. Please select Prepaid option.',
+        };
+      }
+
+      // Calculate monthly estimations of existing active/paused postpaid subscriptions
+      const existingSubsRes = await this.db.query(
+        `SELECT
+          si.unit_price,
+          COALESCE(SUM(sws.m_quantity + sws.e_quantity), 0) AS weekly_qty
+        FROM subscriptions s
+        JOIN subscription_items si
+            ON si.subscription_id = s.subscription_id
+        LEFT JOIN subscription_weekly_schedule sws
+            ON sws.subscription_item_id = si.subscription_item_id
+        WHERE s.customer_id = $1
+          AND s.payment_type = 'postpaid'
+          AND LOWER(s.status) IN ('active', 'paused')
+        GROUP BY si.subscription_item_id, si.unit_price;`,
+        [customerId],
+      );
+
+      let existingCommitted = 0;
+      if (Array.isArray(existingSubsRes)) {
+        for (const row of existingSubsRes) {
+          const unitPrice = Number(row.unit_price || 0);
+          const weeklyQty = Number(row.weekly_qty || 0);
+          existingCommitted += (unitPrice * (weeklyQty / 7)) * 30; // Monthly estimation
+        }
+      }
+
+      const combinedTotal = existingCommitted + estimatedTotal;
+      if (creditLimit > 0 && combinedTotal > creditLimit) {
+        return {
+          status: false,
+          error_code: 'credit limit exceeded',
+          message: 'Postpaid credit limit exceeded. Please re-select Prepaid option.',
+          credit_limit: creditLimit,
+          existing_committed: existingCommitted,
+          requested: estimatedTotal,
+        };
+      }
+    }
+
+    // 4. Create subscription
+    this.developer.debug('SubscriptionsService.checkout invoking create subscription', { customerId });
+    const createResult = await this.create(body);
+
+    // 5. Post-creation ledger & billing updates for prepaid payments
+    if (paymentType === 'prepaid' && paymentMethod === 'wallet' && createResult?.subscription_id) {
+      this.developer.debug('SubscriptionsService.checkout updating wallet reference and adding prepaid bill', {
+        subscription_id: createResult.subscription_id,
+        customerId,
+      });
+
+      
+        // Deduct from wallet
+        const newBalance = walletBalance - estimatedTotal;
+        this.developer.debug('SubscriptionsService.checkout deducting wallet balance', {
+          customerId,
+          walletBalance,
+          estimatedTotal,
+          newBalance,
+        });
+
+        await this.db.query(
+          `UPDATE customers SET wallet_balance = $1 WHERE customer_id = $2`,
+          [newBalance, customerId],
+        );
+
+        // Record wallet transaction ledger entry
+        await this.data.insert(
+          'customer_wallet_transactions',
+          {
+            customer_id: customerId,
+            transaction_type: 'debit',
+            amount: estimatedTotal,
+            balance_after: newBalance,
+            remarks: 'Subscription prepaid wallet payment',
+            reference_type: 'subscription',
+            reference_id: 'PENDING_SUB',
+            created_by: customerId,
+            created_at: new Date(),
+          },
+        );
+
+      const billId = `BILL_${Date.now().toString(36).toUpperCase()}`;
+      const startDateStr = body.start_date;
+      const endDateStr = body.end_date || startDateStr;
+
+      await this.data.insert('customer_bills', {
+        bill_id: billId,
+        customer_id: customerId,
+        bill_type: 'subscription',
+        reference_id: createResult.subscription_id,
+        payment_type: 'prepaid',
+        payment_method: paymentMethod,
+        billing_from: startDateStr,
+        billing_to: endDateStr,
+        due_date: startDateStr,
+        subtotal: estimatedTotal,
+        discount_amount: 0,
+        tax_amount: 0,
+        total_amount: estimatedTotal,
+        paid_amount: estimatedTotal,
+        due_amount: 0,
+        status: 'paid',
+        remarks: 'Prepaid subscription checkout',
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+    }
+
+    const response = {
+      status: true,
+      success: true,
+      id: `#SUB-${createResult.subscription_id}`,
+      subscription_id: createResult.subscription_id,
+      subscription_number: createResult.subscription_number,
+      message: 'Subscription created successfully',
+      items: createResult.items,
+    };
+
+    this.developer.debug('SubscriptionsService.checkout completed successfully', { response });
+    return response;
+  }
+
+  async create(body: CreateSubscriptionDto) {
+    this.developer.debug('SubscriptionsService.create called', { body });
+
+    const itemsList = body.items || [];
+    const validItems = itemsList
+      .map((item) => ({
+        ...item,
+        product_variant_id: item.product_variant_id || '',
+        schedules: (item.schedules || [])
+          .map((schedule, idx) => ({
+            day: schedule.day_of_week ?? schedule.day ?? idx,
+            m_quantity: Number(schedule.m_quantity ?? schedule.m_qty ?? schedule.morning_qty ?? 0),
+            e_quantity: Number(schedule.e_quantity ?? schedule.e_qty ?? schedule.evening_qty ?? 0),
+          }))
+          .filter((schedule) => schedule.m_quantity > 0 || schedule.e_quantity > 0),
+      }))
+      .filter((item) => item.schedules.length > 0 && Boolean(item.product_variant_id));
+
+    const customerIdStr = (body.customer_id || '').trim();
+
+    if (!customerIdStr) {
+      throw new BadRequestException('customer_id is required');
+    }
+
+    if (!body.start_date) {
+      throw new BadRequestException('start_date is required');
+    }
+
+    if (body.schedule_type === 'weekly' && validItems.length === 0) {
+
+      throw new BadRequestException('Add at least one weekly quantity');
+    }
+
+    if (body.schedule_type === 'custom_dates' && (body.custom_dates || []).length === 0) {
+
+      throw new BadRequestException('Add at least one custom date');
+    }
+
+    const branchId = body.branch_id || DEFAULT_BRANCH_ID;
+    const addressId = body.address_id || DEFAULT_ADDRESS_ID;
+
+    return this.db.transaction(async (client) => {
+      // 1. Fetch or generate subscription_number from customers table
+      const custRes = await client.query(
+        `SELECT subscription_number FROM customers WHERE customer_id = $1 LIMIT 1`,
+        [customerIdStr],
+      );
+      let subscriptionNumber = custRes?.rows?.[0]?.subscription_number;
+
+      if (!subscriptionNumber || !subscriptionNumber.trim()) {
+        subscriptionNumber = `SUBNO${Date.now()}`;
+        await client.query(
+          `UPDATE customers SET subscription_number = $1 WHERE customer_id = $2`,
+          [subscriptionNumber, customerIdStr],
+        );
+        this.developer.debug('SubscriptionsService.create generated new subscription_number for customer', {
+          customerIdStr,
+          subscriptionNumber,
+        });
+      } else {
+        this.developer.debug('SubscriptionsService.create reusing existing subscription_number for customer', {
+          customerIdStr,
+          subscriptionNumber,
+        });
+      }
+
+      // Always generate a new subscription_id for each subscription record
+      const subscriptionId = this.makeId('SUB');
+
+      this.developer.debug('SubscriptionsService.create initiating DB transaction', {
+        subscriptionId,
+        subscriptionNumber,
+        branchId,
+        addressId,
+        validItemsCount: validItems.length,
+      });
+
+      // 2. Remove existing subscription records for this customer (customer_id is UNIQUE in subscriptions table)
+      // const existingSub = await client.query(
+      //   `SELECT subscription_id FROM subscriptions WHERE customer_id = $1 LIMIT 1`,
+      //   [customerIdStr],
+      // );
+      // if (existingSub?.rows?.length > 0) {
+      //   const oldSubId = existingSub.rows[0].subscription_id;
+      //   this.developer.debug('SubscriptionsService.create replacing existing subscription', { oldSubId, customerIdStr });
+      //   await client.query(`DELETE FROM subscription_weekly_schedule WHERE subscription_id = $1`, [oldSubId]);
+      //   await client.query(`DELETE FROM subscription_items WHERE subscription_id = $1`, [oldSubId]);
+      //   await client.query(`DELETE FROM subscriptions WHERE customer_id = $1`, [customerIdStr]);
+      // }
+
+      // 3. Insert new subscription row using varchar subscription_id
+      await client.query(
+        `
+        INSERT INTO subscriptions (
+          subscription_id,
+          subscription_number,
+          customer_id,
+          branch_id,
+          address_id,
+          schedule_type,
+          payment_type,
+          billing_cycle,
+          start_date,
+          end_date,
+          auto_renew,
+          renewal_grace_days,
+          status,
+          notes,
+          metadata,
+          created_by,
+          updated_by
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'active', $13, $14, $15, $15)
+        `,
+        [
+          subscriptionId,
+          subscriptionNumber,
+          customerIdStr,
+          branchId,
+          addressId,
+          body.schedule_type,
+          body.payment_type,
+          body.schedule_type === 'custom_dates' ? 'custom' : 'monthly',
+          body.start_date,
+          body.end_date || null,
+          body.auto_renew,
+          body.auto_renew ? 3 : 0,
+          body.notes || 'Created from customer subscription form',
+          {
+            source: 'customer_app',
+            branch_id: branchId,
+            custom_dates: body.custom_dates || [],
+          },
+          customerIdStr,
+        ],
+      );
+
+      const insertedItems: { id: string; product_variant_id: string }[] = [];
+
+      for (let index = 0; index < validItems.length; index += 1) {
+        const item = validItems[index];
+        const itemId = this.makeId(`SBI${index + 1}`);
+
+        this.developer.debug('SubscriptionsService.create inserting item', {
+          itemId,
+          product_variant_id: item.product_variant_id,
+          unit_price: item.unit_price,
+        });
+
+        await client.query(
+          `
+          INSERT INTO subscription_items (
+            subscription_item_id,
+            subscription_id,
+            product_variant_id,
+            unit_price,
+            discount_id,
+            coupon_id,
+            discount_amount,
+            coupon_amount,
+            status,
+            start_date,
+            end_date
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', $9, $10)
+          `,
+          [
+            itemId,
+            subscriptionId,
+            item.product_variant_id,
+            item.unit_price || 0,
+            item.discount_id || null,
+            item.coupon_id || null,
+            item.discount_amount || 0,
+            item.coupon_amount || 0,
+            body.start_date,
+            body.end_date || null,
+          ],
+        );
+
+        await this.insertWeeklySchedule(client, itemId, subscriptionId, item, body);
+
+        await client.query(
+          `
+          INSERT INTO subscription_logs (
+            subscription_id,
+            subscription_item_id,
+            action,
+            old_data,
+            new_data,
+            created_by
+          )
+          VALUES ($1, $2, 'created', NULL, $3, $4)
+          `,
+          [
+            subscriptionId,
+            itemId,
+            {
+              product_variant_id: item.product_variant_id,
+              schedule_type: body.schedule_type,
+              schedules: item.schedules,
+              custom_dates: body.custom_dates || [],
+            },
+            customerIdStr,
+          ],
+        );
+
+        insertedItems.push({
+          id: itemId,
+          product_variant_id: item.product_variant_id,
+        });
+      }
+
+      this.developer.debug('SubscriptionsService.create transaction successful', {
+        subscription_id: subscriptionId,
+        subscription_number: subscriptionNumber,
+        itemsCount: insertedItems.length,
+      });
+
+      return {
+        status: true,
+        subscription_id: subscriptionId,
+        subscription_number: subscriptionNumber,
+        items: insertedItems,
+      };
+    });
+  }
+
+  private async insertWeeklySchedule(
+    client: PoolClient,
+    itemId: string,
+    subscriptionId: string,
+    item: SubscriptionItemDto,
+    body: CreateSubscriptionDto,
+  ) {
+    const schedules = item.schedules || [];
+    this.developer.debug('SubscriptionsService.insertWeeklySchedule called', {
+      itemId,
+      subscriptionId,
+      schedulesCount: schedules.length,
+    });
+
+    for (const schedule of schedules) {
+      const day = schedule.day_of_week ?? schedule.day ?? 0;
+      const mQty = Number(schedule.m_quantity ?? schedule.m_qty ?? schedule.morning_qty ?? 0);
+      const eQty = Number(schedule.e_quantity ?? schedule.e_qty ?? schedule.evening_qty ?? 0);
+
+      await client.query(
+        `
+        INSERT INTO subscription_weekly_schedule (
+          subscription_item_id,
+          subscription_id,
+          day_of_week,
+          m_quantity,
+          e_quantity,
+          effective_from,
+          effective_to
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `,
+        [
+          itemId,
+          subscriptionId,
+          day,
+          mQty,
+          eQty,
+          body.start_date,
+          body.end_date || null,
+        ],
+      );
+    }
+  }
+
+  private makeId(prefix: string) {
+    return `${prefix}_${Date.now().toString(36).toUpperCase()}${Math.random()
+      .toString(36)
+      .slice(2, 6)
+      .toUpperCase()}`.slice(0, 30);
+  }
+
+  async getVariants() {
+    this.developer.debug('SubscriptionsService.getVariants called');
+  }
+
   async getSubscriptions(userId: string, email: string) {
+    this.developer.debug('SubscriptionsService.getSubscriptions called', { userId, email });
+
     let customerResult = await this.data.query('customers', {
       where: [{ column: 'email', operator: '=', value: email }],
       limit: 1,
@@ -32,16 +513,30 @@ export class SubscriptionsService {
     }
     const customer = customerResult?.data?.[0];
     if (!customer) {
+      this.developer.debug('SubscriptionsService.getSubscriptions customer not found', { userId, email });
       return { status: true, data: [] };
     }
 
     const subsDetails = await this.data.query('subscriptions', {
       select: [
-        'subscriptions.*',
-        'subscription_items.subscription_item_id',
+        'subscriptions.subscription_id',
+        'subscriptions.subscription_number',
+        'subscriptions.customer_id',
+        'subscriptions.schedule_type',
+        'subscriptions.branch_id',
+        'subscriptions.address_id',
+        'subscriptions.payment_type',
+        'subscriptions.billing_cycle',
+        'subscriptions.start_date',
+        'subscriptions.end_date',
+        'subscriptions.auto_renew',
+        'subscriptions.status',
+        'subscriptions.pause_from_date',
+        'subscriptions.pause_to_date',
+        'subscriptions.created_at',
+        'subscriptions.updated_at',
+        'subscription_items.id AS subscription_item_id',
         'subscription_items.product_variant_id',
-        'subscription_items.default_m_quantity',
-        'subscription_items.default_e_quantity',
         'subscription_items.unit_price',
         'subscription_items.discount_id',
         'subscription_items.coupon_id',
@@ -95,9 +590,12 @@ export class SubscriptionsService {
 
     const items = subsDetails.data || [];
     const baseUrl = process.env.BACKEND_URL || 'http://localhost:8000';
-    if (items.length === 0) return { status: true, data: [] };
+    if (items.length === 0) {
+      this.developer.debug('SubscriptionsService.getSubscriptions no subscriptions found for customer', { customer_id: customer.customer_id });
+      return { status: true, data: [] };
+    }
 
-    const subscriptionIds = Array.from(new Set(items.map(item => item.subscription_id || item.id).filter(Boolean)));
+    const subscriptionIds = Array.from(new Set(items.map(item => item.subscription_id).filter(Boolean)));
     let weeklySchedules: any[] = [];
     let pauses: any[] = [];
     let customDates: any[] = [];
@@ -130,14 +628,20 @@ export class SubscriptionsService {
 
     for (const item of items) {
       item.url = mapImagePath(item.url);
-      const subId = item.subscription_id || item.id;
-      const itemId = item.subscription_item_id || item.si_id || item.id;
-      item.weekly_schedules = weeklySchedules.filter(s => s.subscription_id === subId);
-      item.pauses = pauses.filter(p => p.subscription_id === subId);
+      const subId = item.subscription_id;
+      const itemId = item.subscription_item_id || item.id;
+      item.weekly_schedules = weeklySchedules.filter(s => s.subscription_id === subId || s.subscription_item_id === itemId);
+      item.pauses = pauses.filter(p => p.subscription_id === subId || p.subscription_item_id === itemId);
       item.custom_dates = customDates.filter(
         cd => cd.subscription_id === subId || cd.subscription_item_id === itemId,
       );
     }
+
+    this.developer.debug('SubscriptionsService.getSubscriptions completed', {
+      customer_id: customer.customer_id,
+      subscriptionsCount: subscriptionIds.length,
+      itemsCount: items.length,
+    });
 
     return {
       status: true,
@@ -146,12 +650,13 @@ export class SubscriptionsService {
   }
 
   async makeSubscriptionCalender(subscriptionId: string) {
-    const isItemId = subscriptionId.startsWith('SUBITEM');
+    this.developer.debug('SubscriptionsService.makeSubscriptionCalender called', { subscriptionId });
+    const isItemId = subscriptionId.startsWith('SBI');
     const result = await this.data.query('subscriptions', {
       select: [
         'subscriptions.start_date',
         'subscriptions.end_date',
-        'subscription_items.subscription_item_id'
+        'subscription_items.id AS subscription_item_id'
       ],
       joins: [
         {
@@ -164,13 +669,16 @@ export class SubscriptionsService {
       ],
       where: [
         isItemId
-            ? { column: 'subscription_items.subscription_item_id', operator: '=', value: subscriptionId }
+            ? { column: 'subscription_items.id', operator: '=', value: subscriptionId }
             : { column: 'subscriptions.subscription_id', operator: '=', value: subscriptionId }
       ],
     });
 
     const items = result.data || [];
-    if (!items.length) return [];
+    if (!items.length) {
+      this.developer.warn('SubscriptionsService.makeSubscriptionCalender no items found', { subscriptionId });
+      return [];
+    }
 
     const startDate = items[0].start_date;
     const endDate = items[0].end_date;
@@ -183,20 +691,7 @@ export class SubscriptionsService {
       });
       schedules = scheduleResult.data || [];
     }
-    const scheduleMap = new Map<string, any[]>();
-    for (const sched of schedules) {
-      if (!scheduleMap.has(sched.subscription_item_id)) {
-        scheduleMap.set(sched.subscription_item_id, []);
-      }
-      scheduleMap.get(sched.subscription_item_id)!.push({
-        id: sched.id,
-        day_of_week: sched.day_of_week,
-        m_quantity: sched.m_quantity,
-        e_quantity: sched.e_quantity,
-        effective_from: sched.effective_from,
-        effective_to: sched.effective_to
-      });
-    }
+
     const start = new Date(startDate);
     const end = new Date(endDate);
 
@@ -216,22 +711,26 @@ export class SubscriptionsService {
       });
     }
 
+    this.developer.debug('SubscriptionsService.makeSubscriptionCalender generated calendar', {
+      subscriptionId,
+      daysCount: calendar.length,
+    });
+
     return calendar;
   }
 
   async pauseSubscription(subscriptionId: string, startDate?: string, endDate?: string) {
-    console.log(subscriptionId, startDate, endDate);
+    this.developer.debug('SubscriptionsService.pauseSubscription called', { subscriptionId, startDate, endDate });
     try {
-      // 1. Check if subscription exists
       const subResult = await this.data.query('subscriptions', {
         where: [{ column: 'subscription_id', operator: '=', value: subscriptionId }],
         limit: 1,
       }, true);
       if (!subResult?.data?.length) {
+        this.developer.error('SubscriptionsService.pauseSubscription subscription not found', { subscriptionId });
         throw new BadRequestException('Subscription not found');
       }
 
-      // 2. Update subscription pause dates in subscriptions table (status remains active)
       const updateData: any = { updated_at: new Date().toISOString() };
       if (startDate) updateData.pause_from_date = startDate;
       if (endDate) updateData.pause_to_date = endDate;
@@ -241,26 +740,16 @@ export class SubscriptionsService {
         where: [{ column: 'subscription_id', operator: '=', value: subscriptionId }],
       }, true);
 
-      // 3. Update status of subscription items to paused (Disabled: we keep them active)
-      // await this.data.query('subscription_items', {
-      //   update: { status: 'paused', updated_at: new Date().toISOString() },
-      //   where: [{ column: 'subscription_id', operator: '=', value: subscriptionId }],
-      // }, true);
-
-      // 4. Fetch subscription items to create pauses
       const itemsResult = await this.data.query('subscription_items', {
         where: [{ column: 'subscription_id', operator: '=', value: subscriptionId }],
       }, true);
       const items = itemsResult.data || [];
 
-      // 5. Insert pause record for each item
       const todayStr = new Date().toISOString().slice(0, 10);
       const startStr = startDate || todayStr;
       const endStr = endDate || '2099-12-31';
       for (const item of items) {
-        // Only pause active/paused items (avoid expired/cancelled)
         if (item.status !== 'cancelled' && item.status !== 'expired') {
-          // Check if there is already an active pause for this item to avoid duplicates
           const activePauseCheck = await this.data.query('subscription_pauses', {
             where: [
               { column: 'subscription_item_id', operator: '=', value: item.id },
@@ -281,7 +770,6 @@ export class SubscriptionsService {
         }
       }
 
-      // 6. Log the action
       await this.data.insert('subscription_logs', {
         subscription_id: subscriptionId,
         action: 'pause',
@@ -289,6 +777,7 @@ export class SubscriptionsService {
         created_by: 'customer',
       }, { includeDeleted: true });
 
+      this.developer.debug('SubscriptionsService.pauseSubscription success', { subscriptionId });
       return {
         status: true,
         message: 'Subscription paused successfully',
@@ -301,17 +790,17 @@ export class SubscriptionsService {
   }
 
   async resumeSubscription(subscriptionId: string) {
+    this.developer.debug('SubscriptionsService.resumeSubscription called', { subscriptionId });
     try {
-      // 1. Check if subscription exists
       const subResult = await this.data.query('subscriptions', {
         where: [{ column: 'subscription_id', operator: '=', value: subscriptionId }],
         limit: 1,
       }, true);
       if (!subResult?.data?.length) {
+        this.developer.error('SubscriptionsService.resumeSubscription subscription not found', { subscriptionId });
         throw new BadRequestException('Subscription not found');
       }
 
-      // 2. Update status of subscription to active and clear pause dates
       await this.data.query('subscriptions', {
         update: {
           status: 'active',
@@ -322,13 +811,11 @@ export class SubscriptionsService {
         where: [{ column: 'subscription_id', operator: '=', value: subscriptionId }],
       }, true);
 
-      // 3. Update status of subscription items to active
       await this.data.query('subscription_items', {
         update: { status: 'active', updated_at: new Date().toISOString() },
         where: [{ column: 'subscription_id', operator: '=', value: subscriptionId }],
       }, true);
 
-      // 4. Update end_date of active pauses to yesterday (ends vacation)
       const todayStr = new Date().toISOString().slice(0, 10);
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
@@ -345,13 +832,11 @@ export class SubscriptionsService {
       for (const p of activePauses) {
         const pStartDate = p.start_date instanceof Date ? p.start_date.toISOString().slice(0, 10) : String(p.start_date).slice(0, 10);
         if (pStartDate === todayStr) {
-          // If paused today and resumed today, delete pause record to prevent start_date > end_date
           await this.data.query('subscription_pauses', {
             delete: true,
             where: [{ column: 'id', operator: '=', value: p.id }]
           }, true);
         } else {
-          // Update end_date to yesterday
           await this.data.query('subscription_pauses', {
             update: { end_date: yesterdayStr },
             where: [{ column: 'id', operator: '=', value: p.id }]
@@ -359,7 +844,6 @@ export class SubscriptionsService {
         }
       }
 
-      // 5. Log the action
       await this.data.insert('subscription_logs', {
         subscription_id: subscriptionId,
         action: 'resume',
@@ -367,6 +851,7 @@ export class SubscriptionsService {
         created_by: 'customer',
       }, { includeDeleted: true });
 
+      this.developer.debug('SubscriptionsService.resumeSubscription success', { subscriptionId });
       return {
         status: true,
         message: 'Subscription resumed successfully',
@@ -379,13 +864,14 @@ export class SubscriptionsService {
   }
 
   async cancelSubscription(subscriptionId: string, cancelReason?: string, endDate?: string) {
+    this.developer.debug('SubscriptionsService.cancelSubscription called', { subscriptionId, cancelReason, endDate });
     try {
-      // 1. Check if subscription exists
       const subResult = await this.data.query('subscriptions', {
         where: [{ column: 'subscription_id', operator: '=', value: subscriptionId }],
         limit: 1,
       }, true);
       if (!subResult?.data?.length) {
+        this.developer.error('SubscriptionsService.cancelSubscription subscription not found', { subscriptionId });
         throw new BadRequestException('Subscription not found');
       }
 
@@ -393,7 +879,6 @@ export class SubscriptionsService {
       const resolvedEndDate = endDate || cancelledAt.slice(0, 10);
       const resolvedReason = cancelReason || 'Cancelled by customer';
 
-      // 2. Update status of subscription to cancelled with reason and end_date
       await this.data.query('subscriptions', {
         update: {
           status: 'cancelled',
@@ -405,13 +890,11 @@ export class SubscriptionsService {
         where: [{ column: 'subscription_id', operator: '=', value: subscriptionId }],
       }, true);
 
-      // 3. Update status of subscription items to cancelled
       await this.data.query('subscription_items', {
         update: { status: 'cancelled', updated_at: cancelledAt },
         where: [{ column: 'subscription_id', operator: '=', value: subscriptionId }],
       }, true);
 
-      // 4. Log the action
       await this.data.insert('subscription_logs', {
         subscription_id: subscriptionId,
         action: 'cancel',
@@ -419,6 +902,7 @@ export class SubscriptionsService {
         created_by: 'customer',
       }, { includeDeleted: true });
 
+      this.developer.debug('SubscriptionsService.cancelSubscription success', { subscriptionId });
       return {
         status: true,
         message: 'Subscription cancelled successfully',
@@ -431,6 +915,7 @@ export class SubscriptionsService {
   }
 
   async getPauseHistory(subscriptionId: string) {
+    this.developer.debug('SubscriptionsService.getPauseHistory called', { subscriptionId });
     try {
       const pauseRes = await this.data.query('subscription_pauses', {
         where: [{ column: 'subscription_id', operator: '=', value: subscriptionId }],
@@ -447,28 +932,27 @@ export class SubscriptionsService {
   }
 
   async cancelSubscriptionItem(subscriptionItemId: string) {
+    this.developer.debug('SubscriptionsService.cancelSubscriptionItem called', { subscriptionItemId });
     try {
-      // 1. Check if subscription item exists
       const itemResult = await this.data.query('subscription_items', {
-        where: [{ column: 'subscription_item_id', operator: '=', value: subscriptionItemId }],
+        where: [{ column: 'id', operator: '=', value: subscriptionItemId }],
         limit: 1,
       }, true);
       if (!itemResult?.data?.length) {
+        this.developer.error('SubscriptionsService.cancelSubscriptionItem item not found', { subscriptionItemId });
         throw new BadRequestException('Subscription item not found');
       }
       const item = itemResult.data[0];
       const subscriptionId = item.subscription_id;
 
-      // 2. Update status of subscription item to cancelled
       await this.data.query('subscription_items', {
         update: {
           status: 'cancelled',
           updated_at: new Date().toISOString()
         },
-        where: [{ column: 'subscription_item_id', operator: '=', value: subscriptionItemId }],
+        where: [{ column: 'id', operator: '=', value: subscriptionItemId }],
       }, true);
 
-      // 3. Log the action
       await this.data.insert('subscription_logs', {
         subscription_id: subscriptionId,
         action: 'cancel_item',
@@ -476,7 +960,6 @@ export class SubscriptionsService {
         created_by: 'customer',
       }, { includeDeleted: true });
 
-      // 4. Check if there are any other active items in this subscription
       const otherItemsResult = await this.data.query('subscription_items', {
         where: [
           { column: 'subscription_id', operator: '=', value: subscriptionId },
@@ -486,7 +969,7 @@ export class SubscriptionsService {
 
       const activeItems = otherItemsResult?.data || [];
       if (activeItems.length === 0) {
-        // No other active items, so cancel the main subscription as well
+        this.developer.debug('SubscriptionsService.cancelSubscriptionItem all items cancelled, cancelling subscription container', { subscriptionId });
         await this.data.query('subscriptions', {
           update: {
             status: 'cancelled',
@@ -498,6 +981,7 @@ export class SubscriptionsService {
         }, true);
       }
 
+      this.developer.debug('SubscriptionsService.cancelSubscriptionItem success', { subscriptionItemId });
       return {
         status: true,
         message: 'Subscription item cancelled successfully',
@@ -506,419 +990,6 @@ export class SubscriptionsService {
       if (error instanceof BadRequestException) throw error;
       this.developer.error('cancelSubscriptionItem error', { error, subscriptionItemId });
       throw new BadRequestException('Failed to cancel subscription item');
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // SKIP DELIVERY FOR A DATE
-  // Customer skips one specific delivery date (before cutoff at 22:00 IST)
-  // ─────────────────────────────────────────────────────────────────────────
-  async skipDelivery(subscriptionId: string, date: string, userId: string) {
-    try {
-      if (!date) throw new BadRequestException('date is required');
-
-      const targetDate = new Date(date);
-      if (isNaN(targetDate.getTime())) throw new BadRequestException('Invalid date');
-
-      const today = new Date();
-      const istOffset = 5.5 * 60 * 60 * 1000;
-      const nowIST = new Date(today.getTime() + istOffset);
-      const todayIST = nowIST.toISOString().slice(0, 10);
-
-      if (date <= todayIST) throw new BadRequestException('Can only skip future dates');
-
-      // Cutoff: 22:00 IST for tomorrow's delivery
-      const tomorrow = new Date(nowIST);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowStr = tomorrow.toISOString().slice(0, 10);
-      if (date === tomorrowStr) {
-        const hourIST = nowIST.getUTCHours();
-        if (hourIST >= 22) throw new BadRequestException('Cutoff passed (10 PM IST) — cannot skip tomorrow\'s delivery');
-      }
-
-      // Check subscription exists and is active
-      const subRes = await this.db.query(
-        `SELECT subscription_id, status FROM subscriptions WHERE subscription_id = $1`,
-        [subscriptionId],
-      );
-      if (!subRes?.length) throw new BadRequestException('Subscription not found');
-      if (!['active', 'paused'].includes(subRes[0].status)) throw new BadRequestException('Subscription is not active');
-
-      // Insert skip date (idempotent)
-      await this.db.query(
-        `INSERT INTO subscription_skip_dates (subscription_id, skip_date, created_by, reason)
-         VALUES ($1, $2::date, $3, 'customer_skip')
-         ON CONFLICT (subscription_id, skip_date) DO NOTHING`,
-        [subscriptionId, date, userId],
-      );
-
-      // If order already generated for this date, delete it
-      const deletedOrders = await this.db.query(
-        `DELETE FROM orders
-         WHERE subscription_id = $1
-           AND scheduled_date = $2::date
-           AND status IN ('placed', 'confirmed')
-         RETURNING order_id`,
-        [subscriptionId, date],
-      );
-
-      // Also mark in overrides with 0 qty
-      await this.db.query(
-        `INSERT INTO subscription_overrides (subscription_item_id, override_date, m_quantity, e_quantity, override_type, notes, created_at)
-         SELECT subscription_item_id, $2::date, 0, 0, 'skip', 'Customer skip', NOW()
-         FROM subscription_items
-         WHERE subscription_id = $1 AND status = 'active'
-         ON CONFLICT DO NOTHING`,
-        [subscriptionId, date],
-      );
-
-      return {
-        status: true,
-        message: `Delivery skipped for ${date}`,
-        orders_removed: (deletedOrders || []).length,
-      };
-    } catch (error) {
-      if (error instanceof BadRequestException) throw error;
-      this.developer.error('skipDelivery error', { error, subscriptionId, date });
-      throw new BadRequestException('Failed to skip delivery');
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // QUANTITY OVERRIDE FOR A DATE
-  // Customer changes quantity for a specific future date
-  // ─────────────────────────────────────────────────────────────────────────
-  async overrideQuantity(
-    subscriptionId: string,
-    body: { date: string; item_id?: string; m_quantity?: number; e_quantity?: number },
-    userId: string,
-  ) {
-    try {
-      const { date, item_id } = body;
-      const m_qty = Math.max(0, Number(body.m_quantity ?? 0));
-      const e_qty = Math.max(0, Number(body.e_quantity ?? 0));
-
-      if (!date) throw new BadRequestException('date is required');
-
-      const istOffset = 5.5 * 60 * 60 * 1000;
-      const nowIST = new Date(Date.now() + istOffset);
-      const todayStr = nowIST.toISOString().slice(0, 10);
-      if (date <= todayStr) throw new BadRequestException('Can only modify future dates');
-
-      const tomorrow = new Date(nowIST);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      if (date === tomorrow.toISOString().slice(0, 10) && nowIST.getUTCHours() >= 22) {
-        throw new BadRequestException('Cutoff passed (10 PM IST) — too late to change tomorrow\'s delivery');
-      }
-
-      // Get subscription items
-      const itemsQuery = item_id
-        ? `SELECT subscription_item_id FROM subscription_items WHERE subscription_id = $1 AND subscription_item_id = $2 AND status = 'active'`
-        : `SELECT subscription_item_id FROM subscription_items WHERE subscription_id = $1 AND status = 'active'`;
-      const itemsParams = item_id ? [subscriptionId, item_id] : [subscriptionId];
-      const items = await this.db.query(itemsQuery, itemsParams);
-
-      if (!items?.length) throw new BadRequestException('No active subscription items found');
-
-      for (const item of items) {
-        await this.db.query(
-          `INSERT INTO subscription_overrides (subscription_item_id, override_date, m_quantity, e_quantity, override_type, notes, created_at)
-           VALUES ($1, $2::date, $3, $4, 'quantity_change', $5, NOW())
-           ON CONFLICT (subscription_item_id, override_date)
-           DO UPDATE SET m_quantity = EXCLUDED.m_quantity, e_quantity = EXCLUDED.e_quantity, notes = EXCLUDED.notes`,
-          [item.subscription_item_id, date, m_qty, e_qty, `Modified by customer ${userId}`],
-        );
-      }
-
-      // If order already exists for this date, update it
-      const existingOrder = await this.db.query(
-        `SELECT o.order_id, oi.order_item_id, oi.variant_id 
-         FROM orders o JOIN order_items oi ON oi.order_id = o.order_id
-         WHERE o.subscription_id = $1 AND o.scheduled_date = $2::date AND o.status IN ('placed','confirmed')`,
-        [subscriptionId, date],
-      );
-
-      for (const row of (existingOrder || [])) {
-        const newQty = m_qty + e_qty;
-        if (newQty > 0) {
-          await this.db.query(
-            `UPDATE order_items SET quantity = $1, updated_at = NOW() WHERE order_item_id = $2`,
-            [newQty, row.order_item_id],
-          );
-        }
-      }
-
-      return {
-        status: true,
-        message: `Quantity updated for ${date}`,
-        m_quantity: m_qty,
-        e_quantity: e_qty,
-      };
-    } catch (error) {
-      if (error instanceof BadRequestException) throw error;
-      this.developer.error('overrideQuantity error', { error, subscriptionId });
-      throw new BadRequestException('Failed to update quantity');
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // TOMORROW PREVIEW
-  // Returns what will be delivered tomorrow, with skip/modify options
-  // ─────────────────────────────────────────────────────────────────────────
-  async getTomorrowPreview(subscriptionId: string) {
-    try {
-      const istOffset = 5.5 * 60 * 60 * 1000;
-      const nowIST = new Date(Date.now() + istOffset);
-      const tomorrow = new Date(nowIST);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowStr = tomorrow.toISOString().slice(0, 10);
-
-      const hourIST = nowIST.getUTCHours();
-      const pastCutoff = hourIST >= 22;
-
-      // Check skip
-      const skipRes = await this.db.query(
-        `SELECT id FROM subscription_skip_dates WHERE subscription_id = $1 AND skip_date = $2::date`,
-        [subscriptionId, tomorrowStr],
-      );
-      const isSkipped = (skipRes || []).length > 0;
-
-      // Get items with overrides
-      const items = await this.db.query(
-        `SELECT
-           si.subscription_item_id, si.product_variant_id,
-           pv.name AS product_name, pv.unit_value, pv.unit_type,
-           pi.url AS image_url,
-           COALESCE(so.m_quantity, sws.m_quantity, si.default_m_quantity, 0) AS m_quantity,
-           COALESCE(so.e_quantity, sws.e_quantity, si.default_e_quantity, 0) AS e_quantity,
-           so.override_type
-         FROM subscription_items si
-         JOIN product_variants pv ON pv.variant_id = si.product_variant_id
-         LEFT JOIN product_images pi ON pi.variant_id = pv.variant_id AND pi.sort_order = 1
-         LEFT JOIN subscription_weekly_schedule sws
-           ON sws.subscription_item_id = si.subscription_item_id
-           AND sws.day_of_week = EXTRACT(DOW FROM $2::date)::int
-           AND (sws.deleted_at IS NULL)
-         LEFT JOIN subscription_overrides so
-           ON so.subscription_item_id = si.subscription_item_id
-           AND so.override_date = $2::date
-         WHERE si.subscription_id = $1 AND si.status = 'active'`,
-        [subscriptionId, tomorrowStr],
-      );
-
-      return {
-        status: true,
-        date: tomorrowStr,
-        is_skipped: isSkipped,
-        past_cutoff: pastCutoff,
-        cutoff_time: '22:00 IST',
-        can_modify: !pastCutoff && !isSkipped,
-        items: items || [],
-      };
-    } catch (error) {
-      this.developer.error('getTomorrowPreview error', { error, subscriptionId });
-      throw new BadRequestException('Failed to get tomorrow preview');
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // ENHANCED CALENDAR — with delivery status history
-  // ─────────────────────────────────────────────────────────────────────────
-  async getEnhancedCalendar(subscriptionId: string, month?: string) {
-    try {
-      const now = new Date();
-      const targetMonth = month || now.toISOString().slice(0, 7);
-      const startDate = `${targetMonth}-01`;
-      const endDate = new Date(new Date(startDate).getFullYear(), new Date(startDate).getMonth() + 1, 0)
-        .toISOString().slice(0, 10);
-
-      // Get all days from subscription_daily_snapshots
-      const snapshots = await this.db.query(
-        `SELECT snapshot_date::text AS date, delivery_status, billing_status,
-                m_final_qty, e_final_qty, product_variant_id
-         FROM subscription_daily_snapshots
-         WHERE subscription_id = $1
-           AND snapshot_date BETWEEN $2::date AND $3::date
-         ORDER BY snapshot_date`,
-        [subscriptionId, startDate, endDate],
-      );
-
-      // Get skip dates
-      const skips = await this.db.query(
-        `SELECT skip_date::text AS date FROM subscription_skip_dates
-         WHERE subscription_id = $1 AND skip_date BETWEEN $2::date AND $3::date`,
-        [subscriptionId, startDate, endDate],
-      );
-
-      // Get pauses
-      const pauses = await this.db.query(
-        `SELECT start_date::text, end_date::text FROM subscription_pauses
-         WHERE subscription_id = $1
-           AND end_date >= $2::date AND start_date <= $3::date`,
-        [subscriptionId, startDate, endDate],
-      );
-
-      // Get delivered orders
-      const delivered = await this.db.query(
-        `SELECT o.scheduled_date::text AS date, o.status, o.order_id
-         FROM orders o
-         WHERE o.subscription_id = $1
-           AND o.scheduled_date BETWEEN $2::date AND $3::date`,
-        [subscriptionId, startDate, endDate],
-      );
-
-      // Build skip set and pause set
-      const skipDates = new Set((skips || []).map((s: any) => s.date));
-      const pausedRanges = pauses || [];
-      const isPaused = (date: string) => pausedRanges.some((p: any) => date >= p.start_date && date <= p.end_date);
-      const deliveredMap = new Map((delivered || []).map((d: any) => [d.date, d]));
-
-      // Build calendar days
-      const calendar: any[] = [];
-      const today = now.toISOString().slice(0, 10);
-      const current = new Date(startDate);
-      const end = new Date(endDate);
-
-      while (current <= end) {
-        const dateStr = current.toISOString().slice(0, 10);
-        const deliveredOrder = deliveredMap.get(dateStr);
-        let status = 'upcoming';
-
-        if (dateStr < today) {
-          if (deliveredOrder?.status === 'delivered') status = 'delivered';
-          else if (skipDates.has(dateStr)) status = 'skipped';
-          else if (isPaused(dateStr)) status = 'paused';
-          else if (deliveredOrder?.status === 'failed') status = 'failed';
-          else if (dateStr < today) status = 'missed';
-        } else {
-          if (skipDates.has(dateStr)) status = 'skipped';
-          else if (isPaused(dateStr)) status = 'paused';
-          else status = 'upcoming';
-        }
-
-        calendar.push({
-          date: dateStr,
-          status,
-          order_id: deliveredOrder?.order_id || null,
-        });
-
-        current.setDate(current.getDate() + 1);
-      }
-
-      const stats = {
-        delivered: calendar.filter(d => d.status === 'delivered').length,
-        skipped: calendar.filter(d => d.status === 'skipped').length,
-        paused: calendar.filter(d => d.status === 'paused').length,
-        upcoming: calendar.filter(d => d.status === 'upcoming').length,
-        failed: calendar.filter(d => d.status === 'failed').length,
-        missed: calendar.filter(d => d.status === 'missed').length,
-      };
-
-      return { status: true, month: targetMonth, calendar, stats };
-    } catch (error) {
-      this.developer.error('getEnhancedCalendar error', { error, subscriptionId });
-      throw new BadRequestException('Failed to get calendar');
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // ADD PRODUCT ITEM TO SUBSCRIPTION
-  // ─────────────────────────────────────────────────────────────────────────
-  async addSubscriptionItem(
-    subscriptionId: string,
-    body: { product_variant_id: string; m_quantity: number; e_quantity: number; unit_price?: number },
-    userId: string,
-  ) {
-    try {
-      if (!body.product_variant_id) throw new BadRequestException('product_variant_id is required');
-      const mQty = Math.max(0, Number(body.m_quantity ?? 0));
-      const eQty = Math.max(0, Number(body.e_quantity ?? 0));
-      if (mQty + eQty <= 0) throw new BadRequestException('At least one quantity must be > 0');
-
-      // Check subscription exists
-      const sub = await this.db.query(
-        `SELECT subscription_id, status FROM subscriptions WHERE subscription_id = $1`,
-        [subscriptionId],
-      );
-      if (!sub?.length) throw new BadRequestException('Subscription not found');
-      if (sub[0].status !== 'active') throw new BadRequestException('Subscription must be active to add items');
-
-      // Get variant price
-      const variant = await this.db.query(
-        `SELECT subscription_price, price FROM product_variants WHERE variant_id = $1`,
-        [body.product_variant_id],
-      );
-      if (!variant?.length) throw new BadRequestException('Product variant not found');
-      const price = body.unit_price || variant[0].subscription_price || variant[0].price || 0;
-
-      const itemId = `SUBITEM${Date.now().toString(36).toUpperCase()}`;
-      const today = new Date().toISOString().slice(0, 10);
-
-      await this.db.transaction(async (client) => {
-        // Insert subscription_item
-        await client.query(
-          `INSERT INTO subscription_items
-            (subscription_item_id, subscription_id, product_variant_id, unit_price, final_price,
-             default_m_quantity, default_e_quantity, status, start_date, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $4, $5, $6, 'active', $7, NOW(), NOW())`,
-          [itemId, subscriptionId, body.product_variant_id, price, mQty, eQty, today],
-        );
-
-        // Insert weekly schedule for all 7 days with the given quantities
-        for (let day = 0; day <= 6; day++) {
-          await client.query(
-            `INSERT INTO subscription_weekly_schedule
-              (subscription_item_id, subscription_id, day_of_week, m_quantity, e_quantity, effective_from, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6::date, NOW())
-             ON CONFLICT DO NOTHING`,
-            [itemId, subscriptionId, day, mQty, eQty, today],
-          );
-        }
-      });
-
-      return { status: true, message: 'Product added to subscription', item_id: itemId };
-    } catch (error) {
-      if (error instanceof BadRequestException) throw error;
-      this.developer.error('addSubscriptionItem error', { error, subscriptionId });
-      throw new BadRequestException('Failed to add item to subscription');
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // CHANGE DELIVERY ADDRESS
-  // ─────────────────────────────────────────────────────────────────────────
-  async changeAddress(subscriptionId: string, addressId: string, userId: string) {
-    try {
-      if (!addressId) throw new BadRequestException('address_id is required');
-
-      // Verify address belongs to customer via subscription → customer
-      const addr = await this.db.query(
-        `SELECT ca.address_id FROM customer_addresses ca
-         JOIN subscriptions s ON s.customer_id = ca.customer_id
-         WHERE s.subscription_id = $1 AND ca.address_id = $2`,
-        [subscriptionId, addressId],
-      );
-      if (!addr?.length) throw new BadRequestException('Address not found or does not belong to this customer');
-
-      await this.db.query(
-        `UPDATE subscriptions SET address_id = $1, updated_at = NOW() WHERE subscription_id = $2`,
-        [addressId, subscriptionId],
-      );
-
-      // Also update any future pending orders for this subscription
-      await this.db.query(
-        `UPDATE orders SET address_id = $1, updated_at = NOW()
-         WHERE subscription_id = $2
-           AND scheduled_date > CURRENT_DATE
-           AND status IN ('placed','confirmed')`,
-        [addressId, subscriptionId],
-      );
-
-      return { status: true, message: 'Delivery address updated' };
-    } catch (error) {
-      if (error instanceof BadRequestException) throw error;
-      this.developer.error('changeAddress error', { error, subscriptionId });
-      throw new BadRequestException('Failed to change address');
     }
   }
 }

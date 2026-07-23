@@ -834,9 +834,9 @@ export class RouteService {
           COALESCE(
             JSON_AGG(
               JSON_BUILD_OBJECT(
-                'product_name', pv.product_id,
-                'morning_qty',  si.default_m_quantity,
-                'evening_qty',  si.default_e_quantity,
+                'product_name', COALESCE(p.name, pv.name, 'Product'),
+                'morning_qty',  COALESCE(sws.m_quantity, 0),
+                'evening_qty',  COALESCE(sws.e_quantity, 0),
                 'unit_price',   si.unit_price
               ) ORDER BY si.id
             ) FILTER (WHERE si.id IS NOT NULL AND sub.status = 'active'),
@@ -851,7 +851,11 @@ export class RouteService {
           AND sub.status = 'active'
           AND (sub.start_date <= $2 AND (sub.end_date IS NULL OR sub.end_date >= $2))
         LEFT JOIN subscription_items si ON si.subscription_id = sub.subscription_id AND si.status = 'active'
+        LEFT JOIN subscription_weekly_schedule sws
+          ON sws.subscription_item_id = si.id
+          AND sws.day_of_week = EXTRACT(DOW FROM CAST($2 AS DATE))
         LEFT JOIN product_variants pv ON pv.variant_id = si.product_variant_id
+        LEFT JOIN products p ON p.product_id = pv.product_id
         LEFT JOIN delivery_proof_logs dpl
           ON dpl.customer_id = c.customer_id
           AND dpl.delivery_date = $2
