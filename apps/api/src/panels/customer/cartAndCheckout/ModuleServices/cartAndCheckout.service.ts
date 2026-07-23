@@ -439,7 +439,7 @@ export class CartService {
 
       // E. Insert customer_bills and customer_bill_items for prepaid orders
       if (paymentType === 'prepaid') {
-        await this.insertPrepaidBillingRecords(customerId, onetimeGroups, walletTransactionsToInsert, referenceId, transaction);
+        await this.insertPrepaidBillingRecords(customerId, onetimeGroups, walletTransactionsToInsert, referenceId, transaction, paymentMethod);
       }
     });
 
@@ -523,6 +523,7 @@ export class CartService {
     walletTransactions: { amount: number; reference_type: string; reference_id: string; remarks: string }[],
     fallbackReferenceId: string | null,
     transaction: any,
+    paymentMethod: string = 'wallet',
   ): Promise<void> {
     for (const [, group] of onetimeGroups) {
       const billId = generateId('BILL', 15);
@@ -539,6 +540,7 @@ export class CartService {
           bill_type: 'order',
           reference_id: orderRefId,
           payment_type: 'prepaid',
+          payment_method: paymentMethod,
           billing_from: group.deliveryDate,
           billing_to: group.deliveryDate,
           due_date: today,
