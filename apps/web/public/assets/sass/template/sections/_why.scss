@@ -1,0 +1,28 @@
+.vs-why {
+
+    &--ele1,
+    &--ele2 {
+        position: absolute;
+        top: 0;
+        left: 0;
+
+        @include lg {
+            display: none;
+        }
+    }
+
+    &--ele1 {
+        top: 84px;
+        left: 63px;
+
+        @include xl {
+            top: 5px;
+        }
+    }
+
+    &--ele2 {
+        top: auto;
+        bottom: 104px;
+        left: 0;
+    }
+}

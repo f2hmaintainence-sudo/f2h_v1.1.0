@@ -1,0 +1,15 @@
+.will-sticky {
+  .sticky-active {
+    position: fixed;
+    top: -100%;
+    right: 0;
+    left: 0;
+    background-color: $vs-white-color;
+    transition: all ease 0.8s;
+    box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.07);
+
+    &.active {
+      top: 0;
+    }
+  }
+}

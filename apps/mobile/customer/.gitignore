@@ -1,0 +1,69 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+*.hprof
+.atom/
+.buildlog/
+.history
+.svn/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configurations and tasks for the project.
+.vscode/
+
+# Temporary tracking files
+TODO_REMOVE_LATER.md
+
+# Flutter/Dart related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/flutter_tools_metadata.json
+**/ios/Frameworks/
+**/ios/Pods/
+**/ios/DerivedData/
+**/ios/.generated/
+**/ios/.symlinks/
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+**/android/.gradle/
+**/android/local.properties
+**/android/key.properties
+**/android/app/src/main/res/generated/
+**/android/sdk.dir
+**/android/flutter_assets/
+**/android/flutter_binary/
+**/.dart_tool/
+**/.packages
+**/.pub-cache/
+**/.pub/
+**/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+
+# Artifacts
+*.apk
+*.aab
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Environment secrets
+.env*
+
+# App-specific copies
+* copy.*
+*-copy.*

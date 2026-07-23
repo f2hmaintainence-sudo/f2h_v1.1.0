@@ -1,0 +1,481 @@
+// ============================================================================
+// ChronoSparkSolutions — A Software Company
+// © 2026 ChronoSparkSolutions. All rights reserved.
+//
+// Project     : F2H Fresh
+// File        : page.tsx
+// Description : Delivery partners management page for admin panel
+// Website     : https://www.chronosparksolutions.com/
+// Copyright   : https://www.chronosparksolutions.com/copyright
+// ============================================================================
+
+"use client";
+
+import { getApiBaseUrl } from "@/lib/api-config";
+import React, { useEffect, useState, useCallback } from "react";
+import { api } from "@/services/api.client";
+import {
+  Truck, Users, ChevronRight, Home, RefreshCw, CheckCircle2, XCircle, MapPin,
+  Phone, ShieldCheck, ShieldAlert, Eye, Loader2, Edit2, X, Plus
+} from "lucide-react";
+import Link from "next/link";
+import { showSuccessToast } from "@/components/Toast";
+import "@/components/Table Generator/SkeletonForm.css";
+import SkeletonForm from "@/components/Table Generator/SkeletonForm";
+
+// --- Helpers ---
+const getImageUrl = (pathString?: string): string | null => {
+  if (!pathString) return null;
+  if (pathString.startsWith("http")) return pathString;
+  const baseUrl = getApiBaseUrl();
+  return `${baseUrl.replace(/\/$/, "")}/${pathString.replace(/^\//, "")}`;
+};
+
+const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+  const el = e.currentTarget;
+  el.style.display = "none";
+  if (el.parentElement && !el.parentElement.querySelector(".img-error-badge")) {
+    const div = document.createElement("div");
+    div.className = "img-error-badge absolute inset-0 flex items-center justify-center text-[10px] text-slate-400 bg-slate-50 font-medium p-1 text-center";
+    div.innerText = "Document Not Found";
+    el.parentElement.appendChild(div);
+  }
+};
+
+// --- Reusable Micro-Components for DRY & Concise Code ---
+const InfoRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
+  <div className="bg-slate-50/80 rounded-lg py-1.5 px-2.5 border border-slate-100 flex items-center justify-between truncate text-[11px]">
+    <span className="text-slate-400 font-medium mr-1.5">{label}</span>
+    <span className="font-bold text-slate-700 truncate">{value || "N/A"}</span>
+  </div>
+);
+
+const DocPreviewBox = ({ url, title, label, onPreview }: { url?: string; title: string; label: string; onPreview: (u: string, t: string) => void }) =>
+  url ? (
+    <div onClick={() => onPreview(getImageUrl(url)!, title)} className="block relative group bg-slate-100 rounded-lg overflow-hidden h-24 border border-slate-200 flex items-center justify-center shadow-inner cursor-pointer">
+      <img src={getImageUrl(url)!} alt={label} className="w-full h-full object-cover group-hover:scale-105 transition-transform" onError={handleImageError} />
+      <span className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[10px] font-bold gap-1"><Eye size={12} /> {label}</span>
+    </div>
+  ) : (
+    <div className="h-24 bg-slate-50 rounded-lg flex items-center justify-center text-[10px] text-slate-400 border border-slate-100">No {label}</div>
+  );
+
+const VerifyActionButtons = ({ status, onVerify }: { status?: string; onVerify: (status: "verified" | "rejected") => void }) => (
+  <div className="flex items-center gap-2 pt-2.5 border-t border-slate-100">
+    <button type="button" onClick={() => onVerify("verified")} className={`flex-1 py-1.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm ${status === "verified" ? "bg-emerald-600 text-white ring-2 ring-emerald-600/30" : "bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border border-slate-200/80 hover:border-emerald-200"}`}>
+      <CheckCircle2 size={15} className={status === "verified" ? "text-white" : "text-emerald-600"} />
+      <span>{status === "verified" ? "Approved" : "Approve"}</span>
+    </button>
+    <button type="button" onClick={() => onVerify("rejected")} className={`flex-1 py-1.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm ${status === "rejected" ? "bg-rose-600 text-white ring-2 ring-rose-600/30" : "bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-200/80 hover:border-rose-200"}`}>
+      <XCircle size={15} className={status === "rejected" ? "text-white" : "text-rose-600"} />
+      <span>Not Approved</span>
+    </button>
+  </div>
+);
+
+// --- Memoized Partner Card ---
+const PartnerCard = React.memo(({ partner: p, onOpenEditModal, onOpenDocsModal }: { partner: any; onOpenEditModal: (p: any) => void; onOpenDocsModal: (p: any) => void }) => (
+  <div className="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm hover:shadow-md hover:border-slate-300 transition-all flex flex-col justify-between group/card">
+    <div>
+      <div className="flex items-start justify-between gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className={`w-9 h-9 shrink-0 rounded-xl font-extrabold flex items-center justify-center text-xs shadow-inner transition-transform group-hover/card:scale-105 ${p.is_active ? "bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-emerald-500/20" : "bg-gradient-to-br from-slate-100 to-slate-200 text-slate-700 border border-slate-300/50"}`}>
+            {(p.full_name || "U")[0].toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-black text-slate-900 truncate group-hover/card:text-teal-700 transition-colors">{p.full_name || "Delivery partner"}</p>
+            <p className="text-[11px] text-slate-400 font-semibold flex items-center gap-1 truncate mt-0.5"><MapPin size={10} className="shrink-0" /><span className="truncate">{p.branch_name || p.branch_id || "No Branch"}</span></p>
+          </div>
+        </div>
+        <button type="button" onClick={() => onOpenEditModal(p)} className="shrink-0 group/edit inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-500/60 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 font-bold text-[10px] transition-all shadow-2xs" title="Edit Partner Profile & Salary">
+          <Edit2 size={11} className="text-emerald-600 group-hover/edit:text-white transition-colors" /><span>Edit</span>
+        </button>
+      </div>
+
+      <div className="bg-slate-50/80 rounded-xl p-2.5 my-2.5 border border-slate-100 space-y-2">
+        <div className="flex items-center justify-between gap-2 text-[11px]">
+          <div className="flex items-center gap-1.5 font-bold text-slate-700 min-w-0 truncate"><Phone size={11} className="text-slate-400 shrink-0" /><span className="truncate">{p.phone || "NA"}</span></div>
+          <span className={`shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${p.is_active ? "bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 shadow-2xs" : "bg-slate-200/80 text-slate-600 border border-slate-300"}`}>
+            {p.is_active && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}<span>{p.is_active ? "Active" : "Inactive"}</span>
+          </span>
+        </div>
+        <div>
+          <button type="button" onClick={() => onOpenDocsModal(p)} className={`w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all border ${p.is_verified ? "bg-emerald-50 text-emerald-700 border-emerald-200/80 hover:bg-emerald-100 shadow-xs" : "bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100 shadow-sm shadow-amber-500/20 animate-pulse"}`} title="Click to review KYC documents">
+            {p.is_verified ? <ShieldCheck size={13} className="text-emerald-600 shrink-0" /> : <ShieldAlert size={13} className="text-amber-600 shrink-0 animate-bounce" />}
+            <span className="truncate">{p.is_verified ? "Verified (Docs)" : "Check Docs"}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div className="grid grid-cols-2 gap-2">
+      <div className="flex flex-col items-center justify-center py-1.5 px-2 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100/60 transition-colors"><span className="text-sm font-extrabold text-slate-800 tracking-tight">{p.today_assigned ?? 0}</span><span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mt-0.5">Assigned</span></div>
+      <div className="flex flex-col items-center justify-center py-1.5 px-2 rounded-xl bg-emerald-50/70 border border-emerald-200/50 hover:bg-emerald-100/60 transition-colors"><span className="text-sm font-extrabold text-emerald-600 tracking-tight">{p.today_delivered ?? 0}</span><span className="text-[9px] font-extrabold text-emerald-600/80 uppercase tracking-widest mt-0.5">Delivered</span></div>
+    </div>
+  </div>
+));
+PartnerCard.displayName = "PartnerCard";
+
+// --- Memoized KYC Sub-Cards ---
+const BankCard = React.memo(({ bank, onPreview, onVerify }: { bank: any; onPreview: (img: string, t: string) => void; onVerify: (id: number, s: "verified" | "rejected") => void }) => (
+  <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-3.5">
+    <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+      <div className="flex items-center gap-2">
+        <span className="px-2.5 py-1 rounded text-[10px] font-black uppercase bg-teal-50 text-teal-700 border border-teal-100">BANK ACCOUNT • {bank.bank_name || "BANK"}</span>
+        {bank.is_primary && <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-50 text-blue-600 border border-blue-100">Primary</span>}
+      </div>
+      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${bank.verification_status === "verified" ? "bg-emerald-100 text-emerald-700" : bank.verification_status === "rejected" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>{bank.verification_status || "pending"}</span>
+    </div>
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+      <div className="lg:col-span-8 grid grid-cols-2 gap-2.5">
+        <InfoRow label="Bank Name:" value={bank.bank_name} />
+        <InfoRow label="Holder Name:" value={bank.account_holder_name} />
+        <InfoRow label="Account No:" value={bank.account_number} />
+        <InfoRow label="IFSC & Branch:" value={`${bank.ifsc_code || "NA"} ${bank.branch_name ? `(${bank.branch_name})` : ""}`} />
+      </div>
+      <div className="lg:col-span-4"><DocPreviewBox url={bank.cancelled_cheque_image} title="Cancelled Cheque" label="Cheque" onPreview={onPreview} /></div>
+    </div>
+    <VerifyActionButtons status={bank.verification_status} onVerify={(s) => onVerify(bank.id, s)} />
+  </div>
+));
+BankCard.displayName = "BankCard";
+
+const DocumentCard = React.memo(({ doc, onPreview, onVerify }: { doc: any; onPreview: (img: string, t: string) => void; onVerify: (id: number, s: "verified" | "rejected") => void }) => (
+  <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-3 flex flex-col justify-between">
+    <div className="flex items-start justify-between">
+      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-indigo-50 text-indigo-700 border border-indigo-100">{doc.document_type || "Document"}</span>
+      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${doc.verification_status === "verified" ? "bg-emerald-100 text-emerald-700" : doc.verification_status === "rejected" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>{doc.verification_status || "pending"}</span>
+    </div>
+    <div className="grid grid-cols-2 gap-2">
+      <InfoRow label="Doc ID:" value={doc.document_number} />
+      <InfoRow label="Uploaded:" value={doc.created_at ? new Date(doc.created_at).toLocaleDateString() : "N/A"} />
+    </div>
+    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+      <DocPreviewBox url={doc.front_image} title={`${doc.document_type || "ID"} (Front)`} label="Front" onPreview={onPreview} />
+      <DocPreviewBox url={doc.back_image} title={`${doc.document_type || "ID"} (Back)`} label="Back" onPreview={onPreview} />
+    </div>
+    <VerifyActionButtons status={doc.verification_status} onVerify={(s) => onVerify(doc.id, s)} />
+  </div>
+));
+DocumentCard.displayName = "DocumentCard";
+
+const VehicleCard = React.memo(({ veh, onPreview, onVerify }: { veh: any; onPreview: (img: string, t: string) => void; onVerify: (id: number, s: "verified" | "rejected") => void }) => (
+  <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-3.5">
+    <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+      <div className="flex items-center gap-2">
+        <span className="px-2.5 py-1 rounded text-[10px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-100">VEHICLE • {veh.vehicle_type || "BIKE"}</span>
+        {veh.registration_number && <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-200">{veh.registration_number}</span>}
+      </div>
+      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${veh.verification_status === "verified" ? "bg-emerald-100 text-emerald-700" : veh.verification_status === "rejected" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>{veh.verification_status || "pending"}</span>
+    </div>
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+      <div className="lg:col-span-6 grid grid-cols-2 gap-2.5">
+        <InfoRow label="Vehicle:" value={`${veh.brand || ""} ${veh.model || ""} ${veh.color ? `(${veh.color})` : ""}`} />
+        <InfoRow label="Reg No:" value={veh.registration_number} />
+        <InfoRow label="Insurance No:" value={veh.insurance_number} />
+        <InfoRow label="Expiry Date:" value={veh.insurance_expiry ? veh.insurance_expiry.toString().split("T")[0] : "N/A"} />
+      </div>
+      <div className="lg:col-span-6 grid grid-cols-3 gap-2">
+        <DocPreviewBox url={veh.rc_front_image} title={`${veh.vehicle_type || "Vehicle"} RC (Front)`} label="RC Front" onPreview={onPreview} />
+        <DocPreviewBox url={veh.rc_back_image} title={`${veh.vehicle_type || "Vehicle"} RC (Back)`} label="RC Back" onPreview={onPreview} />
+        <DocPreviewBox url={veh.insurance_image} title={`${veh.vehicle_type || "Vehicle"} Insurance Policy`} label="Insurance" onPreview={onPreview} />
+      </div>
+    </div>
+    <VerifyActionButtons status={veh.verification_status} onVerify={(s) => onVerify(veh.id, s)} />
+  </div>
+));
+VehicleCard.displayName = "VehicleCard";
+
+// -----------------------------------------------------------------------------
+// Main Delivery Partners Page
+// -----------------------------------------------------------------------------
+export default function DeliveryPartnersPage() {
+  const [partners, setPartners] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
+
+  const [branches, setBranches] = useState<any[]>([]);
+  const [selectedPartnerForEdit, setSelectedPartnerForEdit] = useState<any | null>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
+
+  const [selectedPartnerForDocs, setSelectedPartnerForDocs] = useState<any | null>(null);
+  const [docsModalVerifiedToggle, setDocsModalVerifiedToggle] = useState<boolean>(false);
+  const [docsData, setDocsData] = useState<{ partner: any; documents: any[]; vehicles: any[]; bank_accounts?: any[] } | null>(null);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+
+  const fetchPartners = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = filter !== "all" ? `?status=${filter}` : "";
+      const res = await api.get<any>(`/admin/delivery/partners${params}`);
+      if (res.data?.data) { setPartners(res.data.data); setTotal(res.data.total ?? 0); }
+    } catch { } finally { setLoading(false); }
+  }, [filter]);
+
+  useEffect(() => {
+    fetchPartners();
+    api.get<any>("/admin/zone/branches-list?all=true").then((res) => {
+      if (res.data?.data) setBranches(res.data.data);
+      else if (Array.isArray(res.data)) setBranches(res.data);
+    }).catch(() => {
+      api.get<any>("/admin/branches").then((res) => {
+        if (res.data?.data) setBranches(res.data.data);
+        else if (Array.isArray(res.data)) setBranches(res.data);
+      }).catch(() => { });
+    });
+  }, [fetchPartners]);
+
+  const handleOpenDocsModal = useCallback(async (partner: any) => {
+    setSelectedPartnerForDocs(partner);
+    setDocsModalVerifiedToggle(Boolean(partner.is_verified));
+    setDocsLoading(true);
+    setDocsData(null);
+    const partnerId = partner.delivery_partner_id || partner.id;
+    try {
+      const res = await api.get<any>(`/admin/delivery/partners/${partnerId}/documents`);
+      if (res?.data?.data) setDocsData(res.data.data);
+    } catch (error) {
+      showSuccessToast("Failed to load documents");
+    } finally { setDocsLoading(false); }
+  }, []);
+
+  const handlePreviewImage = useCallback((url: string, title: string) => setPreviewImage({ url, title }), []);
+
+
+
+  const hasAnyUploadedProof = Boolean(
+    docsData &&
+    ((docsData.documents?.some((d: any) => d.front_image || d.back_image || d.document_number)) ||
+      (docsData.vehicles?.some((v: any) => v.rc_front_image || v.rc_back_image || v.registration_number)) ||
+      (docsData.bank_accounts?.some((b: any) => b.cancelled_cheque_image)))
+  );
+
+  const handleVerifyPartner = async (isVerified: boolean) => {
+    if (!selectedPartnerForDocs) return;
+    const partnerId = selectedPartnerForDocs.delivery_partner_id || selectedPartnerForDocs.id;
+    setVerifying(true);
+    try {
+      const res = await api.patch<any>(`/admin/delivery/partners/${partnerId}/verify`, { is_verified: isVerified });
+      if (res?.data?.status || res?.status === 200 || res?.data) {
+        setPartners((prev) => prev.map((p) => (p.delivery_partner_id || p.id) === partnerId ? { ...p, is_verified: isVerified } : p));
+        showSuccessToast(`Partner marked as ${isVerified ? "Verified" : "Not Verified"}`);
+        setSelectedPartnerForDocs(null);
+      }
+    } catch (error: any) {
+      alert(error?.response?.data?.message || "Failed to update partner verification status");
+    } finally { setVerifying(false); }
+  };
+
+  const handleVerifyDocItem = useCallback(async (docId: number, status: "verified" | "rejected") => {
+    if (!selectedPartnerForDocs) return;
+    const partnerId = selectedPartnerForDocs.delivery_partner_id || selectedPartnerForDocs.id;
+    try {
+      await api.patch<any>(`/admin/delivery/partners/${partnerId}/verify`, { document_id: docId, document_status: status });
+      setDocsData((prev) => prev ? { ...prev, documents: prev.documents.map((d) => (d.id === docId ? { ...d, verification_status: status } : d)) } : null);
+      showSuccessToast(`Document marked as ${status}`);
+    } catch (err) { alert("Failed to update document"); }
+  }, [selectedPartnerForDocs]);
+
+  const handleVerifyVehicleItem = useCallback(async (vehId: number, status: "verified" | "rejected") => {
+    if (!selectedPartnerForDocs) return;
+    const partnerId = selectedPartnerForDocs.delivery_partner_id || selectedPartnerForDocs.id;
+    try {
+      await api.patch<any>(`/admin/delivery/partners/${partnerId}/verify`, { vehicle_id: vehId, vehicle_status: status });
+      setDocsData((prev) => prev ? { ...prev, vehicles: prev.vehicles.map((v) => (v.id === vehId ? { ...v, verification_status: status } : v)) } : null);
+      showSuccessToast(`Vehicle marked as ${status}`);
+    } catch (err) { alert("Failed to update vehicle"); }
+  }, [selectedPartnerForDocs]);
+
+  const handleVerifyBankItem = useCallback(async (bankId: number, status: "verified" | "rejected") => {
+    if (!selectedPartnerForDocs) return;
+    const partnerId = selectedPartnerForDocs.delivery_partner_id || selectedPartnerForDocs.id;
+    try {
+      await api.patch<any>(`/admin/delivery/partners/${partnerId}/verify`, { bank_account_id: bankId, bank_status: status });
+      setDocsData((prev) => prev ? { ...prev, bank_accounts: prev.bank_accounts?.map((b: any) => (b.id === bankId ? { ...b, verification_status: status } : b)) || [] } : null);
+      showSuccessToast(`Bank Account marked as ${status}`);
+    } catch (err) { alert("Failed to update bank account"); }
+  }, [selectedPartnerForDocs]);
+
+  const handleOpenEditModal = useCallback((p: any) => {
+    setSelectedPartnerForEdit(p);
+  }, []);
+
+  return (
+    <div className="space-y-6 p-4 md:p-6">
+      <nav className="flex items-center gap-1.5 text-sm text-gray-500">
+        <Link href="/admin/dashboard" className="flex items-center gap-1 hover:text-emerald-600"><Home size={14} /> Dashboard</Link>
+        <ChevronRight size={14} className="text-gray-300" /><span className="font-semibold text-slate-800">Delivery Partners</span>
+      </nav>
+
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2"><Truck size={24} className="text-[#388E3C]" style={{ color: "#388E3C" }} /> Delivery Partners</h1>
+          <p className="text-sm text-slate-400 mt-1">{total} partners total</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex bg-white rounded-lg border border-slate-200 overflow-hidden shadow-xs">
+            {(["all", "active", "inactive"] as const).map((f) => (
+              <button key={f} onClick={() => setFilter(f)} className={`px-3.5 py-2 text-xs font-bold capitalize transition-all ${filter === f ? "bg-[#388E3C] text-white shadow-xs" : "text-slate-600 hover:bg-[#388E3C]/10 hover:text-[#388E3C]"}`}>{f}</button>
+            ))}
+          </div>
+          {/* <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-1.5 px-3.5 py-2 bg-[#388E3C] hover:bg-[#2E7D32] text-white rounded-lg font-bold text-xs transition-all shadow-xs">
+            <Plus size={14} /><span>Add Partner</span>
+          </button> */}
+          <button onClick={fetchPartners} className="px-3 py-2 bg-white border border-slate-200 rounded-lg hover:bg-[#388E3C]/10 hover:text-[#388E3C] hover:border-[#388E3C]/40 transition-all shadow-xs"><RefreshCw size={14} /></button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-12"><div className="w-8 h-8 border-2 border-[#388E3C]/20 border-t-[#388E3C] rounded-full animate-spin" /></div>
+      ) : partners.length === 0 ? (
+        <div className="text-center py-16 text-slate-400"><Users size={40} className="mx-auto mb-3 opacity-30" /><p className="text-sm font-bold">No delivery partners found</p></div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {partners.map((p) => <PartnerCard key={p.delivery_partner_id || p.id} partner={p} onOpenEditModal={handleOpenEditModal} onOpenDocsModal={handleOpenDocsModal} />)}
+        </div>
+      )}
+
+      {/* KYC Modal */}
+      {selectedPartnerForDocs && (
+        <div className="skf-overlay !m-0 !p-4" onClick={(e) => { if (e.target === e.currentTarget) setSelectedPartnerForDocs(null); }}>
+          <div className="skf-modal !m-auto" style={{ maxWidth: "820px" }}>
+            <div className="skf-header">
+              <h3 className="skf-title">Document & KYC Verification</h3>
+              <button type="button" className="skf-close-btn" onClick={() => setSelectedPartnerForDocs(null)} title="Close"><X size={16} /></button>
+            </div>
+
+            <div className="skf-body space-y-6">
+              {docsLoading ? (
+                <div className="skf-loading py-16 flex flex-col items-center justify-center gap-3"><Loader2 className="w-8 h-8 text-emerald-600 animate-spin" /><p className="text-xs font-semibold text-slate-400">Fetching partner documents and verification details...</p></div>
+              ) : docsData ? (
+                <>
+                  <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-2xs space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase text-slate-700 tracking-wider">Delivery Partner Profile</span>
+                      <span className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase ${!hasAnyUploadedProof ? "bg-rose-100 text-rose-700 border border-rose-200" : docsModalVerifiedToggle ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                        {!hasAnyUploadedProof ? "No Proofs Uploaded" : docsModalVerifiedToggle ? "Overall Verified" : "Overall Pending"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="skf-field"><label className="text-xs font-semibold text-slate-600">Full Name</label><div className="px-3 py-2 bg-slate-50/80 rounded-lg border border-slate-200/60 text-sm font-semibold text-slate-800">{docsData.partner?.full_name || selectedPartnerForDocs.full_name || "NA"}</div></div>
+                      <div className="skf-field"><label className="text-xs font-semibold text-slate-600">Phone Number</label><div className="px-3 py-2 bg-slate-50/80 rounded-lg border border-slate-200/60 text-sm font-semibold text-slate-800">{docsData.partner?.phone || selectedPartnerForDocs.phone || "NA"}</div></div>
+                    </div>
+                    <div className="pt-2 border-t border-slate-100">
+                      <div className="!flex !flex-row !items-center !justify-between gap-4 bg-slate-50 border border-slate-200/80 rounded-xl px-4 py-3.5 w-full text-left shadow-2xs">
+                        <div className="flex-1 min-w-0">
+                          <span className="text-xs font-bold text-slate-800 block mb-0.5">Partner Verification Status</span>
+                          <p className="text-[11px] text-slate-500 font-medium leading-tight m-0">Toggle whether this delivery partner is approved and verified for active deliveries</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setDocsModalVerifiedToggle(!docsModalVerifiedToggle)}
+                          className={`shrink-0 group relative inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-200 shadow-sm cursor-pointer border ${docsModalVerifiedToggle ? 'bg-[#00B074] text-white border-emerald-600 shadow-emerald-500/20' : 'bg-[#F59E0B] text-white border-amber-600 shadow-amber-500/20'}`}
+                        >
+                          <div className={`w-6 h-3.5 rounded-full p-0.5 flex items-center transition-colors duration-300 ${docsModalVerifiedToggle ? 'bg-emerald-700/40' : 'bg-amber-700/40'}`}>
+                            <div className={`w-2.5 h-2.5 rounded-full bg-white shadow transform transition-transform duration-300 ${docsModalVerifiedToggle ? 'translate-x-2.5' : 'translate-x-0'}`} />
+                          </div>
+                          <span>{docsModalVerifiedToggle ? 'ACTIVE' : 'INACTIVE'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="skf-group-header"><span>Bank Accounts & Cheque Verification ({docsData.bank_accounts?.length || 0})</span></div>
+                    <div className="mt-3">
+                      {!docsData.bank_accounts || docsData.bank_accounts.length === 0 ? (
+                        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-3">
+                          <div className="flex items-start justify-between"><span className="px-2.5 py-1 rounded text-[10px] font-black uppercase bg-teal-50 text-teal-700 border border-teal-100">PRIMARY BANK ACCOUNT DETAILS</span><span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-amber-100 text-amber-700">PENDING</span></div>
+                          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+                            <div className="lg:col-span-8 grid grid-cols-2 gap-2 text-[11px]"><InfoRow label="Account No:" value={docsData.partner?.bank_account_number} /><InfoRow label="IFSC Code:" value={docsData.partner?.bank_ifsc} /></div>
+                            <div className="lg:col-span-4 h-24 bg-slate-50 rounded-lg flex items-center justify-center text-[11px] text-slate-400 border border-slate-100">No Cancelled Cheque Uploaded</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">{docsData.bank_accounts.map((bank: any) => <BankCard key={bank.id} bank={bank} onPreview={handlePreviewImage} onVerify={handleVerifyBankItem} />)}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="skf-group-header"><span>Identity Documents ({docsData.documents.length})</span></div>
+                    <div className="mt-3">
+                      {docsData.documents.length === 0 ? (
+                        <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 text-xs">No identity documents uploaded yet</div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{docsData.documents.map((doc: any) => <DocumentCard key={doc.id} doc={doc} onPreview={handlePreviewImage} onVerify={handleVerifyDocItem} />)}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="skf-group-header"><span>Vehicle & Insurance ({docsData.vehicles.length})</span></div>
+                    <div className="mt-3">
+                      {docsData.vehicles.length === 0 ? (
+                        <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 text-xs">No vehicle details uploaded yet</div>
+                      ) : (
+                        <div className="space-y-4">{docsData.vehicles.map((veh: any) => <VehicleCard key={veh.id} veh={veh} onPreview={handlePreviewImage} onVerify={handleVerifyVehicleItem} />)}</div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-12 text-slate-400 text-xs">Failed to load documents</div>
+              )}
+            </div>
+
+            <div className="skf-footer">
+              <button type="button" onClick={() => setSelectedPartnerForDocs(null)} className="skf-btn skf-btn-cancel">Cancel</button>
+              <button type="button" disabled={verifying} onClick={() => handleVerifyPartner(docsModalVerifiedToggle)} title="Save verification status" className="skf-btn skf-btn-submit flex items-center gap-1.5">
+                {verifying && <Loader2 size={14} className="animate-spin" />}<span>Save Changes</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div className="skf-overlay !m-0 !p-4" style={{ zIndex: 100000 }} onClick={(e) => { if (e.target === e.currentTarget) setPreviewImage(null); }}>
+          <div className="skf-modal !m-auto bg-white overflow-hidden shadow-2xl border border-slate-200" style={{ maxWidth: "750px", width: "100%" }}>
+            <div className="skf-header">
+              <div className="flex items-center gap-2"><span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase bg-teal-50 text-teal-700 border border-teal-100">Document Preview</span><h3 className="skf-title text-sm font-bold text-slate-800 truncate">{previewImage.title}</h3></div>
+              <button type="button" className="skf-close-btn" onClick={() => setPreviewImage(null)} title="Close Preview"><X size={16} /></button>
+            </div>
+            <div className="p-6 bg-slate-900/5 flex items-center justify-center min-h-[350px] max-h-[70vh] overflow-auto">
+              <img src={previewImage.url} alt={previewImage.title} className="max-w-full max-h-[65vh] object-contain rounded-xl shadow-md border border-slate-200 bg-white" onError={(e) => { const el = e.currentTarget; el.style.display = "none"; if (el.parentElement && !el.parentElement.querySelector(".preview-error")) { const div = document.createElement("div"); div.className = "preview-error py-12 px-6 text-center text-slate-400 font-bold text-sm bg-white rounded-xl border border-slate-200 shadow-sm"; div.innerText = "Unable to load image preview."; el.parentElement.appendChild(div); } }} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Partner Form via SkeletonForm */}
+      <SkeletonForm
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        apiEndpoint="/admin/delivery/partners/showAdd"
+        submitEndpoint="/admin/delivery/partners/saveAdd"
+        onSuccess={() => {
+          setIsAddModalOpen(false);
+          fetchPartners();
+        }}
+      />
+
+      {/* Edit Partner Form via SkeletonForm (showEdit / saveEdit) */}
+      {selectedPartnerForEdit && (
+        <SkeletonForm
+          isOpen={Boolean(selectedPartnerForEdit)}
+          onClose={() => setSelectedPartnerForEdit(null)}
+          apiEndpoint={`/admin/delivery/partners/${selectedPartnerForEdit.delivery_partner_id || selectedPartnerForEdit.id}/showEdit`}
+          submitEndpoint={`/admin/delivery/partners/${selectedPartnerForEdit.delivery_partner_id || selectedPartnerForEdit.id}/saveEdit`}
+          onSuccess={() => {
+            setSelectedPartnerForEdit(null);
+            fetchPartners();
+          }}
+        />
+      )}
+    </div>
+  );
+}

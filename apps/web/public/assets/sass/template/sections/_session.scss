@@ -1,0 +1,109 @@
+.vs-session {
+    $self: &;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    z-index: 1;
+    padding: 30px 35px;
+    margin-bottom: 30px;
+
+    @include lg {
+        background-color: var(--vs-white-color);
+        border-radius: 15px;
+        padding: 18px 20px;
+        margin-bottom: 24px;
+    }
+
+    &__bg {
+        position: absolute;
+        right: 0;
+        z-index: -1;
+        width: 100%;
+        top: 0;
+        height: 100% !important;
+
+        @include lg {
+            display: none;
+        }
+    }
+
+    &--bg {
+        &-image {
+            position: absolute;
+            right: 0;
+            z-index: -1;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            opacity: 5%;
+        }
+    }
+
+    &__title {
+        font-size: 24px;
+        font-weight: 800;
+        line-height: 1.2;
+        margin-bottom: 4px;
+    }
+
+    &__time {
+        font-weight: 700;
+        @include lts(3);
+        color: var(--vs-theme-color-1);
+        display: inline-block;
+        @include vst;
+    }
+
+    &__icon {
+        --icon-size: 77px;
+        display: inline-flex;
+        align-items: center;
+        min-width: var(--icon-size);
+        min-height: var(--icon-size);
+        justify-content: center;
+        border-radius: 50%;
+        background-color: var(--vs-theme-color1);
+        @include vst;
+    }
+
+    &--ele1,
+    &--ele2 {
+        position: absolute;
+        top: 0;
+        left: 0;
+
+        @include md {
+            display: none;
+        }
+    }
+
+    &--ele1 {
+        left: 5%;
+
+        @include lg {
+            left: 0;
+        }
+    }
+
+    &--ele2 {
+        left: auto;
+        top: 173px;
+        right: 185px;
+
+        @include lg {
+            right: 0;
+        }
+    }
+
+    &:hover {
+        #{$self}__icon {
+            background-color: var(--vs-theme-color2);
+        }
+
+        #{$self}__time {
+            color: var(--vs-theme-color2);
+        }
+    }
+}

@@ -1,0 +1,128 @@
+:root {
+  --vs-theme-color1: #70167e;
+  --vs-theme-color1-rgb: 112, 22, 126;
+  --vs-theme-color2: #D18109;
+  --vs-theme-color2-rgb: 209, 129, 9;
+  --vs-theme-color3: #a60c56;
+  --vs-theme-color4: #4f830e;
+  --vs-theme-color5: #f8931f;
+  --vs-theme-color6: #F6F1E4;
+  --vs-theme-color7: #FFEFE4;
+  --vs-theme-color8: #FFEFE4;
+  --vs-title-color: #25283e;
+  --vs-title-color-rgb: 37, 40, 62;
+  --vs-text-color: #e1e1e1;
+  --vs-body-color: #5b5a7b;
+  --vs-body-color-rgb: 91, 90, 123;
+  --vs-smoke-color: #eff1f5;
+  --vs-black-color: #000000;
+  --vs-white-color: #ffffff;
+  --vs-white-color-rgb: 255, 255, 255;
+  --vs-yellow-color: #fec624;
+  --vs-success-color: #28a745;
+  --vs-error-color: #dc3545;
+  --vs-border-color: #e0e0e0;
+  --vs-title-font: 'Baloo 2', sans-serif;
+  --vs-body-font: 'Roboto', sans-serif;
+  --vs-special-font: 'Amatic SC', sans-serif;
+  --vs-icon-font: 'Font Awesome 6 Pro';
+  --vs-main-container: 1220px;
+  --vs-container-gutters: 30px;
+  --vs-section-space: 120px;
+  --vs-section-space-mobile: 80px;
+  --vs-section-title-space: 80px;
+  --ripple-ani-duration: 5s;
+}
+
+// Color Variation
+$vs-theme-color1: var(--vs-theme-color1);
+$vs-theme-color2: var(--vs-theme-color2);
+$vs-theme-color3: var(--vs-theme-color3);
+$vs-theme-color4: var(--vs-theme-color4);
+$vs-theme-color5: var(--vs-theme-color5);
+$vs-main-container: var(--vs-main-container);
+$vs-title-color: var(--vs-title-color);
+$vs-body-color: var(--vs-body-color);
+$vs-smoke-color: var(--vs-smoke-color);
+$vs-white-color: var(--vs-white-color);
+$vs-black-color: var(--vs-black-color);
+$vs-yellow-color: var(--vs-yellow-color);
+$vs-success-color: var(--vs-success-color);
+$vs-error-color: var(--vs-error-color);
+$vs-border-color: var(--vs-border-color);
+
+// Font Variation
+$vs-icon-font: var(--vs-icon-font);
+
+// Typography
+$vs-title-font: var(--vs-title-font) !default;
+$vs-body-font: var(--vs-body-font) !default;
+$vs-body-font-size: 16px;
+$vs-body-line-Height: 1.4;
+$vs-body-font-weight: 400;
+$vs-p-line-Height: 1.64;
+$vs-default-letter-spacing: 0.48px;
+
+// Device Variation
+$hd: 1921px; // Large Device Than 1920
+$xl: 1500px; // Extra large Device
+$ml: 1399px; // Medium Large Device
+$lg: 1199px; // Large Device (Laptop)
+$md: 991px; // Medium Device (Tablet)
+$sm: 767px; // Small Device
+$xs: 575px; // Extra Small Device
+
+// Spacing Count with 5x
+$space-count: 10;
+
+// Section Space  For large Device
+$space: var(--vs-section-space);
+$space-extra: calc(var(--vs-section-space) - 40px);
+
+// Section Space On small Device
+$space-mobile: var(--vs-section-space-mobile);
+$space-mobile-extra: calc(var(--vs-section-space-mobile) - 30px);
+
+// BG Color Mapping
+$bgcolorMap: (
+  ) !default;
+$bgcolorMap: map-merge(('theme': $vs-theme-color1,
+      'smoke': $vs-smoke-color,
+      'white': $vs-white-color,
+      'black': $vs-black-color,
+      'title': $vs-title-color,
+    ),
+    $bgcolorMap
+);
+
+// Overlay Color Mapping
+$overlaycolorMap: (
+);
+$overlaycolorMap: map-merge(('theme': $vs-theme-color1,
+      'title': $vs-title-color,
+      'white': $vs-white-color,
+      'black': $vs-black-color,
+    ),
+    $overlaycolorMap);
+
+// Text Color Mapping
+$textColorsMap: (
+);
+$textColorsMap: map-merge(('theme': $vs-theme-color1,
+      'title': $vs-title-color,
+      'body': $vs-body-color,
+      'white': $vs-white-color,
+      'yellow': $vs-yellow-color,
+      'success': $vs-success-color,
+      'error': $vs-error-color,
+    ),
+    $textColorsMap);
+
+// Font Mapping
+$fontsMap: (
+);
+$fontsMap: map-merge(('icon': $vs-icon-font,
+      'title': $vs-title-font,
+      'body': $vs-body-font,
+    ),
+    $fontsMap);

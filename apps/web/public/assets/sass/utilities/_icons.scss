@@ -1,0 +1,43 @@
+.sideMenuToggler {
+  background-color: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--vs-title-color);
+  margin-left: 10px;
+
+  &:hover {
+    color: var(--vs-theme-color2);
+  }
+}
+
+.searchBoxTggler {
+  --icon-size: 52px;
+  min-width: var(--icon-size);
+  min-height: var(--icon-size);
+  border-radius: 50%;
+  position: relative;
+  border: 0;
+  background-color: var(--vs-title-color);
+  color: var(--vs-white-color);
+
+  &:hover {
+    background-color: var(--vs-theme-color1);
+  }
+
+  &:before {
+    position: absolute;
+    content: "";
+    top: 50%;
+    left: 50%;
+    border-radius: inherit;
+    background-color: transparent;
+    border: 3px dashed var(--vs-white-color);
+    z-index: 1;
+    opacity: 0.4;
+    transition: all ease 0.4s;
+    width: 45px;
+    height: 45px;
+    transform: translate(-50%, -50%);
+    transform-origin: center center;
+  }
+}

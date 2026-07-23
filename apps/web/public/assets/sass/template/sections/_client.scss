@@ -1,0 +1,58 @@
+.vs-client {
+    display: flex;
+    align-items: stretch;
+    position: relative;
+    gap: 27px;
+    padding: 25px 60px 40px 50px;
+
+    @include lg {
+        background-color: var(--vs-white-color);
+        border-radius: 20px;
+        padding: 20px;
+    }
+
+    @include sm {
+        flex-wrap: wrap;
+        gap: 0;
+    }
+
+    &--slider {
+        padding-left: 0px;
+        display: flex;
+        justify-content: center;
+    }
+
+    &__image {
+        align-self: self-start;
+        border-radius: 50%;
+        overflow: hidden;
+        border: 7px solid var(--vs-theme-color1);
+        min-width: 91px;
+    }
+
+    &__content {
+        padding-top: 10px;
+    }
+
+    &__title {
+        font-size: 24px;
+        margin-bottom: 0px;
+        text-transform: capitalize;
+    }
+
+    &__quote {
+        position: absolute;
+        right: 80px;
+        bottom: 55px;
+
+        @include md {
+            right: 15px;
+            bottom: 25px;
+        }
+    }
+
+    &__desc {
+        font-weight: 500;
+        text-transform: capitalize;
+    }
+}

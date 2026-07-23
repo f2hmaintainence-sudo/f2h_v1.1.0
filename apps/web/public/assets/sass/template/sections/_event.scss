@@ -1,0 +1,312 @@
+.vs-event {
+    $self: &;
+    display: flex;
+    align-items: stretch;
+    gap: 40px;
+    background-color: var(--vs-white-color);
+    border: 1.5px dashed rgba(var(--vs-title-color-rgb), 0.20);
+    border-radius: 25px;
+    overflow: hidden;
+    padding: 21px 40px 21px 21px;
+    margin-bottom: 20px;
+
+    @include lg {
+        gap: 20px;
+        padding: 15px;
+    }
+
+    @include md {
+        flex-wrap: wrap;
+        gap: 20px;
+    }
+
+    &--ele1,
+    &--ele2 {
+        position: absolute;
+        top: 105px;
+        left: 0;
+        z-index: -1;
+    }
+
+    &--ele2 {
+        right: 0;
+        left: auto;
+    }
+
+    &__figure {
+        position: relative;
+        height: auto;
+        border-radius: 20px;
+        overflow: hidden;
+        min-width: 411px;
+
+        @include md {
+            min-width: 100%;
+        }
+
+        &--img {
+            height: 100%;
+            object-fit: cover;
+            transform: scale(1.05);
+            transition: transform 0.3s ease-in-out;
+
+            @include md {
+                width: 100%;
+            }
+        }
+
+        &--date {
+            position: absolute;
+            top: 21px;
+            right: 21px;
+            display: flex;
+            flex-direction: column;
+            text-align: center;
+            border: 1.5px dashed rgba(var(--vs-white-color-rgb), 0.30);
+            border-radius: 15px;
+            font-weight: 700;
+            font-family: var(--vs-title-font);
+            color: var(--vs-white-color);
+            overflow: hidden;
+        }
+
+        &--day {
+            display: flex;
+            flex-direction: column;
+            padding: 6px 21px;
+            font-size: 40px;
+            line-height: 1;
+            background-color: var(--vs-theme-color2);
+
+            @include sm {
+                font-size: 30px;
+            }
+        }
+
+        &--month {
+            font-size: 18px;
+            line-height: 1;
+            text-transform: uppercase;
+        }
+
+        &--year {
+            background-color: var(--vs-theme-color1);
+            padding: 4px 0px 2px;
+            font-size: 18px;
+        }
+    }
+
+    &__content {
+        align-self: center;
+    }
+
+    &__title {
+        font-size: clamp(1.625rem, 1.45rem + 0.88vw, 2.5rem);
+
+        a {
+            color: var(--vs-title-color);
+            text-transform: capitalize;
+
+            &:hover {
+                color: var(--vs-theme-color2);
+            }
+        }
+    }
+
+    .vs-time__features {
+        margin-bottom: 20px;
+
+        ul {
+            justify-content: flex-start;
+            gap: 20px;
+
+            @include md {
+                gap: 5px;
+            }
+
+            li {
+                color: var(--vs-title-color);
+
+                i {
+                    color: var(--vs-theme-color1);
+                }
+            }
+        }
+    }
+
+    &__text {
+        font-weight: 500;
+        text-transform: capitalize;
+        @include lts(3);
+
+        @include lg {
+            margin-bottom: 0;
+        }
+    }
+
+    &__footer {
+        display: flex;
+        gap: 34px;
+        padding-top: 20px;
+
+        @include sm {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+    }
+
+    &__user {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+
+        &--name {
+            font-size: 20px;
+            margin-bottom: 0;
+            text-transform: capitalize;
+        }
+
+        &--role {
+            text-transform: capitalize;
+            font-weight: 500;
+        }
+
+        &--img {
+            border-radius: 50%;
+            border: 3px solid rgba(var(--vs-theme-color2-rgb), 0.50);
+        }
+    }
+
+    &__btn {
+        padding-left: 15px;
+        position: relative;
+
+        @include sm {
+            padding-left: 0;
+        }
+
+        &::before {
+            position: absolute;
+            content: "";
+            top: 50%;
+            transform: translateY(-50%);
+            left: 0;
+            width: 1px;
+            height: 55px;
+            background-color: rgba(var(--vs-title-color-rgb), 0.30);
+
+            @include sm {
+                display: none;
+            }
+        }
+    }
+
+    &:hover {
+        #{$self}__figure--img {
+            transform: scale(1.01);
+        }
+    }
+
+    &--speaker {
+        #{$self}__footer {
+            padding-top: 0;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .social-style {
+            color: var(--vs-body-color);
+            font-family: var(--vs-body-font);
+            @include lts(3);
+            font-weight: 500;
+            padding-left: 20px;
+            position: relative;
+            flex: 1;
+
+            @include sm {
+                padding-left: 0;
+            }
+
+            &::before {
+                position: absolute;
+                content: "";
+                width: 1px;
+                height: 55px;
+                background-color: rgba(var(--vs-title-color-rgb), $alpha: 0.30);
+                left: 0;
+
+                @include sm {
+                    display: none;
+                }
+            }
+
+            a {
+                --icon-size: 36px;
+                color: var(--vs-theme-color2);
+                border: 2px solid rgba(var(--vs-title-color-rgb), $alpha: 0.30);
+
+                &:hover {
+                    background-color: var(--vs-theme-color2);
+                    color: var(--vs-white-color);
+                    border-color: var(--vs-theme-color2);
+                }
+            }
+        }
+    }
+}
+
+.vs-side-form {
+    $self: &;
+
+    &--reg {
+        padding: 55px;
+        border: 1px dashed rgba(var(--vs-title-color-rgb), $alpha: 0.30);
+        border-radius: 25px;
+
+        @include md {
+            padding: 15px;
+        }
+
+        .wp-block-heading {
+            font-size: 20px;
+            text-transform: capitalize;
+            padding: 10px 0;
+        }
+
+        #{$self}__group {
+            position: relative;
+            border: 1px solid rgba(var(--vs-title-color-rgb), $alpha: 0.40);
+            border-radius: 10px;
+
+            &--inline {
+                #{$self}__group {
+                    flex: auto;
+
+                    @include md {
+                        width: 100%;
+                    }
+                }
+            }
+
+            &--checkbox {
+                border: 0;
+            }
+        }
+
+        #{$self}__input {
+            @include lts(5);
+            font-size: 14px;
+
+            @include md {
+                width: 100%;
+            }
+        }
+
+        #{$self}__icon-wrapper {
+            position: absolute;
+            right: 0;
+            border-right: 0;
+        }
+    }
+}

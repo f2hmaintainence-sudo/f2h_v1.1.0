@@ -1,0 +1,316 @@
+import { api } from "./api.client";
+
+export interface DispatchItem {
+  product_variant_id: string;
+  product_name: string;
+  variant_name: string;
+  unit_value: number | null;
+  unit_type: string;
+  quantity: number;
+  /** Warehouse-friendly display string, e.g. "1000 ml Milk × 3" */
+  displayLabel: string;
+  orderCount?: number;
+}
+
+export interface DispatchOrder {
+  order_id: string;
+  customer_name: string;
+  address_line: string;
+  delivery_slot: string;
+  items: DispatchItem[];
+}
+
+export interface DeliveryPartnerPlan {
+  id: number; // Numeric primary key
+  run_id: string; // String run identifier (e.g. RUN-...)
+  run_number: string;
+  delivery_partner_id: string;
+  delivery_partner_name: string;
+  phone: string;
+  branch_name: string;
+  delivery_slot: string;
+  status: string;
+  orders: DispatchOrder[];
+  totals: Record<string, DispatchItem>;
+  totalOrders: number;
+  totalCustomers: number;
+  totalQuantity: number;
+  totalProducts: number;
+}
+
+export interface WarehouseTotalItem {
+  product_variant_id: string;
+  product_name: string;
+  variant_name: string;
+  unit_value: number | null;
+  unit_type: string;
+  quantity: number;
+  displayLabel: string;
+  orderCount?: number;
+}
+
+/**
+ * Builds a warehouse-friendly display label for a variant.
+ * E.g. "Cow Milk (500 ml) × 3"
+ */
+function buildDisplayLabel(
+  variantName: string,
+  productName: string,
+  unitValue: number | null,
+  unitType: string,
+  quantity: number,
+): string {
+  let label = productName;
+  if (variantName && variantName !== productName) {
+    label = `${productName} (${variantName})`;
+  }
+  return `${label} × ${quantity}`;
+}
+
+export class DispatchPlanningService {
+  /**
+   * Fetches the dispatch planning data from API for a target date
+   */
+  static async fetchDispatchPlan(date: string): Promise<DeliveryPartnerPlan[]> {
+    const runsRes = await api.get<any>(`/admin/delivery/runs?date=${date}&limit=100`);
+    const runs = runsRes.data?.data || [];
+
+    if (runs.length === 0) {
+      return [];
+    }
+
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date());
+    const pick = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+    const todayStr = `${pick('year')}-${pick('month')}-${pick('day')}`;
+    const isHistorical = date < todayStr;
+
+    // Fetch details for each run in parallel
+    const runDetailsPromises = runs.map((run: any) => {
+      const isDispatched = ['dispatched', 'in_progress', 'completed', 'partial'].includes(run.status);
+      if (isHistorical || isDispatched) {
+        // Fetch both address list and table-stored dispatch items
+        return Promise.all([
+          api.get<any>(`/admin/delivery/runs/${run.run_id}/addresses`).catch(() => ({ data: { data: [] } })),
+          api.get<any>(`/admin/delivery/dispatch/${run.id}/items`).catch(() => ({ data: { data: [] } }))
+        ]).then(([addrRes, dispRes]) => ({
+          run,
+          addresses: addrRes.data?.data || [],
+          dispatchItems: dispRes.data?.data || []
+        }));
+      } else {
+        // Today: live calculation from order addresses
+        return api.get<any>(`/admin/delivery/runs/${run.run_id}/addresses`)
+          .then(res => ({
+            run,
+            addresses: res.data?.data || [],
+            dispatchItems: []
+          }))
+          .catch(() => ({ run, addresses: [], dispatchItems: [] }));
+      }
+    });
+
+    const runsWithDetails = await Promise.all(runDetailsPromises);
+
+    // Process and construct plans
+    return runsWithDetails.map(({ run, addresses, dispatchItems }) => {
+      const orders: DispatchOrder[] = addresses.map((row: any) => {
+        let items: any[] = [];
+        if (typeof row.items_json === 'string') {
+          try {
+            items = JSON.parse(row.items_json);
+          } catch {
+            items = [];
+          }
+        } else if (Array.isArray(row.items_json)) {
+          items = row.items_json;
+        }
+
+        const parsedItems: DispatchItem[] = items.map(item => {
+          const qty = Number(item.quantity || 0);
+          const unitType = item.unit || 'pcs';
+          const unitValue = item.unit_value ? Number(item.unit_value) : null;
+          
+          // Real proper product name is item.variant_name (corresponds to pv.name in DB)
+          const productName = item.variant_name || item.product_name || 'Unknown Product';
+          
+          // Variant details is the unit representation (unit_value + unit_type)
+          const variantName = unitValue && unitType ? `${unitValue} ${unitType}` : (item.variant_name || '');
+
+          return {
+            product_variant_id: item.product_variant_id,
+            product_name: productName,
+            variant_name: variantName,
+            unit_value: unitValue,
+            unit_type: unitType,
+            quantity: qty,
+            displayLabel: buildDisplayLabel(variantName, productName, unitValue, unitType, qty),
+          };
+        });
+
+        return {
+          order_id: row.order_id,
+          customer_name: row.customer_name || 'Customer',
+          address_line: row.address_line || 'Address not listed',
+          delivery_slot: row.delivery_slot || run.delivery_slot,
+          items: parsedItems
+        };
+      });
+
+      // Calculate delivery-boy-wise product aggregates (grouped by product_name + variant_name combo)
+      const totals: Record<string, DispatchItem> = {};
+
+      const isDispatched = ['dispatched', 'in_progress', 'completed', 'partial'].includes(run.status);
+      if (isHistorical || isDispatched) {
+        // Count orders that contain each product group for this run
+        const orderCounts: Record<string, number> = {};
+        orders.forEach(order => {
+          const seen = new Set<string>();
+          order.items.forEach(item => {
+            const groupKey = `${item.product_name.trim()}::${item.variant_name.trim()}`;
+            if (!seen.has(groupKey)) {
+              orderCounts[groupKey] = (orderCounts[groupKey] || 0) + 1;
+              seen.add(groupKey);
+            }
+          });
+        });
+
+        // Populate totals directly from table data (delivery_dispatch_items)
+        dispatchItems.forEach((row: any) => {
+          const unitType = row.unit || row.unit_type || 'pcs';
+          const unitValue = row.unit_value ? Number(row.unit_value) : null;
+          
+          // Real proper product name is row.variant_name (corresponds to pv.name in DB)
+          const productName = row.variant_name || row.product_name || 'Unknown Product';
+          
+          // Variant details is unit representation
+          const variantName = unitValue && unitType ? `${unitValue} ${unitType}` : (row.variant_name || '');
+          const groupKey = `${productName.trim()}::${variantName.trim()}`;
+          const qty = Number(row.loaded_qty || row.planned_qty || 0);
+
+          if (!totals[groupKey]) {
+            totals[groupKey] = {
+              product_variant_id: row.product_variant_id,
+              product_name: productName,
+              variant_name: variantName,
+              unit_value: unitValue,
+              unit_type: unitType,
+              quantity: 0,
+              displayLabel: '',
+              orderCount: orderCounts[groupKey] || 1
+            };
+          }
+          totals[groupKey].quantity += qty;
+        });
+
+        // Compute display labels
+        Object.keys(totals).forEach(key => {
+          const t = totals[key];
+          t.displayLabel = buildDisplayLabel(t.variant_name, t.product_name, t.unit_value, t.unit_type, t.quantity);
+        });
+
+      } else {
+        // Today: live calculation from order items grouped by product_name + variant_name
+        orders.forEach(order => {
+          const seenInOrder = new Set<string>();
+          order.items.forEach(item => {
+            const groupKey = `${item.product_name.trim()}::${item.variant_name.trim()}`;
+            if (!totals[groupKey]) {
+              totals[groupKey] = {
+                product_variant_id: item.product_variant_id,
+                product_name: item.product_name,
+                variant_name: item.variant_name,
+                unit_value: item.unit_value,
+                unit_type: item.unit_type,
+                quantity: 0,
+                displayLabel: '',
+                orderCount: 0
+              };
+            }
+            totals[groupKey].quantity += item.quantity;
+            if (!seenInOrder.has(groupKey)) {
+              totals[groupKey].orderCount = (totals[groupKey].orderCount || 0) + 1;
+              seenInOrder.add(groupKey);
+            }
+          });
+        });
+
+        // Compute display labels for aggregated totals
+        Object.keys(totals).forEach(key => {
+          const t = totals[key];
+          t.displayLabel = buildDisplayLabel(t.variant_name, t.product_name, t.unit_value, t.unit_type, t.quantity);
+        });
+      }
+
+      const totalQty = Object.values(totals).reduce((sum, item) => sum + item.quantity, 0);
+
+      return {
+        id: run.id, // Primary key
+        run_id: run.run_id,
+        run_number: run.run_id,
+        delivery_partner_id: run.delivery_partner_id,
+        delivery_partner_name: run.partner_name || 'Unassigned Rider',
+        phone: run.partner_phone || 'N/A',
+        branch_name: run.branch_name || 'Default Branch',
+        delivery_slot: run.delivery_slot,
+        status: run.status,
+        orders,
+        totals,
+        totalOrders: orders.length,
+        totalCustomers: new Set(orders.map(o => o.customer_name)).size,
+        totalQuantity: totalQty,
+        totalProducts: Object.keys(totals).length
+      };
+    });
+  }
+
+  /**
+   * Compiles the overall warehouse aggregates
+   */
+  static compileWarehouseTotals(plans: DeliveryPartnerPlan[]): Record<string, WarehouseTotalItem> {
+    const totals: Record<string, WarehouseTotalItem> = {};
+    plans.forEach(plan => {
+      Object.keys(plan.totals).forEach(key => {
+        const pt = plan.totals[key];
+        // key is already groupKey from plan.totals
+        if (!totals[key]) {
+          totals[key] = {
+            product_variant_id: pt.product_variant_id,
+            product_name: pt.product_name,
+            variant_name: pt.variant_name,
+            unit_value: pt.unit_value,
+            unit_type: pt.unit_type,
+            quantity: 0,
+            displayLabel: '',
+            orderCount: 0
+          };
+        }
+        totals[key].quantity += pt.quantity;
+        totals[key].orderCount = (totals[key].orderCount || 0) + (pt.orderCount || 1);
+      });
+    });
+
+    Object.keys(totals).forEach(key => {
+      const wt = totals[key];
+      wt.displayLabel = buildDisplayLabel(wt.variant_name, wt.product_name, wt.unit_value, wt.unit_type, wt.quantity);
+    });
+
+    return totals;
+  }
+
+  /**
+   * Dispatches the stock for a delivery run
+   */
+  static async approveDispatch(runDbId: number, warehouseId: string, totals: Record<string, DispatchItem>): Promise<any> {
+    const items = Object.values(totals).map(t => ({
+      warehouse_id: warehouseId,
+      product_variant_id: t.product_variant_id,
+      planned_qty: t.quantity,
+      loaded_qty: t.quantity,
+      unit: t.unit_type
+    }));
+
+    return api.post<any>(`/admin/delivery/dispatch/${runDbId}`, { items });
+  }
+}

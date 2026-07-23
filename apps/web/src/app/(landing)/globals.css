@@ -1,0 +1,129 @@
+/* F2H theme tokens: @theme inline from f2h — utilities wired via tailwind.config.js (Tailwind v3) */
+
+/*
+ * Bootstrap/base `_base.scss` sets `img { max-width: 100%; height: auto; }` globally.
+ * That breaks Next/Image `fill` and some fixed hero/section backgrounds. Reset inside F2H wrappers.
+ */
+.f2h-media-reset img {
+  max-width: none !important;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: #f9f6ef;
+  color: #6b7280;
+  font-family: "Plus Jakarta Sans", sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f9f6ef;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2d8a45;
+  border-radius: 4px;
+}
+
+/* Glassmorphism utility */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.glass-dark {
+  background: rgba(13, 61, 26, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(45, 138, 69, 0.2);
+}
+
+/* Gold gradient text */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #0d3d1a, #1a6b32, #0d3d1a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Green glow shadow */
+.shadow-green-glow {
+  box-shadow: 0 4px 30px rgba(45, 138, 69, 0.15);
+}
+
+/* Gold glow shadow */
+.shadow-gold-glow {
+  box-shadow: 0 4px 30px rgba(240, 165, 0, 0.25);
+}
+
+/* Organic pattern overlay */
+.organic-pattern {
+  background-image: radial-gradient(circle at 20% 80%, rgba(45, 138, 69, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(240, 165, 0, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(45, 138, 69, 0.05) 0%, transparent 70%);
+}
+
+/* Floating animation */
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+@keyframes float-delayed {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-float-delayed {
+  animation: float-delayed 5s ease-in-out infinite;
+  animation-delay: 1s;
+}
+
+/* Phone mockup glow */
+.phone-glow {
+  box-shadow: 0 0 60px rgba(240, 165, 0, 0.2), 0 0 120px rgba(45, 138, 69, 0.1);
+}
+
+/* Delivery section route line */
+@keyframes delivery-route-shift {
+  0% {
+    stroke-dashoffset: 80;
+  }
+
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.delivery-route-path {
+  stroke-dasharray: 8 6;
+  animation: delivery-route-shift 18s linear infinite;
+}

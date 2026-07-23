@@ -1,0 +1,20 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development          # uses the dev stage from the multi-stage Dockerfile
+    container_name: f2hfrontend-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app                     # hot-reload: sync local source into container
+      - /app/node_modules          # anonymous volume: keep container's node_modules isolated
+      - /app/.next                 # anonymous volume: keep .next build cache inside container
+    environment:
+      - NODE_ENV=development
+    env_file:
+      - path: .env.local
+        required: false            # won't crash if .env.local doesn't exist (e.g. fresh clone)
+    command: npm run dev
+    restart: unless-stopped

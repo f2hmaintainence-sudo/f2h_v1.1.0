@@ -1,0 +1,245 @@
+.image-scale-hover {
+  overflow: hidden;
+
+  img {
+    transition: all ease 0.4s;
+    transform: scale(1.001);
+  }
+
+  &:hover {
+    img {
+      transform: scale(1.2);
+    }
+  }
+}
+
+.alert-dismissible .btn-close {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.z-index-step1 {
+  position: relative;
+  z-index: 4 !important;
+}
+
+.z-index-common {
+  position: relative;
+  z-index: 3;
+}
+
+.z-index-n1 {
+  z-index: -1;
+}
+
+.z-index-n2 {
+  z-index: 2;
+}
+
+.media-body {
+  flex: 1;
+}
+
+.fs-40 {
+  font-size: 40px;
+}
+
+.badge {
+  position: absolute;
+  width: -webkit-fit-content;
+  width: -moz-fit-content;
+  width: fit-content;
+  display: inline-block;
+  text-align: center;
+  background-color: $vs-theme-color1;
+  color: $vs-white-color;
+  padding: 0.35em 0.55em;
+  border-radius: 50%;
+}
+
+.hr-style1 {
+  background-color: $vs-white-color;
+  margin: 20px 0 30px 0;
+}
+
+.new-label {
+  font-size: 12px;
+  background-color: $vs-error-color;
+  color: $vs-white-color;
+  line-height: 1;
+  padding: 1px 5px;
+  border-radius: 4px;
+  text-transform: capitalize;
+  position: relative;
+  top: -1px;
+}
+
+.big-name {
+  font-size: 450px;
+  color: $vs-white-color;
+  -webkit-text-stroke: 2px #eef0ff;
+  line-height: 1;
+  letter-spacing: -0.08em;
+  font-weight: 400;
+  position: relative;
+  z-index: 31;
+  text-align: right;
+  margin: -234px 30px -59px 0;
+}
+
+@mixin vs-text--bolder {
+  font-weight: 900;
+  font-size: 18px;
+  color: var(--vs-title-color);
+  text-transform: capitalize;
+}
+
+.vs-text-bolder {
+  @include vs-text--bolder;
+}
+
+.vs-text {
+  font-weight: 500;
+  @include lts(3);
+}
+
+.vs-list {
+  list-style: none;
+  padding-left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  li {
+    position: relative;
+    @include vs-text--bolder;
+    font-family: var(--vs-title-font);
+    padding-left: 39px;
+
+    &::before {
+      position: absolute;
+      content: "\e426";
+      font-family: var(--vs-icon-font);
+      left: 0;
+      color: var(--vs-theme-color2);
+      font-size: 26px;
+      top: 0;
+      line-height: 1;
+    }
+  }
+
+  &.style2 {
+    li {
+      font-weight: 500;
+      font-size: 16px;
+      color: #25283E;
+      padding-left: 30px;
+      font-family: var(--vs-body-font);
+
+      &::before {
+        content: "\f058";
+        font-size: 18px;
+        color: var(--vs-theme-color2);
+        font-weight: 700;
+      }
+    }
+  }
+}
+
+.vs-custom-checkbox {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 15px 0 25px;
+
+  input[type="checkbox"] {
+    display: none;
+
+    &:checked+label::before {
+      background-color: var(--vs-theme-color2);
+      border-color: var(--vs-theme-color2);
+      content: '✔';
+      color: var(--vs-white-color);
+      text-align: center;
+      line-height: 24px;
+      font-size: 16px;
+    }
+  }
+
+  label {
+    position: relative;
+    padding-left: 36px;
+    cursor: pointer;
+    font-size: 16px;
+    user-select: none;
+    font-size: 18px;
+    font-weight: 800;
+    font-family: var(--vs-title-font);
+    color: var(--vs-white-color);
+    text-transform: capitalize;
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 24px;
+      height: 24px;
+      border: 2px solid rgba(var(--vs-white-color-rgb), $alpha: 0.20);
+      border-radius: 4px;
+      background-color: transparent;
+      transition: all 0.4s ease;
+    }
+  }
+}
+
+.column-count-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+
+  @media (max-width: 991px) {
+    grid-template-columns: repeat(1, 1fr);
+  }
+}
+
+.vs-image-effect {
+  transform-style: preserve-3d;
+
+  &__image {
+    backface-visibility: hidden;
+    will-change: transform;
+  }
+
+  &__overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    opacity: 0;
+    transform: scale(1);
+    border-radius: 16px;
+    mix-blend-mode: screen;
+    will-change: opacity, transform, filter, background-position;
+    background: linear-gradient(120deg,
+        rgba(209, 129, 9, 0.6) 0%,
+        rgba(112, 22, 126, 0.6) 50%,
+        rgba(209, 129, 9, 0.6) 90%);
+    background-size: 200% 200%;
+    animation: shimmer 3s linear infinite;
+    filter: blur(3px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}

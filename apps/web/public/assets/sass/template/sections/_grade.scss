@@ -1,0 +1,134 @@
+.vs-grade {
+    $self: &;
+    position: relative;
+    background-color: var(--vs-white-color);
+    border-radius: 21px;
+    overflow: hidden;
+    margin-bottom: 30px;
+    filter: drop-shadow(0px 4px 15px rgba(0, 0, 0, 0.07));
+    @include vst;
+
+    &::before {
+        position: absolute;
+        content: "";
+        width: 100%;
+        height: 100%;
+        border: 3px dashed rgba($color: #1E1E1E, $alpha: 0.15);
+        border-radius: 21px;
+    }
+
+    &__figure {
+        margin-bottom: 0;
+        position: relative;
+        overflow: hidden;
+    }
+
+    &__body {
+        padding: 0 12px 20px 12px;
+        position: relative;
+        z-index: 1;
+    }
+
+    &__header {
+        padding: 10px;
+        background-color: var(--vs-white-color);
+        margin-top: -23px;
+        border-radius: 10px;
+
+        ul {
+            list-style: none;
+            padding-left: 0;
+            margin-bottom: 0;
+            column-count: 3;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+
+            li {
+                flex: auto;
+            }
+
+            @include lg {
+                justify-content: flex-start;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+        }
+    }
+
+    &__feature {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 9px 15px;
+        border: 3px dashed rgba(var(--vs-white-color-rgb), 0.3);
+        border-radius: 10px;
+        min-width: 100%;
+        min-height: 67px;
+    }
+
+    &__age,
+    &__size {
+        color: var(--vs-white-color);
+        display: inline-block;
+    }
+
+    &__age {
+        font-size: 20px;
+        font-weight: 900;
+        font-family: var(--vs-title-font);
+        line-height: 1.1;
+    }
+
+    &__size {
+        font-size: 14px;
+        font-weight: 600;
+        @include lts(3);
+        text-transform: capitalize;
+    }
+
+    &__content {
+        padding: 15px 25px;
+    }
+
+    &__heading {
+        font-size: clamp(1.25rem, 1.159rem + 0.45vw, 1.5rem);
+        text-transform: capitalize;
+        line-height: 1.1;
+        margin-bottom: 7px;
+        @include vst;
+
+        &:hover {
+            color: var(--vs-theme-color2);
+        }
+
+        &--link {
+            display: block;
+        }
+    }
+
+    &__price {
+        font-weight: 600;
+        color: var(--vs-theme-color2);
+        font-size: 20px;
+        display: inline-block;
+        margin-bottom: 13px;
+
+        span {
+            font-size: 16px;
+        }
+    }
+
+    &__text {
+        margin-bottom: 0;
+        text-transform: capitalize;
+        font-weight: 500;
+        @include lts(3);
+    }
+
+    &:hover {
+        background-color: var(--vs-theme-color8);
+    }
+}

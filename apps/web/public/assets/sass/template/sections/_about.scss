@@ -1,0 +1,236 @@
+.vs-about {
+    @mixin story-title {
+        font-size: 18px;
+        font-weight: 700;
+        font-family: var(--vs-title-font);
+        color: var(--vs-title-color);
+        text-transform: capitalize;
+    }
+
+    &--ele1,
+    &--ele1h3 {
+        position: absolute;
+        right: 10%;
+        bottom: 0;
+
+        @include sm {
+            right: 0;
+        }
+    }
+
+    &--ele1h3 {
+        top: 139px;
+        left: 0;
+        right: auto;
+        bottom: auto;
+    }
+
+    &--story {
+        &__tab {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            column-gap: 27px;
+
+            @include sm {
+                gap: 15px;
+            }
+
+            .nav-tabs {
+                border-bottom: 0;
+
+                button {
+                    @include story-title;
+                    padding: 10px 25px;
+                    border-radius: 30px;
+                    background-color: transparent;
+                    line-height: 1;
+                    border: 2px dashed transparent;
+
+                    @include sm {
+                        padding: 10px 15px;
+                    }
+
+                    &:hover {
+                        border-color: transparent;
+                        color: var(--vs-theme-color2);
+                    }
+
+                    &.active {
+                        border: 2px dashed var(--vs-theme-color2);
+                        background-color: rgba(var(--vs-theme-color2-rgb), $alpha: 0.10);
+                        color: var(--vs-theme-color2);
+                        box-shadow: inset 0px 4px 4px rgba(0, 0, 0, 0.1);
+                    }
+                }
+            }
+        }
+
+        &__title {
+            @include story-title;
+        }
+    }
+
+    &--image {
+        min-height: 607px;
+        max-width: 607px;
+        width: 100%;
+        position: relative;
+
+        @include lg {
+            min-height: 607px;
+        }
+
+        @include md {
+            min-height: 607px;
+            margin: 0 auto;
+        }
+
+        @include sm {
+            display: grid;
+            gap: 15px;
+        }
+
+        &__figure1,
+        &__figure2,
+        &__ele1,
+        &__ele2,
+        &__ele3 {
+            position: absolute;
+            top: 0;
+            left: 0;
+
+            @include sm {
+                position: static;
+            }
+        }
+
+        &__figure1,
+        &__figure2 {
+            display: inline-block;
+
+            &::before {
+                position: absolute;
+                content: '';
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                border: 3px dashed rgba(var(--vs-white-color-rgb), $alpha: 0.40);
+                border-radius: 21px;
+            }
+
+            img {
+                border-radius: 21px;
+
+                @include sm {
+                    width: 100%;
+                    object-fit: cover;
+                }
+            }
+        }
+
+        &__figure1 {
+            left: 13px;
+        }
+
+        &__figure2 {
+            left: 145px;
+            top: 146px;
+        }
+
+        &__ele1 {
+            top: calc(214px + 52px);
+            left: -96px;
+
+            @include sm {
+                display: none;
+            }
+        }
+
+        &__ele2 {
+            top: calc(214px + 53px);
+            left: 45px;
+
+            @include sm {
+                display: none;
+            }
+        }
+
+        &__ele3 {
+            --circle-size: 309px;
+            min-width: var(--circle-size);
+            min-height: var(--circle-size);
+            background-color: rgba(var(--vs-theme-color2-rgb), 0.30);
+            border-radius: 50%;
+            z-index: -1;
+            left: -68px;
+            top: 188px;
+
+            @include sm {
+                display: none;
+            }
+        }
+
+        &.style2 {
+            min-height: auto;
+        }
+    }
+
+    &--yoe {
+        position: absolute;
+        top: 34px;
+        left: calc(198px + 13px + 30px);
+        display: flex;
+        align-items: center;
+        gap: 15px;
+
+        @include sm {
+            max-width: 80%;
+            margin: 0 auto;
+            position: static;
+            padding-top: 30px;
+        }
+
+        &__number {
+            --icon-size: 88px;
+            width: var(--icon-size);
+            height: var(--icon-size);
+            min-width: var(--icon-size);
+            min-height: var(--icon-size);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            font-weight: 700;
+            font-family: var(--vs-title-font);
+            background-color: var(--vs-theme-color1);
+            border-radius: 50%;
+            color: var(--vs-white-color);
+            position: relative;
+
+            &::before {
+                position: absolute;
+                content: '';
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                border-radius: 50%;
+                border: 3px dashed rgba(var(--vs-white-color-rgb), $alpha: 0.50);
+                opacity: 0.4;
+            }
+        }
+
+        &__text {
+            @include vs-text--bolder;
+            font-size: 20px;
+            padding-right: 210px;
+            font-family: var(--vs-title-font);
+
+            @include sm {
+                padding-right: 0;
+            }
+        }
+    }
+}

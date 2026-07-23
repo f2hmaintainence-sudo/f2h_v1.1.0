@@ -1,0 +1,105 @@
+.breadcrumb-wrapper {
+  padding-top: 140px;
+  padding-bottom: 135px;
+  background-color: var(--vs-title-color);
+  min-height: 465px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-position: bottom center;
+  position: relative;
+  overflow: hidden;
+
+  @include md {
+    padding-top: 40px;
+    padding-bottom: 40px;
+    min-height: 325px;
+  }
+
+  &__bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: -1;
+    bottom: 0;
+
+    &>img {
+      height: 100%;
+      object-fit: cover;
+      width: 100%;
+    }
+  }
+
+  &__ele1 {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+  }
+
+  &__content {
+    text-align: center;
+  }
+
+  &__title {
+    color: var(--vs-white-color);
+    width: 100%;
+    text-transform: capitalize;
+    font-size: clamp(1.875rem, 1.563rem + 1.56vw, 3.438rem);
+    margin: 0 0 5px 0;
+
+    @include md {
+      margin: 0 0 10px 0;
+    }
+  }
+
+  &__menu {
+    max-width: 100%;
+    margin: -0.35em 0 -0.35em 0;
+    padding: 0;
+    list-style-type: none;
+
+    &--item {
+      display: inline-block;
+      list-style: none;
+      position: relative;
+
+      &::after {
+        content: '\f101';
+        font-family: var(--vs-icon-font);
+        display: inline-block;
+        margin: 0 3px 0 7px;
+        position: relative;
+        color: inherit; // Ensure color is inherited
+        font-size: 16px;
+        color: var(--vs-theme-color2);
+      }
+
+      &:last-child::after {
+        content: ''; // Remove the slash for the last item
+      }
+    }
+
+    li,
+    a,
+    span {
+      white-space: normal;
+      word-break: break-word;
+      font-weight: 700;
+      font-size: 22px;
+      font-family: var(--vs-title-font);
+      color: var(--vs-white-color);
+      text-transform: capitalize;
+    }
+
+    a {
+      color: var(--vs-theme-color2);
+
+      &:hover {
+        color: var(--vs-white-color);
+      }
+    }
+  }
+}

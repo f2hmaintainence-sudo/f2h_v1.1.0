@@ -1,0 +1,188 @@
+.vs {
+    &-feature {
+        $self: &;
+        display: flex;
+        align-items: center;
+        border: 3px dashed rgba(var(--vs-white-color-rgb), 25%);
+        gap: 15px;
+        padding: 25px 30px;
+        border-radius: 18px;
+        position: relative;
+
+        @include lg {
+            padding: 20px 15px;
+            gap: 10px;
+        }
+
+        &__top {
+            position: absolute;
+            top: -23px;
+            left: 30px;
+        }
+
+        &__title {
+            font-size: clamp(1.25rem, 1.159rem + 0.45vw, 1.5rem);
+            color: var(--vs-white-color);
+        }
+
+        &__text {
+            color: var(--vs-white-color);
+            font-weight: 500;
+            margin-bottom: 0;
+        }
+
+        &__icon {
+            --icon-size: 90px;
+            width: var(--icon-size);
+            height: var(--icon-size);
+            min-width: var(--icon-size);
+            min-height: var(--icon-size);
+
+            @include lg {
+                --icon-size: 65px;
+            }
+        }
+
+        &.style2 {
+            background: var(--vs-theme-color2);
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 20px;
+            border: none;
+            z-index: 1;
+            align-items: flex-start;
+            padding: 33px 30px;
+            @include vst();
+
+            &::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                left: -1px;
+                right: 0;
+                bottom: 0;
+                width: 96%;
+                height: 100%;
+                border-radius: 20px;
+                background-color: var(--vs-white-color);
+                z-index: -1;
+            }
+
+            #{$self}__icon {
+                --icon-size: 60px;
+            }
+
+            #{$self}__title {
+                color: var(--vs-title-color);
+            }
+
+            #{$self}__text {
+                color: var(--vs-body-color);
+                margin-bottom: 20px;
+                text-transform: capitalize;
+                font-weight: 500;
+            }
+
+            #{$self}__link {
+                color: var(--vs-body-color);
+                font-weight: 800;
+                font-family: var(--vs-title-font);
+                text-transform: uppercase;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+
+                &:hover {
+                    color: var(--vs-theme-color2);
+                }
+            }
+
+            &:hover {
+                background-color: var(--vs-theme-color1);
+            }
+        }
+    }
+
+    &-featureh3 {
+        $self: &;
+        display: flex;
+        align-items: center;
+        gap: 21px;
+        text-align: right;
+        margin-bottom: 40px;
+
+        @include sm {
+            gap: 15px;
+        }
+
+        @include md {
+            justify-content: flex-end;
+        }
+
+        &__heading {
+            font-size: 24px;
+
+            @include sm {
+                font-size: 22px;
+            }
+        }
+
+        &__icon {
+            --icon-size: 95px;
+            width: var(--icon-size);
+            height: var(--icon-size);
+            min-width: var(--icon-size);
+            min-height: var(--icon-size);
+            background-color: var(--vs-theme-color2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            color: var(--vs-white-color);
+            font-size: 30px;
+            padding: 10px;
+            position: relative;
+            z-index: 1;
+            @include vst;
+
+            @include sm {
+                --icon-size: 80px;
+            }
+
+            &::before {
+                --border-size: 100%;
+                content: "";
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                width: var(--border-size);
+                height: var(--border-size);
+                border-radius: 50%;
+                border: 2px dashed var(--vs-white-color);
+                z-index: -1;
+                transition: all 0.3s ease-in-out;
+                scale: 0.9;
+            }
+        }
+
+        &__text {
+            margin-bottom: 0;
+            text-transform: capitalize;
+        }
+
+        &__image {
+            margin-bottom: 40px;
+
+            @include md {
+                text-align: center;
+            }
+        }
+
+        &:hover {
+            #{$self}__icon {
+                background-color: var(--vs-theme-color1);
+            }
+        }
+    }
+}

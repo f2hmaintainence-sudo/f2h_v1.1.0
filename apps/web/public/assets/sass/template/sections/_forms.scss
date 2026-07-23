@@ -1,0 +1,157 @@
+.form-style {
+  --bs-gutter-x: 20px;
+  --bs-gutter-y: 20px;
+  padding: 0px;
+
+  .row:not([class*=gx-]) {
+    --bs-gutter-x: 20px;
+    --bs-gutter-y: 15px;
+  }
+
+  textarea,
+  input {
+    height: 60px;
+    background-color: transparent;
+    font-size: 16px;
+    font-family: $vs-body-font;
+    color: $vs-body-color;
+    border-radius: 50px;
+    border: 1.5px solid rgba(var(--vs-white-color-rgb), 0.2);
+    padding: 10px 31px;
+    font-weight: 500;
+    box-shadow: none;
+    outline: none;
+    @include vst;
+
+    &::placeholder {
+      color: var(--vs-white-color);
+      opacity: 1;
+      visibility: visible;
+      @include vst;
+    }
+
+    &:focus {
+      box-shadow: none;
+
+      &::placeholder {
+        color: var(--vs-title-color);
+        opacity: 0;
+        visibility: hidden;
+      }
+    }
+  }
+
+  textarea {
+    min-height: 180px;
+    resize: none;
+  }
+}
+
+.form-style2 {
+  .form-group {
+    margin-bottom: var(--bs-gutter-x);
+    position: relative;
+  }
+
+  .form-control {
+    background-color: var(--vs-theme-color6);
+    border-radius: 15px;
+    border: 1.5px solid rgba(var(--vs-title-color-rgb), 0.07);
+    min-height: 69px;
+    border-radius: 15px;
+    font-weight: 700;
+    @include lts(5);
+    padding: 19px 20px;
+    box-shadow: none;
+    outline: none;
+  }
+
+  textarea.form-control {
+    min-height: 169px;
+  }
+}
+
+.custom-checkbox input[type=checkbox]~label:before,
+.custom-checkbox input[type=radio]~label:before,
+.wc_payment_method input[type=checkbox]~label:before,
+.wc_payment_method input[type=radio]~label:before,
+.woocommerce-shipping-methods input[type=checkbox]~label:before,
+.woocommerce-shipping-methods input[type=radio]~label:before,
+#ship-to-different-address input[type=checkbox]~label:before,
+#ship-to-different-address input[type=radio]~label:before {
+  content: "\f00c";
+  background-color: transparent;
+  border: 1px solid var(--vs-theme-color2);
+  border-radius: 0;
+  height: 20px;
+  width: 20px;
+  min-width: 20px;
+  line-height: 20px;
+  font-family: var(--icon-font);
+  text-align: center;
+  color: var(--bg-color);
+  font-size: 0px;
+  transition: all 0.3s ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.custom-checkbox,
+.wc_payment_method,
+.woocommerce-shipping-methods,
+#ship-to-different-address {
+  padding: 10px 0 20px 0;
+  display: flex;
+  align-items: center;
+
+  @include lg {
+    padding: 0px 0 20px 0;
+  }
+
+  label {
+    margin-bottom: 0;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+  }
+
+  input[type='checkbox'],
+  input[type='radio'] {
+    display: none;
+
+    &~label:before {
+      content: '\f00c';
+      background-color: transparent;
+      border: 1px solid var(--vs-theme-color2);
+      border-radius: 0;
+      height: 20px;
+      width: 20px;
+      min-width: 20px;
+      line-height: 20px;
+      font-family: var(--vs-icon-font);
+      text-align: center;
+      color: var(--vs-white-color);
+      font-size: 0px;
+      @include vst;
+    }
+
+    &:checked {
+      ~label {
+        &:before {
+          background-color: var(--vs-theme-color2);
+          border-color: transparent;
+          font-size: 16px;
+          @include vst;
+        }
+      }
+    }
+  }
+}
+
+.form-messages {
+  font-weight: 700;
+}

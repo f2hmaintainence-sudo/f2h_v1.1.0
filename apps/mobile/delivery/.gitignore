@@ -1,0 +1,58 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# VS Code
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+build/
+*.DS_Store
+
+# Web related
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio keystores
+*.jks
+*.keystore
+
+# Crashlytics files (if any)
+crashlytics-build.properties
+# JVM crash/heap dump logs
+hs_err_pid*.log
+replay_pid*.log
+*.hprof
+
+# Gradle/Kotlin error logs
+android/.gradle/
+android/.kotlin/
+
+# Scratch/temp scripts
+scratch/

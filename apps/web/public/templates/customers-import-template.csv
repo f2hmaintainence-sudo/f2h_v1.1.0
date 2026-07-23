@@ -1,0 +1,4 @@
+first_name,last_name,phone,email,address,area,city,pincode,delivery_preference,zone_name
+Rajesh,Kumar,9876543210,rajesh@example.com,"12 MG Road",Madhapur,Hyderabad,500081,morning,North Zone
+Priya,,9123456789,,Door 4 Banjara Hills,Banjara Hills,Hyderabad,500034,evening,
+Amit,Shah,9988776655,amit@mail.com,Plot 22 Hitech City,Hitech City,Hyderabad,500081,both,South Zone

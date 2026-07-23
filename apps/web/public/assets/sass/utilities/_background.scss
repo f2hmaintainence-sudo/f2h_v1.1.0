@@ -1,0 +1,54 @@
+@each $bgcolorMap, $value in $bgcolorMap {
+  .bg-#{$bgcolorMap} {
+    background-color: #{$value} !important;
+  }
+}
+
+.bg-gray {
+  background-color: #e5e5e5;
+}
+
+.bg-title {
+  background-color: var(--vs-title-color);
+}
+
+.bg-theme-color-1 {
+  background-color: var(--vs-theme-color1);
+}
+
+.background-image,
+[data-bg-src] {
+  @include background-content(no-repeat, cover, center center);
+}
+
+.bg-fluid {
+  @include background-content(no-repeat, 100% 100%, center center);
+}
+
+.bg-auto {
+  background-size: auto auto;
+}
+
+.bg-color1 {
+  background-color: var(--vs-theme-color1);
+}
+
+.bg-color2 {
+  background-color: var(--vs-theme-color2);
+}
+
+.bg-color3 {
+  background-color: var(--vs-theme-color3);
+}
+
+.bg-color4 {
+  background-color: var(--vs-theme-color4);
+}
+
+.bg-color5 {
+  background-color: var(--vs-theme-color5);
+}
+
+.bg-color6 {
+  background-color: var(--vs-theme-color6);
+}

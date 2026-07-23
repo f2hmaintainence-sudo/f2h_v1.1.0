@@ -1,0 +1,522 @@
+import 'package:f2h_customer/core/utils/extensions.dart';
+
+String? _asString(dynamic value) {
+  if (value == null) return null;
+  final text = value.toString().trim();
+  return text.isEmpty ? null : text;
+}
+
+int _asInt(dynamic value) {
+  if (value == null) return 0;
+  if (value is int) return value;
+  if (value is double) return value.toInt();
+  return int.tryParse(value.toString()) ?? 0;
+}
+
+double _asDouble(dynamic value) {
+  if (value == null) return 0.0;
+  if (value is double) return value;
+  if (value is int) return value.toDouble();
+  return double.tryParse(value.toString()) ?? 0.0;
+}
+
+bool _isTruthy(dynamic value) {
+  final normalized = value?.toString().trim().toLowerCase();
+  return normalized == 'true' || normalized == '1' || normalized == 'yes';
+}
+
+List<Map<String, dynamic>> _asListOfMaps(dynamic value) {
+  if (value is! List) return const [];
+  return value
+      .whereType<Map>()
+      .map((entry) => Map<String, dynamic>.from(entry))
+      .toList();
+}
+
+String _emojiForProduct(String name) {
+  final normalized = name.toLowerCase();
+  if (normalized.contains('milk')) return '🥛';
+  if (normalized.contains('ghee')) return '🧈';
+  if (normalized.contains('curd')) return '🍶';
+  if (normalized.contains('paneer')) return '🧀';
+  return '📦';
+}
+
+class SubscriptionScheduleModel {
+  final String? subscriptionItemId;
+  final int dayOfWeek;
+  final int mQuantity;
+  final int eQuantity;
+  final String? effectiveFrom;
+  final String? effectiveTo;
+
+  const SubscriptionScheduleModel({
+    this.subscriptionItemId,
+    required this.dayOfWeek,
+    this.mQuantity = 0,
+    this.eQuantity = 0,
+    this.effectiveFrom,
+    this.effectiveTo,
+  });
+
+  factory SubscriptionScheduleModel.fromJson(Map<String, dynamic> json) {
+    return SubscriptionScheduleModel(
+      subscriptionItemId: _asString(
+        json['subscription_item_id'] ?? json['subscriptionItemId'],
+      ),
+      dayOfWeek: _asInt(json['day_of_week'] ?? json['dayOfWeek']),
+      mQuantity: _asInt(json['m_quantity'] ?? json['mQuantity']),
+      eQuantity: _asInt(json['e_quantity'] ?? json['eQuantity']),
+      effectiveFrom: _asString(json['effective_from'] ?? json['effectiveFrom']),
+      effectiveTo: _asString(json['effective_to'] ?? json['effectiveTo']),
+    );
+  }
+
+  String get dayName {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return days[dayOfWeek.clamp(0, 6)];
+  }
+
+  bool get hasDelivery => mQuantity > 0 || eQuantity > 0;
+}
+
+class SubscriptionCustomDateModel {
+  final String id;
+  final String subscriptionId;
+  final String subscriptionItemId;
+  final String deliveryDate;
+  final int mQuantity;
+  final int eQuantity;
+
+  const SubscriptionCustomDateModel({
+    required this.id,
+    required this.subscriptionId,
+    required this.subscriptionItemId,
+    required this.deliveryDate,
+    this.mQuantity = 0,
+    this.eQuantity = 0,
+  });
+
+  factory SubscriptionCustomDateModel.fromJson(Map<String, dynamic> json) {
+    return SubscriptionCustomDateModel(
+      id: _asString(json['id'] ?? json['custom_date_id']) ?? '',
+      subscriptionId:
+          _asString(json['subscription_id'] ?? json['subscriptionId']) ?? '',
+      subscriptionItemId:
+          _asString(
+            json['subscription_item_id'] ?? json['subscriptionItemId'],
+          ) ??
+          '',
+      deliveryDate:
+          _asString(json['delivery_date'] ?? json['deliveryDate']) ?? '',
+      mQuantity: _asInt(json['m_quantity'] ?? json['mQuantity']),
+      eQuantity: _asInt(json['e_quantity'] ?? json['eQuantity']),
+    );
+  }
+
+  bool get hasDelivery => mQuantity > 0 || eQuantity > 0;
+}
+
+class SubscriptionPauseModel {
+  final String id;
+  final String subscriptionId;
+  final String subscriptionItemId;
+  final String? startDate;
+  final String? endDate;
+  final String? reason;
+
+  const SubscriptionPauseModel({
+    required this.id,
+    required this.subscriptionId,
+    this.subscriptionItemId = '',
+    this.startDate,
+    this.endDate,
+    this.reason,
+  });
+
+  factory SubscriptionPauseModel.fromJson(Map<String, dynamic> json) {
+    return SubscriptionPauseModel(
+      id: _asString(json['id']) ?? '',
+      subscriptionId:
+          _asString(json['subscription_id'] ?? json['subscriptionId']) ?? '',
+      subscriptionItemId:
+          _asString(
+            json['subscription_item_id'] ?? json['subscriptionItemId'],
+          ) ??
+          '',
+      startDate: _asString(
+        json['start_date'] ??
+            json['paused_at'] ??
+            json['pause_from_date'] ??
+            json['pauseFromDate'],
+      ),
+      endDate: _asString(
+        json['end_date'] ??
+            json['resumed_at'] ??
+            json['pause_to_date'] ??
+            json['pauseToDate'],
+      ),
+      reason: _asString(json['reason']),
+    );
+  }
+
+  bool get isCurrentlyPaused {
+    final end = endDate;
+    if (end == null || end.isEmpty) return true;
+
+    final parsedEnd = DateTime.tryParse(end);
+    if (parsedEnd == null) {
+      return end == '2099-12-31';
+    }
+
+    final today = DateTime.now();
+    final currentDay = DateTime(today.year, today.month, today.day);
+    final endDay = DateTime(parsedEnd.year, parsedEnd.month, parsedEnd.day);
+    return !endDay.isBefore(currentDay);
+  }
+
+  String? get pausedAt => startDate;
+  String? get resumedAt => endDate;
+}
+
+class SubscriptionItemModel {
+  final String id;
+  final String subscriptionId;
+  final String productVariantId;
+  final String productName;
+  final String variantName;
+  final String sku;
+  final int defaultMQty;
+  final int defaultEQty;
+  final double unitPrice;
+  final double finalPrice;
+  final String status;
+  final String? startDate;
+  final String? endDate;
+  final String? imageUrl;
+  final List<SubscriptionScheduleModel> weeklySchedules;
+  final List<SubscriptionCustomDateModel> customDates;
+
+  const SubscriptionItemModel({
+    required this.id,
+    required this.subscriptionId,
+    required this.productVariantId,
+    this.productName = 'Product',
+    this.variantName = '',
+    this.sku = '',
+    this.defaultMQty = 0,
+    this.defaultEQty = 0,
+    this.unitPrice = 0,
+    this.finalPrice = 0,
+    this.status = 'active',
+    this.startDate,
+    this.endDate,
+    this.imageUrl,
+    this.weeklySchedules = const [],
+    this.customDates = const [],
+  });
+
+  factory SubscriptionItemModel.fromJson(Map<String, dynamic> json) {
+    return SubscriptionItemModel(
+      id:
+          _asString(
+            json['subscription_item_id'] ?? json['id'] ?? json['si_id'],
+          ) ??
+          '',
+      subscriptionId:
+          _asString(json['subscription_id'] ?? json['subscriptionId']) ?? '',
+      productVariantId:
+          _asString(
+            json['product_variant_id'] ??
+                json['variant_id'] ??
+                json['productVariantId'],
+          ) ??
+          '',
+      productName:
+          (_asString(json['product_name'] ?? json['name']) ?? 'Product')
+              .toTitleCase(),
+      variantName: _asString(json['variant_name'] ?? json['name']) ?? '',
+      sku: _asString(json['sku']) ?? '',
+      defaultMQty: _asInt(json['default_m_quantity'] ?? json['defaultMQty']),
+      defaultEQty: _asInt(json['default_e_quantity'] ?? json['defaultEQty']),
+      unitPrice: _asDouble(json['unit_price'] ?? json['unitPrice']),
+      finalPrice: _asDouble(json['final_price'] ?? json['finalPrice']),
+      status: (_asString(json['item_status'] ?? json['status']) ?? 'active').toLowerCase() == 'paused'
+          ? 'active'
+          : (_asString(json['item_status'] ?? json['status']) ?? 'active'),
+      startDate: _asString(json['item_start_date'] ?? json['start_date']),
+      endDate: _asString(json['item_end_date'] ?? json['end_date']),
+      imageUrl: _asString(
+        json['url'] ?? json['image_url'] ?? json['imagePath'],
+      ),
+      weeklySchedules: _asListOfMaps(
+        json['weekly_schedules'] ?? json['weeklySchedules'],
+      ).map(SubscriptionScheduleModel.fromJson).toList(),
+      customDates: _asListOfMaps(
+        json['custom_dates'] ?? json['customDates'],
+      ).map(SubscriptionCustomDateModel.fromJson).toList(),
+    );
+  }
+
+  String get displayName {
+    if (variantName.isNotEmpty && variantName.toLowerCase() != 'standard') {
+      return '$productName ($variantName)';
+    }
+    return productName;
+  }
+
+  int get totalDailyQty => defaultMQty + defaultEQty;
+
+  String get slotLabel {
+    if (defaultMQty > 0 && defaultEQty > 0) return 'Morning & Evening';
+    if (defaultEQty > 0) return 'Evening';
+    return 'Morning';
+  }
+
+  bool get hasCustomSchedule => customDates.isNotEmpty;
+}
+
+class Subscription {
+  final String id;
+  final String subscriptionNumber;
+  final String customerId;
+  final String status;
+  final String scheduleType;
+  final String paymentType;
+  final String deliverySlot;
+  final bool autoRenew;
+  final String? startDate;
+  final String? endDate;
+  final String? pauseFromDate;
+  final String? pauseToDate;
+  final String addressId;
+  final String branchId;
+  final String? createdAt;
+  final String? updatedAt;
+  final String? notes;
+
+  final List<SubscriptionItemModel> items;
+  final List<SubscriptionScheduleModel> weeklySchedules;
+  final List<SubscriptionCustomDateModel> customDates;
+  final List<SubscriptionPauseModel> pauses;
+
+  final String productName;
+  final String vendorName;
+  final String emoji;
+  final double pricePerDay;
+  final String frequency;
+  final String slot;
+  final int qty;
+
+  final String? imageUrl;
+
+  const Subscription({
+    required this.id,
+    this.subscriptionNumber = '',
+    this.customerId = '',
+    required this.status,
+    this.scheduleType = 'weekly',
+    this.paymentType = 'prepaid',
+    this.deliverySlot = 'Morning',
+    this.autoRenew = true,
+    this.startDate,
+    this.endDate,
+    this.pauseFromDate,
+    this.pauseToDate,
+    this.addressId = '',
+    this.branchId = '',
+    this.createdAt,
+    this.updatedAt,
+    this.notes,
+    this.items = const [],
+    this.weeklySchedules = const [],
+    this.customDates = const [],
+    this.pauses = const [],
+    required this.productName,
+    required this.vendorName,
+    required this.emoji,
+    required this.pricePerDay,
+    required this.frequency,
+    required this.slot,
+    required this.qty,
+    this.imageUrl,
+  });
+
+  bool get isPaused => false;
+  bool get isActive => status == 'active';
+  bool get isCompleted => status == 'completed';
+  bool get isRenewed => status == 'renewed';
+  bool get isExpired => status == 'expired' || status == 'expaired';
+  bool get hasCustomSchedule =>
+      scheduleType == 'custom_dates' ||
+      customDates.isNotEmpty ||
+      items.any((item) => item.customDates.isNotEmpty);
+
+  double get totalDailyCost {
+    if (items.isEmpty) return pricePerDay * (qty > 0 ? qty : 1);
+    final calculated = items.fold<double>(
+      0,
+      (sum, item) {
+        final itemPrice = item.finalPrice > 0 ? item.finalPrice : item.unitPrice;
+        final itemQty = item.totalDailyQty > 0 ? item.totalDailyQty : 1;
+        return sum + (itemPrice * itemQty);
+      },
+    );
+    if (calculated > 0) return calculated;
+    return pricePerDay > 0 ? pricePerDay * (qty > 0 ? qty : 1) : 0.0;
+  }
+
+  List<SubscriptionCustomDateModel> get allCustomDates {
+    final collected = <SubscriptionCustomDateModel>[
+      ...customDates,
+      ...items.expand((item) => item.customDates),
+    ];
+    return collected;
+  }
+
+  SubscriptionPauseModel? get currentPause {
+    for (final pause in pauses) {
+      if (pause.isCurrentlyPaused) return pause;
+    }
+    return null;
+  }
+
+  List<SubscriptionPauseModel> get pauseHistory =>
+      List<SubscriptionPauseModel>.unmodifiable(pauses);
+
+  String get displayLabel =>
+      subscriptionNumber.isNotEmpty ? subscriptionNumber : id;
+
+  factory Subscription.fromJson(Map<String, dynamic> json) {
+    final rawItems = _asListOfMaps(json['items']);
+    final items = rawItems.map(SubscriptionItemModel.fromJson).toList();
+    final weeklySchedules = _asListOfMaps(
+      json['weekly_schedules'] ?? json['weeklySchedules'],
+    ).map(SubscriptionScheduleModel.fromJson).toList();
+    final customDates = _asListOfMaps(
+      json['custom_dates'] ?? json['customDates'],
+    ).map(SubscriptionCustomDateModel.fromJson).toList();
+    final pauses = _asListOfMaps(
+      json['pauses'],
+    ).map(SubscriptionPauseModel.fromJson).toList();
+
+    final normalizedItems = items.isNotEmpty
+        ? items
+        : <SubscriptionItemModel>[
+            if (_asString(json['product_variant_id']) != null)
+              SubscriptionItemModel(
+                id: _asString(json['subscription_item_id'] ?? json['id']) ?? '',
+                subscriptionId:
+                    _asString(json['subscription_id'] ?? json['id']) ?? '',
+                productVariantId: _asString(json['product_variant_id']) ?? '',
+                productName:
+                    (_asString(json['product_name'] ?? json['name']) ??
+                            'Product')
+                        .toTitleCase(),
+                variantName:
+                    _asString(json['variant_name'] ?? json['name']) ?? '',
+                sku: _asString(json['sku']) ?? '',
+                defaultMQty: _asInt(json['default_m_quantity']),
+                defaultEQty: _asInt(json['default_e_quantity']),
+                unitPrice: _asDouble(json['unit_price']),
+                finalPrice: _asDouble(json['final_price']),
+                status: (_asString(json['item_status'] ?? json['status']) ?? 'active').toLowerCase() == 'paused'
+                    ? 'active'
+                    : (_asString(json['item_status'] ?? json['status']) ?? 'active'),
+                startDate: _asString(
+                  json['item_start_date'] ?? json['start_date'],
+                ),
+                endDate: _asString(json['item_end_date'] ?? json['end_date']),
+                imageUrl: _asString(
+                  json['url'] ?? json['image_url'] ?? json['imagePath'],
+                ),
+              ),
+          ];
+
+    final productLabel = normalizedItems.isNotEmpty
+        ? normalizedItems.first.displayName
+        : (_asString(json['product_name'] ?? json['name']) ?? 'Subscription')
+              .toTitleCase();
+    final vendorLabel =
+        normalizedItems.isNotEmpty && normalizedItems.first.sku.isNotEmpty
+        ? normalizedItems.first.sku
+        : _asString(json['vendor_name'] ?? json['branch_name']) ??
+              'F2H Partner';
+    final quantityTotal = normalizedItems.isNotEmpty
+        ? normalizedItems.fold<int>(0, (sum, item) => sum + (item.totalDailyQty > 0 ? item.totalDailyQty : 1))
+        : _asInt(json['qty'] ?? json['quantity']);
+    double dailyCost = 0.0;
+    if (normalizedItems.isNotEmpty) {
+      dailyCost = normalizedItems.fold<double>(
+        0,
+        (sum, item) {
+          final itemPrice = item.finalPrice > 0 ? item.finalPrice : item.unitPrice;
+          final itemQty = item.totalDailyQty > 0 ? item.totalDailyQty : 1;
+          return sum + (itemPrice * itemQty);
+        },
+      );
+    }
+    if (dailyCost <= 0) {
+      dailyCost = _asDouble(json['price_per_day'] ?? json['pricePerDay'] ?? json['price'] ?? json['unit_price']);
+    }
+    final frequencyLabel = weeklySchedules.isNotEmpty
+        ? weeklySchedules
+              .where((schedule) => schedule.hasDelivery)
+              .map((schedule) => schedule.dayName)
+              .toSet()
+              .join(', ')
+        : _asString(json['frequency']) ?? 'Weekly';
+    final slotLabel =
+        _asString(json['delivery_slot'] ?? json['slot']) ??
+        (normalizedItems.isNotEmpty
+            ? normalizedItems.first.slotLabel
+            : 'Morning');
+    final emoji = _emojiForProduct(productLabel);
+
+    return Subscription(
+      id: _asString(json['subscription_id'] ?? json['id']) ?? '',
+      subscriptionNumber: _asString(json['subscription_number']) ?? '',
+      customerId: _asString(json['customer_id']) ?? '',
+      status: (_asString(json['status']) ?? 'active').toLowerCase() == 'expired' ||
+              (_asString(json['status']) ?? 'active').toLowerCase() == 'expaired'
+          ? 'expired'
+          : (_asString(json['status']) ?? 'active').toLowerCase() == 'paused'
+              ? 'active'
+              : (_asString(json['status']) ?? 'active'),
+      scheduleType: _asString(json['schedule_type']) ?? 'weekly',
+      paymentType: _asString(json['payment_type']) ?? 'prepaid',
+      deliverySlot: slotLabel,
+      autoRenew: _isTruthy(json['auto_renew'] ?? json['autoRenew']),
+      startDate: _asString(json['start_date'] ?? json['startDate']),
+      endDate: _asString(json['end_date'] ?? json['endDate']),
+      pauseFromDate: _asString(
+        json['pause_from_date'] ??
+            json['pause_start_date'] ??
+            json['pauseFromDate'],
+      ),
+      pauseToDate: _asString(
+        json['pause_to_date'] ?? json['pause_end_date'] ?? json['pauseToDate'],
+      ),
+      addressId:
+          _asString(
+            json['address_id'] ?? json['addressId'] ?? json['action_id'],
+          ) ??
+          '',
+      branchId: _asString(json['branch_id'] ?? json['branchId']) ?? '',
+      createdAt: _asString(json['created_at'] ?? json['createdAt']),
+      updatedAt: _asString(json['updated_at'] ?? json['updatedAt']),
+      notes: _asString(json['notes'] ?? json['remark']),
+      items: normalizedItems,
+      weeklySchedules: weeklySchedules,
+      customDates: customDates,
+      pauses: pauses,
+      productName: productLabel,
+      vendorName: vendorLabel,
+      emoji: emoji,
+      pricePerDay: dailyCost,
+      frequency: frequencyLabel.isEmpty ? 'Weekly' : frequencyLabel,
+      slot: slotLabel,
+      qty: quantityTotal,
+    );
+  }
+}

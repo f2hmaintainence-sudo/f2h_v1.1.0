@@ -1,0 +1,74 @@
+.offer-counter {
+    margin: 0;
+    padding: 0;
+    list-style-type: none;
+    display: flex;
+    justify-content: center;
+    background: var(--vs-theme-color1);
+    margin-bottom: 30px;
+    min-height: 175px;
+    align-items: center;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+
+    @include sm {
+        flex-direction: column;
+    }
+
+    &>li {
+        line-height: 1;
+        padding: 16px 30px 16px 30px;
+        position: relative;
+        color: var(--vs-white-color);
+
+        &::before {
+            content: '';
+            position: absolute;
+            height: 37px;
+            width: 1px;
+            background: var(--vs-theme-color);
+            right: -1px;
+            top: 50%;
+            transform: translateY(-50%);
+            border-radius: 0.49px;
+
+            @include sm {
+                display: none;
+            }
+        }
+
+        &:first-child {
+            padding-left: 0;
+        }
+
+        &:last-child {
+            padding-right: 0;
+            margin-right: 0;
+
+            &::before {
+                display: none;
+            }
+        }
+
+        @include sm {
+            padding-right: 0;
+            padding-left: 0;
+        }
+    }
+
+    .count-number {
+        font-size: 40px;
+        font-weight: 700;
+        color: var(--vs-theme-color);
+        font-family: var(--title-font);
+        margin-bottom: 10px;
+    }
+
+    .count-name {
+        font-size: 16px;
+        color: var(--white-color);
+        font-family: var(--title-font);
+        font-weight: 800;
+        text-transform: uppercase;
+        display: inline-block;
+    }
+}

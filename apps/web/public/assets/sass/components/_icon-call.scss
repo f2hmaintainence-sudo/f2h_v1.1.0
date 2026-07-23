@@ -1,0 +1,44 @@
+.icon-call {
+  display: flex;
+  align-items: center;
+
+  &__icon {
+    --icon-size: 52px;
+    font-size: 20px;
+    margin-right: 14px;
+    position: relative;
+    min-width: var(--icon-size);
+    min-height: var(--icon-size);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: var(--vs-white-color);
+    background-color: var(--vs-theme-color2);
+    transition: all ease 0.4s;
+    @include border-style1;
+  }
+
+  &__title {
+    display: block;
+    color: var(--vs-text-color);
+    font-size: 16px;
+    @include lts(3);
+    font-weight: 600;
+    text-transform: capitalize;
+    margin: 0 0 3px 0;
+  }
+
+  &__number {
+    display: block;
+    color: var(--vs-white-color);
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+    font-family: var(--vs-title-font);
+
+    &:hover {
+      color: var(--vs-theme-color2);
+    }
+  }
+}

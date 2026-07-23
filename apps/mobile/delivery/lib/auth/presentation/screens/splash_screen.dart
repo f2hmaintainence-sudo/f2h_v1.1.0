@@ -1,0 +1,224 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:f2h_delivery/theme/app_colors.dart';
+import 'package:f2h_delivery/app.dart';
+import 'package:f2h_delivery/features/onboarding/presentation/screens/welcome_intro_screen.dart';
+import 'package:f2h_delivery/auth/presentation/bloc/auth_bloc.dart';
+import 'package:f2h_delivery/auth/presentation/bloc/auth_state.dart';
+import 'package:f2h_delivery/auth/presentation/screens/login_screen.dart';
+import 'package:f2h_delivery/core/utils/version_checker.dart';
+
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
+  late AnimationController _fadeController;
+  late AnimationController _scaleController;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+    ));
+
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _scaleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeOut,
+    );
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
+    );
+
+    _fadeController.forward();
+    _scaleController.forward();
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _scaleController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _checkOnboardingAndNavigate(AuthState authState) async {
+    try {
+      if (!mounted) return;
+
+      // ── PRIORITY 0: App Version Check ──────────────────────────────────────
+      final isBlocked = await VersionChecker.checkUpdates(context);
+      if (isBlocked) return; // Keep showing splash screen under dialog if blocked
+
+      // ── PRIORITY 1: Valid session → go straight to Dashboard ──────────────
+      // This ensures a logged-in user NEVER gets sent back to onboarding,
+      // even if they haven't finished every KYC step.
+      if (authState is Authenticated) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const AppShell()),
+        );
+        return;
+      }
+
+      // ── PRIORITY 2: No session → go directly to login ───────────────────
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+    } catch (e) {
+      // Fallback in case of error
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (context, state) {
+        // Once AuthCheckRequested completes and resolves the state, execute routing
+        if (state is! AuthInitial && state is! AuthLoading) {
+          Future.delayed(const Duration(milliseconds: 800), () {
+            _checkOnboardingAndNavigate(state);
+          });
+        }
+      },
+      child: Scaffold(
+        backgroundColor: kBg,
+        body: Stack(
+          children: [
+            // Soft radial gradient background
+            Positioned(
+              top: -140,
+              left: -100,
+              child: Container(
+                width: 400,
+                height: 400,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      kPrimaryPl.withValues(alpha: 0.5),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: -120,
+              right: -80,
+              child: Container(
+                width: 320,
+                height: 320,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      kAccentLt.withValues(alpha: 0.4),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Main content
+            Center(
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: ScaleTransition(
+                  scale: _scaleAnimation,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Logo circle
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            colors: [kPrimaryMid, kPrimary],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: kPrimary.withValues(alpha: 0.25),
+                              blurRadius: 32,
+                              spreadRadius: 4,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.eco_rounded,
+                          size: 48,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+                      Text(
+                        'F2H FRESH',
+                        style: GoogleFonts.poppins(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w800,
+                          color: kPrimary,
+                          letterSpacing: 2.5,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Delivery Partner',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: kTextSub,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                      const SizedBox(height: 48),
+                      SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(
+                          color: kAccent,
+                          strokeWidth: 2.5,
+                          strokeCap: StrokeCap.round,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

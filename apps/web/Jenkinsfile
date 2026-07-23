@@ -1,0 +1,45 @@
+pipeline {
+    agent any
+
+    stages {
+
+        stage('Deploy Frontend') {
+            steps {
+                sh '''
+                echo "========== STARTING FRONTEND DEPLOYMENT =========="
+
+                cd /www/wwwroot/dev.f2hfresh.com/f2hfrontend
+
+                echo "========== FETCHING LATEST CODE =========="
+                git fetch origin main
+
+                echo "========== RESETTING TO LATEST MAIN =========="
+                git reset --hard origin/main
+
+                echo "========== INSTALLING DEPENDENCIES =========="
+                npm install
+
+                echo "========== BUILDING FRONTEND =========="
+                npm run build
+
+                echo "========== RESTARTING PM2 =========="
+                pm2 restart frontend-f2hfresh
+
+                echo "========== FRONTEND DEPLOYMENT SUCCESS =========="
+                '''
+            }
+        }
+
+    }
+
+    post {
+
+        success {
+            echo 'Frontend deployed successfully!'
+        }
+
+        failure {
+            echo 'Frontend deployment failed!'
+        }
+    }
+}

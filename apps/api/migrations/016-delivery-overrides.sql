@@ -1,0 +1,20 @@
+CREATE TABLE "delivery_overrides" (
+  "id" int NOT NULL,
+  "override_id" VARCHAR(20) NOT NULL,
+  "customer_id" int NOT NULL,
+  "assignment_id" int NOT NULL,
+  "delivery_slot" VARCHAR(255) NOT NULL,
+  "override_type" VARCHAR(255) NOT NULL,
+  "new_quantity" int DEFAULT NULL,
+  "from_date" date NOT NULL,
+  "to_date" date DEFAULT NULL,
+  "reason" VARCHAR(255) DEFAULT NULL,
+  "actioned_by" VARCHAR(255) NOT NULL,
+  "is_active" SMALLINT NOT NULL DEFAULT '1',
+  "created_at" timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  "created_by" int DEFAULT NULL,
+  "updated_at" timestamp NULL DEFAULT CURRENT_TIMESTAMP ,
+  "updated_by" int DEFAULT NULL,
+  "deleted_at" timestamp NULL DEFAULT NULL,
+  "deleted_by" int DEFAULT NULL
+);

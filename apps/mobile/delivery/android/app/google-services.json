@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "445665408019",
+    "project_id": "f2hdeliverypartnerapp",
+    "storage_bucket": "f2hdeliverypartnerapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:445665408019:android:c83b72549e1885c959fbe6",
+        "android_client_info": {
+          "package_name": "com.f2h.delivery"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDROn5BjA4Dsn_qcdZnqprhQYsElrUXztI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

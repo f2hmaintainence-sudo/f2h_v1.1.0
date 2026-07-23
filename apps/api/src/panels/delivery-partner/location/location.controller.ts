@@ -1,0 +1,480 @@
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  UseGuards,
+  Req,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { Request } from 'express';
+import { RedisService } from 'src/shared/redis/redis.service';
+import { DatabaseService } from 'src/shared/database/Database.service';
+import { NotificationGateway } from 'src/notifications/notification.gateway';
+import { FieldEncryptionService } from 'src/encryption/field-encryption.service';
+import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
+
+function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+@Controller({ path: 'DeliveryPartner/location', version: '1' })
+export class LocationController {
+  constructor(
+    private readonly redisService: RedisService,
+    private readonly db: DatabaseService,
+    private readonly fieldEncryption: FieldEncryptionService,
+    private readonly notificationGateway: NotificationGateway,
+    private readonly pushNotificationService: PushNotificationService,
+  ) { }
+
+  @Post('update')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async updateLocation(
+    @Req() req: Request,
+    @Body() body: { latitude: number; longitude: number; battery?: number; speed?: number },
+  ) {
+    const userObj = req.user as any;
+    const userId = userObj?.user_id;
+
+    if (!body.latitude || !body.longitude) {
+      return { status: false, message: 'Latitude and longitude are required' };
+    }
+
+    // Fetch previous cached location to throttle DB writes
+    const redisKey = `delivery_partner_location:${userId}`;
+    const prevLocation: any = await this.redisService.fetch(redisKey);
+
+    let shouldLogToDb = true;
+    if (prevLocation) {
+      const latDiff = Math.abs(Number(prevLocation.latitude) - Number(body.latitude));
+      const lngDiff = Math.abs(Number(prevLocation.longitude) - Number(body.longitude));
+      const locationChanged = latDiff > 0.0001 || lngDiff > 0.0001; // roughly 10 meters
+
+      const lastDbLog = prevLocation.lastDbLogTime ? new Date(prevLocation.lastDbLogTime) : null;
+
+      if (lastDbLog) {
+        const timeDiffMinutes = (new Date().getTime() - lastDbLog.getTime()) / (1000 * 60);
+        if (locationChanged) {
+          if (timeDiffMinutes < 2) {
+            shouldLogToDb = false;
+          }
+        } else {
+          if (timeDiffMinutes < 5) {
+            shouldLogToDb = false;
+          }
+        }
+      }
+    }
+
+    // Append debug info to a file we can inspect
+    try {
+      const fs = require('fs');
+      const logMsg = `[${new Date().toISOString()}] userId: ${userId}, lat: ${body.latitude}, lng: ${body.longitude}, shouldLogToDb: ${shouldLogToDb}\n`;
+      fs.appendFileSync('location_debug.log', logMsg);
+    } catch (e) {}
+
+    // 1. Get delivery_partner ID (UUID) using user_id and log asynchronously
+    if (shouldLogToDb) {
+      this.db.query(`SELECT id FROM delivery_partners WHERE user_id = $1 OR delivery_partner_id = $1`, [userId])
+        .then(async (boyRows) => {
+          try {
+            const fs = require('fs');
+            fs.appendFileSync('location_debug.log', `[${new Date().toISOString()}] SELECT results: ${JSON.stringify(boyRows)}\n`);
+          } catch (e) {}
+
+          if (boyRows && boyRows.length > 0) {
+            const deliveryPartnerId = boyRows[0].id;
+            try {
+              // Update recent coordinates on delivery_partners table
+              await this.db.query(
+                `UPDATE delivery_partners SET current_lat = $1, current_lng = $2, updated_at = NOW() WHERE id = $3`,
+                [Number(body.latitude), Number(body.longitude), deliveryPartnerId]
+              );
+
+              const insertHistoryQuery = `
+                INSERT INTO delivery_location_logs (delivery_partner_id, latitude, longitude, recorded_at)
+                VALUES ($1, $2, $3, NOW())`;
+              const insertResult = await this.db.query(insertHistoryQuery, [
+                deliveryPartnerId,
+                Number(body.latitude),
+                Number(body.longitude),
+              ]);
+              try {
+                const fs = require('fs');
+                fs.appendFileSync('location_debug.log', `[${new Date().toISOString()}] INSERT success: ${JSON.stringify(insertResult)}\n`);
+              } catch (e) {}
+            } catch (err) {
+              console.error('[LocationUpdate] Failed to log location history to database:', err);
+              try {
+                const fs = require('fs');
+                fs.appendFileSync('location_debug.log', `[${new Date().toISOString()}] INSERT error: ${err.message}\n`);
+              } catch (e) {}
+            }
+
+            // Check distance to next delivery
+            try {
+              const nextOrderRes = await this.db.query(`
+                SELECT 
+                  o.order_id, 
+                  o.customer_id, 
+                  o.is_arriving_notified,
+                  ca.latitude AS address_lat, 
+                  ca.longitude AS address_lng
+                FROM orders o
+                JOIN customers c ON c.customer_id = o.customer_id
+                LEFT JOIN customer_addresses ca ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
+                LEFT JOIN delivery_route_customers drc ON drc.customer_id = c.id
+                WHERE o.delivery_partner_id = $1
+                  AND o.scheduled_date = CURRENT_DATE
+                  AND o.status IN ('pending', 'out_for_delivery')
+                ORDER BY drc.sequence_number ASC NULLS LAST, o.created_at ASC
+                LIMIT 1
+              `, [deliveryPartnerId]);
+
+              if (nextOrderRes && nextOrderRes.length > 0) {
+                const nextOrder = nextOrderRes[0];
+                if (!nextOrder.is_arriving_notified && nextOrder.address_lat && nextOrder.address_lng) {
+                  const dist = getDistanceKm(
+                    Number(body.latitude), 
+                    Number(body.longitude), 
+                    Number(nextOrder.address_lat), 
+                    Number(nextOrder.address_lng)
+                  );
+                  if (dist <= 1.0) { // 1 km threshold
+                    await this.pushNotificationService.sendNotificationToUsers(
+                      [nextOrder.customer_id],
+                      {
+                        title: 'Your Delivery Partner is Arriving Soon!',
+                        body: 'Your F2H Fresh order is less than 1km away.',
+                      }
+                    );
+                    await this.db.query(
+                      `UPDATE orders SET is_arriving_notified = true WHERE order_id = $1`,
+                      [nextOrder.order_id]
+                    );
+                  }
+                }
+              }
+            } catch (err) {
+              console.error('[LocationUpdate] Failed to process arriving soon notification:', err);
+            }
+
+          } else {
+            try {
+              const fs = require('fs');
+              fs.appendFileSync('location_debug.log', `[${new Date().toISOString()}] No boy found for userId: ${userId}\n`);
+            } catch (e) {}
+          }
+        })
+        .catch((err) => {
+          console.error('[LocationUpdate] Failed to fetch delivery boy ID for background logging:', err);
+          try {
+            const fs = require('fs');
+            fs.appendFileSync('location_debug.log', `[${new Date().toISOString()}] SELECT error: ${err.message}\n`);
+          } catch (e) {}
+        });
+    }
+
+    // Preserve the SOS status on subsequent updates until explicitly cleared
+    const status = prevLocation?.status === 'SOS' ? 'SOS' : 'Delivering';
+
+    // Save location to Redis (TTL 1 hour)
+    const locationData = {
+      userId,
+      latitude: Number(body.latitude),
+      longitude: Number(body.longitude),
+      battery: body.battery !== undefined ? Number(body.battery) : 100,
+      speed: body.speed !== undefined ? Number(body.speed) : 0,
+      status,
+      updatedAt: new Date().toISOString(),
+      lastDbLogTime: shouldLogToDb ? new Date().toISOString() : (prevLocation?.lastDbLogTime || new Date().toISOString()),
+    };
+    await this.redisService.put(redisKey, locationData, 3600);
+
+    // Broadcast location update to all connected Socket.io clients
+    if (this.notificationGateway && this.notificationGateway.server) {
+      try {
+        const fs = require('fs');
+        fs.appendFileSync('location_debug.log', `[${new Date().toISOString()}] Broadcasting location update to WS for userId: ${userId}\n`);
+      } catch (e) {}
+
+      this.notificationGateway.server.emit('delivery_location_update', {
+        userId,
+        latitude: Number(body.latitude),
+        longitude: Number(body.longitude),
+        battery: body.battery !== undefined ? Number(body.battery) : 100,
+        speed: body.speed !== undefined ? Number(body.speed) : 0,
+        status,
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      try {
+        const fs = require('fs');
+        fs.appendFileSync('location_debug.log', `[${new Date().toISOString()}] WS Broadcast Failed: Gateway or Server undefined\n`);
+      } catch (e) {}
+    }
+
+    return {
+      status: true,
+      message: 'Location updated and broadcasted successfully',
+    };
+  }
+
+  @Post('sos')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async triggerSos(
+    @Req() req: Request,
+    @Body() body: { latitude?: number; longitude?: number },
+  ) {
+    const userObj = req.user as any;
+    const userId = userObj?.user_id;
+
+    // Fetch previous location for fallback coordinates
+    const redisKey = `delivery_partner_location:${userId}`;
+    const prevLocation: any = await this.redisService.fetch(redisKey);
+
+    const latitude = body.latitude !== undefined ? Number(body.latitude) : (prevLocation ? Number(prevLocation.latitude) : 0);
+    const longitude = body.longitude !== undefined ? Number(body.longitude) : (prevLocation ? Number(prevLocation.longitude) : 0);
+
+    const locationData = {
+      userId,
+      latitude,
+      longitude,
+      battery: prevLocation?.battery || 100,
+      speed: 0,
+      status: 'SOS',
+      updatedAt: new Date().toISOString(),
+      lastDbLogTime: prevLocation?.lastDbLogTime || new Date().toISOString(),
+    };
+
+    // Update Redis cache with SOS status (TTL 1 hour)
+    await this.redisService.put(redisKey, locationData, 3600);
+
+    // Write SOS entry to database logs immediately for emergency audit trail
+    this.db.query(`SELECT id FROM delivery_partners WHERE user_id = $1 OR delivery_partner_id = $1`, [userId])
+      .then(async (boyRows) => {
+        if (boyRows && boyRows.length > 0) {
+          const deliveryPartnerId = boyRows[0].id;
+          try {
+            await this.db.query(
+              `UPDATE delivery_partners SET current_lat = $1, current_lng = $2, updated_at = NOW() WHERE id = $3`,
+              [latitude, longitude, deliveryPartnerId]
+            );
+            await this.db.query(
+              `INSERT INTO delivery_location_logs (delivery_partner_id, latitude, longitude, recorded_at)
+               VALUES ($1, $2, $3, NOW())`,
+              [deliveryPartnerId, latitude, longitude]
+            );
+          } catch (err) {
+            console.error('Failed to log SOS location to database:', err);
+          }
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch delivery boy ID for SOS logging:', err);
+      });
+
+    // Broadcast location update with 'SOS' status to all connected Socket.io clients
+    if (this.notificationGateway && this.notificationGateway.server) {
+      this.notificationGateway.server.emit('delivery_location_update', {
+        userId,
+        latitude,
+        longitude,
+        battery: prevLocation?.battery || 100,
+        speed: 0,
+        status: 'SOS',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    return {
+      status: true,
+      message: 'SOS alert broadcasted to admin panel successfully',
+    };
+  }
+
+  @Post('clear-sos')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async clearSos(@Req() req: Request) {
+    const userObj = req.user as any;
+    const userId = userObj?.user_id;
+
+    const redisKey = `delivery_partner_location:${userId}`;
+    const prevLocation: any = await this.redisService.fetch(redisKey);
+
+    if (prevLocation) {
+      prevLocation.status = 'Delivering';
+      await this.redisService.put(redisKey, prevLocation, 3600);
+
+      // Broadcast the status resolution
+      if (this.notificationGateway && this.notificationGateway.server) {
+        this.notificationGateway.server.emit('delivery_location_update', {
+          userId,
+          latitude: Number(prevLocation.latitude),
+          longitude: Number(prevLocation.longitude),
+          battery: prevLocation.battery || 100,
+          speed: prevLocation.speed || 0,
+          status: 'Delivering',
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+
+    return {
+      status: true,
+      message: 'SOS status cleared successfully',
+    };
+  }
+
+  @Get('active')
+  @UseGuards(AuthGuard('jwt'))
+  async getActiveLocations() {
+    const query = `
+      SELECT id, user_id, full_name, phone, vehicle_type, is_active 
+      FROM delivery_partners 
+      WHERE is_active = true
+    `;
+    const rows = await this.db.query(query);
+
+    // Decrypt fields
+    const decryptedRows = this.fieldEncryption.decryptRows('delivery_partners', rows);
+
+    // Map each driver with their Redis location
+    const activeDrivers: any[] = [];
+    for (const driver of decryptedRows) {
+      const redisKey = `delivery_partner_location:${driver.user_id}`;
+      const location: any = await this.redisService.fetch(redisKey);
+
+      // Fetch today's orders and routes
+      let orders: any[] = [];
+      try {
+        orders = await this.db.query(
+          `SELECT 
+             o.order_id, 
+             o.status, 
+             o.delivery_slot, 
+             c.route_id, 
+             r.route_name,
+             COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '') AS customer_name
+           FROM orders o
+           JOIN customers c ON c.customer_id = o.customer_id
+           LEFT JOIN delivery_routes r ON r.id::text = c.route_id::text
+           WHERE o.delivery_partner_id = $1 AND o.scheduled_date = CURRENT_DATE`,
+          [driver.id]
+        );
+      } catch (e) {
+        console.error('Error fetching driver orders:', e);
+      }
+
+      const routeGroups: Record<string, { routeName: string, total: number, delivered: number, pending: number, orders: any[] }> = {};
+      for (const order of orders || []) {
+        const routeId = order.route_id || 'unassigned';
+        const routeName = order.route_name || 'Unassigned Route';
+        if (!routeGroups[routeId]) {
+          routeGroups[routeId] = {
+            routeName,
+            total: 0,
+            delivered: 0,
+            pending: 0,
+            orders: []
+          };
+        }
+        routeGroups[routeId].total += 1;
+        if (order.status === 'delivered') {
+          routeGroups[routeId].delivered += 1;
+        } else {
+          routeGroups[routeId].pending += 1;
+        }
+        routeGroups[routeId].orders.push({
+          orderId: order.order_id,
+          customerName: order.customer_name,
+          status: order.status,
+          slot: order.delivery_slot
+        });
+      }
+
+      const routesArray = Object.keys(routeGroups).map(id => ({
+        id,
+        ...routeGroups[id]
+      }));
+
+      const totalOrders = orders ? orders.length : 0;
+      const deliveredOrders = orders ? orders.filter(o => o.status === 'delivered').length : 0;
+      const pendingOrders = totalOrders - deliveredOrders;
+
+      if (location) {
+        activeDrivers.push({
+          id: driver.id,
+          userId: driver.user_id,
+          name: driver.full_name,
+          phone: driver.phone,
+          vehicle: driver.vehicle_type || 'bike',
+          status: location.status || 'Delivering', // Mark as active/delivering if they are sending location updates
+          battery: location.battery !== undefined && location.battery !== null ? Number(location.battery) : 100,
+          speed: location.speed !== undefined && location.speed !== null ? Number(location.speed) : 0,
+          currentCoords: [Number(location.latitude), Number(location.longitude)],
+          route: [],
+          currentRouteIndex: 0,
+          updatedAt: location.updatedAt || new Date().toISOString(),
+          totalOrders,
+          deliveredOrders,
+          pendingOrders,
+          routes: routesArray
+        });
+      } else {
+        // Fetch last known location from database logs
+        try {
+          const lastLog = await this.db.query(
+            `SELECT latitude, longitude, recorded_at 
+             FROM delivery_location_logs 
+             WHERE delivery_partner_id = $1 
+             ORDER BY recorded_at DESC 
+             LIMIT 1`,
+            [driver.id]
+          );
+          if (lastLog && lastLog.length > 0) {
+            activeDrivers.push({
+              id: driver.id,
+              userId: driver.user_id,
+              name: driver.full_name,
+              phone: driver.phone,
+              vehicle: driver.vehicle_type || 'bike',
+              status: 'Offline',
+              battery: 0,
+              speed: 0,
+              currentCoords: [Number(lastLog[0].latitude), Number(lastLog[0].longitude)],
+              route: [],
+              currentRouteIndex: 0,
+              lastSeenAt: lastLog[0].recorded_at,
+              updatedAt: lastLog[0].recorded_at,
+              totalOrders,
+              deliveredOrders,
+              pendingOrders,
+              routes: routesArray
+            });
+          }
+        } catch (err) {
+          console.error(`Failed to fetch last known location for driver ${driver.id}:`, err);
+        }
+      }
+    }
+
+    return {
+      status: true,
+      data: activeDrivers,
+    };
+  }
+}
