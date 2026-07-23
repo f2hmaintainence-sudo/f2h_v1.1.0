@@ -1,3 +1,4 @@
+// Trigger build: 2026-07-23
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
