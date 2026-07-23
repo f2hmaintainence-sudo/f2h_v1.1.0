@@ -78,15 +78,15 @@ const PartnerCard = React.memo(({ partner: p, onOpenEditModal, onOpenDocsModal }
   <div className="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm hover:shadow-md hover:border-slate-300 transition-all flex flex-col justify-between group/card">
     <div>
       <div className="flex items-start justify-between gap-2.5">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className={`w-9 h-9 shrink-0 rounded-xl font-extrabold flex items-center justify-center text-xs shadow-inner transition-transform group-hover/card:scale-105 ${p.is_active ? "bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-emerald-500/20" : "bg-gradient-to-br from-slate-100 to-slate-200 text-slate-700 border border-slate-300/50"}`}>
+        <Link href={`/admin/delivery/partners/${p.delivery_partner_id || p.id}`} className="flex items-center gap-2.5 min-w-0 group/link cursor-pointer">
+          <div className={`w-9 h-9 shrink-0 rounded-xl font-extrabold flex items-center justify-center text-xs shadow-inner transition-transform group-hover/link:scale-105 ${p.is_active ? "bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-emerald-500/20" : "bg-gradient-to-br from-slate-100 to-slate-200 text-slate-700 border border-slate-300/50"}`}>
             {(p.full_name || "U")[0].toUpperCase()}
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-black text-slate-900 truncate group-hover/card:text-teal-700 transition-colors">{p.full_name || "Delivery partner"}</p>
+            <p className="text-xs font-black text-slate-900 truncate group-hover/link:text-emerald-600 transition-colors">{p.full_name || "Delivery partner"}</p>
             <p className="text-[11px] text-slate-400 font-semibold flex items-center gap-1 truncate mt-0.5"><MapPin size={10} className="shrink-0" /><span className="truncate">{p.branch_name || p.branch_id || "No Branch"}</span></p>
           </div>
-        </div>
+        </Link>
         <button type="button" onClick={() => onOpenEditModal(p)} className="shrink-0 group/edit inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-500/60 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 font-bold text-[10px] transition-all shadow-2xs" title="Edit Partner Profile & Salary">
           <Edit2 size={11} className="text-emerald-600 group-hover/edit:text-white transition-colors" /><span>Edit</span>
         </button>

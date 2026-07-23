@@ -198,6 +198,7 @@ export class CatalogSaveAddService {
         is_one_time: true,
         is_returnable: false,
         gst_percentage: 0,
+        unit_type: 'piece',
       };
 
       // =====================================================
@@ -268,6 +269,10 @@ export class CatalogSaveAddService {
       const productImage = insertData.product_image;
       delete insertData.product_image;
       delete insertData.vendor_id;
+      delete insertData.primary_image_url;
+      delete insertData.secondary_image_url;
+      delete insertData.primary_image_file;
+      delete insertData.secondary_image_file;
 
       // =====================================================
       // 5. REQUIRED FIELD VALIDATION
@@ -318,18 +323,8 @@ export class CatalogSaveAddService {
       }
 
       const allowedUnitTypes = ['kg', 'ltr', 'ml', 'gm', 'piece', 'pack'];
-      if (
-        insertData.unit_type !== undefined &&
-        insertData.unit_type !== null &&
-        !allowedUnitTypes.includes(insertData.unit_type)
-      ) {
-        throw new BadRequestException({
-          status: false,
-          message: 'Validation failed',
-          errors: {
-            unit_type: 'Invalid unit type',
-          },
-        });
+      if (!insertData.unit_type || !allowedUnitTypes.includes(insertData.unit_type)) {
+        insertData.unit_type = 'piece';
       }
 
       // =====================================================
@@ -364,9 +359,14 @@ export class CatalogSaveAddService {
 
       // 7. System fields
       insertData.product_id = generateId('PRD', 12);
+      
+      if (!insertData.sku) {
+        insertData.sku = insertData.product_id; // Or generate a new one, but product_id is fine and unique. Let's use generateId('SKU', 10) for clarity
+        insertData.sku = generateId('SKU', 10);
+      }
 
-      insertData.created_by = Number(adminId);
-      insertData.updated_by = Number(adminId);
+      insertData.created_by = String(adminId);
+      insertData.updated_by = String(adminId);
 
       // =====================================================
       // 9. INSERT
@@ -414,6 +414,7 @@ export class CatalogSaveAddService {
         id: newId,
       };
     } catch (error) {
+      console.error('SAVE_PRODUCT_ERROR:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
@@ -676,6 +677,9 @@ export class CatalogSaveAddService {
 
       const variantImage = insertData.variant_image;
       delete insertData.variant_image;
+      delete insertData.primary_image_url;
+      delete insertData.additional_image_urls;
+      delete insertData.variant_image_file;
 
       // 6. Insert
       const result = await this.dataService.insert(
