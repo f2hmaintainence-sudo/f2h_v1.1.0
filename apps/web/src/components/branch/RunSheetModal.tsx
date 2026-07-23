@@ -116,6 +116,7 @@ export default function RunSheetModal({ routeId, onClose }: RunSheetModalProps) 
             className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
           >
             <X size={18} />
+          </button>
           <div className="flex items-center gap-2">
             <input
               type="date"
