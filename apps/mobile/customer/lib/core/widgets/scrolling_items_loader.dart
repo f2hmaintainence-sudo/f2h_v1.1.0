@@ -76,6 +76,21 @@ class _ScrollingItemsLoaderState extends State<ScrollingItemsLoader> with Single
                         height: itemSize,
                         width: itemSize,
                         fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: itemSize,
+                            height: itemSize,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFE8F5E9),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.local_shipping_rounded,
+                              color: Color(0xFF0C831F),
+                              size: 28,
+                            ),
+                          );
+                        },
                       ),
                     ),
                   );
