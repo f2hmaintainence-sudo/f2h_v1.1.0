@@ -5,7 +5,7 @@ CREATE TABLE "users" (
   "email" text,
   "user_name" VARCHAR(30)   DEFAULT NULL,
   "password" VARCHAR(255)   DEFAULT NULL,
-  "role_id" VARCHAR(30);
+  "role_id" VARCHAR(30)   DEFAULT NULL,
   "first_name" text,
   "last_name" text,
   "phone" text,

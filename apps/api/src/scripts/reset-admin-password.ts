@@ -8,19 +8,15 @@ async function bootstrap() {
   const db = app.get(DatabaseService);
 
   try {
-    const hashed = await bcrypt.hash('admin123', 10);
-    console.log('Hashed admin123:', hashed);
-
-    // Get all users
-    const users = await db.query('SELECT user_id, email, user_name FROM users');
-    console.log('Users currently in database:', users);
+    const hashedAdmin123 = await bcrypt.hash('admin123', 10);
+    const hashedAdmin12345 = await bcrypt.hash('Admin@12345', 10);
 
     // Upsert admin.panel@f2hfresh.com
     await db.query(
       `INSERT INTO users (id, sno, user_id, email, user_name, password, first_name, last_name, account_status, created_at, updated_at)
        VALUES (1, 1001, 'USRADMIN001', 'admin.panel@f2hfresh.com', 'admin', $1, 'Admin', 'User', 'active', NOW(), NOW())
        ON CONFLICT (email) DO UPDATE SET password = $1, account_status = 'active';`,
-      [hashed]
+      [hashedAdmin123]
     );
 
     await db.query(
@@ -35,7 +31,7 @@ async function bootstrap() {
       `INSERT INTO users (id, sno, user_id, email, user_name, password, first_name, last_name, account_status, created_at, updated_at)
        VALUES (2, 1002, 'USRADMIN002', 'f2hmaintainence@gmail.com', 'f2hmaintenance', $1, 'Maintenance', 'Admin', 'active', NOW(), NOW())
        ON CONFLICT (email) DO UPDATE SET password = $1, account_status = 'active';`,
-      [hashed]
+      [hashedAdmin12345]
     );
 
     await db.query(
