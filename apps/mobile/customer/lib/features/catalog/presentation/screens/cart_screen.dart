@@ -506,7 +506,10 @@ class _CartScreenState extends State<CartScreen> {
                   try {
                     matchedItem = filteredItems.firstWhere((item) {
                       final itemKey = '${item.variantId}_once';
-                      return itemKey == key || item.variantId == key.split('_')[0];
+                      final variantIdFromKey = key.endsWith('_once')
+                          ? key.substring(0, key.length - 5)
+                          : (key.endsWith('_sub') ? key.substring(0, key.length - 4) : key);
+                      return itemKey == key || item.variantId == variantIdFromKey || item.variantId == key;
                     });
                   } catch (_) {}
                 }

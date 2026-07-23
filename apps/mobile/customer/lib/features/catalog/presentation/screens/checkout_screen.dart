@@ -84,10 +84,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// Filters cart items to only include one-time items selected by the user.
   List<CartItemEntity> _getCheckoutItems(List<CartItemEntity> allItems) {
     final List<CartItemEntity> checkoutItems = [];
-    if (widget.selectedItemIds != null) {
+    if (widget.selectedItemIds != null && widget.selectedItemIds!.isNotEmpty) {
       for (final key in widget.selectedItemIds!) {
-        final variantId = key.split('_')[0];
-        final matches = allItems.where((i) => i.variantId == variantId).toList();
+        final variantId = key.endsWith('_once')
+            ? key.substring(0, key.length - 5)
+            : (key.endsWith('_sub') ? key.substring(0, key.length - 4) : key);
+        final matches = allItems.where((i) =>
+            i.variantId == variantId ||
+            '${i.variantId}_once' == key ||
+            '${i.variantId}_sub' == key ||
+            i.variantId == key).toList();
         if (matches.isNotEmpty) {
           checkoutItems.add(matches.first);
         }
@@ -191,10 +197,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           final cartState = bloc.state;
           if (cartState is CartLoadedState) {
             final List<CartItemEntity> remainingItems = List.from(cartState.items);
-            if (widget.selectedItemIds != null) {
+            if (widget.selectedItemIds != null && widget.selectedItemIds!.isNotEmpty) {
               for (final key in widget.selectedItemIds!) {
-                final variantId = key.split('_')[0];
-                remainingItems.removeWhere((item) => item.variantId == variantId);
+                final variantId = key.endsWith('_once')
+                    ? key.substring(0, key.length - 5)
+                    : (key.endsWith('_sub') ? key.substring(0, key.length - 4) : key);
+                remainingItems.removeWhere((item) =>
+                    item.variantId == variantId ||
+                    '${item.variantId}_once' == key ||
+                    '${item.variantId}_sub' == key ||
+                    item.variantId == key);
               }
             } else {
               remainingItems.clear();
