@@ -3,9 +3,6 @@ pipeline {
 
     stages {
         stage('Deploy Backend') {
-            when {
-                changeset "apps/api/**"
-            }
             steps {
                 sh '''
                 echo "========== STARTING BACKEND DEPLOYMENT =========="
@@ -19,9 +16,6 @@ pipeline {
         }
 
         stage('Deploy Frontend') {
-            when {
-                changeset "apps/web/**"
-            }
             steps {
                 sh '''
                 echo "========== STARTING FRONTEND DEPLOYMENT =========="
