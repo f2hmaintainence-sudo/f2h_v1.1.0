@@ -17,7 +17,7 @@ CREATE TABLE orders (
 
     subscription_id VARCHAR(30) DEFAULT NULL,
 
-    generation_type VARCHAR(20)
+    generation_type VARCHAR(20),
     -- cron
     -- manual
     -- event
