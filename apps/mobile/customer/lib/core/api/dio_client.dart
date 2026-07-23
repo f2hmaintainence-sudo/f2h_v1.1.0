@@ -75,10 +75,11 @@ class DioClient {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    // 1. Inject Bearer token if available
     final token = await TokenStorage.getAccessToken();
     if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';
+    } else {
+      options.headers.remove('Authorization');
     }
 
     // 2. Inject compact CSRF header for mutations on native platforms

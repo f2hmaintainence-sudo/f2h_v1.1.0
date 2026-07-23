@@ -69,6 +69,8 @@ class DioClient {
     final token = await TokenStorage.getAccessToken();
     if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';
+    } else {
+      options.headers.remove('Authorization');
     }
 
     if (!kIsWeb && options.method != 'GET') {

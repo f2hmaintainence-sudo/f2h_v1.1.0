@@ -69,40 +69,7 @@ export function AdminHeader() {
           <span className="text-xs font-semibold text-[#2e7d32] tracking-tight">End-to-End Encrypted</span>
         </div>
 
-        {/* Role switcher (only if multiple roles) */}
-        {user && user.roles.length > 1 && (
-          <div ref={roleRef} className="relative">
-            <button
-              onClick={() => setRoleOpen(!roleOpen)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-brand-blue/10 border border-brand-blue/20 text-sm font-semibold text-[#2e7d32]  hover:bg-brand-blue/20 transition-colors"
-            >
-              {currentRoleName}
-              <ChevronDown size={14} className={`transition-transform ${roleOpen ? "rotate-180" : ""}`} />
-            </button>
-            {roleOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-50">
-                {user.roles.map((role) => (
-                  <button
-                    key={role.role_id}
-                    onClick={() => {
-                      switchRole(role.role_id);
-                      setRoleOpen(false);
-                    }}
-                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${role.role_id === activeRole
-                      ? "bg-brand-blue/10 text-brand-blue font-semibold"
-                      : "text-gray-700 hover:bg-gray-50"
-                      }`}
-                  >
-                    {role.role_name}
-                    {role.role_id === activeRole && (
-                      <span className="ml-2 text-xs text-brand-blue">●</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+
 
         {/* Notifications */}
         <NotificationPanel />

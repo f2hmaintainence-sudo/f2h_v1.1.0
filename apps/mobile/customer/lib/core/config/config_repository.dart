@@ -46,7 +46,7 @@ class ConfigRepository {
       final lastSync = DateTime.fromMillisecondsSinceEpoch(lastSyncMs);
       final isExpired = DateTime.now().difference(lastSync) > _syncTtl;
 
-      if (!isExpired && !force) return;
+      if (!isExpired && !force && AppConfig.firebaseApiKey.isNotEmpty) return;
 
       final response = await _dioClient.dio.get('/device/client-config');
       if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
