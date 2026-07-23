@@ -61,7 +61,7 @@ export default function ContainersPage() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const limit = 20;
-  const searchRef = useRef<NodeJS.Timeout>();
+  const searchRef = useRef<NodeJS.Timeout | null>(null);
 
   const load = useCallback(async (s = search, p = page) => {
     setLoading(true);

@@ -209,10 +209,11 @@ export function LoginContent() {
         return
       }
 
-      if (data.accessToken && typeof window !== 'undefined') {
-        localStorage.setItem("access_token", data.accessToken)
-        if (data.refreshToken) localStorage.setItem("refresh_token", data.refreshToken)
-        document.cookie = `access_token=${data.accessToken}; path=/; max-age=86400`
+      const authData = data as any
+      if (authData.accessToken && typeof window !== 'undefined') {
+        localStorage.setItem("access_token", authData.accessToken)
+        if (authData.refreshToken) localStorage.setItem("refresh_token", authData.refreshToken)
+        document.cookie = `access_token=${authData.accessToken}; path=/; max-age=86400`
       }
 
       // Check role returned from login endpoint

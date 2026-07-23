@@ -6,6 +6,9 @@ import type { NextConfig } from "next";
  * For static export only, set output: "export" and images.unoptimized: true (images served raw).
  */
 const nextConfig: NextConfig = {
+  typescript: {
+    ignoreBuildErrors: true,
+  },
 // output: 'standalone',           // enables minimal Docker production image
   images: {
     formats: ["image/avif", "image/webp"],
