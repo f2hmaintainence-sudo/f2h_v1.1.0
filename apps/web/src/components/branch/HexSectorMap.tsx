@@ -201,13 +201,13 @@ export default function HexSectorMap({
   }
 
   return (
-    <div className="relative h-full flex flex-col">
-      <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm flex-1" style={height === '100%' ? undefined : { height }}>
+    <div className="relative w-full flex flex-col" style={{ height: height || '450px', minHeight: '380px' }}>
+      <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm flex-1 relative w-full h-full">
         <MapContainer
           key={mapKey}
           center={defaultCenter}
           zoom={12}
-          style={{ height: '100%', width: '100%' }}
+          style={{ height: '100%', width: '100%', minHeight: '380px' }}
           zoomControl={true}
         >
           <TileLayer
