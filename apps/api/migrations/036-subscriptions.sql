@@ -19,6 +19,7 @@ CREATE TABLE subscriptions (
 
     customer_id VARCHAR(30) UNIQUE NOT NULL,
 
+
     schedule_type subscription_schedule_type_enum NOT NULL,
 
     branch_id VARCHAR(30) DEFAULT NULL,

@@ -21,7 +21,7 @@ import { AuthService } from './auth.service';
 const h3 = require('h3-js');
 const COORDINATE_EPSILON = 0.0000001;
 
-@Controller({ path: 'customer', version: '1' })
+@Controller('customer')
 export class CustomerBootstrapController {
   constructor(private readonly Data: DataService,
     private readonly Developer: DeveloperService,
@@ -374,151 +374,90 @@ export class CustomerBootstrapController {
     addressId: string,
     body: any,
   ) {
-    const existing = await this.findCustomerAddress(customerId, addressId);
+    try {
+      const existing = await this.findCustomerAddress(customerId, addressId);
 
-    const addressData = this.buildAddressData(body, customerId, existing);
+      const addressData = this.buildAddressData(body, customerId, existing);
+      
+      // Always keep the same address_id
+      addressData.address_id = existing.address_id;
 
-    // --------------------------------------------------
-    // If coordinates are missing, simply update
-    // --------------------------------------------------
-    if (
-      addressData.latitude == null ||
-      addressData.longitude == null
-    ) {
-      const updateResult = await this.Data.executeTransaction(
-        async (transaction) => {
-          if (addressData.is_default === true) {
-            await this.clearDefaultAddresses(customerId, transaction);
-          }
-
-          return this.Data.update(
-            'customer_addresses',
-            addressData,
-            [
-              {
-                column: 'address_id',
-                operator: '=',
-                value: addressId,
-              },
-              {
-                column: 'customer_id',
-                operator: '=',
-                value: customerId,
-              },
-            ],
-            { transaction },
-          );
-        },
-      );
-
-      return {
-        status: true,
-        message: 'Address updated successfully',
-        address_id: addressId,
-        data: this.normalizeAddress(updateResult),
-      };
-    }
-
-    // --------------------------------------------------
-    // Check whether coordinates actually changed
-    // --------------------------------------------------
-    const locationChanged = this.coordinatesChanged(
-      existing,
-      addressData.latitude,
-      addressData.longitude,
-    );
-
-    // --------------------------------------------------
-    // Same location -> Update existing address
-    // --------------------------------------------------
-    if (!locationChanged) {
-      const updateResult = await this.Data.executeTransaction(
-        async (transaction) => {
-          if (addressData.is_default === true) {
-            await this.clearDefaultAddresses(customerId, transaction);
-          }
-
-          return this.Data.update(
-            'customer_addresses',
-            addressData,
-            [
-              {
-                column: 'address_id',
-                operator: '=',
-                value: addressId,
-              },
-              {
-                column: 'customer_id',
-                operator: '=',
-                value: customerId,
-              },
-            ],
-            { transaction },
-          );
-        },
-      );
-
-      return {
-        status: true,
-        message: 'Address updated successfully',
-        address_id: addressId,
-        data: this.normalizeAddress(updateResult),
-      };
-    }
-
-    // --------------------------------------------------
-    // Coordinates changed -> Recalculate branch & H3
-    // Create new address and deactivate old one
-    // --------------------------------------------------
-    const { branch_id, h3_index } = await this.assignBranchAndH3(
-      addressData.latitude,
-      addressData.longitude,
-    );
-
-    addressData.branch_id = branch_id || '';
-    addressData.h3_index = h3_index || '';
-
-    const insertResult = await this.Data.executeTransaction(
-      async (transaction) => {
-        await this.Data.update(
-          'customer_addresses',
-          {
-            status: false,
-            is_default: false,
-          },
-          [
-            {
-              column: 'address_id',
-              operator: '=',
-              value: addressId,
-            },
-            {
-              column: 'customer_id',
-              operator: '=',
-              value: customerId,
-            },
-          ],
-          { transaction },
+      // If coordinates are provided, recalculate branch and H3 index
+      if (addressData.latitude != null && addressData.longitude != null) {
+        const locationChanged = this.coordinatesChanged(
+          existing,
+          addressData.latitude,
+          addressData.longitude,
         );
 
-        if (addressData.is_default === true) {
-          await this.clearDefaultAddresses(customerId, transaction);
+        if (locationChanged) {
+          const { branch_id, h3_index } = await this.assignBranchAndH3(
+            addressData.latitude,
+            addressData.longitude,
+          );
+          addressData.branch_id = branch_id || '';
+          addressData.h3_index = h3_index || '';
         }
+      }
 
-        return this.Data.insert(
-          'customer_addresses',
-          addressData,
-          { transaction },
-        );
-      },
-    );
+      // Keep address_id out of the update payload to ensure it is never modified
+      const { address_id, ...updatePayload } = addressData;
 
-    return {
-      status: true,
-      message: 'Address updated successfully',
-      address_id: insertResult?.address_id,
-      data: this.normalizeAddress(insertResult),
-    };
+      await this.Data.executeTransaction(
+        async (transaction) => {
+          if (addressData.is_default === true) {
+            await this.clearDefaultAddresses(customerId, transaction);
+          }
+
+          const updateResult = await this.Data.update(
+            'customer_addresses',
+            updatePayload,
+            [
+              {
+                column: 'address_id',
+                operator: '=',
+                value: addressId,
+              },
+              {
+                column: 'customer_id',
+                operator: '=',
+                value: customerId,
+              },
+            ],
+            { transaction },
+          );
+
+          if (!updateResult?.status) {
+            throw new Error(updateResult?.message || 'Database update failed');
+          }
+        },
+      );
+
+      // Fetch the updated address to return correct normalized data
+      const updatedQueryResult = await this.Data.query('customer_addresses', {
+        where: [
+          { column: 'address_id', operator: '=', value: addressId },
+          { column: 'customer_id', operator: '=', value: customerId },
+        ],
+        limit: 1,
+      });
+
+      if (!updatedQueryResult?.data || updatedQueryResult.data.length === 0) {
+        throw new Error('Updated address not found');
+      }
+
+      const updatedRecord = updatedQueryResult.data[0];
+
+      return {
+        status: true,
+        message: 'Address updated successfully',
+        address_id: addressId,
+        data: this.normalizeAddress(updatedRecord),
+      };
+    } catch (error: any) {
+      this.Developer.error('Failed to save existing address', error);
+      throw new BadRequestException(error?.message || 'Failed to update address');
+    }
   }
 
   private formatDateForPostgres(date: string | null): string | null {

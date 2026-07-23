@@ -50,8 +50,6 @@ export class SubscriptionsService {
           'subscription_items.product_variant_id',
           'products.name AS product_name',
           'product_variants.name AS variant_name',
-          'subscription_items.default_m_quantity',
-          'subscription_items.default_e_quantity',
           'subscription_items.unit_price',
           'subscription_items.discount_id',
           'subscription_items.coupon_id',
