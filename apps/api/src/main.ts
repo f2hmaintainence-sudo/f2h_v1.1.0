@@ -6,8 +6,7 @@
 // File        : main.ts
 // Description : NestJS API entry point — URI-versioned (/api/v1/), compact
 //               headers (X-Role, X-Plt, X-Ver, X-Csrf), gzip compression.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import { NestFactory } from '@nestjs/core';

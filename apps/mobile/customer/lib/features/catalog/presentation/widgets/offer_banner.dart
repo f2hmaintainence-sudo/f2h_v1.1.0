@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : offer_banner.dart
 // Description : Premium auto-rotating offer banner carousel for Customer App.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'dart:async';

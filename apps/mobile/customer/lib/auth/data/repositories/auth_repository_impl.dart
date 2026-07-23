@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : auth_repository_impl.dart
 // Description : Auth repository implementation for customer app
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'package:flutter/foundation.dart';

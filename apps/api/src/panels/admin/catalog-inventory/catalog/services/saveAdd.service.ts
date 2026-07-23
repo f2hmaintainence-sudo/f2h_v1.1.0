@@ -930,27 +930,38 @@ export class CatalogSaveAddService {
           errors: { title: 'Banner title is required' },
         });
       }
-      if (!body?.image_url?.trim()) {
+
+      let imageUrl = body.image_url?.trim() || '';
+      if (body.banner_image && typeof body.banner_image === 'string' && body.banner_image.startsWith('data:image')) {
+        imageUrl = saveImageUpload(body.banner_image, 'offers');
+      }
+
+      if (!imageUrl) {
         throw new BadRequestException({
           status: false,
           message: 'Validation failed',
-          errors: { image_url: 'Image URL is required' },
+          errors: { image_url: 'Banner image (URL or file upload) is required' },
         });
       }
 
-      const insertData = {
+      const insertData: Record<string, any> = {
         title: body.title.trim(),
-        description: body.description?.trim() || null,
-        image_url: body.image_url.trim(),
+        image_url: imageUrl,
         action_type: body.action_type || 'CATEGORY',
         cta_label: body.cta_label?.trim() || 'Shop Now',
         discount_text: body.discount_text?.trim() || null,
         background_color: body.background_color?.trim() || '#16a34a',
         display_order: body.display_order ? Number(body.display_order) : 0,
         is_active: body.is_active !== undefined ? Boolean(body.is_active) : true,
+        created_by: adminId || null,
+        updated_by: adminId || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
+
+      if (body.description !== undefined && body.description !== null) {
+        insertData.description = body.description.trim() || null;
+      }
 
       const result = await this.dataService.insert('product_banner', insertData);
       if (!result.status) {

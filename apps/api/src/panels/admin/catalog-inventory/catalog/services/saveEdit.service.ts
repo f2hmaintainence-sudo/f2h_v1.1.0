@@ -849,12 +849,17 @@ export class CatalogSaveEditService {
       }
 
       const updateData: Record<string, any> = {
+        updated_by: adminId || null,
         updated_at: new Date().toISOString(),
       };
 
       if (body.title !== undefined) updateData.title = body.title.trim();
       if (body.description !== undefined) updateData.description = body.description?.trim() || null;
-      if (body.image_url !== undefined) updateData.image_url = body.image_url.trim();
+      if (body.banner_image && typeof body.banner_image === 'string' && body.banner_image.startsWith('data:image')) {
+        updateData.image_url = saveImageUpload(body.banner_image, 'offers');
+      } else if (body.image_url !== undefined && body.image_url.trim()) {
+        updateData.image_url = body.image_url.trim();
+      }
       if (body.action_type !== undefined) updateData.action_type = body.action_type;
       if (body.cta_label !== undefined) updateData.cta_label = body.cta_label.trim();
       if (body.discount_text !== undefined) updateData.discount_text = body.discount_text?.trim() || null;

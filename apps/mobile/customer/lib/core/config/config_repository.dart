@@ -7,8 +7,7 @@
 // Description : Daily server configuration sync engine with SharedPreferences caching.
 //               Hydrates AppConfig instantly from local disk, then refreshes
 //               from /api/v1/device/app-version if > 24 hours since last sync.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'dart:convert';

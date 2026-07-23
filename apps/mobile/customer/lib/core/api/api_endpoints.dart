@@ -7,8 +7,7 @@
 // Description : Versioned API endpoint definitions for the F2H Customer app.
 //               All paths resolve under /api/v1/ via the baseUrl prefix.
 //               Compact header values (C, D, ac, ic …) are sent by DioClient.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'package:flutter/foundation.dart';

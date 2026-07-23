@@ -6,8 +6,7 @@
 // File        : api_endpoints.dart
 // Description : Versioned API endpoint definitions for F2H Delivery App.
 //               All paths resolve under /api/v1/ via the baseUrl prefix.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'package:flutter/foundation.dart';

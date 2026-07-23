@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : order_tracking_screen.dart
 // Description : Realtime live order tracking screen with ETA, driver info, and stops-away countdown
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'dart:async';

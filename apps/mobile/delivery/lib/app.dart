@@ -29,39 +29,35 @@ class F2HApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MultiBlocProvider(
-        providers: [
-          BlocProvider(
-            create: (_) => sl<AuthBloc>()..add(AuthCheckRequested()),
-          ),
-          BlocProvider(
-            create: (_) => sl<DeliverySessionBloc>()..add(LoadSessionEvent()),
-          ),
-        ],
-        child: MaterialApp(
-          title: 'Farm to Home',
-          debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            brightness: Brightness.light,
-            scaffoldBackgroundColor: kBg,
-            textTheme: GoogleFonts.poppinsTextTheme(
-              ThemeData.light().textTheme,
-            ),
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: kPrimary,
-              brightness: Brightness.light,
-              primary: kPrimary,
-            ),
-            useMaterial3: true,
-            appBarTheme: const AppBarTheme(
-              backgroundColor: kSurface,
-              foregroundColor: kText,
-              elevation: 0,
-              surfaceTintColor: Colors.transparent,
-            ),
-          ),
-          home: const SplashScreen(),
+    providers: [
+      BlocProvider(create: (_) => sl<AuthBloc>()..add(AuthCheckRequested())),
+      BlocProvider(
+        create: (_) => sl<DeliverySessionBloc>()..add(LoadSessionEvent()),
+      ),
+    ],
+    child: MaterialApp(
+      title: 'Farm to Home',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: kBg,
+        textTheme: GoogleFonts.poppinsTextTheme(ThemeData.light().textTheme),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: kPrimary,
+          brightness: Brightness.light,
+          primary: kPrimary,
         ),
-      );
+        useMaterial3: true,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: kSurface,
+          foregroundColor: kText,
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
+        ),
+      ),
+      home: const SplashScreen(),
+    ),
+  );
 }
 
 class AppShell extends StatefulWidget {
@@ -85,20 +81,23 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     (Icons.explore_rounded, 'Home'),
     (Icons.assignment_rounded, 'Orders'),
     (Icons.map_rounded, 'Map'),
-    (Icons.person_rounded, 'Profile')
+    (Icons.person_rounded, 'Profile'),
   ];
 
   Future<bool> _handlePop() async {
     final now = DateTime.now();
     const backButtonInterval = Duration(seconds: 2);
-    if (_lastPressedAt == null || now.difference(_lastPressedAt!) > backButtonInterval) {
+    if (_lastPressedAt == null ||
+        now.difference(_lastPressedAt!) > backButtonInterval) {
       _lastPressedAt = now;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Press back again to exit'),
           duration: backButtonInterval,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
       return false;
@@ -130,7 +129,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           onPopInvoked: (didPop) async {
             if (didPop) return;
             if (_i != 0) {
-              setState(() { _i = 0; });
+              setState(() {
+                _i = 0;
+              });
               return;
             }
             final shouldPop = await _handlePop();
@@ -141,10 +142,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             body: Column(
               children: [
                 Expanded(
-                  child: IndexedStack(
-                    index: _i,
-                    children: _screens,
-                  ),
+                  child: IndexedStack(index: _i, children: _screens),
                 ),
               ],
             ),
@@ -153,7 +151,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 color: kSurface,
                 border: const Border(top: BorderSide(color: kBorderLt)),
                 boxShadow: [
-                  BoxShadow(color: kPrimary.withOpacity(0.04), blurRadius: 16, offset: const Offset(0, -4))
+                  BoxShadow(
+                    color: kPrimary.withOpacity(0.04),
+                    blurRadius: 16,
+                    offset: const Offset(0, -4),
+                  ),
                 ],
               ),
               child: SafeArea(
@@ -163,7 +165,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   child: Row(
                     children: List.generate(_tabs.length, (i) {
                       final on = i == _i;
-                      final isTabEnabled = (i == 0 || i == 3) || (isVerified && isAccountActive);
+                      final isTabEnabled =
+                          (i == 0 || i == 3) || (isVerified && isAccountActive);
                       const activeColor = kPrimary;
                       return Expanded(
                         child: GestureDetector(
@@ -172,7 +175,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                               if (!isVerified) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('Verification pending. Please wait for admin approval.'),
+                                    content: Text(
+                                      'Verification pending. Please wait for admin approval.',
+                                    ),
                                     backgroundColor: Colors.redAccent,
                                     duration: Duration(seconds: 2),
                                   ),
@@ -182,7 +187,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                               if (!isAccountActive) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('Account is inactive. Please contact admin.'),
+                                    content: Text(
+                                      'Account is inactive. Please contact admin.',
+                                    ),
                                     backgroundColor: Colors.redAccent,
                                     duration: Duration(seconds: 2),
                                   ),
@@ -205,10 +212,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                   boxShadow: on
                                       ? [
                                           BoxShadow(
-                                            color: activeColor.withValues(alpha: 0.3),
+                                            color: activeColor.withValues(
+                                              alpha: 0.3,
+                                            ),
                                             blurRadius: 8,
                                             offset: const Offset(0, 3),
-                                          )
+                                          ),
                                         ]
                                       : [],
                                 ),
@@ -216,7 +225,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                   _tabs[i].$1,
                                   color: on
                                       ? Colors.white
-                                      : (isTabEnabled ? kMuted : kMuted.withValues(alpha: 0.3)),
+                                      : (isTabEnabled
+                                            ? kMuted
+                                            : kMuted.withValues(alpha: 0.3)),
                                   size: 20,
                                 ),
                               ),
@@ -225,10 +236,14 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                 _tabs[i].$2,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  fontWeight: on ? FontWeight.w800 : FontWeight.w500,
+                                  fontWeight: on
+                                      ? FontWeight.w800
+                                      : FontWeight.w500,
                                   color: on
                                       ? activeColor
-                                      : (isTabEnabled ? kMuted : kMuted.withOpacity(0.3)),
+                                      : (isTabEnabled
+                                            ? kMuted
+                                            : kMuted.withOpacity(0.3)),
                                 ),
                               ),
                             ],
@@ -257,7 +272,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     // Listen to tab navigation requests (still on MockDataService.tabNavigationNotifier
     // as it's a UI-only navigation bus, not session data)
-    MockDataService().tabNavigationNotifier.addListener(_onTabNavigationRequested);
+    MockDataService().tabNavigationNotifier.addListener(
+      _onTabNavigationRequested,
+    );
 
     // Request location permissions on app startup
     _requestLocationPermission();
@@ -329,7 +346,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    MockDataService().tabNavigationNotifier.removeListener(_onTabNavigationRequested);
+    MockDataService().tabNavigationNotifier.removeListener(
+      _onTabNavigationRequested,
+    );
     _locationTrackingService.stopTracking();
     super.dispose();
   }

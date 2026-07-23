@@ -20,7 +20,7 @@ export class InventoryDashboardService {
   // ────────────────────────────────────────────────
   // Full Dashboard Data
   // ────────────────────────────────────────────────
-  async getDashboardData() {
+  async getDashboardData(warehouseId?: string) {
     try {
       const today = todayIST();
 
@@ -35,11 +35,11 @@ export class InventoryDashboardService {
       ] = await Promise.all([
         this.getWarehouseStockSummary(),
         this.getBranchStockSummary(),
-        this.getLowStockAlerts(),
+        this.getLowStockAlerts(warehouseId),
         this.getDispatchStatusSummary(today),
         this.getTransferStatusSummary(),
         this.getProductionRequirements(today),
-        this.getRecentStockMovements(),
+        this.getRecentStockMovements(warehouseId),
       ]);
 
       return {
@@ -131,8 +131,13 @@ export class InventoryDashboardService {
   // ────────────────────────────────────────────────
   // Low Stock Alerts
   // ────────────────────────────────────────────────
-  async getLowStockAlerts() {
+  async getLowStockAlerts(warehouseId?: string) {
     try {
+      const params: any[] = [];
+      const warehouseFilter = warehouseId
+        ? `AND sb.warehouse_id = $${params.push(warehouseId)}`
+        : '';
+
       const sql = `
         SELECT
           sb.warehouse_id, w.name AS warehouse_name,
@@ -146,10 +151,11 @@ export class InventoryDashboardService {
         JOIN products p ON p.product_id = pv.product_id
         JOIN warehouses w ON w.warehouse_id = sb.warehouse_id
         WHERE sb.available_quantity <= sb.low_stock_threshold
+        ${warehouseFilter}
         ORDER BY sb.available_quantity ASC
         LIMIT 50
       `;
-      return await this.db.query(sql);
+      return await this.db.query(sql, params);
     } catch (error) {
       this.developer.error('getLowStockAlerts error', { error });
       return [];
@@ -276,8 +282,13 @@ export class InventoryDashboardService {
   // ────────────────────────────────────────────────
   // Recent Stock Movements
   // ────────────────────────────────────────────────
-  async getRecentStockMovements() {
+  async getRecentStockMovements(warehouseId?: string) {
     try {
+      const params: any[] = [];
+      const warehouseFilter = warehouseId
+        ? `AND sm.warehouse_id = $${params.push(warehouseId)}`
+        : '';
+
       const sql = `
         SELECT
           sm.movement_id, sm.movement_type, sm.direction,
@@ -291,16 +302,18 @@ export class InventoryDashboardService {
         LEFT JOIN warehouses w ON w.warehouse_id = sm.warehouse_id
         LEFT JOIN product_variants pv ON pv.variant_id = sm.product_variant_id
         LEFT JOIN products p ON p.product_id = pv.product_id
-        WHERE sm.deleted_at IS NULL
+        WHERE 1=1
+        ${warehouseFilter}
         ORDER BY sm.created_at DESC
         LIMIT 20
       `;
-      return await this.db.query(sql);
+      return await this.db.query(sql, params);
     } catch (error) {
       this.developer.error('getRecentStockMovements error', { error });
       return [];
     }
   }
+
 
   // ────────────────────────────────────────────────
   // Daily Inventory Reconciliation

@@ -6,8 +6,7 @@
 // File        : offline_queue_manager.dart
 // Description : Queues offline delivery updates (status change, delivery proof)
 //               and automatically syncs when network returns.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'dart:async';

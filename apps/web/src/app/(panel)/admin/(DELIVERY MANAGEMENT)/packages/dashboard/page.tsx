@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : page.tsx
 // Description : Containers — pending returnable assets per customer (simplified)
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 'use client';
@@ -125,9 +124,8 @@ export default function ContainersPage() {
     <div className="space-y-4 p-1 md:p-2 font-sans min-h-screen">
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-sm font-semibold transition-all ${
-          toast.ok ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'
-        }`}>
+        <div className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-sm font-semibold transition-all ${toast.ok ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'
+          }`}>
           {toast.ok ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
           {toast.msg}
         </div>
@@ -304,9 +302,8 @@ export default function ContainersPage() {
                     };
                     return (
                       <button key={a} onClick={() => setAdjusting(s => s ? { ...s, action: a } : s)}
-                        className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border-2 text-xs font-bold capitalize transition-all ${
-                          adjusting.action === a ? colors[a] : 'border-gray-200 text-gray-400 hover:border-gray-300'
-                        }`}>
+                        className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border-2 text-xs font-bold capitalize transition-all ${adjusting.action === a ? colors[a] : 'border-gray-200 text-gray-400 hover:border-gray-300'
+                          }`}>
                         {icons[a]}{a}
                       </button>
                     );

@@ -388,11 +388,19 @@ export class CatalogShowEditService {
       }
 
       const formRes = await this.showAddService.getOffersForm();
+      const rawImageUrl = result.data[0]?.image_url || '';
+      const isUploadedFile = rawImageUrl.startsWith('/uploads/') || rawImageUrl.startsWith('uploads/');
+
+      const offerData = {
+        ...result.data[0],
+        image_url: isUploadedFile ? '' : rawImageUrl,
+        banner_image: rawImageUrl,
+      };
       return this.formHelper.generateResponse({
         title: 'Edit Offer Banner',
         submitLabel: 'Update Offer',
         fields: formRes.fields,
-        data: result.data[0],
+        data: offerData,
         script: '',
       });
     } catch (error) {

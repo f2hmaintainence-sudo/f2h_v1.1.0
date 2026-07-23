@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : api-integrations.service.ts
 // Description : Service for managing developer API integrations configs & DLT templates
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import { Injectable, NotFoundException } from '@nestjs/common';
@@ -18,7 +17,7 @@ export class ApiIntegrationsService {
   constructor(
     private readonly db: DatabaseService,
     private readonly developer: DeveloperService,
-  ) {}
+  ) { }
 
   async getConfigsByCategory(category: string) {
     try {
@@ -113,10 +112,10 @@ export class ApiIntegrationsService {
   async saveSmsTemplate(body: any) {
     try {
       const { id, template_key, name, dlt_template_id, dlt_sender_id, placeholders, body: templateBody, is_active } = body;
-      
-      const parsedPlaceholders = Array.isArray(placeholders) 
-        ? placeholders 
-        : typeof placeholders === 'string' 
+
+      const parsedPlaceholders = Array.isArray(placeholders)
+        ? placeholders
+        : typeof placeholders === 'string'
           ? placeholders.split(',').map((s: string) => s.trim()).filter(Boolean)
           : [];
 

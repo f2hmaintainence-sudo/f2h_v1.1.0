@@ -553,7 +553,7 @@ export class AuthService {
       JSON.stringify({
         phone: phone || null,
         email: email || null,
-        purpose: 'registration',
+        purpose: (body as any).purpose || 'registration',
       }),
       CACHE_TTL.FIFTEEN_MINUTES,
     );

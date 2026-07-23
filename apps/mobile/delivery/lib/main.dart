@@ -1,14 +1,3 @@
-// ============================================================================
-// ChronoSparkSolutions — A Software Company
-// © 2026 ChronoSparkSolutions. All rights reserved.
-//
-// Project     : F2H Fresh
-// File        : main.dart
-// Description : Entry point for F2H Delivery App with AppBootstrap.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
-// ============================================================================
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

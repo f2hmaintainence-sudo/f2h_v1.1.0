@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 /**
  * Production config for Contabo VPS with Node.js (next start).
@@ -30,7 +31,7 @@ const nextConfig: NextConfig = {
     ],
   },
   turbopack: {
-    root: '/home/f2hfresh/htdocs/f2hfresh.com',
+    root: path.resolve(__dirname, "../../"),
   },
   experimental: {
     optimizePackageImports: ["react-icons", "lucide-react"],
@@ -39,7 +40,11 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:5001/:path*',
+        destination: 'http://localhost:5001/api/:path*',
+      },
+      {
+        source: '/uploads/:path*',
+        destination: 'http://localhost:5001/uploads/:path*',
       },
     ];
   },

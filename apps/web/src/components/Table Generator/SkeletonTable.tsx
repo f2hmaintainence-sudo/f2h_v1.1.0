@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : SkeletonTable.tsx
 // Description : Skeleton table generator component for web panel
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 'use client';

@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : injection.dart
 // Description : Dependency injection container setup for customer app
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'package:get_it/get_it.dart';

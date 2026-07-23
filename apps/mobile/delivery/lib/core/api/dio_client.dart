@@ -9,8 +9,7 @@
 //               - Compact headers: X-Role:D, X-Plt:<code>, X-Ver:<semver>
 //               - AuthInterceptor: auto-injects Bearer token + silently
 //                 refreshes expired access tokens using the refresh token.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'dart:io';

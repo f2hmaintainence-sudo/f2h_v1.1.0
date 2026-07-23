@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : page.tsx
 // Description : Delivery partners management page for admin panel
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 "use client";

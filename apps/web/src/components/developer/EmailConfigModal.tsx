@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : EmailConfigModal.tsx
 // Description : Modal for creating & editing Email SMTP configuration
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 "use client";

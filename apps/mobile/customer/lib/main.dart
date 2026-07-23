@@ -8,8 +8,7 @@
 //               Runs AppBootstrap.checkAuth() before runApp() to silently
 //               validate any stored JWT session — enforcing "never logout"
 //               unless the user explicitly signs out or refresh token expires.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'package:flutter/foundation.dart';

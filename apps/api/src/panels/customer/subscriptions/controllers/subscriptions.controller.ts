@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : subscriptions.controller.ts
 // Description : Customer subscription management endpoints (Phase 2 — full feature parity)
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards, Req } from '@nestjs/common';
@@ -18,7 +17,7 @@ import { Request } from 'express';
 
 @Controller({ path: 'customer', version: '1' })
 export class SubscriptionsController {
-  constructor(private readonly service: SubscriptionsService) {}
+  constructor(private readonly service: SubscriptionsService) { }
 
   // ── GET subscriptions list ────────────────────────────────────────────
   @Get('subscriptions')

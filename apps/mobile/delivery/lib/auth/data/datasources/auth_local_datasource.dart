@@ -1,14 +1,3 @@
-// ============================================================================
-// ChronoSparkSolutions — A Software Company
-// © 2026 ChronoSparkSolutions. All rights reserved.
-//
-// Project     : F2H Fresh
-// File        : auth_local_datasource.dart
-// Description : Local user cache data source for Delivery App.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
-// ============================================================================
-
 import 'package:flutter/foundation.dart';
 import 'package:isar/isar.dart';
 import 'package:f2h_delivery/auth/data/models/user_model.dart';

@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : token_storage.dart
 // Description : Secure, persistent storage for Delivery app JWT tokens.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';

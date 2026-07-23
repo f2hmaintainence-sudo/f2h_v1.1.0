@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : AdminSidebar.tsx
 // Description : Admin sidebar component with DEVELOPER section for API integrations
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 "use client";
@@ -59,11 +58,10 @@ const adminNav = [
         name: "Inventory & Warehouse",
         icon: Archive,
         subItems: [
+          { name: "Warehouses", href: "/admin/warehouse/list", icon: Building },
           { name: "Stock Overview", href: "/admin/inventory/overview", icon: AlignLeft },
           { name: "Stock In/Out", href: "/admin/warehouse/stock-movements", icon: ArrowRightLeft },
           { name: "Dispatch Requirements", href: "/admin/warehouse/dispatch", icon: Truck },
-          { name: "Warehouses", href: "/admin/warehouse/list", icon: Building },
-          { name: "Production Batches", href: "/admin/production/batches", icon: Boxes },
         ]
       },
       {

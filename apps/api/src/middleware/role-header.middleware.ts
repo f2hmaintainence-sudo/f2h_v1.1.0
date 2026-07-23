@@ -11,8 +11,7 @@
 //               X-Csrf (uuid)   → x-csrf-token
 //               This ensures zero breaking changes to downstream guards and
 //               services while keeping the wire-format as small as possible.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import { Injectable, NestMiddleware } from '@nestjs/common';
@@ -39,8 +38,8 @@ export class RoleHeaderMiddleware implements NestMiddleware {
 
   use(req: Request, _res: Response, next: NextFunction): void {
     const role = (req.headers['x-role'] as string | undefined)?.trim();
-    const plt  = (req.headers['x-plt']  as string | undefined)?.trim();
-    const ver  = (req.headers['x-ver']  as string | undefined)?.trim();
+    const plt = (req.headers['x-plt'] as string | undefined)?.trim();
+    const ver = (req.headers['x-ver'] as string | undefined)?.trim();
     const csrf = (req.headers['x-csrf'] as string | undefined)?.trim();
 
     // Expand compact role code → full role string consumed by JwtStrategy / AuthController
