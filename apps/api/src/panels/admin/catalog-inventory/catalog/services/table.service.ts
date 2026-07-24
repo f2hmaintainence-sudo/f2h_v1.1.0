@@ -145,8 +145,8 @@ export class CatalogTableService {
           product_category: ['categories.name AS product_category', true],
           product_name: ['products.name AS product_name', true],
           name: ['products.name AS name', false],
-          url: ['COALESCE(products.image_url, (SELECT url FROM product_images WHERE product_images.product_id = products.product_id ORDER BY is_primary DESC, id ASC LIMIT 1)) AS url', false],
-          image: ['COALESCE(products.image_url, (SELECT url FROM product_images WHERE product_images.product_id = products.product_id ORDER BY is_primary DESC, id ASC LIMIT 1)) AS image', true],
+          url: ['products.image_url AS url', false],
+          image: ['products.image_url AS image', true],
           batch_product: ['products.batch_product', false],
           gst: ['products.gst_percentage', true],
           packaging_type: ['packaging_types.name AS packaging_type', true],
@@ -300,7 +300,7 @@ export class CatalogTableService {
           variant_id: ['product_variants.variant_id', true],
           product_name: ['products.name AS product_name', true],
           variant_name: ['product_variants.name', true],
-          product_image: ['COALESCE(product_variants.image_url, (SELECT url FROM product_images WHERE product_images.variant_id = product_variants.variant_id ORDER BY is_primary DESC, id ASC LIMIT 1), products.image_url) AS product_image', true],
+          product_image: ['product_variants.image_url AS product_image', true],
           unit_value: ['product_variants.unit_value', true],
           unit_type: ['product_variants.unit_type', true],
           price: ['product_variants.price', true],
@@ -311,16 +311,10 @@ export class CatalogTableService {
           fulfillment_mode: ['product_variants.fulfillment_mode', true],
         },
         joins: [
-
           {
             type: 'left',
             table: 'products',
             on: [['product_variants.product_id', 'products.product_id']],
-          },
-          {
-            type: 'left',
-            table: 'product_images',
-            on: [['product_variants.variant_id', 'product_images.variant_id']],
           },
         ],
         conditions,

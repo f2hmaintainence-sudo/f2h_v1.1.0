@@ -64,7 +64,8 @@ export const AVOID_DELETED_AT = [
   'delivery_container_lines',
   'customer_container_balances',
   'customer_feedback',
-
+  'packaging_types',
+  'product_images',
 ];
 export const AVOID_DATACHANGE_TABLES = [
   'notifications',
