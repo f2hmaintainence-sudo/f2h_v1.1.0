@@ -199,6 +199,7 @@ export class CatalogSaveAddService {
         'is_subscribable',
         'is_one_time',
         'is_returnable',
+        'is_out_of_stock',
         'is_active',
       ];
 
@@ -207,6 +208,7 @@ export class CatalogSaveAddService {
         is_subscribable: false,
         is_one_time: true,
         is_returnable: false,
+        is_out_of_stock: false,
         gst_percentage: 0,
         unit_type: 'piece',
       };
