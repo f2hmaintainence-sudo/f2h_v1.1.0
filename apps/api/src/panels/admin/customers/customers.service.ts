@@ -82,10 +82,14 @@ export class CustomersService {
         whereClauses.push(`COALESCE(c.wallet_balance, 0) > 0`);
       } else if (walletFilter === 'negative') {
         whereClauses.push(`COALESCE(c.wallet_balance, 0) < 0`);
+      } else if (walletFilter === 'zero') {
+        whereClauses.push(`COALESCE(c.wallet_balance, 0) = 0`);
       }
 
       if (dueFilter === 'has_due') {
         whereClauses.push(`COALESCE(cb.outstanding_due, 0) > 0`);
+      } else if (dueFilter === 'no_due') {
+        whereClauses.push(`(cb.outstanding_due IS NULL OR cb.outstanding_due = 0)`);
       }
 
       const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
@@ -207,7 +211,7 @@ export class CustomersService {
         FROM customers
       `;
 
-      const branchesSql = `SELECT branch_id, branch_name FROM branches ORDER BY branch_name ASC`;
+      const branchesSql = `SELECT branch_id, branch_name FROM branches WHERE deleted_at IS NULL ORDER BY branch_name ASC`;
 
       const listQueryParams = [...params, limit, offset];
       const [rows, countRes, statsRes, branchesRes] = await Promise.all([
