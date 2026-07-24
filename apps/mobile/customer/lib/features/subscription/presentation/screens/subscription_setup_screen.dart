@@ -348,12 +348,14 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
             customDays: _kDays,
             morningQty: morningQty,
             eveningQty: eveningQty,
+            weeklySchedule: _frequency == 'weekly' ? Map.from(_weeklySchedule) : {},
             paymentType: paymentType,
             paymentMethod: paymentMethod,
             autoRenew: _autoRenew,
             estimatedTotal: _currentMonthEstimate.total,
           ),
         );
+
   }
 
   // ══════════════════════════════════════════════════════

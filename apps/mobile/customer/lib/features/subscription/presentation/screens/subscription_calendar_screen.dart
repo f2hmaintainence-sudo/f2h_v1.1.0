@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
-import 'package:f2h_customer/core/widgets/hot_toast.dart';
 import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/features/subscription/domain/repositories/subscription_repository.dart';
 import 'package:f2h_customer/features/subscription/data/models/subscription_model.dart';
@@ -18,10 +17,9 @@ class SubscriptionCalendarScreen extends StatefulWidget {
 class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen> {
   late DateTime _focusedMonth;
   late DateTime _selectedDate;
-  final Set<String> _skippedDates = {};
+  // Map<dateStr, calendarEntry>
   Map<String, Map<String, dynamic>> _apiCalendar = {};
   bool _isLoading = true;
-  bool _isSaving = false;
 
   @override
   void initState() {
@@ -32,123 +30,205 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
   }
 
   Future<void> _fetchCalendarData() async {
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
     try {
       final data = await sl<SubscriptionRepository>().getSubscriptionCalendar(widget.subscription.id);
-      debugPrint('Calendar Screen: Received data length: ${data.length}');
-      debugPrint('Calendar Screen: First item: ${data.isNotEmpty ? data.first : "none"}');
-      
       setState(() {
         _apiCalendar = {
           for (var item in data)
             if (item is Map && item['date'] != null)
               item['date'].toString(): Map<String, dynamic>.from(item)
         };
-        debugPrint('Calendar Screen: Mapped keys: ${_apiCalendar.keys.toList()}');
-        
+
         if (_apiCalendar.isNotEmpty) {
           final sortedDates = _apiCalendar.keys.toList()..sort();
-          final firstDateStr = sortedDates.first;
           try {
-            final firstDate = DateTime.parse(firstDateStr);
+            final firstDate = DateTime.parse(sortedDates.first);
             _selectedDate = firstDate;
             _focusedMonth = DateTime(firstDate.year, firstDate.month);
-            debugPrint('Calendar Screen: Focused month set to: $_focusedMonth');
-          } catch (e) {
-            debugPrint('Calendar Screen: Error setting focused date: $e');
+          } catch (_) {}
+        }
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  String _dateKey(DateTime date) =>
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+  DateTime? _parseDateStr(String? dateStr) {
+    if (dateStr == null || dateStr.trim().isEmpty) return null;
+    final text = dateStr.trim();
+    try {
+      final parsed = DateTime.parse(text);
+      return DateTime(parsed.year, parsed.month, parsed.day);
+    } catch (_) {
+      try {
+        final parts = text.split(' ');
+        if (parts.length == 3) {
+          final day = int.tryParse(parts[0]);
+          final year = int.tryParse(parts[2]);
+          const months = [
+            'jan', 'feb', 'mar', 'apr', 'may', 'jun',
+            'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
+          ];
+          final mIndex = months.indexOf(parts[1].toLowerCase().substring(0, 3));
+          if (day != null && year != null && mIndex != -1) {
+            return DateTime(year, mIndex + 1, day);
           }
         }
-        
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('Calendar Screen: Error fetching calendar data: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      } catch (_) {}
     }
+    return null;
   }
 
-  String _dateKey(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-  }
+  bool _isScheduledDay(DateTime date) {
+    if (widget.subscription.status == 'cancelled' ||
+        widget.subscription.status == 'expaired' ||
+        widget.subscription.status == 'expired') {
+      return false;
+    }
 
-  bool _isPast(DateTime date) {
-    final today = DateTime.now();
-    final normalizedDate = DateTime(date.year, date.month, date.day);
-    final normalizedToday = DateTime(today.year, today.month, today.day);
-    return normalizedDate.isBefore(normalizedToday);
-  }
+    final d = DateTime(date.year, date.month, date.day);
 
-  bool _isScheduledDelivery(DateTime date) {
+    // 1. Start date check (cannot schedule before subscription start date)
+    final startDate = _parseDateStr(widget.subscription.startDate);
+    if (startDate != null && d.isBefore(startDate)) {
+      return false;
+    }
+
+    // 2. End date check (cannot schedule after subscription end date)
+    final endDate = _parseDateStr(widget.subscription.endDate);
+    if (endDate != null && d.isAfter(endDate)) {
+      return false;
+    }
+
+    // 3. If API has returned data for this date, trust the API
     final key = _dateKey(date);
+    if (_apiCalendar.isNotEmpty && _apiCalendar.containsKey(key)) {
+      final item = _apiCalendar[key]!;
+      final mq = double.tryParse(item['m_quantity']?.toString() ?? '0') ?? 0;
+      final eq = double.tryParse(item['e_quantity']?.toString() ?? '0') ?? 0;
+      final apiStatus = item['status']?.toString() ?? '';
+      if (mq > 0 || eq > 0) return true;
+      if (apiStatus == 'skipped' || apiStatus == 'cancelled') return true;
+      return false;
+    }
+
+    // 4. Fallback: Day-of-week schedule check using client-side data
+    final dayQtys = widget.subscription.getSelectedDayQuantities();
+    if (dayQtys.isEmpty) return true; // Default everyday
+
+    // Flutter DateTime.weekday: 1=Mon, 2=Tue, ..., 6=Sat, 7=Sun
+    const weekdayMap = {
+      1: ['Mon', 'Monday', 'Everyday', 'Daily'],
+      2: ['Tue', 'Tuesday', 'Everyday', 'Daily'],
+      3: ['Wed', 'Wednesday', 'Everyday', 'Daily'],
+      4: ['Thu', 'Thursday', 'Everyday', 'Daily'],
+      5: ['Fri', 'Friday', 'Everyday', 'Daily'],
+      6: ['Sat', 'Saturday', 'Everyday', 'Daily'],
+      7: ['Sun', 'Sunday', 'Everyday', 'Daily'],
+    };
+
+    final validNames = weekdayMap[date.weekday] ?? [];
+    return dayQtys.any((dq) =>
+        validNames.any((vn) => dq.dayName.toLowerCase().contains(vn.toLowerCase())));
+  }
+
+  /// Returns the delivery status for a date: 'completed', 'today', 'upcoming', 'skipped', 'cancelled', or 'no_delivery'
+  String _deliveryStatus(DateTime date) {
+    final key = _dateKey(date);
+    final d = DateTime(date.year, date.month, date.day);
+    final today = DateTime.now();
+    final t = DateTime(today.year, today.month, today.day);
+
+    // Priority 1: Check start/end date bounds
+    final startDate = _parseDateStr(widget.subscription.startDate);
+    if (startDate != null && d.isBefore(startDate)) return 'no_delivery';
+    final endDate = _parseDateStr(widget.subscription.endDate);
+    if (endDate != null && d.isAfter(endDate)) return 'no_delivery';
+
+    if (widget.subscription.status == 'cancelled' ||
+        widget.subscription.status == 'expaired' ||
+        widget.subscription.status == 'expired') {
+      return 'no_delivery';
+    }
+
+    // Priority 2: API data
     if (_apiCalendar.containsKey(key)) {
       final item = _apiCalendar[key]!;
-      final mq = double.tryParse(item['m_quantity']?.toString() ?? '0.0') ?? 0.0;
-      final eq = double.tryParse(item['e_quantity']?.toString() ?? '0.0') ?? 0.0;
-      return mq > 0 || eq > 0;
+      final apiStatus = item['status']?.toString() ?? '';
+      if (apiStatus.isNotEmpty && apiStatus != 'no_delivery') return apiStatus;
+
+      final mq = double.tryParse(item['m_quantity']?.toString() ?? '0') ?? 0;
+      final eq = double.tryParse(item['e_quantity']?.toString() ?? '0') ?? 0;
+      if (mq > 0 || eq > 0) {
+        if (d.isBefore(t)) return 'completed';
+        if (d == t) return 'today';
+        return 'upcoming';
+      }
+      // API explicitly says no delivery
+      return 'no_delivery';
     }
-    return false;
+
+    // Priority 3: Client-side fallback using schedule
+    if (!_isScheduledDay(date)) return 'no_delivery';
+
+    if (d.isBefore(t)) return 'completed';
+    if (d == t) return 'today';
+    return 'upcoming';
   }
 
   bool _hasDelivery(DateTime date) {
     final key = _dateKey(date);
-    if (_skippedDates.contains(key)) return false;
-    return _isScheduledDelivery(date);
+    if (_apiCalendar.containsKey(key)) {
+      final item = _apiCalendar[key]!;
+      final mq = double.tryParse(item['m_quantity']?.toString() ?? '0') ?? 0;
+      final eq = double.tryParse(item['e_quantity']?.toString() ?? '0') ?? 0;
+      if (mq > 0 || eq > 0) return true;
+    }
+    return _isScheduledDay(date);
   }
 
-  bool _isSkipped(DateTime date) {
-    return _skippedDates.contains(_dateKey(date));
-  }
-
-  String _getDeliveryQuantitiesText(DateTime date) {
+  String _getDeliveryQtyText(DateTime date) {
+    if (!_isScheduledDay(date)) return '';
     final key = _dateKey(date);
     if (_apiCalendar.containsKey(key)) {
       final item = _apiCalendar[key]!;
-      final double mq = double.tryParse(item['m_quantity']?.toString() ?? '0.0') ?? 0.0;
-      final double eq = double.tryParse(item['e_quantity']?.toString() ?? '0.0') ?? 0.0;
-      
-      if (mq > 0 && eq > 0) {
-        return '${mq.toInt()} Morn + ${eq.toInt()} Eve';
-      } else if (mq > 0) {
-        return '${mq.toInt()} Morning';
-      } else if (eq > 0) {
-        return '${eq.toInt()} Evening';
-      }
+      final double mq = double.tryParse(item['m_quantity']?.toString() ?? '0') ?? 0;
+      final double eq = double.tryParse(item['e_quantity']?.toString() ?? '0') ?? 0;
+      if (mq > 0 && eq > 0) return '${mq.toInt()} Morn + ${eq.toInt()} Eve';
+      if (mq > 0) return '${mq.toInt()} Morning';
+      if (eq > 0) return '${eq.toInt()} Evening';
     }
-    return '${widget.subscription.qty} ${widget.subscription.slot}';
+    if (_isScheduledDay(date)) {
+      final qty = widget.subscription.qty > 0 ? widget.subscription.qty : 1;
+      return '$qty Morning';
+    }
+    return '';
   }
 
   List<DateTime> _generateCalendarDates(DateTime month) {
     final firstDayOfMonth = DateTime(month.year, month.month, 1);
     int startWeekday = firstDayOfMonth.weekday;
-    if (startWeekday == 7) {
-      startWeekday = 0;
-    }
-    
-    return List.generate(42, (index) {
-      return DateTime(month.year, month.month, 1 - startWeekday + index);
-    });
+    if (startWeekday == 7) startWeekday = 0;
+    return List.generate(42, (index) => DateTime(month.year, month.month, 1 - startWeekday + index));
   }
 
-  void _previousMonth() {
-    setState(() {
-      _focusedMonth = DateTime(_focusedMonth.year, _focusedMonth.month - 1);
-    });
-  }
+  void _previousMonth() => setState(() {
+        _focusedMonth = DateTime(_focusedMonth.year, _focusedMonth.month - 1);
+      });
 
-  void _nextMonth() {
-    setState(() {
-      _focusedMonth = DateTime(_focusedMonth.year, _focusedMonth.month + 1);
-    });
-  }
+  void _nextMonth() => setState(() {
+        _focusedMonth = DateTime(_focusedMonth.year, _focusedMonth.month + 1);
+      });
 
   String _getMonthName(int month) {
     const months = [
       'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'July', 'August', 'September', 'October', 'November', 'December',
     ];
     return months[month - 1];
   }
@@ -158,13 +238,49 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
     return days[weekday];
   }
 
-  Future<void> _saveCalendarChanges() async {
-    setState(() => _isSaving = true);
-    await Future.delayed(const Duration(milliseconds: 1200));
-    if (mounted) {
-      setState(() => _isSaving = false);
-      F2HToast.success(context, 'Calendar modifications saved successfully!');
-      Navigator.pop(context);
+  // ─── Status helpers ─────────────────────────────────────────────────────────
+
+  Color _statusBg(String status, bool isSelected) {
+    switch (status) {
+      case 'completed': return const Color(0xFFDCFCE7);
+      case 'today':     return const Color(0xFFDBEAFE);
+      case 'upcoming':  return kPrimaryPl;
+      case 'skipped':   return const Color(0xFFFFF7ED);
+      case 'cancelled': return const Color(0xFFFEE2E2);
+      default:          return kSurface;
+    }
+  }
+
+  Color _statusTextColor(String status) {
+    switch (status) {
+      case 'completed': return const Color(0xFF16A34A);
+      case 'today':     return const Color(0xFF2563EB);
+      case 'upcoming':  return kPrimary;
+      case 'skipped':   return const Color(0xFFD97706);
+      case 'cancelled': return kRed;
+      default:          return kText;
+    }
+  }
+
+  IconData _statusIcon(String status) {
+    switch (status) {
+      case 'completed': return Icons.check_circle_rounded;
+      case 'today':     return Icons.local_shipping_rounded;
+      case 'upcoming':  return Icons.schedule_rounded;
+      case 'skipped':   return Icons.block_rounded;
+      case 'cancelled': return Icons.cancel_rounded;
+      default:          return Icons.event_busy_rounded;
+    }
+  }
+
+  String _statusLabel(String status, DateTime date) {
+    switch (status) {
+      case 'completed': return 'Delivered successfully';
+      case 'today':     return 'Delivery scheduled for today';
+      case 'upcoming':  return 'Upcoming delivery';
+      case 'skipped':   return 'Delivery was skipped';
+      case 'cancelled': return 'Delivery cancelled';
+      default:          return 'No delivery scheduled';
     }
   }
 
@@ -172,12 +288,8 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
   Widget build(BuildContext context) {
     final dates = _generateCalendarDates(_focusedMonth);
     final selectedKey = _dateKey(_selectedDate);
-    
-    final isFromBackend = _apiCalendar.containsKey(selectedKey);
-    final isScheduled = _isScheduledDelivery(_selectedDate);
+    final selectedStatus = _deliveryStatus(_selectedDate);
     final hasDel = _hasDelivery(_selectedDate);
-    final isSkp = _isSkipped(_selectedDate);
-    final isPastDate = _isPast(_selectedDate);
 
     return Scaffold(
       backgroundColor: kBg,
@@ -207,19 +319,15 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
           IconButton(
             icon: const Icon(Icons.refresh, color: kTextMid),
             onPressed: _fetchCalendarData,
-          )
+          ),
         ],
       ),
       body: SafeArea(
         child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
-                ),
-              )
+            ? const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(kPrimary)))
             : Column(
                 children: [
-                  // 1. Subscription Product Info Header
+                  // 1. Product info header
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                     child: Container(
@@ -230,10 +338,10 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                         border: Border.all(color: kBorder),
                         boxShadow: [
                           BoxShadow(
-                            color: kText.withOpacity(0.02),
+                            color: kText.withValues(alpha: 0.02),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
-                          )
+                          ),
                         ],
                       ),
                       child: Row(
@@ -263,72 +371,44 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                                 Text(
                                   _prettifyName(widget.subscription.productName),
                                   style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w800,
-                                    color: kText,
-                                    letterSpacing: -0.1,
+                                    fontSize: 14, fontWeight: FontWeight.w800,
+                                    color: kText, letterSpacing: -0.1,
                                   ),
                                 ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  widget.subscription.frequency,
-                                  style: const TextStyle(fontSize: 11, color: kTextSub, fontWeight: FontWeight.w600),
-                                ),
-                                if (widget.subscription.items.isNotEmpty) ...[
-                                  const SizedBox(height: 4),
-                                  ...widget.subscription.items.map((item) {
-                                    final List<String> parts = [];
-                                    if (item.defaultMQty > 0) parts.add('${item.defaultMQty} AM');
-                                    if (item.defaultEQty > 0) parts.add('${item.defaultEQty} PM');
-                                    final qtyLabel = parts.join(' + ');
-
-                                    return Padding(
-                                      padding: const EdgeInsets.only(top: 2),
-                                      child: Row(
-                                        children: [
-                                          const Icon(Icons.subdirectory_arrow_right_rounded, size: 10, color: kTextSub),
-                                          const SizedBox(width: 2),
-                                          Expanded(
-                                            child: Text(
-                                              '${item.displayName}: $qtyLabel',
-                                              style: const TextStyle(fontSize: 9.5, color: kTextSub, fontWeight: FontWeight.w500),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }),
-                                ],
                               ],
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: kPrimary.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              'Qty: ${widget.subscription.qty}',
-                              style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  color: kPrimary),
-                            ),
-                          )
+                          Builder(builder: (_) {
+                            final dayQtys = widget.subscription.getSelectedDayQuantities();
+                            final scheduleLabel = dayQtys.isEmpty
+                                ? 'Daily'
+                                : dayQtys.length == 7
+                                    ? 'Everyday'
+                                    : '${dayQtys.length} days/week';
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: kPrimary.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                scheduleLabel,
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: kPrimary),
+                              ),
+                            );
+                          }),
                         ],
                       ),
                     ),
                   ),
 
-                  // 2. Month Selector & Calendar Sheet
+                  // 2. Calendar
                   Expanded(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                       child: Column(
                         children: [
+                          // Calendar card
                           Container(
                             padding: const EdgeInsets.all(16.0),
                             decoration: BoxDecoration(
@@ -338,7 +418,7 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                             ),
                             child: Column(
                               children: [
-                                // Month navigation row
+                                // Month nav
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
@@ -349,9 +429,7 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                                     Text(
                                       '${_getMonthName(_focusedMonth.month)} ${_focusedMonth.year}',
                                       style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w900,
-                                        color: kText,
+                                        fontSize: 15, fontWeight: FontWeight.w900, color: kText,
                                       ),
                                     ),
                                     IconButton(
@@ -361,8 +439,7 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                                   ],
                                 ),
                                 const SizedBox(height: 12),
-                                
-                                // Calendar Weekday Header
+                                // Weekday header
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                                   children: List.generate(7, (i) {
@@ -372,9 +449,7 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                                         child: Text(
                                           _getWeekDayName(i),
                                           style: const TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w800,
-                                            color: kTextSub,
+                                            fontSize: 11, fontWeight: FontWeight.w800, color: kTextSub,
                                           ),
                                         ),
                                       ),
@@ -382,8 +457,7 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                                   }),
                                 ),
                                 const SizedBox(height: 8),
-
-                                // Calendar Grid
+                                // Calendar grid
                                 GridView.builder(
                                   shrinkWrap: true,
                                   physics: const NeverScrollableScrollPhysics(),
@@ -400,75 +474,58 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                                     final isSelected = date.year == _selectedDate.year &&
                                         date.month == _selectedDate.month &&
                                         date.day == _selectedDate.day;
-                                    
                                     final key = _dateKey(date);
                                     final dateFromBackend = _apiCalendar.containsKey(key);
-                                    
-                                    final isDel = _hasDelivery(date);
-                                    final isSk = _isSkipped(date);
-                                    final isPastDateTile = _isPast(date);
-                                    
+                                    final status = _deliveryStatus(date);
                                     final isToday = date.day == DateTime.now().day &&
                                         date.month == DateTime.now().month &&
                                         date.year == DateTime.now().year;
+
+                                    double mQty = 0, eQty = 0;
+                                    if (_isScheduledDay(date)) {
+                                      if (dateFromBackend) {
+                                        final item = _apiCalendar[key]!;
+                                        mQty = double.tryParse(item['m_quantity']?.toString() ?? '0') ?? 0;
+                                        eQty = double.tryParse(item['e_quantity']?.toString() ?? '0') ?? 0;
+                                      } else {
+                                        mQty = (widget.subscription.qty > 0 ? widget.subscription.qty : 1).toDouble();
+                                      }
+                                    }
 
                                     Color textCol = kText;
                                     Color bgCol = Colors.transparent;
                                     Border? border;
 
-                                    double mQty = 0.0;
-                                    double eQty = 0.0;
-                                    if (dateFromBackend) {
-                                      final item = _apiCalendar[key]!;
-                                      mQty = double.tryParse(item['m_quantity']?.toString() ?? '0.0') ?? 0.0;
-                                      eQty = double.tryParse(item['e_quantity']?.toString() ?? '0.0') ?? 0.0;
-                                    }
-
-                                    if (!isCurrentMonth || !dateFromBackend) {
-                                      textCol = kMuted.withOpacity(0.5);
-                                      bgCol = kBgDeep.withOpacity(0.3);
+                                    if (!isCurrentMonth) {
+                                      textCol = kMuted.withValues(alpha: 0.3);
+                                      bgCol = kBgDeep.withValues(alpha: 0.2);
                                     } else {
-                                      if (isSelected) {
-                                        border = Border.all(color: kPrimary, width: 2);
-                                      } else if (isToday) {
-                                        border = Border.all(color: kPrimary.withOpacity(0.3), width: 1.5);
-                                      } else {
-                                        border = Border.all(color: kBorder);
+                                      bgCol = _statusBg(status, isSelected);
+                                      textCol = _statusTextColor(status);
+
+                                      if (status == 'no_delivery') {
+                                        textCol = kTextSub;
+                                        bgCol = kSurface;
                                       }
 
-                                      if (isDel) {
-                                        bgCol = isPastDateTile ? kPrimaryPl.withOpacity(0.4) : kPrimaryPl;
-                                        textCol = isPastDateTile ? kPrimary.withOpacity(0.5) : kPrimary;
-                                      } else if (isSk) {
-                                        bgCol = isPastDateTile ? kRedLt.withOpacity(0.4) : kRedLt;
-                                        textCol = isPastDateTile ? kRed.withOpacity(0.5) : kRed;
+                                      if (isSelected) {
+                                        border = Border.all(color: _statusTextColor(status), width: 2);
+                                      } else if (isToday) {
+                                        border = Border.all(color: kPrimary.withValues(alpha: 0.4), width: 1.5);
                                       } else {
-                                        bgCol = kSurface;
+                                        border = Border.all(color: kBorder.withValues(alpha: 0.5));
                                       }
                                     }
 
                                     return GestureDetector(
-                                      onTap: dateFromBackend
-                                          ? () {
-                                              setState(() {
-                                                _selectedDate = date;
-                                                if (date.month != _focusedMonth.month) {
-                                                  _focusedMonth = DateTime(date.year, date.month);
-                                                }
-                                              });
-                                            }
-                                          : null,
-                                      onDoubleTap: (dateFromBackend && !isPastDateTile && (isDel || isSk))
-                                          ? () {
-                                              setState(() {
-                                                if (_skippedDates.contains(key)) {
-                                                  _skippedDates.remove(key);
-                                                } else {
-                                                  _skippedDates.add(key);
-                                                }
-                                              });
-                                            }
-                                          : null,
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedDate = date;
+                                          if (date.month != _focusedMonth.month) {
+                                            _focusedMonth = DateTime(date.year, date.month);
+                                          }
+                                        });
+                                      },
                                       child: Container(
                                         padding: const EdgeInsets.all(4.0),
                                         decoration: BoxDecoration(
@@ -491,23 +548,22 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                                                       date.day.toString(),
                                                       style: TextStyle(
                                                         fontSize: 12,
-                                                        fontWeight: isSelected || isDel || isSk ? FontWeight.w900 : FontWeight.w600,
+                                                        fontWeight: isSelected || status != 'no_delivery'
+                                                            ? FontWeight.w900
+                                                            : FontWeight.w600,
                                                         color: textCol,
-                                                        decoration: isSk ? TextDecoration.lineThrough : null,
+                                                        decoration: status == 'cancelled'
+                                                            ? TextDecoration.lineThrough
+                                                            : null,
                                                       ),
                                                     ),
                                                   ),
                                                 ),
-                                                if (dateFromBackend && isCurrentMonth && isPastDateTile) ...[
-                                                  Icon(
-                                                    Icons.lock,
-                                                    size: 9,
-                                                    color: kTextSub.withOpacity(0.4),
-                                                  ),
-                                                ],
+                                                if (isCurrentMonth && status == 'completed')
+                                                  const Icon(Icons.check_rounded, size: 8, color: Color(0xFF16A34A)),
                                               ],
                                             ),
-                                            if (dateFromBackend && isCurrentMonth && (mQty > 0 || eQty > 0)) ...[
+                                            if (isCurrentMonth && (mQty > 0 || eQty > 0)) ...[
                                               Column(
                                                 mainAxisSize: MainAxisSize.min,
                                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -520,10 +576,9 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                                                         mainAxisSize: MainAxisSize.min,
                                                         children: [
                                                           Container(
-                                                            width: 4,
-                                                            height: 4,
+                                                            width: 4, height: 4,
                                                             decoration: BoxDecoration(
-                                                              color: isSk ? kRed : kPrimary,
+                                                              color: _statusTextColor(status),
                                                               shape: BoxShape.circle,
                                                             ),
                                                           ),
@@ -531,10 +586,11 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                                                           Text(
                                                             '${mQty.toInt()}M',
                                                             style: TextStyle(
-                                                              fontSize: 8,
-                                                              fontWeight: FontWeight.w900,
-                                                              color: isSk ? kRed : kPrimary,
-                                                              decoration: isSk ? TextDecoration.lineThrough : null,
+                                                              fontSize: 8, fontWeight: FontWeight.w900,
+                                                              color: _statusTextColor(status),
+                                                              decoration: status == 'cancelled' || status == 'skipped'
+                                                                  ? TextDecoration.lineThrough
+                                                                  : null,
                                                             ),
                                                           ),
                                                         ],
@@ -549,10 +605,9 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                                                         mainAxisSize: MainAxisSize.min,
                                                         children: [
                                                           Container(
-                                                            width: 4,
-                                                            height: 4,
+                                                            width: 4, height: 4,
                                                             decoration: BoxDecoration(
-                                                              color: isSk ? kRed.withOpacity(0.7) : kAccent,
+                                                              color: _statusTextColor(status).withValues(alpha: 0.7),
                                                               shape: BoxShape.circle,
                                                             ),
                                                           ),
@@ -560,10 +615,11 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                                                           Text(
                                                             '${eQty.toInt()}E',
                                                             style: TextStyle(
-                                                              fontSize: 8,
-                                                              fontWeight: FontWeight.w900,
-                                                              color: isSk ? kRed.withOpacity(0.7) : kAccent,
-                                                              decoration: isSk ? TextDecoration.lineThrough : null,
+                                                              fontSize: 8, fontWeight: FontWeight.w900,
+                                                              color: _statusTextColor(status).withValues(alpha: 0.7),
+                                                              decoration: status == 'cancelled' || status == 'skipped'
+                                                                  ? TextDecoration.lineThrough
+                                                                  : null,
                                                             ),
                                                           ),
                                                         ],
@@ -580,12 +636,25 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                                     );
                                   },
                                 ),
+                                const SizedBox(height: 12),
+                                // Color legend
+                                Wrap(
+                                  spacing: 12,
+                                  runSpacing: 6,
+                                  children: [
+                                    _LegendDot(color: const Color(0xFF16A34A), label: 'Delivered'),
+                                    _LegendDot(color: const Color(0xFF2563EB), label: 'Today'),
+                                    _LegendDot(color: kPrimary, label: 'Upcoming'),
+                                    _LegendDot(color: const Color(0xFFD97706), label: 'Skipped'),
+                                    _LegendDot(color: kRed, label: 'Cancelled'),
+                                  ],
+                                ),
                               ],
                             ),
                           ),
                           const SizedBox(height: 16),
-                          
-                          // 3. Selected Date Status Card
+
+                          // 3. Selected date status card
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(18.0),
@@ -599,92 +668,103 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                               children: [
                                 Row(
                                   children: [
-                                    Icon(
-                                      !isFromBackend
-                                          ? Icons.event_busy
-                                          : (hasDel ? Icons.local_shipping_outlined : (isSkp ? Icons.block : Icons.event_busy)),
-                                      color: !isFromBackend
-                                          ? kTextSub
-                                          : (hasDel ? kPrimary : (isSkp ? kRed : kTextSub)),
-                                      size: 20,
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: _statusTextColor(selectedStatus).withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Icon(
+                                        _statusIcon(selectedStatus),
+                                        color: _statusTextColor(selectedStatus),
+                                        size: 18,
+                                      ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      '${_selectedDate.day} ${_getMonthName(_selectedDate.month)} ${_selectedDate.year}',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w900,
-                                        color: kText,
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${_selectedDate.day} ${_getMonthName(_selectedDate.month)} ${_selectedDate.year}',
+                                            style: const TextStyle(
+                                              fontSize: 14, fontWeight: FontWeight.w900, color: kText,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            _statusLabel(selectedStatus, _selectedDate),
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: _statusTextColor(selectedStatus),
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    // Status badge
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                      decoration: BoxDecoration(
+                                        color: _statusTextColor(selectedStatus).withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        selectedStatus == 'no_delivery' ? 'No Delivery' : selectedStatus.toUpperCase(),
+                                        style: TextStyle(
+                                          fontSize: 9, fontWeight: FontWeight.w900,
+                                          color: _statusTextColor(selectedStatus),
+                                          letterSpacing: 0.3,
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  !isFromBackend
-                                      ? 'No delivery scheduled for this date.'
-                                      : (hasDel
-                                          ? 'Regular scheduled delivery (${_getDeliveryQuantitiesText(_selectedDate)}).'
-                                          : (isSkp
-                                              ? 'Delivery paused/skipped for this date.'
-                                              : 'No delivery scheduled.')),
-                                  style: const TextStyle(
-                                    fontSize: 12.5,
-                                    color: kTextMid,
-                                    height: 1.3,
-                                  ),
-                                ),
-                                if (isFromBackend && isPastDate) ...[
+                                if (hasDel) ...[
                                   const SizedBox(height: 12),
                                   Container(
                                     padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
-                                      color: kBgDeep.withOpacity(0.5),
+                                      color: kBgDeep.withValues(alpha: 0.5),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Row(
-                                      children: const [
-                                        Icon(Icons.lock_outline, size: 14, color: kTextSub),
-                                        SizedBox(width: 8),
+                                      children: [
+                                        Icon(Icons.local_shipping_outlined, size: 14,
+                                            color: _statusTextColor(selectedStatus)),
+                                        const SizedBox(width: 8),
                                         Text(
-                                          'Past deliveries cannot be paused or resumed.',
-                                          style: TextStyle(fontSize: 11, color: kTextSub, fontWeight: FontWeight.w600),
+                                          'Qty: ${_getDeliveryQtyText(_selectedDate)}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: _statusTextColor(selectedStatus),
+                                            fontWeight: FontWeight.w700,
+                                          ),
                                         ),
                                       ],
                                     ),
                                   ),
                                 ],
-                                const SizedBox(height: 16),
-                                
-                                // Toggle Action Button
-                                if (isFromBackend && !isPastDate) ...[
-                                  if (isScheduled) ...[
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: OutlinedButton(
-                                        onPressed: () {
-                                          setState(() {
-                                            final key = selectedKey;
-                                            if (_skippedDates.contains(key)) {
-                                              _skippedDates.remove(key);
-                                            } else {
-                                              _skippedDates.add(key);
-                                            }
-                                          });
-                                        },
-                                        style: OutlinedButton.styleFrom(
-                                          side: BorderSide(color: isSkp ? kPrimary : kRed),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                          padding: const EdgeInsets.symmetric(vertical: 12),
-                                          foregroundColor: isSkp ? kPrimary : kRed,
-                                        ),
-                                        child: Text(
-                                          isSkp ? 'Resume Delivery' : 'Pause Delivery',
-                                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                                        ),
-                                      ),
+                                if (!hasDel && _apiCalendar.containsKey(selectedKey)) ...[
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: kBgDeep.withValues(alpha: 0.5),
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
-                                  ],
+                                    child: const Row(
+                                      children: [
+                                        Icon(Icons.info_outline_rounded, size: 14, color: kTextSub),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'No delivery quantity set for this day.',
+                                          style: TextStyle(fontSize: 11, color: kTextSub, fontWeight: FontWeight.w600),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ],
                               ],
                             ),
@@ -693,70 +773,33 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                       ),
                     ),
                   ),
-
-                  // 4. Save Changes Bottom Bar
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                    decoration: BoxDecoration(
-                      color: kSurface,
-                      border: Border.all(color: kBorder),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                '${_skippedDates.length} paused',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                  color: kTextMid,
-                                ),
-                              ),
-                              const Text(
-                                'Unsaved changes',
-                                style: TextStyle(fontSize: 10, color: kTextSub),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        ElevatedButton(
-                          onPressed: (_skippedDates.isEmpty && !_isSaving)
-                              ? null
-                              : _saveCalendarChanges,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: kPrimary,
-                            foregroundColor: Colors.white,
-                            disabledBackgroundColor: kBgDeep,
-                            disabledForegroundColor: kTextSub,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                            elevation: 0,
-                          ),
-                          child: _isSaving
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                  ),
-                                )
-                              : const Text(
-                                  'Save Changes',
-                                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                                ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
       ),
+    );
+  }
+}
+
+// ─── Legend dot ───────────────────────────────────────────────────────────────
+
+class _LegendDot extends StatelessWidget {
+  final Color color;
+  final String label;
+
+  const _LegendDot({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8, height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: kTextSub)),
+      ],
     );
   }
 }

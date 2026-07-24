@@ -160,6 +160,9 @@ class SubscriptionCheckoutRequested extends SubscriptionEvent {
   final List<String> customDays;
   final int morningQty;
   final int eveningQty;
+  // Per-day schedule map for 'weekly' frequency:
+  // { 'Mon': {'morning': 1, 'evening': 0}, 'Wed': {'morning': 3, 'evening': 0}, ... }
+  final Map<String, Map<String, int>> weeklySchedule;
   final String paymentType;   // 'prepaid' | 'postpaid'
   final String paymentMethod; // 'wallet' | 'upi' | 'postpaid'
   final bool autoRenew;
@@ -177,6 +180,7 @@ class SubscriptionCheckoutRequested extends SubscriptionEvent {
     required this.customDays,
     this.morningQty = 1,
     this.eveningQty = 0,
+    this.weeklySchedule = const {},
     this.paymentType = 'prepaid',
     this.paymentMethod = 'wallet',
     this.autoRenew = true,
@@ -189,6 +193,6 @@ class SubscriptionCheckoutRequested extends SubscriptionEvent {
   List<Object?> get props => [
         customerId, branchId, variantId, scheduleType, deliverySlot,
         startDate, unitPrice, customDays, morningQty, eveningQty,
-        paymentType, paymentMethod, autoRenew, estimatedTotal,
+        weeklySchedule, paymentType, paymentMethod, autoRenew, estimatedTotal,
       ];
 }

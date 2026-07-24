@@ -42,6 +42,55 @@ String _emojiForProduct(String name) {
   return '📦';
 }
 
+class DayQty {
+  final String dayName;
+  final int quantity;
+  final int morningQty;
+  final int eveningQty;
+
+  const DayQty({
+    required this.dayName,
+    required this.quantity,
+    this.morningQty = 0,
+    this.eveningQty = 0,
+  });
+
+  String get formattedText => '$dayName $quantity';
+}
+
+class SubscriptionDetailInfo {
+  final double walletBalance;
+  final double nextRenewalEstimate;
+  final int outstandingBillCount;
+  final double outstandingAmount;
+  final bool alertLowBalance;
+  final bool alertOutstandingBills;
+  final List<SubscriptionBillModel> latestBills;
+
+  const SubscriptionDetailInfo({
+    this.walletBalance = 0,
+    this.nextRenewalEstimate = 0,
+    this.outstandingBillCount = 0,
+    this.outstandingAmount = 0,
+    this.alertLowBalance = false,
+    this.alertOutstandingBills = false,
+    this.latestBills = const [],
+  });
+
+  factory SubscriptionDetailInfo.fromJson(Map<String, dynamic> json) {
+    final rawBills = _asListOfMaps(json['latest_bills']);
+    return SubscriptionDetailInfo(
+      walletBalance: _asDouble(json['wallet_balance']),
+      nextRenewalEstimate: _asDouble(json['next_renewal_estimate']),
+      outstandingBillCount: _asInt(json['outstanding_bill_count']),
+      outstandingAmount: _asDouble(json['outstanding_amount']),
+      alertLowBalance: _isTruthy(json['alert_low_balance']),
+      alertOutstandingBills: _isTruthy(json['alert_outstanding_bills']),
+      latestBills: rawBills.map(SubscriptionBillModel.fromJson).toList(),
+    );
+  }
+}
+
 class SubscriptionScheduleModel {
   final String? subscriptionItemId;
   final int dayOfWeek;
@@ -64,9 +113,19 @@ class SubscriptionScheduleModel {
       subscriptionItemId: _asString(
         json['subscription_item_id'] ?? json['subscriptionItemId'],
       ),
-      dayOfWeek: _asInt(json['day_of_week'] ?? json['dayOfWeek']),
-      mQuantity: _asInt(json['m_quantity'] ?? json['mQuantity']),
-      eQuantity: _asInt(json['e_quantity'] ?? json['eQuantity']),
+      dayOfWeek: _asInt(json['day_of_week'] ?? json['dayOfWeek'] ?? json['day']),
+      mQuantity: _asInt(
+        json['m_quantity'] ??
+            json['mQuantity'] ??
+            json['m_qty'] ??
+            json['morning_qty'],
+      ),
+      eQuantity: _asInt(
+        json['e_quantity'] ??
+            json['eQuantity'] ??
+            json['e_qty'] ??
+            json['evening_qty'],
+      ),
       effectiveFrom: _asString(json['effective_from'] ?? json['effectiveFrom']),
       effectiveTo: _asString(json['effective_to'] ?? json['effectiveTo']),
     );
@@ -482,6 +541,85 @@ class Subscription {
 
   String get displayLabel =>
       subscriptionNumber.isNotEmpty ? subscriptionNumber : id;
+
+  List<DayQty> getSelectedDayQuantities([
+    List<SubscriptionScheduleModel>? itemSchedules,
+  ]) {
+    final schedules = (itemSchedules != null && itemSchedules.isNotEmpty)
+        ? itemSchedules
+        : (weeklySchedules.isNotEmpty
+            ? weeklySchedules
+            : items.expand((i) => i.weeklySchedules).toList());
+
+    const fullDayNames = [
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+    ];
+
+    if (schedules.isNotEmpty) {
+      final Map<int, ({int m, int e})> dayMap = {};
+      for (final sch in schedules) {
+        final dow = sch.dayOfWeek.clamp(0, 6);
+        final current = dayMap[dow] ?? (m: 0, e: 0);
+        dayMap[dow] = (
+          m: current.m + sch.mQuantity,
+          e: current.e + sch.eQuantity
+        );
+      }
+
+      final result = <DayQty>[];
+      final sortedKeys = dayMap.keys.toList()..sort();
+      for (final dow in sortedKeys) {
+        final data = dayMap[dow]!;
+        final total = data.m + data.e;
+        if (total > 0) {
+          result.add(DayQty(
+            dayName: fullDayNames[dow],
+            quantity: total,
+            morningQty: data.m,
+            eveningQty: data.e,
+          ));
+        }
+      }
+      if (result.isNotEmpty) return result;
+    }
+
+    final freq = frequency.toLowerCase();
+    final defaultQty = qty > 0 ? qty : 1;
+
+    if (freq.contains('daily') || freq.contains('everyday')) {
+      return List.generate(
+        7,
+        (i) => DayQty(
+          dayName: fullDayNames[i],
+          quantity: defaultQty,
+        ),
+      );
+    }
+
+    final result = <DayQty>[];
+    for (int i = 0; i < fullDayNames.length; i++) {
+      final fullName = fullDayNames[i];
+      final shortKey = fullName.substring(0, 3).toLowerCase();
+      if (freq.contains(shortKey) || freq.contains(fullName.toLowerCase())) {
+        result.add(DayQty(
+          dayName: fullName,
+          quantity: defaultQty,
+        ));
+      }
+    }
+
+    if (result.isNotEmpty) return result;
+
+    return [
+      DayQty(dayName: 'Everyday', quantity: defaultQty),
+    ];
+  }
 
   factory Subscription.fromJson(Map<String, dynamic> json) {
     final rawItems = _asListOfMaps(json['items']);

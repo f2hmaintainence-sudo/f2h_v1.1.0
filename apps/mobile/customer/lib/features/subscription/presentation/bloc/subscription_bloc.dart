@@ -111,6 +111,7 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
         quantity: event.quantity,
         morningQty: event.morningQty,
         eveningQty: event.eveningQty,
+        weeklySchedule: event.weeklySchedule,
         scheduleType: event.scheduleType,
         deliverySlot: event.deliverySlot,
         startDate: event.startDate,
@@ -121,6 +122,7 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
         autoRenew: event.autoRenew,
         estimatedTotal: event.estimatedTotal,
       );
+
 
       // Handle structured error codes from backend
       final errorCode = result['error_code']?.toString();
