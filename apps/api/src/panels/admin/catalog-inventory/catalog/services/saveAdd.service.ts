@@ -93,6 +93,11 @@ export class CatalogSaveAddService {
         [primaryUrlStr, JSON.stringify(finalUrls), productId],
       );
 
+      await this.dataService.query(
+        `DELETE FROM product_images WHERE product_id = $1 AND variant_id IS NULL`,
+        [productId],
+      );
+
       for (const [index, fileUrl] of finalUrls.entries()) {
         await this.dataService.insert('product_images', {
           product_id: productId,
@@ -153,6 +158,11 @@ export class CatalogSaveAddService {
         [firstImage, variantId],
       );
 
+      await this.dataService.query(
+        `DELETE FROM product_images WHERE variant_id = $1`,
+        [variantId],
+      );
+
       for (const [index, fileUrl] of finalUrls.entries()) {
         await this.dataService.insert('product_images', {
           product_id: productId,
@@ -189,6 +199,7 @@ export class CatalogSaveAddService {
         'is_subscribable',
         'is_one_time',
         'is_returnable',
+        'is_out_of_stock',
         'is_active',
       ];
 
@@ -197,6 +208,7 @@ export class CatalogSaveAddService {
         is_subscribable: false,
         is_one_time: true,
         is_returnable: false,
+        is_out_of_stock: false,
         gst_percentage: 0,
         unit_type: 'piece',
       };
@@ -289,13 +301,10 @@ export class CatalogSaveAddService {
       }
 
       if (!insertData.slug) {
-        throw new BadRequestException({
-          status: false,
-          message: 'Validation failed',
-          errors: {
-            slug: 'Slug is required',
-          },
-        });
+        insertData.slug = String(insertData.name || 'product')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '') + '-' + Date.now().toString().slice(-4);
       }
 
       if (!insertData.category_id) {
@@ -854,6 +863,13 @@ export class CatalogSaveAddService {
       }
 
       // 6. Defaults
+      if (!insertData.slug) {
+        insertData.slug = String(insertData.name || 'category')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '') + '-' + Date.now().toString().slice(-4);
+      }
+
       if (insertData.is_active === undefined) {
         insertData.is_active = true;
       }

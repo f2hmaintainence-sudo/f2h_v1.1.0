@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   ChevronRight,
+  ChevronDown,
+  ArrowLeft,
   Home,
   Phone,
   Mail,
@@ -24,6 +26,15 @@ import {
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/services/api.client';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer
+} from 'recharts';
 
 export default function CustomerDetailsPage() {
   const params = useParams();
@@ -107,6 +118,16 @@ export default function CustomerDetailsPage() {
 
   return (
     <div className="space-y-6 p-4 md:p-6 font-sans min-h-screen bg-slate-50/50">
+      
+      {/* Return to Customers Navigation */}
+      <div className="flex items-center justify-between">
+        <Link 
+          href="/admin/customers/allcustomers"
+          className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 text-slate-700 hover:text-emerald-700 hover:border-emerald-300 text-xs font-bold rounded-xl shadow-2xs transition-all"
+        >
+          <ArrowLeft size={14} /> Return to Customers
+        </Link>
+      </div>
       
       {/* Header Panel */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -241,7 +262,7 @@ export default function CustomerDetailsPage() {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <MetricCard title="TOTAL REVENUE" value={`₹${Number(stats.lifetimeRevenue || 0).toLocaleString()}`} sub="Cumulative spend" onClick={() => setActiveTab('Revenue Trends')} />
         <MetricCard title="TOTAL ORDERS" value={`${totalOrdersCount} (${deliveredCount} ✓ / ${cancelledCount} ✕)`} sub="Click for orders" onClick={() => setActiveTab(tabs[1]?.name || 'Orders')} />
         <MetricCard title="AVG ORDER VALUE" value={`₹${Number(stats.aov || 0).toLocaleString()}`} sub="Average per order" onClick={() => setActiveTab(tabs[1]?.name || 'Orders')} />
@@ -272,7 +293,12 @@ export default function CustomerDetailsPage() {
         <div className="p-6">
           {activeTab === 'Overview & Insights' && <OverviewTab customer={customer} formattedOrders={formattedOrders} primaryAddress={primaryAddress} />}
           {activeTab.startsWith('Orders') && <OrdersTab orders={formattedOrders} />}
-          {!activeTab.startsWith('Orders') && activeTab !== 'Overview & Insights' && (
+          {activeTab === 'Postpaid Ledger' && <PostpaidTab ledger={data.postpaid_ledger} />}
+          {activeTab === 'Wallet Analytics' && <WalletTab ledger={data.wallet_ledger} />}
+          {activeTab === 'Subscription' && <SubscriptionTab subscriptions={data.subscriptions} />}
+          {activeTab === 'Revenue Trends' && <RevenueTrendsTab revenueAnalytics={data.revenue_analytics} />}
+          {activeTab === 'Activity Log' && <ActivityLogTab timeline={data.activity_timeline} />}
+          {!activeTab.startsWith('Orders') && !['Overview & Insights', 'Postpaid Ledger', 'Wallet Analytics', 'Subscription', 'Revenue Trends', 'Activity Log'].includes(activeTab) && (
             <div className="text-center py-10 text-gray-400 font-medium flex flex-col items-center justify-center">
               <Box size={40} className="mb-4 text-gray-200" />
               This section is under construction. Check back soon.
@@ -288,14 +314,13 @@ function MetricCard({ title, value, sub, onClick }: { title: string, value: stri
   return (
     <div 
       onClick={onClick}
-      className={`bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center ${
+      className={`bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center overflow-hidden min-w-0 ${
         onClick ? 'cursor-pointer hover:border-emerald-300 hover:shadow-md transition-all' : ''
       }`}
     >
-      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">{title}</p>
-      <p className="text-xl font-black text-gray-900 mb-1">{value}</p>
-      <p className="text-xs text-gray-400 flex items-center gap-1">
-        <AlertTriangle size={12} className="opacity-0" /> {/* Spacer */}
+      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1 truncate">{title}</p>
+      <p className="text-lg font-black text-gray-900 mb-1 truncate">{value}</p>
+      <p className="text-[10px] text-gray-400 flex items-center gap-1 truncate">
         {sub}
       </p>
     </div>
@@ -402,6 +427,422 @@ function OrdersTab({ orders }: { orders: any[] }) {
                     <ChevronDown size={16} className="text-gray-400" />
                   </div>
                 </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PostpaidTab({ ledger }: { ledger: any }) {
+  if (!ledger) return <div className="text-sm text-gray-500 py-8 text-center bg-gray-50 rounded-xl">No Postpaid Ledger Data Available</div>;
+  const { summary = {}, bills = [] } = ledger;
+
+  return (
+    <div className="space-y-6 font-sans">
+      {/* Summary Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Credit Limit</p>
+          <p className="text-xl font-black text-gray-900">₹{Number(summary?.credit_limit || 0).toLocaleString()}</p>
+        </div>
+        <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Current Due</p>
+          <p className="text-xl font-black text-rose-600">₹{Number(summary?.current_due || 0).toLocaleString()}</p>
+        </div>
+        <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Credit Given</p>
+          <p className="text-xl font-black text-blue-600">₹{Number(summary?.total_credit_given || 0).toLocaleString()}</p>
+        </div>
+        <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Paid</p>
+          <p className="text-xl font-black text-emerald-600">₹{Number(summary?.total_paid || 0).toLocaleString()}</p>
+        </div>
+      </div>
+
+      {/* Utilization Bar */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs">
+        <div className="flex justify-between items-center mb-2 text-xs font-bold text-gray-700">
+          <span>Credit Utilization ({Number(summary?.credit_utilization_pct || 0).toFixed(1)}%)</span>
+          <span>₹{Number(summary?.current_due || 0).toLocaleString()} / ₹{Number(summary?.credit_limit || 0).toLocaleString()}</span>
+        </div>
+        <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+          <div 
+            className={`h-full rounded-full transition-all ${
+              Number(summary?.credit_utilization_pct || 0) > 80 ? 'bg-rose-500' : 
+              Number(summary?.credit_utilization_pct || 0) > 50 ? 'bg-amber-500' : 'bg-blue-600'
+            }`}
+            style={{ width: `${Math.min(100, Math.max(0, Number(summary?.credit_utilization_pct || 0)))}%` }}
+          ></div>
+        </div>
+      </div>
+
+      {/* Bills Table */}
+      <div>
+        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <CreditCard size={16} className="text-blue-600" /> Postpaid Bills History ({bills.length})
+        </h3>
+        {bills.length === 0 ? (
+          <p className="text-xs text-gray-500 italic py-8 text-center bg-gray-50 rounded-xl border border-gray-100">
+            No postpaid bills generated for this customer yet.
+          </p>
+        ) : (
+          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-2xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+                  <tr>
+                    <th className="text-left px-4 py-3 font-semibold">Bill ID</th>
+                    <th className="text-left px-4 py-3 font-semibold">Period / Date</th>
+                    <th className="text-right px-4 py-3 font-semibold">Total</th>
+                    <th className="text-right px-4 py-3 font-semibold">Paid</th>
+                    <th className="text-right px-4 py-3 font-semibold">Due</th>
+                    <th className="text-center px-4 py-3 font-semibold">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {bills.map((bill: any, i: number) => (
+                    <tr key={i} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3 font-bold text-gray-900">
+                        #{bill.bill_id || bill.id}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-600">
+                        {bill.billing_period || (bill.created_at ? new Date(bill.created_at).toLocaleDateString('en-GB') : 'N/A')}
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-gray-900">
+                        ₹{Number(bill.total_amount || 0).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-emerald-600">
+                        ₹{Number(bill.paid_amount || 0).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-rose-600">
+                        ₹{Number(bill.due_amount || 0).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                          bill.status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
+                          bill.status === 'partially_paid' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
+                        }`}>
+                          {bill.status || 'UNPAID'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function WalletTab({ ledger }: { ledger: any }) {
+  if (!ledger) return <div className="text-sm text-gray-500">No Wallet Data</div>;
+  const { summary, transactions = [] } = ledger;
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Current Balance</p>
+          <p className="text-xl font-black text-gray-900">₹{summary?.balance?.toLocaleString()}</p>
+        </div>
+        <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Credits</p>
+          <p className="text-xl font-black text-emerald-600">₹{summary?.total_credits?.toLocaleString()}</p>
+        </div>
+        <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Debits</p>
+          <p className="text-xl font-black text-red-600">₹{summary?.total_debits?.toLocaleString()}</p>
+        </div>
+      </div>
+      
+      <div>
+        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Transaction History ({transactions.length})</h3>
+        {transactions.length === 0 ? (
+          <p className="text-sm text-gray-500">No transactions found.</p>
+        ) : (
+          <div className="space-y-3">
+            {transactions.map((t: any, i: number) => (
+              <div key={i} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:shadow-sm transition-shadow bg-white">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                      t.transaction_type === 'credit' || t.transaction_type === 'refund' || t.transaction_type === 'cashback' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                    }`}>
+                      {t.transaction_type}
+                    </span>
+                    <span className="font-bold text-gray-900 text-sm">{t.remarks || t.reference_type || 'Wallet Transaction'}</span>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {new Date(t.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    {t.reference_id && <span className="ml-2">• Ref: {t.reference_id}</span>}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className={`text-lg font-bold ${t.transaction_type === 'credit' || t.transaction_type === 'refund' || t.transaction_type === 'cashback' ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {t.transaction_type === 'credit' || t.transaction_type === 'refund' || t.transaction_type === 'cashback' ? '+' : '-'}₹{t.amount?.toLocaleString()}
+                  </p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">Balance: ₹{t.balance_after?.toLocaleString()}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SubscriptionTab({ subscriptions }: { subscriptions: any }) {
+  if (!subscriptions || (!subscriptions.active_plan && (!subscriptions.history || subscriptions.history.length === 0))) {
+    return (
+      <div className="text-center py-12 text-gray-500 font-medium flex flex-col items-center justify-center">
+        <Calendar size={44} className="mb-3 text-gray-300" />
+        <p className="text-base font-bold text-gray-700">No Active Subscriptions</p>
+        <p className="text-xs text-gray-400 mt-1">This customer does not have any active or past subscription plans.</p>
+      </div>
+    );
+  }
+
+  const { active_plan, items = [], history = [] } = subscriptions;
+
+  return (
+    <div className="space-y-6">
+      {/* Active Subscription Summary Card */}
+      {active_plan ? (
+        <div className="bg-gradient-to-r from-emerald-50 to-teal-50/50 p-6 rounded-2xl border border-emerald-100/80 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-emerald-200/40">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-xs">
+                <Calendar size={22} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-gray-900">
+                    Subscription #{active_plan.subscription_number || active_plan.subscription_id || active_plan.id}
+                  </h3>
+                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                    active_plan.status === 'active' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-amber-100 text-amber-700 border border-amber-200'
+                  }`}>
+                    {active_plan.status || 'ACTIVE'}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Created on {new Date(active_plan.created_at || Date.now()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold px-3 py-1.5 bg-white border border-emerald-200 rounded-lg text-emerald-800 shadow-2xs">
+                Cycle: <strong className="capitalize">{active_plan.billing_cycle || active_plan.schedule_type || 'Daily'}</strong>
+              </span>
+              {active_plan.delivery_slot && (
+                <span className="text-xs font-semibold px-3 py-1.5 bg-white border border-emerald-200 rounded-lg text-emerald-800 shadow-2xs">
+                  Slot: <strong className="capitalize">{active_plan.delivery_slot}</strong>
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Start Date</p>
+              <p className="text-sm font-bold text-gray-900">
+                {active_plan.start_date ? new Date(active_plan.start_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">End Date</p>
+              <p className="text-sm font-bold text-gray-900">
+                {active_plan.end_date ? new Date(active_plan.end_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Ongoing / No End'}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Schedule Type</p>
+              <p className="text-sm font-bold text-gray-900 capitalize">{active_plan.schedule_type || 'Everyday'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Payment Mode</p>
+              <p className="text-sm font-bold text-gray-900 capitalize">{active_plan.payment_mode || active_plan.payment_type || 'Prepaid Wallet'}</p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Subscribed Items */}
+      <div>
+        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <Box size={16} className="text-emerald-600" /> Subscribed Items ({items.length})
+        </h3>
+        {items.length === 0 ? (
+          <p className="text-xs text-gray-500 italic bg-gray-50 p-4 rounded-xl border border-gray-100">
+            No specific items detailed for this active plan.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {items.map((item: any, i: number) => (
+              <div key={i} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl hover:shadow-xs transition-shadow">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-sm">
+                    {i + 1}
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-900 text-sm">{item.product_name || 'Milk / Dairy Product'}</p>
+                    {item.variant_name && <p className="text-xs text-gray-500">{item.variant_name}</p>}
+                    {item.quantity && <p className="text-[11px] font-semibold text-emerald-700 mt-0.5">Quantity: {item.quantity} unit(s)</p>}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-extrabold text-gray-900 text-sm">₹{Number(item.final_price || item.unit_price || 0).toLocaleString()}</p>
+                  <p className="text-[10px] text-gray-400 uppercase">per delivery</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Subscription History */}
+      {history.length > 0 && (
+        <div>
+          <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">
+            Subscription History ({history.length})
+          </h3>
+          <div className="space-y-2">
+            {history.map((sub: any, i: number) => (
+              <div key={i} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl bg-white text-xs">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-bold text-gray-900">#{sub.subscription_number || sub.subscription_id || sub.id}</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                      sub.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {sub.status}
+                    </span>
+                  </div>
+                  <p className="text-gray-500">
+                    Cycle: <span className="capitalize font-semibold">{sub.billing_cycle || sub.schedule_type || 'N/A'}</span> • Created {new Date(sub.created_at).toLocaleDateString('en-GB')}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="font-semibold text-gray-700 capitalize">{sub.schedule_type || 'Custom Schedule'}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RevenueTrendsTab({ revenueAnalytics }: { revenueAnalytics: any }) {
+  const monthlyTrend = revenueAnalytics?.monthly_trend || [];
+  const topProducts = revenueAnalytics?.top_products || [];
+
+  return (
+    <div className="space-y-6 font-sans">
+      {/* 6-Month Revenue Trend */}
+      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xs">
+        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <TrendingUp size={16} className="text-emerald-600" /> Revenue & Spending Trends
+        </h3>
+        
+        {monthlyTrend.length === 0 ? (
+          <p className="text-xs text-gray-500 italic py-8 text-center bg-gray-50 rounded-xl border border-gray-100">
+            No completed order revenue recorded yet.
+          </p>
+        ) : (
+          <div className="h-64 w-full pt-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={monthlyTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={8} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} tickFormatter={(v) => `₹${v}`} />
+                <RechartsTooltip 
+                  cursor={{ fill: '#f8fafc' }}
+                  contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', fontSize: '12px', fontWeight: 'bold' }}
+                  formatter={(val: number) => [`₹${val.toLocaleString()}`, 'Revenue']}
+                />
+                <Bar dataKey="revenue" fill="#10b981" radius={[6, 6, 0, 0]} barSize={36} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      {/* Top Products */}
+      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xs">
+        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <Award size={16} className="text-amber-500" /> Top Purchased Products ({topProducts.length})
+        </h3>
+        
+        {topProducts.length === 0 ? (
+          <p className="text-xs text-gray-500 italic py-6 text-center bg-gray-50 rounded-xl border border-gray-100">
+            No item breakdown available yet.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {topProducts.map((prod: any, i: number) => (
+              <div key={i} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl bg-slate-50/50 hover:bg-white hover:shadow-xs transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
+                    #{i + 1}
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-900 text-sm">{prod.name || prod.product_name || 'Product Item'}</p>
+                    <p className="text-xs text-gray-500">{prod.total_qty} unit(s) ordered</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-gray-900 text-sm">₹{Number(prod.total_spend || 0).toLocaleString()}</p>
+                  <p className="text-[10px] text-gray-400 uppercase">Total Spend</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ActivityLogTab({ timeline }: { timeline: any[] }) {
+  const events = timeline || [];
+
+  return (
+    <div className="space-y-4 font-sans">
+      <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+        <Activity size={16} className="text-emerald-600" /> Customer Activity Timeline ({events.length})
+      </h3>
+
+      {events.length === 0 ? (
+        <p className="text-xs text-gray-500 italic py-8 text-center bg-gray-50 rounded-xl border border-gray-100">
+          No activity timeline recorded for this customer yet.
+        </p>
+      ) : (
+        <div className="relative border-l-2 border-slate-100 ml-4 space-y-6 pb-2">
+          {events.map((event: any, i: number) => (
+            <div key={i} className="relative pl-6">
+              <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-xs"></div>
+              <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-2xs hover:shadow-xs transition-shadow">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1">
+                  <span className="font-bold text-gray-900 text-sm">{event.title}</span>
+                  <span className="text-[11px] font-semibold text-gray-400">
+                    {event.date ? new Date(event.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600">{event.desc}</p>
+                {event.tag && (
+                  <span className="inline-block mt-2 px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-gray-100 text-gray-500">
+                    {event.tag}
+                  </span>
+                )}
               </div>
             </div>
           ))}

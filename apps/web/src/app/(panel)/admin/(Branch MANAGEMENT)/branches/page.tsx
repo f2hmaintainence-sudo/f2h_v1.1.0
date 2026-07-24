@@ -1,4 +1,4 @@
-// Trigger build: 2026-07-23
+// Live deploy trigger: 2026-07-24-v1
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
