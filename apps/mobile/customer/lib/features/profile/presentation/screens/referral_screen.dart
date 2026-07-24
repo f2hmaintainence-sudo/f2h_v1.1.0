@@ -96,11 +96,38 @@ class _ReferralScreenState extends State<ReferralScreen>
             }
             _totalCount = count;
 
-
             _isLoading = false;
           });
         }
       }
+
+      // Query wallet transactions for referral rewards directly to guarantee real-time balance accuracy
+      try {
+        final walletRes = await dioClient.dio.get('${ApiEndpoints.baseUrl}/customer/bootstrap');
+        if (walletRes.data != null) {
+          final wData = walletRes.data['data'] ?? walletRes.data;
+          final txs = wData['wallet_transactions'] as List?;
+          if (txs != null) {
+            double sumRef = 0;
+            int refCount = 0;
+            for (final tx in txs) {
+              final refType = (tx['reference_type'] ?? '').toString().toLowerCase();
+              final remarks = (tx['remarks'] ?? '').toString().toLowerCase();
+              if (refType.contains('referral') || remarks.contains('referral')) {
+                final amt = double.tryParse(tx['amount']?.toString() ?? '0') ?? 0;
+                sumRef += amt;
+                refCount++;
+              }
+            }
+            if (mounted) {
+              setState(() {
+                if (sumRef > _totalEarnings) _totalEarnings = sumRef;
+                if (refCount > _totalCount) _totalCount = refCount;
+              });
+            }
+          }
+        }
+      } catch (_) {}
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -116,13 +143,13 @@ class _ReferralScreenState extends State<ReferralScreen>
       return;
     }
 
-    final message = '🥛 Freshness is better when shared!\n\n'
-        'I\'m using F2H – Farm To Home for fresh farm products delivered to my doorstep.\n\n'
-        '🎁 Join using my referral link and get eligible referral benefits.\n\n'
-        'My Referral Code:\n$_activeCode\n\n'
-        'Join F2H:\n$_referralLink\n\n'
-        'Place your first eligible order and unlock referral rewards.\n\n'
-        'F2H – Farm To Home 💚';
+    final message = 'Your F2H Invite is Ready\n\n'
+        'Get ₹100 on your first order!\n'
+        'Fresh farm products, delivered to your doorstep.\n\n'
+        'Invite Code: $_activeCode\n'
+        '$_referralLink\n\n'
+        'F2H — Farm To Home\n'
+        'Fresh. Smart. Rewarding. ';
 
     final encodedMsg = Uri.encodeComponent(message);
     final whatsappUri = Uri.parse('https://wa.me/?text=$encodedMsg');
@@ -337,15 +364,12 @@ class _ReferralScreenState extends State<ReferralScreen>
                             const SizedBox(height: 20),
                             _buildTrustBadges(),
                             const SizedBox(height: 20),
-                            _buildWhatsAppCTACard(),
-                            const SizedBox(height: 20),
                             _buildActionList(),
                           ],
                         ),
                       ),
               ),
             ),
-            _buildWhatsAppBottomBar(),
           ],
         ),
       ),
@@ -503,47 +527,45 @@ class _ReferralScreenState extends State<ReferralScreen>
           // Graphic + Referral Code
           Row(
             children: [
-              // F2H bag graphic
-              Container(
-                width: 90,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: Colors.white.withOpacity(0.15)),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: const BoxDecoration(
-                        color: _kGold,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.shopping_bag_rounded,
-                          color: Color(0xFF0A3D22), size: 26),
+              // F2H 3D graphic
+              ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: Container(
+                  width: 90,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                  ),
+                  child: Image.network(
+                    '${ApiEndpoints.host}/uploads/whatsapp_share/referral_banner.png',
+                    fit: BoxFit.cover,
+                    errorBuilder: (ctx, err, stack) => Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: const BoxDecoration(
+                            color: _kGold,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.shopping_bag_rounded,
+                              color: Color(0xFF0A3D22), size: 26),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'F2H',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'F2H',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                    const Text(
-                      'FARM TO HOME',
-                      style: TextStyle(
-                        fontSize: 7,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white70,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
               const SizedBox(width: 14),

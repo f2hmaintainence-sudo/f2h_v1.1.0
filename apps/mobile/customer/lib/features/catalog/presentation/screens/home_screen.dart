@@ -16,8 +16,10 @@ import '../../../../core/network/network_bloc.dart';
 import '../../../../core/network/network_state.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
-import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
+import '../../../profile/presentation/screens/referral_screen.dart';
 import '../../../notifications/presentation/screens/notifications_screen.dart';
 import '../../../address/presentation/widgets/address_selector_drawer.dart';
 import '../../../address/data/models/profile_address.dart';
@@ -271,6 +273,11 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
 
 
+
+                // 5.5. Referral Banner (Invite Friends, Earn Rewards!)
+                const SliverToBoxAdapter(
+                  child: _HomeReferralBanner(),
+                ),
 
                 // 6. One time Product
                 SliverToBoxAdapter(
@@ -2173,6 +2180,215 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
         oldDelegate.notifBtn != notifBtn ||
         oldDelegate.profileBtn != profileBtn ||
         oldDelegate.topPadding != topPadding;
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  HOME REFERRAL BANNER (Invite Friends, Earn Rewards!)
+// ══════════════════════════════════════════════════════════
+class _HomeReferralBanner extends StatelessWidget {
+  const _HomeReferralBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
+      builder: (context, sessionState) {
+        final profile = sessionState.profile;
+        final rawCode = profile?.referralCode ?? sessionState.wallet['referral_code']?.toString();
+        final code = (rawCode != null && rawCode.isNotEmpty) ? rawCode : 'F2HPUR636';
+
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ReferralScreen()),
+            );
+          },
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFFF0F0), Color(0xFFFFF7F7)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFFFC5C5), width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFF0000).withOpacity(0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                // Left Icon
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.06),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.card_giftcard_rounded,
+                      color: Color(0xFFE53935),
+                      size: 24,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Center Text (Title & Subtitle)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Invite Friends, Earn Rewards!',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF1E293B),
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      const Text(
+                        'You & your friend both get ₹50 on your first order.',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF64748B),
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+
+                // Right Section (Referral Code + Share Now)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Your Referral Code',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Dashed-style Pill for Code (Clicking navigates to ReferralScreen)
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const ReferralScreen()),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFF16653A), width: 1),
+                            ),
+                            child: Text(
+                              code,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF16653A),
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+
+                        // Green Share Now Button
+                        GestureDetector(
+                          onTap: () => _shareCode(context, code),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF16653A),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.share, color: Colors.white, size: 12),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Share Now',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  static Future<void> _shareCode(BuildContext context, String code) async {
+    final message = 'Your F2H Invite is Ready\n\n'
+        'Get ₹100 on your first order!\n'
+        'Fresh farm products, delivered to your doorstep.\n\n'
+        'Invite Code: $code\n'
+        'https://f2h.app.link/$code\n\n'
+        'F2H — Farm To Home\n'
+        'Fresh. Smart. Rewarding.';
+    final encodedMsg = Uri.encodeComponent(message);
+    final whatsappUri = Uri.parse('https://wa.me/?text=$encodedMsg');
+
+    try {
+      if (await canLaunchUrl(whatsappUri)) {
+        await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
+      } else {
+        Clipboard.setData(ClipboardData(text: message));
+        if (context.mounted) {
+          F2HToast.success(context, 'Referral message copied to clipboard!');
+        }
+      }
+    } catch (_) {
+      Clipboard.setData(ClipboardData(text: message));
+      if (context.mounted) {
+        F2HToast.success(context, 'Referral message copied to clipboard!');
+      }
+    }
   }
 }
 
