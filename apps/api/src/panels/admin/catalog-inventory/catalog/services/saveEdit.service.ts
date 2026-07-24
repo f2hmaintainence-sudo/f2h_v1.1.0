@@ -92,6 +92,11 @@ export class CatalogSaveEditService {
         [primaryUrlStr, JSON.stringify(finalUrls), productId],
       );
 
+      await this.dataService.query(
+        `DELETE FROM product_images WHERE product_id = $1 AND variant_id IS NULL`,
+        [productId],
+      );
+
       for (const [index, fileUrl] of finalUrls.entries()) {
         await this.dataService.insert('product_images', {
           product_id: productId,
@@ -149,6 +154,11 @@ export class CatalogSaveEditService {
       await this.dataService.query(
         `UPDATE product_variants SET image_url = $1, image_path = $1 WHERE variant_id = $2`,
         [firstImage, variantId],
+      );
+
+      await this.dataService.query(
+        `DELETE FROM product_images WHERE variant_id = $1`,
+        [variantId],
       );
 
       for (const [index, fileUrl] of finalUrls.entries()) {
@@ -291,6 +301,12 @@ export class CatalogSaveEditService {
           if (typeof value === 'string') value = value.trim();
           updateData[fieldName] = value;
         }
+      }
+
+      const primaryUrl = body.primary_image_url || body.image_url;
+      if (primaryUrl && primaryUrl.trim()) {
+        updateData.image_url = primaryUrl.trim();
+        updateData.image_path = primaryUrl.trim();
       }
 
       if (Object.keys(updateData).length === 0 && !productImage) {
@@ -598,7 +614,7 @@ export class CatalogSaveEditService {
             {
               column: 'id',
               operator: '=',
-              value: id,
+              value: Number(id),
             },
           ],
         });

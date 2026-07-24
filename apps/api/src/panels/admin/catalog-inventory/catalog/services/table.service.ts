@@ -118,13 +118,6 @@ export class CatalogTableService {
         value: null,
       });
 
-      // Filter for primary images only
-      conditions.push({
-        column: 'product_images.is_primary',
-        operator: '=',
-        value: true,
-      });
-
       const reqSet: ReqSet = {
         key: 'products',
         table: 'products',
@@ -153,8 +146,8 @@ export class CatalogTableService {
           product_name: ['products.name AS product_name', true],
           name: ['products.name AS name', false],
           slug: ['products.slug', true],
-          url: ['product_images.url', false],
-          image: ['product_images.url', true],
+          url: ['COALESCE(products.image_url, (SELECT url FROM product_images WHERE product_images.product_id = products.product_id ORDER BY is_primary DESC, id ASC LIMIT 1)) AS url', false],
+          image: ['COALESCE(products.image_url, (SELECT url FROM product_images WHERE product_images.product_id = products.product_id ORDER BY is_primary DESC, id ASC LIMIT 1)) AS image', true],
           batch_product: ['products.batch_product', false],
           unit: ['products.unit_type', true],
           gst: ['products.gst_percentage', true],
@@ -170,11 +163,6 @@ export class CatalogTableService {
           created_at: ['products.created_at', true],
         },
         joins: [
-          {
-            type: 'left',
-            table: 'product_images',
-            on: [['products.product_id', 'product_images.product_id']],
-          },
           {
             type: 'left',
             table: 'categories',
@@ -280,24 +268,6 @@ export class CatalogTableService {
         value: null,
       });
 
-      conditions.push({
-        nested: [
-          {
-            column: 'product_images.sort_order',
-            operator: '=',
-            value: 0,
-            boolean: 'OR',
-          },
-          {
-            column: 'product_images.id',
-            operator: 'IS',
-            value: null,
-            boolean: 'OR',
-          }
-        ],
-        boolean: 'AND'
-      });
-
       const reqSet: ReqSet = {
         key: 'product_variants',
         table: 'product_variants',
@@ -324,7 +294,7 @@ export class CatalogTableService {
           variant_id: ['product_variants.variant_id', true],
           product_name: ['products.name AS product_name', true],
           variant_name: ['product_variants.name', true],
-          product_image: ['product_images.url', true],
+          product_image: ['COALESCE(product_variants.image_url, (SELECT url FROM product_images WHERE product_images.variant_id = product_variants.variant_id ORDER BY is_primary DESC, id ASC LIMIT 1), products.image_url) AS product_image', true],
           unit_value: ['product_variants.unit_value', true],
           unit_type: ['product_variants.unit_type', true],
           price: ['product_variants.price', true],
