@@ -1,5 +1,5 @@
 
-import { CustomThrottlerGuard } from 'src/throttler/custom-throttler.guard'
+import { CustomThrottlerGuard } from './throttler/custom-throttler.guard';
 import { ThrottlerGuard } from '@nestjs/throttler'
 import { APP_GUARD } from '@nestjs/core';
 import { UserHelperModule } from './helpers/UserHelper.module'

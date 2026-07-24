@@ -83,7 +83,7 @@ export class CategoriesProductsService {
           c.name AS category,
           pv.image_url AS variant_image,
           p.image_url AS product_image,
-          pi.image_path AS gallery_image
+          pi.url AS gallery_image
         FROM product_variants pv
         LEFT JOIN products p ON pv.product_id = p.product_id
         LEFT JOIN categories c ON p.category_id = c.category_id
@@ -150,7 +150,7 @@ export class CategoriesProductsService {
           c.name AS category,
           pv.image_url AS variant_image,
           p.image_url AS product_image,
-          pi.image_path AS gallery_image
+          pi.url AS gallery_image
         FROM product_variants pv
         LEFT JOIN products p ON pv.product_id = p.product_id
         LEFT JOIN categories c ON p.category_id = c.category_id
@@ -209,7 +209,7 @@ export class CategoriesProductsService {
            cf.rating,
            cf.feedback,
            cf.created_at,
-           c.full_name AS customer_name
+           TRIM(CONCAT(COALESCE(c.first_name, ''), ' ', COALESCE(c.last_name, ''))) AS customer_name
          FROM customer_feedback cf
          LEFT JOIN customers c ON c.customer_id = cf.customer_id
          WHERE cf.reference_id = $1 AND cf.reference_type = 'product'

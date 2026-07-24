@@ -49,85 +49,75 @@ export class WalletController {
     const currentBalance = Number(customer?.wallet_balance || 0);
     const newBalance = currentBalance + amount;
 
-    return this.Data.executeTransaction(async (conn) => {
-      await this.Data.update(
-        'customers',
-        { wallet_balance: newBalance, updated_at: new Date() },
-        [{ column: 'customer_id', operator: '=', value: customer.customer_id }],
-        { transaction: conn },
-      );
-
-      // ponytail: compact ID to fit VARCHAR(20) column constraint
-      const ts = Math.floor(Date.now() / 1000).toString(36);
-      const rnd = Math.floor(Math.random() * 9000 + 1000);
-      const txId = `WT${ts}${rnd}`;
-      await this.Data.insert('customer_wallet_transactions', {
-        transaction_id: txId,
-        customer_id: customer.customer_id,
-        transaction_type: 'credit',
-        amount: amount,
-        balance_after: newBalance,
-        reference_type: 'topup',
-        reference_id: txId,
-        remarks: 'Wallet Topup',
-        created_by: customer.customer_id,
-        created_at: new Date(),
-      }, { transaction: conn });
-
+    await this.Data.update(
+      'customers',
+      { wallet_balance: newBalance, updated_at: new Date() },
+      [{ column: 'customer_id', operator: '=', value: customer.customer_id }],
+    );
+    if (email) {
       try {
-        await this.Data.insert('wallet_transactions', {
-          transaction_id: txId,
-          customer_id: customer.customer_id,
-          user_id: customer.customer_id,
-          amount: amount,
-          type: 'topup',
-          is_credit: true,
-          transaction_type: 'credit',
-          description: 'Wallet Topup',
-          status: 'completed',
-          created_at: new Date(),
-          updated_at: new Date(),
-        }, { transaction: conn });
+        await this.Data.update(
+          'customers',
+          { wallet_balance: newBalance, customer_id: userId, updated_at: new Date() },
+          [{ column: 'email', operator: '=', value: email }],
+        );
       } catch (_) {}
+    }
 
-      try {
-        const nts = Math.floor(Date.now() / 1000).toString(36);
-        const nrnd = Math.floor(Math.random() * 9000 + 1000);
-        const notificationId = `NF${nts}${nrnd}`;
-        await this.Data.insert('notifications', {
-          notification_id: notificationId,
-          title: 'Wallet Credited',
-          message: `Your wallet has been recharged with ₹${amount.toFixed(0)}. New balance: ₹${newBalance.toFixed(0)}.`,
-          medium: 'websocket',
-          type: 'success',
-          priority: 'medium',
-          status: 'active',
-          created_by: 'system',
-          updated_by: 'system',
-          created_at: new Date(),
-          updated_at: new Date(),
-        }, { transaction: conn });
-
-        await this.Data.insert('notification_recipients', {
-          notification_id: notificationId,
-          user_id: customer.customer_id,
-          status: 'unread',
-          notified_at: new Date(),
-          created_by: 'system',
-          updated_by: 'system',
-          created_at: new Date(),
-          updated_at: new Date(),
-        }, { transaction: conn });
-      } catch (notifErr) {
-        // Notification failure must not block wallet credit
-      }
-
-      return {
-        status: true,
-        message: 'Wallet recharged successfully',
-        balance: newBalance,
-      };
+    // ponytail: compact ID to fit VARCHAR(20) column constraint
+    const ts = Math.floor(Date.now() / 1000).toString(36);
+    const rnd = Math.floor(Math.random() * 9000 + 1000);
+    const txId = `WT${ts}${rnd}`;
+    await this.Data.insert('customer_wallet_transactions', {
+      transaction_id: txId,
+      customer_id: customer.customer_id,
+      transaction_type: 'credit',
+      amount: amount,
+      balance_after: newBalance,
+      reference_type: 'topup',
+      reference_id: txId,
+      remarks: 'Wallet Topup',
+      created_by: customer.customer_id,
+      created_at: new Date(),
     });
+
+    try {
+      const nts = Math.floor(Date.now() / 1000).toString(36);
+      const nrnd = Math.floor(Math.random() * 9000 + 1000);
+      const notificationId = `NF${nts}${nrnd}`;
+      await this.Data.insert('notifications', {
+        notification_id: notificationId,
+        title: 'Wallet Credited',
+        message: `Your wallet has been recharged with ₹${amount.toFixed(0)}. New balance: ₹${newBalance.toFixed(0)}.`,
+        medium: 'websocket',
+        type: 'success',
+        priority: 'medium',
+        status: 'active',
+        created_by: 'system',
+        updated_by: 'system',
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+
+      await this.Data.insert('notification_recipients', {
+        notification_id: notificationId,
+        user_id: customer.customer_id,
+        status: 'unread',
+        notified_at: new Date(),
+        created_by: 'system',
+        updated_by: 'system',
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+    } catch (notifErr) {
+      // Notification failure must not block wallet credit
+    }
+
+    return {
+      status: true,
+      message: 'Wallet recharged successfully',
+      balance: newBalance,
+    };
   }
 
   @Get('transactions')
@@ -153,8 +143,12 @@ export class WalletController {
       throw new BadRequestException('Customer profile not found');
     }
 
+    const customerIds = Array.from(new Set([userId, customer.customer_id].filter(Boolean)));
+
     const txResult = await this.Data.query('customer_wallet_transactions', {
-      where: [{ column: 'customer_id', operator: '=', value: customer.customer_id }],
+      where: customerIds.length > 1
+        ? [{ column: 'customer_id', operator: 'IN', value: customerIds }]
+        : [{ column: 'customer_id', operator: '=', value: customerIds[0] }],
       orderBy: [{ column: 'created_at', direction: 'DESC' }],
     });
     return {

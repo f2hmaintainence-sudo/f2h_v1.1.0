@@ -19,7 +19,7 @@ export class SubscriptionsService {
     private readonly developer: DeveloperService,
   ) { }
 
-  async checkout(body: CreateSubscriptionDto) {
+  async checkout(body: CreateSubscriptionDto, req?: any) {
     this.developer.debug('SubscriptionsService.checkout called', { body });
 
     const customerId = body.customer_id?.trim();
@@ -32,13 +32,52 @@ export class SubscriptionsService {
 
     
 
-    // 1. Fetch customer details
-    const customerResult = await this.data.query('customers', {
-      select: ['customer_id', 'wallet_balance', 'is_postpaid_enabled', 'postpaid_credit_limit'],
+    const email = (req as any)?.user?.email;
+    let customerResult = await this.data.query('customers', {
+      select: ['customer_id', 'wallet_balance', 'is_postpaid_enabled', 'postpaid_credit_limit', 'email', 'branch_id'],
       where: [{ column: 'customer_id', operator: '=', value: customerId }],
       limit: 1,
     });
-    const customer = customerResult?.data?.[0];
+    let customer = customerResult?.data?.[0];
+    if (!customer && email) {
+      customerResult = await this.data.query('customers', {
+        where: [{ column: 'email', operator: '=', value: email }],
+        limit: 1,
+      });
+      customer = customerResult?.data?.[0];
+    }
+    if (!customer) {
+      try {
+        const userRes = await this.data.query('users', {
+          where: [{ column: 'user_id', operator: '=', value: customerId }],
+          limit: 1,
+        });
+        const userObj = userRes?.data?.[0];
+        if (userObj) {
+          const now = new Date();
+          const activeBranchRes = await this.data.query('branches', {
+            where: [{ column: 'is_active', operator: '=', value: true }],
+            limit: 1,
+          });
+          const activeBranchId = activeBranchRes?.data?.[0]?.branch_id || 'BRANCH_KUPPAM_01';
+          customer = {
+            customer_id: customerId,
+            first_name: userObj.first_name || userObj.user_name || 'Customer',
+            last_name: userObj.last_name || '',
+            mobile: userObj.phone || ('NO_PHONE_' + customerId),
+            phone: userObj.phone || ('NO_PHONE_' + customerId),
+            email: userObj.email || email || null,
+            branch_id: activeBranchId,
+            wallet_balance: 0,
+            is_postpaid_enabled: false,
+            postpaid_credit_limit: 0,
+            created_at: now,
+            updated_at: now,
+          };
+          await this.data.insert('customers', customer);
+        }
+      } catch (_) {}
+    }
     if (!customer) {
       this.developer.error('SubscriptionsService.checkout customer profile not found', { customerId });
       throw new BadRequestException('Customer profile not found');

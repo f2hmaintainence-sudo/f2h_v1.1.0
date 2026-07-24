@@ -77,6 +77,20 @@ export class CustomerBootstrapController {
     });
     let customer = customerResult?.data?.[0];
 
+    if (!customer && email) {
+      customerResult = await this.Data.query('customers', {
+        where: [{ column: 'email', operator: '=', value: email }],
+        limit: 1,
+      });
+      customer = customerResult?.data?.[0];
+      if (customer) {
+        try {
+          await this.Data.update('customers', { customer_id: userId }, [{ column: 'email', operator: '=', value: email }]);
+          customer.customer_id = userId;
+        } catch (_) {}
+      }
+    }
+
     if (!customer) {
       // Auto-heal: If user exists in users table but not in customers table
       try {
@@ -87,6 +101,11 @@ export class CustomerBootstrapController {
         const userObj = userRes?.data?.[0];
         if (userObj) {
           const now = new Date();
+          const activeBranchRes = await this.Data.query('branches', {
+            where: [{ column: 'is_active', operator: '=', value: true }],
+            limit: 1,
+          });
+          const activeBranchId = activeBranchRes?.data?.[0]?.branch_id || '';
           const newCustData = {
             customer_id: userId,
             first_name: userObj.first_name || userObj.user_name || (userObj.email ? userObj.email.split('@')[0] : 'Customer'),
@@ -94,7 +113,7 @@ export class CustomerBootstrapController {
             mobile: userObj.phone || ('NO_PHONE_' + userId),
             phone: userObj.phone || ('NO_PHONE_' + userId),
             email: userObj.email || email || null,
-            branch_id: 'BRANCH_DEFAULT',
+            branch_id: activeBranchId,
             created_at: now,
             updated_at: now,
           };
@@ -106,25 +125,66 @@ export class CustomerBootstrapController {
       }
     }
 
-    if (customer && (!customer.referral_code || !customer.referral_code.trim())) {
+    if (customer) {
       try {
-        const cleanName = (customer.first_name || customer.name || 'USR').replace(/[^a-zA-Z]/g, '').toUpperCase();
-        const prefix = cleanName.length >= 3 ? cleanName.slice(0, 3) : 'USR';
-        const cleanPhone = (customer.mobile || customer.phone || '').replace(/\D/g, '');
-        const phoneSuffix = cleanPhone.length >= 3 ? cleanPhone.slice(-3) : Math.floor(100 + Math.random() * 900).toString();
-        const generatedCode = `F2H${prefix}${phoneSuffix}`;
-        const status = customer.first_order_completed ? 'active' : 'locked';
+        const orderCheck = await this.Data.query('orders', {
+          select: ['order_id'],
+          where: [{ column: 'customer_id', operator: '=', value: customer.customer_id || userId }],
+          limit: 1,
+        });
+        const hasOrder = (orderCheck?.data?.length || 0) > 0;
+        const isUnlocked = customer.first_order_completed || hasOrder || customer.referral_status === 'active';
+        const computedStatus = isUnlocked ? 'active' : 'locked';
+
+        if (!customer.referral_code || !customer.referral_code.trim()) {
+          const cleanName = (customer.first_name || customer.name || 'USR').replace(/[^a-zA-Z]/g, '').toUpperCase();
+          const prefix = cleanName.length >= 3 ? cleanName.slice(0, 3) : 'USR';
+          const cleanPhone = (customer.mobile || customer.phone || '').replace(/\D/g, '');
+          const phoneSuffix = cleanPhone.length >= 3 ? cleanPhone.slice(-3) : Math.floor(100 + Math.random() * 900).toString();
+          customer.referral_code = `F2H${prefix}${phoneSuffix}`;
+        }
+
+        customer.referral_status = computedStatus;
+        customer.first_order_completed = isUnlocked;
 
         await this.Data.update(
           'customers',
-          { referral_code: generatedCode, referral_status: status, updated_at: new Date() },
+          { referral_code: customer.referral_code, referral_status: computedStatus, first_order_completed: isUnlocked, updated_at: new Date() },
           [{ column: 'customer_id', operator: '=', value: userId }],
         );
-
-        customer.referral_code = generatedCode;
-        customer.referral_status = status;
       } catch (err) {
         this.Developer.error('[CustomerBootstrapController] Failed to auto-assign referral_code', err);
+      }
+    }
+    if (customer && customer.referred_by) {
+      try {
+        const existingRef = await this.Data.query('referrals', {
+          where: [{ column: 'referred_customer_id', operator: '=', value: customer.customer_id }],
+          limit: 1,
+        });
+        if (!existingRef?.data?.length) {
+          const referrerCust = await this.Data.query('customers', {
+            where: [{ column: 'customer_id', operator: '=', value: customer.referred_by }],
+            limit: 1,
+          });
+          const refCode = referrerCust?.data?.[0]?.referral_code || 'F2HREF';
+          const ts = Math.floor(Date.now() / 1000).toString(36).toUpperCase();
+          const rnd = Math.floor(Math.random() * 9000 + 1000);
+          await this.Data.insert('referrals', {
+            refer_id: `REF${ts}${rnd}`,
+            referrer_customer_id: customer.referred_by,
+            referred_customer_id: customer.customer_id,
+            referral_code: refCode,
+            referrer_reward_amount: 50.00,
+            referred_reward_amount: 50.00,
+            status: customer.first_order_completed ? 'completed' : 'pending',
+            remarks: 'Referral registered - pending first delivered order',
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
+        }
+      } catch (err) {
+        this.Developer.error('[CustomerBootstrapController] Failed to auto-sync referral record', err);
       }
     }
 
@@ -214,6 +274,10 @@ export class CustomerBootstrapController {
       }
     }
 
+    if (!nearestBranch && branches.length > 0) {
+      nearestBranch = branches[0];
+    }
+
     if (!nearestBranch) {
       throw new BadRequestException(
         'Currently this location is outside our delivery area.',
@@ -227,8 +291,6 @@ export class CustomerBootstrapController {
       h3_index: h3Index,
     };
   }
-
-
 
   private hasValue(value: any): boolean {
     return value !== undefined && value !== null && String(value).trim() !== '';
@@ -256,44 +318,51 @@ export class CustomerBootstrapController {
     if (this.hasValue(body?.[shortKey])) {
       return this.toNullableNumber(body[shortKey], longKey);
     }
+
     if (this.hasValue(body?.[longKey])) {
       return this.toNullableNumber(body[longKey], longKey);
     }
 
-    return this.toNullableNumber(existing?.[longKey], longKey);
+    if (existing?.[longKey] !== undefined) {
+      return this.toNullableNumber(existing[longKey], longKey);
+    }
+
+    return null;
   }
 
-  private buildAddressLine(addressData: any): string {
-    const addressParts = [
-      addressData.flat_no,
-      addressData.floor_no ? `Floor ${addressData.floor_no}` : null,
-      addressData.building_name,
-      addressData.street,
-      addressData.area,
-      addressData.city,
-      addressData.state,
+  private buildAddressLine(data: any): string {
+    const parts = [
+      data.flat_no ? `Flat ${data.flat_no}` : '',
+      data.floor_no ? `Floor ${data.floor_no}` : '',
+      data.building_name,
+      data.street,
+      data.area,
+      data.landmark ? `Near ${data.landmark}` : '',
+      data.city,
+      data.state,
+      data.pincode,
     ].filter(Boolean);
 
-    return addressParts.join(', ');
+    return parts.join(', ');
   }
 
-  private buildAddressData(
-    body: any,
-    customerId: string,
-    existing: any | null = null,
-  ) {
-    const rawDefault = body?.is_default !== undefined ? body.is_default : existing?.is_default;
-    const defaultValue = (rawDefault === true || rawDefault === true || rawDefault === 'true' || rawDefault === 1 || rawDefault === '1') ? true : false;
-    const addressData = {
-      address_id: generateId('ADDR', 10),
+  private buildAddressData(body: any, customerId: string, existing: any = null) {
+    const isDefaultInput =
+      body?.is_default !== undefined
+        ? body.is_default
+        : (existing?.is_default ?? false);
+
+    const defaultValue =
+      isDefaultInput === true ||
+      isDefaultInput === 1 ||
+      isDefaultInput === '1' ||
+      isDefaultInput === 'true';
+
+    const addressData: any = {
       customer_id: customerId,
       address_type: String(
-        body?.address_type !== undefined
-          ? body.address_type
-          : (existing?.address_type ?? 'home'),
-      )
-        .toLowerCase()
-        .trim(),
+        body?.address_type ?? existing?.address_type ?? 'home',
+      ).toLowerCase(),
       contact_name: String(
         body?.contact_name !== undefined
           ? body.contact_name
@@ -347,7 +416,7 @@ export class CustomerBootstrapController {
       is_default: defaultValue,
       status: true,
       address_line: '',
-      branch_id: existing?.branch_id ?? '',
+      branch_id: existing?.branch_id ?? 'BRANCH_KUPPAM_01',
       h3_index: existing?.h3_index ?? '',
     };
 
@@ -394,14 +463,13 @@ export class CustomerBootstrapController {
     );
   }
 
-  private async clearDefaultAddresses(customerId: string, transaction: any) {
+  private async clearDefaultAddresses(customerId: string, _tx?: any) {
     await this.Data.update(
       'customer_addresses',
       { is_default: false },
       [
         { column: 'customer_id', operator: '=', value: customerId },
       ],
-      { transaction },
     );
   }
 
@@ -428,64 +496,43 @@ export class CustomerBootstrapController {
   ) {
     try {
       const existing = await this.findCustomerAddress(customerId, addressId);
-
       const addressData = this.buildAddressData(body, customerId, existing);
-      
-      // Always keep the same address_id
       addressData.address_id = existing.address_id;
 
-      // If coordinates are provided, recalculate branch and H3 index
       if (addressData.latitude != null && addressData.longitude != null) {
-        const locationChanged = this.coordinatesChanged(
-          existing,
+        const { branch_id, h3_index } = await this.assignBranchAndH3(
           addressData.latitude,
           addressData.longitude,
         );
-
-        if (locationChanged) {
-          const { branch_id, h3_index } = await this.assignBranchAndH3(
-            addressData.latitude,
-            addressData.longitude,
-          );
-          addressData.branch_id = branch_id || '';
-          addressData.h3_index = h3_index || '';
-        }
+        addressData.branch_id = branch_id || 'BRANCH_KUPPAM_01';
+        addressData.h3_index = h3_index || '';
       }
 
-      // Keep address_id out of the update payload to ensure it is never modified
       const { address_id, ...updatePayload } = addressData;
 
-      await this.Data.executeTransaction(
-        async (transaction) => {
-          if (addressData.is_default === true) {
-            await this.clearDefaultAddresses(customerId, transaction);
-          }
+      if (addressData.is_default === true) {
+        await this.clearDefaultAddresses(customerId);
+      }
 
-          const updateResult = await this.Data.update(
-            'customer_addresses',
-            updatePayload,
-            [
-              {
-                column: 'address_id',
-                operator: '=',
-                value: addressId,
-              },
-              {
-                column: 'customer_id',
-                operator: '=',
-                value: customerId,
-              },
-            ],
-            { transaction },
-          );
-
-          if (!updateResult?.status) {
-            throw new Error(updateResult?.message || 'Database update failed');
-          }
-        },
+      await this.Data.update(
+        'customer_addresses',
+        updatePayload,
+        [
+          { column: 'address_id', operator: '=', value: addressId },
+          { column: 'customer_id', operator: '=', value: customerId },
+        ],
       );
 
-      // Fetch the updated address to return correct normalized data
+      if (addressData.branch_id) {
+        try {
+          await this.Data.update(
+            'customers',
+            { branch_id: addressData.branch_id, updated_at: new Date() },
+            [{ column: 'customer_id', operator: '=', value: customerId }],
+          );
+        } catch (_) {}
+      }
+
       const updatedQueryResult = await this.Data.query('customer_addresses', {
         where: [
           { column: 'address_id', operator: '=', value: addressId },
@@ -494,11 +541,7 @@ export class CustomerBootstrapController {
         limit: 1,
       });
 
-      if (!updatedQueryResult?.data || updatedQueryResult.data.length === 0) {
-        throw new Error('Updated address not found');
-      }
-
-      const updatedRecord = updatedQueryResult.data[0];
+      const updatedRecord = updatedQueryResult?.data?.[0] || addressData;
 
       return {
         status: true,
@@ -515,12 +558,10 @@ export class CustomerBootstrapController {
   private formatDateForPostgres(date: string | null): string | null {
     if (!date) return null;
 
-    // Already in YYYY-MM-DD
     if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return date;
     }
 
-    // Convert DD-MM-YYYY or D-M-YYYY
     const parts = date.split('-');
     if (parts.length === 3) {
       const [day, month, year] = parts;
@@ -700,27 +741,31 @@ export class CustomerBootstrapController {
       addressData.latitude,
       addressData.longitude,
     );
-    addressData.branch_id = branch_id || '';
+    addressData.branch_id = branch_id || 'BRANCH_KUPPAM_01';
     addressData.h3_index = h3_index || '';
     addressData.address_id = generateId('ADDR', 10);
 
-    const insertResult = await this.Data.executeTransaction(
-      async (transaction) => {
-        if (addressData.is_default === true) {
-          await this.clearDefaultAddresses(customerId, transaction);
-        }
+    if (addressData.is_default === true) {
+      await this.clearDefaultAddresses(customerId);
+    }
 
-        return this.Data.insert('customer_addresses', addressData, {
-          transaction,
-        });
-      },
-    );
+    await this.Data.insert('customer_addresses', addressData);
+
+    if (addressData.branch_id) {
+      try {
+        await this.Data.update(
+          'customers',
+          { branch_id: addressData.branch_id, updated_at: new Date() },
+          [{ column: 'customer_id', operator: '=', value: customerId }],
+        );
+      } catch (_) {}
+    }
 
     return {
       status: true,
       message: 'Address added successfully',
-      address_id: insertResult?.address_id,
-      data: this.normalizeAddress(insertResult),
+      address_id: addressData.address_id,
+      data: this.normalizeAddress(addressData),
     };
   }
 

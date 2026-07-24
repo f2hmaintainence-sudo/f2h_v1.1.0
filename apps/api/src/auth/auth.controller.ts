@@ -44,7 +44,7 @@ export class AuthController {
     const rawClientRole = req.headers['x-client-role'];
     const clientRole = typeof rawClientRole === 'string' ? rawClientRole.trim().toUpperCase() : '';
 
-    if (!clientRole || !['CUSTOMER', 'DELIVERY_PARTNER', 'ADMIN'].includes(clientRole)) {
+    if (!clientRole || !['CUSTOMER', 'DELIVERY_PARTNER', 'DELIVERY_BOY', 'ADMIN'].includes(clientRole)) {
       console.log(
         `[AuthController:login] Login rejected: Missing or invalid x-client-role header: "${rawClientRole}"`,
       );

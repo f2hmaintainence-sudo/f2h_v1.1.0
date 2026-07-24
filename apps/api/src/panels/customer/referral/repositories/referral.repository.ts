@@ -158,13 +158,12 @@ export class ReferralRepository implements IReferralRepository {
     try {
       const walletQuery = `
         SELECT COALESCE(SUM(amount), 0) as total
-        FROM wallet_transactions
-        WHERE (customer_id = $1 OR user_id = $1)
-          AND (type = 'credit' OR is_credit = true OR transaction_type = 'credit')
+        FROM customer_wallet_transactions
+        WHERE customer_id = $1
+          AND transaction_type = 'credit'
           AND (
             LOWER(COALESCE(reference_type, '')) LIKE '%referral%'
             OR LOWER(COALESCE(remarks, '')) LIKE '%referral%'
-            OR LOWER(COALESCE(description, '')) LIKE '%referral%'
           )
       `;
       const res = await this.db.query(walletQuery, [referrerId]);
@@ -205,10 +204,31 @@ export class ReferralRepository implements IReferralRepository {
       };
     }
 
+    // Check if customer has any order placed/delivered in database
+    const orderCheck = await this.dataService.query('orders', {
+      select: ['order_id'],
+      where: [{ column: 'customer_id', operator: '=', value: customerId }],
+      limit: 1,
+    });
+
+    const hasOrder = (orderCheck?.data?.length || 0) > 0;
+    const isUnlocked = cust.first_order_completed || hasOrder || cust.referral_status === 'active';
+    const computedStatus = isUnlocked ? 'active' : 'locked';
+
+    if (isUnlocked && (cust.referral_status !== 'active' || !cust.first_order_completed)) {
+      try {
+        await this.dataService.update(
+          'customers',
+          { referral_status: 'active', first_order_completed: true, updated_at: new Date() },
+          [{ column: 'customer_id', operator: '=', value: cust.customer_id }]
+        );
+      } catch (_) {}
+    }
+
     if (cust.referral_code && cust.referral_code.trim().length > 0) {
       return {
         referral_code: cust.referral_code,
-        referral_status: cust.referral_status || (cust.first_order_completed ? 'active' : 'locked'),
+        referral_status: computedStatus,
         customer_id: cust.customer_id,
       };
     }
@@ -218,17 +238,16 @@ export class ReferralRepository implements IReferralRepository {
     const cleanPhone = (cust.phone || cust.mobile || '').replace(/\D/g, '');
     const phoneSuffix = cleanPhone.length >= 3 ? cleanPhone.slice(-3) : Math.floor(100 + Math.random() * 900).toString();
     const code = `F2H${prefix}${phoneSuffix}`;
-    const status = cust.first_order_completed ? 'active' : 'locked';
 
     await this.dataService.update(
       'customers',
-      { referral_code: code, referral_status: status, updated_at: new Date() },
+      { referral_code: code, referral_status: computedStatus, first_order_completed: isUnlocked, updated_at: new Date() },
       [{ column: 'customer_id', operator: '=', value: cust.customer_id }]
     );
 
     return {
       referral_code: code,
-      referral_status: status,
+      referral_status: computedStatus,
       customer_id: cust.customer_id,
     };
   }

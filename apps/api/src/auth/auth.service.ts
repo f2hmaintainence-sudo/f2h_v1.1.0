@@ -129,7 +129,22 @@ export class AuthService {
       }
     }
 
-    // Check lock status
+    // Verify Password first
+    const passwordMatch = await bcrypt.compare(password, user.password);
+
+    if (passwordMatch) {
+      // Clear any lockout and reset failed attempts on successful password match
+      if (user.locked_at || user.max_logins > 0) {
+        await this.Data.update(
+          'users',
+          { locked_at: null, max_logins: 0 },
+          [{ column: 'user_id', operator: '=', value: user.user_id }],
+        );
+      }
+      return user;
+    }
+
+    // Password failed: enforce lockout duration if account is locked
     if (user.locked_at) {
       const lockoutDuration = 30 * 60 * 1000; // 30 minutes
       if (
@@ -156,60 +171,48 @@ export class AuthService {
         // Unlock account after lockout duration has passed
         await this.Data.update(
           'users',
-          { locked_at: null },
+          { locked_at: null, max_logins: 0 },
           [{ column: 'user_id', operator: '=', value: user.user_id }],
         );
       }
     }
 
-    // Verify Password
-    const passwordMatch = await bcrypt.compare(password, user.password);
-    if (!passwordMatch) {
-      const newAttempts = (user.max_logins || 0) + 1;
+    // Handle failed login attempt increment
+    const newAttempts = (user.max_logins || 0) + 1;
 
-      if (newAttempts >= 5) {
-        await this.Data.update(
-          'users',
-          { locked_at: new Date(), max_logins: newAttempts },
-          [{ column: 'user_id', operator: '=', value: user.user_id }],
-        );
-
-        await this.securityAlerts.alertAccountLocked({
-          userId: user.user_id,
-          email: user.email || '',
-          ipAddress: ip || 'unknown',
-          reason: 'LOGIN_ATTEMPTS',
-        });
-
-        throw new ForbiddenException(
-          'Account has been locked due to multiple failed login attempts. Please try again in 30 minutes.',
-        );
-      } else {
-        await this.Data.update(
-          'users',
-          { max_logins: newAttempts },
-          [{ column: 'user_id', operator: '=', value: user.user_id }],
-        );
-
-        this.auditLogger.logLoginFailure({
-          identifier: formattedIdentifier,
-          email: user.email,
-          ip: ip || 'unknown',
-          reason: 'Incorrect password',
-          attempt: newAttempts,
-        });
-
-        throw new UnauthorizedException('Invalid email/mobile or password');
-      }
-    }
-
-    // Success: clear login attempts database field
-    if (user.max_logins > 0) {
+    if (newAttempts >= 5) {
       await this.Data.update(
         'users',
-        { max_logins: 0 },
+        { locked_at: new Date(), max_logins: newAttempts },
         [{ column: 'user_id', operator: '=', value: user.user_id }],
       );
+
+      await this.securityAlerts.alertAccountLocked({
+        userId: user.user_id,
+        email: user.email || '',
+        ipAddress: ip || 'unknown',
+        reason: 'LOGIN_ATTEMPTS',
+      });
+
+      throw new ForbiddenException(
+        'Account has been locked due to multiple failed login attempts. Please try again in 30 minutes.',
+      );
+    } else {
+      await this.Data.update(
+        'users',
+        { max_logins: newAttempts },
+        [{ column: 'user_id', operator: '=', value: user.user_id }],
+      );
+
+      this.auditLogger.logLoginFailure({
+        identifier: formattedIdentifier,
+        email: user.email,
+        ip: ip || 'unknown',
+        reason: 'Incorrect password',
+        attempt: newAttempts,
+      });
+
+      throw new UnauthorizedException('Invalid email/mobile or password');
     }
     return user;
   }
@@ -321,11 +324,18 @@ export class AuthService {
         let referrerCustomer: any = null;
         if (body.referral_code && body.referral_code.trim()) {
           const cleanCode = body.referral_code.trim().toUpperCase();
-          const rawCust: any = await this.DataBase.query(
+          let rawCust: any = await this.DataBase.query(
             `SELECT customer_id, referral_code FROM customers WHERE UPPER(referral_code) = $1 LIMIT 1`,
             [cleanCode],
           );
-          const custRows = Array.isArray(rawCust) ? rawCust : (rawCust?.rows || []);
+          let custRows = Array.isArray(rawCust) ? rawCust : (rawCust?.rows || []);
+          if (custRows.length === 0) {
+            rawCust = await this.DataBase.query(
+              `SELECT user_id as customer_id, referral_code FROM users WHERE UPPER(referral_code) = $1 LIMIT 1`,
+              [cleanCode],
+            );
+            custRows = Array.isArray(rawCust) ? rawCust : (rawCust?.rows || []);
+          }
           if (custRows.length === 0) {
             throw new BadRequestException('Invalid referral code. Please check the code and try again.');
           }

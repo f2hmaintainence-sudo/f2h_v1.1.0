@@ -10,8 +10,10 @@ import { CartService } from './ModuleServices/cartAndCheckout.service';
 import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
 import { NotificationModule } from 'src/notifications/notification.module';
 
+import { ReferralModule } from '../referral/referral.module';
+
 @Module({
-  imports: [ConfigModule, NotificationModule],
+  imports: [ConfigModule, NotificationModule, ReferralModule],
   controllers: [CartController],
   providers: [DatabaseService, DataService, DeveloperService, CartService, PushNotificationService],
 })

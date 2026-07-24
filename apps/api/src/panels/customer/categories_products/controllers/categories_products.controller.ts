@@ -22,7 +22,7 @@ export class CategoriesController {
           title: 'Save Up To 5%',
           subtitle: 'Subscription to fresh milk, curd, paneer & more for hassle free morning deliveries.',
           cta: 'Order Now',
-          route: 'subscribe', // tab name in the app
+          route: 'menu', // tab name in the app
           isActive: true,
         },
       ],
