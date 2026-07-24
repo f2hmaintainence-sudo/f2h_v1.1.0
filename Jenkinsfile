@@ -32,8 +32,12 @@ pipeline {
                     cp -Rf src "$LIVE_DIR/apps/web/" 2>/dev/null || true
                 fi
 
-                echo "[F2H Deploy] Restarting PM2 processes..."
-                pm2 restart all || pm2 reload all || true
+                echo "[F2H Deploy] Starting & Restarting PM2 via live ecosystem.config.js..."
+                if [ -f "$LIVE_DIR/ecosystem.config.js" ]; then
+                    pm2 start "$LIVE_DIR/ecosystem.config.js" || pm2 restart "$LIVE_DIR/ecosystem.config.js" || pm2 reload "$LIVE_DIR/ecosystem.config.js"
+                else
+                    pm2 restart all || pm2 reload all || true
+                fi
 
                 echo "========== LIVE DEPLOYMENT COMPLETED SUCCESSFULLY =========="
                 '''
