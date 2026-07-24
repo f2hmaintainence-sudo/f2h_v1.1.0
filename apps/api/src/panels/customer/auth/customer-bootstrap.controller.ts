@@ -75,7 +75,59 @@ export class CustomerBootstrapController {
       where: [{ column: 'customer_id', operator: '=', value: userId }],
       limit: 1,
     });
-    const customer = customerResult?.data?.[0]
+    let customer = customerResult?.data?.[0];
+
+    if (!customer) {
+      // Auto-heal: If user exists in users table but not in customers table
+      try {
+        const userRes = await this.Data.query('users', {
+          where: [{ column: 'user_id', operator: '=', value: userId }],
+          limit: 1,
+        });
+        const userObj = userRes?.data?.[0];
+        if (userObj) {
+          const now = new Date();
+          const newCustData = {
+            customer_id: userId,
+            first_name: userObj.first_name || userObj.user_name || (userObj.email ? userObj.email.split('@')[0] : 'Customer'),
+            last_name: userObj.last_name || '',
+            mobile: userObj.phone || ('NO_PHONE_' + userId),
+            phone: userObj.phone || ('NO_PHONE_' + userId),
+            email: userObj.email || email || null,
+            branch_id: 'BRANCH_DEFAULT',
+            created_at: now,
+            updated_at: now,
+          };
+          await this.Data.insert('customers', newCustData);
+          customer = newCustData;
+        }
+      } catch (err) {
+        this.Developer.error('[CustomerBootstrapController] Failed to auto-create missing customer record', err);
+      }
+    }
+
+    if (customer && (!customer.referral_code || !customer.referral_code.trim())) {
+      try {
+        const cleanName = (customer.first_name || customer.name || 'USR').replace(/[^a-zA-Z]/g, '').toUpperCase();
+        const prefix = cleanName.length >= 3 ? cleanName.slice(0, 3) : 'USR';
+        const cleanPhone = (customer.mobile || customer.phone || '').replace(/\D/g, '');
+        const phoneSuffix = cleanPhone.length >= 3 ? cleanPhone.slice(-3) : Math.floor(100 + Math.random() * 900).toString();
+        const generatedCode = `F2H${prefix}${phoneSuffix}`;
+        const status = customer.first_order_completed ? 'active' : 'locked';
+
+        await this.Data.update(
+          'customers',
+          { referral_code: generatedCode, referral_status: status, updated_at: new Date() },
+          [{ column: 'customer_id', operator: '=', value: userId }],
+        );
+
+        customer.referral_code = generatedCode;
+        customer.referral_status = status;
+      } catch (err) {
+        this.Developer.error('[CustomerBootstrapController] Failed to auto-assign referral_code', err);
+      }
+    }
+
     return customer;
   }
 

@@ -57,45 +57,70 @@ export class WalletController {
         { transaction: conn },
       );
 
-      // const txId = 'WTX_' + Math.random().toString(36).substring(2, 14).toUpperCase();
+      // ponytail: compact ID to fit VARCHAR(20) column constraint
+      const ts = Math.floor(Date.now() / 1000).toString(36);
+      const rnd = Math.floor(Math.random() * 9000 + 1000);
+      const txId = `WT${ts}${rnd}`;
       await this.Data.insert('customer_wallet_transactions', {
+        transaction_id: txId,
         customer_id: customer.customer_id,
         transaction_type: 'credit',
         amount: amount,
         balance_after: newBalance,
         reference_type: 'topup',
-        // reference_id : txId,
+        reference_id: txId,
         remarks: 'Wallet Topup',
         created_by: customer.customer_id,
+        created_at: new Date(),
       }, { transaction: conn });
 
-      // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
-      // Insert wallet topup notification
-      const notificationId = 'NTF-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000);
-      await this.Data.insert('notifications', {
-        notification_id: notificationId,
-        title: 'Wallet Credited',
-        message: `Your wallet has been recharged with ₹${amount.toFixed(0)}. New balance: ₹${newBalance.toFixed(0)}.`,
-        medium: 'websocket',
-        type: 'success',
-        priority: 'medium',
-        status: 'active',
-        created_by: 'system',
-        updated_by: 'system',
-        created_at: new Date(),
-        updated_at: new Date(),
-      }, { transaction: conn });
+      try {
+        await this.Data.insert('wallet_transactions', {
+          transaction_id: txId,
+          customer_id: customer.customer_id,
+          user_id: customer.customer_id,
+          amount: amount,
+          type: 'topup',
+          is_credit: true,
+          transaction_type: 'credit',
+          description: 'Wallet Topup',
+          status: 'completed',
+          created_at: new Date(),
+          updated_at: new Date(),
+        }, { transaction: conn });
+      } catch (_) {}
 
-      await this.Data.insert('notification_recipients', {
-        notification_id: notificationId,
-        user_id: customer.customer_id,
-        status: 'unread',
-        notified_at: new Date(),
-        created_by: 'system',
-        updated_by: 'system',
-        created_at: new Date(),
-        updated_at: new Date(),
-      }, { transaction: conn });
+      try {
+        const nts = Math.floor(Date.now() / 1000).toString(36);
+        const nrnd = Math.floor(Math.random() * 9000 + 1000);
+        const notificationId = `NF${nts}${nrnd}`;
+        await this.Data.insert('notifications', {
+          notification_id: notificationId,
+          title: 'Wallet Credited',
+          message: `Your wallet has been recharged with ₹${amount.toFixed(0)}. New balance: ₹${newBalance.toFixed(0)}.`,
+          medium: 'websocket',
+          type: 'success',
+          priority: 'medium',
+          status: 'active',
+          created_by: 'system',
+          updated_by: 'system',
+          created_at: new Date(),
+          updated_at: new Date(),
+        }, { transaction: conn });
+
+        await this.Data.insert('notification_recipients', {
+          notification_id: notificationId,
+          user_id: customer.customer_id,
+          status: 'unread',
+          notified_at: new Date(),
+          created_by: 'system',
+          updated_by: 'system',
+          created_at: new Date(),
+          updated_at: new Date(),
+        }, { transaction: conn });
+      } catch (notifErr) {
+        // Notification failure must not block wallet credit
+      }
 
       return {
         status: true,

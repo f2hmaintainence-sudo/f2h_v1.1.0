@@ -150,8 +150,44 @@ export class AuthController {
   @Public()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  async register(@Body() body: RegisterDto) {
-    return this.authService.register(body);
+  async register(
+    @Body() body: RegisterDto,
+    @Res({ passthrough: true }) res: Response,
+    @Req() req: Request,
+  ) {
+    const regResult = await this.authService.register(body);
+    const ip = req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+
+    const userId = regResult.userId;
+    const roleId = body.role || 'CUSTOMER';
+
+    const { accessToken, refreshToken } = await this.authService.generateTokens(
+      {
+        user_id: userId,
+        email: body.email || null,
+        role_id: roleId,
+      },
+      {
+        fcmToken: body.fcm_token,
+        ipAddress: ip,
+        userAgent,
+      },
+    );
+
+    this.setCookies(res, accessToken, refreshToken);
+
+    return {
+      message: 'Registration successful',
+      user: {
+        user_id: userId,
+        email: body.email,
+        role_id: roleId,
+      },
+      accessToken,
+      refreshToken,
+      token: accessToken,
+    };
   }
 
   @Public()

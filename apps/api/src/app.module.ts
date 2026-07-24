@@ -58,6 +58,8 @@ import { DeliveryPartnerProfileModule } from './panels/delivery-partner/profile/
 import { SupportTicketsModule } from './support-tickets/support-tickets.module';
 import { CustomerBillingModule } from './panels/admin/customers-orders/customer-billing/customer-billing.module';
 import { ApiIntegrationsModule } from './developer/api-integrations/api-integrations.module';
+import { ReferralModule } from './panels/customer/referral/referral.module';
+import { AdminReferralModule } from './panels/admin/referrals/admin-referral.module';
 @Module({
   imports: [
     ApiIntegrationsModule,
@@ -123,6 +125,8 @@ import { ApiIntegrationsModule } from './developer/api-integrations/api-integrat
     ProfileManagementModule,
     DeliveryPartnerProfileModule,
     SupportTicketsModule,
+    ReferralModule,
+    AdminReferralModule,
     ThrottlerModule.forRoot([
       {
         name: 'short',

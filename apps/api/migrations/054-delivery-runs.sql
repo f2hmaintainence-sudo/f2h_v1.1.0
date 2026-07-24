@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS delivery_runs (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_delivery_runs_number
   ON delivery_runs (run_id);
 CREATE INDEX IF NOT EXISTS idx_delivery_runs_partner_date
-  ON delivery_runs (delivery_partner_id, run_date, slot);
+  ON delivery_runs (delivery_partner_id, run_date, delivery_slot);
 CREATE INDEX IF NOT EXISTS idx_delivery_runs_branch_date
   ON delivery_runs (branch_id, run_date);
 CREATE INDEX IF NOT EXISTS idx_delivery_runs_status

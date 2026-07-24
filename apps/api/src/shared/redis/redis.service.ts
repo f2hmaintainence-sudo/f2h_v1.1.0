@@ -36,6 +36,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       this.redis.on('connect', () => {
         this.isConnected = true;
         this.logger.log('Connected successfully');
+        this.redis.config('SET', 'stop-writes-on-bgsave-error', 'no').catch(() => {});
       });
       this.redis.on('close', () => {
         this.isConnected = false;
