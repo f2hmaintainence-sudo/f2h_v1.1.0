@@ -13,7 +13,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ClipboardCheck, CalendarCheck, Boxes, AlignLeft, TriangleAlert, Users, Package, Truck, BarChart3, Menu, X, ShoppingCart, Wallet, Settings, ClipboardList, UserCog, Shield, RefreshCw, AlertTriangle, PieChart, ChevronDown, MapPin, Banknote, LineChart, BookOpen, Box, Archive, Factory, Clipboard, Building, ArrowRightLeft, Container, CreditCard, FileText, ShieldAlert, Ticket, Percent, Gift, TrendingUp, Bell, Layers, Calendar, AlertOctagon, ShoppingBag, Clock, Orbit, Activity, IndianRupee, Target, Zap, Eye, UserCheck, BarChart, Gauge, CalendarOff, Tag } from "lucide-react";
+import { LayoutDashboard, ClipboardCheck, CalendarCheck, Boxes, AlignLeft, TriangleAlert, Users, Package, Truck, BarChart3, Menu, X, ShoppingCart, Wallet, Settings, ClipboardList, UserCog, Shield, RefreshCw, AlertTriangle, PieChart, ChevronDown, MapPin, Banknote, LineChart, BookOpen, Box, Archive, Factory, Clipboard, Building, Building2, ArrowRightLeft, Container, CreditCard, FileText, ShieldAlert, Ticket, Percent, Gift, TrendingUp, Bell, Layers, Calendar, AlertOctagon, ShoppingBag, Clock, Orbit, Activity, IndianRupee, Target, Zap, Eye, UserCheck, BarChart, Gauge, CalendarOff, Tag } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
 const adminNav = [
@@ -33,6 +33,34 @@ const adminNav = [
     ],
   },
   {
+    label: "CATALOG & INVENTORY",
+    items: [
+      { name: "Categories", href: "/admin/catalog/categories", icon: Layers },
+      { name: "Products", href: "/admin/catalog/products", icon: Package },
+      { name: "Product Variants", href: "/admin/catalog/variants", icon: Tag },
+      {
+        name: "Inventory",
+        icon: Boxes,
+        subItems: [
+          { name: "Overview", href: "/admin/inventory/overview", icon: BarChart3 },
+          { name: "Production Batches", href: "/admin/inventory/production", icon: Factory },
+          { name: "Reconciliation", href: "/admin/inventory/reconciliation", icon: ClipboardCheck },
+          { name: "Expiry Tracker", href: "/admin/inventory/expiry", icon: Clock },
+          { name: "Stock Forecast", href: "/admin/inventory/forecast", icon: LineChart },
+        ]
+      },
+      {
+        name: "Warehouse",
+        icon: Building,
+        subItems: [
+          { name: "Warehouse Stock", href: "/admin/inventory/warehouse", icon: Building2 },
+          { name: "Warehouse Dispatch", href: "/admin/warehouse/dispatch", icon: Box },
+          { name: "Inter-Warehouse Transfers", href: "/admin/warehouse/transfers", icon: ArrowRightLeft },
+        ]
+      },
+    ],
+  },
+  {
     label: "ORDERS & DELIVERIES",
     items: [
       { name: "Orders", href: "/admin/orders/allorders", icon: ShoppingBag },
@@ -48,33 +76,7 @@ const adminNav = [
         ]
       },
       { name: "Containers", href: "/admin/packages/dashboard", icon: Container },
-    ],
-  },
-  {
-    label: "CATALOG & INVENTORY",
-    items: [
-      { name: "Products", href: "/admin/catalog/products", icon: Package },
-      { name: "Offers", href: "/admin/catalog/offers", icon: Tag },
-      {
-        name: "Inventory & Warehouse",
-        icon: Archive,
-        subItems: [
-          { name: "Stock Overview", href: "/admin/inventory/overview", icon: AlignLeft },
-          { name: "Stock In/Out", href: "/admin/warehouse/stock-movements", icon: ArrowRightLeft },
-          { name: "Dispatch Requirements", href: "/admin/warehouse/dispatch", icon: Truck },
-          { name: "Warehouses", href: "/admin/warehouse/list", icon: Building },
-          { name: "Production Batches", href: "/admin/production/batches", icon: Boxes },
-        ]
-      },
-      {
-        name: "Branch Config",
-        icon: Settings,
-        subItems: [
-          { name: "Branches", href: "/admin/branches", icon: Building },
-          { name: "Partner Allocation", href: "/admin/branches/partners", icon: UserCheck },
-          { name: "Branch Analytics", href: "/admin/branches/analytics", icon: BarChart },
-        ]
-      },
+      { name: "Branches", href: "/admin/branches", icon: Building2 },
     ],
   },
   {

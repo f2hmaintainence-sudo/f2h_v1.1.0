@@ -118,13 +118,6 @@ export class CatalogTableService {
         value: null,
       });
 
-      // Filter for primary images only
-      conditions.push({
-        column: 'product_images.is_primary',
-        operator: '=',
-        value: true,
-      });
-
       const reqSet: ReqSet = {
         key: 'products',
         table: 'products',
@@ -152,19 +145,20 @@ export class CatalogTableService {
           product_category: ['categories.name AS product_category', true],
           product_name: ['products.name AS product_name', true],
           name: ['products.name AS name', false],
-          slug: ['products.slug', true],
-          url: ['product_images.url', false],
-          image: ['product_images.url', true],
+          url: ['products.image_url AS url', false],
+          image: ['products.image_url AS image', true],
           batch_product: ['products.batch_product', false],
-          unit: ['products.unit_type', true],
           gst: ['products.gst_percentage', true],
+          packaging_type: ['packaging_types.name AS packaging_type', true],
           subscribable: ['products.is_subscribable AS subscribable', true],
           one_time: ['products.is_one_time AS one_time', true],
           returnable: ['products.is_returnable AS returnable', true],
+          out_of_stock: ['products.is_out_of_stock AS out_of_stock', true],
           active: ['products.is_active AS active', true],
           is_subscribable: ['products.is_subscribable AS is_subscribable', false],
           is_one_time: ['products.is_one_time AS is_one_time', false],
           is_returnable: ['products.is_returnable AS is_returnable', false],
+          is_out_of_stock: ['products.is_out_of_stock AS is_out_of_stock', false],
           is_active: ['products.is_active AS is_active', false],
           category_name: ['categories.name AS category_name', false],
           created_at: ['products.created_at', true],
@@ -172,13 +166,13 @@ export class CatalogTableService {
         joins: [
           {
             type: 'left',
-            table: 'product_images',
-            on: [['products.product_id', 'product_images.product_id']],
+            table: 'categories',
+            on: [['products.category_id', 'categories.category_id']],
           },
           {
             type: 'left',
-            table: 'categories',
-            on: [['products.category_id', 'categories.category_id']],
+            table: 'packaging_types',
+            on: [['products.packaging_type_id', 'packaging_types.id']],
           }
         ],
         conditions,
@@ -280,24 +274,6 @@ export class CatalogTableService {
         value: null,
       });
 
-      conditions.push({
-        nested: [
-          {
-            column: 'product_images.sort_order',
-            operator: '=',
-            value: 0,
-            boolean: 'OR',
-          },
-          {
-            column: 'product_images.id',
-            operator: 'IS',
-            value: null,
-            boolean: 'OR',
-          }
-        ],
-        boolean: 'AND'
-      });
-
       const reqSet: ReqSet = {
         key: 'product_variants',
         table: 'product_variants',
@@ -324,7 +300,7 @@ export class CatalogTableService {
           variant_id: ['product_variants.variant_id', true],
           product_name: ['products.name AS product_name', true],
           variant_name: ['product_variants.name', true],
-          product_image: ['product_images.url', true],
+          product_image: ['product_variants.image_url AS product_image', true],
           unit_value: ['product_variants.unit_value', true],
           unit_type: ['product_variants.unit_type', true],
           price: ['product_variants.price', true],
@@ -335,16 +311,10 @@ export class CatalogTableService {
           fulfillment_mode: ['product_variants.fulfillment_mode', true],
         },
         joins: [
-
           {
             type: 'left',
             table: 'products',
             on: [['product_variants.product_id', 'products.product_id']],
-          },
-          {
-            type: 'left',
-            table: 'product_images',
-            on: [['product_variants.variant_id', 'product_images.variant_id']],
           },
         ],
         conditions,

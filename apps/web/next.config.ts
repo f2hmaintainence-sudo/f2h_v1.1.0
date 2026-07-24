@@ -29,9 +29,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  turbopack: {
-    root: '/home/f2hfresh/htdocs/f2hfresh.com',
-  },
   experimental: {
     optimizePackageImports: ["react-icons", "lucide-react"],
   },

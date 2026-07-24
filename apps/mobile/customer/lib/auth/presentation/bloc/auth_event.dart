@@ -23,6 +23,7 @@ class SignupRequested extends AuthEvent {
   final String phone;
   final String password;
   final String verificationToken;
+  final String? referralCode;
 
   const SignupRequested({
     required this.user_name,
@@ -30,10 +31,11 @@ class SignupRequested extends AuthEvent {
     required this.phone,
     required this.password,
     required this.verificationToken,
+    this.referralCode,
   });
 
   @override
-  List<Object> get props => [user_name, email, phone, password, verificationToken];
+  List<Object> get props => [user_name, email, phone, password, verificationToken, referralCode ?? ''];
 }
 
 class LogoutRequested extends AuthEvent {

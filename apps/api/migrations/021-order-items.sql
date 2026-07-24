@@ -1,5 +1,5 @@
 CREATE TABLE "order_items" (
-  id VARCHAR(30) PRIMARY KEY,
+  id INT PRIMARY KEY,
   order_id VARCHAR(50) NOT NULL,
 
   variant_id VARCHAR(30) DEFAULT NULL,

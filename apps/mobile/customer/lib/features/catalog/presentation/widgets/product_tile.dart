@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
-import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
-import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_view_screen.dart';
+import '../../data/models/product_model.dart';
+import '../screens/product_detail_view_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_bloc.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_event.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_state.dart';
-import 'package:f2h_customer/features/catalog/domain/entities/cart/cart_item_entity.dart';
-import 'package:f2h_customer/core/guards/auth_guard.dart';
-import 'package:f2h_customer/features/catalog/presentation/widgets/cart_widgets.dart';
+import '../bloc/cart/cart_bloc.dart';
+import '../bloc/cart/cart_event.dart';
+import '../bloc/cart/cart_state.dart';
+import '../../domain/entities/cart/cart_item_entity.dart';
+import '../../../../core/guards/auth_guard.dart';
+import '../../../subscription/presentation/widgets/subscription_button.dart';
+import 'cart_widgets.dart';
 // ── Product image widget ─────────────────────────────────
 Widget _productImage(Product p, {BoxFit fit = BoxFit.cover, double padding = 0.0}) {
   return Padding(
@@ -434,7 +435,7 @@ class ProductCardH extends StatelessWidget {
                 Hero(
                   tag: 'product-${p.id}',
                   child: Container(
-                    height: 104,
+                    height: 120,
                     width: double.infinity,
                     decoration: const BoxDecoration(
                       color: Colors.transparent,
@@ -514,25 +515,14 @@ class ProductCardH extends StatelessWidget {
                       child: const Text('ORGANIC', style: TextStyle(fontSize: 6.5, fontWeight: FontWeight.w900, color: Color(0xFF2E7D32), letterSpacing: 0.3)),
                     ),
                   ),
-                // Subscription badge
+                // Subscribe badge — opens SubscriptionSetupScreen when tapped
                 if (p.isSubscribable)
                   Positioned(
-                    bottom: 6, left: 6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F5E9),
-                        borderRadius: BorderRadius.circular(100),
-                        border: Border.all(color: const Color(0xFFA5D6A7), width: 0.8),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.autorenew_rounded, size: 8, color: Color(0xFF2E7D32)),
-                          SizedBox(width: 2),
-                          Text('Sub', style: TextStyle(fontSize: 6.5, fontWeight: FontWeight.w900, color: Color(0xFF2E7D32), letterSpacing: 0.3)),
-                        ],
-                      ),
+                    bottom: 6,
+                    left: 6,
+                    child: SubscriptionButton(
+                      product: p,
+                      isCompact: true,
                     ),
                   ),
               ],
@@ -713,6 +703,14 @@ class ProductCardV extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                            const SizedBox(height: 2),
+                           if (p.isSubscribable)
+                             Padding(
+                               padding: const EdgeInsets.only(top: 4),
+                               child: SubscriptionButton(
+                                 product: p,
+                                 isCompact: true,
+                               ),
+                             ),
                            if (p.unit.isNotEmpty)
                              Text(
                                p.unit,
@@ -720,26 +718,6 @@ class ProductCardV extends StatelessWidget {
                                  fontSize: 10.5,
                                  color: kTextSub,
                                  fontWeight: FontWeight.w600,
-                               ),
-                             ),
-                          if (p.isSubscribable)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 3),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE8F5E9),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: const Color(0xFFA5D6A7), width: 0.8),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.autorenew_rounded, size: 9, color: Color(0xFF2E7D32)),
-                                    SizedBox(width: 2),
-                                    Text('Subscription', style: TextStyle(fontSize: 7.5, fontWeight: FontWeight.w800, color: Color(0xFF2E7D32), letterSpacing: 0.2)),
-                                  ],
-                                ),
                               ),
                             ),
                           const Spacer(),

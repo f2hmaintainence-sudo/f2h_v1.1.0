@@ -17,6 +17,8 @@ class ProfileModel {
   final double postpaidCreditLimit;
   final bool isMember;
   final String? subscriptionNumber;
+  final String? referralCode;
+  final String? referralStatus;
 
   ProfileModel({
     required this.customerId,
@@ -37,6 +39,8 @@ class ProfileModel {
     this.postpaidCreditLimit = 0.0,
     this.isMember = false,
     this.subscriptionNumber,
+    this.referralCode,
+    this.referralStatus,
   });
 
   factory ProfileModel.fromJson(Map<String, dynamic> json) {
@@ -64,6 +68,8 @@ class ProfileModel {
       postpaidCreditLimit: double.tryParse(json['postpaid_credit_limit']?.toString() ?? '') ?? 0.0,
       isMember: hasSubscription,
       subscriptionNumber: subNum == 'null' ? null : subNum,
+      referralCode: json['referral_code']?.toString(),
+      referralStatus: json['referral_status']?.toString(),
     );
   }
 
@@ -86,6 +92,8 @@ class ProfileModel {
     double? postpaidCreditLimit,
     bool? isMember,
     String? subscriptionNumber,
+    String? referralCode,
+    String? referralStatus,
   }) {
     return ProfileModel(
       customerId: customerId ?? this.customerId,
@@ -106,6 +114,8 @@ class ProfileModel {
       postpaidCreditLimit: postpaidCreditLimit ?? this.postpaidCreditLimit,
       isMember: isMember ?? this.isMember,
       subscriptionNumber: subscriptionNumber ?? this.subscriptionNumber,
+      referralCode: referralCode ?? this.referralCode,
+      referralStatus: referralStatus ?? this.referralStatus,
     );
   }
 }

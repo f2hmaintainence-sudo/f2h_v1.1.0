@@ -129,7 +129,22 @@ export class AuthService {
       }
     }
 
-    // Check lock status
+    // Verify Password first
+    const passwordMatch = await bcrypt.compare(password, user.password);
+
+    if (passwordMatch) {
+      // Clear any lockout and reset failed attempts on successful password match
+      if (user.locked_at || user.max_logins > 0) {
+        await this.Data.update(
+          'users',
+          { locked_at: null, max_logins: 0 },
+          [{ column: 'user_id', operator: '=', value: user.user_id }],
+        );
+      }
+      return user;
+    }
+
+    // Password failed: enforce lockout duration if account is locked
     if (user.locked_at) {
       const lockoutDuration = 30 * 60 * 1000; // 30 minutes
       if (
@@ -156,60 +171,48 @@ export class AuthService {
         // Unlock account after lockout duration has passed
         await this.Data.update(
           'users',
-          { locked_at: null },
+          { locked_at: null, max_logins: 0 },
           [{ column: 'user_id', operator: '=', value: user.user_id }],
         );
       }
     }
 
-    // Verify Password
-    const passwordMatch = await bcrypt.compare(password, user.password);
-    if (!passwordMatch) {
-      const newAttempts = (user.max_logins || 0) + 1;
+    // Handle failed login attempt increment
+    const newAttempts = (user.max_logins || 0) + 1;
 
-      if (newAttempts >= 5) {
-        await this.Data.update(
-          'users',
-          { locked_at: new Date(), max_logins: newAttempts },
-          [{ column: 'user_id', operator: '=', value: user.user_id }],
-        );
-
-        await this.securityAlerts.alertAccountLocked({
-          userId: user.user_id,
-          email: user.email || '',
-          ipAddress: ip || 'unknown',
-          reason: 'LOGIN_ATTEMPTS',
-        });
-
-        throw new ForbiddenException(
-          'Account has been locked due to multiple failed login attempts. Please try again in 30 minutes.',
-        );
-      } else {
-        await this.Data.update(
-          'users',
-          { max_logins: newAttempts },
-          [{ column: 'user_id', operator: '=', value: user.user_id }],
-        );
-
-        this.auditLogger.logLoginFailure({
-          identifier: formattedIdentifier,
-          email: user.email,
-          ip: ip || 'unknown',
-          reason: 'Incorrect password',
-          attempt: newAttempts,
-        });
-
-        throw new UnauthorizedException('Invalid email/mobile or password');
-      }
-    }
-
-    // Success: clear login attempts database field
-    if (user.max_logins > 0) {
+    if (newAttempts >= 5) {
       await this.Data.update(
         'users',
-        { max_logins: 0 },
+        { locked_at: new Date(), max_logins: newAttempts },
         [{ column: 'user_id', operator: '=', value: user.user_id }],
       );
+
+      await this.securityAlerts.alertAccountLocked({
+        userId: user.user_id,
+        email: user.email || '',
+        ipAddress: ip || 'unknown',
+        reason: 'LOGIN_ATTEMPTS',
+      });
+
+      throw new ForbiddenException(
+        'Account has been locked due to multiple failed login attempts. Please try again in 30 minutes.',
+      );
+    } else {
+      await this.Data.update(
+        'users',
+        { max_logins: newAttempts },
+        [{ column: 'user_id', operator: '=', value: user.user_id }],
+      );
+
+      this.auditLogger.logLoginFailure({
+        identifier: formattedIdentifier,
+        email: user.email,
+        ip: ip || 'unknown',
+        reason: 'Incorrect password',
+        attempt: newAttempts,
+      });
+
+      throw new UnauthorizedException('Invalid email/mobile or password');
     }
     return user;
   }
@@ -221,7 +224,7 @@ export class AuthService {
   async findReferrer(code: string): Promise<any> {
     if (!code) return null;
     const trimmed = code.trim();
-    
+
     // 1. Search by user_id in users
     let res = await this.Data.query('users', {
       where: [{ column: 'user_id', operator: '=', value: trimmed }],
@@ -324,38 +327,46 @@ export class AuthService {
     await this.Data.executeTransaction(async (transaction) => {
       if (existingUser) {
         // Update placeholder user created during OTP verification
+        const userUpdatePayload: any = {
+          email,
+          phone,
+          user_name: userName,
+          first_name: firstName,
+          last_name: lastName,
+          password: hashedPassword,
+          role_id: roleId,
+          updated_at: now,
+        };
+        if (body.fcm_token) {
+          userUpdatePayload.fcm_token = body.fcm_token;
+        }
+
         await this.Data.update(
           'users',
-          {
-            email,
-            phone,
-            user_name: userName,
-            first_name: firstName,
-            last_name: lastName,
-            fcm_token: body.fcm_token,
-            password: hashedPassword,
-            role_id: roleId,
-            updated_at: now,
-          },
+          userUpdatePayload,
           [{ column: 'user_id', operator: '=', value: userId }],
           { transaction },
         );
       } else {
+        const userInsertPayload: any = {
+          user_id: userId,
+          email,
+          phone,
+          user_name: userName,
+          first_name: firstName,
+          last_name: lastName,
+          password: hashedPassword,
+          role_id: roleId,
+          created_at: now,
+          updated_at: now,
+        };
+        if (body.fcm_token) {
+          userInsertPayload.fcm_token = body.fcm_token;
+        }
+
         const userResult = await this.Data.insert(
           'users',
-          {
-            user_id: userId,
-            email,
-            phone,
-            user_name: userName,
-            first_name: firstName,
-            last_name: lastName,
-            fcm_token: body.fcm_token,
-            password: hashedPassword,
-            role_id: roleId,
-            created_at: now,
-            updated_at: now,
-          },
+          userInsertPayload,
           { transaction },
         );
 
@@ -366,20 +377,53 @@ export class AuthService {
 
       // Customer specific initialization
       if (roleId === 'CUSTOMER') {
+        let referrerCustomer: any = null;
+        if (body.referral_code && body.referral_code.trim()) {
+          const cleanCode = body.referral_code.trim().toUpperCase();
+          let rawCust: any = await this.DataBase.query(
+            `SELECT customer_id, referral_code FROM customers WHERE UPPER(referral_code) = $1 LIMIT 1`,
+            [cleanCode],
+          );
+          let custRows = Array.isArray(rawCust) ? rawCust : (rawCust?.rows || []);
+          if (custRows.length === 0) {
+            rawCust = await this.DataBase.query(
+              `SELECT user_id as customer_id, referral_code FROM users WHERE UPPER(referral_code) = $1 LIMIT 1`,
+              [cleanCode],
+            );
+            custRows = Array.isArray(rawCust) ? rawCust : (rawCust?.rows || []);
+          }
+          if (custRows.length === 0) {
+            throw new BadRequestException('Invalid referral code. Please check the code and try again.');
+          }
+          referrerCustomer = custRows[0];
+          if (referrerCustomer.customer_id === userId) {
+            throw new BadRequestException('You cannot use your own referral code.');
+          }
+        }
+
         const existingCust = await this.Data.query('customers', {
           where: [{ column: 'customer_id', operator: '=', value: userId }],
           limit: 1,
         });
 
         const custFirstName = firstName || userName || 'Customer';
+        const generatedRefCode = await this.generateUniqueRefCode(
+          custFirstName,
+          phone || undefined,
+        );
+
         if (existingCust?.data?.length > 0) {
           await this.Data.update(
             'customers',
             {
               first_name: custFirstName,
               last_name: lastName,
-              mobile: phone || '',
+              mobile: phone || ('NO_PHONE_' + userId),
+              phone: phone || ('NO_PHONE_' + userId),
               email: email || null,
+              referral_code: existingCust.data[0].referral_code || generatedRefCode,
+              referral_status: existingCust.data[0].referral_status || 'locked',
+              ...(referrerCustomer?.customer_id ? { referred_by: referrerCustomer.customer_id } : {}),
               updated_at: now,
             },
             [{ column: 'customer_id', operator: '=', value: userId }],
@@ -392,8 +436,33 @@ export class AuthService {
               customer_id: userId,
               first_name: custFirstName,
               last_name: lastName,
-              mobile: phone || '',
+              mobile: phone || ('NO_PHONE_' + userId),
+              phone: phone || ('NO_PHONE_' + userId),
               email: email || null,
+              branch_id: body.branch_id || 'BRANCH_DEFAULT',
+              referral_code: generatedRefCode,
+              referral_status: 'locked',
+              ...(referrerCustomer?.customer_id ? { referred_by: referrerCustomer.customer_id } : {}),
+              created_at: now,
+              updated_at: now,
+            },
+            { transaction },
+          );
+        }
+
+        if (referrerCustomer?.customer_id) {
+          const refCode = (body.referral_code || '').trim().toUpperCase();
+          await this.Data.insert(
+            'referrals',
+            {
+              refer_id: `REF${Date.now().toString(36).toUpperCase()}`,
+              referrer_customer_id: referrerCustomer.customer_id,
+              referred_customer_id: userId,
+              referral_code: refCode,
+              referrer_reward_amount: 50.00,
+              referred_reward_amount: 50.00,
+              status: 'pending',
+              remarks: 'Referral registered - pending first delivered order',
               created_at: now,
               updated_at: now,
             },
@@ -625,6 +694,30 @@ export class AuthService {
         created_at: now,
         updated_at: now,
       });
+
+      try {
+        const cleanName = (email ? email.split('@')[0] : 'USR').replace(/[^a-zA-Z]/g, '').toUpperCase();
+        const prefix = cleanName.length >= 3 ? cleanName.slice(0, 3) : 'USR';
+        const phoneDigits = (phone || '').replace(/\D/g, '');
+        const suffix = phoneDigits.length >= 3 ? phoneDigits.slice(-3) : Math.floor(100 + Math.random() * 900).toString();
+        const generatedRefCode = `F2H${prefix}${suffix}`;
+
+        await this.Data.insert('customers', {
+          customer_id: userId,
+          first_name: email ? email.split('@')[0] : 'Customer',
+          last_name: '',
+          mobile: phone || ('NO_PHONE_' + userId),
+          phone: phone || ('NO_PHONE_' + userId),
+          email: email || null,
+          branch_id: 'BRANCH_DEFAULT',
+          referral_code: generatedRefCode,
+          referral_status: 'locked',
+          created_at: now,
+          updated_at: now,
+        });
+      } catch (custErr) {
+        console.error('[AuthService] Auto customer record creation failed during OTP verify:', custErr);
+      }
 
       user = {
         user_id: userId,
@@ -1157,6 +1250,26 @@ export class AuthService {
         created_at: new Date(),
         updated_at: new Date(),
       });
+
+      if (roleId === 'CUSTOMER') {
+        try {
+          const now = new Date();
+          await this.Data.insert('customers', {
+            customer_id: userId,
+            first_name: body.name || email.split('@')[0],
+            last_name: '',
+            mobile: 'NO_PHONE_' + userId,
+            phone: 'NO_PHONE_' + userId,
+            email: email.toLowerCase().trim(),
+            branch_id: 'BRANCH_DEFAULT',
+            created_at: now,
+            updated_at: now,
+          });
+        } catch (custErr) {
+          console.error('[AuthService] Auto customer record creation failed during Google login:', custErr);
+        }
+      }
+
       user = { user_id: userId, email: email.toLowerCase().trim(), role_id: roleId };
     }
 
@@ -1176,5 +1289,36 @@ export class AuthService {
       accessToken,
       refreshToken,
     };
+  }
+
+  private async generateUniqueRefCode(firstName?: string | null, phone?: string | null): Promise<string> {
+    const cleanName = (firstName || 'USR').replace(/[^a-zA-Z]/g, '').toUpperCase();
+    const prefix = cleanName.length >= 3 ? cleanName.slice(0, 3) : 'USR';
+    const phoneDigits = (phone || '').replace(/\D/g, '');
+    const suffix = phoneDigits.length >= 3 ? phoneDigits.slice(-3) : Math.floor(100 + Math.random() * 900).toString();
+
+    let code = `F2H${prefix}${suffix}`;
+    let isUnique = false;
+    let attempts = 0;
+
+    while (!isUnique && attempts < 10) {
+      try {
+        const checkRes: any = await this.DataBase.query(
+          `SELECT customer_id FROM customers WHERE UPPER(referral_code) = $1 LIMIT 1`,
+          [code.toUpperCase()],
+        );
+        const rows = Array.isArray(checkRes) ? checkRes : (checkRes?.rows || []);
+        if (rows.length === 0) {
+          isUnique = true;
+        } else {
+          attempts++;
+          const extra = Math.floor(10 + Math.random() * 90).toString();
+          code = `F2H${prefix}${suffix}${extra}`;
+        }
+      } catch (_) {
+        break;
+      }
+    }
+    return code;
   }
 }

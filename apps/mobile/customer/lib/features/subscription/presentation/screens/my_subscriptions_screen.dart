@@ -51,7 +51,8 @@ class _SubsScreenState extends State<SubsScreen> {
       _subscriptions = [];
     }
     final authState = context.read<AuthBloc>().state;
-    if (authState is Authenticated) {
+    final sessionState = context.read<CustomerSessionCubit>().state;
+    if (authState is Authenticated || sessionState.profile != null) {
       bloc.add(LoadSubscriptions());
     }
   }
@@ -830,8 +831,10 @@ class _SubsScreenState extends State<SubsScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthBloc>().state;
+    final sessionState = context.watch<CustomerSessionCubit>().state;
+    final isLoggedIn = authState is Authenticated || sessionState.profile != null;
 
-    if (authState is! Authenticated) {
+    if (!isLoggedIn) {
       return Scaffold(
         backgroundColor: kBg,
         appBar: AppBar(

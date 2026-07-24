@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
@@ -13,6 +14,8 @@ import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
 import 'package:f2h_customer/auth/presentation/screens/otp_screen.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/privacy_screen.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
+import 'package:f2h_customer/core/api/dio_client.dart';
+import 'package:f2h_customer/core/api/api_endpoints.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -28,20 +31,76 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
+  final TextEditingController _referralCodeController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreeToTerms = false;
   bool _isSendingOtp = false;
 
+  // Referral auto-check state
+  bool? _isReferralValid;
+  String? _referralMessage;
+  bool _isCheckingReferral = false;
+  Timer? _referralDebounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _referralCodeController.addListener(_onReferralChanged);
+  }
+
   @override
   void dispose() {
+    _referralDebounce?.cancel();
+    _referralCodeController.removeListener(_onReferralChanged);
     _usernameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _referralCodeController.dispose();
     super.dispose();
+  }
+
+  void _onReferralChanged() {
+    _referralDebounce?.cancel();
+    final code = _referralCodeController.text.trim();
+    if (code.isEmpty) {
+      setState(() {
+        _isReferralValid = null;
+        _referralMessage = null;
+        _isCheckingReferral = false;
+      });
+      return;
+    }
+    if (code.length < 3) return;
+    setState(() => _isCheckingReferral = true);
+    _referralDebounce = Timer(const Duration(milliseconds: 350), () async {
+      try {
+        final dio = sl<DioClient>().dio;
+        final resp = await dio.get('${ApiEndpoints.validateReferralCode}/$code');
+        if (!mounted) return;
+        final data = resp.data;
+        final isValid = data['valid'] == true;
+        setState(() {
+          _isReferralValid = isValid;
+          _referralMessage = isValid
+              ? (data['referrer_name'] != null && data['referrer_name'].toString().isNotEmpty
+                  ? 'Valid referral code! (From ${data['referrer_name']})'
+                  : 'Referral code is valid!')
+              : (data['message']?.toString() ?? 'Invalid referral code');
+          _isCheckingReferral = false;
+        });
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          _isReferralValid = false;
+          _referralMessage = 'Invalid referral code';
+          _isCheckingReferral = false;
+        });
+      }
+    });
   }
 
   Future<void> _onSignupPressed() async {
@@ -92,6 +151,14 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
+    final referral = _referralCodeController.text.trim();
+    if (referral.isNotEmpty && _isReferralValid == false) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid referral code. Please correct or remove it.')),
+      );
+      return;
+    }
+
     if (!_agreeToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -118,6 +185,7 @@ class _SignupScreenState extends State<SignupScreen> {
             email: email,
             phone: phone,
             password: password,
+            referralCode: _referralCodeController.text.trim(),
           ),
         ),
       );
@@ -421,7 +489,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                         // Full Name Input
                                         Container(
                                           decoration: BoxDecoration(
-                                            color: kPrimaryPl.withOpacity(0.55),
+                                            color: Colors.white,
                                             borderRadius: BorderRadius.circular(
                                               30,
                                             ),
@@ -476,7 +544,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                         // Mobile Number Input
                                         Container(
                                           decoration: BoxDecoration(
-                                            color: kPrimaryPl.withOpacity(0.55),
+                                            color: Colors.white,
                                             borderRadius: BorderRadius.circular(
                                               30,
                                             ),
@@ -497,6 +565,11 @@ class _SignupScreenState extends State<SignupScreen> {
                                           child: TextField(
                                             controller: _phoneController,
                                             keyboardType: TextInputType.phone,
+                                            maxLength: 10,
+                                            inputFormatters: [
+                                              FilteringTextInputFormatter.digitsOnly,
+                                              LengthLimitingTextInputFormatter(10),
+                                            ],
                                             style: const TextStyle(
                                               fontSize: 13,
                                               fontWeight: FontWeight.bold,
@@ -508,11 +581,12 @@ class _SignupScreenState extends State<SignupScreen> {
                                                   context,
                                                 ).unfocus(),
                                             decoration: const InputDecoration(
+                                              counterText: '',
                                               prefixIcon: Icon(
                                                 Icons.phone_outlined,
                                                 color: Color(0xFF94A3B8),
                                               ),
-                                              hintText: 'Mobile Number',
+                                              hintText: '10-digit Mobile Number',
                                               hintStyle: TextStyle(
                                                 color: Color(0xFF94A3B8),
                                                 fontWeight: FontWeight.w500,
@@ -531,7 +605,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                         // Email Address Input
                                         Container(
                                           decoration: BoxDecoration(
-                                            color: kPrimaryPl.withOpacity(0.55),
+                                            color: Colors.white,
                                             borderRadius: BorderRadius.circular(
                                               30,
                                             ),
@@ -587,7 +661,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                         // Password Input
                                         Container(
                                           decoration: BoxDecoration(
-                                            color: kPrimaryPl.withOpacity(0.55),
+                                            color: Colors.white,
                                             borderRadius: BorderRadius.circular(
                                               30,
                                             ),
@@ -661,7 +735,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                         // Confirm Password Input
                                         Container(
                                           decoration: BoxDecoration(
-                                            color: kPrimaryPl.withOpacity(0.55),
+                                            color: Colors.white,
                                             borderRadius: BorderRadius.circular(
                                               30,
                                             ),
@@ -731,6 +805,89 @@ class _SignupScreenState extends State<SignupScreen> {
                                               ),
                                             ),
                                           ),
+                                        ),
+                                        const SizedBox(height: 12),
+
+                                        // Referral Code Input (Optional)
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Container(
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                borderRadius: BorderRadius.circular(30),
+                                                border: Border.all(
+                                                  color: _isReferralValid == true
+                                                      ? Colors.green
+                                                      : _isReferralValid == false
+                                                          ? Colors.red
+                                                          : kBorder.withOpacity(0.35),
+                                                  width: 1.2,
+                                                ),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black.withOpacity(0.015),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 2),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: TextField(
+                                                controller: _referralCodeController,
+                                                textCapitalization: TextCapitalization.characters,
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF1A1A1A),
+                                                ),
+                                                enableInteractiveSelection: true,
+                                                onTapOutside: (event) =>
+                                                    FocusScope.of(context).unfocus(),
+                                                decoration: InputDecoration(
+                                                  prefixIcon: const Icon(
+                                                    Icons.card_giftcard_rounded,
+                                                    color: Color(0xFF94A3B8),
+                                                  ),
+                                                  hintText: 'Referral Code (Optional)',
+                                                  hintStyle: const TextStyle(
+                                                    color: Color(0xFF94A3B8),
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                  border: InputBorder.none,
+                                                  contentPadding: const EdgeInsets.symmetric(
+                                                    horizontal: 16,
+                                                    vertical: 12,
+                                                  ),
+                                                  suffixIcon: _isCheckingReferral
+                                                      ? const Padding(
+                                                          padding: EdgeInsets.all(14),
+                                                          child: SizedBox(
+                                                            width: 16,
+                                                            height: 16,
+                                                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF94A3B8)),
+                                                          ),
+                                                        )
+                                                      : _isReferralValid == true
+                                                          ? const Icon(Icons.check_circle_rounded, color: Colors.green)
+                                                          : _isReferralValid == false
+                                                              ? const Icon(Icons.cancel_rounded, color: Colors.red)
+                                                              : null,
+                                                ),
+                                              ),
+                                            ),
+                                            if (_referralMessage != null)
+                                              Padding(
+                                                padding: const EdgeInsets.only(left: 16, top: 4),
+                                                child: Text(
+                                                  _referralMessage!,
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: _isReferralValid == true ? Colors.green : Colors.red,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
                                         ),
                                         const SizedBox(height: 12),
 

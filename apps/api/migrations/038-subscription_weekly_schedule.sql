@@ -6,14 +6,14 @@
 -- =========================================================
 
 CREATE TABLE subscription_weekly_schedule (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY AUTO_INCREMENT,
 
     subscription_item_id VARCHAR(30) NOT NULL
-    REFERENCES subscription_items(id)
+    REFERENCES subscription_items(subscription_item_id)
     ON DELETE CASCADE,
 
     subscription_id VARCHAR(30) NOT NULL
-    REFERENCES subscriptions(id)
+    REFERENCES subscriptions(subscription_id)
     ON DELETE CASCADE,
 
     day_of_week SMALLINT NOT NULL,
@@ -22,6 +22,9 @@ CREATE TABLE subscription_weekly_schedule (
 
     e_quantity NUMERIC(10,2) DEFAULT 0,
 
+    effective_from DATE NULL,
+
+    effective_to   DATE NULL,
     
     created_at TIMESTAMPTZ DEFAULT now(),
 

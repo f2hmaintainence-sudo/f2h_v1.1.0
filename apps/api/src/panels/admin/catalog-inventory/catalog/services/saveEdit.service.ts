@@ -92,6 +92,11 @@ export class CatalogSaveEditService {
         [primaryUrlStr, JSON.stringify(finalUrls), productId],
       );
 
+      await this.dataService.query(
+        `DELETE FROM product_images WHERE product_id = $1 AND variant_id IS NULL`,
+        [productId],
+      );
+
       for (const [index, fileUrl] of finalUrls.entries()) {
         await this.dataService.insert('product_images', {
           product_id: productId,
@@ -151,6 +156,11 @@ export class CatalogSaveEditService {
         [firstImage, variantId],
       );
 
+      await this.dataService.query(
+        `DELETE FROM product_images WHERE variant_id = $1`,
+        [variantId],
+      );
+
       for (const [index, fileUrl] of finalUrls.entries()) {
         await this.dataService.insert('product_images', {
           product_id: productId,
@@ -179,6 +189,7 @@ export class CatalogSaveEditService {
         'is_subscribable',
         'is_one_time',
         'is_returnable',
+        'is_out_of_stock',
         'is_active',
       ];
 
@@ -277,6 +288,8 @@ export class CatalogSaveEditService {
         'is_subscribable',
         'is_one_time',
         'is_returnable',
+        'is_out_of_stock',
+        'packaging_type_id',
         'unit_type',
         'lift_days',
         'gst_percentage',
@@ -291,6 +304,12 @@ export class CatalogSaveEditService {
           if (typeof value === 'string') value = value.trim();
           updateData[fieldName] = value;
         }
+      }
+
+      const primaryUrl = body.primary_image_url || body.image_url;
+      if (primaryUrl && primaryUrl.trim()) {
+        updateData.image_url = primaryUrl.trim();
+        updateData.image_path = primaryUrl.trim();
       }
 
       if (Object.keys(updateData).length === 0 && !productImage) {
@@ -310,7 +329,6 @@ export class CatalogSaveEditService {
         }
       }
 
-      const primaryUrl = body.primary_image_url || body.image_url;
       const secondaryUrl = body.secondary_image_url;
       const secondaryImage = body.secondary_image_file ? this.normalizeProductImage(body.secondary_image_file) : undefined;
 
@@ -598,7 +616,7 @@ export class CatalogSaveEditService {
             {
               column: 'id',
               operator: '=',
-              value: id,
+              value: Number(id),
             },
           ],
         });

@@ -8,6 +8,27 @@ import { CategoriesProductsService } from '../ModuleServices/categories_products
 export class CategoriesController {
   constructor(private readonly service: CategoriesProductsService) { }
 
+  // ponytail: static config — no DB table until banners need CRUD
+  @Public()
+  @Get('banners')
+  async getBanners(@Req() req: Request) {
+    const host = `${req.protocol}://${req.get('host')}`;
+    return {
+      status: true,
+      data: [
+        {
+          id: 'sub-save-5',
+          imageUrl: `${host}/uploads/banners/subscription_banner.png`,
+          title: 'Save Up To 5%',
+          subtitle: 'Subscription to fresh milk, curd, paneer & more for hassle free morning deliveries.',
+          cta: 'Order Now',
+          route: 'menu', // tab name in the app
+          isActive: true,
+        },
+      ],
+    };
+  }
+
   @Public()
   @Get('categories')
   async getCategories() {
@@ -32,4 +53,5 @@ export class CategoriesController {
     return this.service.getProductReviews(req.params.productId as string);
   }
 }
+
 

@@ -1,6 +1,6 @@
 import { Phone, Sprout } from "lucide-react";
 
-const phoneTel = "+919876543210";
+const phoneTel = "+919148773591";
 
 import { EyebrowPill } from "./EyebrowPill";
 

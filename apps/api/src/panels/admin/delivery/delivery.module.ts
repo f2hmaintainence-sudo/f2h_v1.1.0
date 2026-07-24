@@ -18,8 +18,10 @@ import { DeliverySaveEditService } from './services/saveEdit.service';
 import { DeliveryLeaveTableService } from './services/table.service';
 import { DeliveryLeaveShowEditService, DeliveryLeaveSaveEditService } from './services/leave-edit.service';
 
+import { ReferralModule } from '../../customer/referral/referral.module';
+
 @Module({
-  imports: [HelpersModule, NotificationModule, AdminAuthModule],
+  imports: [HelpersModule, NotificationModule, AdminAuthModule, ReferralModule],
   controllers: [DeliveryManagementController],
   providers: [
     DeliveryManagementService,

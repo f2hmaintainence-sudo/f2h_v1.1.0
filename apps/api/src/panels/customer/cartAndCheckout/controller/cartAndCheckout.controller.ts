@@ -32,7 +32,7 @@ export class CartController {
     const userId = user?.user_id;
     body.customer_id = userId;
     
-    return this.cartService.checkout(body);
+    return this.cartService.checkout(body, req);
   }
 
 }

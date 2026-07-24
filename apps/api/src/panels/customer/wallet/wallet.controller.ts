@@ -49,29 +49,42 @@ export class WalletController {
     const currentBalance = Number(customer?.wallet_balance || 0);
     const newBalance = currentBalance + amount;
 
-    return this.Data.executeTransaction(async (conn) => {
-      await this.Data.update(
-        'customers',
-        { wallet_balance: newBalance, updated_at: new Date() },
-        [{ column: 'customer_id', operator: '=', value: customer.customer_id }],
-        { transaction: conn },
-      );
+    await this.Data.update(
+      'customers',
+      { wallet_balance: newBalance, updated_at: new Date() },
+      [{ column: 'customer_id', operator: '=', value: customer.customer_id }],
+    );
+    if (email) {
+      try {
+        await this.Data.update(
+          'customers',
+          { wallet_balance: newBalance, customer_id: userId, updated_at: new Date() },
+          [{ column: 'email', operator: '=', value: email }],
+        );
+      } catch (_) {}
+    }
 
-      // const txId = 'WTX_' + Math.random().toString(36).substring(2, 14).toUpperCase();
-      await this.Data.insert('customer_wallet_transactions', {
-        customer_id: customer.customer_id,
-        transaction_type: 'credit',
-        amount: amount,
-        balance_after: newBalance,
-        reference_type: 'topup',
-        // reference_id : txId,
-        remarks: 'Wallet Topup',
-        created_by: customer.customer_id,
-      }, { transaction: conn });
+    // ponytail: compact ID to fit VARCHAR(20) column constraint
+    const ts = Math.floor(Date.now() / 1000).toString(36);
+    const rnd = Math.floor(Math.random() * 9000 + 1000);
+    const txId = `WT${ts}${rnd}`;
+    await this.Data.insert('customer_wallet_transactions', {
+      transaction_id: txId,
+      customer_id: customer.customer_id,
+      transaction_type: 'credit',
+      amount: amount,
+      balance_after: newBalance,
+      reference_type: 'topup',
+      reference_id: txId,
+      remarks: 'Wallet Topup',
+      created_by: customer.customer_id,
+      created_at: new Date(),
+    });
 
-      // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
-      // Insert wallet topup notification
-      const notificationId = 'NTF-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000);
+    try {
+      const nts = Math.floor(Date.now() / 1000).toString(36);
+      const nrnd = Math.floor(Math.random() * 9000 + 1000);
+      const notificationId = `NF${nts}${nrnd}`;
       await this.Data.insert('notifications', {
         notification_id: notificationId,
         title: 'Wallet Credited',
@@ -84,7 +97,7 @@ export class WalletController {
         updated_by: 'system',
         created_at: new Date(),
         updated_at: new Date(),
-      }, { transaction: conn });
+      });
 
       await this.Data.insert('notification_recipients', {
         notification_id: notificationId,
@@ -95,14 +108,16 @@ export class WalletController {
         updated_by: 'system',
         created_at: new Date(),
         updated_at: new Date(),
-      }, { transaction: conn });
+      });
+    } catch (notifErr) {
+      // Notification failure must not block wallet credit
+    }
 
-      return {
-        status: true,
-        message: 'Wallet recharged successfully',
-        balance: newBalance,
-      };
-    });
+    return {
+      status: true,
+      message: 'Wallet recharged successfully',
+      balance: newBalance,
+    };
   }
 
   @Get('transactions')
@@ -128,8 +143,12 @@ export class WalletController {
       throw new BadRequestException('Customer profile not found');
     }
 
+    const customerIds = Array.from(new Set([userId, customer.customer_id].filter(Boolean)));
+
     const txResult = await this.Data.query('customer_wallet_transactions', {
-      where: [{ column: 'customer_id', operator: '=', value: customer.customer_id }],
+      where: customerIds.length > 1
+        ? [{ column: 'customer_id', operator: 'IN', value: customerIds }]
+        : [{ column: 'customer_id', operator: '=', value: customerIds[0] }],
       orderBy: [{ column: 'created_at', direction: 'DESC' }],
     });
     return {

@@ -17,7 +17,7 @@ const quickLinks = [
 
 const socialLinks = [
   { name: "instagram", icon: FaInstagram, href: "#", hoverClass: "hover:bg-pink-500" },
-  { name: "whatsapp", icon: FaWhatsapp, href: "https://wa.me/919876543210", hoverClass: "hover:bg-green-500" },
+  { name: "whatsapp", icon: FaWhatsapp, href: "https://wa.me/919148773591", hoverClass: "hover:bg-green-500" },
   { name: "facebook", icon: FaFacebookF, href: "#", hoverClass: "hover:bg-blue-600" },
   { name: "youtube", icon: FaYoutube, href: "#", hoverClass: "hover:bg-red-600" },
 ];
@@ -307,8 +307,8 @@ export function Footer() {
             </h4>
             <ul className="space-y-3.5 text-sm text-white/65">
               {[
-                { href: "tel:+919876543210", Icon: FiPhone, label: "+91 98765 43210" },
-                { href: "https://wa.me/919876543210", Icon: FaWhatsapp, label: "WhatsApp Us" },
+                { href: "tel:+919148773591", Icon: FiPhone, label: "+91 91487 73591" },
+                { href: "https://wa.me/919148773591", Icon: FaWhatsapp, label: "WhatsApp Us" },
                 { href: "mailto:hello@f2hfresh.com", Icon: FiMail, label: "hello@f2hfresh.com" },
               ].map(({ href, Icon, label }) => (
                 <li key={label}>

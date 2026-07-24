@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/auth/domain/repositories/auth_repository.dart';
 import 'package:f2h_customer/core/services/notification_service.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
+import 'package:f2h_customer/auth/domain/entities/user_entity.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_event.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 
@@ -38,6 +39,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         event.password,
         phone: event.phone,
         verificationToken: event.verificationToken,
+        referralCode: event.referralCode,
         fcmToken: fcmToken,
       );
       emit(Authenticated(user: user));
@@ -71,11 +73,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final isAuthenticated = await authRepository.checkAuthStatus();
     if (isAuthenticated) {
       final user = await authRepository.getCachedUser();
-      if (user != null) {
-        emit(Authenticated(user: user));
-      } else {
-        emit(const Unauthenticated());
-      }
+      emit(Authenticated(user: user ?? User(userId: 'session', email: '')));
     } else {
       emit(const Unauthenticated());
     }
