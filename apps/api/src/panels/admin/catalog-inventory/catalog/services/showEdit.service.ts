@@ -109,31 +109,12 @@ export class CatalogShowEditService {
         })),
       ];
 
-      // Fetch active packaging types
-      const packagingTypesResult = await this.dataService.query('packaging_types', {
-        select: ['id', 'name'],
-        where: [
-          { column: 'status', operator: '=', value: 'active' },
-        ],
-        orderBy: 'name',
-        orderDirection: 'ASC',
-      });
-
-      const packagingOptions = [
-        { value: '', label: 'No Returnable Packaging (Disposable)' },
-        ...(packagingTypesResult.data || []).map((pkg: any) => ({
-          value: String(pkg.id),
-          label: pkg.name,
-        })),
-      ];
-
       // =====================================================
       // GENERATE FIELDS
       // =====================================================
 
       const fields = this.showAddService.catalogFields(
         categoryOptions,
-        packagingOptions,
       );
 
       // =====================================================
@@ -144,8 +125,6 @@ export class CatalogShowEditService {
         ...product,
 
         category_id: String(product.category_id || ''),
-
-        packaging_type_id: String(product.packaging_type_id || ''),
 
         product_image: productImage,
       };
