@@ -25,6 +25,9 @@ import { memoryStorage } from 'multer';
 import * as path from 'path';
 import * as fs from 'fs';
 
+import { FirstOrderDetectorService } from '../../../customer/referral/services/first-order-detector.service';
+import { ReferralRewardEngineService } from '../../../customer/referral/services/referral-reward-engine.service';
+
 @Controller({ path: 'delivery/orders', version: '1' })
 @UseGuards(JwtAuthGuard)
 export class DeliveryOrderController {
@@ -32,6 +35,8 @@ export class DeliveryOrderController {
     private readonly db: DatabaseService,
     private readonly pushNotificationService: PushNotificationService,
     private readonly developer: DeveloperService,
+    private readonly firstOrderDetector: FirstOrderDetectorService,
+    private readonly referralRewardEngine: ReferralRewardEngineService,
   ) { }
 
   private cleanDeliveryImagePath(imageUrl: string | null | undefined): string | null {
@@ -738,8 +743,16 @@ export class DeliveryOrderController {
       }
     });
 
-    // Send push notification to customer if delivered
+    // Send push notification to customer if delivered & process referral reward
     if (newStatus === 'delivered') {
+      try {
+        await this.firstOrderDetector.detectAndMarkFirstOrder(order.customer_id, orderId);
+        await this.firstOrderDetector.unlockReferralCode(order.customer_id);
+        await this.referralRewardEngine.processReferralReward(order.customer_id, orderId);
+      } catch (refErr) {
+        this.developer.error('DeliveryOrderController: Failed to process referral reward on order delivery', refErr);
+      }
+
       try {
         await this.pushNotificationService.sendNotificationToUsers(
           [order.customer_id],

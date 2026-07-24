@@ -109,18 +109,22 @@ export class CatalogShowEditService {
         })),
       ];
 
-      // =====================================================
-      // UNIT OPTIONS
-      // MUST MATCH ENUM EXACTLY
-      // =====================================================
+      // Fetch active packaging types
+      const packagingTypesResult = await this.dataService.query('packaging_types', {
+        select: ['id', 'name'],
+        where: [
+          { column: 'status', operator: '=', value: 'active' },
+        ],
+        orderBy: 'name',
+        orderDirection: 'ASC',
+      });
 
-      const unitOptions = [
-        { label: 'Liter', value: 'ltr' },
-        { label: 'Milliliter', value: 'ml' },
-        { label: 'Kilogram', value: 'kg' },
-        { label: 'Gram', value: 'gm' },
-        { label: 'Piece', value: 'piece' },
-        { label: 'Pack', value: 'pack' },
+      const packagingOptions = [
+        { value: '', label: 'No Returnable Packaging (Disposable)' },
+        ...(packagingTypesResult.data || []).map((pkg: any) => ({
+          value: String(pkg.id),
+          label: pkg.name,
+        })),
       ];
 
       // =====================================================
@@ -129,7 +133,7 @@ export class CatalogShowEditService {
 
       const fields = this.showAddService.catalogFields(
         categoryOptions,
-        unitOptions,
+        packagingOptions,
       );
 
       // =====================================================
@@ -141,7 +145,7 @@ export class CatalogShowEditService {
 
         category_id: String(product.category_id || ''),
 
-        unit_type: String(product.unit_type || 'piece'),
+        packaging_type_id: String(product.packaging_type_id || ''),
 
         product_image: productImage,
       };

@@ -20,6 +20,7 @@ import 'package:f2h_customer/features/notifications/presentation/bloc/notificati
 import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_event.dart';
 import 'package:f2h_customer/features/notifications/presentation/screens/notifications_screen.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
+import 'package:f2h_customer/features/profile/presentation/screens/referral_screen.dart';
 
 // ----------------------------------------------------------
 //  PROFILE SCREEN - Premium farm-market design
@@ -1248,8 +1249,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
         builder: (context, state) {
           final profile = state.profile;
-          final isLoggedIn = authState is Authenticated &&
-              profile != null &&
+          final isLoggedIn = (authState is Authenticated || profile != null) &&
               state.status != CustomerSessionStatus.unauthenticated;
           String customerName = 'Guest';
           String customerMobile = 'Login to unlock your farm-fresh dashboard';
@@ -1638,6 +1638,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         child: Column(
                           children: [
+                            _menuItem(
+                              Icons.card_giftcard_rounded,
+                              'Refer & Earn ₹50',
+                              const Color(0xFFECFDF5),
+                              const Color(0xFF16653A),
+                              onTap: () {
+                                if (isLoggedIn && profile != null) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ReferralScreen(
+                                        referralCode: profile.referralCode,
+                                        referralStatus: profile.referralStatus,
+                                      ),
+                                    ),
+                                  );
+                                } else {
+                                  _showLoginDrawer(context);
+                                }
+                              },
+                            ),
+                            _divider(),
                             _menuItem(
                               Icons.person_outline_rounded,
                               'Personal Details',

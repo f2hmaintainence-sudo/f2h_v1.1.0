@@ -33,6 +33,34 @@ const adminNav = [
     ],
   },
   {
+    label: "CATALOG & INVENTORY",
+    items: [
+      { name: "Categories", href: "/admin/catalog/categories", icon: Layers },
+      { name: "Products", href: "/admin/catalog/products", icon: Package },
+      { name: "Product Variants", href: "/admin/catalog/variants", icon: Tag },
+      {
+        name: "Inventory",
+        icon: Boxes,
+        subItems: [
+          { name: "Overview", href: "/admin/inventory/overview", icon: BarChart3 },
+          { name: "Production Batches", href: "/admin/inventory/production", icon: Factory },
+          { name: "Reconciliation", href: "/admin/inventory/reconciliation", icon: ClipboardCheck },
+          { name: "Expiry Tracker", href: "/admin/inventory/expiry", icon: Clock },
+          { name: "Stock Forecast", href: "/admin/inventory/forecast", icon: LineChart },
+        ]
+      },
+      {
+        name: "Warehouse",
+        icon: Building,
+        subItems: [
+          { name: "Warehouse Stock", href: "/admin/inventory/warehouse", icon: Building2 },
+          { name: "Warehouse Dispatch", href: "/admin/warehouse/dispatch", icon: Box },
+          { name: "Inter-Warehouse Transfers", href: "/admin/warehouse/transfers", icon: ArrowRightLeft },
+        ]
+      },
+    ],
+  },
+  {
     label: "ORDERS & DELIVERIES",
     items: [
       { name: "Orders", href: "/admin/orders/allorders", icon: ShoppingBag },

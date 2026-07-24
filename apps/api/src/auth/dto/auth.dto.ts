@@ -64,6 +64,10 @@ export class RegisterDto {
 
   @IsOptional()
   longitude?: number;
+
+  @IsString()
+  @IsOptional()
+  referral_code?: string;
 }
 
 export class LoginDto {

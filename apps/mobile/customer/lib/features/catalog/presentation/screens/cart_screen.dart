@@ -74,6 +74,8 @@ class _CartScreenState extends State<CartScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthBloc>().state;
+    final sessionState = context.watch<CustomerSessionCubit>().state;
+    final isLoggedIn = authState is Authenticated || sessionState.profile != null;
   
     return Scaffold(
       backgroundColor: kBg,
@@ -91,23 +93,32 @@ class _CartScreenState extends State<CartScreen> {
         ),
         centerTitle: true,
       ),
-      body: authState is! Authenticated
+      body: !isLoggedIn
           ? _buildEmptyState(context)
           : BlocBuilder<CartBloc, CartState>(
               builder: (context, state) {
                 if (state is CartErrorState) {
+                  if (state.message.toLowerCase().contains('unauthorized') || state.message.contains('401')) {
+                    return _buildEmptyState(context);
+                  }
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24.0),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.error_outline_rounded, color: Colors.red, size: 64),
+                          const Icon(Icons.shopping_bag_outlined, color: kPrimary, size: 64),
                           const SizedBox(height: 16),
+                          const Text(
+                            'Unable to load your cart',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: kText, fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
                           Text(
                             state.message,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(color: kText, fontSize: 16),
+                            style: const TextStyle(color: kTextSub, fontSize: 13),
                           ),
                           const SizedBox(height: 24),
                           ElevatedButton(
@@ -1004,6 +1015,7 @@ class _CartItemTile extends StatefulWidget {
 }
 
 class _CartItemTileState extends State<_CartItemTile> {
+  /// Whether a cart update is in progress (shows spinner on counter)
   bool _isUpdating = false;
 
   @override

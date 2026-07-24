@@ -76,7 +76,8 @@ class _TopupDrawerState extends State<TopupDrawer> {
         throw Exception(data['message'] ?? 'Failed to add money');
       }
 
-      await sessionCubit.refreshSilently();
+      sessionCubit.rechargeWallet(amount);
+      await sessionCubit.refresh();
 
       if (!mounted) return;
       F2HToast.success(
@@ -225,8 +226,10 @@ class _TopupDrawerState extends State<TopupDrawer> {
                     ? null
                     : () {
                         final authState = context.read<AuthBloc>().state;
+                        final sessionState = context.read<CustomerSessionCubit>().state;
+                        final isLoggedIn = authState is Authenticated || sessionState.profile != null;
 
-                        if (authState is! Authenticated) {
+                        if (!isLoggedIn) {
                           F2HToast.error(
                               context, 'Please login to add money to wallet');
                           Navigator.push(

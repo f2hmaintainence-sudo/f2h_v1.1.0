@@ -13,6 +13,9 @@ import { generateId } from 'src/helpers/RandomHelper';
 import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
 import { NotificationService } from 'src/notifications/notification.service';
 
+import { FirstOrderDetectorService } from '../../referral/services/first-order-detector.service';
+import { ReferralRewardEngineService } from '../../referral/services/referral-reward-engine.service';
+
 @Injectable()
 export class CartService {
   constructor(
@@ -21,6 +24,8 @@ export class CartService {
     private readonly developer: DeveloperService,
     private readonly pushNotificationService: PushNotificationService,
     private readonly notificationService: NotificationService,
+    private readonly firstOrderDetector: FirstOrderDetectorService,
+    private readonly referralRewardEngine: ReferralRewardEngineService,
   ) { }
 
   async syncCart(body: CartDto) {
@@ -164,7 +169,7 @@ export class CartService {
     };
   }
 
-  async checkout(body: CheckOutDto) {
+  async checkout(body: CheckOutDto, req?: any) {
     const customerId = body.customer_id;
     const itemsToCheckout = body.items || [];
     if (!customerId) {
@@ -217,19 +222,75 @@ export class CartService {
       throw new BadRequestException('Delivery address not found. Please add an address before checking out.');
     }
 
-    // Resolve Customer Details and Wallet balance
-    const customerResult = await this.Data.query('customers', {
+    let email = (req as any)?.user?.email;
+    let customerResult = await this.Data.query('customers', {
       select: [
+        'customer_id',
         'wallet_balance',
         'full_name',
         'first_name',
         'last_name',
         'phone',
+        'branch_id',
+        'email',
       ],
       where: [{ column: 'customer_id', operator: '=', value: customerId }],
       limit: 1,
     });
-    const customer = customerResult?.data?.[0];
+    let customer = customerResult?.data?.[0];
+
+    const userRes = await this.Data.query('users', {
+      where: [{ column: 'user_id', operator: '=', value: customerId }],
+      limit: 1,
+    });
+    const userObj = userRes?.data?.[0];
+    if (!email && userObj?.email) {
+      email = userObj.email;
+    }
+
+    if (!customer && email) {
+      customerResult = await this.Data.query('customers', {
+        where: [{ column: 'email', operator: '=', value: email }],
+        limit: 1,
+      });
+      customer = customerResult?.data?.[0];
+
+      if (customer) {
+        try {
+          await this.Data.update(
+            'customers',
+            { customer_id: customerId, updated_at: new Date() },
+            [{ column: 'email', operator: '=', value: email }],
+          );
+          customer.customer_id = customerId;
+        } catch (_) {}
+      }
+    }
+
+    if (!customer && userObj) {
+      try {
+        const now = new Date();
+        const activeBranchRes = await this.Data.query('branches', {
+          where: [{ column: 'is_active', operator: '=', value: true }],
+          limit: 1,
+        });
+        const activeBranchId = activeBranchRes?.data?.[0]?.branch_id || 'BRANCH_KUPPAM_01';
+        customer = {
+          customer_id: customerId,
+          first_name: userObj.first_name || userObj.user_name || 'Customer',
+          last_name: userObj.last_name || '',
+          mobile: userObj.phone || ('NO_PHONE_' + customerId),
+          phone: userObj.phone || ('NO_PHONE_' + customerId),
+          email: userObj.email || email || null,
+          branch_id: activeBranchId,
+          wallet_balance: 0,
+          created_at: now,
+          updated_at: now,
+        };
+        await this.Data.insert('customers', customer);
+      } catch (_) {}
+    }
+
     if (!customer) {
       throw new BadRequestException('Customer profile not found');
     }
@@ -249,17 +310,19 @@ export class CartService {
     }
 
     // 1. Fetch current cart
-    const cartResult = await this.Data.query('carts', {
-      select: ['cart_data'],
-      where: [{ column: 'user_id', operator: '=', value: customerId }],
-    });
-
-    const cartRow = cartResult?.data?.[0];
-    const currentCartItems = cartRow
-      ? typeof cartRow.cart_data === 'string'
-        ? JSON.parse(cartRow.cart_data)
-        : cartRow.cart_data || []
-      : [];
+    let currentCartItems: any[] = [];
+    try {
+      const cartResult = await this.Data.query('carts', {
+        select: ['cart_data'],
+        where: [{ column: 'user_id', operator: '=', value: customerId }],
+      });
+      const cartRow = cartResult?.data?.[0];
+      currentCartItems = cartRow
+        ? typeof cartRow.cart_data === 'string'
+          ? JSON.parse(cartRow.cart_data)
+          : cartRow.cart_data || []
+        : [];
+    } catch (_) {}
 
     // 2. Create set of checkout item variantIds
     const checkoutSet = new Set(
@@ -326,95 +389,94 @@ export class CartService {
     const orderedProductNames: string[] = [];
     let referenceId: string | null = null;
 
-    // Run checkout transaction
-    await this.Data.executeTransaction(async (transaction) => {
-      const walletTransactionsToInsert: {
-        amount: number;
-        reference_type: string;
-        reference_id: string;
-        remarks: string;
-      }[] = [];
+    const walletTransactionsToInsert: {
+      amount: number;
+      reference_type: string;
+      reference_id: string;
+      remarks: string;
+    }[] = [];
 
-      // A. Deduct customer wallet balance
-      if (paymentMethod === 'wallet' && onetimeTotal > 0 && newBalance !== walletBalance) {
-        await this.Data.update(
-          'customers',
-          { wallet_balance: newBalance },
-          [{ column: 'customer_id', operator: '=', value: customerId }],
-          { transaction },
-        );
+    // A. Deduct customer wallet balance
+    if (paymentMethod === 'wallet' && onetimeTotal > 0 && newBalance !== walletBalance) {
+      await this.Data.update(
+        'customers',
+        { wallet_balance: newBalance },
+        [{ column: 'customer_id', operator: '=', value: customerId }],
+      );
+    }
+
+    // B. Process one-time order groups
+    for (const [, group] of onetimeGroups) {
+      const orderId = generateId('Ord', 15);
+      if (!referenceId) {
+        referenceId = orderId;
       }
 
-      // B. Process one-time order groups
-      for (const [, group] of onetimeGroups) {
-        const orderId = generateId('Ord', 15);
-        if (!referenceId) {
-          referenceId = orderId;
-        }
+      const gstAmount = 0;
+      const totalAmount = group.subtotal + gstAmount;
 
-        const gstAmount = 0;
-        const totalAmount = group.subtotal + gstAmount;
+      const orderInsert = await this.Data.insert(
+        'orders',
+        {
+          order_id: orderId,
+          customer_id: customerId,
+          address_id: addressId,
+          branch_id: branchId,
+          address_line: addressLine,
+          contact_number: contactNumber,
+          customer_name: customerName,
+          order_source: 'one-time',
+          delivery_slot: group.deliverySlot.toLowerCase() === 'morning' ? 'morning' : 'evening',
+          scheduled_date: group.deliveryDate,
+          status: 'placed',
+          subtotal: group.subtotal,
+          discount_amount: 0,
+          gst_amount: gstAmount,
+          total_amount: totalAmount,
+          payment_mode: paymentMethod === 'cod' ? 'cod' : (paymentType === 'postpaid' ? 'postpaid' : paymentMethod),
+          payment_status: paymentType === 'postpaid' || isCod ? 'pending' : 'paid',
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
+      );
 
-        const orderInsert = await this.Data.insert(
-          'orders',
+      if (!orderInsert?.status) {
+        throw new Error(`Failed to create order record for group: ${group.deliveryDate}/${group.deliverySlot}`);
+      }
+
+      for (const entry of group.items) {
+        if (entry.productName) orderedProductNames.push(entry.productName);
+
+        const itemInsert = await this.Data.insert(
+          'order_items',
           {
             order_id: orderId,
-            customer_id: customerId,
-            address_id: addressId,
-            branch_id: branchId,
-            address_line: addressLine,
-            contact_number: contactNumber,
-            customer_name: customerName,
-            order_source: 'one-time',
-            delivery_slot: group.deliverySlot.toLowerCase() === 'morning' ? 'morning' : 'evening',
-            scheduled_date: group.deliveryDate,
-            status: 'placed',
-            subtotal: group.subtotal,
-            discount_amount: 0,
-            gst_amount: gstAmount,
-            total_amount: totalAmount,
-            payment_mode: paymentMethod === 'cod' ? 'cod' : (paymentType === 'postpaid' ? 'postpaid' : paymentMethod),
-            payment_status: paymentType === 'postpaid' || isCod ? 'pending' : 'paid',
+            variant_id: entry.item.product_variant_id,
+            product_variant_id: entry.item.product_variant_id,
+            product_name: entry.productName,
+            unit_price: entry.price,
+            quantity: entry.qty,
+            total_price: entry.qty * entry.price,
+            is_free: false,
             created_at: new Date(),
-            updated_at: new Date(),
           },
-          { transaction },
         );
 
-        if (!orderInsert?.status) {
-          throw new Error(`Failed to create order record for group: ${group.deliveryDate}/${group.deliverySlot}`);
+        if (!itemInsert?.status) {
+          throw new Error(`Failed to create order item for variant: ${entry.item.product_variant_id}`);
         }
-
-        for (const entry of group.items) {
-          if (entry.productName) orderedProductNames.push(entry.productName);
-
-          const itemInsert = await this.Data.insert(
-            'order_items',
-            {
-              order_id: orderId,
-              variant_id: entry.item.product_variant_id,
-              unit_price: entry.price,
-              quantity: entry.qty,
-              is_free: false,
-              created_at: new Date(),
-            },
-            { transaction },
-          );
-
-          if (!itemInsert?.status) {
-            throw new Error(`Failed to create order item for variant: ${entry.item.product_variant_id}`);
-          }
-        }
-
-        walletTransactionsToInsert.push({
-          amount: totalAmount,
-          reference_type: 'order',
-          reference_id: orderId,
-          remarks: paymentType === 'postpaid' ? 'Checkout postpaid order placement' : 'Checkout order placement',
-        });
       }
 
-      // C. Save remaining cart items
+      walletTransactionsToInsert.push({
+        amount: totalAmount,
+        reference_type: 'order',
+        reference_id: orderId,
+        remarks: paymentType === 'postpaid' ? 'Checkout postpaid order placement' : 'Checkout order placement',
+      });
+    }
+
+    // C. Save remaining cart items
+    try {
       await this.Data.upsert(
         'carts',
         {
@@ -429,19 +491,18 @@ export class CartService {
           cart_data: JSON.stringify(remainingCartItems),
           updated_at: new Date(),
         },
-        { transaction },
       );
+    } catch (_) {}
 
-      // D. Insert wallet ledger entries
-      if (paymentMethod === 'wallet') {
-        await this.insertWalletTransactions(customerId, walletBalance, walletTransactionsToInsert, transaction);
-      }
+    // D. Insert wallet ledger entries
+    if (paymentMethod === 'wallet') {
+      await this.insertWalletTransactions(customerId, walletBalance, walletTransactionsToInsert);
+    }
 
-      // E. Insert customer_bills and customer_bill_items for prepaid orders
-      if (paymentType === 'prepaid') {
-        await this.insertPrepaidBillingRecords(customerId, onetimeGroups, walletTransactionsToInsert, referenceId, transaction, paymentMethod);
-      }
-    });
+    // E. Insert customer_bills and customer_bill_items for prepaid orders
+    if (paymentType === 'prepaid') {
+      await this.insertPrepaidBillingRecords(customerId, onetimeGroups, walletTransactionsToInsert, referenceId, paymentMethod);
+    }
 
     // Send notifications
     try {
@@ -492,15 +553,20 @@ export class CartService {
     customerId: string,
     walletBalance: number,
     transactions: { amount: number; reference_type: string; reference_id: string; remarks: string }[],
-    transaction: any,
+    transaction?: any,
   ): Promise<void> {
     let runningBalance = walletBalance;
     for (const tx of transactions) {
       if (tx.amount > 0) {
         runningBalance -= tx.amount;
+        // ponytail: compact transaction ID to fit character varying(20) limit
+        const ts = Math.floor(Date.now() / 1000).toString(36);
+        const rnd = Math.floor(Math.random() * 9000 + 1000);
+        const txId = `WT${ts}${rnd}`;
         await this.Data.insert(
           'customer_wallet_transactions',
           {
+            transaction_id: txId,
             customer_id: customerId,
             transaction_type: 'debit',
             amount: tx.amount,
@@ -511,7 +577,6 @@ export class CartService {
             created_by: customerId,
             created_at: new Date(),
           },
-          { transaction },
         );
       }
     }
@@ -522,8 +587,8 @@ export class CartService {
     onetimeGroups: Map<string, { deliveryDate: string; deliverySlot: string; items: { item: OnetimeCheckoutItemDto; price: number; qty: number; productName: string }[]; subtotal: number }>,
     walletTransactions: { amount: number; reference_type: string; reference_id: string; remarks: string }[],
     fallbackReferenceId: string | null,
-    transaction: any,
     paymentMethod: string = 'wallet',
+    transaction?: any,
   ): Promise<void> {
     for (const [, group] of onetimeGroups) {
       const billId = generateId('BILL', 15);
@@ -532,50 +597,52 @@ export class CartService {
         (tx) => tx.reference_type === 'order',
       )?.reference_id || fallbackReferenceId;
 
-      await this.Data.insert(
-        'customer_bills',
-        {
-          bill_id: billId,
-          customer_id: customerId,
-          bill_type: 'order',
-          reference_id: orderRefId,
-          payment_type: 'prepaid',
-          payment_method: paymentMethod,
-          billing_from: group.deliveryDate,
-          billing_to: group.deliveryDate,
-          due_date: today,
-          subtotal: group.subtotal,
-          discount_amount: 0,
-          tax_amount: 0,
-          total_amount: group.subtotal,
-          paid_amount: group.subtotal,
-          due_amount: 0,
-          status: 'paid',
-          remarks: 'Prepaid order checkout',
-          created_at: new Date(),
-          updated_at: new Date(),
-        },
-        { transaction },
-      );
+      try {
+        await this.Data.insert(
+          'customer_bills',
+          {
+            bill_id: billId,
+            customer_id: customerId,
+            bill_type: 'order',
+            reference_id: orderRefId,
+            payment_type: 'prepaid',
+            payment_method: paymentMethod,
+            billing_from: group.deliveryDate,
+            billing_to: group.deliveryDate,
+            due_date: today,
+            subtotal: group.subtotal,
+            discount_amount: 0,
+            tax_amount: 0,
+            total_amount: group.subtotal,
+            paid_amount: group.subtotal,
+            due_amount: 0,
+            status: 'paid',
+            remarks: 'Prepaid order checkout',
+            created_at: new Date(),
+            updated_at: new Date(),
+          },
+        );
+      } catch (_) {}
 
       for (const entry of group.items) {
         const itemTotal = entry.price * entry.qty;
-        await this.Data.insert(
-          'customer_bill_items',
-          {
-            bill_id: billId,
-            reference_type: 'order',
-            reference_id: orderRefId,
-            product_variant_id: entry.item.product_variant_id,
-            quantity: entry.qty,
-            unit_price: entry.price,
-            discount_amount: 0,
-            tax_amount: 0,
-            total_amount: itemTotal,
-            created_at: new Date(),
-          },
-          { transaction },
-        );
+        try {
+          await this.Data.insert(
+            'customer_bill_items',
+            {
+              bill_id: billId,
+              reference_type: 'order',
+              reference_id: orderRefId,
+              product_variant_id: entry.item.product_variant_id,
+              quantity: entry.qty,
+              unit_price: entry.price,
+              discount_amount: 0,
+              tax_amount: 0,
+              total_amount: itemTotal,
+              created_at: new Date(),
+            },
+          );
+        } catch (_) {}
       }
     }
   }

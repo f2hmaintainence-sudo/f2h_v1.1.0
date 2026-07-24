@@ -69,6 +69,8 @@ export const AVOID_DELETED_AT = [
   'stock_balances',
   'product_images',
   'categories',
+  'packaging_types',
+  'product_images',
 ];
 export const AVOID_DATACHANGE_TABLES = [
   'notifications',

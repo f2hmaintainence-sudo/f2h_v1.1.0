@@ -62,12 +62,14 @@ class AuthRepositoryImpl implements AuthRepository {
     String password, {
     required String phone,
     required String verificationToken,
+    String? referralCode,
     String? fcmToken,
   }) async {
     final userModel = await remoteDataSource.register(
       userName, email, password,
       phone: phone,
       verificationToken: verificationToken,
+      referralCode: referralCode,
       fcmToken: fcmToken,
     );
     final access  = userModel.token;

@@ -71,6 +71,7 @@ class ApiEndpoints {
   static const String packageTransactions        = '$_customer/package/transactions';
   static const String customerPakagesTransactions = packageTransactions;
   static const String categories                 = '$_customer/categories';
+  static const String banners                    = '$_customer/banners';
   static const String customerCategory           = '$_customer/category';
   static const String products                   = '$_customer/products';
   static const String orders                     = '$_customer/orders';
@@ -90,6 +91,12 @@ class ApiEndpoints {
   static const String cartItems                  = '$_customer/cart-items';
   static const String cartData                   = cartItems;
   static const String checkout                   = '$_customer/checkout/payment';
+
+  // Referrals  →  /api/v1/customer/referrals/…
+  static const String customerReferrals          = '$_customer/referrals/dashboard';
+  static const String validateReferralCode       = '$_customer/referrals/validate';
+  static const String referralHistory            = '$_customer/referrals/history';
+  static const String referralDetails            = '$_customer/referrals/details';
 
   // ---------------------------------------------------------------------------
   // App version & device  →  /api/v1/device/…

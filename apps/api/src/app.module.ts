@@ -1,5 +1,5 @@
 
-import { CustomThrottlerGuard } from 'src/throttler/custom-throttler.guard'
+import { CustomThrottlerGuard } from './throttler/custom-throttler.guard';
 import { ThrottlerGuard } from '@nestjs/throttler'
 import { APP_GUARD } from '@nestjs/core';
 import { UserHelperModule } from './helpers/UserHelper.module'
@@ -58,6 +58,8 @@ import { DeliveryPartnerProfileModule } from './panels/delivery-partner/profile/
 import { SupportTicketsModule } from './support-tickets/support-tickets.module';
 import { CustomerBillingModule } from './panels/admin/customers-orders/customer-billing/customer-billing.module';
 import { ApiIntegrationsModule } from './developer/api-integrations/api-integrations.module';
+import { ReferralModule } from './panels/customer/referral/referral.module';
+import { AdminReferralModule } from './panels/admin/referrals/admin-referral.module';
 import { CustomerAppAssetsModule } from './panels/customer/app_assets/app_assets.module';
 @Module({
   imports: [
@@ -124,6 +126,8 @@ import { CustomerAppAssetsModule } from './panels/customer/app_assets/app_assets
     ProfileManagementModule,
     DeliveryPartnerProfileModule,
     SupportTicketsModule,
+    ReferralModule,
+    AdminReferralModule,
     ThrottlerModule.forRoot([
       {
         name: 'short',

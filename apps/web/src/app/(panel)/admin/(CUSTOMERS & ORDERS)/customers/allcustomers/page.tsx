@@ -36,10 +36,16 @@ export default function AllCustomersPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(12);
 
+  const [branches, setBranches] = useState<any[]>([]);
+  const [selectedBranch, setSelectedBranch] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [selectedWallet, setSelectedWallet] = useState('');
+  const [selectedDue, setSelectedDue] = useState('');
+
   useEffect(() => {
     fetchCustomers();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, page, limit]);
+  }, [activeTab, page, limit, selectedBranch, selectedStatus, selectedWallet, selectedDue]);
 
   const fetchCustomers = async () => {
     setLoading(true);
@@ -49,12 +55,24 @@ export default function AllCustomersPage() {
       if (activeTab === 'Postpaid') type = 'postpaid';
       if (activeTab === 'One-Time Only') type = 'non_subscriber';
 
-      const res = await api.get(`/admin/customer/intelligence-list?type=${type}&page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`);
+      const queryParams = new URLSearchParams({
+        type,
+        page: String(page),
+        limit: String(limit),
+        search,
+        branchId: selectedBranch,
+        status: selectedStatus,
+        wallet: selectedWallet,
+        due: selectedDue,
+      });
+
+      const res = await api.get(`/admin/customer/intelligence-list?${queryParams.toString()}`);
       
       if (res.data) {
         const payload = res.data as any;
         setData(payload.data || []);
         setSummary(payload.summary || {});
+        if (payload.branches) setBranches(payload.branches);
       }
     } catch (error) {
       console.error('Failed to fetch customers:', error);
@@ -86,13 +104,13 @@ export default function AllCustomersPage() {
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <StatCard title="TOTAL CUSTOMERS" value={summary.total_customers || '0'} icon={<Users size={20} className="text-emerald-500" />} bg="bg-emerald-50" />
-        <StatCard title="SUBSCRIBERS" value={summary.active_subscribers || '0'} icon={<Repeat size={20} className="text-teal-500" />} bg="bg-teal-50" />
-        <StatCard title="POSTPAID ACCOUNTS" value={summary.postpaid_accounts || '0'} icon={<CreditCard size={20} className="text-blue-500" />} bg="bg-blue-50" />
-        <StatCard title="TOTAL SALES" value={`₹${Number(summary.total_revenue || 0).toLocaleString()}`} icon={<TrendingUp size={20} className="text-emerald-600" />} bg="bg-emerald-50" />
-        <StatCard title="TOTAL DUE" value={`₹${Number(summary.total_due || 0).toLocaleString()}`} icon={<AlertTriangle size={20} className="text-red-500" />} bg="bg-red-50" />
-        <StatCard title="BLOCKED" value={summary.blocked_accounts || '0'} icon={<ShieldAlert size={20} className="text-amber-500" />} bg="bg-amber-50" />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <StatCard title="TOTAL CUSTOMERS" value={summary.total_customers || '0'} icon={<Users size={16} className="text-emerald-500" />} bg="bg-emerald-50" />
+        <StatCard title="SUBSCRIBERS" value={summary.active_subscribers || '0'} icon={<Repeat size={16} className="text-teal-500" />} bg="bg-teal-50" />
+        <StatCard title="POSTPAID ACCOUNTS" value={summary.postpaid_accounts || '0'} icon={<CreditCard size={16} className="text-blue-500" />} bg="bg-blue-50" />
+        <StatCard title="TOTAL SALES" value={`₹${Number(summary.total_revenue || 0).toLocaleString()}`} icon={<TrendingUp size={16} className="text-emerald-600" />} bg="bg-emerald-50" />
+        <StatCard title="TOTAL DUE" value={`₹${Number(summary.total_due || 0).toLocaleString()}`} icon={<AlertTriangle size={16} className="text-red-500" />} bg="bg-red-50" />
+        <StatCard title="BLOCKED" value={summary.blocked_accounts || '0'} icon={<ShieldAlert size={16} className="text-amber-500" />} bg="bg-amber-50" />
       </div>
 
       {/* Filters Toolbar */}
@@ -143,23 +161,82 @@ export default function AllCustomersPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 pt-2">
-          <FilterDropdown label="All Branches" />
-          <FilterDropdown label="All Account Statuses" />
-          <FilterDropdown label="All Wallet Balances" />
-          <FilterDropdown label="All Postpaid Dues" />
+          {/* Branch Filter Dropdown */}
+          <div className="relative">
+            <select
+              value={selectedBranch}
+              onChange={(e) => { setSelectedBranch(e.target.value); setPage(1); }}
+              className="appearance-none bg-white border border-gray-200 rounded-xl px-4 py-2 pr-8 text-sm font-medium text-fresh-green hover:bg-gray-50 focus:outline-none cursor-pointer"
+            >
+              <option value="">All Branches</option>
+              {branches.map((b: any) => (
+                <option key={b.branch_id} value={b.branch_id}>
+                  {b.branch_name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+
+          {/* Account Status Filter Dropdown */}
+          <div className="relative">
+            <select
+              value={selectedStatus}
+              onChange={(e) => { setSelectedStatus(e.target.value); setPage(1); }}
+              className="appearance-none bg-white border border-gray-200 rounded-xl px-4 py-2 pr-8 text-sm font-medium text-fresh-green hover:bg-gray-50 focus:outline-none cursor-pointer"
+            >
+              <option value="">All Account Statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="blocked">Blocked</option>
+              <option value="dormant">Dormant</option>
+            </select>
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+
+          {/* Wallet Balance Filter Dropdown */}
+          <div className="relative">
+            <select
+              value={selectedWallet}
+              onChange={(e) => { setSelectedWallet(e.target.value); setPage(1); }}
+              className="appearance-none bg-white border border-gray-200 rounded-xl px-4 py-2 pr-8 text-sm font-medium text-fresh-green hover:bg-gray-50 focus:outline-none cursor-pointer"
+            >
+              <option value="">All Wallet Balances</option>
+              <option value="positive">Positive Balance (&gt; ₹0)</option>
+              <option value="zero">Zero Balance (₹0)</option>
+              <option value="negative">Negative Balance (&lt; ₹0)</option>
+            </select>
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+
+          {/* Postpaid Dues Filter Dropdown */}
+          <div className="relative">
+            <select
+              value={selectedDue}
+              onChange={(e) => { setSelectedDue(e.target.value); setPage(1); }}
+              className="appearance-none bg-white border border-gray-200 rounded-xl px-4 py-2 pr-8 text-sm font-medium text-fresh-green hover:bg-gray-50 focus:outline-none cursor-pointer"
+            >
+              <option value="">All Postpaid Dues</option>
+              <option value="has_due">Has Outstanding Due</option>
+              <option value="no_due">No Outstanding Due</option>
+            </select>
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
           
           <div className="ml-auto flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-500">Sort by:</span>
-              <button className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg text-sm font-medium text-gray-700">
-                Newest Registration <ChevronDown size={14} />
-              </button>
-              <button className="p-1.5 bg-gray-50 rounded-lg text-gray-500 hover:bg-gray-100">
-                <ArrowDownUp size={16} />
-              </button>
+            <div className="relative">
+              <select
+                value={limit}
+                onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                className="appearance-none bg-white border border-gray-200 rounded-xl px-4 py-2 pr-8 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none cursor-pointer"
+              >
+                <option value={12}>12 / page</option>
+                <option value={24}>24 / page</option>
+                <option value={48}>48 / page</option>
+                <option value={100}>100 / page</option>
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             </div>
-            
-            <FilterDropdown label="12 / page" onChange={(val) => { setLimit(Number(val)); setPage(1); }} />
           </div>
         </div>
       </div>
@@ -235,13 +312,13 @@ export default function AllCustomersPage() {
 
 function StatCard({ title, value, icon, bg }: { title: string, value: string | number, icon: React.ReactNode, bg: string }) {
   return (
-    <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
-      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${bg}`}>
+    <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex items-center gap-3 overflow-hidden">
+      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${bg}`}>
         {icon}
       </div>
-      <div>
-        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{title}</p>
-        <p className="text-xl font-black text-gray-900">{value}</p>
+      <div className="overflow-hidden min-w-0">
+        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider truncate">{title}</p>
+        <p className="text-lg font-black text-gray-900 truncate">{value}</p>
       </div>
     </div>
   );

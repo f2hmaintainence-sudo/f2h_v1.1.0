@@ -1,0 +1,254 @@
+import { Injectable } from '@nestjs/common';
+import { DataService } from 'src/shared/database/Data.service';
+import { DatabaseService } from 'src/shared/database/Database.service';
+import { IReferralRepository } from '../interfaces/referral.repository.interface';
+import { generateId } from 'src/helpers/RandomHelper';
+
+@Injectable()
+export class ReferralRepository implements IReferralRepository {
+  constructor(
+    private readonly dataService: DataService,
+    private readonly db: DatabaseService,
+  ) {}
+
+  async findByReferrerId(referrerId: string): Promise<any[]> {
+    const query = `
+      SELECT 
+        r.id,
+        r.refer_id,
+        r.referrer_customer_id,
+        r.referred_customer_id,
+        r.referrer_id,
+        r.referral_code,
+        r.status,
+        r.remarks,
+        r.created_at,
+        r.updated_at,
+        r.rewarded_at,
+        CASE 
+          WHEN r.referrer_customer_id = $1 OR r.referrer_id = $1 THEN COALESCE(r.referrer_reward_amount, r.reward_amount, 50.00)
+          ELSE COALESCE(r.referred_reward_amount, r.reward_amount, 50.00)
+        END as reward_amount,
+        CASE 
+          WHEN r.referrer_customer_id = $1 OR r.referrer_id = $1 THEN COALESCE(c2.first_name, r.referee_name, 'Friend')
+          ELSE COALESCE(c1.first_name, 'Inviter')
+        END as referee_name,
+        CASE 
+          WHEN r.referrer_customer_id = $1 OR r.referrer_id = $1 THEN COALESCE(c2.phone, r.referee_phone, '')
+          ELSE COALESCE(c1.phone, '')
+        END as referee_phone
+      FROM referrals r
+      LEFT JOIN customers c1 ON r.referrer_customer_id = c1.customer_id OR r.referrer_id = c1.customer_id
+      LEFT JOIN customers c2 ON r.referred_customer_id = c2.customer_id
+      WHERE r.referrer_customer_id = $1 OR r.referred_customer_id = $1 OR r.referrer_id = $1
+      ORDER BY r.created_at DESC
+    `;
+
+    try {
+      const res = await this.db.query(query, [referrerId]);
+      return res || [];
+    } catch (_) {
+      const res = await this.dataService.query('referrals', {
+        where: [{ column: 'referrer_customer_id', operator: '=', value: referrerId }],
+        orderBy: [{ column: 'created_at', direction: 'DESC' }],
+      });
+      return res?.data || [];
+    }
+  }
+
+  async findByReferralCode(code: string): Promise<any | null> {
+    if (!code || !code.trim()) return null;
+
+    const raw = code.trim().toUpperCase();
+    const noHyphen = raw.replace(/-/g, '');
+    const withHyphen = noHyphen.startsWith('F2H') && noHyphen.length > 3 ? 'F2H-' + noHyphen.substring(3) : raw;
+
+    const variations = Array.from(new Set([raw, noHyphen, withHyphen]));
+
+    // 1. Search customers table by referral_code variations
+    for (const varCode of variations) {
+      const custRes = await this.dataService.query('customers', {
+        where: [{ column: 'referral_code', operator: '=', value: varCode }],
+        limit: 1,
+      });
+      if (custRes?.data?.length > 0) {
+        return custRes.data[0];
+      }
+    }
+
+    // 2. Search users table by referral_code variations
+    for (const varCode of variations) {
+      const userRes = await this.dataService.query('users', {
+        where: [{ column: 'referral_code', operator: '=', value: varCode }],
+        limit: 1,
+      });
+      if (userRes?.data?.length > 0) {
+        return userRes.data[0];
+      }
+    }
+
+    // 3. Fallback for old phone-suffix referral codes e.g. F2H-0305, F2H0305, REF0305, 0305
+    const digitsOnly = raw.replace(/\D/g, '');
+    if (digitsOnly.length >= 4) {
+      const last4 = digitsOnly.slice(-4);
+      const phoneMatch = await this.dataService.query('customers', {
+        where: [{ column: 'phone', operator: 'LIKE', value: `%${last4}` }],
+        limit: 1,
+      });
+      let matchedCust = phoneMatch?.data?.[0];
+
+      if (!matchedCust) {
+        const mobileMatch = await this.dataService.query('customers', {
+          where: [{ column: 'mobile', operator: 'LIKE', value: `%${last4}` }],
+          limit: 1,
+        });
+        matchedCust = mobileMatch?.data?.[0];
+      }
+
+      if (matchedCust) {
+        await this.dataService.update(
+          'customers',
+          { referral_code: raw, updated_at: new Date() },
+          [{ column: 'customer_id', operator: '=', value: matchedCust.customer_id }]
+        );
+        matchedCust.referral_code = raw;
+        return matchedCust;
+      }
+    }
+
+    return null;
+  }
+
+  async findByRefereePhone(phone: string): Promise<any | null> {
+    const res = await this.dataService.query('referrals', {
+      where: [{ column: 'referred_customer_id', operator: '=', value: phone }],
+      limit: 1,
+    });
+    return res?.data?.[0] || null;
+  }
+
+  async createReferral(data: any): Promise<any> {
+    const referId = data.refer_id || generateId('REF', 8);
+    const payload = {
+      refer_id: referId,
+      referrer_customer_id: data.referrer_customer_id || data.referrer_id,
+      referred_customer_id: data.referred_customer_id || data.referee_id,
+      referral_code: data.referral_code,
+      referrer_reward_amount: data.referrer_reward_amount || 50.00,
+      referred_reward_amount: data.referred_reward_amount || 50.00,
+      status: data.status || 'pending',
+      remarks: data.remarks || 'Referral signup pending first delivered order',
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+
+    const res = await this.dataService.insert('referrals', payload);
+    return res?.status ? { ...payload, id: res.insertId || referId } : null;
+  }
+
+  async getTotalEarnings(referrerId: string): Promise<number> {
+    const list = await this.findByReferrerId(referrerId);
+    const rewarded = list.filter((r) => {
+      const st = (r.status || '').toLowerCase();
+      return st === 'rewarded' || st === 'completed' || st === 'active' || st === 'success' || st === 'credited';
+    });
+
+    let total = rewarded.reduce((sum, r) => sum + Number(r.reward_amount || r.referrer_reward_amount || 50.00), 0);
+
+    try {
+      const walletQuery = `
+        SELECT COALESCE(SUM(amount), 0) as total
+        FROM customer_wallet_transactions
+        WHERE customer_id = $1
+          AND transaction_type = 'credit'
+          AND (
+            LOWER(COALESCE(reference_type, '')) LIKE '%referral%'
+            OR LOWER(COALESCE(remarks, '')) LIKE '%referral%'
+          )
+      `;
+      const res = await this.db.query(walletQuery, [referrerId]);
+      const walletSum = parseFloat(res?.[0]?.total || '0');
+      if (walletSum > total) {
+        total = walletSum;
+      }
+    } catch (_) {}
+
+    return total;
+  }
+
+  async getCustomerByCustomerId(customerId: string): Promise<any | null> {
+    try {
+      const query = `
+        SELECT * FROM customers 
+        WHERE customer_id = $1 OR email = $1 OR phone = $1
+        LIMIT 1
+      `;
+      const rows = await this.db.query(query, [customerId]);
+      return rows?.[0] || null;
+    } catch (_) {
+      const res = await this.dataService.query('customers', {
+        where: [{ column: 'customer_id', operator: '=', value: customerId }],
+        limit: 1,
+      });
+      return res?.data?.[0] || null;
+    }
+  }
+
+  async ensureCustomerReferralCode(customerId: string): Promise<{ referral_code: string; referral_status: string; customer_id: string }> {
+    const cust = await this.getCustomerByCustomerId(customerId);
+    if (!cust) {
+      return {
+        referral_code: `F2H-${customerId.slice(-4).toUpperCase()}`,
+        referral_status: 'locked',
+        customer_id: customerId,
+      };
+    }
+
+    // Check if customer has any order placed/delivered in database
+    const orderCheck = await this.dataService.query('orders', {
+      select: ['order_id'],
+      where: [{ column: 'customer_id', operator: '=', value: customerId }],
+      limit: 1,
+    });
+
+    const hasOrder = (orderCheck?.data?.length || 0) > 0;
+    const isUnlocked = cust.first_order_completed || hasOrder || cust.referral_status === 'active';
+    const computedStatus = isUnlocked ? 'active' : 'locked';
+
+    if (isUnlocked && (cust.referral_status !== 'active' || !cust.first_order_completed)) {
+      try {
+        await this.dataService.update(
+          'customers',
+          { referral_status: 'active', first_order_completed: true, updated_at: new Date() },
+          [{ column: 'customer_id', operator: '=', value: cust.customer_id }]
+        );
+      } catch (_) {}
+    }
+
+    if (cust.referral_code && cust.referral_code.trim().length > 0) {
+      return {
+        referral_code: cust.referral_code,
+        referral_status: computedStatus,
+        customer_id: cust.customer_id,
+      };
+    }
+
+    const cleanName = (cust.first_name || 'USER').replace(/[^a-zA-Z]/g, '').toUpperCase();
+    const prefix = cleanName.length >= 3 ? cleanName.slice(0, 3) : 'USR';
+    const cleanPhone = (cust.phone || cust.mobile || '').replace(/\D/g, '');
+    const phoneSuffix = cleanPhone.length >= 3 ? cleanPhone.slice(-3) : Math.floor(100 + Math.random() * 900).toString();
+    const code = `F2H${prefix}${phoneSuffix}`;
+
+    await this.dataService.update(
+      'customers',
+      { referral_code: code, referral_status: computedStatus, first_order_completed: isUnlocked, updated_at: new Date() },
+      [{ column: 'customer_id', operator: '=', value: cust.customer_id }]
+    );
+
+    return {
+      referral_code: code,
+      referral_status: computedStatus,
+      customer_id: cust.customer_id,
+    };
+  }
+}

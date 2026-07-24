@@ -16,18 +16,8 @@ class CheckoutRequestModel extends CheckoutRequestEntity {
     final listItems = <Map<String, dynamic>>[];
 
     for (final item in items) {
-      if (item.purchaseType == 'onetime') {
-        listItems.add({
-          'product_id': item.productId,
-          'product_variant_id': item.variantId,
-          'purchase_type': 'onetime',
-          'onetime_details': {
-            'quantity': item.quantity ?? 1,
-            'delivery_date': item.deliveryDate ?? DateTime.now().add(const Duration(days: 1)).toString().split(' ')[0],
-            'delivery_slot': item.deliverySlot ?? 'Morning',
-          },
-        });
-      } else if (item.purchaseType == 'subscription') {
+      final pType = (item.purchaseType ?? 'onetime').toLowerCase().replaceAll('-', '').replaceAll('_', '');
+      if (pType == 'subscription') {
         listItems.add({
           'product_id': item.productId,
           'product_variant_id': item.variantId,
@@ -43,6 +33,17 @@ class CheckoutRequestModel extends CheckoutRequestEntity {
               if (subscriptionEndDate != null) 'end_date': subscriptionEndDate,
               if (subscriptionAutoRenew != null) 'auto_renew': subscriptionAutoRenew,
             }
+        });
+      } else {
+        listItems.add({
+          'product_id': item.productId,
+          'product_variant_id': item.variantId,
+          'purchase_type': 'onetime',
+          'onetime_details': {
+            'quantity': item.quantity ?? 1,
+            'delivery_date': item.deliveryDate ?? DateTime.now().add(const Duration(days: 1)).toString().split(' ')[0],
+            'delivery_slot': item.deliverySlot ?? 'Morning',
+          },
         });
       }
     }

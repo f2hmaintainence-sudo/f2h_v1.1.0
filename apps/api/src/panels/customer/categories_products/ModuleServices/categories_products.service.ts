@@ -142,23 +142,68 @@ export class CategoriesProductsService {
 
     let ratingsMap = new Map<string, any>();
     try {
-      const ratingRows = await this.db.query(
-        `SELECT 
-           reference_id AS product_id,
-           COALESCE(AVG(rating), 0) AS avg_rating,
-           COUNT(*) AS review_count
-         FROM customer_feedback
-         WHERE reference_type = 'product' AND rating IS NOT NULL
-         GROUP BY reference_id`
-      );
-      ratingsMap = new Map<string, any>(
-        (ratingRows || []).map((r: any) => [r.product_id, {
-          rating: parseFloat(r.avg_rating),
-          reviews: parseInt(r.review_count, 10),
-        }])
-      );
+      const query = `
+        SELECT 
+          pv.variant_id,
+          pv.product_id,
+          pv.name AS variant_name,
+          pv.price,
+          pv.unit_value,
+          pv.unit_type,
+          p.name AS product_name,
+          p.slug,
+          p.description,
+          p.is_subscribable,
+          p.is_one_time,
+          pv.subscription_price,
+          c.name AS category,
+          pv.image_url AS variant_image,
+          p.image_url AS product_image,
+          pi.url AS gallery_image
+        FROM product_variants pv
+        LEFT JOIN products p ON pv.product_id = p.product_id
+        LEFT JOIN categories c ON p.category_id = c.category_id
+        LEFT JOIN product_images pi ON pv.variant_id = pi.product_id OR p.product_id = pi.product_id
+        WHERE (pv.status = 'active' OR pv.status IS NULL) AND (p.is_active = true OR p.is_active IS NULL)
+      `;
+      const rows = await this.db.query(query);
+
+      const baseUrl = process.env.BACKEND_URL || 'http://localhost:8000';
+
+      let ratingsMap = new Map<string, any>();
+      try {
+        const ratingRows = await this.db.query(
+          `SELECT 
+             reference_id AS product_id,
+             COALESCE(AVG(rating), 0) AS avg_rating,
+             COUNT(*) AS review_count
+           FROM customer_feedback
+           WHERE reference_type = 'product' AND rating IS NOT NULL
+           GROUP BY reference_id`
+        );
+        ratingsMap = new Map<string, any>(
+          (ratingRows || []).map((r: any) => [r.product_id, {
+            rating: parseFloat(r.avg_rating),
+            reviews: parseInt(r.review_count, 10),
+          }])
+        );
+      } catch (e) {}
+
+      const mappedData = (rows || []).map((item: any) => {
+        const ratingInfo = ratingsMap.get(item.product_id) ?? { rating: 0.0, reviews: 0 };
+        const rawImage = item.variant_image || item.product_image || item.gallery_image;
+        return {
+          ...item,
+          image_path: normalizeImagePath(rawImage, baseUrl),
+          rating: ratingInfo.rating,
+          reviews: ratingInfo.reviews,
+        };
+      });
+
+      return { data: mappedData };
     } catch (e) {
-      console.error('Error fetching product ratings in getProducts:', e);
+      console.error('Error in getProducts service:', e);
+      return { data: [] };
     }
 
     const mappedData = (response.data || []).map((item: any) => {
@@ -273,23 +318,70 @@ export class CategoriesProductsService {
 
     let ratingsMap = new Map<string, any>();
     try {
-      const ratingRows = await this.db.query(
-        `SELECT 
-           reference_id AS product_id,
-           COALESCE(AVG(rating), 0) AS avg_rating,
-           COUNT(*) AS review_count
-         FROM customer_feedback
-         WHERE reference_type = 'product' AND rating IS NOT NULL
-         GROUP BY reference_id`
-      );
-      ratingsMap = new Map<string, any>(
-        (ratingRows || []).map((r: any) => [r.product_id, {
-          rating: parseFloat(r.avg_rating),
-          reviews: parseInt(r.review_count, 10),
-        }])
-      );
+      const query = `
+        SELECT 
+          pv.variant_id,
+          pv.product_id,
+          pv.name AS variant_name,
+          pv.price,
+          pv.unit_value,
+          pv.unit_type,
+          p.name AS product_name,
+          p.slug,
+          p.description,
+          p.is_subscribable,
+          p.is_one_time,
+          pv.subscription_price,
+          c.name AS category,
+          pv.image_url AS variant_image,
+          p.image_url AS product_image,
+          pi.url AS gallery_image
+        FROM product_variants pv
+        LEFT JOIN products p ON pv.product_id = p.product_id
+        LEFT JOIN categories c ON p.category_id = c.category_id
+        LEFT JOIN product_images pi ON pv.variant_id = pi.product_id OR p.product_id = pi.product_id
+        WHERE (pv.status = 'active' OR pv.status IS NULL) 
+          AND (p.is_active = true OR p.is_active IS NULL)
+          AND (p.category_id = $1 OR c.category_id = $1)
+      `;
+      const rows = await this.db.query(query, [categoryId]);
+
+      const baseUrl = process.env.BACKEND_URL || 'http://localhost:8000';
+
+      let ratingsMap = new Map<string, any>();
+      try {
+        const ratingRows = await this.db.query(
+          `SELECT 
+             reference_id AS product_id,
+             COALESCE(AVG(rating), 0) AS avg_rating,
+             COUNT(*) AS review_count
+           FROM customer_feedback
+           WHERE reference_type = 'product' AND rating IS NOT NULL
+           GROUP BY reference_id`
+        );
+        ratingsMap = new Map<string, any>(
+          (ratingRows || []).map((r: any) => [r.product_id, {
+            rating: parseFloat(r.avg_rating),
+            reviews: parseInt(r.review_count, 10),
+          }])
+        );
+      } catch (e) {}
+
+      const mappedData = (rows || []).map((item: any) => {
+        const ratingInfo = ratingsMap.get(item.product_id) ?? { rating: 0.0, reviews: 0 };
+        const rawImage = item.variant_image || item.product_image || item.gallery_image;
+        return {
+          ...item,
+          image_path: normalizeImagePath(rawImage, baseUrl),
+          rating: ratingInfo.rating,
+          reviews: ratingInfo.reviews,
+        };
+      });
+
+      return { data: mappedData };
     } catch (e) {
-      console.error('Error fetching product ratings in getProductsByCategoryId:', e);
+      console.error('Error in getProductsByCategoryId service:', e);
+      return { data: [] };
     }
 
     const mappedData = (response.data || []).map((item: any) => {
@@ -330,7 +422,7 @@ export class CategoriesProductsService {
            cf.rating,
            cf.feedback,
            cf.created_at,
-           c.full_name AS customer_name
+           TRIM(CONCAT(COALESCE(c.first_name, ''), ' ', COALESCE(c.last_name, ''))) AS customer_name
          FROM customer_feedback cf
          LEFT JOIN customers c ON c.customer_id = cf.customer_id
          WHERE cf.reference_id = $1 AND cf.reference_type = 'product'

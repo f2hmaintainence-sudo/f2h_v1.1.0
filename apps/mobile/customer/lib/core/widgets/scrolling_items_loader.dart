@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 class ScrollingItemsLoader extends StatefulWidget {
   final String text;
   const ScrollingItemsLoader({
-    this.text = 'Getting your BIG basket ready',
+    this.text = 'Getting your F2H Fresh ready',
     super.key,
   });
 
@@ -12,7 +12,8 @@ class ScrollingItemsLoader extends StatefulWidget {
   State<ScrollingItemsLoader> createState() => _ScrollingItemsLoaderState();
 }
 
-class _ScrollingItemsLoaderState extends State<ScrollingItemsLoader> with SingleTickerProviderStateMixin {
+class _ScrollingItemsLoaderState extends State<ScrollingItemsLoader>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
   final List<String> _images = [
@@ -27,7 +28,7 @@ class _ScrollingItemsLoaderState extends State<ScrollingItemsLoader> with Single
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 4),
+      duration: const Duration(milliseconds: 2400),
     )..repeat();
   }
 
@@ -39,76 +40,158 @@ class _ScrollingItemsLoaderState extends State<ScrollingItemsLoader> with Single
 
   @override
   Widget build(BuildContext context) {
+    const primaryColor = Color(0xFF16653A);
+    const lightBgColor = Color(0xFFEAF5EE);
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
-          height: 100,
-          width: double.infinity,
+          height: 140,
+          width: 140,
           child: AnimatedBuilder(
             animation: _controller,
             builder: (context, child) {
-              final screenWidth = MediaQuery.of(context).size.width;
+              final val = _controller.value;
+              // Gentle float bounce
+              final bounceY = -10 * math.sin(val * 2 * math.pi);
+              // Pulse ring scale (0.85 to 1.35)
+              final ringScale = 0.85 + 0.5 * (val % 1.0);
+              // Pulse ring opacity (0.6 to 0.0)
+              final ringOpacity = (1.0 - (val % 1.0)).clamp(0.0, 0.6);
+
+              // Image index rotation
+              final activeIndex = (val * _images.length).floor() % _images.length;
+
               return Stack(
+                alignment: Alignment.center,
                 clipBehavior: Clip.none,
-                children: List.generate(8, (index) {
-                  final imgIndex = index % _images.length;
-                  final itemSize = 74.0;
-                  final spacing = 36.0;
-                  final totalItemWidth = itemSize + spacing;
-                  final loopWidth = totalItemWidth * _images.length;
-                  
-                  // Slide from right to left in a line
-                  double x = screenWidth - (_controller.value * loopWidth) + (index * totalItemWidth);
-                  x = (x + loopWidth) % (loopWidth + screenWidth) - totalItemWidth;
-
-                  // Rotate clockwise as they move
-                  final rotationAngle = _controller.value * 4 * math.pi + (index * math.pi / 2);
-
-                  return Positioned(
-                    left: x,
-                    top: 10,
-                    child: Transform.rotate(
-                      angle: rotationAngle,
-                      child: Image.asset(
-                        _images[imgIndex],
-                        height: itemSize,
-                        width: itemSize,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            width: itemSize,
-                            height: itemSize,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFE8F5E9),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.local_shipping_rounded,
-                              color: Color(0xFF0C831F),
-                              size: 28,
-                            ),
-                          );
-                        },
+                children: [
+                  // Outer expanding ripple ring
+                  Transform.scale(
+                    scale: ringScale,
+                    child: Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: primaryColor.withValues(alpha: ringOpacity * 0.2),
+                        border: Border.all(
+                          color: primaryColor.withValues(alpha: ringOpacity),
+                          width: 1.5,
+                        ),
                       ),
                     ),
-                  );
-                }),
+                  ),
+
+                  // Inner soft static ring
+                  Container(
+                    width: 96,
+                    height: 96,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: lightBgColor,
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withValues(alpha: 0.08),
+                          blurRadius: 16,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Floating product image card
+                  Transform.translate(
+                    offset: Offset(0, bounceY),
+                    child: Container(
+                      width: 72,
+                      height: 72,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 400),
+                        transitionBuilder: (child, anim) => ScaleTransition(
+                          scale: anim,
+                          child: FadeTransition(opacity: anim, child: child),
+                        ),
+                        child: Image.asset(
+                          _images[activeIndex],
+                          key: ValueKey<int>(activeIndex),
+                          height: 52,
+                          width: 52,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Icon(
+                              Icons.shopping_bag_outlined,
+                              color: primaryColor,
+                              size: 34,
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               );
             },
           ),
         ),
-        const SizedBox(height: 28),
+
+        const SizedBox(height: 16),
+
+        // Text Indicator
         Text(
           widget.text,
           textAlign: TextAlign.center,
           style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF222222),
-            letterSpacing: -0.2,
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF0F172A),
+            letterSpacing: -0.3,
           ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // 3 Animated Pulsing Green Dots
+        AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(3, (dotIndex) {
+                final delay = dotIndex * 0.25;
+                final dotProgress = (_controller.value + delay) % 1.0;
+                final scale = 0.6 + 0.5 * math.sin(dotProgress * math.pi);
+                final opacity = 0.3 + 0.7 * math.sin(dotProgress * math.pi);
+
+                return Transform.scale(
+                  scale: scale,
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: primaryColor.withValues(alpha: opacity),
+                    ),
+                  ),
+                );
+              }),
+            );
+          },
         ),
       ],
     );
