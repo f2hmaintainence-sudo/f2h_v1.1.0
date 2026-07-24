@@ -13,8 +13,8 @@ module.exports = {
     {
       name: 'frontend-f2hfresh',
       cwd: '/home/f2hfresh/htdocs/f2hfresh.com/apps/web',
-      script: 'node_modules/next/dist/bin/next',
-      args: 'start -H 0.0.0.0 -p 5002',
+      script: 'npm',
+      args: 'start -- -H 0.0.0.0 -p 5002',
       env: {
         NODE_ENV: 'production',
         PORT: 5002,
