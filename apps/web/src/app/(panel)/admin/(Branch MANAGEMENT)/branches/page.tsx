@@ -1,3 +1,4 @@
+// Trigger build: 2026-07-23
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -6,6 +7,7 @@ import {
   MapPin, Plus, Search, Building2, Building, Loader2, ChevronRight,
   AlertTriangle, Users, Hexagon, Pencil, Eye, X, Check, RefreshCw, ArrowLeft, Info, Activity, Globe
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { api } from '@/services/api.client';
 import { showSuccessToast } from '@/services/toast.service';
 
@@ -49,6 +51,7 @@ type FormState = {
 };
 
 export default function BranchesPage() {
+  const router = useRouter();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -69,11 +72,18 @@ export default function BranchesPage() {
   const [detailStep, setDetailStep] = useState(1);
   const [formModalOpen, setFormModalOpen] = useState(false);
 
-  // Hex data for detail view
+  // Hex data & Partner Allocation for detail view
   const [hexes, setHexes] = useState<{ hex_id: string; sector_index: number }[]>([]);
   const [hexMessage, setHexMessage] = useState('');
   const [sectors, setSectors] = useState<any[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
+
+  // Partner Allocation & Analytics State
+  const [branchPartners, setBranchPartners] = useState<any[]>([]);
+  const [unassignedPartners, setUnassignedPartners] = useState<any[]>([]);
+  const [selectedPartnerToAssign, setSelectedPartnerToAssign] = useState('');
+  const [allocating, setAllocating] = useState(false);
+
   const normalizeHexShape = (value: unknown): BranchHexShape => {
     return value === 'circle' || value === 'square' || value === 'hexagon' ? value : 'hexagon';
   };
@@ -113,11 +123,14 @@ export default function BranchesPage() {
     setHexes([]);
     setHexMessage('');
     setSectors([]);
+    setBranchPartners([]);
+    setUnassignedPartners([]);
     try {
-      const [fullRes, hexRes, sectorRes] = await Promise.all([
+      const [fullRes, hexRes, sectorRes, partnersRes] = await Promise.all([
         api.get<any>(`/admin/branch/${branch.branch_id}/detail`),
         api.get<any>(`/admin/branch/hexes/${branch.branch_id}`),
         api.get<any>(`/admin/zone/sectors/${branch.branch_id}`),
+        api.get<any>(`/admin/delivery/partners?limit=200`),
       ]);
       if (fullRes.data?.status && fullRes.data?.data) setSelectedBranch({ ...fullRes.data.data, hex_shape: normalizeHexShape(fullRes.data.data.hex_shape) });
       if (hexRes.data?.status) {
@@ -125,9 +138,40 @@ export default function BranchesPage() {
         setHexMessage(hexRes.data.message || '');
       }
       if (sectorRes.data?.status) setSectors(sectorRes.data.data || []);
+
+      if (partnersRes.data?.data) {
+        const all = partnersRes.data.data || [];
+        const allocated = all.filter((p: any) => p.branch_id === branch.branch_id);
+        const others = all.filter((p: any) => p.branch_id !== branch.branch_id);
+        setBranchPartners(allocated);
+        setUnassignedPartners(others);
+      }
     } catch { }
     setLoadingDetail(false);
   }, []);
+
+  const handleAllocatePartner = async (partnerId: string, targetBranchId: string | null) => {
+    if (!partnerId) return;
+    setAllocating(true);
+    try {
+      const all = [...branchPartners, ...unassignedPartners];
+      const targetPartner = all.find(p => (p.delivery_partner_id || p.id) === partnerId);
+      if (targetPartner) {
+        await api.post(`/admin/delivery/partners/saveEdit/${partnerId}`, {
+          full_name: targetPartner.full_name,
+          phone: targetPartner.phone,
+          branch_id: targetBranchId
+        });
+        showSuccessToast(targetBranchId ? 'Delivery partner allocated to branch!' : 'Delivery partner de-allocated!', 3000);
+        setSelectedPartnerToAssign('');
+        if (selectedBranch) await loadBranchDetail(selectedBranch);
+      }
+    } catch (e) {
+      console.error('Failed to allocate partner:', e);
+    } finally {
+      setAllocating(false);
+    }
+  };
 
   // Create branch
   const handleSave = async () => {
@@ -348,47 +392,37 @@ export default function BranchesPage() {
               {filtered.map((b, idx) => (
                 <div
                   key={b.branch_id || `branch-${idx}`}
-                  className="group relative flex min-h-[256px] flex-col overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.04)] transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_22px_55px_rgba(15,23,42,0.09)]"
+                  onClick={() => router.push(`/admin/branches/${b.branch_id}`)}
+                  className="group relative flex min-h-[240px] flex-col justify-between overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-emerald-300 hover:shadow-xl cursor-pointer"
                 >
                   <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-sky-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
-                  <div className="p-6 pb-4">
+                  <div>
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex min-w-0 items-center gap-3">
-                        <div className="w-11 h-11 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 group-hover:border-emerald-100 transition-colors shrink-0">
-                          <Building2 size={21} />
+                        <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 group-hover:border-emerald-100 transition-colors shrink-0 shadow-inner">
+                          <Building2 size={22} />
                         </div>
                         <div className="min-w-0">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">CODE: {b.branch_code || '-'}</span>
-                          <h3 className="mt-1 font-extrabold text-slate-900 text-lg leading-tight group-hover:text-emerald-700 transition-colors line-clamp-1">{b.branch_name}</h3>
+                          <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-widest block">CODE: {b.branch_code || '-'}</span>
+                          <h3 className="mt-0.5 font-black text-slate-900 text-lg leading-tight group-hover:text-emerald-700 transition-colors line-clamp-1">{b.branch_name}</h3>
                         </div>
                       </div>
 
-                      <div className="flex shrink-0 flex-col items-end gap-2">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${b.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${b.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-600 border border-rose-200'}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${b.is_active ? 'bg-emerald-500' : 'bg-rose-400'}`} />
                           {b.is_active ? 'Active' : 'Inactive'}
                         </span>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={(event) => { event.stopPropagation(); loadBranchDetail(b); }}
-                            className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 shadow-sm transition-all hover:border-sky-200 hover:bg-sky-50 hover:text-sky-600"
-                            title="View branch"
-                            aria-label={`View ${b.branch_name}`}
-                          >
-                            <Eye size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(event) => { event.stopPropagation(); openEditBranch(b); }}
-                            className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 shadow-sm transition-all hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600"
-                            title="Edit branch"
-                            aria-label={`Edit ${b.branch_name}`}
-                          >
-                            <Pencil size={14} />
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={(event) => { event.stopPropagation(); openEditBranch(b); }}
+                          className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all shadow-xs"
+                          title="Edit branch"
+                          aria-label={`Edit ${b.branch_name}`}
+                        >
+                          <Pencil size={13} />
+                        </button>
                       </div>
                     </div>
 
@@ -490,18 +524,30 @@ export default function BranchesPage() {
 
               {/* Navigation Tabs */}
               <div className="px-8 py-3 border-b border-slate-50 bg-slate-50/50 flex items-center justify-between shrink-0">
-                <div className="flex p-0.5 bg-slate-200/60 rounded-xl border border-slate-200/50">
+                <div className="flex p-0.5 bg-slate-200/60 rounded-xl border border-slate-200/50 overflow-x-auto">
                   <button
                     onClick={() => setDetailStep(1)}
-                    className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${detailStep === 1 ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                    className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${detailStep === 1 ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                   >
                     Overview
                   </button>
                   <button
                     onClick={() => setDetailStep(2)}
-                    className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${detailStep === 2 ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                    className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${detailStep === 2 ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                   >
                     Service Zone
+                  </button>
+                  <button
+                    onClick={() => setDetailStep(3)}
+                    className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${detailStep === 3 ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                    Partner Allocation ({branchPartners.length})
+                  </button>
+                  <button
+                    onClick={() => setDetailStep(4)}
+                    className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${detailStep === 4 ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                    Branch Analytics
                   </button>
                 </div>
                 {loadingDetail && (
@@ -518,7 +564,7 @@ export default function BranchesPage() {
                   </div>
                 ) : (
                   <div className="h-full">
-                    {detailStep === 1 ? (
+                    {detailStep === 1 && (
                       <div className="space-y-6 animate-in fade-in duration-300">
                         {/* Address Detail Card */}
                         <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
@@ -553,8 +599,8 @@ export default function BranchesPage() {
                             <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-500 mb-4 border border-emerald-100">
                               <Users size={18} />
                             </div>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Delivery Force</p>
-                            <p className="text-2xl font-extrabold text-slate-800 mt-1">{sectors.length} <span className="text-xs text-slate-400 font-bold uppercase">Sectors</span></p>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Allocated Partners</p>
+                            <p className="text-2xl font-extrabold text-slate-800 mt-1">{branchPartners.length} <span className="text-xs text-slate-400 font-bold uppercase">Partners</span></p>
                           </div>
 
                           <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
@@ -573,17 +619,10 @@ export default function BranchesPage() {
                             <p className="text-2xl font-extrabold text-slate-800 mt-1">{selectedBranch.buffer_zone || 0} <span className="text-xs text-slate-400 font-bold uppercase">KM</span></p>
                           </div>
                         </div>
-
-                        <div className="flex justify-center pt-4">
-                          <button
-                            onClick={() => setDetailStep(2)}
-                            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-md flex items-center justify-center gap-2"
-                          >
-                            View Live Map & Sectors <ChevronRight size={14} />
-                          </button>
-                        </div>
                       </div>
-                    ) : (
+                    )}
+
+                    {detailStep === 2 && (
                       <div className="space-y-6 animate-in fade-in duration-300 h-full flex flex-col">
                         {/* Map Card */}
                         <div className="bg-white rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] overflow-hidden flex flex-col flex-1 min-h-[350px]">
@@ -616,68 +655,104 @@ export default function BranchesPage() {
                             )}
                           </div>
                         </div>
+                      </div>
+                    )}
 
-                        {/* Sectors Breakdown */}
-                        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] overflow-hidden flex flex-col">
-                          <div className="px-6 py-4 border-b border-slate-50 flex justify-between items-center shrink-0">
-                            <h3 className="font-bold text-slate-700 uppercase tracking-widest text-[10px]">Sector Assignments</h3>
-                            <span className="text-[9px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">{sectors.length} Areas</span>
-                          </div>
-                          <div className="overflow-y-auto max-h-[300px]">
-                            {sectors.length > 0 ? (
-                              <table className="w-full text-left border-collapse">
-                                <thead>
-                                  <tr className="bg-slate-50 sticky top-0 z-10 border-b border-slate-100">
-                                    <th className="px-6 py-3.5 text-[9px] font-bold uppercase tracking-widest text-slate-400">Zone</th>
-                                    <th className="px-6 py-3.5 text-[9px] font-bold uppercase tracking-widest text-slate-400">Partner</th>
-                                    <th className="px-6 py-3.5 text-[9px] font-bold uppercase tracking-widest text-slate-400">Users</th>
-                                    <th className="px-6 py-3.5 text-[9px] font-bold uppercase tracking-widest text-slate-400 text-right">Status</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                  {sectors.map((s: any) => (
-                                    <tr key={s.sector_index} className="hover:bg-slate-50/50 transition-colors">
-                                      <td className="px-6 py-4">
-                                        <div className="flex items-center gap-2">
-                                          <div className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center font-bold text-slate-700 text-xs shadow-sm">
-                                            {s.sector_index}
-                                          </div>
-                                          <span className="font-extrabold text-slate-700 text-xs">SEC-{s.sector_index}</span>
-                                        </div>
-                                      </td>
-                                      <td className="px-6 py-4 text-xs font-bold text-slate-500">
-                                        {s.delivery_partner_name || <span className="text-slate-300 italic font-medium">Unassigned</span>}
-                                      </td>
-                                      <td className="px-6 py-4 text-slate-700 font-extrabold text-sm">
-                                        {s.customer_count}
-                                      </td>
-                                      <td className="px-6 py-4 text-right">
-                                        {s.is_unassigned ? (
-                                          <span className="inline-flex px-2.5 py-0.5 bg-amber-50 text-amber-600 text-[8px] font-bold uppercase tracking-widest rounded-lg border border-amber-100">Pending</span>
-                                        ) : (
-                                          <span className="inline-flex px-2.5 py-0.5 bg-emerald-50 text-emerald-600 text-[8px] font-bold uppercase tracking-widest rounded-lg border border-emerald-100">Active</span>
-                                        )}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            ) : (
-                              <div className="flex flex-col items-center justify-center py-16 text-center">
-                                <Users size={32} className="text-slate-200 mb-2" />
-                                <p className="font-bold text-slate-400 text-xs uppercase tracking-widest">No sector details</p>
-                              </div>
-                            )}
+                    {/* Step 3: Partner Allocation */}
+                    {detailStep === 3 && (
+                      <div className="space-y-6 animate-in fade-in duration-300">
+                        {/* Assign Partner Form */}
+                        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] space-y-4">
+                          <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Allocate Delivery Partner</h4>
+                          <div className="flex items-center gap-3">
+                            <select
+                              value={selectedPartnerToAssign}
+                              onChange={(e) => setSelectedPartnerToAssign(e.target.value)}
+                              className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:border-emerald-600 focus:outline-none"
+                            >
+                              <option value="">Select a delivery partner to allocate...</option>
+                              {unassignedPartners.map((p) => (
+                                <option key={p.delivery_partner_id || p.id} value={p.delivery_partner_id || p.id}>
+                                  {p.full_name} ({p.phone}) — Current: {p.branch_name || p.branch_id || 'Unassigned'}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              disabled={!selectedPartnerToAssign || allocating}
+                              onClick={() => handleAllocatePartner(selectedPartnerToAssign, selectedBranch.branch_id)}
+                              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all disabled:opacity-50 flex items-center gap-1.5 shrink-0"
+                            >
+                              {allocating ? 'Allocating...' : 'Assign to Branch'}
+                            </button>
                           </div>
                         </div>
 
-                        <div className="flex justify-center pt-2">
-                          <button
-                            onClick={() => setDetailStep(1)}
-                            className="px-6 py-2 text-slate-400 font-bold uppercase tracking-widest text-[10px] hover:text-slate-700 transition-colors flex items-center gap-1.5"
-                          >
-                            <ArrowLeft size={13} /> Back to Overview
-                          </button>
+                        {/* Allocated Partners Table */}
+                        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] overflow-hidden">
+                          <div className="px-6 py-4 border-b border-slate-50 flex items-center justify-between">
+                            <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Allocated Partners ({branchPartners.length})</h4>
+                            <span className="text-[10px] font-bold text-slate-400">Branch ID: #{selectedBranch.branch_id}</span>
+                          </div>
+                          {branchPartners.length === 0 ? (
+                            <div className="p-12 text-center text-xs text-slate-400">No delivery partners allocated to this branch yet.</div>
+                          ) : (
+                            <div className="divide-y divide-slate-50">
+                              {branchPartners.map((p) => (
+                                <div key={p.delivery_partner_id || p.id} className="px-6 py-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 font-extrabold text-xs flex items-center justify-center border border-emerald-100">
+                                      {(p.full_name || 'D').charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                      <p className="text-xs font-bold text-slate-900">{p.full_name}</p>
+                                      <p className="text-[11px] text-slate-500 font-medium">{p.phone} • {p.vehicle_type || 'Bike'}</p>
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    disabled={allocating}
+                                    onClick={() => handleAllocatePartner(p.delivery_partner_id || p.id, null)}
+                                    className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-[11px] font-bold rounded-lg transition-colors border border-rose-200"
+                                  >
+                                    De-assign
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Step 4: Branch Analytics */}
+                    {detailStep === 4 && (
+                      <div className="space-y-6 animate-in fade-in duration-300">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Branch Status</p>
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider mt-2 ${
+                              selectedBranch.is_active ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {selectedBranch.is_active ? 'Active Operation' : 'Inactive'}
+                            </span>
+                          </div>
+
+                          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Active Partners</p>
+                            <p className="text-2xl font-extrabold text-slate-800 mt-1">{branchPartners.filter(p => p.is_active).length} / {branchPartners.length}</p>
+                          </div>
+
+                          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Buffer Orders Allowed</p>
+                            <p className="text-sm font-bold text-slate-800 mt-2">{selectedBranch.allow_buffer_order ? 'Enabled' : 'Disabled'}</p>
+                          </div>
+
+                          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">H3 Resolution</p>
+                            <p className="text-2xl font-extrabold text-slate-800 mt-1">Res-{selectedBranch.h3_resolution || 8}</p>
+                          </div>
                         </div>
                       </div>
                     )}

@@ -1,4 +1,4 @@
-import 'package:f2h_customer/core/utils/extensions.dart';
+import '../../../../core/utils/extensions.dart';
 
 String? _asString(dynamic value) {
   if (value == null) return null;
@@ -179,6 +179,98 @@ class SubscriptionPauseModel {
   String? get resumedAt => endDate;
 }
 
+class SubscriptionBillItemModel {
+  final String billItemId;
+  final String billId;
+  final String productVariantId;
+  final int quantity;
+  final double unitPrice;
+  final double totalAmount;
+
+  const SubscriptionBillItemModel({
+    required this.billItemId,
+    required this.billId,
+    required this.productVariantId,
+    required this.quantity,
+    required this.unitPrice,
+    required this.totalAmount,
+  });
+
+  factory SubscriptionBillItemModel.fromJson(Map<String, dynamic> json) {
+    return SubscriptionBillItemModel(
+      billItemId: _asString(json['bill_item_id'] ?? json['id']) ?? '',
+      billId: _asString(json['bill_id']) ?? '',
+      productVariantId: _asString(json['product_variant_id']) ?? '',
+      quantity: _asInt(json['quantity']),
+      unitPrice: _asDouble(json['unit_price']),
+      totalAmount: _asDouble(json['total_amount']),
+    );
+  }
+}
+
+class SubscriptionBillModel {
+  final String billId;
+  final String customerId;
+  final String billType;
+  final String referenceId;
+  final String paymentType;
+  final String? billingFrom;
+  final String? billingTo;
+  final String? dueDate;
+  final double subtotal;
+  final double discountAmount;
+  final double taxAmount;
+  final double totalAmount;
+  final double paidAmount;
+  final double dueAmount;
+  final String status;
+  final String? remarks;
+  final List<SubscriptionBillItemModel> items;
+
+  const SubscriptionBillModel({
+    required this.billId,
+    required this.customerId,
+    required this.billType,
+    required this.referenceId,
+    required this.paymentType,
+    this.billingFrom,
+    this.billingTo,
+    this.dueDate,
+    required this.subtotal,
+    required this.discountAmount,
+    required this.taxAmount,
+    required this.totalAmount,
+    required this.paidAmount,
+    required this.dueAmount,
+    required this.status,
+    this.remarks,
+    this.items = const [],
+  });
+
+  factory SubscriptionBillModel.fromJson(Map<String, dynamic> json) {
+    final rawItems = _asListOfMaps(json['items']);
+    return SubscriptionBillModel(
+      billId: _asString(json['bill_id'] ?? json['id']) ?? '',
+      customerId: _asString(json['customer_id']) ?? '',
+      billType: _asString(json['bill_type']) ?? 'subscription',
+      referenceId: _asString(json['reference_id']) ?? '',
+      paymentType: _asString(json['payment_type']) ?? 'prepaid',
+      billingFrom: _asString(json['billing_from']),
+      billingTo: _asString(json['billing_to']),
+      dueDate: _asString(json['due_date']),
+      subtotal: _asDouble(json['subtotal']),
+      discountAmount: _asDouble(json['discount_amount']),
+      taxAmount: _asDouble(json['tax_amount']),
+      totalAmount: _asDouble(json['total_amount']),
+      paidAmount: _asDouble(json['paid_amount']),
+      dueAmount: _asDouble(json['due_amount']),
+      status: _asString(json['status']) ?? 'paid',
+      remarks: _asString(json['remarks']),
+      items: rawItems.map(SubscriptionBillItemModel.fromJson).toList(),
+    );
+  }
+}
+
 class SubscriptionItemModel {
   final String id;
   final String subscriptionId;
@@ -299,6 +391,8 @@ class Subscription {
   final List<SubscriptionScheduleModel> weeklySchedules;
   final List<SubscriptionCustomDateModel> customDates;
   final List<SubscriptionPauseModel> pauses;
+  final List<SubscriptionBillModel> bills;
+  final Map<String, dynamic>? customerInfo;
 
   final String productName;
   final String vendorName;
@@ -332,6 +426,8 @@ class Subscription {
     this.weeklySchedules = const [],
     this.customDates = const [],
     this.pauses = const [],
+    this.bills = const [],
+    this.customerInfo,
     required this.productName,
     required this.vendorName,
     required this.emoji,
@@ -399,6 +495,14 @@ class Subscription {
     final pauses = _asListOfMaps(
       json['pauses'],
     ).map(SubscriptionPauseModel.fromJson).toList();
+    final bills = _asListOfMaps(
+      json['bills'],
+    ).map(SubscriptionBillModel.fromJson).toList();
+    final customerInfo = json['customer_info'] is Map<String, dynamic>
+        ? json['customer_info'] as Map<String, dynamic>
+        : (json['customer_info'] is Map
+            ? Map<String, dynamic>.from(json['customer_info'])
+            : null);
 
     final normalizedItems = items.isNotEmpty
         ? items
@@ -510,6 +614,8 @@ class Subscription {
       weeklySchedules: weeklySchedules,
       customDates: customDates,
       pauses: pauses,
+      bills: bills,
+      customerInfo: customerInfo,
       productName: productLabel,
       vendorName: vendorLabel,
       emoji: emoji,

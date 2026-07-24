@@ -60,6 +60,7 @@ import { CustomerBillingModule } from './panels/admin/customers-orders/customer-
 import { ApiIntegrationsModule } from './developer/api-integrations/api-integrations.module';
 import { ReferralModule } from './panels/customer/referral/referral.module';
 import { AdminReferralModule } from './panels/admin/referrals/admin-referral.module';
+import { CustomerAppAssetsModule } from './panels/customer/app_assets/app_assets.module';
 @Module({
   imports: [
     ApiIntegrationsModule,
@@ -116,7 +117,7 @@ import { AdminReferralModule } from './panels/admin/referrals/admin-referral.mod
     DeviceInformationModule,
     SharedDatabaseModule,
     CustomerSubscriptionsModule,
-
+    CustomerAppAssetsModule,
     WalletModule,
     CustomerPackageModule,
     DashboardModule,

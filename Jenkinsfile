@@ -3,32 +3,26 @@ pipeline {
 
     stages {
         stage('Deploy Backend') {
-            when {
-                changeset "apps/api/**"
-            }
             steps {
                 sh '''
                 echo "========== STARTING BACKEND DEPLOYMENT =========="
                 cd apps/api
                 npm install --no-audit --no-fund
                 npm run build
-                pm2 restart api-f2hfresh
+                pm2 restart api-f2hfresh || sudo pm2 restart api-f2hfresh || pm2 start npm --name "api-f2hfresh" -- run start
                 echo "========== BACKEND DEPLOYMENT SUCCESS =========="
                 '''
             }
         }
 
         stage('Deploy Frontend') {
-            when {
-                changeset "apps/web/**"
-            }
             steps {
                 sh '''
                 echo "========== STARTING FRONTEND DEPLOYMENT =========="
                 cd apps/web
                 npm install --no-audit --no-fund
                 npm run build
-                pm2 restart frontend-f2hfresh
+                pm2 restart frontend-f2hfresh || sudo pm2 restart frontend-f2hfresh || pm2 start npm --name "frontend-f2hfresh" -- run start
                 echo "========== FRONTEND DEPLOYMENT SUCCESS =========="
                 '''
             }

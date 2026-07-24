@@ -42,7 +42,7 @@ export class CustomersService {
       const sortBy = query.sortBy || 'created_at';
       const sortDir = query.sortDir?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-      const whereClauses: string[] = ['c.deleted_at IS NULL'];
+      const whereClauses: string[] = [];
       const params: any[] = [];
 
       if (search) {
@@ -147,7 +147,7 @@ export class CustomersService {
           COALESCE(c.last_name, '') as last_name,
           COALESCE(NULLIF(c.full_name, ''), (COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, ''))) as full_name,
           COALESCE(c.phone, '') as phone,
-          COALESCE(c.alternate_phone, '') as alternate_phone,
+          '' as alternate_phone,
           c.email,
           c.gender,
           c.dob,
@@ -205,10 +205,9 @@ export class CustomersService {
           COALESCE((SELECT SUM(total_amount) FROM orders WHERE status = 'delivered'), 0)::numeric as total_revenue,
           COALESCE((SELECT SUM(due_amount) FROM customer_bills WHERE status != 'paid' AND status != 'cancelled'), 0)::numeric as total_due
         FROM customers
-        WHERE deleted_at IS NULL
       `;
 
-      const branchesSql = `SELECT branch_id, branch_name FROM branches WHERE deleted_at IS NULL ORDER BY branch_name ASC`;
+      const branchesSql = `SELECT branch_id, branch_name FROM branches ORDER BY branch_name ASC`;
 
       const listQueryParams = [...params, limit, offset];
       const [rows, countRes, statsRes, branchesRes] = await Promise.all([
@@ -264,7 +263,7 @@ export class CustomersService {
       const ordersRes = await this.databaseService.query(
         `SELECT o.*, dp.full_name as delivery_partner_name
          FROM orders o
-         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = o.delivery_partner_id OR dp.user_id = o.delivery_partner_id
+         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = o.delivery_partner_id
          WHERE o.customer_id = ?
          ORDER BY o.created_at DESC`,
         [customerId]
@@ -495,36 +494,54 @@ export class CustomersService {
 
       timelineEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
+      const customerProfileObj = {
+        id: customer.id,
+        customer_id: customer.customer_id,
+        first_name: customer.first_name,
+        last_name: customer.last_name,
+        full_name: `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Customer',
+        phone: customer.mobile || customer.phone || '',
+        alternate_phone: customer.alternate_mobile || customer.alternate_phone || '',
+        email: customer.email || '',
+        gender: customer.gender,
+        dob: customer.dob,
+        profile_image: customer.profile_image,
+        branch_id: customer.branch_id,
+        branch_name: customer.branch_name,
+        customer_status: customer.customer_status || 'active',
+        customer_type: customer.customer_type || 'regular',
+        wallet_balance: Number(customer.wallet_balance || 0),
+        reward_points: Number(customer.reward_points || 0),
+        is_postpaid_enabled: customer.is_postpaid_enabled || false,
+        postpaid_credit_limit: Number(customer.postpaid_credit_limit || 0),
+        is_blocked: customer.is_blocked || false,
+        block_reason: customer.block_reason || '',
+        subscription_number: customer.subscription_number,
+        created_at: customer.created_at,
+      };
+
       return {
         status: true,
         data: {
-          profile: {
-            id: customer.id,
-            customer_id: customer.customer_id,
-            first_name: customer.first_name,
-            last_name: customer.last_name,
-            full_name: `${customer.first_name || ''} ${customer.last_name || ''}`.trim(),
-            phone: customer.mobile || customer.phone,
-            alternate_phone: customer.alternate_mobile || customer.alternate_phone,
-            email: customer.email,
-            gender: customer.gender,
-            dob: customer.dob,
-            profile_image: customer.profile_image,
-            branch_id: customer.branch_id,
-            branch_name: customer.branch_name,
-            customer_status: customer.customer_status,
-            customer_type: customer.customer_type,
-            wallet_balance: Number(customer.wallet_balance || 0),
-            reward_points: Number(customer.reward_points || 0),
-            is_postpaid_enabled: customer.is_postpaid_enabled || false,
-            postpaid_credit_limit: Number(customer.postpaid_credit_limit || 0),
-            is_blocked: customer.is_blocked || false,
-            block_reason: customer.block_reason || '',
-            subscription_number: customer.subscription_number,
-            created_at: customer.created_at,
-          },
+          customer: customerProfileObj,
+          profile: customerProfileObj,
           address: addresses[0] || null,
+          addresses: addresses,
           all_addresses: addresses,
+          formattedOrders: formattedOrders,
+          orders: formattedOrders,
+          stats: {
+            lifetime_revenue: lifetimeRevenue,
+            total_orders: formattedOrders.length,
+            completed_orders: completedOrders.length,
+            cancelled_orders: cancelledOrders.length,
+            avg_order_value: aov,
+            max_order_value: maxOrderValue,
+            wallet_balance: Number(customer.wallet_balance || 0),
+            outstanding_due: outstandingDue,
+            reward_points: Number(customer.reward_points || 0),
+            total_discounts_availed: totalDiscounts,
+          },
           kpis: {
             lifetime_revenue: lifetimeRevenue,
             total_orders: formattedOrders.length,
@@ -541,7 +558,6 @@ export class CustomersService {
             preferred_delivery_slot: formattedOrders[0]?.delivery_slot || 'Morning',
             preferred_payment_method: formattedOrders[0]?.payment_mode || 'UPI',
           },
-          orders: formattedOrders,
           postpaid_ledger: {
             summary: {
               credit_limit: postpaidLimit,

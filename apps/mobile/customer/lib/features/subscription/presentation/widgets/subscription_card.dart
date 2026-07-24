@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
-import 'package:f2h_customer/core/widgets/hot_toast.dart';
-import 'package:f2h_customer/features/subscription/data/models/subscription_model.dart';
-import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
-import 'package:f2h_customer/features/catalog/domain/entities/cart/cart_item_entity.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_bloc.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_event.dart';
-import 'package:f2h_customer/features/catalog/presentation/screens/cart_screen.dart';
-import 'package:f2h_customer/features/wallet/presentation/screens/wallet_screen.dart';
-import 'package:f2h_customer/features/subscription/presentation/screens/subscription_detail_screen.dart';
+import '../../../../core/widgets/hot_toast.dart';
+import '../../data/models/subscription_model.dart';
+import '../../../catalog/data/models/product_model.dart';
+import '../../../catalog/domain/entities/cart/cart_item_entity.dart';
+import '../../../catalog/presentation/bloc/cart/cart_bloc.dart';
+import '../../../catalog/presentation/bloc/cart/cart_event.dart';
+import '../../../catalog/presentation/screens/cart_screen.dart';
+import '../../../wallet/presentation/screens/wallet_screen.dart';
+import '../screens/subscription_detail_screen.dart';
 
 class SubCard extends StatelessWidget {
   final Subscription s;

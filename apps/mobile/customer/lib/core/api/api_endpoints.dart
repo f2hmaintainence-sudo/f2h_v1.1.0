@@ -23,8 +23,8 @@ class ApiEndpoints {
   // ---------------------------------------------------------------------------
   static const String _envBaseUrl = String.fromEnvironment('F2H_API_BASE_URL');
   static String get _devBaseUrl {
-    if (kIsWeb) {
-      return 'http://localhost:5001';
+    if (kReleaseMode) {
+      return 'https://f2hfresh.com';
     }
     return 'http://192.168.1.38:5001';
   }
@@ -59,6 +59,7 @@ class ApiEndpoints {
   // ---------------------------------------------------------------------------
   static const String _customer = '/customer';
   static const String customerBootstrap          = '$_customer/bootstrap';
+  static const String customerAssets             = '$_customer/assets';
   static const String wallet                     = '$_customer/wallet';
   static const String walletTopup                = '$wallet/topup';
   static const String customerWalletTopup        = walletTopup;
@@ -76,8 +77,9 @@ class ApiEndpoints {
   static const String orders                     = '$_customer/orders';
   static const String checkOut                   = '$_customer/checkout/payment';
   static const String subscriptions              = '$_customer/subscriptions';
-  static const String subscriptionCalendar       = '$_customer/subscription-calender/';
-  static const String cancelSubscriptionItem     = '$_customer/subscription-items/';
+  static const String subscriptionCheckout        = '$_customer/subscriptions/checkout';
+  static const String subscriptionCalendar       = '$_customer/subscriptions/subscription-calender/';
+  static const String cancelSubscriptionItem     = '$_customer/subscriptions/subscription-items/';
   static String subscriptionSkip(String id) => '$_customer/subscriptions/$id/skip';
   static String subscriptionOverride(String id) => '$_customer/subscriptions/$id/override';
   static String subscriptionTomorrow(String id) => '$_customer/subscriptions/$id/tomorrow';

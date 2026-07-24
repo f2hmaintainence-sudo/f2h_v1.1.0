@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Headers, Param, UnauthorizedException, BadRequestException, UseInterceptors, UploadedFile, Body } from '@nestjs/common';
+import { Controller, Get, Post, Headers, Param, Req, Query, UnauthorizedException, BadRequestException, UseInterceptors, UploadedFile, Body } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -29,7 +29,7 @@ export class AppController {
   }
 
   @Get('device/client-config')
-  async getClientConfig() {
+  async getClientConfig(@Req() req: any, @Query('role') queryRole?: string, @Query('app') queryApp?: string) {
     try {
       const sql = `
         SELECT category, config_key, provider, config_data
@@ -45,15 +45,32 @@ export class AppController {
         }
       }
 
-      const firebaseConfig = dbConfigs['firebase:client'] || {
-        apiKey: process.env.FIREBASE_ANDROID_API_KEY || 'AIzaSyAv0aMZBt7L7021HzVHX8I2PEi2h8paAcE',
-        appId: process.env.FIREBASE_ANDROID_APP_ID || '1:1060833982707:android:51bfa93dfd661022f31f86',
-        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '1060833982707',
-        projectId: process.env.FIREBASE_PROJECT_ID || 'f2hcustomerapp',
-        storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'f2hcustomerapp.firebasestorage.app',
-        iosApiKey: process.env.FIREBASE_IOS_API_KEY || 'AIzaSyBR4Xs71YQTs8Hzlp5Ql5a15ZxD2FfzGxg',
-        iosAppId: process.env.FIREBASE_IOS_APP_ID || '1:1060833982707:ios:64708d0f2c64294ef31f86',
-        iosBundleId: process.env.FIREBASE_IOS_BUNDLE_ID || 'com.f2h.customer',
+      const roleHeader = (req?.headers?.['x-role'] || req?.headers?.['x-client-role'] || queryRole || queryApp || '').toString().toUpperCase();
+      const isDelivery = roleHeader.includes('D') || roleHeader.includes('DELIVERY');
+
+      const rawFb = isDelivery 
+        ? (dbConfigs['firebase:delivery'] || dbConfigs['firebase:customer'] || dbConfigs['firebase:client'])
+        : (dbConfigs['firebase:customer'] || dbConfigs['firebase:delivery'] || dbConfigs['firebase:client']);
+
+      const firebaseConfig = rawFb ? {
+        apiKey: rawFb.apiKey || rawFb.client_api_key || 'AIzaSyBMqFkPAenVd4rurNYLxcb17fqRN0Bm47U',
+        appId: rawFb.appId || rawFb.android_app_id || (isDelivery ? '1:277443632535:android:0f9e3b1ff9e36e9f0b38d2' : '1:277443632535:android:a9290d2881da2d5e0b38d2'),
+        messagingSenderId: rawFb.messagingSenderId || rawFb.messaging_sender_id || '277443632535',
+        projectId: rawFb.projectId || rawFb.project_id || 'f2hfresh-65beb',
+        storageBucket: rawFb.storageBucket || rawFb.storage_bucket || 'f2hfresh-65beb.firebasestorage.app',
+        iosApiKey: rawFb.iosApiKey || rawFb.ios_api_key || rawFb.apiKey || rawFb.client_api_key,
+        iosAppId: rawFb.iosAppId || rawFb.ios_app_id || (isDelivery ? '1:445665408019:ios:8b7b36e7cca52b2d59fbe6' : '1:1060833982707:ios:64708d0f2c64294ef31f86'),
+        iosBundleId: rawFb.iosBundleId || rawFb.ios_bundle_id || (isDelivery ? 'com.f2h.delivery' : 'com.f2h.customer'),
+        authDomain: rawFb.authDomain || rawFb.auth_domain || 'f2hfresh-65beb.firebaseapp.com',
+      } : {
+        apiKey: process.env.FIREBASE_ANDROID_API_KEY || 'AIzaSyBMqFkPAenVd4rurNYLxcb17fqRN0Bm47U',
+        appId: isDelivery ? '1:277443632535:android:0f9e3b1ff9e36e9f0b38d2' : '1:277443632535:android:a9290d2881da2d5e0b38d2',
+        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '277443632535',
+        projectId: process.env.FIREBASE_PROJECT_ID || 'f2hfresh-65beb',
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'f2hfresh-65beb.firebasestorage.app',
+        iosApiKey: isDelivery ? 'AIzaSyAtT56n3QZdD7ZFYyXOwVPlFoLEuVkkOFk' : 'AIzaSyBR4Xs71YQTs8Hzlp5Ql5a15ZxD2FfzGxg',
+        iosAppId: isDelivery ? '1:445665408019:ios:8b7b36e7cca52b2d59fbe6' : '1:1060833982707:ios:64708d0f2c64294ef31f86',
+        iosBundleId: isDelivery ? 'com.f2h.delivery' : 'com.f2h.customer',
       };
 
       const googleOauth = dbConfigs['oauth:google'] || {
@@ -87,11 +104,11 @@ export class AppController {
         status: true,
         data: {
           firebase: {
-            apiKey: 'AIzaSyAv0aMZBt7L7021HzVHX8I2PEi2h8paAcE',
-            appId: '1:1060833982707:android:51bfa93dfd661022f31f86',
-            messagingSenderId: '1060833982707',
-            projectId: 'f2hcustomerapp',
-            storageBucket: 'f2hcustomerapp.firebasestorage.app',
+            apiKey: 'AIzaSyBMqFkPAenVd4rurNYLxcb17fqRN0Bm47U',
+            appId: '1:277443632535:android:a9290d2881da2d5e0b38d2',
+            messagingSenderId: '277443632535',
+            projectId: 'f2hfresh-65beb',
+            storageBucket: 'f2hfresh-65beb.firebasestorage.app',
             iosApiKey: 'AIzaSyBR4Xs71YQTs8Hzlp5Ql5a15ZxD2FfzGxg',
             iosAppId: '1:1060833982707:ios:64708d0f2c64294ef31f86',
             iosBundleId: 'com.f2h.customer',

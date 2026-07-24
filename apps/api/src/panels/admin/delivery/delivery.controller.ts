@@ -33,6 +33,11 @@ export class DeliveryManagementController {
     return this.deliveryService.getDeliveryPartners(query);
   }
 
+  @Get('partners/:id/portfolio')
+  async getPartnerPortfolio(@Param('id') id: string) {
+    return this.deliveryService.getPartnerPortfolio(id);
+  }
+
   // Static routes MUST be before parameterized routes (:id)
   @Get('partners/showAdd')
   async showPartnerAdd() {

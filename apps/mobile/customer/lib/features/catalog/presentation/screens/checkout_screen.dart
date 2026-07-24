@@ -1,47 +1,34 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //  CHECKOUT SCREEN
 //
-//  Final order placement screen. Displays:
-//    • Delivery address with change option
-//    • Order items summary with quantities
-//    • Subscription billing configuration (if subscription items exist)
-//    • Payment method selection
-//    • Bill summary with separate one-time and subscription totals
-//    • Swipe-to-pay confirmation
-//
-//  BUSINESS RULES:
-//    • Subscription items ALWAYS use variant.subscription_price
-//    • One-time items ALWAYS use variant.price (normal selling price)
-//    • Subscription Payment Type (Prepaid/Postpaid) is managed HERE, not in Cart
-//    • Order success shows Order ID for one-time, Subscription ID for subscriptions
+//  Final order placement screen for One-Time Orders.
 // ═══════════════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
-import 'package:f2h_customer/core/errors/error_handler.dart';
+import '../../../../core/errors/error_handler.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
-import 'package:f2h_customer/features/catalog/presentation/widgets/checkout_status_widget.dart';
-import 'package:f2h_customer/core/widgets/custom_date_picker.dart';
-import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_bloc.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_state.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_event.dart';
-import 'package:f2h_customer/features/catalog/domain/entities/cart/cart_item_entity.dart';
-import 'package:f2h_customer/core/session/customer_session_cubit.dart';
-import 'package:f2h_customer/core/session/customer_session_state.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/checkout/checkout_bloc.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/checkout/checkout_event.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/checkout/checkout_state.dart';
-import 'package:f2h_customer/features/catalog/domain/entities/checkout/checkout_request_entity.dart';
-import 'package:f2h_customer/features/address/presentation/widgets/address_selector_drawer.dart';
-import 'package:f2h_customer/features/address/presentation/screens/add_address_screen.dart';
-import 'package:f2h_customer/core/widgets/hot_toast.dart';
-import 'package:f2h_customer/features/address/data/models/profile_address.dart';
-import 'package:f2h_customer/core/widgets/scrolling_items_loader.dart';
-import 'package:f2h_customer/features/catalog/presentation/helpers/cart_helpers.dart';
-import 'package:f2h_customer/features/catalog/presentation/widgets/cart_widgets.dart';
+import '../widgets/checkout_status_widget.dart';
+import '../../data/models/product_model.dart';
+import '../bloc/cart/cart_bloc.dart';
+import '../bloc/cart/cart_state.dart';
+import '../bloc/cart/cart_event.dart';
+import '../../domain/entities/cart/cart_item_entity.dart';
+import '../../../../core/session/customer_session_cubit.dart';
+import '../../../../core/session/customer_session_state.dart';
+import '../bloc/checkout/checkout_bloc.dart';
+import '../bloc/checkout/checkout_event.dart';
+import '../bloc/checkout/checkout_state.dart';
+import '../../domain/entities/checkout/checkout_request_entity.dart';
+import '../../../address/presentation/widgets/address_selector_drawer.dart';
+import '../../../address/presentation/screens/add_address_screen.dart';
+import '../../../../core/widgets/hot_toast.dart';
+import '../../../address/data/models/profile_address.dart';
+import '../../../../core/widgets/scrolling_items_loader.dart';
+import '../helpers/cart_helpers.dart';
+import '../widgets/cart_widgets.dart';
 // [ADDED BY ANTIGRAVITY FOR WALLET TOPUP]
-import 'package:f2h_customer/features/wallet/presentation/widgets/topup_drawer.dart';
+import '../../../wallet/presentation/widgets/topup_drawer.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  CHECKOUT SCREEN WIDGET
@@ -49,16 +36,10 @@ import 'package:f2h_customer/features/wallet/presentation/widgets/topup_drawer.d
 
 class CheckoutScreen extends StatefulWidget {
   final List<String>? selectedItemIds;
-  final String? subscriptionFrequency;
-
-  /// Kept for backward compatibility but Checkout now manages its own payment type.
-  final String? subscriptionPaymentType;
 
   const CheckoutScreen({
     super.key,
     this.selectedItemIds,
-    this.subscriptionFrequency,
-    this.subscriptionPaymentType,
   });
 
   @override
@@ -71,20 +52,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// Selected payment method: 'wallet', 'upi', or 'cod'
   String _selectedPayment = 'wallet';
 
-  /// Subscription payment type: 'prepaid' or 'postpaid'
-  /// Managed internally by Checkout (not passed from Cart).
-  String _selectedPaymentType = 'prepaid';
-
   /// Whether the user opted into donation
   bool _donating = false;
 
   /// Whether the order has been successfully placed (or failed checkout completed)
   bool _isOrderPlaced = false;
 
-  /// Whether the placed order was a subscription
-  bool _placedIsSubscription = false;
-
-  /// The order/subscription ID returned from the backend
+  /// The order ID returned from the backend
   String? _placedOrderId;
 
   /// Status of the placement: 'success', 'pending', or 'failed'
@@ -105,70 +79,28 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// Key to force-rebuild the SwipeToPay button after errors
   int _dragKey = 0;
 
-  /// Subscription start date (defaults to today)
-  DateTime? _subscriptionStartDate;
-
-  /// Subscription end date (defaults to end of current month)
-  DateTime? _subscriptionEndDate;
-
-  /// Whether the subscription auto-renews monthly
-  bool _autoRenew = true;
-
   // ===== Checkout Item Filtering =====
 
-  /// Filters cart items to only include items selected by the user.
-  /// Handles both one-time and subscription item keys.
+  /// Filters cart items to only include one-time items selected by the user.
   List<CartItemEntity> _getCheckoutItems(List<CartItemEntity> allItems) {
     final List<CartItemEntity> checkoutItems = [];
-    if (widget.selectedItemIds != null) {
+    if (widget.selectedItemIds != null && widget.selectedItemIds!.isNotEmpty) {
       for (final key in widget.selectedItemIds!) {
-        final parts = key.split('_');
-        if (parts.length < 2) continue;
-        final variantId = parts[0];
-        final type = parts[1]; // 'once' or 'sub'
-
-        // Find the best matching item from allItems
-        final sameVariantItems = allItems.where((i) => i.variantId == variantId).toList();
-        if (sameVariantItems.isEmpty) continue;
-
-        CartItemEntity bestMatch;
-        if (type == 'once') {
-          bestMatch = sameVariantItems.firstWhere(
-            (i) => i.purchaseType == 'onetime',
-            orElse: () => sameVariantItems.first,
-          );
-          // Convert/ensure it is in one-time format
-          checkoutItems.add(bestMatch.copyWith(
-            purchaseType: 'onetime',
-            quantity: bestMatch.purchaseType == 'onetime' ? (bestMatch.quantity ?? 1) : 1,
-            schedules: null,
-          ));
-        } else if (type == 'sub') {
-          bestMatch = sameVariantItems.firstWhere(
-            (i) => i.purchaseType == 'subscription',
-            orElse: () => sameVariantItems.first,
-          );
-          // Convert/ensure it is in subscription format
-          if (bestMatch.purchaseType == 'subscription') {
-            checkoutItems.add(bestMatch);
-          } else {
-            checkoutItems.add(bestMatch.copyWith(
-              purchaseType: 'subscription',
-              schedules: bestMatch.schedules ?? List.generate(
-                7,
-                (i) => SubscriptionSchedule(
-                  day: i,
-                  mQuantity: 1,
-                  eQuantity: 0,
-                ),
-              ),
-              quantity: null,
-            ));
-          }
+        final variantId = key.endsWith('_once')
+            ? key.substring(0, key.length - 5)
+            : (key.endsWith('_sub') ? key.substring(0, key.length - 4) : key);
+        final matches = allItems.where((i) =>
+            i.variantId == variantId ||
+            '${i.variantId}_once' == key ||
+            '${i.variantId}_sub' == key ||
+            i.variantId == key).toList();
+        if (matches.isNotEmpty) {
+          checkoutItems.add(matches.first);
         }
       }
+    } else {
+      checkoutItems.addAll(allItems.where((i) => i.purchaseType == 'onetime'));
     }
-
     if (checkoutItems.isEmpty) {
       checkoutItems.addAll(allItems);
     }
@@ -179,103 +111,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   void initState() {
     super.initState();
 
-    // Initialize subscription dates to start from tomorrow
-    _subscriptionStartDate = DateTime.now().add(const Duration(days: 1));
-    _subscriptionEndDate = DateTime(_subscriptionStartDate!.year, _subscriptionStartDate!.month + 1, 0);
-
-    // Initialize payment type from Cart's suggestion (if provided),
-    // but Checkout owns this state going forward.
-    if (widget.subscriptionPaymentType != null) {
-      _selectedPaymentType = widget.subscriptionPaymentType!;
-      _selectedPayment = _selectedPaymentType == 'postpaid' ? 'cod' : 'wallet';
-    }
-    
-    _placedIsSubscription = widget.subscriptionFrequency != null;
-
-    // Refresh session and detect subscription items
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<CustomerSessionCubit>().refreshSilently();
-        
-        final cartState = context.read<CartBloc>().state;
-        if (cartState is CartLoadedState) {
-          final allItems = cartState.items;
-          final checkoutItems = _getCheckoutItems(allItems);
-          if (checkoutItems.any((item) => item.purchaseType == 'subscription')) {
-            setState(() {
-              _placedIsSubscription = true;
-            });
-          }
-        }
       }
     });
   }
 
   // ===== Price Calculation =====
 
-  /// Calculates the subtotal for all checkout items.
-  /// Uses getEffectivePrice() from shared helpers to ensure correct pricing.
   double _calculateSubtotal(List<CartItemEntity> checkoutItems) {
-    final onetimeItems = checkoutItems.where((i) => i.purchaseType == 'onetime').toList();
-    final subItems = checkoutItems.where((i) => i.purchaseType == 'subscription').toList();
-
-    final onetimeTotal = calculateOneTimeTotal(onetimeItems);
-
-    double subscriptionPayable = 0;
-    if (subItems.isNotEmpty) {
-      final subEstimate = calculateSubscriptionEstimate(
-        subItems,
-        _subscriptionStartDate ?? DateTime.now(),
-      );
-      subscriptionPayable = subEstimate.estimatedAmount;
-    }
-
-    return onetimeTotal + subscriptionPayable;
-  }
-
-  // ===== Subscription Date Selection =====
-
-  Future<void> _selectSubscriptionStartDate(BuildContext context) async {
-    final firstSelectable = DateTime.now().add(const Duration(days: 1));
-    final lastSelectable = DateTime(firstSelectable.year, firstSelectable.month + 1, 0);
-
-    final DateTime? picked = await showCustomDatePicker(
-      context: context,
-      initialDate: _subscriptionStartDate ?? firstSelectable,
-      firstDate: firstSelectable,
-      lastDate: lastSelectable,
-      title: 'Select Start Date',
-      highlightMonthEnd: true,
-    );
-
-    if (picked != null) {
-      setState(() {
-        _subscriptionStartDate = picked;
-        // End date is always end of the month containing the start date
-        _subscriptionEndDate = DateTime(picked.year, picked.month + 1, 0);
-      });
-    }
+    return calculateOneTimeTotal(checkoutItems);
   }
 
   // ===== Order Placement =====
 
-  /// Places the order via CheckoutBloc.
-  /// Determines payment method and type based on local state (not Cart).
   void _placeOrder(double grandTotal, List<CartItemEntity> checkoutItems, String userId, String? addressId) {
-    String? paymentMethod;
-    String? paymentType;
-
-    final hasSubscription = checkoutItems.any((item) => item.purchaseType == 'subscription');
-
-    if (hasSubscription) {
-      // For subscriptions, use the locally managed payment type
-      paymentType = _selectedPaymentType;
-      paymentMethod = paymentType == 'postpaid' ? 'cod' : _selectedPayment;
-    } else {
-      // For one-time orders, derive payment type from selected method
-      paymentMethod = _selectedPayment;
-      paymentType = _selectedPayment == 'cod' ? 'postpaid' : 'prepaid';
-    }
+    final paymentMethod = _selectedPayment;
+    final paymentType = _selectedPayment == 'cod' ? 'postpaid' : 'prepaid';
 
     final request = CheckoutRequestEntity(
       userId: userId,
@@ -283,13 +136,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       addressId: addressId,
       paymentMethod: paymentMethod,
       paymentType: paymentType,
-      subscriptionStartDate: _subscriptionStartDate != null
-          ? _subscriptionStartDate!.toString().split(' ')[0]
-          : null,
-      subscriptionEndDate: _subscriptionEndDate != null
-          ? _subscriptionEndDate!.toString().split(' ')[0]
-          : null,
-      subscriptionAutoRenew: _autoRenew,
     );
 
     context.read<CheckoutBloc>().add(PlaceCheckoutEvent(request));
@@ -311,7 +157,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         onDone: () {
           if (mounted) Navigator.pop(context);
         },
-        isSubscription: _placedIsSubscription,
         status: _placedStatus,
         deliveryAddress: addressText,
         orderId: _placedOrderId,
@@ -330,10 +175,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           final allItems = (context.read<CartBloc>().state as CartLoadedState).items;
           final checkoutItems = _getCheckoutItems(allItems);
 
-          // Determine if this was a subscription order and extract the correct ID
-          final hasSubscription = checkoutItems.any((item) => item.purchaseType == 'subscription');
-
-
           final backendStatus = checkoutState.responseData['status']?.toString() ?? 'success';
           final backendId = checkoutState.responseData['id']?.toString();
           final backendAddress = checkoutState.responseData['address']?.toString();
@@ -341,7 +182,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           setState(() {
             _isLoading = false;
             _isOrderPlaced = true;
-            _placedIsSubscription = hasSubscription;
             _placedStatus = backendStatus;
             _placedOrderId = backendId;
             _placedAddress = backendAddress;
@@ -360,18 +200,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           final cartState = bloc.state;
           if (cartState is CartLoadedState) {
             final List<CartItemEntity> remainingItems = List.from(cartState.items);
-            if (widget.selectedItemIds != null) {
+            if (widget.selectedItemIds != null && widget.selectedItemIds!.isNotEmpty) {
               for (final key in widget.selectedItemIds!) {
-                final parts = key.split('_');
-                if (parts.length >= 2) {
-                  final variantId = parts[0];
-                  final type = parts[1]; // 'once' or 'sub'
-                  final purchaseType = type == 'once' ? 'onetime' : 'subscription';
-                  remainingItems.removeWhere((item) => item.variantId == variantId && item.purchaseType == purchaseType);
-                } else if (parts.isNotEmpty) {
-                  final variantId = parts[0];
-                  remainingItems.removeWhere((item) => item.variantId == variantId);
-                }
+                final variantId = key.endsWith('_once')
+                    ? key.substring(0, key.length - 5)
+                    : (key.endsWith('_sub') ? key.substring(0, key.length - 4) : key);
+                remainingItems.removeWhere((item) =>
+                    item.variantId == variantId ||
+                    '${item.variantId}_once' == key ||
+                    '${item.variantId}_sub' == key ||
+                    item.variantId == key);
               }
             } else {
               remainingItems.clear();
@@ -379,15 +217,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             bloc.add(SyncCartEvent(remainingItems));
           }
         } else if (checkoutState is CheckoutErrorState) {
-          final allItems = (context.read<CartBloc>().state as CartLoadedState).items;
-          final checkoutItems = _getCheckoutItems(allItems);
-          final hasSubscription = checkoutItems.any((item) => item.purchaseType == 'subscription');
-
           setState(() {
             _isLoading = false;
-            _dragKey++; // Reset swipe button
+            _dragKey++;
             _isOrderPlaced = true;
-            _placedIsSubscription = hasSubscription;
             _placedStatus = 'failed';
             _placedOrderId = null;
             _placedAddress = null;
@@ -439,47 +272,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               }
 
               // ===== Bill Calculations =====
-              // Uses shared helpers for consistent pricing
               final double deliveryFee = 0.0;
               final double taxes = 0.0;
               final double donation = 0.0;
 
-              // Separate totals for one-time and subscription items
-              final onetimeItems = checkoutItems.where((i) => i.purchaseType == 'onetime').toList();
-              final subItems = checkoutItems.where((i) => i.purchaseType == 'subscription').toList();
-              final double onetimeTotal = calculateOneTimeTotal(onetimeItems);
-
-              final hasSubscription = subItems.isNotEmpty;
-              final hasOnetime = onetimeItems.isNotEmpty;
-
-              // Subscription estimation using delivery-count formula
-              // Total = Deliveries × (Morning Qty + Evening Qty) × Subscription Price
-              final subEstimate = hasSubscription
-                  ? calculateSubscriptionEstimate(subItems, _subscriptionStartDate ?? DateTime.now())
-                  : null;
-              final subSavings = hasSubscription
-                  ? calculateMonthlySavings(subItems, _subscriptionStartDate ?? DateTime.now())
-                  : null;
-              final subEndOfMonth = DateTime(
-                (_subscriptionStartDate ?? DateTime.now()).year,
-                (_subscriptionStartDate ?? DateTime.now()).month + 1,
-                0,
-              );
-
-              // ===== Grand Total Calculation =====
-              // For subscription items: use estimated monthly amount (delivery-count formula)
-              // For one-time items: use unitPrice × quantity
-              // These NEVER mix — subscription items never use simple price × qty
-              final double subscriptionPayable = subEstimate?.estimatedAmount ?? 0.0;
-              final double subtotal = onetimeTotal + subscriptionPayable;
+              final double onetimeTotal = calculateOneTimeTotal(checkoutItems);
+              final double subtotal = onetimeTotal;
               final double grandTotal = subtotal + deliveryFee + taxes + donation;
-
-              // For postpaid subscriptions, user pays ₹0 now (billed later)
-              // For prepaid or one-time, user pays the full grandTotal
-              final bool isPostpaidSubscription = hasSubscription && _selectedPaymentType == 'postpaid';
-              final double payableNow = isPostpaidSubscription
-                  ? onetimeTotal // Only pay for one-time items now (if any)
-                  : grandTotal;
+              final double payableNow = grandTotal;
 
               return Column(
                 children: [
@@ -665,7 +465,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                       price: effectivePrice,
                                       imageAsset: item.imageAsset,
                                     );
-                                    final isSub = item.purchaseType == 'subscription';
                                     final qty = getItemQuantity(item);
                                     final displayPrice = effectivePrice;
                                     return Padding(
@@ -705,11 +504,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                                   '${p.unit} · ₹${displayPrice.toStringAsFixed(0)}',
                                                   style: const TextStyle(fontSize: 11, color: kTextSub),
                                                 ),
-                                                if (isSub)
-                                                  const Text(
-                                                    'Subscribed',
-                                                    style: TextStyle(fontSize: 10, color: kPrimary, fontWeight: FontWeight.w700),
-                                                  ),
                                               ],
                                             ),
                                           ),
@@ -741,328 +535,45 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           ),
                           const SizedBox(height: 16),
 
-                          // ===== Subscription Payment Type =====
-                          // Only shown when subscription items exist.
-                          // Checkout manages this state internally.
-                          Builder(
-                            builder: (context) {
-                              final profile = sessionState.profile;
-                              final isPostpaidEnabled = profile?.isPostpaidEnabled ?? false;
-                              final creditLimit = profile?.postpaidCreditLimit ?? 0.0;
-
-                              return Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: kSurface,
-                                  borderRadius: BorderRadius.circular(24),
-                                  border: Border.all(color: kBorder),
+                          // ===== Payment Method =====
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: kSurface,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(color: kBorder),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Payment Method',
+                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: kText),
                                 ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Payment Method',
-                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: kText),
-                                    ),
-
-                                    // ===== Subscription Billing Toggle =====
-                                    if (hasSubscription) ...[
-                                      const SizedBox(height: 14),
-                                      Container(
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: kPrimary.withOpacity(0.04),
-                                          borderRadius: BorderRadius.circular(24),
-                                          border: Border.all(color: kPrimary.withOpacity(0.15)),
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Icon(Icons.repeat_rounded, size: 15, color: kPrimary),
-                                                const SizedBox(width: 6),
-                                                const Text(
-                                                  'SUBSCRIPTION BILLING',
-                                                  style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: kTextSub, letterSpacing: 0.5),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 10),
-
-                                            // Prepaid / Postpaid toggle
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: GestureDetector(
-                                                    onTap: () => setState(() => _selectedPaymentType = 'prepaid'),
-                                                    child: AnimatedContainer(
-                                                      duration: const Duration(milliseconds: 200),
-                                                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                                                      decoration: BoxDecoration(
-                                                        color: _selectedPaymentType == 'prepaid' ? kPrimary : kSurface,
-                                                        borderRadius: BorderRadius.circular(16),
-                                                        border: Border.all(
-                                                          color: _selectedPaymentType == 'prepaid' ? kPrimary : kBorder,
-                                                          width: 1.5,
-                                                        ),
-                                                      ),
-                                                      child: Column(
-                                                        children: [
-                                                          Icon(
-                                                            Icons.account_balance_wallet_outlined,
-                                                            size: 16,
-                                                            color: _selectedPaymentType == 'prepaid' ? Colors.white : kTextSub,
-                                                          ),
-                                                          const SizedBox(height: 2),
-                                                          Text(
-                                                            'Prepaid',
-                                                            style: TextStyle(
-                                                              fontSize: 12,
-                                                              fontWeight: FontWeight.w700,
-                                                              color: _selectedPaymentType == 'prepaid' ? Colors.white : kText,
-                                                            ),
-                                                          ),
-                                                          const SizedBox(height: 2),
-                                                          Text(
-                                                            'Pay from wallet',
-                                                            style: TextStyle(
-                                                              fontSize: 9,
-                                                              color: _selectedPaymentType == 'prepaid' ? Colors.white70 : kMuted,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 10),
-                                                Expanded(
-                                                  child: GestureDetector(
-                                                    onTap: isPostpaidEnabled
-                                                        ? () => setState(() => _selectedPaymentType = 'postpaid')
-                                                        : null,
-                                                    child: AnimatedContainer(
-                                                      duration: const Duration(milliseconds: 200),
-                                                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                                                      decoration: BoxDecoration(
-                                                        color: _selectedPaymentType == 'postpaid' ? kAccent : (isPostpaidEnabled ? kSurface : kBg),
-                                                        borderRadius: BorderRadius.circular(16),
-                                                        border: Border.all(
-                                                          color: _selectedPaymentType == 'postpaid' ? kAccent : kBorder,
-                                                          width: 1.5,
-                                                        ),
-                                                      ),
-                                                      child: Column(
-                                                        children: [
-                                                          Icon(
-                                                            Icons.schedule_outlined,
-                                                            size: 16,
-                                                            color: _selectedPaymentType == 'postpaid' ? Colors.white : (isPostpaidEnabled ? kTextSub : kMuted),
-                                                          ),
-                                                          const SizedBox(height: 2),
-                                                          Text(
-                                                            'Postpaid',
-                                                            style: TextStyle(
-                                                              fontSize: 12,
-                                                              fontWeight: FontWeight.w700,
-                                                              color: _selectedPaymentType == 'postpaid' ? Colors.white : (isPostpaidEnabled ? kText : kMuted),
-                                                            ),
-                                                          ),
-                                                          const SizedBox(height: 2),
-                                                          Text(
-                                                            isPostpaidEnabled ? 'Limit: ₹${creditLimit.toStringAsFixed(0)}' : 'Not enabled',
-                                                            style: TextStyle(
-                                                              fontSize: 9,
-                                                              color: _selectedPaymentType == 'postpaid' ? Colors.white70 : kMuted,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const Divider(color: kBorderLt, height: 24),
-                                            
-                                            // ===== Start Date Selector =====
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    children: [
-                                                      const Text(
-                                                        'START DATE',
-                                                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: kTextSub, letterSpacing: 0.5),
-                                                      ),
-                                                      const SizedBox(height: 2),
-                                                      Text(
-                                                        'Starts today onwards',
-                                                        style: TextStyle(fontSize: 9, color: kTextSub.withOpacity(0.6)),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                GestureDetector(
-                                                  onTap: () => _selectSubscriptionStartDate(context),
-                                                  child: Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.white,
-                                                      borderRadius: BorderRadius.circular(12),
-                                                      border: Border.all(color: kBorder),
-                                                    ),
-                                                    child: Row(
-                                                      children: [
-                                                        const Icon(Icons.calendar_today_rounded, size: 14, color: kPrimary),
-                                                        const SizedBox(width: 8),
-                                                        Text(
-                                                          _subscriptionStartDate != null
-                                                              ? '${_subscriptionStartDate!.day}/${_subscriptionStartDate!.month}/${_subscriptionStartDate!.year}'
-                                                              : 'Select Date',
-                                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kPrimary),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 14),
-
-                                            // ===== Auto Renew Toggle =====
-                                            Row(
-                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                              children: [
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    children: [
-                                                      const Text(
-                                                        'AUTO RENEW PLAN',
-                                                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: kTextSub, letterSpacing: 0.5),
-                                                      ),
-                                                      const SizedBox(height: 2),
-                                                      Text(
-                                                        'Renew automatically every month',
-                                                        style: TextStyle(fontSize: 9, color: kTextSub.withOpacity(0.6)),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                GestureDetector(
-                                                   onTap: () {
-                                                     setState(() {
-                                                       _autoRenew = !_autoRenew;
-                                                     });
-                                                   },
-                                                   child: AnimatedContainer(
-                                                     duration: const Duration(milliseconds: 150),
-                                                     width: 44,
-                                                     height: 24,
-                                                     decoration: BoxDecoration(
-                                                       color: _autoRenew ? kPrimary : kBorder,
-                                                       borderRadius: BorderRadius.circular(4),
-                                                     ),
-                                                     padding: const EdgeInsets.all(2),
-                                                     alignment: _autoRenew ? Alignment.centerRight : Alignment.centerLeft,
-                                                     child: Container(
-                                                       width: 20,
-                                                       height: 20,
-                                                       decoration: BoxDecoration(
-                                                         color: Colors.white,
-                                                         borderRadius: BorderRadius.circular(2),
-                                                         boxShadow: [
-                                                           BoxShadow(
-                                                             color: Colors.black.withOpacity(0.1),
-                                                             blurRadius: 2,
-                                                           ),
-                                                         ],
-                                                       ),
-                                                     ),
-                                                   ),
-                                                 ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-
-                                      const SizedBox(height: 12),
-
-                                      // Info tooltips explaining prepaid vs postpaid
-                                      _selectedPaymentType == 'prepaid'
-                                          ? InfoTooltipCard.prepaid()
-                                          : InfoTooltipCard.postpaid(),
-                                    ],
-
-                                    const SizedBox(height: 16),
-
-                                    // ===== Payment Method =====
-                                    // Prepaid section (shown for one-time or prepaid subscription)
-                                    if (!hasSubscription || _selectedPaymentType == 'prepaid') ...[
-                                      Row(
-                                        children: [
-                                          const Icon(Icons.payment_rounded, size: 14, color: kPrimary),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            hasSubscription ? 'PREPAID (Instant Pay)' : 'SELECT PAYMENT METHOD',
-                                            style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: kTextSub, letterSpacing: 0.5),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 10),
-                                      _buildPaymentOption(
-                                        id: 'wallet',
-                                        icon: Icons.credit_card_outlined,
-                                        title: 'F2H Wallet (₹${walletBalance.toStringAsFixed(2)} available)',
-                                        subtitle: grandTotal <= walletBalance ? 'Sufficient balance' : 'Insufficient balance (Top-up required)',
-                                        disabled: grandTotal > walletBalance,
-                                      ),
-                                      const SizedBox(height: 10),
-                                      _buildPaymentOption(
-                                        id: 'upi',
-                                        icon: Icons.bolt_outlined,
-                                        title: 'Instant UPI',
-                                        subtitle: 'Pay via Google Pay, PhonePe, or Paytm',
-                                      ),
-                                      if (!hasSubscription) ...[
-                                        const SizedBox(height: 10),
-                                        _buildPaymentOption(
-                                          id: 'cod',
-                                          icon: Icons.payments_outlined,
-                                          title: 'Cash on Delivery (COD)',
-                                          subtitle: 'Pay cash or Scan UPI on delivery',
-                                        ),
-                                      ],
-                                    ],
-
-                                    // Postpaid section (only for subscriptions with postpaid enabled)
-                                    if (hasSubscription && _selectedPaymentType == 'postpaid') ...[
-                                      const Row(
-                                        children: [
-                                          Icon(Icons.local_shipping_rounded, size: 14, color: kAccent),
-                                          SizedBox(width: 6),
-                                          Text(
-                                            'POSTPAID (Pay on Delivery)',
-                                            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: kTextSub, letterSpacing: 0.5),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 10),
-                                      _buildPaymentOption(
-                                        id: 'cod',
-                                        icon: Icons.payments_outlined,
-                                        title: 'F2H Postpaid',
-                                        subtitle: 'Billed to your postpaid limit',
-                                      ),
-                                    ],
-                                  ],
+                                const SizedBox(height: 14),
+                                _buildPaymentOption(
+                                  id: 'wallet',
+                                  icon: Icons.credit_card_outlined,
+                                  title: 'F2H Wallet (₹${walletBalance.toStringAsFixed(2)} available)',
+                                  subtitle: grandTotal <= walletBalance ? 'Sufficient balance' : 'Insufficient balance (Top-up required)',
+                                  disabled: grandTotal > walletBalance,
                                 ),
-                              );
-                            },
+                                const SizedBox(height: 10),
+                                _buildPaymentOption(
+                                  id: 'upi',
+                                  icon: Icons.bolt_outlined,
+                                  title: 'Instant UPI',
+                                  subtitle: 'Pay via Google Pay, PhonePe, or Paytm',
+                                ),
+                                const SizedBox(height: 10),
+                                _buildPaymentOption(
+                                  id: 'cod',
+                                  icon: Icons.payments_outlined,
+                                  title: 'Cash on Delivery (COD)',
+                                  subtitle: 'Pay cash or Scan UPI on delivery',
+                                ),
+                              ],
+                            ),
                           ),
                           const SizedBox(height: 16),
 
@@ -1077,154 +588,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: kText),
                                 ),
                                 const SizedBox(height: 12),
-
-                                // ===== One-Time Section =====
-                                if (hasOnetime) ...[
-                                  Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: kPrimaryPl.withValues(alpha: 0.5),
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Row(
-                                          children: [
-                                            Icon(Icons.shopping_basket_rounded, size: 12, color: kPrimary),
-                                            SizedBox(width: 6),
-                                            Text('ONE-TIME ORDER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: kPrimary, letterSpacing: 0.5)),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 8),
-                                        // Delivery date from the first one-time item
-                                        if (onetimeItems.isNotEmpty && onetimeItems.first.deliveryDate != null)
-                                          SummaryRow(
-                                            label: 'Delivery Date',
-                                            value: onetimeItems.first.deliveryDate!,
-                                          ),
-                                        if (onetimeItems.isNotEmpty && onetimeItems.first.deliverySlot != null) ...[
-                                          const SizedBox(height: 4),
-                                          SummaryRow(
-                                            label: 'Delivery Slot',
-                                            value: onetimeItems.first.deliverySlot!,
-                                          ),
-                                        ],
-                                        const SizedBox(height: 4),
-                                        SummaryRow(
-                                          label: 'Items',
-                                          value: '${onetimeItems.fold<int>(0, (sum, i) => sum + (i.quantity ?? 1))}',
-                                        ),
-                                        const Divider(color: kBorderLt, height: 16),
-                                        SummaryRow(
-                                          label: 'One-Time Total',
-                                          value: '₹${onetimeTotal.toStringAsFixed(0)}',
-                                          isBold: true,
-                                        ),
-                                      ],
-                                    ),
+                                if (checkoutItems.isNotEmpty && checkoutItems.first.deliveryDate != null) ...[
+                                  SummaryRow(
+                                    label: 'Delivery Date',
+                                    value: checkoutItems.first.deliveryDate!,
                                   ),
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: 4),
                                 ],
-
-                                // ===== Subscription Section =====
-                                if (hasSubscription && subEstimate != null) ...[
-                                  Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: kAccentLt.withValues(alpha: 0.5),
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Row(
-                                          children: [
-                                            Icon(Icons.repeat_rounded, size: 12, color: kAccent),
-                                            SizedBox(width: 6),
-                                            Text('SUBSCRIPTION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: kAccent, letterSpacing: 0.5)),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 8),
-                                        SummaryRow(
-                                          label: 'Start Date',
-                                          value: '${(_subscriptionStartDate ?? DateTime.now()).day}/${(_subscriptionStartDate ?? DateTime.now()).month}/${(_subscriptionStartDate ?? DateTime.now()).year}',
-                                        ),
-                                        const SizedBox(height: 4),
-                                        SummaryRow(
-                                          label: 'End Date',
-                                          value: '${subEndOfMonth.day}/${subEndOfMonth.month}/${subEndOfMonth.year}',
-                                        ),
-                                        const SizedBox(height: 4),
-                                        SummaryRow(
-                                          label: 'Delivery Days',
-                                          value: '${subEstimate.totalDays} days',
-                                        ),
-                                        const SizedBox(height: 4),
-                                        SummaryRow(
-                                          label: 'Morning Qty',
-                                          value: '${subEstimate.totalMorningQty}',
-                                        ),
-                                        const SizedBox(height: 4),
-                                        SummaryRow(
-                                          label: 'Evening Qty',
-                                          value: '${subEstimate.totalEveningQty}',
-                                        ),
-                                        const SizedBox(height: 4),
-                                        SummaryRow(
-                                          label: 'Total Est. Qty',
-                                          value: '${subEstimate.totalQuantity} items',
-                                        ),
-                                        const Divider(color: kBorderLt, height: 16),
-                                        SummaryRow(
-                                          label: 'Est. Monthly Total',
-                                          value: '₹${subEstimate.estimatedAmount.toStringAsFixed(0)}',
-                                          isBold: true,
-                                          valueColor: kAccent,
-                                        ),
-                                      ],
-                                    ),
+                                if (checkoutItems.isNotEmpty && checkoutItems.first.deliverySlot != null) ...[
+                                  SummaryRow(
+                                    label: 'Delivery Slot',
+                                    value: checkoutItems.first.deliverySlot!,
                                   ),
-                                  const SizedBox(height: 10),
-
-                                  // ===== Monthly Savings =====
-                                  if (subSavings != null && subSavings.savings > 0)
-                                    MonthlySavingsCard(
-                                      normalPriceTotal: subSavings.normalPriceTotal,
-                                      subscriptionTotal: subSavings.subscriptionTotal,
-                                      savings: subSavings.savings,
-                                      savingsPercent: subSavings.savingsPercent,
-                                      totalDeliveryDays: subSavings.totalDeliveryDays,
-                                      totalEstimatedQuantity: subSavings.totalEstimatedQuantity,
-                                    ),
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: 4),
                                 ],
-
-                                // ===== Bill Totals =====
+                                SummaryRow(
+                                  label: 'Total Items',
+                                  value: '${checkoutItems.fold<int>(0, (sum, i) => sum + (i.quantity ?? 1))}',
+                                ),
                                 const Divider(color: kBorderLt, height: 16),
-
-                                // Show the correct item total based on what's in checkout
-                                if (hasOnetime && !hasSubscription) ...[
-                                  // One-time only: simple item total
-                                  SummaryRow(label: 'Item Total', value: '₹${onetimeTotal.toStringAsFixed(0)}'),
-                                ] else if (hasSubscription && !hasOnetime) ...[
-                                  // Subscription only: show estimated monthly total
-                                  SummaryRow(
-                                    label: 'Est. Monthly Total',
-                                    value: '₹${subscriptionPayable.toStringAsFixed(0)}',
-                                    valueColor: kAccent,
-                                  ),
-                                ] else if (hasOnetime && hasSubscription) ...[
-                                  // Both: show separate totals
-                                  SummaryRow(label: 'One-Time Total', value: '₹${onetimeTotal.toStringAsFixed(0)}'),
-                                  const SizedBox(height: 6),
-                                  SummaryRow(
-                                    label: 'Subscription Est. Total',
-                                    value: '₹${subscriptionPayable.toStringAsFixed(0)}',
-                                    valueColor: kAccent,
-                                  ),
-                                ],
-
+                                SummaryRow(label: 'Item Total', value: '₹${onetimeTotal.toStringAsFixed(0)}'),
                                 const SizedBox(height: 8),
                                 const SummaryRow(label: 'Delivery Fee', value: '₹39'),
                                 const SizedBox(height: 8),
@@ -1236,35 +619,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   const SummaryRow(label: 'Feeding India Donation', value: '₹2'),
                                 ],
                                 const Divider(color: kBorderLt, height: 24),
-
-                                // To Pay: shows what user pays NOW
-                                // Postpaid subscription = ₹0 now (billed monthly)
-                                // Prepaid subscription = estimated monthly total
-                                // One-time = item total
-                                if (isPostpaidSubscription && !hasOnetime) ...[
-                                  const SummaryRow(
-                                    label: 'To Pay Now',
-                                    value: '₹0',
-                                    isBold: true,
-                                    fontSize: 16,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Postpaid · Billed monthly to your limit',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: kAccent,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ] else ...[
-                                  SummaryRow(
-                                    label: 'To Pay',
-                                    value: '₹${payableNow.toStringAsFixed(0)}',
-                                    isBold: true,
-                                    fontSize: 16,
-                                  ),
-                                ],
+                                SummaryRow(
+                                  label: 'To Pay',
+                                  value: '₹${payableNow.toStringAsFixed(0)}',
+                                  isBold: true,
+                                  fontSize: 16,
+                                ),
                               ],
                             ),
                           ),
@@ -1291,11 +651,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     child: SafeArea(
                       child: SlideToPayButton(
                         key: ValueKey(_dragKey),
-                        // For postpaid subscription: always enabled (no upfront payment)
-                        // For prepaid/one-time: check wallet balance
-                        disabled: !isPostpaidSubscription &&
-                            _selectedPayment == 'wallet' &&
-                            payableNow > walletBalance,
+                        disabled: _selectedPayment == 'wallet' && payableNow > walletBalance,
                         onSwipeCompleted: () {
                           final list = sessionState.addresses;
                           final addressId = list.isEmpty
@@ -1317,20 +673,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           );
         },
       ),
-          // Loading overlay
-          if (_isLoading)
-            Positioned.fill(
-              child: Container(
-                color: Colors.black.withValues(alpha: 0.3),
-                child: const Center(
-                  child: CircularProgressIndicator(color: kPrimary),
-                ),
-              ),
+      if (_isLoading)
+        Positioned.fill(
+          child: Container(
+            color: Colors.black.withValues(alpha: 0.3),
+            child: const Center(
+              child: CircularProgressIndicator(color: kPrimary),
             ),
-        ],
-      ),
-      ),
-    );
+          ),
+        ),
+    ],
+  ),
+),
+);
   }
 
   // ===== Payment Option Widget =====
@@ -1444,33 +799,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   // ===== Checkout Item Counter =====
 
-  /// Read-only counter for subscription items, editable for one-time items.
+  /// Item counter for one-time order items.
   Widget _buildCheckoutItemCounter(CartItemEntity item) {
-    final isSub = item.purchaseType == 'subscription';
-    if (isSub) {
-      // Subscription items show quantity as read-only
-      final qty = getItemQuantity(item);
-      return Container(
-        width: 36,
-        height: 28,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: kBgDeep,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: kBorder),
-        ),
-        child: Text(
-          '$qty',
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-            color: kText,
-          ),
-        ),
-      );
-    }
-
-    // One-time items are editable
     int qty = item.quantity ?? 1;
 
     return QuantityCounter(

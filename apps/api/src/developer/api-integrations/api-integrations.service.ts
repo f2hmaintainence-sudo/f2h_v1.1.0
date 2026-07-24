@@ -194,11 +194,11 @@ export class ApiIntegrationsService {
 
       // Default fallback values from environment / safe defaults
       const firebaseConfig = dbConfigs['firebase:client'] || {
-        apiKey: process.env.FIREBASE_ANDROID_API_KEY || 'AIzaSyAv0aMZBt7L7021HzVHX8I2PEi2h8paAcE',
-        appId: process.env.FIREBASE_ANDROID_APP_ID || '1:1060833982707:android:51bfa93dfd661022f31f86',
-        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '1060833982707',
-        projectId: process.env.FIREBASE_PROJECT_ID || 'f2hcustomerapp',
-        storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'f2hcustomerapp.firebasestorage.app',
+        apiKey: process.env.FIREBASE_ANDROID_API_KEY || 'AIzaSyBMqFkPAenVd4rurNYLxcb17fqRN0Bm47U',
+        appId: process.env.FIREBASE_ANDROID_APP_ID || '1:277443632535:android:a9290d2881da2d5e0b38d2',
+        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '277443632535',
+        projectId: process.env.FIREBASE_PROJECT_ID || 'f2hfresh-65beb',
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'f2hfresh-65beb.firebasestorage.app',
         iosApiKey: process.env.FIREBASE_IOS_API_KEY || 'AIzaSyBR4Xs71YQTs8Hzlp5Ql5a15ZxD2FfzGxg',
         iosAppId: process.env.FIREBASE_IOS_APP_ID || '1:1060833982707:ios:64708d0f2c64294ef31f86',
         iosBundleId: process.env.FIREBASE_IOS_BUNDLE_ID || 'com.f2h.customer',

@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS subscription_items (
     is_free BOOLEAN NOT NULL DEFAULT false,
     status subscription_status_enum DEFAULT 'active',
     start_date DATE,
+    
     end_date DATE,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
