@@ -654,8 +654,10 @@ export class SubscriptionsService {
     const isItemId = subscriptionId.startsWith('SBI');
     const result = await this.data.query('subscriptions', {
       select: [
+        'subscriptions.subscription_id',
         'subscriptions.start_date',
         'subscriptions.end_date',
+        'subscriptions.created_at',
         'subscription_items.id AS subscription_item_id'
       ],
       joins: [
@@ -675,25 +677,37 @@ export class SubscriptionsService {
     });
 
     const items = result.data || [];
-    if (!items.length) {
-      this.developer.warn('SubscriptionsService.makeSubscriptionCalender no items found', { subscriptionId });
-      return [];
+
+    // Extract subscriptionId if isItemId was passed
+    const resolvedSubId = items[0]?.subscription_id || subscriptionId;
+
+    // Determine start & end date
+    const rawStart = items[0]?.start_date || items[0]?.created_at;
+    let start = rawStart ? new Date(rawStart) : new Date();
+    if (isNaN(start.getTime())) start = new Date();
+
+    const rawEnd = items[0]?.end_date;
+    let end = rawEnd ? new Date(rawEnd) : null;
+    if (!end || isNaN(end.getTime())) {
+      // Default to 180 days out from start
+      end = new Date(start.getTime() + 180 * 24 * 60 * 60 * 1000);
     }
 
-    const startDate = items[0].start_date;
-    const endDate = items[0].end_date;
     const itemIds = items.map(item => item.subscription_item_id).filter(Boolean);
     let schedules: any[] = [];
-    if (itemIds.length > 0) {
-      const scheduleResult = await this.data.query('subscription_weekly_schedule', {
-        select: ['subscription_weekly_schedule.*'],
-        where: [{ column: 'subscription_item_id', operator: 'IN', value: itemIds }],
-      });
-      schedules = scheduleResult.data || [];
+    
+    try {
+      const scheduleResult = await this.db.query(
+        `SELECT * FROM subscription_weekly_schedule WHERE subscription_id = $1 OR subscription_item_id = ANY($2::text[])`,
+        [resolvedSubId, itemIds.length ? itemIds : ['NONE']],
+      );
+      schedules = Array.isArray(scheduleResult) ? scheduleResult : (scheduleResult as any)?.rows || [];
+    } catch (e) {
+      this.developer.warn('makeSubscriptionCalender schedule query failed', { error: e });
     }
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    const today = new Date();
+    const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60 * 1000).toISOString().split('T')[0];
 
     const calendar: any[] = [];
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
@@ -703,11 +717,33 @@ export class SubscriptionsService {
       const offset = d.getTimezoneOffset() * 60 * 1000;
       const localDateStr = new Date(d.getTime() - offset).toISOString().split('T')[0];
 
+      // If no explicit schedule row exists, check if weekly schedule has any entries;
+      // if schedules table is empty for this sub, default m_quantity to 1.00 for all days
+      let mQty = '0.00';
+      let eQty = '0.00';
+
+      if (schedule) {
+        mQty = schedule.m_quantity?.toString() ?? '0.00';
+        eQty = schedule.e_quantity?.toString() ?? '0.00';
+      } else if (schedules.length === 0) {
+        mQty = '1.00';
+      }
+
+      const hasDelivery = Number(mQty) > 0 || Number(eQty) > 0;
+
+      let status = 'no_delivery';
+      if (hasDelivery) {
+        if (localDateStr < todayStr) status = 'completed';
+        else if (localDateStr === todayStr) status = 'today';
+        else status = 'upcoming';
+      }
+
       calendar.push({
         date: localDateStr,
         day_of_week: dayOfWeek,
-        m_quantity: schedule ? schedule.m_quantity : "0.00",
-        e_quantity: schedule ? schedule.e_quantity : "0.00",
+        m_quantity: mQty,
+        e_quantity: eQty,
+        status,
       });
     }
 
@@ -990,6 +1026,127 @@ export class SubscriptionsService {
       if (error instanceof BadRequestException) throw error;
       this.developer.error('cancelSubscriptionItem error', { error, subscriptionItemId });
       throw new BadRequestException('Failed to cancel subscription item');
+    }
+  }
+
+  async getSubscriptionDetail(subscriptionId: string) {
+    this.developer.debug('SubscriptionsService.getSubscriptionDetail called', { subscriptionId });
+    try {
+      // 1. Fetch subscription basic info
+      const subRes = await this.data.query('subscriptions', {
+        select: ['subscriptions.*'],
+        where: [{ column: 'subscriptions.subscription_id', operator: '=', value: subscriptionId }],
+        limit: 1,
+      }, true);
+      const sub = subRes?.data?.[0];
+      if (!sub) throw new Error('Subscription not found');
+
+      const customerId = sub.customer_id;
+
+      // 2. Fetch customer wallet balance
+      const custRes = await this.data.query('customers', {
+        select: ['wallet_balance'],
+        where: [{ column: 'customer_id', operator: '=', value: customerId }],
+        limit: 1,
+      });
+      const walletBalance = Number(custRes?.data?.[0]?.wallet_balance || 0);
+
+      // 3. Fetch outstanding bills
+      const billsRes = await this.db.query(
+        `SELECT
+           bill_id, status, total_amount, paid_amount, due_amount, due_date,
+           billing_from, billing_to, payment_type, payment_method, created_at
+         FROM customer_bills
+         WHERE reference_id = $1
+         ORDER BY created_at DESC
+         LIMIT 5`,
+        [subscriptionId],
+      );
+      const latestBills = Array.isArray(billsRes) ? billsRes : [];
+
+      // 4. Outstanding count & amount
+      const outstandingRes = await this.db.query(
+        `SELECT COUNT(*) as count, COALESCE(SUM(due_amount), 0) as total_due
+         FROM customer_bills
+         WHERE reference_id = $1
+           AND status IN ('unpaid', 'draft')
+           AND due_amount > 0`,
+        [subscriptionId],
+      );
+      const outstandingRow = Array.isArray(outstandingRes) ? outstandingRes[0] : {};
+      const outstandingBillCount = Number(outstandingRow?.count || 0);
+      const outstandingAmount = Number(outstandingRow?.total_due || 0);
+
+      // 5. Alert flags
+      const isAutoRenew = Boolean(sub.auto_renew === true || sub.auto_renew === 't' || sub.auto_renew === 'true');
+      const isPostpaid = sub.payment_type === 'postpaid';
+
+      // For auto_renew prepaid: estimate next renewal cost from weekly schedule
+      let nextRenewalEstimate = 0;
+      if (isAutoRenew && !isPostpaid) {
+        const schedRes = await this.db.query(
+          `SELECT sws.m_quantity, sws.e_quantity, si.unit_price
+           FROM subscription_weekly_schedule sws
+           JOIN subscription_items si ON si.id = sws.subscription_item_id
+           WHERE sws.subscription_id = $1`,
+          [subscriptionId],
+        );
+        const schedRows = Array.isArray(schedRes) ? schedRes : [];
+        for (const row of schedRows) {
+          nextRenewalEstimate += (Number(row.m_quantity) + Number(row.e_quantity)) * Number(row.unit_price);
+        }
+        // Multiply by average days in month (30) / 7 days
+        nextRenewalEstimate = Math.round((nextRenewalEstimate / 7) * 30);
+      }
+
+      const alertLowBalance = isAutoRenew && !isPostpaid && nextRenewalEstimate > 0 && walletBalance < nextRenewalEstimate;
+      const alertOutstandingBills = outstandingBillCount > 0;
+
+      return {
+        status: true,
+        wallet_balance: walletBalance,
+        next_renewal_estimate: nextRenewalEstimate,
+        outstanding_bill_count: outstandingBillCount,
+        outstanding_amount: outstandingAmount,
+        alert_low_balance: alertLowBalance,
+        alert_outstanding_bills: alertOutstandingBills,
+        latest_bills: latestBills,
+      };
+    } catch (error) {
+      this.developer.error('getSubscriptionDetail error', { error, subscriptionId });
+      return {
+        status: false,
+        wallet_balance: 0,
+        next_renewal_estimate: 0,
+        outstanding_bill_count: 0,
+        outstanding_amount: 0,
+        alert_low_balance: false,
+        alert_outstanding_bills: false,
+        latest_bills: [],
+      };
+    }
+  }
+
+  async getSubscriptionBills(subscriptionId: string) {
+    this.developer.debug('SubscriptionsService.getSubscriptionBills called', { subscriptionId });
+    try {
+      const billsRes = await this.db.query(
+        `SELECT
+           bill_id, customer_id, bill_type, reference_id, payment_type, payment_method,
+           billing_from, billing_to, due_date, subtotal, discount_amount, tax_amount,
+           total_amount, paid_amount, due_amount, status, remarks, created_at, updated_at
+         FROM customer_bills
+         WHERE reference_id = $1
+         ORDER BY created_at DESC`,
+        [subscriptionId],
+      );
+      return {
+        status: true,
+        data: Array.isArray(billsRes) ? billsRes : [],
+      };
+    } catch (error) {
+      this.developer.error('getSubscriptionBills error', { error, subscriptionId });
+      return { status: false, data: [] };
     }
   }
 }

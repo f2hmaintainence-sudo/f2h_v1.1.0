@@ -130,37 +130,37 @@ export class AuthService {
     }
 
     // Check lock status
-    if (user.locked_at) {
-      const lockoutDuration = 30 * 60 * 1000; // 30 minutes
-      if (
-        new Date().getTime() - new Date(user.locked_at).getTime() <
-        lockoutDuration
-      ) {
-        const remainingTime = Math.ceil(
-          (lockoutDuration -
-            (new Date().getTime() - new Date(user.locked_at).getTime())) /
-          60000,
-        );
+    // if (user.locked_at) {
+    //   const lockoutDuration = 30 * 60 * 1000; // 30 minutes
+    //   if (
+    //     new Date().getTime() - new Date(user.locked_at).getTime() <
+    //     lockoutDuration
+    //   ) {
+    //     const remainingTime = Math.ceil(
+    //       (lockoutDuration -
+    //         (new Date().getTime() - new Date(user.locked_at).getTime())) /
+    //       60000,
+    //     );
 
-        this.auditLogger.logAccountLockout({
-          userId: user.user_id,
-          email: user.email,
-          ip: ip || 'unknown',
-          reason: 'Account locked - multiple failed attempts',
-        });
+    //     this.auditLogger.logAccountLockout({
+    //       userId: user.user_id,
+    //       email: user.email,
+    //       ip: ip || 'unknown',
+    //       reason: 'Account locked - multiple failed attempts',
+    //     });
 
-        throw new ForbiddenException(
-          `Account is locked due to multiple failed login attempts. Please try again in ${remainingTime} minutes.`,
-        );
-      } else {
-        // Unlock account after lockout duration has passed
-        await this.Data.update(
-          'users',
-          { locked_at: null },
-          [{ column: 'user_id', operator: '=', value: user.user_id }],
-        );
-      }
-    }
+    //     throw new ForbiddenException(
+    //       `Account is locked due to multiple failed login attempts. Please try again in ${remainingTime} minutes.`,
+    //     );
+    //   } else {
+    //     // Unlock account after lockout duration has passed
+    //     await this.Data.update(
+    //       'users',
+    //       { locked_at: null },
+    //       [{ column: 'user_id', operator: '=', value: user.user_id }],
+    //     );
+    //   }
+    // }
 
     // Verify Password
     const passwordMatch = await bcrypt.compare(password, user.password);

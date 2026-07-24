@@ -83,6 +83,18 @@ export class SubscriptionsController {
     return this.service.getPauseHistory(id);
   }
 
+  @Public()
+  @Get(':id/detail')
+  async getSubscriptionDetail(@Param('id') id: string) {
+    return this.service.getSubscriptionDetail(id);
+  }
+
+  @Public()
+  @Get(':id/bills')
+  async getSubscriptionBills(@Param('id') id: string) {
+    return this.service.getSubscriptionBills(id);
+  }
+
   // @Public()
   // @Post(':id/cancel')
   // async cancelSubscriptionItem(@Param('id') id: string) {
