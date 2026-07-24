@@ -31,18 +31,26 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _onLoginPressed() {
-    if (_usernameController.text.isNotEmpty && _passwordController.text.isNotEmpty) {
-      context.read<AuthBloc>().add(
-        LoginRequested(
-          identifier: _usernameController.text.trim(),
-          password: _passwordController.text,
-        ),
-      );
-    } else {
+    final identifier = _usernameController.text.trim();
+    final password = _passwordController.text;
+
+    if (identifier.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter email or mobile number and password'))
+        const SnackBar(content: Text('Please enter your email or mobile number')),
       );
+      return;
     }
+
+    if (password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your password')),
+      );
+      return;
+    }
+
+    context.read<AuthBloc>().add(
+      LoginRequested(identifier: identifier, password: password),
+    );
   }
 
   @override

@@ -1,149 +1,117 @@
 import 'package:flutter/material.dart';
+import 'package:f2h_customer/core/di/injection.dart';
+import 'package:f2h_customer/core/api/dio_client.dart';
+import 'package:f2h_customer/core/api/api_endpoints.dart';
+import 'package:f2h_customer/app.dart';
 
-class ImageBanner extends StatelessWidget {
+/// Fetches banners from the API and displays them as a tappable carousel.
+/// Tapping navigates to the route specified by each banner (e.g. Subscribe tab).
+class ImageBanner extends StatefulWidget {
   const ImageBanner({super.key});
 
   @override
+  State<ImageBanner> createState() => _ImageBannerState();
+}
+
+class _ImageBannerState extends State<ImageBanner> {
+  List<Map<String, dynamic>> _banners = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchBanners();
+  }
+
+  Future<void> _fetchBanners() async {
+    try {
+      final resp = await sl<DioClient>().dio.get(ApiEndpoints.banners);
+      final data = resp.data;
+      if (data['status'] == true && data['data'] is List) {
+        final list = (data['data'] as List)
+            .where((b) => b['isActive'] == true)
+            .map((b) => Map<String, dynamic>.from(b as Map))
+            .toList();
+        if (mounted) setState(() { _banners = list; _loading = false; });
+      } else {
+        if (mounted) setState(() => _loading = false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _onBannerTap(Map<String, dynamic> banner) {
+    final route = banner['route']?.toString() ?? '';
+    if (route == 'subscribe') {
+      // Navigate to Subscribe tab (index 3) via AppShell
+      final shellState = context.findAncestorStateOfType<AppShellState>();
+      shellState?.setTab(3);
+    }
+    // ponytail: extend with other routes (e.g. 'menu', 'cart') when needed
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        height: 140,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          color: Colors.grey.shade200,
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 24, height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    if (_banners.isEmpty) return const SizedBox.shrink();
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF16A34A), Color(0xFF15803D)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF16A34A).withValues(alpha: 0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
-        child: AspectRatio(
-          aspectRatio: 1024 / 450, // Premium banner aspect ratio
-          child: Stack(
-            children: [
-              // Decorative circle shapes in background
-              Positioned(
-                right: -40,
-                bottom: -40,
-                child: Container(
-                  width: 180,
-                  height: 180,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.04),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 20,
-                top: -30,
-                child: Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.03),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-              // Main content
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE5A93B).withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: const Color(0xFFE5A93B).withValues(alpha: 0.4),
-                              ),
-                            ),
-                            child: const Text(
-                              'DAILY SUBSCRIPTION',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFFE5A93B),
-                                letterSpacing: 1.0,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          const Text(
-                            'Save Up To 5%',
-                            style: TextStyle(
-                              fontSize: 22,
-                              // fontWeight: FontWeight.w950,
-                              color: Colors.white,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Subscribe to fresh milk, curd, paneer & more for hassle-free morning deliveries.',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white.withValues(alpha: 0.8),
-                              height: 1.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Visual illustration icon container
-                    Expanded(
-                      flex: 1,
-                      child: Center(
-                        child: Container(
-                          width: 68,
-                          height: 68,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.08),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Center(
-                            child: Icon(
-                              Icons.calendar_today_rounded,
-                              color: Color(0xFFE5A93B),
-                              size: 32,
-                            ),
+        child: SizedBox(
+          height: 140,
+          child: PageView.builder(
+            itemCount: _banners.length,
+            itemBuilder: (context, index) {
+              final banner = _banners[index];
+              final imageUrl = banner['imageUrl']?.toString() ?? '';
+              return GestureDetector(
+                onTap: () => _onBannerTap(banner),
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  loadingBuilder: (_, child, progress) {
+                    if (progress == null) return child;
+                    return Container(
+                      color: const Color(0xFF16A34A),
+                      child: const Center(
+                        child: SizedBox(
+                          width: 24, height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white,
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              // Subtle border overlay
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.08),
-                      width: 1.2,
+                    );
+                  },
+                  errorBuilder: (_, __, ___) => Container(
+                    color: const Color(0xFF16A34A),
+                    child: const Center(
+                      child: Icon(Icons.image_not_supported, color: Colors.white54),
                     ),
                   ),
                 ),
-              ),
-            ],
+              );
+            },
           ),
         ),
       ),

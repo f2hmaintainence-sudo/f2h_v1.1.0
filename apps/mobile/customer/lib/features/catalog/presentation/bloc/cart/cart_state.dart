@@ -13,7 +13,12 @@ class CartLoadedState extends CartState {
 
   CartLoadedState({
     required this.items,
-    required this.calculations,
+    this.calculations = const CartCalculationsEntity(
+      subtotal: 0,
+      deliveryFee: 0,
+      taxes: 0,
+      grandTotal: 0,
+    ),
   });
 }
 

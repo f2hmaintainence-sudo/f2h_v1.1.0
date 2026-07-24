@@ -15,8 +15,9 @@ extension AuthGuardExtension on BuildContext {
   ///   to be loaded, and then executes [action].
   Future<void> runWithAuth(VoidCallback action) async {
     final authState = read<AuthBloc>().state;
+    final sessionState = read<CustomerSessionCubit>().state;
     
-    if (authState is Authenticated) {
+    if (authState is Authenticated || sessionState.profile != null) {
       action();
     } else {
       // User is not authenticated. Push LoginScreen with popOnSuccess set to true.

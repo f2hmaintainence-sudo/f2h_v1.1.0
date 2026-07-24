@@ -167,7 +167,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           }
         }
       }
-    } else {
+    }
+
+    if (checkoutItems.isEmpty) {
       checkoutItems.addAll(allItems);
     }
     return checkoutItems;

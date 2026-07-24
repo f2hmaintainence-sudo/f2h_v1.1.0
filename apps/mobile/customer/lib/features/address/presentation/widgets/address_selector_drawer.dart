@@ -35,7 +35,9 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
 
   void _openAddAddress(BuildContext context, {AddressModel? existing}) {
     final authState = context.read<AuthBloc>().state;
-    if (authState is! Authenticated) {
+    final sessionState = context.read<CustomerSessionCubit>().state;
+    final isLoggedIn = authState is Authenticated || sessionState.profile != null;
+    if (!isLoggedIn) {
       F2HToast.error(context, 'Please log in to manage addresses.');
       Navigator.push(
         context,

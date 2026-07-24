@@ -273,7 +273,12 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       emit(CartLoadedState(items: _currentItems, calculations: result.calculations));
     } catch (e) {
       print('=== [CartBloc] Error loading cart from backend: $e');
-      emit(CartErrorState(extractErrorMessage(e)));
+      final errMsg = extractErrorMessage(e);
+      if (errMsg.toLowerCase().contains('unauthorized') || errMsg.contains('401')) {
+        emit(CartLoadedState(items: _currentItems));
+      } else {
+        emit(CartErrorState(errMsg));
+      }
     }
   }
 
