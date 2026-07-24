@@ -9,11 +9,15 @@ pipeline {
                 cd apps/api
                 npm install --no-audit --no-fund
                 npm run build
-                # Sync compiled backend if live directory exists
-                if [ -d "/home/f2hfresh/htdocs/f2hfresh.com" ]; then
-                    cp -r dist /home/f2hfresh/htdocs/f2hfresh.com/apps/api/ 2>/dev/null || true
-                fi
-                pm2 restart api-f2hfresh || pm2 restart all || pm2 reload all || pm2 start npm --name "api-f2hfresh" -- run start
+                # Sync build output to potential live deployment paths
+                for dir in "/home/f2hfresh/htdocs/f2hfresh.com/apps/api" "/var/www/f2hfresh/apps/api" "/home/f2hfresh/apps/api"; do
+                    if [ -d "$dir" ]; then
+                        echo "Syncing backend dist to $dir..."
+                        cp -r dist "$dir/" 2>/dev/null || true
+                        cp -r src "$dir/" 2>/dev/null || true
+                    fi
+                done
+                pm2 restart api-f2hfresh --update-env || pm2 restart all || pm2 reload all || pm2 start npm --name "api-f2hfresh" -- run start
                 echo "========== BACKEND DEPLOYMENT SUCCESS =========="
                 '''
             }
@@ -26,12 +30,15 @@ pipeline {
                 cd apps/web
                 npm install --no-audit --no-fund
                 npm run build
-                # Sync compiled frontend build if live directory exists
-                if [ -d "/home/f2hfresh/htdocs/f2hfresh.com" ]; then
-                    cp -r .next /home/f2hfresh/htdocs/f2hfresh.com/apps/web/ 2>/dev/null || true
-                    cp -r .next /home/f2hfresh/htdocs/f2hfresh.com/ 2>/dev/null || true
-                fi
-                pm2 restart frontend-f2hfresh || pm2 restart all || pm2 reload all || pm2 start npm --name "frontend-f2hfresh" -- run start
+                # Sync build output to potential live deployment paths
+                for dir in "/home/f2hfresh/htdocs/f2hfresh.com/apps/web" "/home/f2hfresh/htdocs/f2hfresh.com" "/var/www/f2hfresh/apps/web" "/var/www/f2hfresh" "/home/f2hfresh/apps/web"; do
+                    if [ -d "$dir" ]; then
+                        echo "Syncing frontend .next to $dir..."
+                        cp -r .next "$dir/" 2>/dev/null || true
+                        cp -r src "$dir/" 2>/dev/null || true
+                    fi
+                done
+                pm2 restart frontend-f2hfresh --update-env || pm2 restart all || pm2 reload all || pm2 start npm --name "frontend-f2hfresh" -- run start
                 echo "========== FRONTEND DEPLOYMENT SUCCESS =========="
                 '''
             }
