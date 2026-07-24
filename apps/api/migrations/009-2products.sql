@@ -16,6 +16,7 @@ CREATE TABLE public.products
     ingredients TEXT,
     legal_info TEXT,
 
+    is_out_of_stock BOOLEAN NOT NULL DEFAULT false,
     is_subscribable BOOLEAN NOT NULL DEFAULT false,
     is_one_time BOOLEAN NOT NULL DEFAULT true,
     is_returnable BOOLEAN NOT NULL DEFAULT false,

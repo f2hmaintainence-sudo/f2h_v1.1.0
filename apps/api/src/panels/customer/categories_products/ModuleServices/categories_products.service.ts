@@ -76,13 +76,19 @@ export class CategoriesProductsService {
         'products.name AS product_name',
         'products.slug',
         'products.description',
+        'products.highlights',
+        'products.ingredients',
+        'products.legal_info',
+        'products.is_out_of_stock',
         'products.is_subscribable',
         'products.is_one_time',
         'product_variants.subscription_price',
         'categories.name AS category',
         'product_variants.image_url AS variant_image',
         'products.image_url AS product_image',
-        'product_images.url AS gallery_image'
+        'product_images.url AS gallery_image',
+        'stock_balances.available_quantity',
+        'stock_balances.low_stock_threshold'
       ],
       joins: [
         {
@@ -90,6 +96,13 @@ export class CategoriesProductsService {
           table: 'products',
           on: [
             ['product_variants.product_id', 'products.product_id']
+          ]
+        },
+        {
+          type: 'left',
+          table: 'stock_balances',
+          on: [
+            ['product_variants.variant_id', 'stock_balances.product_variant_id']
           ]
         },
         {
@@ -127,8 +140,6 @@ export class CategoriesProductsService {
 
     const baseUrl = process.env.BACKEND_URL || 'http://localhost:8000';
 
-    // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
-    // Fetch aggregated ratings/reviews for products
     let ratingsMap = new Map<string, any>();
     try {
       const ratingRows = await this.db.query(
@@ -150,15 +161,29 @@ export class CategoriesProductsService {
       console.error('Error fetching product ratings in getProducts:', e);
     }
 
-    // Map the relative paths to full absolute URLs for the mobile/frontend app
     const mappedData = (response.data || []).map((item: any) => {
       const ratingInfo = ratingsMap.get(item.product_id) ?? { rating: 0.0, reviews: 0 };
       const rawImage = item.variant_image || item.product_image || item.gallery_image;
+
+      const isProductOutOfStock = Boolean(item.is_out_of_stock);
+      let isLowStock = false;
+
+      // Only check variant stock balance if products.is_out_of_stock is true
+      if (isProductOutOfStock) {
+        const availQty = item.available_quantity != null ? Number(item.available_quantity) : 0;
+        const lowThreshold = item.low_stock_threshold != null ? Number(item.low_stock_threshold) : 10;
+        if (availQty < lowThreshold || availQty <= 0) {
+          isLowStock = true;
+        }
+      }
+
       return {
         ...item,
         image_path: normalizeImagePath(rawImage, baseUrl),
         rating: ratingInfo.rating,
         reviews: ratingInfo.reviews,
+        is_low_stock: isLowStock,
+        is_one_time: isLowStock ? false : Boolean(item.is_one_time),
       };
     });
 
@@ -177,13 +202,19 @@ export class CategoriesProductsService {
         'products.name AS product_name',
         'products.slug',
         'products.description',
+        'products.highlights',
+        'products.ingredients',
+        'products.legal_info',
+        'products.is_out_of_stock',
         'products.is_subscribable',
         'products.is_one_time',
         'product_variants.subscription_price',
         'categories.name AS category',
         'product_variants.image_url AS variant_image',
         'products.image_url AS product_image',
-        'product_images.url AS gallery_image'
+        'product_images.url AS gallery_image',
+        'stock_balances.available_quantity',
+        'stock_balances.low_stock_threshold'
       ],
       joins: [
         {
@@ -191,6 +222,13 @@ export class CategoriesProductsService {
           table: 'products',
           on: [
             ['product_variants.product_id', 'products.product_id']
+          ]
+        },
+        {
+          type: 'left',
+          table: 'stock_balances',
+          on: [
+            ['product_variants.variant_id', 'stock_balances.product_variant_id']
           ]
         },
         {
@@ -233,8 +271,6 @@ export class CategoriesProductsService {
 
     const baseUrl = process.env.BACKEND_URL || 'http://localhost:8000';
 
-    // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
-    // Fetch aggregated ratings/reviews for products
     let ratingsMap = new Map<string, any>();
     try {
       const ratingRows = await this.db.query(
@@ -256,15 +292,29 @@ export class CategoriesProductsService {
       console.error('Error fetching product ratings in getProductsByCategoryId:', e);
     }
 
-    // Map the relative paths to full absolute URLs for the mobile/frontend app
     const mappedData = (response.data || []).map((item: any) => {
       const ratingInfo = ratingsMap.get(item.product_id) ?? { rating: 0.0, reviews: 0 };
       const rawImage = item.variant_image || item.product_image || item.gallery_image;
+
+      const isProductOutOfStock = Boolean(item.is_out_of_stock);
+      let isLowStock = false;
+
+      // Only check variant stock balance if products.is_out_of_stock is true
+      if (isProductOutOfStock) {
+        const availQty = item.available_quantity != null ? Number(item.available_quantity) : 0;
+        const lowThreshold = item.low_stock_threshold != null ? Number(item.low_stock_threshold) : 10;
+        if (availQty < lowThreshold || availQty <= 0) {
+          isLowStock = true;
+        }
+      }
+
       return {
         ...item,
         image_path: normalizeImagePath(rawImage, baseUrl),
         rating: ratingInfo.rating,
         reviews: ratingInfo.reviews,
+        is_low_stock: isLowStock,
+        is_one_time: isLowStock ? false : Boolean(item.is_one_time),
       };
     });
 
