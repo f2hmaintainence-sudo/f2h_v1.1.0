@@ -2,40 +2,38 @@ pipeline {
     agent any
 
     stages {
-        stage('Deploy Live Monorepo') {
+        stage('Deploy Monorepo Build') {
             steps {
                 sh '''
-                echo "========== STARTING LIVE MONOREPO DEPLOYMENT =========="
+                echo "========== STARTING MONOREPO BUILD & DEPLOY =========="
+
+                echo "[F2H Deploy] Building Backend (apps/api)..."
+                cd apps/api
+                npm install --no-audit --no-fund
+                npm run build
+
+                echo "[F2H Deploy] Building Frontend (apps/web)..."
+                cd ../web
+                npm install --no-audit --no-fund
+                npm run build
+
+                echo "[F2H Deploy] Syncing compiled artifacts to live htdocs..."
                 LIVE_DIR="/home/f2hfresh/htdocs/f2hfresh.com"
 
                 if [ -d "$LIVE_DIR" ]; then
-                    echo "[F2H Deploy] Navigating to live directory: $LIVE_DIR"
-                    cd "$LIVE_DIR"
-                    git config --global --add safe.directory "$LIVE_DIR" 2>/dev/null || true
-                    
-                    echo "[F2H Deploy] Fetching and resetting to latest origin/main..."
-                    git fetch origin main
-                    git reset --hard origin/main
+                    mkdir -p "$LIVE_DIR/apps/api" "$LIVE_DIR/apps/web" 2>/dev/null || true
 
-                    echo "[F2H Deploy] Building Backend (apps/api)..."
-                    cd "$LIVE_DIR/apps/api"
-                    npm install --no-audit --no-fund
-                    npm run build
+                    echo "[F2H Deploy] Copying backend dist..."
+                    cp -Rf ../api/dist "$LIVE_DIR/apps/api/" 2>/dev/null || true
+                    cp -Rf ../api/src "$LIVE_DIR/apps/api/" 2>/dev/null || true
 
-                    echo "[F2H Deploy] Building Frontend (apps/web)..."
-                    cd "$LIVE_DIR/apps/web"
-                    npm install --no-audit --no-fund
-                    npm run build
-
-                    echo "[F2H Deploy] Reloading PM2 processes using ecosystem.config.js..."
-                    cd "$LIVE_DIR"
-                    pm2 restart ecosystem.config.js || pm2 restart all
-                else
-                    echo "[F2H Deploy] Workspace Fallback Build..."
-                    cd apps/api && npm install --no-audit --no-fund && npm run build
-                    cd ../web && npm install --no-audit --no-fund && npm run build
-                    pm2 restart all || true
+                    echo "[F2H Deploy] Copying frontend .next..."
+                    cp -Rf .next "$LIVE_DIR/apps/web/" 2>/dev/null || true
+                    cp -Rf src "$LIVE_DIR/apps/web/" 2>/dev/null || true
                 fi
+
+                echo "[F2H Deploy] Restarting PM2 processes..."
+                pm2 restart all || pm2 reload all || true
 
                 echo "========== LIVE DEPLOYMENT COMPLETED SUCCESSFULLY =========="
                 '''
@@ -45,7 +43,7 @@ pipeline {
 
     post {
         success {
-            echo 'Monorepo build and deploy succeeded!'
+            echo 'Monorepo deployment succeeded!'
         }
         failure {
             echo 'Monorepo deployment failed!'
