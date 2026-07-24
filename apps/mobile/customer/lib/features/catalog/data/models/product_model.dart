@@ -14,12 +14,19 @@ class ProductVariant {
   final double price;
   final double originalPrice;
   final double? subscriptionPrice;
+  final double? availableQuantity;
+  final double? lowStockThreshold;
+  final bool isLowStock;
+
   const ProductVariant({
     required this.id,
     required this.label,
     required this.price,
     required this.originalPrice,
     this.subscriptionPrice,
+    this.availableQuantity,
+    this.lowStockThreshold,
+    this.isLowStock = false,
   });
 
   Map<String, dynamic> toJson() {
@@ -29,6 +36,9 @@ class ProductVariant {
       'price': price,
       'originalPrice': originalPrice,
       'subscriptionPrice': subscriptionPrice,
+      'availableQuantity': availableQuantity,
+      'lowStockThreshold': lowStockThreshold,
+      'isLowStock': isLowStock,
     };
   }
 
@@ -36,9 +46,12 @@ class ProductVariant {
     return ProductVariant(
       id: json['id'],
       label: json['label'],
-      price: json['price'],
-      originalPrice: json['originalPrice'],
+      price: json['price']?.toDouble() ?? 0.0,
+      originalPrice: json['originalPrice']?.toDouble() ?? 0.0,
       subscriptionPrice: json['subscriptionPrice']?.toDouble(),
+      availableQuantity: json['availableQuantity']?.toDouble(),
+      lowStockThreshold: json['lowStockThreshold']?.toDouble(),
+      isLowStock: json['isLowStock'] ?? false,
     );
   }
 }
@@ -52,7 +65,11 @@ class Product {
   final double price, originalPrice, rating;
   final double? subscriptionPrice;
   final int reviews;
-  final bool isOrganic, isSubscribable, isOneTime;
+  final bool isOrganic, isSubscribable, isOneTime, isOutOfStock, isLowStock;
+  final String? description;
+  final String? highlights;
+  final String? ingredients;
+  final String? legalInfo;
   final Color badgeColor;
   final List<ProductVariant> variants;
   final String? imageAsset;
@@ -72,6 +89,12 @@ class Product {
     this.isOrganic = false,
     this.isSubscribable = true,
     this.isOneTime = true,
+    this.isOutOfStock = false,
+    this.isLowStock = false,
+    this.description,
+    this.highlights,
+    this.ingredients,
+    this.legalInfo,
     required this.badge,
     required this.badgeColor,
     this.variants = const [],
@@ -110,13 +133,18 @@ class Product {
       'badge': badge,
       'price': price,
       'originalPrice': originalPrice,
-      // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
       'subscriptionPrice': subscriptionPrice,
       'rating': rating,
       'reviews': reviews,
       'isOrganic': isOrganic,
       'isSubscribable': isSubscribable,
       'isOneTime': isOneTime,
+      'isOutOfStock': isOutOfStock,
+      'isLowStock': isLowStock,
+      'description': description,
+      'highlights': highlights,
+      'ingredients': ingredients,
+      'legalInfo': legalInfo,
       'badgeColor': badgeColor.value,
       'variants': variants.map((v) => v.toJson()).toList(),
       'imageAsset': imageAsset,
@@ -133,15 +161,20 @@ class Product {
       category: json['category'],
       emoji: json['emoji'],
       badge: json['badge'],
-      price: json['price'],
-      originalPrice: json['originalPrice'],
-      // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
+      price: json['price']?.toDouble() ?? 0.0,
+      originalPrice: json['originalPrice']?.toDouble() ?? 0.0,
       subscriptionPrice: json['subscriptionPrice']?.toDouble(),
-      rating: json['rating'],
-      reviews: json['reviews'],
+      rating: json['rating']?.toDouble() ?? 0.0,
+      reviews: json['reviews'] ?? 0,
       isOrganic: json['isOrganic'] ?? false,
       isSubscribable: json['isSubscribable'] ?? true,
       isOneTime: json['isOneTime'] ?? true,
+      isOutOfStock: json['isOutOfStock'] ?? false,
+      isLowStock: json['isLowStock'] ?? false,
+      description: json['description'],
+      highlights: json['highlights'],
+      ingredients: json['ingredients'],
+      legalInfo: json['legalInfo'],
       badgeColor: Color(json['badgeColor']),
       variants: json['variants'] != null
           ? (json['variants'] as List).map((v) => ProductVariant.fromJson(v)).toList()

@@ -289,6 +289,32 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                             style: const TextStyle(
                                 fontSize: 13, color: kTextSub),
                           ),
+                          if (p.isLowStock || p.isOutOfStock || _selectedVariant.isLowStock) ...[
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFEBEE),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFFEF5350)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.warning_amber_rounded, size: 14, color: Color(0xFFD32F2F)),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'LOW STOCK — One-Time Order Unavailable',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFFD32F2F),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 12),
 
                           if (p.allVariants.length > 1) ...[
@@ -505,12 +531,68 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    'Sourced from locally vetted farms. Pasteurized under strict temperature controls to keep nutrients intact. FSSAI certified and tested for 75+ adulterants.',
+                                    (p.description != null && p.description!.isNotEmpty)
+                                        ? p.description!
+                                        : 'Sourced from locally vetted farms. Pasteurized under strict temperature controls to keep nutrients intact. FSSAI certified and tested for 75+ adulterants.',
                                     style: const TextStyle(
                                         fontSize: 12,
                                         color: kTextSub,
                                         height: 1.5),
                                   ),
+                                  if (p.highlights != null && p.highlights!.isNotEmpty) ...[
+                                    const SizedBox(height: 10),
+                                    const Text(
+                                      'Highlights',
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: kText),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      p.highlights!,
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          color: kTextSub,
+                                          height: 1.4),
+                                    ),
+                                  ],
+                                  if (p.ingredients != null && p.ingredients!.isNotEmpty) ...[
+                                    const SizedBox(height: 10),
+                                    const Text(
+                                      'Ingredients',
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: kText),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      p.ingredients!,
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          color: kTextSub,
+                                          height: 1.4),
+                                    ),
+                                  ],
+                                  if (p.legalInfo != null && p.legalInfo!.isNotEmpty) ...[
+                                    const SizedBox(height: 10),
+                                    const Text(
+                                      'Legal Information',
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: kText),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      p.legalInfo!,
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          color: kTextSub,
+                                          height: 1.4),
+                                    ),
+                                  ],
                                   const SizedBox(height: 10),
                                   _infoRow('Shelf Life', '2 Days (Refrigerated)'),
                                   _infoRow('FSSAI', 'Certified · All Clear'),
@@ -841,27 +923,33 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
           ctx.read<CartBloc>().add(RemoveFromCartEvent(cartItem));
         }
 
+        final isLowStockOrNoOneTime = !p.isOneTime || p.isLowStock || p.isOutOfStock || _selectedVariant.isLowStock;
+
         if (qty == 0) {
           return SizedBox(
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                ctx.runWithAuth(() => dispatchAdd());
-              },
+              onPressed: isLowStockOrNoOneTime
+                  ? null
+                  : () {
+                      HapticFeedback.lightImpact();
+                      ctx.runWithAuth(() => dispatchAdd());
+                    },
               style: ElevatedButton.styleFrom(
-                backgroundColor: kPrimary,
-                foregroundColor: Colors.white,
+                backgroundColor: isLowStockOrNoOneTime ? const Color(0xFFE0E0E0) : kPrimary,
+                foregroundColor: isLowStockOrNoOneTime ? const Color(0xFF757575) : Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
               child: Text(
-                'ADD TO CART — ₹${_selectedVariant.price.toStringAsFixed(0)}',
+                isLowStockOrNoOneTime
+                    ? 'LOW STOCK — ONE TIME ORDER UNAVAILABLE'
+                    : 'ADD TO CART — ₹${_selectedVariant.price.toStringAsFixed(0)}',
                 style: const TextStyle(
-                  fontSize: 15,
+                  fontSize: 13,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 0.5,
                 ),
