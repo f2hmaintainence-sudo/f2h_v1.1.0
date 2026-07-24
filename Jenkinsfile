@@ -9,7 +9,11 @@ pipeline {
                 cd apps/api
                 npm install --no-audit --no-fund
                 npm run build
-                pm2 restart api-f2hfresh || sudo pm2 restart api-f2hfresh || pm2 start npm --name "api-f2hfresh" -- run start
+                # Sync compiled backend if live directory exists
+                if [ -d "/home/f2hfresh/htdocs/f2hfresh.com" ]; then
+                    cp -r dist /home/f2hfresh/htdocs/f2hfresh.com/apps/api/ 2>/dev/null || true
+                fi
+                pm2 restart api-f2hfresh || pm2 start npm --name "api-f2hfresh" -- run start
                 echo "========== BACKEND DEPLOYMENT SUCCESS =========="
                 '''
             }
@@ -22,7 +26,12 @@ pipeline {
                 cd apps/web
                 npm install --no-audit --no-fund
                 npm run build
-                pm2 restart frontend-f2hfresh || sudo pm2 restart frontend-f2hfresh || pm2 start npm --name "frontend-f2hfresh" -- run start
+                # Sync compiled frontend build if live directory exists
+                if [ -d "/home/f2hfresh/htdocs/f2hfresh.com" ]; then
+                    cp -r .next /home/f2hfresh/htdocs/f2hfresh.com/apps/web/ 2>/dev/null || true
+                    cp -r .next /home/f2hfresh/htdocs/f2hfresh.com/ 2>/dev/null || true
+                fi
+                pm2 restart frontend-f2hfresh || pm2 start npm --name "frontend-f2hfresh" -- run start
                 echo "========== FRONTEND DEPLOYMENT SUCCESS =========="
                 '''
             }
