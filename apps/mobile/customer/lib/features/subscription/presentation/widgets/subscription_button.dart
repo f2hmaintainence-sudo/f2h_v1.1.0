@@ -49,10 +49,18 @@ class SubscriptionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!product.isSubscribable) return const SizedBox.shrink();
 
+    final subPrice = selectedVariant?.subscriptionPrice ?? product.subscriptionPrice;
+
     if (isCompact) {
-      return _CompactBadge(onTap: () => _openSetup(context));
+      return _CompactBadge(
+        onTap: () => _openSetup(context),
+        subscriptionPrice: subPrice,
+      );
     }
-    return _FullButton(onTap: () => _openSetup(context));
+    return _FullButton(
+      onTap: () => _openSetup(context),
+      subscriptionPrice: subPrice,
+    );
   }
 }
 
@@ -60,10 +68,14 @@ class SubscriptionButton extends StatelessWidget {
 
 class _CompactBadge extends StatelessWidget {
   final VoidCallback onTap;
-  const _CompactBadge({required this.onTap});
+  final double? subscriptionPrice;
+  const _CompactBadge({required this.onTap, this.subscriptionPrice});
 
   @override
   Widget build(BuildContext context) {
+    final hasPrice = subscriptionPrice != null && subscriptionPrice! > 0;
+    final label = hasPrice ? 'Subscribe @ ₹${subscriptionPrice!.toStringAsFixed(0)}' : 'Subscribe';
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -73,20 +85,20 @@ class _CompactBadge extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF1B4332).withOpacity(0.25),
+              color: const Color(0xFF1B4332).withValues(alpha: 0.25),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.autorenew_rounded, size: 9, color: Colors.white),
-            SizedBox(width: 3),
+            const Icon(Icons.autorenew_rounded, size: 9, color: Colors.white),
+            const SizedBox(width: 3),
             Text(
-              'Subscribe',
-              style: TextStyle(
+              label,
+              style: const TextStyle(
                 fontSize: 7.5,
                 fontWeight: FontWeight.w900,
                 color: Colors.white,
@@ -104,10 +116,14 @@ class _CompactBadge extends StatelessWidget {
 
 class _FullButton extends StatelessWidget {
   final VoidCallback onTap;
-  const _FullButton({required this.onTap});
+  final double? subscriptionPrice;
+  const _FullButton({required this.onTap, this.subscriptionPrice});
 
   @override
   Widget build(BuildContext context) {
+    final hasPrice = subscriptionPrice != null && subscriptionPrice! > 0;
+    final label = hasPrice ? 'Subscribe @ ₹${subscriptionPrice!.toStringAsFixed(0)}' : 'Subscribe & Save';
+
     return OutlinedButton.icon(
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
@@ -117,9 +133,9 @@ class _FullButton extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       icon: const Icon(Icons.autorenew_rounded, size: 16),
-      label: const Text(
-        'Subscribe & Save',
-        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+      label: Text(
+        label,
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
       ),
     );
   }

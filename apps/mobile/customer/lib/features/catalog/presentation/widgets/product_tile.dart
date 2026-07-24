@@ -121,7 +121,6 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
               runSpacing: 8,
               children: p.variants.map((v) {
                 final isSel = v.id == _selected.id;
-                final disc = (((v.originalPrice - v.price) / v.originalPrice) * 100).round();
                 return GestureDetector(
                   onTap: () => setState(() {
                     _selected = v;
@@ -443,33 +442,6 @@ class ProductCardH extends StatelessWidget {
                     child: _productImage(p, padding: 0.0),
                   ),
                 ),
-                // Discount badge hidden
-                if (false)
-                  Positioned(
-                    top: 8, left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFE9A600), Color(0xFFFFC857)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(100),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFE9A600).withValues(alpha: 0.15),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Text(
-                        '${(((p.originalPrice - p.price) / p.originalPrice) * 100).round()}% OFF',
-                        style: const TextStyle(fontSize: 7.5, fontWeight: FontWeight.w900, color: Color(0xFF1F1200), letterSpacing: 0.2),
-                      ),
-                    ),
-                  ),
                 // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
                 if (p.reviews > 0)
                   Positioned(
@@ -501,8 +473,25 @@ class ProductCardH extends StatelessWidget {
                       ),
                     ),
                   ),
-                // Organic badge
-                if (p.isOrganic)
+                // Low Stock badge
+                if (p.isLowStock || p.isOutOfStock)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFEBEE),
+                        borderRadius: BorderRadius.circular(100),
+                        border: Border.all(color: const Color(0xFFEF5350), width: 0.8),
+                      ),
+                      child: const Text(
+                        'LOW STOCK',
+                        style: TextStyle(fontSize: 6.5, fontWeight: FontWeight.w900, color: Color(0xFFD32F2F), letterSpacing: 0.3),
+                      ),
+                    ),
+                  )
+                else if (p.isOrganic)
                   Positioned(
                     top: 8, right: 8,
                     child: Container(
@@ -543,13 +532,6 @@ class ProductCardH extends StatelessWidget {
                   else
                     const SizedBox(height: 12),
                   const SizedBox(height: 6),
-                  // Subscription price badge
-                  if (p.isSubscribable && p.subscriptionPrice != null && p.subscriptionPrice! > 0) ...[
-                    SubscriptionPriceBadge.compact(
-                      subscriptionPrice: p.subscriptionPrice!,
-                    ),
-                    const SizedBox(height: 6),
-                  ],
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [

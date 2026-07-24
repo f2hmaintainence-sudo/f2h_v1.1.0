@@ -15,6 +15,8 @@ abstract class SubscriptionRemoteDataSource {
   Future<Map<String, dynamic>> cancelSubscriptionItem(String subscriptionItemId);
   Future<Map<String, dynamic>> cancelSubscription(String subscriptionId, {String? cancelReason, String? endDate});
   Future<List<dynamic>> getPauseHistory(String subscriptionId);
+  Future<Map<String, dynamic>> getSubscriptionDetail(String subscriptionId);
+  Future<List<dynamic>> getSubscriptionBills(String subscriptionId);
 }
 
 class SubscriptionRemoteDataSourceImpl implements SubscriptionRemoteDataSource {
@@ -160,5 +162,34 @@ class SubscriptionRemoteDataSourceImpl implements SubscriptionRemoteDataSource {
     if (raw is Map && raw['data'] is List) return raw['data'] as List;
     if (raw is List) return raw;
     return [];
+  }
+
+  @override
+  Future<Map<String, dynamic>> getSubscriptionDetail(String subscriptionId) async {
+    try {
+      final response = await dioClient.dio.get(
+        '${ApiEndpoints.subscriptions}/$subscriptionId/detail',
+      );
+      final raw = response.data;
+      if (raw is Map<String, dynamic>) return raw;
+      return {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  @override
+  Future<List<dynamic>> getSubscriptionBills(String subscriptionId) async {
+    try {
+      final response = await dioClient.dio.get(
+        '${ApiEndpoints.subscriptions}/$subscriptionId/bills',
+      );
+      final raw = response.data;
+      if (raw is Map && raw['data'] is List) return raw['data'] as List;
+      if (raw is List) return raw;
+      return [];
+    } catch (e) {
+      return [];
+    }
   }
 }
