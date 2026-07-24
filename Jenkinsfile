@@ -32,21 +32,22 @@ pipeline {
                     cp -Rf ../api/src "$LIVE_DIR/apps/api/" 2>/dev/null || true
                     cp -f ../api/package.json "$LIVE_DIR/apps/api/" 2>/dev/null || true
 
-                    # Copy frontend .next & package.json
+                    # Copy frontend .next & package.json & public
                     cp -Rf .next "$LIVE_DIR/apps/web/" 2>/dev/null || true
                     cp -Rf src "$LIVE_DIR/apps/web/" 2>/dev/null || true
+                    cp -Rf public "$LIVE_DIR/apps/web/" 2>/dev/null || true
                     cp -f package.json "$LIVE_DIR/apps/web/" 2>/dev/null || true
                 fi
 
                 echo "[F2H Deploy] Starting & Restarting PM2 via live ecosystem.config.js..."
                 if [ -f "$LIVE_DIR/ecosystem.config.js" ]; then
-                    pm2 start "$LIVE_DIR/ecosystem.config.js" || pm2 restart "$LIVE_DIR/ecosystem.config.js" || pm2 reload "$LIVE_DIR/ecosystem.config.js"
+                    sudo pm2 start "$LIVE_DIR/ecosystem.config.js" || sudo pm2 restart "$LIVE_DIR/ecosystem.config.js" || sudo pm2 reload "$LIVE_DIR/ecosystem.config.js"
                 else
-                    pm2 restart all || pm2 reload all || true
+                    sudo pm2 restart all || sudo pm2 reload all || true
                 fi
 
                 # Reload Nginx web server if running
-                nginx -s reload 2>/dev/null || true
+                sudo nginx -s reload 2>/dev/null || true
 
                 echo "========== LIVE DEPLOYMENT COMPLETED SUCCESSFULLY =========="
                 '''
