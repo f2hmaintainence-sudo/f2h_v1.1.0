@@ -189,6 +189,7 @@ export class CatalogSaveEditService {
         'is_subscribable',
         'is_one_time',
         'is_returnable',
+        'is_out_of_stock',
         'is_active',
       ];
 
@@ -287,6 +288,8 @@ export class CatalogSaveEditService {
         'is_subscribable',
         'is_one_time',
         'is_returnable',
+        'is_out_of_stock',
+        'packaging_type_id',
         'unit_type',
         'lift_days',
         'gst_percentage',
@@ -326,7 +329,6 @@ export class CatalogSaveEditService {
         }
       }
 
-      const primaryUrl = body.primary_image_url || body.image_url;
       const secondaryUrl = body.secondary_image_url;
       const secondaryImage = body.secondary_image_file ? this.normalizeProductImage(body.secondary_image_file) : undefined;
 

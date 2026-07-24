@@ -71,11 +71,29 @@ export class CatalogShowAddService {
         { label: 'Pack', value: 'pack' },
       ];
 
+      // Fetch active packaging types
+      const packagingTypesResult = await this.dataService.query('packaging_types', {
+        select: ['id', 'name'],
+        where: [
+          { column: 'status', operator: '=', value: 'active' },
+        ],
+        orderBy: 'name',
+        orderDirection: 'ASC',
+      });
+
+      const packagingOptions = [
+        { value: '', label: 'No Returnable Packaging (Disposable)' },
+        ...(packagingTypesResult.data || []).map((pkg: any) => ({
+          value: String(pkg.id),
+          label: pkg.name,
+        })),
+      ];
+
       // =====================================================
       // GENERATE FIELDS
       // =====================================================
 
-      const fields = this.catalogFields(categoryOptions, unitOptions);
+      const fields = this.catalogFields(categoryOptions, packagingOptions);
 
       // =====================================================
       // RESPONSE
@@ -167,7 +185,7 @@ export class CatalogShowAddService {
   /** Shared field definitions — used by both showAdd and showEdit */
   catalogFields(
     categoryOptions: any[] = [],
-    unitOptions: any[] = [],
+    packagingOptions: any[] = [],
   ): FieldDef[] {
     return [
       { name: 'name', label: 'Product Name', type: 'text', required: true, width: 'half', group: 'Basic Identity', placeholder: 'Enter product name', validation: { minLength: 2, maxLength: 200 }, },
@@ -182,9 +200,11 @@ export class CatalogShowAddService {
       { name: 'secondary_image_file', label: 'Or Upload Secondary Image', type: 'file', required: false, width: 'half', group: 'Product Images (Min 1 Mandatory, Max 2)', accept: 'image/png,image/jpeg,image/webp', crop: true, aspectRatio: 1, cropWidth: 800, cropHeight: 800, },
       { name: 'lift_days', label: 'Lift Days', type: 'number', required: false, width: 'half', group: 'Units & Rules', placeholder: 'Days for subscription lift', validation: { min: 0, max: 365 }, },
       { name: 'gst_percentage', label: 'GST Percentage', type: 'number', required: false, width: 'half', group: 'Units & Rules', defaultValue: 0, placeholder: '0.00', validation: { min: 0, max: 100 }, },
+      { name: 'packaging_type_id', label: 'Packaging Type (Returnable)', type: 'select', required: false, width: 'half', group: 'Units & Rules', options: packagingOptions, },
       { name: 'is_subscribable', label: 'Subscribable', type: 'toggle', required: false, width: 'quarter', group: 'Permissions', defaultValue: false, },
       { name: 'is_one_time', label: 'One-time Purchase', type: 'toggle', required: false, width: 'quarter', group: 'Permissions', defaultValue: true, },
       { name: 'is_returnable', label: 'Returnable', type: 'toggle', required: false, width: 'quarter', group: 'Permissions', defaultValue: false, },
+      { name: 'is_out_of_stock', label: 'Out of Stock', type: 'toggle', required: false, width: 'quarter', group: 'Permissions', defaultValue: false, },
       { name: 'is_active', label: 'Active', type: 'toggle', required: false, width: 'quarter', group: 'Permissions', defaultValue: true, },
     ];
   }
@@ -209,8 +229,6 @@ export class CatalogShowAddService {
       { name: 'status', label: 'Status', type: 'toggle', required: false, width: 'half', group: 'Management', defaultValue: true, toggleOptions: { onLabel: 'Active', offLabel: 'Inactive', pill: true }, },
       { name: 'manageable_qty', label: 'Manageable Quantity', type: 'number', required: false, width: 'half', group: 'Management', defaultValue: 0, placeholder: '0', validation: { min: 0, max: 99999 }, },
       { name: 'sort_order', label: 'Sort Order', type: 'number', required: false, width: 'half', group: 'Management', defaultValue: 0, placeholder: '0', validation: { min: 0, max: 9999 }, },
-      { name: 'is_out_of_stock', label: 'Out of Stock', type: 'toggle', required: false, width: 'half', group: 'Management', defaultValue: false, },
-      { name: 'packaging_type_id', label: 'Packaging Type (Returnable)', type: 'select', required: false, width: 'half', group: 'Management', options: packagingOptions, },
     ];
   }
 
