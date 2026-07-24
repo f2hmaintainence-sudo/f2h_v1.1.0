@@ -45,6 +45,9 @@ pipeline {
                     pm2 restart all || pm2 reload all || true
                 fi
 
+                # Reload Nginx web server if running
+                nginx -s reload 2>/dev/null || true
+
                 echo "========== LIVE DEPLOYMENT COMPLETED SUCCESSFULLY =========="
                 '''
             }
