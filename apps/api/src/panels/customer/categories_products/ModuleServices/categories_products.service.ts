@@ -65,6 +65,82 @@ export class CategoriesProductsService {
   }
 
   async getProducts() {
+    const response = await this.Data.query('product_variants', {
+      select: [
+        'product_variants.variant_id',
+        'product_variants.product_id',
+        'product_variants.name AS variant_name',
+        'product_variants.price',
+        'product_variants.unit_value',
+        'product_variants.unit_type',
+        'products.name AS product_name',
+        'products.slug',
+        'products.description',
+        'products.highlights',
+        'products.ingredients',
+        'products.legal_info',
+        'products.is_out_of_stock',
+        'products.is_subscribable',
+        'products.is_one_time',
+        'product_variants.subscription_price',
+        'categories.name AS category',
+        'product_variants.image_url AS variant_image',
+        'products.image_url AS product_image',
+        'product_images.url AS gallery_image',
+        'stock_balances.available_quantity',
+        'stock_balances.low_stock_threshold'
+      ],
+      joins: [
+        {
+          type: 'left',
+          table: 'products',
+          on: [
+            ['product_variants.product_id', 'products.product_id']
+          ]
+        },
+        {
+          type: 'left',
+          table: 'stock_balances',
+          on: [
+            ['product_variants.variant_id', 'stock_balances.product_variant_id']
+          ]
+        },
+        {
+          type: 'left',
+          table: 'product_images',
+          on: [
+            ['product_variants.variant_id', 'product_images.variant_id']
+          ]
+        },
+        {
+          type: 'left',
+          table: 'categories',
+          on: [
+            ['products.category_id', 'categories.category_id']
+          ]
+        }
+      ],
+      where: [
+        {
+          column: 'product_variants.status',
+          operator: '=',
+          value: 'active',
+        },
+        {
+          column: 'products.is_active',
+          operator: '=',
+          value: true,
+        }
+      ],
+    });
+
+    if (!response.status) {
+      console.error('DATABASE ERROR IN getProducts:', response);
+    }
+
+    const baseUrl = process.env.BACKEND_URL || 'http://localhost:8000';
+
+    let ratingsMap = new Map<string, any>();
     try {
       const query = `
         SELECT 
@@ -129,9 +205,118 @@ export class CategoriesProductsService {
       console.error('Error in getProducts service:', e);
       return { data: [] };
     }
+
+    const mappedData = (response.data || []).map((item: any) => {
+      const ratingInfo = ratingsMap.get(item.product_id) ?? { rating: 0.0, reviews: 0 };
+      const rawImage = item.variant_image || item.product_image || item.gallery_image;
+
+      const isProductOutOfStock = Boolean(item.is_out_of_stock);
+      let isLowStock = false;
+
+      // Only check variant stock balance if products.is_out_of_stock is true
+      if (isProductOutOfStock) {
+        const availQty = item.available_quantity != null ? Number(item.available_quantity) : 0;
+        const lowThreshold = item.low_stock_threshold != null ? Number(item.low_stock_threshold) : 10;
+        if (availQty < lowThreshold || availQty <= 0) {
+          isLowStock = true;
+        }
+      }
+
+      return {
+        ...item,
+        image_path: normalizeImagePath(rawImage, baseUrl),
+        rating: ratingInfo.rating,
+        reviews: ratingInfo.reviews,
+        is_low_stock: isLowStock,
+        is_one_time: isLowStock ? false : Boolean(item.is_one_time),
+      };
+    });
+
+    return { data: mappedData };
   }
 
   async getProductsByCategoryId(categoryId: string) {
+    const response = await this.Data.query('product_variants', {
+      select: [
+        'product_variants.variant_id',
+        'product_variants.product_id',
+        'product_variants.name AS variant_name',
+        'product_variants.price',
+        'product_variants.unit_value',
+        'product_variants.unit_type',
+        'products.name AS product_name',
+        'products.slug',
+        'products.description',
+        'products.highlights',
+        'products.ingredients',
+        'products.legal_info',
+        'products.is_out_of_stock',
+        'products.is_subscribable',
+        'products.is_one_time',
+        'product_variants.subscription_price',
+        'categories.name AS category',
+        'product_variants.image_url AS variant_image',
+        'products.image_url AS product_image',
+        'product_images.url AS gallery_image',
+        'stock_balances.available_quantity',
+        'stock_balances.low_stock_threshold'
+      ],
+      joins: [
+        {
+          type: 'left',
+          table: 'products',
+          on: [
+            ['product_variants.product_id', 'products.product_id']
+          ]
+        },
+        {
+          type: 'left',
+          table: 'stock_balances',
+          on: [
+            ['product_variants.variant_id', 'stock_balances.product_variant_id']
+          ]
+        },
+        {
+          type: 'left',
+          table: 'product_images',
+          on: [
+            ['product_variants.variant_id', 'product_images.variant_id']
+          ]
+        },
+        {
+          type: 'left',
+          table: 'categories',
+          on: [
+            ['products.category_id', 'categories.category_id']
+          ]
+        }
+      ],
+      where: [
+        {
+          column: 'product_variants.status',
+          operator: '=',
+          value: 'active',
+        },
+        {
+          column: 'products.is_active',
+          operator: '=',
+          value: true,
+        },
+        {
+          column: 'products.category_id',
+          operator: '=',
+          value: categoryId,
+        }
+      ],
+    });
+
+    if (!response.status) {
+      console.error('DATABASE ERROR IN getProductsByCategoryId:', response);
+    }
+
+    const baseUrl = process.env.BACKEND_URL || 'http://localhost:8000';
+
+    let ratingsMap = new Map<string, any>();
     try {
       const query = `
         SELECT 
@@ -198,6 +383,34 @@ export class CategoriesProductsService {
       console.error('Error in getProductsByCategoryId service:', e);
       return { data: [] };
     }
+
+    const mappedData = (response.data || []).map((item: any) => {
+      const ratingInfo = ratingsMap.get(item.product_id) ?? { rating: 0.0, reviews: 0 };
+      const rawImage = item.variant_image || item.product_image || item.gallery_image;
+
+      const isProductOutOfStock = Boolean(item.is_out_of_stock);
+      let isLowStock = false;
+
+      // Only check variant stock balance if products.is_out_of_stock is true
+      if (isProductOutOfStock) {
+        const availQty = item.available_quantity != null ? Number(item.available_quantity) : 0;
+        const lowThreshold = item.low_stock_threshold != null ? Number(item.low_stock_threshold) : 10;
+        if (availQty < lowThreshold || availQty <= 0) {
+          isLowStock = true;
+        }
+      }
+
+      return {
+        ...item,
+        image_path: normalizeImagePath(rawImage, baseUrl),
+        rating: ratingInfo.rating,
+        reviews: ratingInfo.reviews,
+        is_low_stock: isLowStock,
+        is_one_time: isLowStock ? false : Boolean(item.is_one_time),
+      };
+    });
+
+    return { data: mappedData };
   }
 
   // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]

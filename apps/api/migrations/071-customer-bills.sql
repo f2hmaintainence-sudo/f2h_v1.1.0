@@ -14,10 +14,15 @@ CREATE TABLE customer_bills (
     payment_type VARCHAR(20) NOT NULL,
     -- prepaid
     -- postpaid
+
+    payment_method VARCHAR(20) NOT NULL,
     -- wallet
     -- cod
-
+    -- upi
+    -- card
+    
     billing_from DATE,
+
     billing_to DATE,
 
     due_date DATE,
@@ -35,9 +40,7 @@ CREATE TABLE customer_bills (
     due_amount NUMERIC(12,2) DEFAULT 0,
 
     status VARCHAR(20) NOT NULL DEFAULT 'draft',
-    -- draft
     -- unpaid
-    -- partial
     -- paid
     -- cancelled
 

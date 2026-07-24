@@ -97,7 +97,14 @@ class CatalogRepositoryImpl implements CatalogRepository {
       final reviews = int.tryParse(baseItem['reviews']?.toString() ?? '') ?? 0;
       final isOrganic = _readBool(baseItem['is_organic'], fallback: false);
       final isSubscribable = _readBool(baseItem['is_subscribable'], fallback: true);
-      final isOneTime = _readBool(baseItem['is_one_time'], fallback: true);
+      
+      final description = baseItem['description']?.toString();
+      final highlights = baseItem['highlights']?.toString();
+      final ingredients = baseItem['ingredients']?.toString();
+      final legalInfo = baseItem['legal_info']?.toString();
+
+      final isProductOutOfStock = _readBool(baseItem['is_out_of_stock'], fallback: false);
+
       final imageAsset = baseItem['image_path']?.toString();
 
       final imagesList = groupItems
@@ -117,6 +124,8 @@ class CatalogRepositoryImpl implements CatalogRepository {
           imagesList.add(backsideImg);
         }
       }
+
+      bool productHasLowStock = isProductOutOfStock;
 
       final variants = <ProductVariant>[];
       for (final item in groupItems) {
@@ -154,8 +163,26 @@ class CatalogRepositoryImpl implements CatalogRepository {
         }
             
         final price = double.tryParse(item['price']?.toString() ?? '') ?? 0.0;
-        final subscriptionPrice = double.tryParse(item['subscription_price']?.toString() ?? '');  // ponytail: null when backend has no subscription_price, not price fallback
+        final subscriptionPrice = double.tryParse(item['subscription_price']?.toString() ?? '');
         final originalPrice = double.tryParse(item['original_price']?.toString() ?? '') ?? price;
+
+        final availQty = item['available_quantity'] != null ? double.tryParse(item['available_quantity'].toString()) : null;
+        final lowThreshold = item['low_stock_threshold'] != null ? double.tryParse(item['low_stock_threshold'].toString()) : 10.0;
+
+        bool isVariantLowStock = false;
+        if (isProductOutOfStock) {
+          if (_readBool(item['is_low_stock'], fallback: false) ||
+              availQty == null ||
+              lowThreshold == null ||
+              availQty < lowThreshold ||
+              availQty <= 0) {
+            isVariantLowStock = true;
+          }
+        }
+
+        if (isVariantLowStock) {
+          productHasLowStock = true;
+        }
             
         variants.add(ProductVariant(
           id: variantId,
@@ -163,8 +190,14 @@ class CatalogRepositoryImpl implements CatalogRepository {
           price: price,
           originalPrice: originalPrice,
           subscriptionPrice: subscriptionPrice,
+          availableQuantity: availQty,
+          lowStockThreshold: lowThreshold,
+          isLowStock: isVariantLowStock,
         ));
       }
+
+      final rawIsOneTime = _readBool(baseItem['is_one_time'], fallback: true);
+      final finalIsOneTime = productHasLowStock ? false : rawIsOneTime;
 
       // Base properties use the first variant's details
       final defaultVariant = variants.first;
@@ -185,7 +218,13 @@ class CatalogRepositoryImpl implements CatalogRepository {
         reviews: reviews,
         isOrganic: isOrganic,
         isSubscribable: isSubscribable,
-        isOneTime: isOneTime,
+        isOneTime: finalIsOneTime,
+        isOutOfStock: isProductOutOfStock,
+        isLowStock: productHasLowStock,
+        description: description,
+        highlights: highlights,
+        ingredients: ingredients,
+        legalInfo: legalInfo,
         badge: badge,
         badgeColor: kPrimaryMid,
         imageAsset: imageAsset,

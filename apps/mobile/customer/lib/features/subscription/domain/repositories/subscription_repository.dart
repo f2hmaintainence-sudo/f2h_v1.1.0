@@ -37,6 +37,7 @@ abstract class SubscriptionRepository {
     required int quantity,
     required int morningQty,
     required int eveningQty,
+    Map<String, Map<String, int>> weeklySchedule = const {},
     required String scheduleType,
     required String deliverySlot,
     required String startDate,
@@ -47,6 +48,7 @@ abstract class SubscriptionRepository {
     required bool autoRenew,
     required double estimatedTotal,
   });
+
 
   Future<bool> placeOrder({
     required String variantId,
@@ -63,4 +65,6 @@ abstract class SubscriptionRepository {
   Future<bool> cancelSubscriptionItem(String subscriptionItemId);
   Future<bool> cancelSubscription(String subscriptionId, {String? cancelReason, String? endDate});
   Future<List<SubscriptionPauseModel>> getPauseHistory(String subscriptionId);
+  Future<SubscriptionDetailInfo> getSubscriptionDetail(String subscriptionId);
+  Future<List<SubscriptionBillModel>> getSubscriptionBills(String subscriptionId);
 }

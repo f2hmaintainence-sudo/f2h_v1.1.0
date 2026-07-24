@@ -129,53 +129,38 @@ export class AuthService {
       }
     }
 
-    // Verify Password first
-    const passwordMatch = await bcrypt.compare(password, user.password);
+    // Check lock status
+    // if (user.locked_at) {
+    //   const lockoutDuration = 30 * 60 * 1000; // 30 minutes
+    //   if (
+    //     new Date().getTime() - new Date(user.locked_at).getTime() <
+    //     lockoutDuration
+    //   ) {
+    //     const remainingTime = Math.ceil(
+    //       (lockoutDuration -
+    //         (new Date().getTime() - new Date(user.locked_at).getTime())) /
+    //       60000,
+    //     );
 
-    if (passwordMatch) {
-      // Clear any lockout and reset failed attempts on successful password match
-      if (user.locked_at || user.max_logins > 0) {
-        await this.Data.update(
-          'users',
-          { locked_at: null, max_logins: 0 },
-          [{ column: 'user_id', operator: '=', value: user.user_id }],
-        );
-      }
-      return user;
-    }
+    //     this.auditLogger.logAccountLockout({
+    //       userId: user.user_id,
+    //       email: user.email,
+    //       ip: ip || 'unknown',
+    //       reason: 'Account locked - multiple failed attempts',
+    //     });
 
-    // Password failed: enforce lockout duration if account is locked
-    if (user.locked_at) {
-      const lockoutDuration = 30 * 60 * 1000; // 30 minutes
-      if (
-        new Date().getTime() - new Date(user.locked_at).getTime() <
-        lockoutDuration
-      ) {
-        const remainingTime = Math.ceil(
-          (lockoutDuration -
-            (new Date().getTime() - new Date(user.locked_at).getTime())) /
-          60000,
-        );
-
-        this.auditLogger.logAccountLockout({
-          userId: user.user_id,
-          email: user.email,
-          ip: ip || 'unknown',
-          reason: 'Account locked - multiple failed attempts',
-        });
-
-        throw new ForbiddenException(
-          `Account is locked due to multiple failed login attempts. Please try again in ${remainingTime} minutes.`,
-        );
-      } else {
-        // Unlock account after lockout duration has passed
-        await this.Data.update(
-          'users',
-          { locked_at: null, max_logins: 0 },
-          [{ column: 'user_id', operator: '=', value: user.user_id }],
-        );
-      }
-    }
+    //     throw new ForbiddenException(
+    //       `Account is locked due to multiple failed login attempts. Please try again in ${remainingTime} minutes.`,
+    //     );
+    //   } else {
+    //     // Unlock account after lockout duration has passed
+    //     await this.Data.update(
+    //       'users',
+    //       { locked_at: null },
+    //       [{ column: 'user_id', operator: '=', value: user.user_id }],
+    //     );
+    //   }
+    // }
 
     // Handle failed login attempt increment
     const newAttempts = (user.max_logins || 0) + 1;
