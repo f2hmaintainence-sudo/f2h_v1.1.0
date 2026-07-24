@@ -315,7 +315,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             // Username Input
                             Container(
                               decoration: BoxDecoration(
-                                color: kPrimaryPl.withOpacity(0.55),
+                                color: Colors.white,
                                 borderRadius: BorderRadius.circular(30),
                                 border: Border.all(color: kBorder.withOpacity(0.35), width: 1.2),
                                 boxShadow: [
@@ -346,7 +346,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             // Password Input
                             Container(
                               decoration: BoxDecoration(
-                                color: kPrimaryPl.withOpacity(0.55),
+                                color: Colors.white,
                                 borderRadius: BorderRadius.circular(30),
                                 border: Border.all(color: kBorder.withOpacity(0.35), width: 1.2),
                                 boxShadow: [

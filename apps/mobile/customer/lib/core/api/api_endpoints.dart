@@ -22,12 +22,7 @@ class ApiEndpoints {
   //   flutter run --dart-define=F2H_API_BASE_URL=https://api.f2hfresh.com
   // ---------------------------------------------------------------------------
   static const String _envBaseUrl = String.fromEnvironment('F2H_API_BASE_URL');
-  static String get _devBaseUrl {
-    if (kReleaseMode) {
-      return 'https://f2hfresh.com';
-    }
-    return 'http://192.168.1.38:5001';
-  }
+  static String get _devBaseUrl => 'http://192.168.1.38:5001';
 
   /// Root host (scheme + host + port), no trailing slash.
   static String get host => _envBaseUrl.isNotEmpty ? _envBaseUrl : _devBaseUrl;

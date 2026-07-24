@@ -98,9 +98,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           checkoutItems.add(matches.first);
         }
       }
-    } else {
-      checkoutItems.addAll(allItems.where((i) => i.purchaseType == 'onetime'));
     }
+
     if (checkoutItems.isEmpty) {
       checkoutItems.addAll(allItems);
     }

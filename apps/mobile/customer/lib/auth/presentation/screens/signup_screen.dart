@@ -74,24 +74,29 @@ class _SignupScreenState extends State<SignupScreen> {
       });
       return;
     }
-    if (code.length < 4) return;
+    if (code.length < 3) return;
     setState(() => _isCheckingReferral = true);
-    _referralDebounce = Timer(const Duration(milliseconds: 500), () async {
+    _referralDebounce = Timer(const Duration(milliseconds: 350), () async {
       try {
         final dio = sl<DioClient>().dio;
         final resp = await dio.get('${ApiEndpoints.validateReferralCode}/$code');
         if (!mounted) return;
         final data = resp.data;
+        final isValid = data['valid'] == true;
         setState(() {
-          _isReferralValid = data['valid'] == true;
-          _referralMessage = data['message']?.toString();
+          _isReferralValid = isValid;
+          _referralMessage = isValid
+              ? (data['referrer_name'] != null && data['referrer_name'].toString().isNotEmpty
+                  ? 'Valid referral code! (From ${data['referrer_name']})'
+                  : 'Referral code is valid!')
+              : (data['message']?.toString() ?? 'Invalid referral code');
           _isCheckingReferral = false;
         });
       } catch (_) {
         if (!mounted) return;
         setState(() {
-          _isReferralValid = null;
-          _referralMessage = null;
+          _isReferralValid = false;
+          _referralMessage = 'Invalid referral code';
           _isCheckingReferral = false;
         });
       }
@@ -484,7 +489,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                         // Full Name Input
                                         Container(
                                           decoration: BoxDecoration(
-                                            color: kPrimaryPl.withOpacity(0.55),
+                                            color: Colors.white,
                                             borderRadius: BorderRadius.circular(
                                               30,
                                             ),
@@ -539,7 +544,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                         // Mobile Number Input
                                         Container(
                                           decoration: BoxDecoration(
-                                            color: kPrimaryPl.withOpacity(0.55),
+                                            color: Colors.white,
                                             borderRadius: BorderRadius.circular(
                                               30,
                                             ),
@@ -600,7 +605,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                         // Email Address Input
                                         Container(
                                           decoration: BoxDecoration(
-                                            color: kPrimaryPl.withOpacity(0.55),
+                                            color: Colors.white,
                                             borderRadius: BorderRadius.circular(
                                               30,
                                             ),
@@ -656,7 +661,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                         // Password Input
                                         Container(
                                           decoration: BoxDecoration(
-                                            color: kPrimaryPl.withOpacity(0.55),
+                                            color: Colors.white,
                                             borderRadius: BorderRadius.circular(
                                               30,
                                             ),
@@ -730,7 +735,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                         // Confirm Password Input
                                         Container(
                                           decoration: BoxDecoration(
-                                            color: kPrimaryPl.withOpacity(0.55),
+                                            color: Colors.white,
                                             borderRadius: BorderRadius.circular(
                                               30,
                                             ),
@@ -809,7 +814,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                           children: [
                                             Container(
                                               decoration: BoxDecoration(
-                                                color: kPrimaryPl.withOpacity(0.55),
+                                                color: Colors.white,
                                                 borderRadius: BorderRadius.circular(30),
                                                 border: Border.all(
                                                   color: _isReferralValid == true

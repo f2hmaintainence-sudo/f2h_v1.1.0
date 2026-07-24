@@ -271,8 +271,6 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
 
 
-                // 5. Video Banner
-                // SliverToBoxAdapter(child: const OfferBanner()),
 
                 // 6. One time Product
                 SliverToBoxAdapter(
@@ -599,8 +597,7 @@ class _HomeScreenState extends State<HomeScreen>
                 final cat = entry.value;
                 final label = cat['name'] ?? '';
                 final imagePath = cat['image_path'] ?? '';
-                // final bgColor = colors[idx % colors.length];
-                final bgColor = Colors.white;
+                final bgColor = const Color(0xFFE8F5E9);
                 return _categoryShortcutItem(
                   label: label,
                   imagePath: imagePath,
@@ -849,15 +846,15 @@ class _HomeScreenState extends State<HomeScreen>
                   height: 140,
                   width: double.infinity,
                   decoration: const BoxDecoration(
-                    color: Colors.transparent,
+                    color: Color(0xFFE8F5E9),
                     borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                   ),
                   child: Padding(
-                    padding: EdgeInsets.zero,
+                    padding: const EdgeInsets.all(10.0),
                     child: buildProductImage(
                       p.name,
                       imageAsset: p.imageAsset,
-                      fit: BoxFit.cover,
+                      fit: BoxFit.contain,
                     ),
                   ),
                 ),
@@ -931,16 +928,16 @@ class _HomeScreenState extends State<HomeScreen>
                 child: Container(
                   height: 26,
                   decoration: const BoxDecoration(
-                    color: Color(0xFF16653A), // Premium Green Background
+                    color: Color(0xFFDCFCE7),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.autorenew_rounded, size: 10, color: Colors.white),
+                      const Icon(Icons.sync_rounded, size: 12, color: Color(0xFF16653A)),
                       const SizedBox(width: 3),
                       Text(
                         'Subscribe @ ₹${p.subscriptionPrice!.toStringAsFixed(0)}',
-                        style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: Colors.white),
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF16653A)),
                       ),
                     ],
                   ),
