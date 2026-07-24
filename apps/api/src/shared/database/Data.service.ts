@@ -23,6 +23,8 @@ export const WORKER_THRESHOLD = 3;
 export const CHUNK_SIZE = 1000;
 export const BULK_CHUNK_SIZE = 500;
 export const AVOID_DELETED_AT = [
+  'user_documents',
+  'user_vehicles',
   'zones',
   'zone_hexagons',
   'branch_zone_hexes',
@@ -1116,9 +1118,6 @@ export async function handleWriteOperation(
       };
     }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // UPDATE
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     case 'update': {
       const prepared = prepareData(businessId, data);
       if (!where || where.length === 0) {

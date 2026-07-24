@@ -4,6 +4,8 @@ abstract class ProfileEvent {}
 
 class FetchProfileEvent extends ProfileEvent {}
 
+class ClearProfileMessageEvent extends ProfileEvent {}
+
 class UpdatePersonalInfoEvent extends ProfileEvent {
   final Map<String, dynamic> data;
   UpdatePersonalInfoEvent(this.data);

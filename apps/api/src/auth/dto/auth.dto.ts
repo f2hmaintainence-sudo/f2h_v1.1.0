@@ -41,6 +41,10 @@ export class RegisterDto {
 
   @IsString()
   @IsOptional()
+  name?: string;
+
+  @IsString()
+  @IsOptional()
   user_name?: string;
 
   @IsString()
@@ -64,6 +68,10 @@ export class RegisterDto {
 
   @IsOptional()
   longitude?: number;
+
+  @IsString()
+  @IsOptional()
+  referral_code?: string;
 }
 
 export class LoginDto {

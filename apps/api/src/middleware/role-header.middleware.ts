@@ -23,7 +23,7 @@ export class RoleHeaderMiddleware implements NestMiddleware {
   /** Single-char code → full CUSTOMER/DELIVERY_BOY/ADMIN role string */
   private static readonly ROLE_MAP: Record<string, string> = {
     C: 'CUSTOMER',
-    D: 'DELIVERY_BOY',
+    D: 'DELIVERY_PARTNER',
     A: 'ADMIN',
   };
 
