@@ -17,19 +17,25 @@ pipeline {
                 npm install --no-audit --no-fund
                 npm run build
 
-                echo "[F2H Deploy] Syncing compiled artifacts to live htdocs..."
+                echo "[F2H Deploy] Syncing compiled artifacts and configs to live htdocs..."
                 LIVE_DIR="/home/f2hfresh/htdocs/f2hfresh.com"
 
                 if [ -d "$LIVE_DIR" ]; then
                     mkdir -p "$LIVE_DIR/apps/api" "$LIVE_DIR/apps/web" 2>/dev/null || true
 
-                    echo "[F2H Deploy] Copying backend dist..."
+                    # Copy ecosystem.config.js & root package.json
+                    cp -f ../../ecosystem.config.js "$LIVE_DIR/" 2>/dev/null || true
+                    cp -f ../../package.json "$LIVE_DIR/" 2>/dev/null || true
+
+                    # Copy backend dist & package.json
                     cp -Rf ../api/dist "$LIVE_DIR/apps/api/" 2>/dev/null || true
                     cp -Rf ../api/src "$LIVE_DIR/apps/api/" 2>/dev/null || true
+                    cp -f ../api/package.json "$LIVE_DIR/apps/api/" 2>/dev/null || true
 
-                    echo "[F2H Deploy] Copying frontend .next..."
+                    # Copy frontend .next & package.json
                     cp -Rf .next "$LIVE_DIR/apps/web/" 2>/dev/null || true
                     cp -Rf src "$LIVE_DIR/apps/web/" 2>/dev/null || true
+                    cp -f package.json "$LIVE_DIR/apps/web/" 2>/dev/null || true
                 fi
 
                 echo "[F2H Deploy] Starting & Restarting PM2 via live ecosystem.config.js..."
