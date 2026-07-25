@@ -45,10 +45,10 @@ export class AppController {
         }
       }
 
-      const roleHeader = (req?.headers?.['x-role'] || req?.headers?.['x-client-role'] || queryRole || queryApp || '').toString().toUpperCase();
+      const roleHeader = (req?.headers?.['x-role'] || req?.headers?.['x-role'] || queryRole || queryApp || '').toString().toUpperCase();
       const isDelivery = roleHeader.includes('D') || roleHeader.includes('DELIVERY');
 
-      const rawFb = isDelivery 
+      const rawFb = isDelivery
         ? (dbConfigs['firebase:delivery'] || dbConfigs['firebase:customer'] || dbConfigs['firebase:client'])
         : (dbConfigs['firebase:customer'] || dbConfigs['firebase:delivery'] || dbConfigs['firebase:client']);
 
@@ -317,7 +317,7 @@ export class AppController {
     }
 
     const config = rows[0];
-    
+
     // Compare versions
     const belowMin = this.compareVersions(clientVersion, config.min_version) < 0;
     const belowLatest = this.compareVersions(clientVersion, config.latest_version) < 0;

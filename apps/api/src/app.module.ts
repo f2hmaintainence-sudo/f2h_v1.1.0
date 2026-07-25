@@ -162,7 +162,7 @@ import { CustomerAppAssetsModule } from './panels/customer/app_assets/app_assets
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {
-    // 1. Expand compact headers (X-Role→x-client-role, X-Plt→x-app-platform, etc.)
+    // 1. Expand compact headers (X-Role→x-role, X-Plt→x-app-platform, etc.)
     //    Must run BEFORE LoggerMiddleware so logs see the resolved role.
     consumer
       .apply(RoleHeaderMiddleware)

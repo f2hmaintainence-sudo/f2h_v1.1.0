@@ -43,31 +43,9 @@ export class CatalogShowEditService {
 
       const product = result.data[0];
 
-      const imageResult = await this.dataService.query('product_images', {
-        select: ['url'],
-        where: [
-          {
-            column: 'product_id',
-            operator: '=',
-            value: product.product_id,
-          },
-          {
-            column: 'is_primary',
-            operator: '=',
-            value: true,
-          },
-          {
-            column: 'deleted_at',
-            operator: 'IS',
-            value: null,
-          },
-        ],
-        orderBy: 'sort_order',
-        orderDirection: 'ASC',
-        limit: 1,
-      });
-
-      const productImage = imageResult?.data?.[0]?.url || '';
+      // Product images are stored exclusively in products.image_path.
+      // product_images table is for variant images only.
+      const productImage = product.image_path || '';
 
       // =====================================================
       // FETCH CATEGORIES

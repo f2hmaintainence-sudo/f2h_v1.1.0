@@ -87,7 +87,7 @@ export class CartService {
     let itemsSubtotal = 0;
     const formattedItems: any[] = [];
 
-    const baseUrl = process.env.BACKEND_URL || 'http://localhost:8000';
+    const baseUrl = process.env.MOBILE_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:5001';
     const mapImagePath = (imagePath: string | null) => {
       if (!imagePath) return null;
       if (imagePath.startsWith('http')) return imagePath;
@@ -107,10 +107,10 @@ export class CartService {
           p.name AS product_name, 
           p.is_subscribable, 
           p.is_one_time, 
-          pi.url AS image_path
+          COALESCE(pi.url, p.image_path) AS image_path
          FROM product_variants pv
          LEFT JOIN products p ON pv.product_id = p.product_id
-         LEFT JOIN product_images pi ON pv.variant_id = pi.variant_id
+         LEFT JOIN product_images pi ON (pv.variant_id = pi.variant_id OR (pi.variant_id IS NULL AND p.product_id = pi.product_id)) AND (pi.is_primary = true OR pi.is_primary IS NULL)
          WHERE pv.variant_id = ANY($1) AND pv.status = 'active'`,
         [variantIds],
       );

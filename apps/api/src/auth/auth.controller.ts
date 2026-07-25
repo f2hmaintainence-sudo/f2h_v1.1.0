@@ -40,15 +40,15 @@ export class AuthController {
   ) {
     const ip = req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
     const userAgent = req.headers['user-agent'] || 'unknown';
-    // 1. Extract x-client-role strictly from header (ignore any role sent in request body)
-    const rawClientRole = req.headers['x-client-role'];
+    // 1. Extract x-role strictly from header (ignore any role sent in request body)
+    const rawClientRole = req.headers['x-role'];
     const clientRole = typeof rawClientRole === 'string' ? rawClientRole.trim().toUpperCase() : '';
 
     if (!clientRole || !['CUSTOMER', 'DELIVERY_PARTNER', 'DELIVERY_BOY', 'ADMIN'].includes(clientRole)) {
       console.log(
-        `[AuthController:login] Login rejected: Missing or invalid x-client-role header: "${rawClientRole}"`,
+        `[AuthController:login] Login rejected: Missing or invalid x-role header: "${rawClientRole}"`,
       );
-      throw new UnauthorizedException('Missing or invalid x-client-role header');
+      throw new UnauthorizedException('Missing or invalid x-role header');
     }
 
     console.log(
@@ -197,7 +197,7 @@ export class AuthController {
     @Body() body: { email?: string; phone?: string; identifier?: string },
     @Req() req: Request,
   ) {
-    const rawClientRole = req.headers['x-client-role'];
+    const rawClientRole = req.headers['x-role'];
     const clientRole = typeof rawClientRole === 'string' ? rawClientRole.trim().toUpperCase() : undefined;
     const identifier = body.email || body.phone || body.identifier || '';
     return this.authService.forgotPassword(identifier, clientRole);
@@ -210,7 +210,7 @@ export class AuthController {
     @Body() body: { phone?: string; identifier?: string },
     @Req() req: Request,
   ) {
-    const rawClientRole = req.headers['x-client-role'];
+    const rawClientRole = req.headers['x-role'];
     const clientRole = typeof rawClientRole === 'string' ? rawClientRole.trim().toUpperCase() : undefined;
     const identifier = body.phone || body.identifier || '';
     return this.authService.forgotPassword(identifier, clientRole);

@@ -22,8 +22,6 @@ CREATE TABLE product_variants
 
     status VARCHAR(20) NOT NULL DEFAULT 'active',
 
-
-
     manageable_qty INTEGER NOT NULL DEFAULT 0,
 
     sort_order INTEGER NOT NULL DEFAULT 0,

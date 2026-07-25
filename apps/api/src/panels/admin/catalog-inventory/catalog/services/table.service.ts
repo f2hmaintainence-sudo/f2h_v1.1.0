@@ -63,11 +63,13 @@ function formatTableImageHtml(rawSrc: any, altText: string = 'Media'): string {
     // Already absolute HTTP/HTTPS or Base64 URL
   } else if (src.startsWith('/uploads/')) {
     src = `${backendUrl}${src}`;
+  } else if (src.startsWith('uploads/')) {
+    src = `${backendUrl}/${src}`;
   } else {
     src = `${backendUrl}/uploads/${src}`;
   }
 
-  return `<img src="${src}" alt="${altText}" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=800&q=80';" style="width:42px;height:42px;object-fit:cover;border-radius:10px;border:1px solid #e2e8f0;box-shadow:0 1px 2px rgba(0,0,0,0.05);" />`;
+  return `<img src="${src}" alt="${altText}" style="width:42px;height:42px;object-fit:cover;border-radius:10px;border:1px solid #e2e8f0;box-shadow:0 1px 2px rgba(0,0,0,0.05);" />`;
 }
 
 @Injectable()
@@ -145,8 +147,8 @@ export class CatalogTableService {
           product_category: ['categories.name AS product_category', true],
           product_name: ['products.name AS product_name', true],
           name: ['products.name AS name', false],
-          url: ['products.image_url AS url', false],
-          image: ['products.image_url AS image', true],
+          url: ['products.image_path AS url', false],
+          image: ['products.image_path AS image', true],
           batch_product: ['products.batch_product', false],
           gst: ['products.gst_percentage', true],
           packaging_type: ['packaging_types.name AS packaging_type', true],
@@ -300,7 +302,7 @@ export class CatalogTableService {
           variant_id: ['product_variants.variant_id', true],
           product_name: ['products.name AS product_name', true],
           variant_name: ['product_variants.name', true],
-          product_image: ['product_variants.image_url AS product_image', true],
+          product_image: ['product_images.url AS product_image', true],
           unit_value: ['product_variants.unit_value', true],
           unit_type: ['product_variants.unit_type', true],
           price: ['product_variants.price', true],
@@ -316,6 +318,11 @@ export class CatalogTableService {
             table: 'products',
             on: [['product_variants.product_id', 'products.product_id']],
           },
+          {
+            type: 'left',
+            table: 'product_images',
+            on: [['product_variants.variant_id', 'product_images.variant_id']],
+          },
         ],
         conditions,
         custom: [
@@ -323,7 +330,7 @@ export class CatalogTableService {
             type: 'compute',
             column: 'product_image',
             renderHtml: true,
-            callback: (row) => formatTableImageHtml(row.url || row.product_image, row.variant_name || 'Variant'),
+            callback: (row) => formatTableImageHtml(row.product_image, row.variant_name || 'Variant'),
           },
           {
             type: 'compute',

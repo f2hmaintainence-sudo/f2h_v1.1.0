@@ -52,13 +52,13 @@ class ApiClient {
     if (typeof window === 'undefined') {
       return process.env.INTERNAL_API_URL || 'http://api:5001/api/v1';
     }
-    
+
     // If we're on the client (Browser), use the public URL
     if (process.env.NEXT_PUBLIC_API_URL) {
       const raw = process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '');
       return raw.endsWith('/api/v1') ? raw : `${raw}/api/v1`;
     }
-    
+
     return `${window.location.origin}/api/v1`;
   }
 
@@ -163,7 +163,7 @@ class ApiClient {
       url,
       headers: {
         'Content-Type': 'application/json',
-        'x-client-role': 'ADMIN',
+        'x-role': 'A',
         ...options.headers,
       },
       credentials: 'include', // SECURITY: Always include credentials for httpOnly cookies

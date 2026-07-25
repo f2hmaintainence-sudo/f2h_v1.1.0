@@ -130,74 +130,86 @@ export class AuthService {
     }
 
     // Check lock status
-    // if (user.locked_at) {
-    //   const lockoutDuration = 30 * 60 * 1000; // 30 minutes
-    //   if (
-    //     new Date().getTime() - new Date(user.locked_at).getTime() <
-    //     lockoutDuration
-    //   ) {
-    //     const remainingTime = Math.ceil(
-    //       (lockoutDuration -
-    //         (new Date().getTime() - new Date(user.locked_at).getTime())) /
-    //       60000,
-    //     );
+    if (user.locked_at) {
+      const lockoutDuration = 30 * 60 * 1000; // 30 minutes
+      if (
+        new Date().getTime() - new Date(user.locked_at).getTime() <
+        lockoutDuration
+      ) {
+        const remainingTime = Math.ceil(
+          (lockoutDuration -
+            (new Date().getTime() - new Date(user.locked_at).getTime())) /
+          60000,
+        );
 
-    //     this.auditLogger.logAccountLockout({
-    //       userId: user.user_id,
-    //       email: user.email,
-    //       ip: ip || 'unknown',
-    //       reason: 'Account locked - multiple failed attempts',
-    //     });
+        this.auditLogger.logAccountLockout({
+          userId: user.user_id,
+          email: user.email,
+          ip: ip || 'unknown',
+          reason: 'Account locked - multiple failed attempts',
+        });
 
-    //     throw new ForbiddenException(
-    //       `Account is locked due to multiple failed login attempts. Please try again in ${remainingTime} minutes.`,
-    //     );
-    //   } else {
-    //     // Unlock account after lockout duration has passed
-    //     await this.Data.update(
-    //       'users',
-    //       { locked_at: null },
-    //       [{ column: 'user_id', operator: '=', value: user.user_id }],
-    //     );
-    //   }
-    // }
+        throw new ForbiddenException(
+          `Account is locked due to multiple failed login attempts. Please try again in ${remainingTime} minutes.`,
+        );
+      } else {
+        // Unlock account after lockout duration has passed
+        await this.Data.update(
+          'users',
+          { locked_at: null },
+          [{ column: 'user_id', operator: '=', value: user.user_id }],
+        );
+      }
+    }
 
-    // Handle failed login attempt increment
-    const newAttempts = (user.max_logins || 0) + 1;
+    // Verify Password
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    if (!passwordMatch) {
+      const newAttempts = (user.max_logins || 0) + 1;
 
-    if (newAttempts >= 5) {
+      if (newAttempts >= 5) {
+        await this.Data.update(
+          'users',
+          { locked_at: new Date(), max_logins: newAttempts },
+          [{ column: 'user_id', operator: '=', value: user.user_id }],
+        );
+
+        await this.securityAlerts.alertAccountLocked({
+          userId: user.user_id,
+          email: user.email || '',
+          ipAddress: ip || 'unknown',
+          reason: 'LOGIN_ATTEMPTS',
+        });
+
+        throw new ForbiddenException(
+          'Account has been locked due to multiple failed login attempts. Please try again in 30 minutes.',
+        );
+      } else {
+        await this.Data.update(
+          'users',
+          { max_logins: newAttempts },
+          [{ column: 'user_id', operator: '=', value: user.user_id }],
+        );
+
+        this.auditLogger.logLoginFailure({
+          identifier: formattedIdentifier,
+          email: user.email,
+          ip: ip || 'unknown',
+          reason: 'Incorrect password',
+          attempt: newAttempts,
+        });
+
+        throw new UnauthorizedException('Invalid email/mobile or password');
+      }
+    }
+
+    // Success: clear login attempts database field
+    if (user.max_logins > 0) {
       await this.Data.update(
         'users',
-        { locked_at: new Date(), max_logins: newAttempts },
+        { max_logins: 0 },
         [{ column: 'user_id', operator: '=', value: user.user_id }],
       );
-
-      await this.securityAlerts.alertAccountLocked({
-        userId: user.user_id,
-        email: user.email || '',
-        ipAddress: ip || 'unknown',
-        reason: 'LOGIN_ATTEMPTS',
-      });
-
-      throw new ForbiddenException(
-        'Account has been locked due to multiple failed login attempts. Please try again in 30 minutes.',
-      );
-    } else {
-      await this.Data.update(
-        'users',
-        { max_logins: newAttempts },
-        [{ column: 'user_id', operator: '=', value: user.user_id }],
-      );
-
-      this.auditLogger.logLoginFailure({
-        identifier: formattedIdentifier,
-        email: user.email,
-        ip: ip || 'unknown',
-        reason: 'Incorrect password',
-        attempt: newAttempts,
-      });
-
-      throw new UnauthorizedException('Invalid email/mobile or password');
     }
     return user;
   }
@@ -328,7 +340,17 @@ export class AuthService {
 
         await this.Data.update(
           'users',
-          userUpdatePayload,
+          {
+            email,
+            phone,
+            user_name: body.user_name || email?.split('@')[0] || phone,
+            first_name: body.first_name || '',
+            last_name: body.last_name || '',
+            fcm_token: body.fcm_token,
+            password: hashedPassword,
+            role_id: roleId,
+            updated_at: now,
+          },
           [{ column: 'user_id', operator: '=', value: userId }],
           { transaction },
         );
@@ -351,7 +373,19 @@ export class AuthService {
 
         const userResult = await this.Data.insert(
           'users',
-          userInsertPayload,
+          {
+            user_id: userId,
+            email,
+            phone,
+            user_name: body.user_name || email?.split('@')[0] || phone,
+            first_name: body.first_name || '',
+            last_name: body.last_name || '',
+            fcm_token: body.fcm_token,
+            password: hashedPassword,
+            role_id: roleId,
+            created_at: now,
+            updated_at: now,
+          },
           { transaction },
         );
 
@@ -362,30 +396,6 @@ export class AuthService {
 
       // Customer specific initialization
       if (roleId === 'CUSTOMER') {
-        let referrerCustomer: any = null;
-        if (body.referral_code && body.referral_code.trim()) {
-          const cleanCode = body.referral_code.trim().toUpperCase();
-          let rawCust: any = await this.DataBase.query(
-            `SELECT customer_id, referral_code FROM customers WHERE UPPER(referral_code) = $1 LIMIT 1`,
-            [cleanCode],
-          );
-          let custRows = Array.isArray(rawCust) ? rawCust : (rawCust?.rows || []);
-          if (custRows.length === 0) {
-            rawCust = await this.DataBase.query(
-              `SELECT user_id as customer_id, referral_code FROM users WHERE UPPER(referral_code) = $1 LIMIT 1`,
-              [cleanCode],
-            );
-            custRows = Array.isArray(rawCust) ? rawCust : (rawCust?.rows || []);
-          }
-          if (custRows.length === 0) {
-            throw new BadRequestException('Invalid referral code. Please check the code and try again.');
-          }
-          referrerCustomer = custRows[0];
-          if (referrerCustomer.customer_id === userId) {
-            throw new BadRequestException('You cannot use your own referral code.');
-          }
-        }
-
         const existingCust = await this.Data.query('customers', {
           where: [{ column: 'customer_id', operator: '=', value: userId }],
           limit: 1,
@@ -401,14 +411,10 @@ export class AuthService {
           await this.Data.update(
             'customers',
             {
-              first_name: custFirstName,
-              last_name: lastName,
-              mobile: phone || ('NO_PHONE_' + userId),
-              phone: phone || ('NO_PHONE_' + userId),
+              first_name: body.first_name || body.user_name || 'Customer',
+              last_name: body.last_name || '',
+              mobile: phone || '',
               email: email || null,
-              referral_code: existingCust.data[0].referral_code || generatedRefCode,
-              referral_status: existingCust.data[0].referral_status || 'locked',
-              ...(referrerCustomer?.customer_id ? { referred_by: referrerCustomer.customer_id } : {}),
               updated_at: now,
             },
             [{ column: 'customer_id', operator: '=', value: userId }],
@@ -422,32 +428,8 @@ export class AuthService {
               first_name: custFirstName,
               last_name: lastName,
               mobile: phone || ('NO_PHONE_' + userId),
-              phone: phone || ('NO_PHONE_' + userId),
+            
               email: email || null,
-              branch_id: body.branch_id || 'BRANCH_DEFAULT',
-              referral_code: generatedRefCode,
-              referral_status: 'locked',
-              ...(referrerCustomer?.customer_id ? { referred_by: referrerCustomer.customer_id } : {}),
-              created_at: now,
-              updated_at: now,
-            },
-            { transaction },
-          );
-        }
-
-        if (referrerCustomer?.customer_id) {
-          const refCode = (body.referral_code || '').trim().toUpperCase();
-          await this.Data.insert(
-            'referrals',
-            {
-              refer_id: `REF${Date.now().toString(36).toUpperCase()}`,
-              referrer_customer_id: referrerCustomer.customer_id,
-              referred_customer_id: userId,
-              referral_code: refCode,
-              referrer_reward_amount: 50.00,
-              referred_reward_amount: 50.00,
-              status: 'pending',
-              remarks: 'Referral registered - pending first delivered order',
               created_at: now,
               updated_at: now,
             },
@@ -580,7 +562,6 @@ export class AuthService {
       userId,
     };
   }
-
   private getHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
     const dLat = (lat2 - lat1) * (Math.PI / 180);
     const dLon = (lon2 - lon1) * (Math.PI / 180);
