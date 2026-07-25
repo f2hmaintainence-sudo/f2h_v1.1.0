@@ -5,7 +5,7 @@
 // Project     : F2H Fresh
 // File        : role-header.middleware.ts
 // Description : Maps compact request header codes to full internal values.
-//               X-Role (C/D/A) → x-client-role (CUSTOMER/DELIVERY_BOY/ADMIN)
+//               X-Role (C/D/A) → x-role (CUSTOMER/DELIVERY_BOY/ADMIN)
 //               X-Plt  (ac/ic/ad/id) → x-app-platform (android_customer etc.)
 //               X-Ver  (semver) → x-app-version
 //               X-Csrf (uuid)   → x-csrf-token
@@ -39,13 +39,13 @@ export class RoleHeaderMiddleware implements NestMiddleware {
 
   use(req: Request, _res: Response, next: NextFunction): void {
     const role = (req.headers['x-role'] as string | undefined)?.trim();
-    const plt  = (req.headers['x-plt']  as string | undefined)?.trim();
-    const ver  = (req.headers['x-ver']  as string | undefined)?.trim();
+    const plt = (req.headers['x-plt'] as string | undefined)?.trim();
+    const ver = (req.headers['x-ver'] as string | undefined)?.trim();
     const csrf = (req.headers['x-csrf'] as string | undefined)?.trim();
 
     // Expand compact role code → full role string consumed by JwtStrategy / AuthController
     if (role) {
-      req.headers['x-client-role'] =
+      req.headers['x-role'] =
         RoleHeaderMiddleware.ROLE_MAP[role.toUpperCase()] ?? role;
     }
 

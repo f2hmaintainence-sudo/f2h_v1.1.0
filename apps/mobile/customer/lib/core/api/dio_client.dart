@@ -48,7 +48,7 @@ class DioClient {
           'Content-Type': 'application/json',
           'Accept':       'application/json',
           // Compact header spec (Section 11 of implementation.md)
-          'X-Role': 'C',   // CUSTOMER → expanded by backend RoleHeaderMiddleware
+          'X-role': 'C',   // CUSTOMER → expanded by backend RoleHeaderMiddleware
           'X-Plt':  _platformCode(),
           'X-Ver':  const String.fromEnvironment('F2H_APP_VERSION', defaultValue: '1.0.0+1'),
         },

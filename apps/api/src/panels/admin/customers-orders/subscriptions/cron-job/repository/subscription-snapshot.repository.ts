@@ -33,6 +33,7 @@ export class SubscriptionSnapshotRepository {
 
     const params: any[] = [date];
     let branchFilter = '';
+
     if (branchId) {
       params.push(branchId);
       branchFilter = `AND s.branch_id = $${params.length}`;
@@ -48,10 +49,10 @@ export class SubscriptionSnapshotRepository {
         SUM(${qtyExpr})                   AS total_quantity,
         COUNT(DISTINCT s.subscription_id) AS subscription_count
       FROM subscriptions s
-      JOIN subscription_items si
+      INNER JOIN subscription_items si
         ON si.subscription_id = s.subscription_id
-      JOIN subscription_weekly_schedule ws
-        ON ws.subscription_item_id = si.subscription_item_id
+      INNER JOIN subscription_weekly_schedule ws
+        ON ws.subscription_item_id = si.id
       LEFT JOIN product_variants pv
         ON pv.variant_id = si.product_variant_id
       LEFT JOIN products p
@@ -62,24 +63,28 @@ export class SubscriptionSnapshotRepository {
         AND (
           s.pause_from_date IS NULL
           OR s.pause_to_date IS NULL
-          OR NOT ($1::date BETWEEN s.pause_from_date AND s.pause_to_date)
+          OR $1::date NOT BETWEEN s.pause_from_date AND s.pause_to_date
         )
-        AND si.status = 'active'
-        AND (si.start_date IS NULL OR si.start_date <= $1::date)
-        AND (si.end_date IS NULL OR si.end_date >= $1::date)
         AND ws.day_of_week = EXTRACT(DOW FROM $1::date)::int
         AND ${qtyExpr} > 0
         ${branchFilter}
-        -- Exclude subscriptions that already have orders
         AND NOT EXISTS (
-          SELECT 1 FROM orders o
+          SELECT 1
+          FROM orders o
           WHERE o.subscription_id = s.subscription_id
             AND o.scheduled_date = $1::date
             AND o.delivery_slot = '${slot}'
             AND o.order_source = 'subscription'
         )
-      GROUP BY s.branch_id, si.product_variant_id, pv.name, p.name
-      ORDER BY s.branch_id NULLS LAST, p.name, pv.name
+      GROUP BY
+        s.branch_id,
+        si.product_variant_id,
+        pv.name,
+        p.name
+      ORDER BY
+        s.branch_id NULLS LAST,
+        p.name,
+        pv.name
       `,
       params,
     );
@@ -131,7 +136,7 @@ export class SubscriptionSnapshotRepository {
         JOIN subscription_items si
           ON si.subscription_id = s.subscription_id
         JOIN subscription_weekly_schedule ws
-          ON ws.subscription_item_id = si.subscription_item_id
+          ON ws.subscription_item_id = si.id
         LEFT JOIN customer_addresses ca
           ON ca.address_id = s.address_id
         WHERE s.status = 'active'
@@ -142,9 +147,6 @@ export class SubscriptionSnapshotRepository {
             OR s.pause_to_date IS NULL
             OR NOT ($1::date BETWEEN s.pause_from_date AND s.pause_to_date)
           )
-          AND si.status = 'active'
-          AND (si.start_date IS NULL OR si.start_date <= $1::date)
-          AND (si.end_date IS NULL OR si.end_date >= $1::date)
           AND ws.day_of_week = EXTRACT(DOW FROM $1::date)::int
           AND ${qtyExpr} > 0
           ${branchFilter}
@@ -234,7 +236,7 @@ export class SubscriptionSnapshotRepository {
       WITH items_to_insert AS (
         SELECT
           o.order_id,
-          si.subscription_item_id,
+          si.id                  AS subscription_item_id,
           si.product_variant_id  AS variant_id,
           ${qtyExpr}             AS quantity,
           si.unit_price,
@@ -243,14 +245,11 @@ export class SubscriptionSnapshotRepository {
         JOIN subscription_items si
           ON si.subscription_id = o.subscription_id
         JOIN subscription_weekly_schedule ws
-          ON ws.subscription_item_id = si.subscription_item_id
+          ON ws.subscription_item_id = si.id
         WHERE o.scheduled_date = $1::date
           AND o.delivery_slot = $2
           AND o.order_source = 'subscription'
           ${branchFilter}
-          AND si.status = 'active'
-          AND (si.start_date IS NULL OR si.start_date <= $1::date)
-          AND (si.end_date IS NULL OR si.end_date >= $1::date)
           AND ws.day_of_week = EXTRACT(DOW FROM $1::date)::int
           AND ${qtyExpr} > 0
           -- Only for orders that don't already have items
@@ -500,4 +499,3 @@ export class SubscriptionSnapshotRepository {
     );
   }
 }
-

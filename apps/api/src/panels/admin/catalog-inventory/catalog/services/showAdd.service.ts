@@ -226,11 +226,12 @@ export class CatalogShowAddService {
       { name: 'unit_type', label: 'Unit Type', type: 'select', required: false, width: 'half', group: 'Pricing & Value', options: [{ value: 'ltr', label: 'Liters' }, { value: 'ml', label: 'Milliliters' }, { value: 'kg', label: 'Kilograms' }, { value: 'gm', label: 'Grams' }, { value: 'piece', label: 'Pieces' }, { value: 'pack', label: 'Pack' },], },
       { name: 'unit_value', label: 'Unit Value', type: 'number', required: false, width: 'half', group: 'Pricing & Value', placeholder: 'e.g., 500 for 500ml', validation: { min: 0.01, max: 99999, message: 'Unit value must be greater than 0' }, },
       { name: 'fulfillment_mode', label: 'Fulfillment Mode', type: 'select', required: false, width: 'half', defaultValue: 'prepacked', options: [{ value: 'bulk', label: 'Bulk' }, { value: 'prepacked', label: 'Pre Packed' },], },
-      { name: 'status', label: 'Status', type: 'toggle', required: false, width: 'half', group: 'Management', defaultValue: true, toggleOptions: { onLabel: 'Active', offLabel: 'Inactive', pill: true }, },
-      { name: 'manageable_qty', label: 'Manageable Quantity', type: 'number', required: false, width: 'half', group: 'Management', defaultValue: 0, placeholder: '0', validation: { min: 0, max: 99999 }, },
-      { name: 'sort_order', label: 'Sort Order', type: 'number', required: false, width: 'half', group: 'Management', defaultValue: 0, placeholder: '0', validation: { min: 0, max: 9999 }, },
-      { name: 'is_out_of_stock', label: 'Out of Stock', type: 'toggle', required: false, width: 'half', group: 'Management', defaultValue: false, },
-      { name: 'packaging_type_id', label: 'Packaging Type (Returnable)', type: 'select', required: false, width: 'half', group: 'Management', options: packagingOptions, },
+      { name: 'manageable_qty', label: 'Manageable Quantity', type: 'number', required: false, width: 'third', group: 'Management', defaultValue: 0, placeholder: '0', validation: { min: 0, max: 99999 }, },
+      { name: 'sort_order', label: 'Sort Order', type: 'number', required: false, width: 'third', group: 'Management', defaultValue: 0, placeholder: '0', validation: { min: 0, max: 9999 }, },
+      // { name: 'is_out_of_stock', label: 'Out of Stock', type: 'toggle', required: false, width: 'half', group: 'Management', defaultValue: false, },
+      { name: 'packaging_type_id', label: 'Packaging Type (Returnable)', type: 'select', required: false, width: 'third', group: 'Management', options: packagingOptions, },
+      { name: 'status', label: 'Status', type: 'toggle', required: false, width: 'third', group: 'Management', defaultValue: true, toggleOptions: { onLabel: 'Active', offLabel: 'Inactive', pill: true }, },
+
     ];
   }
 
