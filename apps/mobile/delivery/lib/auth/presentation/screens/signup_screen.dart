@@ -30,6 +30,8 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
   // Controllers
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _referralCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   final List<TextEditingController> _otpCtrl = List.generate(6, (_) => TextEditingController());
@@ -39,6 +41,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
   bool _obscureConfirm = true;
   bool _isLoading = false;
   String? _selectedBranchId;
+  String? _verificationToken;
 
   // Countdown timer
   int _countdown = 60;
@@ -72,7 +75,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
 
   @override
   void dispose() {
-    _nameCtrl.dispose(); _emailCtrl.dispose();
+    _nameCtrl.dispose(); _emailCtrl.dispose(); _phoneCtrl.dispose(); _referralCtrl.dispose();
     _passwordCtrl.dispose(); _confirmCtrl.dispose();
     for (var c in _otpCtrl) c.dispose();
     for (var f in _otpFocus) f.dispose();
@@ -83,12 +86,17 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
   // ─── Step 1: Send Email OTP ────────────────────────────────────────────────
   Future<void> _sendEmailOtp() async {
     final email = _emailCtrl.text.trim();
-    if (_nameCtrl.text.trim().isEmpty || email.isEmpty) {
-      _showSnack('Please enter your name and email', isError: true);
+    final phone = _phoneCtrl.text.trim();
+    if (_nameCtrl.text.trim().isEmpty || email.isEmpty || phone.isEmpty) {
+      _showSnack('Please enter your name, email, and phone number', isError: true);
       return;
     }
     if (!RegExp(r'^[\w.-]+@[\w-]+\.\w+$').hasMatch(email)) {
       _showSnack('Please enter a valid email address', isError: true);
+      return;
+    }
+    if (!RegExp(r'^\d{10,15}$').hasMatch(phone)) {
+      _showSnack('Please enter a valid 10-15 digit phone number (digits only)', isError: true);
       return;
     }
     setState(() => _isLoading = true);
@@ -132,11 +140,15 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
       final dioClient = sl<DioClient>();
       await dioClient.fetchCsrfToken();
       
-      await dioClient.dio.post(
+      final res = await dioClient.dio.post(
         '/DeliveryPartner/auth/verify-email-otp',
         data: {'email': _emailCtrl.text.trim(), 'otp': otp},
       );
-      setState(() { _isLoading = false; _step = 2; });
+      setState(() {
+        _verificationToken = res.data['verification_token'] as String?;
+        _isLoading = false;
+        _step = 2;
+      });
       _stepAnim.forward(from: 0);
       _showSnack('Email verified! ✅ Now set your password');
     } on DioException catch (e) {
@@ -190,9 +202,12 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
       name: _nameCtrl.text.trim(),
       email: _emailCtrl.text.trim(),
       password: pass,
+      phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
       branchId: _selectedBranchId,
       latitude: latitude,
       longitude: longitude,
+      verificationToken: _verificationToken,
+      referralCode: _referralCtrl.text.trim().isEmpty ? null : _referralCtrl.text.trim(),
     ));
   }
 
@@ -359,6 +374,15 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
         _LightField(controller: _nameCtrl, hint: 'Full Name', icon: Icons.badge_outlined, keyboard: TextInputType.name),
         const SizedBox(height: 14),
         _LightField(controller: _emailCtrl, hint: 'Email Address', icon: Icons.email_outlined, keyboard: TextInputType.emailAddress),
+        const SizedBox(height: 14),
+        _LightField(controller: _phoneCtrl, hint: 'Phone Number', icon: Icons.phone_android_rounded, keyboard: TextInputType.phone),
+        const SizedBox(height: 14),
+        _LightField(
+          controller: _referralCtrl,
+          hint: 'Referral Code (Optional)',
+          icon: Icons.card_giftcard_outlined,
+          keyboard: TextInputType.text,
+        ),
         const SizedBox(height: 32),
 
         _GreenButton(

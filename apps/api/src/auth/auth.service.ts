@@ -218,6 +218,41 @@ export class AuthService {
     Registration Flow:
    ================================================================================================*/
 
+  async findReferrer(code: string): Promise<any> {
+    if (!code) return null;
+    const trimmed = code.trim();
+
+    // 1. Search by user_id in users
+    let res = await this.Data.query('users', {
+      where: [{ column: 'user_id', operator: '=', value: trimmed }],
+      limit: 1,
+    });
+    if (res?.data?.length) return res.data[0];
+
+    // 2. Search by phone in users
+    res = await this.Data.query('users', {
+      where: [{ column: 'phone', operator: '=', value: trimmed }],
+      limit: 1,
+    });
+    if (res?.data?.length) return res.data[0];
+
+    // 3. Search by email in users
+    res = await this.Data.query('users', {
+      where: [{ column: 'email', operator: '=', value: trimmed }],
+      limit: 1,
+    });
+    if (res?.data?.length) return res.data[0];
+
+    // 4. Search by customer_id in customers
+    res = await this.Data.query('customers', {
+      where: [{ column: 'customer_id', operator: '=', value: trimmed }],
+      limit: 1,
+    });
+    if (res?.data?.length) return res.data[0];
+
+    return null;
+  }
+
   async register(body: RegisterDto) {
     const now = new Date();
     const email = body.email ? body.email.toLowerCase().trim() : null;
@@ -228,8 +263,29 @@ export class AuthService {
       throw new BadRequestException('Email and phone is required');
     }
 
-    // Verify OTP for customer registrations first
-    if (roleId === 'CUSTOMER') {
+    // Validate referral code if provided
+    let referrerId: string | null = null;
+    if (body.referral_code) {
+      const referrer = await this.findReferrer(body.referral_code);
+      if (!referrer) {
+        throw new BadRequestException('Invalid referral code');
+      }
+      referrerId = referrer.user_id || referrer.customer_id || null;
+    }
+
+    const rawName = body.name || (body as any).name;
+    let firstName = body.first_name || '';
+    let lastName = body.last_name || '';
+
+    if (rawName && !firstName && !lastName) {
+      const parts = rawName.trim().split(/\s+/);
+      firstName = parts[0] || '';
+      lastName = parts.slice(1).join(' ') || '';
+    }
+    const userName = body.user_name || rawName || email?.split('@')[0] || phone;
+
+    // Verify OTP for registrations first
+    if (roleId === 'CUSTOMER' || roleId === 'DELIVERY_PARTNER' || roleId === 'DELIVERY_BOY') {
       if (!body.verification_token) {
         throw new BadRequestException('Verification token is required');
       }
@@ -268,6 +324,20 @@ export class AuthService {
     await this.Data.executeTransaction(async (transaction) => {
       if (existingUser) {
         // Update placeholder user created during OTP verification
+        const userUpdatePayload: any = {
+          email,
+          phone,
+          user_name: userName,
+          first_name: firstName,
+          last_name: lastName,
+          password: hashedPassword,
+          role_id: roleId,
+          updated_at: now,
+        };
+        if (body.fcm_token) {
+          userUpdatePayload.fcm_token = body.fcm_token;
+        }
+
         await this.Data.update(
           'users',
           {
@@ -285,6 +355,22 @@ export class AuthService {
           { transaction },
         );
       } else {
+        const userInsertPayload: any = {
+          user_id: userId,
+          email,
+          phone,
+          user_name: userName,
+          first_name: firstName,
+          last_name: lastName,
+          password: hashedPassword,
+          role_id: roleId,
+          created_at: now,
+          updated_at: now,
+        };
+        if (body.fcm_token) {
+          userInsertPayload.fcm_token = body.fcm_token;
+        }
+
         const userResult = await this.Data.insert(
           'users',
           {
@@ -315,6 +401,12 @@ export class AuthService {
           limit: 1,
         });
 
+        const custFirstName = firstName || userName || 'Customer';
+        const generatedRefCode = await this.generateUniqueRefCode(
+          custFirstName,
+          phone || undefined,
+        );
+
         if (existingCust?.data?.length > 0) {
           await this.Data.update(
             'customers',
@@ -333,9 +425,10 @@ export class AuthService {
             'customers',
             {
               customer_id: userId,
-              first_name: body.first_name || body.user_name || 'Customer',
-              last_name: body.last_name || '',
-              phone: phone || '',
+              first_name: custFirstName,
+              last_name: lastName,
+              mobile: phone || ('NO_PHONE_' + userId),
+            
               email: email || null,
               created_at: now,
               updated_at: now,
@@ -377,14 +470,20 @@ export class AuthService {
           limit: 1,
         });
 
+        const partnerFullName = `${firstName} ${lastName}`.trim() || userName || 'Partner';
+
         if (existingDp?.data?.length > 0) {
           await this.Data.update(
             'delivery_partners',
             {
-              full_name: `${body.first_name || ''} ${body.last_name || ''}`.trim() || body.user_name || 'Partner',
-              phone: phone || '',
+              user_id: userId,
+              full_name: partnerFullName,
+              phone: phone || null,
               email: email || null,
               branch_id: selectedBranchId || 'BRANCH_DEFAULT',
+              current_lat: body.latitude !== undefined && body.latitude !== null ? Number(body.latitude) : null,
+              current_lng: body.longitude !== undefined && body.longitude !== null ? Number(body.longitude) : null,
+              referred_by: referrerId,
               updated_at: now,
             },
             [{ column: 'delivery_partner_id', operator: '=', value: userId }],
@@ -395,14 +494,39 @@ export class AuthService {
             'delivery_partners',
             {
               delivery_partner_id: userId,
-              full_name: `${body.first_name || ''} ${body.last_name || ''}`.trim() || body.user_name || 'Partner',
-              phone: phone || '',
+              user_id: userId,
+              full_name: partnerFullName,
+              phone: phone || null,
               email: email || null,
               branch_id: selectedBranchId || 'BRANCHd8c0WDGS76ii',
               is_active: 1,
               is_verified: 0,
               vehicle_type: 'BIKE',
               vehicle_number: 'N/A',
+              current_lat: body.latitude !== undefined && body.latitude !== null ? Number(body.latitude) : null,
+              current_lng: body.longitude !== undefined && body.longitude !== null ? Number(body.longitude) : null,
+              referred_by: referrerId,
+              created_at: now,
+              updated_at: now,
+            },
+            { transaction },
+          );
+        }
+
+        // Ensure active role assignment exists in role_assignments table
+        const [existingRaRows] = await transaction.query(
+          'SELECT id FROM role_assignments WHERE user_id = ? AND role_id = ? LIMIT 1',
+          [userId, roleId]
+        );
+
+        if (!existingRaRows?.length) {
+          await this.Data.insert(
+            'role_assignments',
+            {
+              id: Date.now() + Math.floor(Math.random() * 1000),
+              user_id: userId,
+              role_id: roleId,
+              is_active: 1,
               created_at: now,
               updated_at: now,
             },
@@ -414,7 +538,7 @@ export class AuthService {
 
     if (email) {
       try {
-        const name = (body.first_name || body.user_name || 'User').trim();
+        const name = (firstName || userName || 'User').trim();
         await this.mailService.sendWelcomeEmail(email, name);
       } catch (err) {
         this.developer.error(`Failed to send welcome email to ${email}`, { err });
@@ -522,7 +646,7 @@ export class AuthService {
     }
 
     if (!user) {
-      const userId = generateId('USER', 32);
+      const userId = generateId('USER', 20);
       const temporaryPassword = crypto.randomBytes(32).toString('hex');
       const hashedPassword = await bcrypt.hash(temporaryPassword, 12);
       const now = new Date();

@@ -41,6 +41,10 @@ export class RegisterDto {
 
   @IsString()
   @IsOptional()
+  name?: string;
+
+  @IsString()
+  @IsOptional()
   user_name?: string;
 
   @IsString()

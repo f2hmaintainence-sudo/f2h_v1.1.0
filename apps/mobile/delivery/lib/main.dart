@@ -16,14 +16,14 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:f2h_delivery/app.dart';
 import 'package:f2h_delivery/firebase_options.dart';
-import 'package:f2h_delivery/core/app_bootstrap.dart';
+import 'package:f2h_delivery/core/config/app_config.dart';
 import 'package:f2h_delivery/core/di/injection.dart' as di;
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   if (!kIsWeb) {
     try {
-      if (Firebase.apps.isEmpty) {
+      if (Firebase.apps.isEmpty && AppConfig.firebaseProjectId.isNotEmpty) {
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
         );
@@ -38,25 +38,23 @@ void main() async {
   
   if (!kIsWeb) {
     try {
-      if (Firebase.apps.isEmpty) {
+      if (Firebase.apps.isEmpty && AppConfig.firebaseProjectId.isNotEmpty) {
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
         );
+        FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+        FirebaseMessaging messaging = FirebaseMessaging.instance;
+        await messaging.requestPermission();
       }
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-      FirebaseMessaging messaging = FirebaseMessaging.instance;
-      await messaging.requestPermission();
     } catch (e) {
       debugPrint('[main] Firebase initialization failed: $e');
     }
   }
 
-  final bootResult = await AppBootstrap.checkAuth();
-
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
   ));
-  runApp(F2HApp(bootResult: bootResult));
+  runApp(const F2HApp());
 }
 

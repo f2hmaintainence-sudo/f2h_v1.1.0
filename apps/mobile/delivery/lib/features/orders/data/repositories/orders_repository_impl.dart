@@ -28,7 +28,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
       }
       return [];
     } catch (e) {
-      throw Exception('Failed to fetch today\'s orders: $e');
+      throw _handleDioError(e, 'Failed to fetch today\'s orders');
     }
   }
 
@@ -267,7 +267,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
         );
       } catch (fallbackError) {
         // If fallback also fails, throw original error
-        throw Exception('Server error. Please try again later.');
+        throw _handleDioError(e, 'Failed to get pickup items');
       }
     }
   }
@@ -293,7 +293,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
       throw Exception(response['message'] ?? 'Failed to confirm pickup');
     } catch (e) {
       print('Error confirming pickup: $e');
-      rethrow;
+      throw _handleDioError(e, 'Failed to confirm pickup');
     }
   }
 
@@ -316,12 +316,23 @@ class OrdersRepositoryImpl implements OrdersRepository {
       print('Error during handover in repository: $e');
       return HandoverResult(
         success: false,
-        message: e.toString(),
+        message: e is DioException ? (e.response?.data['message'] ?? e.message ?? e.toString()) : e.toString(),
         status: '',
         emptyBottlesReturned: 0,
         returnedItems: [],
       );
     }
+  }
+
+  Exception _handleDioError(dynamic e, String defaultMessage) {
+    if (e is DioException) {
+      final serverMessage = e.response?.data['message'] ?? e.response?.data['error'];
+      if (serverMessage != null) {
+        return Exception(serverMessage);
+      }
+      return Exception(e.message ?? defaultMessage);
+    }
+    return Exception('$defaultMessage: $e');
   }
 }
 

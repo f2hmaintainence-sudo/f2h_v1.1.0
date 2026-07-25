@@ -55,7 +55,17 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<User> register(String name, String email, String password, {String? branchId, double? latitude, double? longitude}) async {
+  Future<User> register(
+    String name,
+    String email,
+    String password, {
+    String? phone,
+    String? branchId,
+    double? latitude,
+    double? longitude,
+    String? verificationToken,
+    String? referralCode,
+  }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await Future.wait([
@@ -66,7 +76,17 @@ class AuthRepositoryImpl implements AuthRepository {
       ]);
     } catch (_) {}
 
-    final user = await remoteDataSource.register(name, email, password, branchId: branchId, latitude: latitude, longitude: longitude);
+    final user = await remoteDataSource.register(
+      name,
+      email,
+      password,
+      phone: phone,
+      branchId: branchId,
+      latitude: latitude,
+      longitude: longitude,
+      verificationToken: verificationToken,
+      referralCode: referralCode,
+    );
     if (user.token != null && user.token!.isNotEmpty) {
       await TokenStorage.saveTokens(
         accessToken: user.token!,
@@ -123,20 +143,29 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> logout() async {
     try {
+      try {
+        await remoteDataSource.logout();
+      } catch (_) {}
+
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {}
+
+      try {
+        await sl<DioClient>().cookieJar.deleteAll();
+      } catch (_) {}
+    } catch (_) {}
+
+    try {
       final prefs = await SharedPreferences.getInstance();
       await Future.wait([
         prefs.remove('cached_profile'),
         prefs.remove('cached_documents'),
         prefs.remove('cached_vehicles'),
         prefs.remove('cached_bank_accounts'),
-        _googleSignIn.signOut(),
-        remoteDataSource.logout(),
         localDataSource.clearCache(),
         TokenStorage.clear(),
       ]);
-      try {
-        await sl<DioClient>().cookieJar.deleteAll();
-      } catch (_) {}
     } catch (_) {
       await TokenStorage.clear();
     }
@@ -144,6 +173,10 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<User?> checkAuthStatus() async {
-    return await localDataSource.getCachedUser();
+    final user = await localDataSource.getCachedUser();
+    if (user == null || user.token == null || user.token!.isEmpty) {
+      return null;
+    }
+    return user;
   }
 }

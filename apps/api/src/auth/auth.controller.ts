@@ -75,7 +75,7 @@ export class AuthController {
         isRoleAllowed = userRole === 'CUSTOMER';
         break;
 
-      case 'DELIVERY_BOY':
+      case 'DELIVERY_PARTNER':
         // Delivery Partner App: only DELIVERY_BOY / DELIVERY_PARTNER users
         isRoleAllowed = userRole === 'DELIVERY_BOY' || userRole === 'DELIVERY_PARTNER';
         break;
@@ -303,12 +303,14 @@ export class AuthController {
     @Query('code') code: string,
     @Query('fcm_token') fcmToken: string,
     @Query('email') email: string,
+    @Query('role') role: string,
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.authService.googleLogin({
       id_token: code,
       email: email || (code?.includes('@') ? code : 'google_user@f2hfresh.com'),
       fcm_token: fcmToken,
+      role: role,
     });
     this.setCookies(res, result.accessToken, result.refreshToken);
     return result;

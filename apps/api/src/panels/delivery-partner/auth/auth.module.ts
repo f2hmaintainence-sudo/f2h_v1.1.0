@@ -6,7 +6,7 @@ import { DatabaseModule } from 'src/database/database.module';
 import { RedisModule } from 'src/shared/redis/redis.module';
 import { RolesModule } from 'src/roles/roles.module';
 import { AuthService } from './auth.service';
-// import { AuthController } from './auth.controller';
+import { AuthController } from './auth.controller';
 import { LocationController } from '../location/location.controller';
 import { AuthModule } from 'src/auth/auth.module';
 import { MailService } from 'src/mail/mail.service';
@@ -40,7 +40,7 @@ import { PushNotificationService } from 'src/shared/pushNotifications/pushNotifi
     RolesModule,
     AuthModule,
   ],
-  controllers: [LocationController],
+  controllers: [LocationController, AuthController],
   providers: [
     AuthService,
     MailService,

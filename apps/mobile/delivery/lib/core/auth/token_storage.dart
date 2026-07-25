@@ -5,18 +5,21 @@
 // Project     : F2H Fresh
 // File        : token_storage.dart
 // Description : Secure, persistent storage for Delivery app JWT tokens.
+//               Web uses localStorage via WebOptions (flutter_secure_storage ≥9).
 // Website     : https://www.chronosparksolutions.com/
 // Copyright   : https://www.chronosparksolutions.com/copyright
 // ============================================================================
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class TokenStorage {
   TokenStorage._();
 
-  static const FlutterSecureStorage _store = FlutterSecureStorage(
+  static FlutterSecureStorage get _store => const FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+    webOptions: WebOptions(dbName: 'f2h_delivery', publicKey: 'f2h_del'),
   );
 
   static const _kAccessToken  = 'f2h_del_access_token';
@@ -25,6 +28,7 @@ class TokenStorage {
   static const _kUserRole     = 'f2h_del_user_role';
   static const _kLastAuthAt   = 'f2h_del_last_auth_at';
 
+  // In-memory cache — always populated on saveTokens / first read.
   static String? _memAccessToken;
   static String? _memRefreshToken;
 
@@ -38,7 +42,7 @@ class TokenStorage {
     String? userId,
     String? role,
   }) async {
-    _memAccessToken = accessToken;
+    _memAccessToken  = accessToken;
     _memRefreshToken = refreshToken;
     await Future.wait([
       _store.write(key: _kAccessToken,  value: accessToken),
@@ -49,8 +53,20 @@ class TokenStorage {
     ]);
   }
 
-  static Future<String?> getAccessToken()  async => _memAccessToken ?? await _store.read(key: _kAccessToken);
-  static Future<String?> getRefreshToken() async => _memRefreshToken ?? await _store.read(key: _kRefreshToken);
+  static Future<String?> getAccessToken() async {
+    if (_memAccessToken != null) return _memAccessToken;
+    final stored = await _store.read(key: _kAccessToken);
+    _memAccessToken = stored; // warm the cache
+    return stored;
+  }
+
+  static Future<String?> getRefreshToken() async {
+    if (_memRefreshToken != null) return _memRefreshToken;
+    final stored = await _store.read(key: _kRefreshToken);
+    _memRefreshToken = stored; // warm the cache
+    return stored;
+  }
+
   static Future<String?> getUserId()       async => _store.read(key: _kUserId);
   static Future<String?> getUserRole()     async => _store.read(key: _kUserRole);
   static Future<String?> getLastAuthAt()   async => _store.read(key: _kLastAuthAt);
@@ -61,10 +77,13 @@ class TokenStorage {
   }
 
   static Future<void> updateAccessToken(String accessToken) async {
+    _memAccessToken = accessToken;
     await _store.write(key: _kAccessToken, value: accessToken);
   }
 
   static Future<void> clear() async {
+    _memAccessToken  = null;
+    _memRefreshToken = null;
     await Future.wait([
       _store.delete(key: _kAccessToken),
       _store.delete(key: _kRefreshToken),

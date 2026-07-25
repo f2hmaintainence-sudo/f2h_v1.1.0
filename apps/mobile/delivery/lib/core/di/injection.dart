@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
 import 'package:f2h_delivery/core/api/dio_client.dart';
 import 'package:f2h_delivery/auth/data/datasources/auth_remote_datasource.dart';
@@ -22,8 +23,13 @@ import 'package:f2h_delivery/core/config/config_repository.dart';
 final sl = GetIt.instance;
 
 Future<void> init() async {
-  // Initialize Isar
-  await IsarService.init();
+  // Initialize Isar — wrapped so a corrupt DB never prevents app launch.
+  // Tokens live in flutter_secure_storage; Isar only caches the user object.
+  try {
+    await IsarService.init();
+  } catch (e) {
+    debugPrint('[DI] IsarService.init() failed, continuing without local cache: $e');
+  }
 
   // Core — DioClient singleton
   final dioClient = DioClient();
