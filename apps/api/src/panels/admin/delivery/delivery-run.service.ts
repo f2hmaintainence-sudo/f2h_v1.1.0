@@ -386,8 +386,8 @@ export class DeliveryRunService {
               await this.db.query(
                 `UPDATE delivery_run_addresses
                  SET order_ids = (
-                   SELECT jsonb_agg(DISTINCT val)
-                   FROM jsonb_array_elements(COALESCE(order_ids, '[]'::jsonb) || $2::jsonb) AS val
+                   SELECT jsonb_agg(DISTINCT val)::text
+                   FROM jsonb_array_elements(COALESCE(order_ids::jsonb, '[]'::jsonb) || $2::text::jsonb) AS val
                  ),
                  updated_at = NOW()
                  WHERE run_id = $1 AND address_id = $3`,
@@ -435,12 +435,14 @@ export class DeliveryRunService {
               await this.db.query(
                 `INSERT INTO delivery_logs
                   (run_id, customer_id, order_id, address_id, delivery_partner_id,
-                   delivery_date, slot, items_json, status, sequence_no)
-                SELECT $1, $2, $3, $4, $5, $6, $7, $8,'pending',$9`,
+                   delivery_date, slot, items_json, latitude, longitude, status)
+                SELECT $1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, 'pending'
+                ON CONFLICT (order_id) WHERE deleted_at IS NULL DO NOTHING`,
                 [
                   runId, order.customer_id, order.order_id,
                   order.address_id, partnerId,
-                  targetDate, slotName, JSON.stringify(itemsJson), currentMaxSeq
+                  targetDate, slotName, JSON.stringify(itemsJson),
+                  order.order_lat, order.order_lng,
                 ],
               );
             }
