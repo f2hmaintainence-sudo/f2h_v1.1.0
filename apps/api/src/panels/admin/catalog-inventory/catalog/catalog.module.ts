@@ -15,9 +15,12 @@ import { FieldEncryptionModule } from '../../../../encryption/field-encryption.m
 import { LocalStorageService } from '../../../../shared/services/storage.service';
 import { AdminAuthModule } from 'src/panels/admin/auth/auth.module';
 
+import { ContainersController } from './containers.controller';
+import { ContainersService } from './containers.service';
+
 @Module({
   imports: [HelpersModule, FieldEncryptionModule, AdminAuthModule],
-  controllers: [CatalogController],
+  controllers: [CatalogController, ContainersController],
   providers: [
     CatalogService,
     CatalogTableService,
@@ -26,7 +29,7 @@ import { AdminAuthModule } from 'src/panels/admin/auth/auth.module';
     CatalogShowEditService,
     CatalogSaveEditService,
     CatalogSubscriptionConfigService,
-    
+    ContainersService,
     
     DeveloperService,
     LocalStorageService],

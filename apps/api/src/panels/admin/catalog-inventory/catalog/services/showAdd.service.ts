@@ -89,11 +89,30 @@ export class CatalogShowAddService {
         })),
       ];
 
+      // Fetch active containers
+      const containersResult = await this.dataService.query('containers', {
+        select: ['container_id', 'name', 'quantity'],
+        where: [
+          { column: 'status', operator: '=', value: 'active' },
+          { column: 'deleted_at', operator: 'IS', value: null },
+        ],
+        orderBy: 'name',
+        orderDirection: 'ASC',
+      }).catch(() => ({ data: [] }));
+
+      const containerOptions = [
+        { value: '', label: 'Select Container (Optional)' },
+        ...(containersResult.data || []).map((c: any) => ({
+          value: String(c.container_id),
+          label: `${c.name} (${c.container_id})`,
+        })),
+      ];
+
       // =====================================================
       // GENERATE FIELDS
       // =====================================================
 
-      const fields = this.catalogFields(categoryOptions, packagingOptions);
+      const fields = this.catalogFields(categoryOptions, packagingOptions, containerOptions);
 
       // =====================================================
       // RESPONSE
@@ -130,6 +149,7 @@ export class CatalogShowAddService {
         select: ['id', 'name'],
         where: [
           { column: 'status', operator: '=', value: 'active' },
+          { column: 'deleted_at', operator: 'IS', value: null },
         ],
         orderBy: 'name',
         orderDirection: 'ASC',
@@ -153,7 +173,26 @@ export class CatalogShowAddService {
         })),
       ];
 
-      const fields = this.variantFields(productOptions, packagingOptions);
+      // Fetch active containers
+      const containersResult = await this.dataService.query('containers', {
+        select: ['container_id', 'name', 'quantity'],
+        where: [
+          { column: 'status', operator: '=', value: 'active' },
+          { column: 'deleted_at', operator: 'IS', value: null },
+        ],
+        orderBy: 'name',
+        orderDirection: 'ASC',
+      }).catch(() => ({ data: [] }));
+
+      const containerOptions = [
+        { value: '', label: 'Select Container (Optional)' },
+        ...(containersResult.data || []).map((c: any) => ({
+          value: String(c.container_id),
+          label: `${c.name} (${c.container_id})`,
+        })),
+      ];
+
+      const fields = this.variantFields(productOptions, packagingOptions, containerOptions);
 
       return this.formHelper.generateResponse({
         title: 'Add Product Variant',
@@ -186,6 +225,7 @@ export class CatalogShowAddService {
   catalogFields(
     categoryOptions: any[] = [],
     packagingOptions: any[] = [],
+    containerOptions: any[] = [],
   ): FieldDef[] {
     return [
       { name: 'name', label: 'Product Name', type: 'text', required: true, width: 'half', group: 'Basic Identity', placeholder: 'Enter product name', validation: { minLength: 2, maxLength: 200 }, },
@@ -201,6 +241,7 @@ export class CatalogShowAddService {
       { name: 'lift_days', label: 'Lift Days', type: 'number', required: false, width: 'half', group: 'Units & Rules', placeholder: 'Days for subscription lift', validation: { min: 0, max: 365 }, },
       { name: 'gst_percentage', label: 'GST Percentage', type: 'number', required: false, width: 'half', group: 'Units & Rules', defaultValue: 0, placeholder: '0.00', validation: { min: 0, max: 100 }, },
       { name: 'packaging_type_id', label: 'Packaging Type (Returnable)', type: 'select', required: false, width: 'half', group: 'Units & Rules', options: packagingOptions, },
+      { name: 'container_id', label: 'Associated Container', type: 'select', required: false, width: 'half', group: 'Units & Rules', options: containerOptions, },
       { name: 'is_subscribable', label: 'Subscribable', type: 'toggle', required: false, width: 'quarter', group: 'Permissions', defaultValue: false, },
       { name: 'is_one_time', label: 'One-time Purchase', type: 'toggle', required: false, width: 'quarter', group: 'Permissions', defaultValue: true, },
       { name: 'is_returnable', label: 'Returnable', type: 'toggle', required: false, width: 'quarter', group: 'Permissions', defaultValue: false, },
@@ -213,6 +254,7 @@ export class CatalogShowAddService {
   variantFields(
     productOptions: any[] = [],
     packagingOptions: any[] = [],
+    containerOptions: any[] = [],
   ): FieldDef[] {
     return [
       { name: 'product_id', label: 'Product', type: 'select', required: true, width: 'third', group: 'Core Details', options: productOptions, },
@@ -228,10 +270,9 @@ export class CatalogShowAddService {
       { name: 'fulfillment_mode', label: 'Fulfillment Mode', type: 'select', required: false, width: 'half', defaultValue: 'prepacked', options: [{ value: 'bulk', label: 'Bulk' }, { value: 'prepacked', label: 'Pre Packed' },], },
       { name: 'manageable_qty', label: 'Manageable Quantity', type: 'number', required: false, width: 'third', group: 'Management', defaultValue: 0, placeholder: '0', validation: { min: 0, max: 99999 }, },
       { name: 'sort_order', label: 'Sort Order', type: 'number', required: false, width: 'third', group: 'Management', defaultValue: 0, placeholder: '0', validation: { min: 0, max: 9999 }, },
-      // { name: 'is_out_of_stock', label: 'Out of Stock', type: 'toggle', required: false, width: 'half', group: 'Management', defaultValue: false, },
       { name: 'packaging_type_id', label: 'Packaging Type (Returnable)', type: 'select', required: false, width: 'third', group: 'Management', options: packagingOptions, },
+      { name: 'container_id', label: 'Associated Container', type: 'select', required: false, width: 'third', group: 'Management', options: containerOptions, },
       { name: 'status', label: 'Status', type: 'toggle', required: false, width: 'third', group: 'Management', defaultValue: true, toggleOptions: { onLabel: 'Active', offLabel: 'Inactive', pill: true }, },
-
     ];
   }
 

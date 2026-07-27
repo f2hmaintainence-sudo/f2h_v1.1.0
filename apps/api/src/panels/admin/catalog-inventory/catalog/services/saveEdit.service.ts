@@ -259,6 +259,7 @@ export class CatalogSaveEditService {
         'is_returnable',
         'is_out_of_stock',
         'packaging_type_id',
+        'container_id',
         'unit_type',
         'lift_days',
         'gst_percentage',
@@ -271,6 +272,9 @@ export class CatalogSaveEditService {
         if (body[fieldName] !== undefined) {
           let value = body[fieldName];
           if (typeof value === 'string') value = value.trim();
+          if ((fieldName === 'packaging_type_id' || fieldName === 'container_id') && (value === '' || value === 'null')) {
+            value = null;
+          }
           updateData[fieldName] = value;
         }
       }
@@ -483,6 +487,7 @@ export class CatalogSaveEditService {
         'sort_order',
         'is_out_of_stock',
         'packaging_type_id',
+        'container_id',
       ];
 
       // 6. Build update payload
@@ -561,7 +566,7 @@ export class CatalogSaveEditService {
             value = null;
           }
 
-          if (fieldName === 'packaging_type_id' && value === '') {
+          if ((fieldName === 'packaging_type_id' || fieldName === 'container_id') && (value === '' || value === 'null')) {
             value = null;
           }
 

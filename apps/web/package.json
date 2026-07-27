@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -H 0.0.0.0 -p 5002",
+    "dev": "next dev --turbo -H 0.0.0.0 -p 5002",
     "dev:webpack": "next dev -H 0.0.0.0 -p 5002 --webpack",
     "clean": "rm -rf .next",
     "build": "next build",
