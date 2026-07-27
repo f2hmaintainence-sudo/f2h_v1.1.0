@@ -25,8 +25,7 @@ import {
   Skull,
 } from 'lucide-react';
 import Link from 'next/link';
-
-const API = process.env.NEXT_PUBLIC_API_URL || '';
+import { api } from '@/services/api.client';
 
 type PendingRow = {
   customer_id: string;
@@ -61,17 +60,37 @@ export default function ContainersPage() {
   const [adjusting, setAdjusting] = useState<AdjustState | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [containersMaster, setContainersMaster] = useState<any[]>([]);
   const limit = 20;
   const searchRef = useRef<NodeJS.Timeout | null>(null);
+
+  const fetchMasterContainers = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/catalog/containers');
+      if (res.data) {
+        const payload = (res.data as any).data || res.data;
+        setContainersMaster(Array.isArray(payload) ? payload : []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch containers master:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMasterContainers();
+  }, [fetchMasterContainers]);
+
+  const totalWarehouseStock = containersMaster.reduce((acc, c) => acc + Number(c.quantity || 0), 0);
 
   const load = useCallback(async (s = search, p = page) => {
     setLoading(true);
     try {
-      const q = new URLSearchParams({ search: s, page: String(p), limit: String(limit) });
-      const res = await fetch(`${API}/admin/package/pending?${q}`, { credentials: 'include' });
-      const json = await res.json();
-      setRows(json.data || []);
-      setTotal(json.total || 0);
+      const res = await api.get('/admin/package/pending', {
+        params: { search: s, page: p, limit },
+      });
+      const data = res.data || {};
+      setRows(data.data || []);
+      setTotal(data.total || 0);
     } catch {
       setRows([]);
     } finally {
@@ -96,31 +115,71 @@ export default function ContainersPage() {
     if (!adjusting) return;
     setSaving(true);
     try {
-      const res = await fetch(`${API}/admin/package/adjust`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customer_id: adjusting.row.customer_id,
-          container_type_id: adjusting.row.container_type_id,
-          action: adjusting.action,
-          quantity: adjusting.quantity,
-          notes: adjusting.notes,
-        }),
+      const res = await api.post('/admin/package/adjust', {
+        customer_id: adjusting.row.customer_id,
+        container_type_id: adjusting.row.container_type_id,
+        action: adjusting.action,
+        quantity: adjusting.quantity,
+        notes: adjusting.notes,
       });
-      const json = await res.json();
-      if (!json.status) throw new Error(json.message);
+      const json = res.data || {};
+      if (json.status === false) throw new Error(json.message);
       showToast(json.message || 'Adjusted successfully', true);
       setAdjusting(null);
       load();
+      fetchMasterContainers();
     } catch (e: any) {
-      showToast(e.message || 'Failed to adjust', false);
+      showToast(e.response?.data?.message || e.message || 'Failed to adjust', false);
     } finally {
       setSaving(false);
     }
   };
 
   const totalPages = Math.ceil(total / limit);
+
+  const renderKpiCards = () => {
+    const totalIssued = rows.reduce((acc, r) => acc + Number(r.issued_quantity || 0), 0);
+    const totalReturned = rows.reduce((acc, r) => acc + Number(r.returned_quantity || 0), 0);
+    const totalPending = rows.reduce((acc, r) => acc + Number(r.pending_count || 0), 0);
+    const totalDamaged = rows.reduce((acc, r) => acc + Number(r.damaged_quantity || 0), 0);
+    const totalLost = rows.reduce((acc, r) => acc + Number(r.lost_quantity || 0), 0);
+    const returnRate = totalIssued > 0 ? ((totalReturned / totalIssued) * 100).toFixed(1) : '100.0';
+
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+        <div className="bg-white p-3.5 rounded-xl border border-purple-100 bg-purple-50/20 shadow-2xs">
+          <p className="text-[10px] font-extrabold text-purple-600 uppercase tracking-wider mb-1">Warehouse Stock</p>
+          <p className="text-xl font-black text-purple-700">{totalWarehouseStock}</p>
+          <p className="text-[10px] text-purple-600/70 mt-0.5">Total registered</p>
+        </div>
+        <div className="bg-white p-3.5 rounded-xl border border-gray-100 shadow-2xs">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Issued</p>
+          <p className="text-xl font-black text-gray-900">{totalIssued}</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">Issued to customers</p>
+        </div>
+        <div className="bg-white p-3.5 rounded-xl border border-emerald-100 bg-emerald-50/20 shadow-2xs">
+          <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Total Returned</p>
+          <p className="text-xl font-black text-emerald-700">{totalReturned}</p>
+          <p className="text-[10px] text-emerald-600/70 mt-0.5">Collected back</p>
+        </div>
+        <div className="bg-white p-3.5 rounded-xl border border-amber-100 bg-amber-50/20 shadow-2xs">
+          <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-1">Pending Return</p>
+          <p className="text-xl font-black text-amber-700">{totalPending}</p>
+          <p className="text-[10px] text-amber-600/70 mt-0.5">With customers</p>
+        </div>
+        <div className="bg-white p-3.5 rounded-xl border border-rose-100 bg-rose-50/20 shadow-2xs">
+          <p className="text-[10px] font-bold text-rose-600 uppercase tracking-wider mb-1">Broken / Lost</p>
+          <p className="text-xl font-black text-rose-700">{totalDamaged + totalLost}</p>
+          <p className="text-[10px] text-rose-600/70 mt-0.5">Damaged: {totalDamaged} | Lost: {totalLost}</p>
+        </div>
+        <div className="bg-white p-3.5 rounded-xl border border-blue-100 bg-blue-50/20 shadow-2xs">
+          <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1">Return Rate</p>
+          <p className="text-xl font-black text-blue-700">{returnRate}%</p>
+          <p className="text-[10px] text-blue-600/70 mt-0.5">Efficiency rating</p>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-4 p-1 md:p-2 font-sans min-h-screen">
@@ -148,44 +207,7 @@ export default function ContainersPage() {
         </button>
       </div>
 
-      {/* Summary KPI Cards */}
-      {(() => {
-        const totalIssued = rows.reduce((acc, r) => acc + Number(r.issued_quantity || 0), 0);
-        const totalReturned = rows.reduce((acc, r) => acc + Number(r.returned_quantity || 0), 0);
-        const totalPending = rows.reduce((acc, r) => acc + Number(r.pending_count || 0), 0);
-        const totalDamagedLost = rows.reduce((acc, r) => acc + Number(r.damaged_quantity || 0) + Number(r.lost_quantity || 0), 0);
-        const returnRate = totalIssued > 0 ? ((totalReturned / totalIssued) * 100).toFixed(1) : '100.0';
-
-        return (
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <div className="bg-white p-3.5 rounded-xl border border-gray-100 shadow-2xs">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Issued</p>
-              <p className="text-xl font-black text-gray-900">{totalIssued}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">Containers distributed</p>
-            </div>
-            <div className="bg-white p-3.5 rounded-xl border border-emerald-100 bg-emerald-50/20 shadow-2xs">
-              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Total Returned</p>
-              <p className="text-xl font-black text-emerald-700">{totalReturned}</p>
-              <p className="text-[10px] text-emerald-600/70 mt-0.5">Collected back</p>
-            </div>
-            <div className="bg-white p-3.5 rounded-xl border border-amber-100 bg-amber-50/20 shadow-2xs">
-              <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-1">Pending Return</p>
-              <p className="text-xl font-black text-amber-700">{totalPending}</p>
-              <p className="text-[10px] text-amber-600/70 mt-0.5">With customers</p>
-            </div>
-            <div className="bg-white p-3.5 rounded-xl border border-rose-100 bg-rose-50/20 shadow-2xs">
-              <p className="text-[10px] font-bold text-rose-600 uppercase tracking-wider mb-1">Damaged / Lost</p>
-              <p className="text-xl font-black text-rose-700">{totalDamagedLost}</p>
-              <p className="text-[10px] text-rose-600/70 mt-0.5">Uncollectible</p>
-            </div>
-            <div className="bg-white p-3.5 rounded-xl border border-blue-100 bg-blue-50/20 shadow-2xs col-span-2 sm:col-span-1">
-              <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1">Return Rate</p>
-              <p className="text-xl font-black text-blue-700">{returnRate}%</p>
-              <p className="text-[10px] text-blue-600/70 mt-0.5">Efficiency rating</p>
-            </div>
-          </div>
-        );
-      })()}
+      {renderKpiCards()}
 
       {/* Filter Toolbar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-gray-100 shadow-2xs">
@@ -205,19 +227,32 @@ export default function ContainersPage() {
         </div>
 
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-          {['All', 'Bottle', 'Bucket', 'Can', 'Crate'].map((type) => (
-            <button
-              key={type}
-              onClick={() => setSelectedType(type)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
-                selectedType === type
-                  ? 'bg-fresh-green text-white shadow-xs'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {type === 'All' ? 'All Container Types' : `${type}s`}
-            </button>
-          ))}
+          <button
+            onClick={() => setSelectedType('All')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+              selectedType === 'All'
+                ? 'bg-fresh-green text-white shadow-xs'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            All Container Types
+          </button>
+          {containersMaster.map((c) => {
+            const val = c.container_id || c.name;
+            return (
+              <button
+                key={c.container_id || c.id}
+                onClick={() => setSelectedType(val)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  selectedType === val
+                    ? 'bg-fresh-green text-white shadow-xs'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {c.name}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -250,7 +285,14 @@ export default function ContainersPage() {
                 ))
               )}
               {!loading && rows
-                .filter(r => selectedType === 'All' || (r.container_name || '').toLowerCase().includes(selectedType.toLowerCase()))
+                .filter(r => {
+                  if (selectedType === 'All') return true;
+                  const target = selectedType.toLowerCase();
+                  return (
+                    (r.container_type_id || '').toLowerCase() === target ||
+                    (r.container_name || '').toLowerCase().includes(target)
+                  );
+                })
                 .map((row) => (
                 <tr key={`${row.customer_id}_${row.container_type_id}`} className="hover:bg-amber-50/40 transition-colors">
                   <td className="px-4 py-3">

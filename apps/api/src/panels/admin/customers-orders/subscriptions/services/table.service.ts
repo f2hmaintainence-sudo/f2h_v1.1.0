@@ -166,9 +166,14 @@ export class SubscriptionsTableService {
       columns: {
         id: ['subscriptions.id', false],
         subscription_number: ['subscriptions.subscription_number', true],
+        subscription_id: ['subscriptions.subscription_id', true],
         customer_id: ['subscriptions.customer_id', true],
-        customer_name: ['customers.full_name', true],
-        phone: ['customers.phone', true],
+        first_name: ['customers.first_name', false],
+        last_name: ['customers.last_name', false],
+        full_name: ['customers.full_name', false],
+        customer_name: ['customers.first_name', true],
+        mobile: ['customers.mobile', false],
+        phone: ['customers.mobile', true],
         schedule_type: ['subscriptions.schedule_type', true],
         payment_type: ['subscriptions.payment_type', true],
         billing_cycle: ['subscriptions.billing_cycle', true],
@@ -191,67 +196,22 @@ export class SubscriptionsTableService {
       custom: [
         {
           type: 'compute',
-          column: 'status',
+          column: 'customer_name',
           callback: (row) => {
-            const value = String(row.status || 'active').toLowerCase();
-
-            const classes =
-              value === 'active'
-                ? 'bg-green-100 text-green-800 border border-green-200'
-                : value === 'paused'
-                  ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
-                  : value === 'completed'
-                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                    : value === 'expired'
-                      ? 'bg-red-100 text-red-800 border border-red-200'
-                      : value === 'cancelled'
-                        ? 'bg-red-100 text-red-800 border border-red-200'
-                        : 'bg-gray-100 text-gray-700 border border-gray-200';
-
-            const label = value
-              .replace(/_/g, ' ')
-              .replace(/\b\w/g, (char) => char.toUpperCase());
-
-            return `
-              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${classes}">
-                ${label}
-              </span>
-            `;
+            if (row.full_name) return row.full_name;
+            const parts = [row.first_name, row.last_name].filter(Boolean);
+            if (parts.length > 0) return parts.join(' ');
+            return row.customer_id || 'N/A';
           },
-          renderHtml: true,
+          renderHtml: false,
         },
         {
           type: 'compute',
-          column: 'auto_renew',
+          column: 'phone',
           callback: (row) => {
-            const enabled =
-              row.auto_renew === true || row.auto_renew === 'true';
-
-            const classes = enabled
-              ? 'bg-green-100 text-green-800 border border-green-200'
-              : 'bg-gray-100 text-gray-700 border border-gray-200';
-
-            const label = enabled ? 'Yes' : 'No';
-
-            return `
-              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${classes}">
-                ${label}
-              </span>
-            `;
+            return row.mobile || row.phone || 'N/A';
           },
-          renderHtml: true,
-        },
-        {
-          type: 'compute',
-          column: 'wallet_balance',
-          callback: (row) => {
-            const balance = Number(row.wallet_balance || 0);
-            const classes = balance > 0
-              ? 'text-green-700 font-semibold'
-              : 'text-red-600 font-semibold';
-            return `<span class="${classes}">₹${balance.toFixed(2)}</span>`;
-          },
-          renderHtml: true,
+          renderHtml: false,
         },
       ],
       req_set: reqSet,

@@ -105,6 +105,25 @@ export class CatalogShowEditService {
         })),
       ];
 
+      // Fetch active containers
+      const containersResult = await this.dataService.query('containers', {
+        select: ['container_id', 'name'],
+        where: [
+          { column: 'status', operator: '=', value: 'active' },
+          { column: 'deleted_at', operator: 'IS', value: null },
+        ],
+        orderBy: 'name',
+        orderDirection: 'ASC',
+      }).catch(() => ({ data: [] }));
+
+      const containerOptions = [
+        { value: '', label: 'Select Container (Optional)' },
+        ...(containersResult.data || []).map((c: any) => ({
+          value: String(c.container_id),
+          label: `${c.name} (${c.container_id})`,
+        })),
+      ];
+
       // =====================================================
       // GENERATE FIELDS
       // =====================================================
@@ -112,6 +131,7 @@ export class CatalogShowEditService {
       const fields = this.showAddService.catalogFields(
         categoryOptions,
         packagingOptions,
+        containerOptions,
       );
 
       // =====================================================
@@ -124,6 +144,8 @@ export class CatalogShowEditService {
         category_id: String(product.category_id || ''),
 
         packaging_type_id: String(product.packaging_type_id || ''),
+
+        container_id: String(product.container_id || ''),
 
         product_image: productImage,
       };
@@ -197,6 +219,7 @@ export class CatalogShowEditService {
         select: ['id', 'name'],
         where: [
           { column: 'status', operator: '=', value: 'active' },
+          { column: 'deleted_at', operator: 'IS', value: null },
         ],
         orderBy: 'name',
         orderDirection: 'ASC',
@@ -210,7 +233,26 @@ export class CatalogShowEditService {
         })),
       ];
 
-      let fields = this.showAddService.variantFields(productOptions, packagingOptions);
+      // Fetch active containers
+      const containersResult = await this.dataService.query('containers', {
+        select: ['container_id', 'name'],
+        where: [
+          { column: 'status', operator: '=', value: 'active' },
+          { column: 'deleted_at', operator: 'IS', value: null },
+        ],
+        orderBy: 'name',
+        orderDirection: 'ASC',
+      }).catch(() => ({ data: [] }));
+
+      const containerOptions = [
+        { value: '', label: 'Select Container (Optional)' },
+        ...(containersResult.data || []).map((c: any) => ({
+          value: String(c.container_id),
+          label: `${c.name} (${c.container_id})`,
+        })),
+      ];
+
+      let fields = this.showAddService.variantFields(productOptions, packagingOptions, containerOptions);
 
       // Hide Subscription Price if the variant's product does not allow subscription
       const parentProduct = (productsResult.data || []).find(
@@ -236,6 +278,8 @@ export class CatalogShowEditService {
       const formattedData = {
         ...variant,
         product_id: String(variant.product_id || ''),
+        packaging_type_id: String(variant.packaging_type_id || ''),
+        container_id: String(variant.container_id || ''),
         variant_image: variantImages,
         status: variant.status === 'active' || variant.status === true || variant.status === 1 || variant.status === '1',
       };

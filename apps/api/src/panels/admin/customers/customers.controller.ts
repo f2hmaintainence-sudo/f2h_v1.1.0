@@ -86,6 +86,16 @@ export class CustomersController {
     return this.customersService.getCustomerPortfolio(id);
   }
 
+  @Post(':id/container-transaction')
+  async logContainerTransaction(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Req() req: any,
+  ) {
+    const adminId = req.user?.user_id ?? 'system';
+    return this.customersService.logContainerTransaction(id, body, adminId);
+  }
+
   @Get(':id/view')
   async getCustomerView(@Param('id') id: string) {
     return this.customersService.getCustomerView(id);

@@ -255,6 +255,10 @@ export class CatalogSaveAddService {
       delete insertData.primary_image_file;
       delete insertData.secondary_image_file;
 
+      if (insertData.container_id === '' || insertData.container_id === 'null') {
+        insertData.container_id = null;
+      }
+
       // =====================================================
       // 5. REQUIRED FIELD VALIDATION
       // =====================================================
@@ -550,7 +554,7 @@ export class CatalogSaveAddService {
       return null;
     }
 
-    if (fieldName === 'packaging_type_id' && value === '') {
+    if ((fieldName === 'packaging_type_id' || fieldName === 'container_id') && (value === '' || value === 'null')) {
       return null;
     }
 

@@ -61,17 +61,11 @@ export const AVOID_DELETED_AT = [
   'subscription_logs',
   'customers',
   'customer_addresses',
-  'customer_wallet_transactions',
-  'container_transactions',
-  'delivery_container_lines',
-  'customer_container_balances',
   'customer_feedback',
   'products',
   'product_variants',
   'stock_balances',
-  'product_images',
   'categories',
-  'packaging_types',
   'product_images',
 ];
 export const AVOID_DATACHANGE_TABLES = [
