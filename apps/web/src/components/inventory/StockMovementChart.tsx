@@ -101,9 +101,10 @@ export default function StockMovementChart({ data, isLoading }: StockMovementCha
                   fontSize: "12px",
                   fontWeight: "600",
                 }}
-                labelFormatter={(idx: number) => {
-                  const label = chartData[idx]?.day;
-                  return label ? `📅 ${label}` : `📅 Day ${idx + 1}`;
+                labelFormatter={(idx) => {
+                  const index = Number(idx);
+                  const label = !isNaN(index) ? chartData[index]?.day : undefined;
+                  return label ? `📅 ${label}` : `📅 ${idx ?? ''}`;
                 }}
                 formatter={(value, name) => [
                   value ?? 0,
