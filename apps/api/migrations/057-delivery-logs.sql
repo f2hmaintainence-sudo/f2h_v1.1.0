@@ -13,7 +13,7 @@ CREATE TABLE delivery_logs (
 
     delivery_date DATE NOT NULL,
 
-    slot VARCHAR(5) NOT NULL,
+    slot VARCHAR(20) NOT NULL,
 
     items_json JSONB,
     -- delivered items from snapshots
