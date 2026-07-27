@@ -280,7 +280,11 @@ export class CatalogShowEditService {
         product_id: String(variant.product_id || ''),
         packaging_type_id: String(variant.packaging_type_id || ''),
         container_id: String(variant.container_id || ''),
-        variant_image: variantImages,
+        variant_image: variantImages[0] || null,
+        variant_image_2: variantImages[1] || null,
+        variant_image_3: variantImages[2] || null,
+        variant_image_4: variantImages[3] || null,
+        variant_image_5: variantImages[4] || null,
         status: variant.status === 'active' || variant.status === true || variant.status === 1 || variant.status === '1',
       };
 

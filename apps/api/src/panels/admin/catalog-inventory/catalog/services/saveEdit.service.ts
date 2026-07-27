@@ -76,10 +76,10 @@ export class CatalogSaveEditService {
     }
 
     if (fileUrl) {
-      await this.dataService.query(
-        `UPDATE products SET image_path = $1 WHERE product_id = $2`,
-        [fileUrl, productId],
-      );
+      await this.dataService.query('products', {
+        update: { image_path: fileUrl },
+        where: [{ column: 'product_id', operator: '=', value: productId }],
+      });
     }
   }
 
@@ -125,10 +125,10 @@ export class CatalogSaveEditService {
     const finalUrls = Array.from(new Set(urlsToProcess)).slice(0, 5);
 
     if (finalUrls.length > 0) {
-      await this.dataService.query(
-        `DELETE FROM product_images WHERE variant_id = $1`,
-        [variantId],
-      );
+      await this.dataService.query('product_images', {
+        delete: true,
+        where: [{ column: 'variant_id', operator: '=', value: variantId }],
+      });
 
       for (const [index, fileUrl] of finalUrls.entries()) {
         await this.dataService.insert('product_images', {
@@ -279,13 +279,7 @@ export class CatalogSaveEditService {
         }
       }
 
-      const primaryUrl = body.primary_image_url || body.image_url;
-      if (primaryUrl && primaryUrl.trim()) {
-        updateData.image_url = primaryUrl.trim();
-        updateData.image_path = primaryUrl.trim();
-      }
-
-      if (Object.keys(updateData).length === 0 && !productImage) {
+      if (Object.keys(updateData).length === 0) {
         this.developer.error("No valid fields to update")
         throw new BadRequestException('No valid fields to update');
       }
@@ -302,18 +296,7 @@ export class CatalogSaveEditService {
         }
       }
 
-      const secondaryUrl = body.secondary_image_url;
-      const secondaryImage = body.secondary_image_file ? this.normalizeProductImage(body.secondary_image_file) : undefined;
-
-      await this.replacePrimaryProductImage(
-        product.product_id,
-        updateData.name || product.name,
-        productImage,
-        secondaryImage,
-        primaryUrl,
-        secondaryUrl,
-        adminId,
-      );
+      // Primary product images are managed on product_variants level
 
       // 5. Audit log
       await this.dataService.insert('admin_audit_logs', {
@@ -471,7 +454,13 @@ export class CatalogSaveEditService {
       }
 
       const existingVariant = existingVariantResult.data[0];
-      const variantImage = body.variant_image;
+      const variantImages = [
+        body.variant_image,
+        body.variant_image_2,
+        body.variant_image_3,
+        body.variant_image_4,
+        body.variant_image_5,
+      ].filter((img) => img !== undefined && img !== null && img !== '');
 
       // 5. Allowed fields whitelist
       const allowedUpdateFields = [
@@ -575,7 +564,7 @@ export class CatalogSaveEditService {
       }
 
       // 7. Ensure at least one field exists
-      if (Object.keys(updateData).length === 0 && variantImage === undefined) {
+      if (Object.keys(updateData).length === 0 && variantImages.length === 0) {
         throw new BadRequestException('No valid fields to update');
       }
 
@@ -603,12 +592,12 @@ export class CatalogSaveEditService {
       const primaryUrl = body.primary_image_url || body.image_url;
       const additionalUrls = body.additional_image_urls;
 
-      if (variantImage !== undefined || primaryUrl || additionalUrls) {
+      if (variantImages.length > 0 || primaryUrl || additionalUrls) {
         await this.replaceVariantImages(
-          updateData.product_id || existingVariant.product_id,
-          existingVariant.variant_id,
-          updateData.name || existingVariant.name,
-          variantImage,
+          String(updateData.product_id || existingVariant.product_id),
+          String(existingVariant.variant_id),
+          String(updateData.name || existingVariant.name),
+          variantImages,
           adminId,
           primaryUrl,
           additionalUrls,
@@ -627,7 +616,7 @@ export class CatalogSaveEditService {
         details: JSON.stringify({
           changes: [
             ...Object.keys(updateData),
-            ...(variantImage !== undefined ? ['variant_image'] : [])
+            ...(variantImages.length > 0 ? ['variant_image'] : []),
           ],
         }),
       });
