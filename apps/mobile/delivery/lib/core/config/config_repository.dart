@@ -5,13 +5,11 @@
 // Project     : F2H Fresh
 // File        : config_repository.dart
 // Description : Daily server configuration sync engine for F2H Delivery App.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:f2h_delivery/core/api/api_endpoints.dart';
 import 'package:f2h_delivery/core/api/dio_client.dart';
 import 'package:f2h_delivery/core/config/app_config.dart';
 

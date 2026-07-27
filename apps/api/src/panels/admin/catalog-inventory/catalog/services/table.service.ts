@@ -147,8 +147,6 @@ export class CatalogTableService {
           product_category: ['categories.name AS product_category', true],
           product_name: ['products.name AS product_name', true],
           name: ['products.name AS name', false],
-          url: ['products.image_path AS url', false],
-          image: ['products.image_path AS image', true],
           batch_product: ['products.batch_product', false],
           gst: ['products.gst_percentage', true],
           packaging_type: ['packaging_types.name AS packaging_type', true],
@@ -179,12 +177,6 @@ export class CatalogTableService {
         ],
         conditions,
         custom: [
-          {
-            type: 'compute',
-            column: 'image',
-            renderHtml: true,
-            callback: (row) => formatTableImageHtml(row.image || row.url, row.product_name || 'Product'),
-          },
           {
             type: 'compute',
             column: 'subscribable',
@@ -302,7 +294,7 @@ export class CatalogTableService {
           variant_id: ['product_variants.variant_id', true],
           product_name: ['products.name AS product_name', true],
           variant_name: ['product_variants.name', true],
-          product_image: ['product_images.url AS product_image', true],
+          image: ['(SELECT url FROM product_images WHERE product_images.variant_id = product_variants.variant_id ORDER BY is_primary DESC, id ASC LIMIT 1) AS image', true],
           unit_value: ['product_variants.unit_value', true],
           unit_type: ['product_variants.unit_type', true],
           price: ['product_variants.price', true],
@@ -318,19 +310,14 @@ export class CatalogTableService {
             table: 'products',
             on: [['product_variants.product_id', 'products.product_id']],
           },
-          {
-            type: 'left',
-            table: 'product_images',
-            on: [['product_variants.variant_id', 'product_images.variant_id']],
-          },
         ],
         conditions,
         custom: [
           {
             type: 'compute',
-            column: 'product_image',
+            column: 'image',
             renderHtml: true,
-            callback: (row) => formatTableImageHtml(row.product_image, row.variant_name || 'Variant'),
+            callback: (row) => formatTableImageHtml(row.image, row.variant_name || 'Variant'),
           },
           {
             type: 'compute',

@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : SmsTemplateModal.tsx
 // Description : Modal for creating & editing SMS DLT templates
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 "use client";

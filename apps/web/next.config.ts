@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 /**
  * Production config for Contabo VPS with Node.js (next start).
@@ -29,6 +30,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  turbopack: {
+    root: path.resolve(__dirname, "../../"),
+  },
   experimental: {
     optimizePackageImports: ["react-icons", "lucide-react"],
   },
@@ -45,6 +49,7 @@ const nextConfig: NextConfig = {
     ];
   },
   async headers() {
+    if (process.env.NODE_ENV !== "production") return [];
     return [
       {
         source: "/assets/:path*",

@@ -43,7 +43,7 @@ class _CollectedItemsDialogState extends State<CollectedItemsDialog> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: kPrimary.withOpacity(0.1),
+                    color: kPrimary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(Icons.playlist_add_check_rounded, color: kPrimary, size: 28),

@@ -32,7 +32,7 @@ export class DeliveryManagementService {
   private async notifyPartner(partnerId: string, title: string, messageBody: string): Promise<void> {
     try {
       const boyRows = await this.db.query(
-        `SELECT delivery_partner_id, user_id FROM delivery_partners WHERE delivery_partner_id = $1 OR user_id = $1 OR id::text = $1`,
+        `SELECT delivery_partner_id FROM delivery_partners WHERE delivery_partner_id = $1 OR id::text = $1`,
         [partnerId],
       );
       if (!boyRows || boyRows.length === 0) return;
@@ -93,7 +93,7 @@ export class DeliveryManagementService {
       const sql = `
         SELECT
           db.delivery_partner_id,
-          db.user_id,
+          db.delivery_partner_id AS user_id,
           db.is_verified,
           db.full_name,
           db.phone,
@@ -280,7 +280,7 @@ export class DeliveryManagementService {
           b.branch_name
         FROM delivery_partners db
         LEFT JOIN branches b ON b.branch_id = db.branch_id
-        WHERE db.delivery_partner_id = $1 OR db.user_id = $1 OR db.id::text = $1
+        WHERE db.delivery_partner_id = $1 OR db.id::text = $1
       `;
       const boyRows = await this.db.query(boySql, [partnerId]);
       const partnerObj = boyRows[0] ?? null;
@@ -380,15 +380,14 @@ export class DeliveryManagementService {
         const boySql = `
           UPDATE delivery_partners
           SET is_verified = $1, updated_at = NOW()
-          WHERE delivery_partner_id = $2 OR user_id = $2 OR id::text = $2
+          WHERE delivery_partner_id = $2 OR id::text = $2
           RETURNING delivery_partner_id, full_name, is_verified, is_active
         `;
         const rows = await this.db.query(boySql, [body.is_verified, partnerId]);
 
         if (body.is_verified === true) {
           const boyId = rows[0]?.delivery_partner_id || partnerId;
-          const boyRows = await this.db.query(`SELECT user_id FROM delivery_partners WHERE delivery_partner_id = $1`, [boyId]);
-          const userId = boyRows[0]?.user_id || boyId;
+          const userId = boyId;
 
           await this.db.query(
             `UPDATE user_documents SET verification_status = 'verified', verified_at = NOW() WHERE (delivery_partner_id = $1 OR delivery_partner_id = $2) AND verification_status = 'pending'`,
@@ -647,8 +646,8 @@ export class DeliveryManagementService {
       }
 
       const dbRes = await this.db.query(
-        `SELECT delivery_partner_id, full_name, user_id FROM delivery_partners 
-         WHERE delivery_partner_id = $1 OR user_id = $1 OR id::text = $1 LIMIT 1`,
+        `SELECT delivery_partner_id, full_name FROM delivery_partners 
+         WHERE delivery_partner_id = $1 OR id::text = $1 LIMIT 1`,
         [dto.delivery_partner_id],
       );
       if (!dbRes || dbRes.length === 0) {

@@ -7,8 +7,7 @@
 // Description : Dynamic Firebase options provider for Customer App.
 //               Reads configurations dynamically from AppConfig / Server API
 //               (no hardcoded credentials).
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;

@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : SmsConfigModal.tsx
 // Description : Modal for creating & editing SMS Gateway configurations
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 "use client";

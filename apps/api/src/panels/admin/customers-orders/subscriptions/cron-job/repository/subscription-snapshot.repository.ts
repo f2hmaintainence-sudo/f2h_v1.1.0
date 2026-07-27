@@ -52,7 +52,7 @@ export class SubscriptionSnapshotRepository {
       INNER JOIN subscription_items si
         ON si.subscription_id = s.subscription_id
       INNER JOIN subscription_weekly_schedule ws
-        ON ws.subscription_item_id = si.id
+        ON (ws.subscription_item_id = si.subscription_item_id OR ws.subscription_item_id = si.id::text)
       LEFT JOIN product_variants pv
         ON pv.variant_id = si.product_variant_id
       LEFT JOIN products p
@@ -136,7 +136,7 @@ export class SubscriptionSnapshotRepository {
         JOIN subscription_items si
           ON si.subscription_id = s.subscription_id
         JOIN subscription_weekly_schedule ws
-          ON ws.subscription_item_id = si.id
+          ON (ws.subscription_item_id = si.subscription_item_id OR ws.subscription_item_id = si.id::text)
         LEFT JOIN customer_addresses ca
           ON ca.address_id = s.address_id
         WHERE s.status = 'active'
@@ -245,7 +245,7 @@ export class SubscriptionSnapshotRepository {
         JOIN subscription_items si
           ON si.subscription_id = o.subscription_id
         JOIN subscription_weekly_schedule ws
-          ON ws.subscription_item_id = si.id
+          ON (ws.subscription_item_id = si.subscription_item_id OR ws.subscription_item_id = si.id::text)
         WHERE o.scheduled_date = $1::date
           AND o.delivery_slot = $2
           AND o.order_source = 'subscription'

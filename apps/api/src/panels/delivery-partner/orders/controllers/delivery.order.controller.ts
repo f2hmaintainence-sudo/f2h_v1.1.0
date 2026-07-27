@@ -1828,4 +1828,78 @@ async markOrdersOutForDelivery(@Request() req: any) {
     order_ids: orderIds,
   };
 }
+
+  // ═══════════════════════════════════════════════════════════════
+  // POST /delivery/orders/:id/update-containers
+  // Accept container return checklist & missing statuses with notes
+  // ═══════════════════════════════════════════════════════════════
+  @Post(':id/update-containers')
+  @HttpCode(HttpStatus.OK)
+  async updateOrderContainers(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Request() req: any,
+  ) {
+    const userId = req.user?.user_id;
+    const boy = await this.resolveDeliveryPartner(userId);
+
+    const orderRes = await this.db.query(
+      `SELECT order_id, customer_id FROM orders WHERE order_id = $1 OR id::text = $1 LIMIT 1`,
+      [id],
+    );
+    if (!orderRes?.length) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const order = orderRes[0];
+    const { container_updates } = body;
+
+    if (!Array.isArray(container_updates) || container_updates.length === 0) {
+      throw new BadRequestException('container_updates must be a non-empty array');
+    }
+
+    for (const item of container_updates) {
+      const { container_id, expected_quantity = 1, returned_quantity = 0, status = 'returned', notes } = item;
+      if (!container_id) continue;
+
+      await this.db.query(
+        `INSERT INTO order_containers 
+         (order_id, customer_id, container_id, expected_quantity, returned_quantity, status, notes, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+        [order.order_id, order.customer_id, container_id, expected_quantity, returned_quantity, status, notes || null]
+      );
+
+      const txnType = status === 'returned' ? 'return' : status === 'broken' ? 'damaged' : status === 'lost' ? 'lost' : 'issue';
+      const qty = Math.max(1, Number(returned_quantity || expected_quantity || 1));
+
+      await this.db.query(
+        `INSERT INTO container_transactions 
+         (customer_id, packaging_type_id, reference_type, reference_id, transaction_type, quantity, remarks, created_by)
+         VALUES ($1, $2, 'order', $3, $4, $5, $6, $7)`,
+        [order.customer_id, container_id, order.order_id, txnType, qty, notes || `Order ${order.order_id} container check (${status})`, boy.full_name || String(boy.user_id)]
+      ).catch(() => null);
+
+      const returnAdd = txnType === 'return' ? qty : 0;
+      const damagedAdd = txnType === 'damaged' ? qty : 0;
+      const lostAdd = txnType === 'lost' ? qty : 0;
+
+      await this.db.query(
+        `INSERT INTO customer_container_balances 
+         (customer_id, packaging_type_id, issued_quantity, returned_quantity, damaged_quantity, lost_quantity)
+         VALUES ($1, $2, 0, $3, $4, $5)
+         ON CONFLICT (customer_id, packaging_type_id) DO UPDATE SET
+           returned_quantity = customer_container_balances.returned_quantity + EXCLUDED.returned_quantity,
+           damaged_quantity = customer_container_balances.damaged_quantity + EXCLUDED.damaged_quantity,
+           lost_quantity = customer_container_balances.lost_quantity + EXCLUDED.lost_quantity,
+           updated_at = NOW()`,
+        [order.customer_id, container_id, returnAdd, damagedAdd, lostAdd]
+      ).catch(() => null);
+    }
+
+    return {
+      success: true,
+      message: 'Container checklist & statuses updated successfully',
+    };
+  }
+>>>>>>> f30ab41b63505b06a6650caa6274197655c17dfc
 }

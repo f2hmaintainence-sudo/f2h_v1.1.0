@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : TodayOrdersClient.tsx
 // Description : Today orders component for admin panel
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 'use client';
@@ -445,8 +444,8 @@ export default function TodayOrdersClient({
               type="button"
               onClick={() => setActiveTab(key)}
               className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors ${activeTab === key
-                  ? 'bg-fresh-green text-white shadow-sm'
-                  : 'text-gray-600 hover:text-deep-green'
+                ? 'bg-fresh-green text-white shadow-sm'
+                : 'text-gray-600 hover:text-deep-green'
                 }`}
             >
               <Icon size={16} />

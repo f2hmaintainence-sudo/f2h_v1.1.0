@@ -245,41 +245,19 @@ export class WarehouseShowAddService {
           orderDirection: 'ASC',
         }),
         this.dataService.query('products', {
-          select: ['products.product_id', 'products.name'],
-          distinct: true,
-          joins: [
-            {
-              type: 'inner',
-              table: 'product_variants',
-              on: [['products.product_id', 'product_variants.product_id']],
-            },
-            {
-              type: 'inner',
-              table: 'stock_balances',
-              on: [['product_variants.variant_id', 'stock_balances.product_variant_id']],
-            },
-          ],
+          select: ['product_id', 'name'],
           where: [
-            { column: 'products.deleted_at', operator: 'IS', value: null },
-            { column: 'product_variants.deleted_at', operator: 'IS', value: null },
+            { column: 'deleted_at', operator: 'IS', value: null },
           ],
-          orderBy: 'products.name',
+          orderBy: 'name',
           orderDirection: 'ASC',
         }),
         this.dataService.query('product_variants', {
-          select: ['product_variants.variant_id', 'product_variants.name'],
-          distinct: true,
-          joins: [
-            {
-              type: 'inner',
-              table: 'stock_balances',
-              on: [['product_variants.variant_id', 'stock_balances.product_variant_id']],
-            },
-          ],
+          select: ['variant_id', 'name', 'product_id'],
           where: [
-            { column: 'product_variants.deleted_at', operator: 'IS', value: null },
+            { column: 'deleted_at', operator: 'IS', value: null },
           ],
-          orderBy: 'product_variants.name',
+          orderBy: 'name',
           orderDirection: 'ASC',
         }),
         this.dataService.query('product_batches', {
@@ -573,20 +551,13 @@ export class WarehouseShowAddService {
       {
         name: 'movement_type',
         label: 'Movement Type',
-        type: 'select',
+        type: 'radio',
         required: true,
         width: 'half',
         group: 'Movement Core',
         options: [
-          { value: 'stock_in', label: 'Stock In' },
+          { value: 'stock_in',  label: 'Stock In' },
           { value: 'stock_out', label: 'Stock Out' },
-          { value: 'transfer_in', label: 'Transfer In' },
-          { value: 'transfer_out', label: 'Transfer Out' },
-          { value: 'return', label: 'Return (Stock In)' },
-          { value: 'damage', label: 'Damage (Stock Out)' },
-          { value: 'expiry', label: 'Expiry (Stock Out)' },
-          { value: 'adjustment_in', label: 'Adjustment In' },
-          { value: 'adjustment_out', label: 'Adjustment Out' },
         ],
       },
       {

@@ -1,4 +1,5 @@
 /// Date and time formatting utilities for the F2H delivery partner app.
+library;
 
 /// Returns a time-appropriate greeting based on the current hour.
 ///

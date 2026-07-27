@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : page.tsx
 // Description : Revenue report page for admin panel
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 "use client";
@@ -31,7 +30,7 @@ export default function RevenuePage() {
     try {
       const res = await api.get<any>(`/admin/analytics/revenue?days=${days}`);
       if (res.data?.data) setData(res.data.data);
-    } catch {} finally { setLoading(false); }
+    } catch { } finally { setLoading(false); }
   }, [days]);
 
   useEffect(() => { fetch_(); }, [fetch_]);

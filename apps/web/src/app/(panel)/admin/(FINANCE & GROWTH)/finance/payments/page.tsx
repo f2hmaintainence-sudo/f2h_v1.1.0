@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : page.tsx
 // Description : Payments and Billing reports page matching F2H theme
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 "use client";
@@ -78,11 +77,10 @@ export default function PaymentsPage() {
               <button
                 key={d}
                 onClick={() => setDays(d)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                  days === d
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${days === d
                     ? "bg-[#16a34a] text-white shadow-xs"
                     : "text-slate-600 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 {d}d
               </button>
@@ -165,13 +163,12 @@ export default function PaymentsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
-                          d.payment_status === "paid"
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${d.payment_status === "paid"
                             ? "bg-emerald-50 text-[#16a34a] border border-emerald-100"
                             : d.payment_status === "pending"
-                            ? "bg-amber-50 text-amber-700 border border-amber-100"
-                            : "bg-slate-100 text-slate-600"
-                        }`}
+                              ? "bg-amber-50 text-amber-700 border border-amber-100"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
                       >
                         {d.payment_status || "Pending"}
                       </span>

@@ -50,7 +50,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),
@@ -183,7 +183,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       borderRadius: BorderRadius.circular(30),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.02),
+                          color: Colors.black.withValues(alpha: 0.02),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -284,7 +284,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             border: Border.all(color: kBorderLt),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.04),
+                                color: Colors.black.withValues(alpha: 0.04),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -399,7 +399,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             border: Border.all(color: item.isUnread ? kBorder : kBorderLt),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.015),
+                color: Colors.black.withValues(alpha: 0.015),
                 blurRadius: 8,
                 offset: const Offset(0, 4),
               ),
@@ -602,7 +602,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       height: 5,
                       margin: const EdgeInsets.only(bottom: 24),
                       decoration: BoxDecoration(
-                        color: kMuted.withOpacity(0.4),
+                        color: kMuted.withValues(alpha: 0.4),
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
@@ -721,7 +721,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               width: 44,
               height: 24,
               decoration: BoxDecoration(
-                color: value ? kPrimary : kMuted.withOpacity(0.3),
+                color: value ? kPrimary : kMuted.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(4),
               ),
               padding: const EdgeInsets.all(2),
@@ -734,7 +734,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   borderRadius: BorderRadius.circular(2),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 2,
                     ),
                   ],

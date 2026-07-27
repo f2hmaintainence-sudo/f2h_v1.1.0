@@ -65,17 +65,17 @@ class QueueItemTile extends StatelessWidget {
         },
         child: Container(
           decoration: BoxDecoration(
-            color: isNext ? kSurface : (isDelivered || isFailed ? kBgDeep.withOpacity(0.5) : kSurface),
+            color: isNext ? kSurface : (isDelivered || isFailed ? kBgDeep.withValues(alpha: 0.5) : kSurface),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: isNext 
-                  ? kPrimary.withOpacity(0.35) 
-                  : (isDelivered ? kSuccess.withOpacity(0.2) : (isFailed ? kDanger.withOpacity(0.2) : kBorder)),
+                  ? kPrimary.withValues(alpha: 0.35) 
+                  : (isDelivered ? kSuccess.withValues(alpha: 0.2) : (isFailed ? kDanger.withValues(alpha: 0.2) : kBorder)),
               width: isNext ? 2.0 : 1.2,
             ),
             boxShadow: [
               BoxShadow(
-                color: kText.withOpacity(0.01),
+                color: kText.withValues(alpha: 0.01),
                 blurRadius: 8,
                 offset: const Offset(0, 4),
               )
@@ -90,8 +90,8 @@ class QueueItemTile extends StatelessWidget {
                   CircleAvatar(
                     radius: 20,
                     backgroundColor: isDelivered 
-                        ? kSuccess.withOpacity(0.12)
-                        : (isFailed ? kDanger.withOpacity(0.12) : kBgDeep),
+                        ? kSuccess.withValues(alpha: 0.12)
+                        : (isFailed ? kDanger.withValues(alpha: 0.12) : kBgDeep),
                     child: isDelivered
                         ? const Icon(Icons.check_rounded, color: kSuccess, size: 20)
                         : (isFailed 
@@ -151,7 +151,7 @@ class QueueItemTile extends StatelessWidget {
               ),
 
               // Right arrow navigation icon
-              Icon(Icons.arrow_forward_ios_rounded, color: kTextSub.withOpacity(0.5), size: 14),
+              Icon(Icons.arrow_forward_ios_rounded, color: kTextSub.withValues(alpha: 0.5), size: 14),
             ],
           ),
         ),

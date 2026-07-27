@@ -10,14 +10,14 @@ export class ProfileController {
   // ── My Profile (logged-in admin) ──
   @Get('me')
   async getMyProfile(@Req() req: any) {
-    const userId = req.user?.user_id;
+    const userId = req.user?.user_id || req.user?.sub || req.user?.email;
     if (!userId) return { status: false, message: 'Unauthorized' };
     return this.profileService.getMyProfile(userId);
   }
 
   @Put('me')
   async updateMyProfile(@Req() req: any, @Body() body: any) {
-    const userId = req.user?.user_id;
+    const userId = req.user?.user_id || req.user?.sub || req.user?.email;
     if (!userId) return { status: false, message: 'Unauthorized' };
     return this.profileService.updateMyProfile(userId, body);
   }

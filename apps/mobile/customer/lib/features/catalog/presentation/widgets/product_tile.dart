@@ -238,7 +238,7 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                           decoration: BoxDecoration(
                             color: kPrimaryPl,
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: kPrimary.withOpacity(0.15)),
+                            border: Border.all(color: kPrimary.withValues(alpha: 0.15)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -391,7 +391,7 @@ class ProductCardH extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorIndex = (p.id?.hashCode ?? p.name.hashCode).abs() % 5;
+    final colorIndex = (p.id.hashCode ?? p.name.hashCode).abs() % 5;
     final borderColor = [
       const Color(0xFFC8E6C9), // soft green
       const Color(0xFFC8E6C9), // soft blue
@@ -404,8 +404,8 @@ class ProductCardH extends StatelessWidget {
       onTap: () => Navigator.push(
         context,
         PageRouteBuilder(
-          pageBuilder: (_, a, __) => ProductDetailViewScreen(product: p),
-          transitionsBuilder: (_, a, __, child) =>
+          pageBuilder: (_, a, _) => ProductDetailViewScreen(product: p),
+          transitionsBuilder: (_, a, _, child) =>
               FadeTransition(opacity: a, child: child),
           transitionDuration: const Duration(milliseconds: 220),
         ),
@@ -449,12 +449,12 @@ class ProductCardH extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 2.5),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withValues(alpha: 0.9),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: const Color(0xFFFFE0B2), width: 0.8),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
+                            color: Colors.black.withValues(alpha: 0.04),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
@@ -583,7 +583,7 @@ class ProductCardV extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final discPct = (((p.originalPrice - p.price) / p.originalPrice) * 100).round();
-    final colorIndex = (p.id?.hashCode ?? p.name.hashCode).abs() % 5;
+    final colorIndex = (p.id.hashCode ?? p.name.hashCode).abs() % 5;
     final borderColor = [
       const Color(0xFFC8E6C9), // soft green
       const Color(0xFFC8E6C9), // soft blue
@@ -596,8 +596,8 @@ class ProductCardV extends StatelessWidget {
       onTap: () => Navigator.push(
         context,
         PageRouteBuilder(
-          pageBuilder: (_, a, __) => ProductDetailViewScreen(product: p),
-          transitionsBuilder: (_, a, __, child) =>
+          pageBuilder: (_, a, _) => ProductDetailViewScreen(product: p),
+          transitionsBuilder: (_, a, _, child) =>
               FadeTransition(opacity: a, child: child),
           transitionDuration: const Duration(milliseconds: 220),
         ),
@@ -639,12 +639,12 @@ class ProductCardV extends StatelessWidget {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 2.5),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.9),
+                                color: Colors.white.withValues(alpha: 0.9),
                                 borderRadius: BorderRadius.circular(6),
                                 border: Border.all(color: const Color(0xFFFFE0B2), width: 0.8),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.04),
+                                    color: Colors.black.withValues(alpha: 0.04),
                                     blurRadius: 4,
                                     offset: const Offset(0, 2),
                                   ),
@@ -784,7 +784,7 @@ class ProductCardV extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 2.5),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(color: const Color(0xFFFFE0B2), width: 0.8),
                             ),
@@ -890,7 +890,7 @@ class ZeptoAddButton extends StatefulWidget {
   final Product p;
   final bool isSmall;
   final bool isBrowse;
-  const ZeptoAddButton({required this.p, this.isSmall = true, this.isBrowse = false});
+  const ZeptoAddButton({super.key, required this.p, this.isSmall = true, this.isBrowse = false});
 
   @override
   State<ZeptoAddButton> createState() => ZeptoAddButtonState();
@@ -977,10 +977,10 @@ class ZeptoAddButtonState extends State<ZeptoAddButton>
                       decoration: BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
-                        border: Border.all(color: kPrimary.withOpacity(0.35), width: 1.5),
+                        border: Border.all(color: kPrimary.withValues(alpha: 0.35), width: 1.5),
                         boxShadow: [
                           BoxShadow(
-                            color: kPrimary.withOpacity(0.04),
+                            color: kPrimary.withValues(alpha: 0.04),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
@@ -995,10 +995,10 @@ class ZeptoAddButtonState extends State<ZeptoAddButton>
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: kPrimary.withOpacity(0.35), width: 1.5),
+                        border: Border.all(color: kPrimary.withValues(alpha: 0.35), width: 1.5),
                         boxShadow: [
                           BoxShadow(
-                            color: kPrimary.withOpacity(0.04),
+                            color: kPrimary.withValues(alpha: 0.04),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
@@ -1035,7 +1035,7 @@ class ZeptoAddButtonState extends State<ZeptoAddButton>
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: kPrimary.withOpacity(0.2),
+                  color: kPrimary.withValues(alpha: 0.2),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),

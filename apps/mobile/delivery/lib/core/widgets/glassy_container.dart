@@ -5,13 +5,11 @@
 // Project     : F2H Fresh
 // File        : glassy_container.dart
 // Description : Glassmorphism container with backdrop blur & smooth borders.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:f2h_delivery/theme/app_colors.dart';
 
 class GlassyContainer extends StatelessWidget {
   final Widget child;

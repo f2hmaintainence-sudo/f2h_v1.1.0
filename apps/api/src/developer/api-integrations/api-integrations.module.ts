@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : api-integrations.module.ts
 // Description : NestJS Module for Developer API Integrations
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import { Module } from '@nestjs/common';
@@ -20,4 +19,4 @@ import { SharedDatabaseModule } from '../../shared/database/Database.module';
   providers: [ApiIntegrationsService],
   exports: [ApiIntegrationsService],
 })
-export class ApiIntegrationsModule {}
+export class ApiIntegrationsModule { }

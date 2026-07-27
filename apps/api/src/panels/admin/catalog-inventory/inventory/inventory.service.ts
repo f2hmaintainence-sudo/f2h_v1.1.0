@@ -22,18 +22,27 @@ export class InventoryService {
       }
 
       const sql = `
+        WITH variant_totals AS (
+          SELECT
+            sb.product_variant_id,
+            SUM(sb.available_quantity) AS total_available,
+            MAX(sb.low_stock_threshold) AS threshold,
+            MAX(COALESCE(pv.price, 0)) AS price
+          FROM stock_balances sb
+          LEFT JOIN product_variants pv ON pv.variant_id = sb.product_variant_id
+          ${whereClause}
+          GROUP BY sb.product_variant_id
+        )
         SELECT
-          COUNT(DISTINCT sb.product_variant_id)::int AS total_variants,
-          COUNT(DISTINCT CASE WHEN sb.available_quantity <= 0 THEN sb.product_variant_id END)::int AS out_of_stock,
-          COUNT(DISTINCT CASE WHEN sb.available_quantity > 0 AND sb.available_quantity <= sb.low_stock_threshold THEN sb.product_variant_id END)::int AS low_stock,
-          COUNT(DISTINCT CASE WHEN sb.available_quantity > sb.low_stock_threshold THEN sb.product_variant_id END)::int AS in_stock,
-          COALESCE(SUM(CASE WHEN sb.available_quantity > 0 THEN sb.available_quantity * COALESCE(pv.price, 0) ELSE 0 END), 0)::numeric AS total_stock_value,
-          COALESCE(SUM(sb.available_quantity), 0)::numeric AS total_available,
-          COALESCE(SUM(sb.reserved_quantity), 0)::numeric AS total_reserved,
-          COALESCE(SUM(sb.dispatched_quantity), 0)::numeric AS total_dispatched
-        FROM stock_balances sb
-        LEFT JOIN product_variants pv ON pv.variant_id = sb.product_variant_id
-        ${whereClause}
+          COUNT(*)::int AS total_variants,
+          COUNT(CASE WHEN total_available <= 0 THEN 1 END)::int AS out_of_stock,
+          COUNT(CASE WHEN total_available > 0 AND total_available <= threshold THEN 1 END)::int AS low_stock,
+          COUNT(CASE WHEN total_available > threshold THEN 1 END)::int AS in_stock,
+          COALESCE(SUM(CASE WHEN total_available > 0 THEN total_available * price ELSE 0 END), 0)::numeric AS total_stock_value,
+          COALESCE(SUM(total_available), 0)::numeric AS total_available,
+          0::numeric AS total_reserved,
+          0::numeric AS total_dispatched
+        FROM variant_totals
       `;
 
       const rows = await this.db.query(sql, params);

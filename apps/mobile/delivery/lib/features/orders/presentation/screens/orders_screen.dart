@@ -259,7 +259,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.inventory_2_outlined, size: 48, color: kMuted.withOpacity(0.5)),
+                    Icon(Icons.inventory_2_outlined, size: 48, color: kMuted.withValues(alpha: 0.5)),
                     const SizedBox(height: 12),
                     const Text(
                       'No matching stops found',
@@ -302,7 +302,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                         border: Border.all(color: kBorder),
                         boxShadow: [
                           BoxShadow(
-                            color: kText.withOpacity(0.02),
+                            color: kText.withValues(alpha: 0.02),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           )
@@ -397,13 +397,13 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: stop.status == 'delivered'
-                ? kSuccess.withOpacity(0.3)
-                : (stop.status == 'failed' ? kDanger.withOpacity(0.3) : primaryColor.withOpacity(0.15)),
+                ? kSuccess.withValues(alpha: 0.3)
+                : (stop.status == 'failed' ? kDanger.withValues(alpha: 0.3) : primaryColor.withValues(alpha: 0.15)),
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: kText.withOpacity(0.02),
+              color: kText.withValues(alpha: 0.02),
               blurRadius: 10,
               offset: const Offset(0, 4),
             )
@@ -540,7 +540,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   CircleAvatar(
-                    backgroundColor: primaryColor.withOpacity(0.08),
+                    backgroundColor: primaryColor.withValues(alpha: 0.08),
                     radius: 20,
                     child: Text(
                       stop.customerName.isNotEmpty ? stop.customerName[0].toUpperCase() : '?',
@@ -681,7 +681,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                color: primaryColor.withOpacity(0.15),
+                                color: primaryColor.withValues(alpha: 0.15),
                                 blurRadius: 6,
                                 offset: const Offset(0, 3),
                               )
@@ -709,13 +709,13 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: stop.status == 'delivered'
-                        ? kSuccess.withOpacity(0.05)
-                        : kDanger.withOpacity(0.05),
+                        ? kSuccess.withValues(alpha: 0.05)
+                        : kDanger.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: stop.status == 'delivered'
-                          ? kSuccess.withOpacity(0.15)
-                          : kDanger.withOpacity(0.15),
+                          ? kSuccess.withValues(alpha: 0.15)
+                          : kDanger.withValues(alpha: 0.15),
                       width: 1,
                     ),
                   ),
@@ -901,33 +901,33 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
 
     switch (status.toLowerCase().trim()) {
       case 'delivered':
-        bg = kSuccess.withOpacity(0.12);
+        bg = kSuccess.withValues(alpha: 0.12);
         fg = kSuccess;
         text = 'Delivered';
         break;
       case 'failed':
-        bg = kDanger.withOpacity(0.12);
+        bg = kDanger.withValues(alpha: 0.12);
         fg = kDanger;
         text = 'Failed';
         break;
       case 'out_for_delivery':
-        bg = kAccent.withOpacity(0.12);
+        bg = kAccent.withValues(alpha: 0.12);
         fg = kAccent;
         text = 'Out For Delivery';
         break;
       case 'confirmed':
       case 'placed':
-        bg = kPrimary.withOpacity(0.12);
+        bg = kPrimary.withValues(alpha: 0.12);
         fg = kPrimary;
         text = 'Confirmed';
         break;
       case 'packed':
-        bg = Colors.orange.withOpacity(0.12);
+        bg = Colors.orange.withValues(alpha: 0.12);
         fg = Colors.orange.shade800;
         text = 'Packed';
         break;
       case 'assigned':
-        bg = Colors.blue.withOpacity(0.12);
+        bg = Colors.blue.withValues(alpha: 0.12);
         fg = Colors.blue;
         text = 'Assigned';
         break;
@@ -957,9 +957,9 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.2), width: 1.2),
+          border: Border.all(color: color.withValues(alpha: 0.2), width: 1.2),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -997,7 +997,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
         border: Border.all(color: kBorder),
         boxShadow: [
           BoxShadow(
-            color: kText.withOpacity(0.02),
+            color: kText.withValues(alpha: 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           )
@@ -1042,9 +1042,9 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.06),
+          color: color.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.15), width: 1),
+          border: Border.all(color: color.withValues(alpha: 0.15), width: 1),
         ),
         child: Column(
           children: [
@@ -1084,9 +1084,9 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
         margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: kDanger.withOpacity(0.08),
+          color: kDanger.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: kDanger.withOpacity(0.2), width: 1.5),
+          border: Border.all(color: kDanger.withValues(alpha: 0.2), width: 1.5),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1175,9 +1175,9 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
         margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: kSuccess.withOpacity(0.08),
+          color: kSuccess.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: kSuccess.withOpacity(0.2), width: 1.5),
+          border: Border.all(color: kSuccess.withValues(alpha: 0.2), width: 1.5),
         ),
         child: Row(
           children: [

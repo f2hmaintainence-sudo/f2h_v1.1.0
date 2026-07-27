@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : app_config.dart
 // Description : Dynamic runtime configuration for F2H Delivery App.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'package:firebase_core/firebase_core.dart';

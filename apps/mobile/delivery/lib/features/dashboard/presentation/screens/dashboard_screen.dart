@@ -366,7 +366,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: (session.isOnline ? kSuccess : kDanger).withOpacity(0.35),
+                            color: (session.isOnline ? kSuccess : kDanger).withValues(alpha: 0.35),
                             blurRadius: 6,
                             spreadRadius: 1,
                           )
@@ -396,7 +396,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           color: kPrimaryMid,
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
-                            BoxShadow(color: kPrimaryMid.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2)),
+                            BoxShadow(color: kPrimaryMid.withValues(alpha: 0.2), blurRadius: 4, offset: const Offset(0, 2)),
                           ],
                         ),
                         child: Row(
@@ -422,7 +422,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       alignment: Alignment.centerRight,
                       child: Switch(
                         value: session.isOnline,
-                        activeColor: kPrimary,
+                        activeThumbColor: kPrimary,
                         inactiveThumbColor: kTextSub,
                         onChanged: (val) async {
                           if (val) {
@@ -536,9 +536,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(colors: [kPrimary, kPrimary.withOpacity(0.8)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                        gradient: LinearGradient(colors: [kPrimary, kPrimary.withValues(alpha: 0.8)], begin: Alignment.topLeft, end: Alignment.bottomRight),
                         borderRadius: BorderRadius.circular(20),
-                        boxShadow: [BoxShadow(color: kPrimary.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4))],
+                        boxShadow: [BoxShadow(color: kPrimary.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4))],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -547,7 +547,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             children: [
                               Container(
                                 padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
+                                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(12)),
                                 child: const Icon(Icons.inventory_2_rounded, color: Colors.white, size: 24),
                               ),
                               const SizedBox(width: 14),
@@ -627,7 +627,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               child: Row(
                                 children: [
                                   const SizedBox(width: 38),
-                                  Icon(Icons.arrow_downward_rounded, size: 18, color: kMuted.withOpacity(0.5)),
+                                  Icon(Icons.arrow_downward_rounded, size: 18, color: kMuted.withValues(alpha: 0.5)),
                                 ],
                               ),
                             ),

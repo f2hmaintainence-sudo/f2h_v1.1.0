@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : SkeletonViewDrawer.tsx
 // Description : Skeleton view drawer component for web panel
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 'use client';
@@ -284,36 +283,36 @@ export default function SkeletonViewDrawer({
 
                   const rawValue = data[field.key];
                   const displayValue = formatValue(field.key, rawValue, field.isDate);
-                const isImageField = field.key === 'url' || field.key === 'image_url' || field.key.toLowerCase().includes('image');
-                const isHtmlImg = typeof rawValue === 'string' && rawValue.startsWith('<img');
+                  const isImageField = field.key === 'url' || field.key === 'image_url' || field.key.toLowerCase().includes('image');
+                  const isHtmlImg = typeof rawValue === 'string' && rawValue.startsWith('<img');
 
-                return (
-                  <div key={`${field.key}-${idx}`} className="svd-field">
-                    <div className="svd-field-icon">
-                      <FileText size={16} />
-                    </div>
-                    <div className="svd-field-content">
-                      <div className="svd-field-label">{field.label}</div>
-                      <div className="svd-field-value">
-                        {isHtmlImg ? (
-                          <div dangerouslySetInnerHTML={{ __html: rawValue }} className="svd-image-container" />
-                        ) : isImageField && rawValue && typeof rawValue === 'string' ? (
-                          <div className="svd-image-container">
-                            <img 
-                              src={rawValue.startsWith('http') ? rawValue : `${API_URL.replace(/\/$/, '')}/${rawValue.replace(/^\//, '')}`} 
-                              alt={field.label}
-                              style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '8px', objectFit: 'contain' }}
-                            />
-                          </div>
-                        ) : (
-                          displayValue
-                        )}
+                  return (
+                    <div key={`${field.key}-${idx}`} className="svd-field">
+                      <div className="svd-field-icon">
+                        <FileText size={16} />
+                      </div>
+                      <div className="svd-field-content">
+                        <div className="svd-field-label">{field.label}</div>
+                        <div className="svd-field-value">
+                          {isHtmlImg ? (
+                            <div dangerouslySetInnerHTML={{ __html: rawValue }} className="svd-image-container" />
+                          ) : isImageField && rawValue && typeof rawValue === 'string' ? (
+                            <div className="svd-image-container">
+                              <img
+                                src={rawValue.startsWith('http') ? rawValue : `${API_URL.replace(/\/$/, '')}/${rawValue.replace(/^\//, '')}`}
+                                alt={field.label}
+                                style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '8px', objectFit: 'contain' }}
+                              />
+                            </div>
+                          ) : (
+                            displayValue
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              });
-            })()}
+                  );
+                });
+              })()}
             </div>
           ) : null}
         </div>
@@ -331,6 +330,7 @@ export default function SkeletonViewDrawer({
         .svd-backdrop {
           position: fixed;
           inset: 0;
+          margin-top: 0 !important;
           background: rgba(15, 23, 42, 0.4);
           backdrop-filter: blur(4px);
           z-index: 9998;
@@ -342,6 +342,7 @@ export default function SkeletonViewDrawer({
           top: 0;
           right: 0;
           bottom: 0;
+          margin-top: 0 !important;
           width: 460px;
           max-width: 90vw;
           background: #fff;
@@ -396,7 +397,7 @@ export default function SkeletonViewDrawer({
         .svd-body {
           flex: 1;
           overflow: auto;
-          padding: 24px;
+          padding: 12px 24px 24px 24px;
         }
 
         .svd-loading {

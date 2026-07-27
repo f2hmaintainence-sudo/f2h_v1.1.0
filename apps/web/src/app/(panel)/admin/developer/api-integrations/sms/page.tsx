@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : page.tsx
 // Description : Developer API Integrations - SMS Management & DLT Templates Page
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 "use client";
@@ -52,15 +51,15 @@ export default function SmsIntegrationsPage() {
       const cfgList = Array.isArray(configRes.data)
         ? configRes.data
         : Array.isArray((configRes.data as any)?.data)
-        ? (configRes.data as any).data
-        : [];
+          ? (configRes.data as any).data
+          : [];
       setConfigs(cfgList);
 
       const tplList = Array.isArray(templateRes.data)
         ? templateRes.data
         : Array.isArray((templateRes.data as any)?.data)
-        ? (templateRes.data as any).data
-        : [];
+          ? (templateRes.data as any).data
+          : [];
       setTemplates(tplList);
     } catch (err: any) {
       showErrorToast(err?.message || "Failed to load SMS settings");

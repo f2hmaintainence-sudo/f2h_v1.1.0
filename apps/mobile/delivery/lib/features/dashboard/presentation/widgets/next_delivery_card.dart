@@ -35,7 +35,7 @@ class NextDeliveryCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.18),
+          color: Colors.white.withValues(alpha: 0.18),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.white30),
         ),
@@ -72,7 +72,7 @@ class NextDeliveryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: kPrimary.withOpacity(0.25),
+            color: kPrimary.withValues(alpha: 0.25),
             blurRadius: 16,
             offset: const Offset(0, 6),
           )
@@ -129,7 +129,7 @@ class NextDeliveryCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.12),
+              color: Colors.white.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(

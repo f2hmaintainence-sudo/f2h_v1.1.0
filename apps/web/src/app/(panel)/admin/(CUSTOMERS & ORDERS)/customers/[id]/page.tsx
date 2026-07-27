@@ -109,6 +109,7 @@ export default function CustomerDetailsPage() {
   const tabs = [
     { name: 'Overview & Insights', icon: <Sparkles size={16} /> },
     { name: `Orders (${totalOrdersCount})`, icon: <ShoppingBag size={16} /> },
+    { name: 'Containers & Returns', icon: <Box size={16} /> },
     { name: 'Postpaid Ledger', icon: <CreditCard size={16} /> },
     { name: 'Wallet Analytics', icon: <Wallet size={16} /> },
     { name: 'Subscription', icon: <Calendar size={16} /> },
@@ -293,12 +294,19 @@ export default function CustomerDetailsPage() {
         <div className="p-6">
           {activeTab === 'Overview & Insights' && <OverviewTab customer={customer} formattedOrders={formattedOrders} primaryAddress={primaryAddress} />}
           {activeTab.startsWith('Orders') && <OrdersTab orders={formattedOrders} />}
+          {activeTab === 'Containers & Returns' && (
+            <ContainersTab 
+              containerData={data.container_tracking} 
+              customerId={customer.customer_id || id} 
+              onRefresh={fetchPortfolio} 
+            />
+          )}
           {activeTab === 'Postpaid Ledger' && <PostpaidTab ledger={data.postpaid_ledger} />}
           {activeTab === 'Wallet Analytics' && <WalletTab ledger={data.wallet_ledger} />}
           {activeTab === 'Subscription' && <SubscriptionTab subscriptions={data.subscriptions} />}
           {activeTab === 'Revenue Trends' && <RevenueTrendsTab revenueAnalytics={data.revenue_analytics} />}
           {activeTab === 'Activity Log' && <ActivityLogTab timeline={data.activity_timeline} />}
-          {!activeTab.startsWith('Orders') && !['Overview & Insights', 'Postpaid Ledger', 'Wallet Analytics', 'Subscription', 'Revenue Trends', 'Activity Log'].includes(activeTab) && (
+          {!activeTab.startsWith('Orders') && !['Overview & Insights', 'Containers & Returns', 'Postpaid Ledger', 'Wallet Analytics', 'Subscription', 'Revenue Trends', 'Activity Log'].includes(activeTab) && (
             <div className="text-center py-10 text-gray-400 font-medium flex flex-col items-center justify-center">
               <Box size={40} className="mb-4 text-gray-200" />
               This section is under construction. Check back soon.
@@ -377,59 +385,502 @@ function OverviewTab({ customer, formattedOrders, primaryAddress }: { customer: 
 }
 
 function OrdersTab({ orders }: { orders: any[] }) {
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+
+  const toggleExpand = (id: string) => {
+    setExpandedOrderId(prev => (prev === id ? null : id));
+  };
+
   return (
-    <div className="space-y-4">
-      <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">
-        FULL ORDER HISTORY ({orders.length})
-      </h3>
+    <div className="space-y-4 font-sans">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
+          FULL ORDER HISTORY ({orders.length})
+        </h3>
+        <p className="text-xs text-gray-500 font-medium">Click any order to view breakdown, delivery partner & payment details</p>
+      </div>
+
       {orders.length === 0 ? (
         <p className="text-sm text-gray-500">No orders found for this customer.</p>
       ) : (
         <div className="space-y-3">
-          {orders.map((order, i) => (
-            <div key={i} className="flex flex-col md:flex-row md:items-center justify-between p-4 border border-gray-100 rounded-xl hover:shadow-sm transition-shadow">
-              <div className="flex items-start gap-4 mb-4 md:mb-0">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                  order.status === 'delivered' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
-                }`}>
-                  <ShoppingBag size={20} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-bold text-gray-900">#{order.order_id}</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
-                      order.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' : 
-                      order.status === 'assigned' ? 'bg-amber-100 text-amber-700' : 
-                      'bg-gray-100 text-gray-600'
+          {orders.map((order, i) => {
+            const isExpanded = expandedOrderId === order.order_id;
+            const isSubscription = Boolean(order.is_subscription || order.subscription_id || order.order_source === 'subscription');
+            const items = order.items || [];
+            const containers = order.containers || [];
+
+            return (
+              <div 
+                key={order.order_id || i} 
+                className={`border rounded-2xl transition-all duration-200 overflow-hidden bg-white ${
+                  isExpanded ? 'border-emerald-300 shadow-md ring-1 ring-emerald-200' : 'border-gray-200/80 hover:border-emerald-200 hover:shadow-xs'
+                }`}
+              >
+                {/* Header Row */}
+                <div 
+                  onClick={() => toggleExpand(order.order_id)}
+                  className="flex flex-col md:flex-row md:items-center justify-between p-4 cursor-pointer select-none gap-4"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 font-bold ${
+                      order.status === 'delivered' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 
+                      order.status === 'assigned' || order.status === 'dispatched' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                      'bg-blue-50 text-blue-600 border border-blue-100'
                     }`}>
-                      {order.status || 'PENDING'}
-                    </span>
+                      {isSubscription ? <Calendar size={20} /> : <ShoppingBag size={20} />}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="font-extrabold text-gray-900 text-base">#{order.order_id}</span>
+                        
+                        {/* Status Badge */}
+                        <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                          order.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' : 
+                          order.status === 'assigned' || order.status === 'dispatched' ? 'bg-amber-100 text-amber-800' : 
+                          order.status === 'cancelled' ? 'bg-rose-100 text-rose-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {order.status || 'PENDING'}
+                        </span>
+
+                        {/* Order Type Badge */}
+                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 ${
+                          isSubscription ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-700 border border-slate-200'
+                        }`}>
+                          {isSubscription ? <><Calendar size={10} /> Subscription Order</> : <><ShoppingBag size={10} /> One-Time Order</>}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
+                        <span>Placed on {new Date(order.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                        <span>•</span>
+                        <span>Slot: <strong className="capitalize text-gray-700">{order.delivery_slot || 'Morning'}</strong></span>
+                        {order.scheduled_date && (
+                          <>
+                            <span>•</span>
+                            <span>Scheduled: <strong className="text-gray-700">{new Date(order.scheduled_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</strong></span>
+                          </>
+                        )}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    Placed on {new Date(order.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    <span className="mx-2">•</span>
-                    Slot: <span className="capitalize">{order.delivery_slot || 'N/A'}</span>
-                  </p>
+
+                  <div className="flex items-center justify-between md:justify-end gap-6 pt-2 md:pt-0 border-t md:border-t-0 border-gray-100">
+                    <div className="text-left md:text-right">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Payment Method</p>
+                      <span className={`inline-flex items-center gap-1.5 text-xs font-bold capitalize px-2 py-0.5 rounded-md ${
+                        order.payment_status === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                      }`}>
+                        {order.payment_mode || 'Wallet'} 
+                        <span className="text-[10px]">({order.payment_status === 'paid' ? 'Paid' : 'Unpaid'})</span>
+                      </span>
+                    </div>
+
+                    <div className="text-right flex items-center gap-3">
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Total Amount</p>
+                        <p className="text-base font-black text-gray-900">₹{Number(order.total_amount || 0).toLocaleString()}</p>
+                      </div>
+                      <div className={`p-1.5 rounded-full bg-slate-100 text-slate-500 transition-transform ${isExpanded ? 'rotate-180 bg-emerald-100 text-emerald-700' : ''}`}>
+                        <ChevronDown size={18} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Expanded Details Section */}
+                {isExpanded && (
+                  <div className="border-t border-gray-100 bg-slate-50/70 p-5 space-y-5 animate-in fade-in duration-200">
+                    
+                    {/* Delivery Partner & Logistics Details */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs">
+                        <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <Truck size={14} className="text-emerald-600" /> Delivery Agent / Partner
+                        </p>
+                        {order.delivery_partner_name ? (
+                          <div className="space-y-1">
+                            <p className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                              {order.delivery_partner_name}
+                            </p>
+                            {order.delivery_partner_phone && (
+                              <a href={`tel:${order.delivery_partner_phone}`} className="text-xs text-emerald-600 font-semibold flex items-center gap-1 hover:underline">
+                                <Phone size={12} /> {order.delivery_partner_phone}
+                              </a>
+                            )}
+                            {order.delivery_run_id && (
+                              <p className="text-[11px] text-gray-500 font-mono">Run ID: {order.delivery_run_id}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-400 italic">Not assigned to a delivery partner yet</p>
+                        )}
+                      </div>
+
+                      <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs">
+                        <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <CreditCard size={14} className="text-blue-600" /> Payment & Billing
+                        </p>
+                        <div className="space-y-1 text-xs">
+                          <p className="text-gray-700">Mode: <strong className="capitalize font-bold text-gray-900">{order.payment_mode || 'Wallet'}</strong></p>
+                          <p className="text-gray-700">Status: <strong className={`font-bold capitalize ${order.payment_status === 'paid' ? 'text-emerald-600' : 'text-rose-600'}`}>{order.payment_status || 'Pending'}</strong></p>
+                          {order.created_by && <p className="text-gray-500">Source: {order.created_by}</p>}
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs">
+                        <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <Box size={14} className="text-purple-600" /> Containers & Packaging
+                        </p>
+                        {containers.length > 0 ? (
+                          <div className="space-y-1 text-xs">
+                            {containers.map((c: any, idx: number) => (
+                              <div key={idx} className="flex justify-between items-center text-gray-700">
+                                <span>{c.packaging_name}:</span>
+                                <span className="font-bold text-purple-700">{c.quantity} units</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-400 italic">Standard recyclable packaging</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Order Items Table */}
+                    <div className="bg-white rounded-xl border border-gray-200/80 overflow-hidden shadow-2xs">
+                      <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                        <span className="text-xs font-extrabold text-gray-700 uppercase tracking-wider">Ordered Items ({items.length})</span>
+                        <span className="text-xs text-gray-500 font-semibold">Subtotal: ₹{Number(order.subtotal || order.total_amount).toLocaleString()}</span>
+                      </div>
+                      {items.length === 0 ? (
+                        <div className="p-4 text-xs text-gray-400 italic text-center">No item details recorded for this order.</div>
+                      ) : (
+                        <div className="divide-y divide-gray-100">
+                          {items.map((item: any, idx: number) => (
+                            <div key={idx} className="p-3.5 flex items-center justify-between text-xs hover:bg-slate-50 transition-colors">
+                              <div className="space-y-0.5">
+                                <p className="font-bold text-gray-900 text-sm">{item.product_name}</p>
+                                {item.variant_name && <p className="text-gray-500 text-[11px] font-medium">{item.variant_name}</p>}
+                              </div>
+                              <div className="flex items-center gap-6 text-right">
+                                <div>
+                                  <p className="text-gray-500 font-medium">Qty</p>
+                                  <p className="font-bold text-gray-900">{item.quantity}</p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-500 font-medium">Unit Price</p>
+                                  <p className="font-semibold text-gray-700">₹{Number(item.unit_price || 0).toLocaleString()}</p>
+                                </div>
+                                <div className="min-w-[70px]">
+                                  <p className="text-gray-500 font-medium">Total</p>
+                                  <p className="font-black text-gray-900">₹{Number(item.total_price || (item.unit_price * item.quantity)).toLocaleString()}</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Price Summary Footer */}
+                      <div className="p-4 bg-slate-50 border-t border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-xs">
+                        {order.special_instructions && (
+                          <div className="text-gray-600 bg-amber-50 border border-amber-200 p-2 rounded-lg text-[11px]">
+                            <strong className="text-amber-800">Note:</strong> {order.special_instructions}
+                          </div>
+                        )}
+                        <div className="ml-auto space-y-1 text-right min-w-[200px]">
+                          {Number(order.discount_amount || 0) > 0 && (
+                            <div className="flex justify-between text-emerald-600 font-semibold">
+                              <span>Discount:</span>
+                              <span>-₹{Number(order.discount_amount).toLocaleString()}</span>
+                            </div>
+                          )}
+                          {Number(order.gst_amount || 0) > 0 && (
+                            <div className="flex justify-between text-gray-500">
+                              <span>GST Tax:</span>
+                              <span>₹{Number(order.gst_amount).toLocaleString()}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-sm font-black text-gray-900 pt-1 border-t border-gray-200">
+                            <span>Final Total:</span>
+                            <span className="text-emerald-700">₹{Number(order.total_amount || 0).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ContainersTab({ containerData, customerId, onRefresh }: { containerData: any, customerId: string, onRefresh: () => void }) {
+  const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [selectedType, setSelectedType] = useState('');
+  const [actionType, setActionType] = useState('return');
+  const [quantityInput, setQuantityInput] = useState('1');
+  const [remarksInput, setRemarksInput] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const balances = containerData?.balances || [];
+  const transactions = containerData?.transactions || [];
+  const packagingTypes = containerData?.packaging_types || [];
+
+  const totalIssued = balances.reduce((sum: number, b: any) => sum + Number(b.issued_quantity || 0), 0);
+  const totalReturned = balances.reduce((sum: number, b: any) => sum + Number(b.returned_quantity || 0), 0);
+  const totalDamaged = balances.reduce((sum: number, b: any) => sum + Number(b.damaged_quantity || 0), 0);
+  const totalLost = balances.reduce((sum: number, b: any) => sum + Number(b.lost_quantity || 0), 0);
+  const totalBalancePending = balances.reduce((sum: number, b: any) => sum + Number(b.balance_quantity || 0), 0);
+
+  const handleLogSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedType) return;
+    setSubmitting(true);
+    try {
+      await api.post(`/admin/customer/${customerId}/container-transaction`, {
+        packaging_type_id: selectedType,
+        transaction_type: actionType,
+        quantity: Number(quantityInput || 1),
+        remarks: remarksInput,
+      });
+      onRefresh();
+      setIsLogModalOpen(false);
+      setRemarksInput('');
+    } catch (err) {
+      console.error('Failed to log container transaction:', err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 font-sans">
+      
+      {/* Header & Log Action Button */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
+            <Box size={24} />
+          </div>
+          <div>
+            <h3 className="font-extrabold text-gray-900 text-base">CONTAINERS & RETURN TRACKING SYSTEM</h3>
+            <p className="text-xs text-gray-500 font-medium font-sans">Track returnable bottles, crates, and packaging balance for this customer</p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => {
+            if (packagingTypes.length > 0) setSelectedType(packagingTypes[0].id);
+            setIsLogModalOpen(true);
+          }}
+          className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <Box size={16} /> + Log Container Movement / Return
+        </button>
+      </div>
+
+      {/* Summary Stat Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Issued</p>
+          <p className="text-xl font-black text-blue-600">{totalIssued}</p>
+        </div>
+        <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Returned</p>
+          <p className="text-xl font-black text-emerald-600">{totalReturned}</p>
+        </div>
+        <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Damaged</p>
+          <p className="text-xl font-black text-amber-600">{totalDamaged}</p>
+        </div>
+        <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Lost</p>
+          <p className="text-xl font-black text-rose-600">{totalLost}</p>
+        </div>
+        <div className="bg-slate-50 p-4 rounded-xl border border-purple-100 bg-purple-50/30">
+          <p className="text-[10px] font-bold text-purple-600 uppercase tracking-wider mb-1">Pending Return</p>
+          <p className="text-xl font-black text-purple-700">{totalBalancePending}</p>
+        </div>
+      </div>
+
+      {/* Balances by Packaging Type */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs">
+        <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <Box size={16} className="text-purple-600" /> Container Balance Breakdown
+        </h4>
+        {balances.length === 0 ? (
+          <p className="text-xs text-gray-400 italic py-4 text-center bg-slate-50 rounded-xl">
+            No active container balances registered for this customer yet.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {balances.map((b: any, i: number) => (
+              <div key={i} className="p-4 bg-slate-50/80 rounded-xl border border-gray-200/80 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-extrabold text-sm text-gray-900">{b.packaging_name || 'Container'}</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                    b.balance_quantity > 0 ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-700'
+                  }`}>
+                    {b.balance_quantity > 0 ? `${b.balance_quantity} Due` : 'Clear'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 gap-1 text-[11px] text-gray-600 pt-1 border-t border-gray-200/60">
+                  <div>Issued: <strong className="text-blue-600">{b.issued_quantity}</strong></div>
+                  <div>Returned: <strong className="text-emerald-600">{b.returned_quantity}</strong></div>
+                  <div>Damaged: <strong className="text-amber-600">{b.damaged_quantity}</strong></div>
+                  <div>Balance: <strong className="text-purple-700 font-extrabold">{b.balance_quantity}</strong></div>
                 </div>
               </div>
-              
-              <div className="flex items-center gap-8 pl-14 md:pl-0">
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Payment</p>
-                  <p className="text-sm font-semibold text-gray-700 capitalize">
-                    {order.payment_mode || 'Cash'} {order.payment_status === 'paid' ? '(Paid)' : '(Unpaid)'}
-                  </p>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Container Transactions Log */}
+      <div>
+        <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <Activity size={16} className="text-purple-600" /> Container Movement Audit Log ({transactions.length})
+        </h4>
+        {transactions.length === 0 ? (
+          <p className="text-xs text-gray-400 italic py-6 text-center bg-slate-50 rounded-xl border border-gray-100">
+            No container transactions recorded yet.
+          </p>
+        ) : (
+          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-2xs">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-gray-50 text-gray-500 uppercase font-semibold">
+                <tr>
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3">Packaging</th>
+                  <th className="px-4 py-3 text-right">Quantity</th>
+                  <th className="px-4 py-3">Remarks / Reference</th>
+                  <th className="px-4 py-3">Logged By</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {transactions.map((t: any, i: number) => (
+                  <tr key={i} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 text-gray-600 font-medium">
+                      {new Date(t.created_at || t.transaction_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase ${
+                        t.transaction_type === 'return' ? 'bg-emerald-100 text-emerald-700' :
+                        t.transaction_type === 'issue' ? 'bg-blue-100 text-blue-700' :
+                        t.transaction_type === 'damaged' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
+                      }`}>
+                        {t.transaction_type}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-bold text-gray-900">{t.packaging_name || 'Container'}</td>
+                    <td className="px-4 py-3 text-right font-black text-gray-900">{t.quantity}</td>
+                    <td className="px-4 py-3 text-gray-500">{t.remarks || t.reference_id || 'N/A'}</td>
+                    <td className="px-4 py-3 text-gray-400 font-mono text-[10px]">{t.created_by || 'system'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Log Transaction Modal */}
+      {isLogModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <form onSubmit={handleLogSubmit} className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-purple-50 text-purple-600 rounded-xl">
+                  <Box size={20} />
                 </div>
-                <div className="text-right">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Amount</p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-bold text-gray-900">₹{Number(order.total_amount || 0).toLocaleString()}</p>
-                    <ChevronDown size={16} className="text-gray-400" />
-                  </div>
-                </div>
+                <h3 className="font-bold text-slate-900 text-base">Record Container Transaction</h3>
               </div>
+              <button 
+                type="button"
+                onClick={() => setIsLogModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                ✕
+              </button>
             </div>
-          ))}
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Packaging Type</label>
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+                className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold focus:outline-none focus:border-purple-600"
+                required
+              >
+                {packagingTypes.map((pt: any) => (
+                  <option key={pt.id} value={pt.id}>{pt.name} ({pt.capacity} {pt.unit})</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Action Type</label>
+              <select
+                value={actionType}
+                onChange={(e) => setActionType(e.target.value)}
+                className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold focus:outline-none focus:border-purple-600"
+              >
+                <option value="return">Return Collected (Customer returned container)</option>
+                <option value="issue">Containers Issued (Delivered to customer)</option>
+                <option value="damaged">Damaged (Broken / unusable container)</option>
+                <option value="lost">Lost / Missing</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Quantity</label>
+              <input
+                type="number"
+                min="1"
+                value={quantityInput}
+                onChange={(e) => setQuantityInput(e.target.value)}
+                className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold focus:outline-none focus:border-purple-600"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Remarks / Note</label>
+              <input
+                type="text"
+                placeholder="e.g. Collected 2 empty milk bottles during morning delivery"
+                value={remarksInput}
+                onChange={(e) => setRemarksInput(e.target.value)}
+                className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:border-purple-600"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsLogModalOpen(false)}
+                className="px-4 py-2 text-slate-600 text-xs font-bold hover:bg-slate-100 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all disabled:opacity-50"
+              >
+                {submitting ? 'Saving...' : 'Save Transaction'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>
@@ -438,27 +889,80 @@ function OrdersTab({ orders }: { orders: any[] }) {
 
 function PostpaidTab({ ledger }: { ledger: any }) {
   if (!ledger) return <div className="text-sm text-gray-500 py-8 text-center bg-gray-50 rounded-xl">No Postpaid Ledger Data Available</div>;
-  const { summary = {}, bills = [] } = ledger;
+  const { summary = {}, bills = [], subscription_orders = [] } = ledger;
+
+  // Calculate current month's subscription bill statement
+  const currentMonthYear = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const currentMonthPrefix = new Date().toISOString().slice(0, 7); // e.g. "2026-07"
+
+  const thisMonthOrders = subscription_orders.filter((o: any) => {
+    const d = o.scheduled_date ? String(o.scheduled_date).slice(0, 7) : (o.created_at ? String(o.created_at).slice(0, 7) : '');
+    return d === currentMonthPrefix;
+  });
+
+  const thisMonthDue = thisMonthOrders
+    .filter((o: any) => String(o.payment_status).toLowerCase() !== 'paid' && String(o.status).toLowerCase() !== 'cancelled')
+    .reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
+
+  const thisMonthBilled = thisMonthOrders
+    .filter((o: any) => String(o.status).toLowerCase() !== 'cancelled')
+    .reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
+
+  const thisMonthPaid = thisMonthOrders
+    .filter((o: any) => String(o.payment_status).toLowerCase() === 'paid' && String(o.status).toLowerCase() !== 'cancelled')
+    .reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
 
   return (
     <div className="space-y-6 font-sans">
+      {/* Current Month Bill Statement Card (Light Theme) */}
+      <div className="bg-gradient-to-r from-emerald-50 via-teal-50/70 to-slate-50 text-slate-900 p-6 rounded-2xl shadow-2xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border border-emerald-200/80">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-extrabold text-emerald-800 uppercase tracking-wider mb-1">
+            <Sparkles size={14} className="text-emerald-600" /> Current Month Statement ({currentMonthYear})
+          </div>
+          <h2 className="text-3xl font-black tracking-tight text-slate-900">
+            ₹{(thisMonthDue > 0 ? thisMonthDue : Number(summary?.current_due || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </h2>
+          <p className="text-xs text-slate-600 font-medium mt-1">
+            {(thisMonthDue > 0 || Number(summary?.current_due || 0) > 0)
+              ? `Current amount customer needs to pay for ${currentMonthYear} subscription orders`
+              : `All subscription charges for ${currentMonthYear} have been fully paid.`}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-4 text-xs font-medium bg-white/90 p-3.5 rounded-xl border border-emerald-100 shadow-2xs">
+          <div>
+            <span className="block text-[10px] text-slate-500 uppercase font-extrabold">Month Billed</span>
+            <span className="font-bold text-slate-900 text-sm">₹{thisMonthBilled.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div className="border-l border-slate-200 pl-4">
+            <span className="block text-[10px] text-slate-500 uppercase font-extrabold">Month Paid</span>
+            <span className="font-bold text-emerald-700 text-sm">₹{thisMonthPaid.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div className="border-l border-slate-200 pl-4">
+            <span className="block text-[10px] text-slate-500 uppercase font-extrabold">Amount To Pay</span>
+            <span className="font-bold text-rose-600 text-sm">₹{thisMonthDue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          </div>
+        </div>
+      </div>
+
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Credit Limit</p>
-          <p className="text-xl font-black text-gray-900">₹{Number(summary?.credit_limit || 0).toLocaleString()}</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Postpaid Credit Limit</p>
+          <p className="text-xl font-black text-gray-900">₹{Number(summary?.credit_limit || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
         </div>
         <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Current Due</p>
-          <p className="text-xl font-black text-rose-600">₹{Number(summary?.current_due || 0).toLocaleString()}</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Outstanding Due</p>
+          <p className="text-xl font-black text-rose-600">₹{Number(summary?.current_due || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
         </div>
         <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Credit Given</p>
-          <p className="text-xl font-black text-blue-600">₹{Number(summary?.total_credit_given || 0).toLocaleString()}</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Subscription Billed Total</p>
+          <p className="text-xl font-black text-blue-600">₹{Number(summary?.total_credit_given || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
         </div>
         <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Paid</p>
-          <p className="text-xl font-black text-emerald-600">₹{Number(summary?.total_paid || 0).toLocaleString()}</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Subscription Paid Total</p>
+          <p className="text-xl font-black text-emerald-600">₹{Number(summary?.total_paid || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
         </div>
       </div>
 
@@ -466,7 +970,7 @@ function PostpaidTab({ ledger }: { ledger: any }) {
       <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs">
         <div className="flex justify-between items-center mb-2 text-xs font-bold text-gray-700">
           <span>Credit Utilization ({Number(summary?.credit_utilization_pct || 0).toFixed(1)}%)</span>
-          <span>₹{Number(summary?.current_due || 0).toLocaleString()} / ₹{Number(summary?.credit_limit || 0).toLocaleString()}</span>
+          <span>₹{Number(summary?.current_due || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / ₹{Number(summary?.credit_limit || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
         </div>
         <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
           <div 
@@ -479,14 +983,14 @@ function PostpaidTab({ ledger }: { ledger: any }) {
         </div>
       </div>
 
-      {/* Bills Table */}
+      {/* Subscription Orders Charges Ledger Table */}
       <div>
         <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-          <CreditCard size={16} className="text-blue-600" /> Postpaid Bills History ({bills.length})
+          <CreditCard size={16} className="text-emerald-600" /> Subscription Postpaid Orders Ledger ({subscription_orders.length})
         </h3>
-        {bills.length === 0 ? (
+        {subscription_orders.length === 0 ? (
           <p className="text-xs text-gray-500 italic py-8 text-center bg-gray-50 rounded-xl border border-gray-100">
-            No postpaid bills generated for this customer yet.
+            No subscription orders recorded for this customer yet.
           </p>
         ) : (
           <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-2xs">
@@ -494,42 +998,60 @@ function PostpaidTab({ ledger }: { ledger: any }) {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
                   <tr>
-                    <th className="text-left px-4 py-3 font-semibold">Bill ID</th>
-                    <th className="text-left px-4 py-3 font-semibold">Period / Date</th>
-                    <th className="text-right px-4 py-3 font-semibold">Total</th>
-                    <th className="text-right px-4 py-3 font-semibold">Paid</th>
-                    <th className="text-right px-4 py-3 font-semibold">Due</th>
-                    <th className="text-center px-4 py-3 font-semibold">Status</th>
+                    <th className="text-left px-4 py-3 font-semibold">Order ID</th>
+                    <th className="text-left px-4 py-3 font-semibold">Sub Ref</th>
+                    <th className="text-left px-4 py-3 font-semibold">Date & Slot</th>
+                    <th className="text-left px-4 py-3 font-semibold">Ordered Subscription Items</th>
+                    <th className="text-right px-4 py-3 font-semibold">Charged Amount</th>
+                    <th className="text-center px-4 py-3 font-semibold">Payment Mode</th>
+                    <th className="text-center px-4 py-3 font-semibold">Payment Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {bills.map((bill: any, i: number) => (
-                    <tr key={i} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 font-bold text-gray-900">
-                        #{bill.bill_id || bill.id}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-600">
-                        {bill.billing_period || (bill.created_at ? new Date(bill.created_at).toLocaleDateString('en-GB') : 'N/A')}
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-gray-900">
-                        ₹{Number(bill.total_amount || 0).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-emerald-600">
-                        ₹{Number(bill.paid_amount || 0).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-rose-600">
-                        ₹{Number(bill.due_amount || 0).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                          bill.status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
-                          bill.status === 'partially_paid' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
-                        }`}>
-                          {bill.status || 'UNPAID'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                <tbody className="divide-y divide-gray-100 text-xs">
+                  {subscription_orders.map((order: any, i: number) => {
+                    const itemsText = order.items && order.items.length > 0
+                      ? order.items.map((it: any) => `${it.product_name || it.variant_name} (${it.quantity || 1})`).join(', ')
+                      : 'Subscription Delivery Item';
+                    
+                    const isPaid = String(order.payment_status).toLowerCase() === 'paid';
+                    const isCancelled = String(order.status).toLowerCase() === 'cancelled';
+
+                    return (
+                      <tr key={i} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3 font-bold text-gray-900 font-mono">
+                          {order.order_id}
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-emerald-700 font-mono">
+                          {order.subscription_number || order.subscription_id || 'Subscription'}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          <span className="block font-bold text-gray-800">
+                            {order.scheduled_date ? String(order.scheduled_date).slice(0, 10) : (order.created_at ? String(order.created_at).slice(0, 10) : '—')}
+                          </span>
+                          <span className="block text-[11px] capitalize text-gray-400">
+                            Slot: {order.delivery_slot || 'Morning'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-800">
+                          {itemsText}
+                        </td>
+                        <td className="px-4 py-3 text-right font-black text-slate-900">
+                          ₹{Number(order.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-4 py-3 text-center uppercase font-bold text-slate-700">
+                          {order.payment_mode || 'Postpaid'}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-block text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase border ${
+                            isCancelled ? 'bg-slate-100 text-slate-600 border-slate-200' :
+                            isPaid ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-rose-100 text-rose-800 border-rose-200'
+                          }`}>
+                            {isCancelled ? 'Cancelled' : isPaid ? 'Paid' : 'Postpaid Due'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

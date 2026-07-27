@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : package.controller.ts
 // Description : Admin container/package management endpoints
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
@@ -16,7 +15,7 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 @UseGuards(JwtAuthGuard)
 @Controller({ path: 'admin/package', version: '1' })
 export class PackageController {
-  constructor(private readonly packageService: PackageService) {}
+  constructor(private readonly packageService: PackageService) { }
 
   @Get('dashboard')
   dashboard(@Query() query: any) {

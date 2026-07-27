@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : LoginClient.tsx
 // Description : Login client component for admin panel auth
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 "use client"

@@ -83,8 +83,8 @@ class _WelcomeIntroScreenState extends State<WelcomeIntroScreen>
 
   PageRouteBuilder _slideRoute(Widget page) {
     return PageRouteBuilder(
-      pageBuilder: (_, __, ___) => page,
-      transitionsBuilder: (_, anim, __, child) {
+      pageBuilder: (_, _, _) => page,
+      transitionsBuilder: (_, anim, _, child) {
         return SlideTransition(
           position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero)
               .animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
@@ -107,7 +107,7 @@ class _WelcomeIntroScreenState extends State<WelcomeIntroScreen>
             left: -80,
             child: AnimatedBuilder(
               animation: _pulse1,
-              builder: (_, __) => Container(
+              builder: (_, _) => Container(
                 width: 420,
                 height: 420,
                 decoration: BoxDecoration(
@@ -217,7 +217,7 @@ class _WelcomeIntroScreenState extends State<WelcomeIntroScreen>
           // 3D Coin Stack icon
           AnimatedBuilder(
             animation: Listenable.merge([_coin1, _floatCtrl, _pulse1]),
-            builder: (_, __) {
+            builder: (_, _) {
               final float = math.sin(_floatCtrl.value * math.pi) * 10;
               final rotate = math.sin(_coin1.value * math.pi * 2) * 0.08;
               return Transform.translate(
@@ -336,7 +336,7 @@ class _WelcomeIntroScreenState extends State<WelcomeIntroScreen>
         children: [
           AnimatedBuilder(
             animation: Listenable.merge([_sunrise, _floatCtrl, _pulse1]),
-            builder: (_, __) {
+            builder: (_, _) {
               final float = math.sin(_floatCtrl.value * math.pi) * 8;
               return Transform.translate(
                 offset: Offset(0, float),
@@ -451,7 +451,7 @@ class _WelcomeIntroScreenState extends State<WelcomeIntroScreen>
         children: [
           AnimatedBuilder(
             animation: Listenable.merge([_hexGrid, _floatCtrl, _pulse1]),
-            builder: (_, __) {
+            builder: (_, _) {
               final float = math.sin(_floatCtrl.value * math.pi) * 9;
               return Transform.translate(
                 offset: Offset(0, float),
@@ -703,7 +703,11 @@ class _HexGridPainter extends CustomPainter {
       final angle = math.pi / 180 * (60 * i - 30);
       final x = cx + r * math.cos(angle);
       final y = cy + r * math.sin(angle);
-      if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
     }
     path.close();
     return path;

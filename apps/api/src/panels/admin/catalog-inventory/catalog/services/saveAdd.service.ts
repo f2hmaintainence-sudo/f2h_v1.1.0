@@ -77,10 +77,10 @@ export class CatalogSaveAddService {
     }
 
     if (fileUrl) {
-      await this.dataService.query(
-        `UPDATE products SET image_path = $1 WHERE product_id = $2`,
-        [fileUrl, productId],
-      );
+      await this.dataService.query('products', {
+        update: { image_path: fileUrl },
+        where: [{ column: 'product_id', operator: '=', value: productId }],
+      });
     }
   }
 
@@ -127,10 +127,10 @@ export class CatalogSaveAddService {
     const finalUrls = Array.from(new Set(urlsToProcess)).slice(0, 5);
 
     if (finalUrls.length > 0) {
-      await this.dataService.query(
-        `DELETE FROM product_images WHERE variant_id = $1`,
-        [variantId],
-      );
+      await this.dataService.query('product_images', {
+        delete: true,
+        where: [{ column: 'variant_id', operator: '=', value: variantId }],
+      });
 
       for (const [index, fileUrl] of finalUrls.entries()) {
         await this.dataService.insert('product_images', {
@@ -255,6 +255,10 @@ export class CatalogSaveAddService {
       delete insertData.primary_image_file;
       delete insertData.secondary_image_file;
 
+      if (insertData.container_id === '' || insertData.container_id === 'null') {
+        insertData.container_id = null;
+      }
+
       // =====================================================
       // 5. REQUIRED FIELD VALIDATION
       // =====================================================
@@ -358,19 +362,7 @@ export class CatalogSaveAddService {
         );
       }
 
-      const primaryUrl = body.primary_image_url || body.image_url;
-      const secondaryUrl = body.secondary_image_url;
-      const secondaryImage = body.secondary_image_file ? this.normalizeProductImage(body.secondary_image_file) : null;
-
-      await this.savePrimaryProductImage(
-        insertData.product_id,
-        insertData.name,
-        productImage,
-        secondaryImage,
-        primaryUrl,
-        secondaryUrl,
-        adminId,
-      );
+      // Primary product images are managed on product_variants level
 
       // =====================================================
       // 10. AUDIT LOG
@@ -550,7 +542,7 @@ export class CatalogSaveAddService {
       return null;
     }
 
-    if (fieldName === 'packaging_type_id' && value === '') {
+    if ((fieldName === 'packaging_type_id' || fieldName === 'container_id') && (value === '' || value === 'null')) {
       return null;
     }
 
@@ -653,8 +645,19 @@ export class CatalogSaveAddService {
       insertData.sort_order = insertData.sort_order ?? 0;
       
 
-      const variantImage = insertData.variant_image;
+      const variantImages = [
+        body.variant_image,
+        body.variant_image_2,
+        body.variant_image_3,
+        body.variant_image_4,
+        body.variant_image_5,
+      ].filter((img) => img !== undefined && img !== null && img !== '');
+
       delete insertData.variant_image;
+      delete insertData.variant_image_2;
+      delete insertData.variant_image_3;
+      delete insertData.variant_image_4;
+      delete insertData.variant_image_5;
       delete insertData.primary_image_url;
       delete insertData.additional_image_urls;
       delete insertData.variant_image_file;
@@ -678,7 +681,7 @@ export class CatalogSaveAddService {
         insertData.product_id,
         insertData.variant_id,
         insertData.name,
-        variantImage,
+        variantImages,
         adminId,
         primaryUrl,
         additionalUrls,
@@ -919,27 +922,38 @@ export class CatalogSaveAddService {
           errors: { title: 'Banner title is required' },
         });
       }
-      if (!body?.image_url?.trim()) {
+
+      let imageUrl = body.image_url?.trim() || '';
+      if (body.banner_image && typeof body.banner_image === 'string' && body.banner_image.startsWith('data:image')) {
+        imageUrl = saveImageUpload(body.banner_image, 'offers');
+      }
+
+      if (!imageUrl) {
         throw new BadRequestException({
           status: false,
           message: 'Validation failed',
-          errors: { image_url: 'Image URL is required' },
+          errors: { image_url: 'Banner image (URL or file upload) is required' },
         });
       }
 
-      const insertData = {
+      const insertData: Record<string, any> = {
         title: body.title.trim(),
-        description: body.description?.trim() || null,
-        image_url: body.image_url.trim(),
+        image_url: imageUrl,
         action_type: body.action_type || 'CATEGORY',
         cta_label: body.cta_label?.trim() || 'Shop Now',
         discount_text: body.discount_text?.trim() || null,
         background_color: body.background_color?.trim() || '#16a34a',
         display_order: body.display_order ? Number(body.display_order) : 0,
         is_active: body.is_active !== undefined ? Boolean(body.is_active) : true,
+        created_by: adminId || null,
+        updated_by: adminId || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
+
+      if (body.description !== undefined && body.description !== null) {
+        insertData.description = body.description.trim() || null;
+      }
 
       const result = await this.dataService.insert('product_banner', insertData);
       if (!result.status) {

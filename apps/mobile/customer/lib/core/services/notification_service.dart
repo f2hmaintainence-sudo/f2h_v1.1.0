@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : notification_service.dart
 // Description : High-importance FCM and Flutter Local Notifications service.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'dart:async';

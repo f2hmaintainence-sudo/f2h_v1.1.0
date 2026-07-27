@@ -141,7 +141,7 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen>
           if (isCellBetween)
             Container(
               margin: const EdgeInsets.symmetric(vertical: 4),
-              color: kPrimaryMid.withOpacity(0.12),
+              color: kPrimaryMid.withValues(alpha: 0.12),
             )
           else if (isCellStart && _selectedEndDate != null)
             Row(
@@ -150,7 +150,7 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen>
                 Expanded(
                   child: Container(
                     margin: const EdgeInsets.symmetric(vertical: 4),
-                    color: kPrimaryMid.withOpacity(0.12),
+                    color: kPrimaryMid.withValues(alpha: 0.12),
                   ),
                 ),
               ],
@@ -161,7 +161,7 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen>
                 Expanded(
                   child: Container(
                     margin: const EdgeInsets.symmetric(vertical: 4),
-                    color: kPrimaryMid.withOpacity(0.12),
+                    color: kPrimaryMid.withValues(alpha: 0.12),
                   ),
                 ),
                 const Expanded(child: SizedBox()),
@@ -327,7 +327,7 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen>
             decoration: BoxDecoration(
               color: kPrimaryPl,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: kPrimaryLt.withOpacity(0.4)),
+              border: Border.all(color: kPrimaryLt.withValues(alpha: 0.4)),
             ),
             child: Row(
               children: const [
@@ -354,7 +354,7 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen>
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: kBorderLt),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+                BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
               ],
             ),
             child: Column(
@@ -418,7 +418,7 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: kPrimaryMid.withOpacity(0.06),
+                color: kPrimaryMid.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -481,7 +481,7 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen>
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: kBorder),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+                BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
               ],
             ),
             child: TextField(
@@ -553,8 +553,8 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen>
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: selected ? kPrimary : kBorder, width: selected ? 0 : 1),
           boxShadow: selected
-              ? [BoxShadow(color: kPrimary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 3))]
-              : [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
+              ? [BoxShadow(color: kPrimary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 3))]
+              : [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
         ),
         child: Center(
           child: Text(
@@ -582,8 +582,8 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen>
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: selected ? kPrimary : kBorder, width: selected ? 0 : 1),
           boxShadow: selected
-              ? [BoxShadow(color: kPrimary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 3))]
-              : [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
+              ? [BoxShadow(color: kPrimary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 3))]
+              : [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
         ),
         child: Center(
           child: Text(
@@ -608,7 +608,7 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.beach_access_rounded, size: 64, color: kMuted.withOpacity(0.5)),
+            Icon(Icons.beach_access_rounded, size: 64, color: kMuted.withValues(alpha: 0.5)),
             const SizedBox(height: 16),
             const Text(
               'No leave requests yet',
@@ -632,7 +632,7 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen>
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: requests.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        separatorBuilder: (_, _) => const SizedBox(height: 10),
         itemBuilder: (context, index) {
           final req = requests[index];
           return _buildLeaveCard(context, req);
@@ -676,7 +676,7 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen>
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: kBorderLt),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
       child: Column(
@@ -708,7 +708,7 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen>
                   decoration: BoxDecoration(
                     color: statusBg,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: statusColor.withOpacity(0.3)),
+                    border: Border.all(color: statusColor.withValues(alpha: 0.3)),
                   ),
                   child: Text(
                     '$statusIcon $statusLabel',

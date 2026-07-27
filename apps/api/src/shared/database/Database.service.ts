@@ -118,6 +118,42 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         CREATE INDEX IF NOT EXISTS idx_dispatch_balances_boy_date ON dispatch_balances(delivery_partner_id, run_date);
       `);
 
+      await this.pool.query(`
+        CREATE TABLE IF NOT EXISTS management_staff (
+            id BIGSERIAL PRIMARY KEY,
+            management_id VARCHAR(30) UNIQUE,
+            user_id VARCHAR(30) NOT NULL,
+            branch_id VARCHAR(30),
+            role_id VARCHAR(30) DEFAULT 'ADMIN',
+            user_name VARCHAR(50),
+            department VARCHAR(100),
+            designation VARCHAR(100),
+            is_active BOOLEAN DEFAULT true,
+            bio TEXT,
+            gender VARCHAR(20),
+            date_of_birth DATE,
+            marital_status VARCHAR(30),
+            phone VARCHAR(20),
+            alt_phone VARCHAR(20),
+            address_line1 VARCHAR(100),
+            address_line2 VARCHAR(100),
+            city VARCHAR(50),
+            state VARCHAR(50),
+            postal_code VARCHAR(20),
+            education VARCHAR(100),
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_mgmt_staff_user ON management_staff(user_id);
+      `);
+
+      await this.pool.query(`
+        ALTER TABLE product_banner ADD COLUMN IF NOT EXISTS description TEXT;
+        ALTER TABLE product_banner ADD COLUMN IF NOT EXISTS background_color VARCHAR(50);
+        ALTER TABLE product_banner ALTER COLUMN created_by TYPE VARCHAR(50) USING created_by::text;
+        ALTER TABLE product_banner ALTER COLUMN updated_by TYPE VARCHAR(50) USING updated_by::text;
+      `);
+
       this.logger.log('dispatch_requirements and dispatch_balances tables verified.');
     } catch (err) {
       this.logger.error('Failed to create required tables dispatch_requirements or dispatch_balances', err);

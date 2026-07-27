@@ -271,7 +271,7 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
                     border: Border.all(
                       color: isSelected 
                           ? Colors.transparent 
-                          : (isInRange ? kPrimary.withOpacity(0.2) : const Color(0xFFF1F5F9)),
+                          : (isInRange ? kPrimary.withValues(alpha: 0.2) : const Color(0xFFF1F5F9)),
                       width: 1,
                     ),
                   ),
@@ -623,13 +623,13 @@ class _CustomDateRangePickerDialogState extends State<CustomDateRangePickerDialo
                   decoration: BoxDecoration(
                     color: isSelected
                         ? kPrimary
-                        : (inRange ? kPrimary.withOpacity(0.08) : Colors.white),
+                        : (inRange ? kPrimary.withValues(alpha: 0.08) : Colors.white),
                     borderRadius: BorderRadius.circular(10),
                     boxShadow: isSelected || inRange
                         ? []
                         : [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.02),
+                              color: Colors.black.withValues(alpha: 0.02),
                               blurRadius: 4,
                               offset: const Offset(0, 2),
                             ),
@@ -637,7 +637,7 @@ class _CustomDateRangePickerDialogState extends State<CustomDateRangePickerDialo
                     border: Border.all(
                       color: isSelected
                           ? Colors.transparent
-                          : (inRange ? kPrimary.withOpacity(0.15) : const Color(0xFFF1F5F9)),
+                          : (inRange ? kPrimary.withValues(alpha: 0.15) : const Color(0xFFF1F5F9)),
                       width: 1,
                     ),
                   ),

@@ -122,7 +122,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                   SwitchListTile(
                     title: const Text('Mark as Primary Payout Account', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     value: isPrimary,
-                    activeColor: kPrimary,
+                    activeThumbColor: kPrimary,
                     onChanged: (val) {
                       setModalState(() => isPrimary = val);
                     },

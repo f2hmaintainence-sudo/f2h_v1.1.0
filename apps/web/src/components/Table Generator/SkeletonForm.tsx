@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : SkeletonForm.tsx
 // Description : Skeleton form generator component for web panel
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 'use client';
@@ -606,7 +605,7 @@ export default function SkeletonForm({
       cropHeight,
       cropBox
     );
-    
+
     if (cropModal.isMultiple) {
       const currentArr = Array.isArray(formData[fieldName]) ? formData[fieldName] : (formData[fieldName] ? [formData[fieldName]] : []);
       handleChange(fieldName, [...currentArr, cropped]);
@@ -1007,6 +1006,38 @@ export default function SkeletonForm({
         );
         break;
 
+      case 'radio':
+        input = (
+          <div className="flex items-center gap-3 py-1">
+            {(field.options ?? []).map((opt, idx) => {
+              const currentVal = formData[field.name] ?? field.defaultValue ?? '';
+              const isChecked = String(currentVal) === String(opt.value);
+              return (
+                <label
+                  key={`${opt.value}-${idx}`}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                    isChecked
+                      ? 'bg-emerald-50 text-[#16a34a] border-emerald-300 shadow-xs'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={field.name}
+                    value={opt.value}
+                    checked={isChecked}
+                    onChange={() => handleChange(field.name, opt.value)}
+                    disabled={field.disabled}
+                    className="w-3.5 h-3.5 text-[#16a34a] focus:ring-emerald-500 accent-[#16a34a]"
+                  />
+                  <span>{opt.label}</span>
+                </label>
+              );
+            })}
+          </div>
+        );
+        break;
+
       case 'toggle': {
         const isOn = Boolean(formData[field.name]);
         const onLabel = field.toggleOptions?.onLabel || (field.description ? 'ACTIVE' : 'Yes');
@@ -1065,7 +1096,7 @@ export default function SkeletonForm({
       case 'file': {
         const isMultiple = !!field.multiple;
         let previews: string[] = [];
-        
+
         if (isMultiple) {
           const raw = Array.isArray(formData[field.name])
             ? formData[field.name]
@@ -1088,82 +1119,83 @@ export default function SkeletonForm({
               {previews.map((previewSrc, idx) => {
                 // previewSrc is guaranteed to be a non-empty string at this point
                 let fullUrl = previewSrc;
-                if (!previewSrc.startsWith('http') && !previewSrc.startsWith('data:')) {
-                  const baseUrl = apiBaseUrl || getApiBaseUrl();
-                  let path = previewSrc.startsWith('/') ? previewSrc.slice(1) : previewSrc;
-                  if (!path.startsWith('uploads/')) path = `uploads/${path}`;
-                  fullUrl = `${baseUrl.replace(/\/$/, '')}/${path}`;
+                if (previewSrc && !previewSrc.startsWith('http') && !previewSrc.startsWith('data:')) {
+                  const apiBase = apiBaseUrl || getApiBaseUrl();
+                  const rootHost = apiBase.replace(/\/api(?:\/v\d+)?\/?$/, '');
+                  let path = previewSrc.startsWith('/') ? previewSrc : `/${previewSrc}`;
+                  if (!path.startsWith('/uploads/')) path = `/uploads${path}`;
+                  fullUrl = `${rootHost}${path}`;
                 }
 
                 return (
-                <div key={idx} className="skf-image-editor" style={{ width: isMultiple ? '150px' : '100%' }}>
-                  <div
-                    className="skf-crop-preview"
-                    style={{
-                      aspectRatio: field.aspectRatio || 1,
-                      position: 'relative',
-                      overflow: 'hidden',
-                      width: '100%'
-                    }}
-                  >
-                    <img
-                      src={fullUrl}
-                      alt="Preview"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  </div>
-                  <div className="skf-crop-controls">
-                    {!isMultiple && field.crop && (
+                  <div key={idx} className="skf-image-editor" style={{ width: isMultiple ? '150px' : '100%' }}>
+                    <div
+                      className="skf-crop-preview"
+                      style={{
+                        aspectRatio: field.aspectRatio || 1,
+                        position: 'relative',
+                        overflow: 'hidden',
+                        width: '100%'
+                      }}
+                    >
+                      <img
+                        src={fullUrl}
+                        alt="Preview"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    </div>
+                    <div className="skf-crop-controls">
+                      {!isMultiple && field.crop && (
+                        <button
+                          type="button"
+                          className="skf-reset-crop"
+                          onClick={() => {
+                            const raw = fileStates[field.name]?.rawSrc || previewSrc;
+                            if (raw) {
+                              setCropModal({
+                                isOpen: true,
+                                fieldName: field.name,
+                                src: raw,
+                                zoom: fileStates[field.name]?.zoom || 1,
+                                panX: fileStates[field.name]?.panX || 0,
+                                panY: fileStates[field.name]?.panY || 0,
+                                rotate: 0,
+                                aspectRatio: field.aspectRatio || 1,
+                                cropWidth: field.cropWidth || 800,
+                                cropHeight: field.cropHeight || 800,
+                                isMultiple: false,
+                              });
+                            }
+                          }}
+                        >
+                          Crop
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="skf-reset-crop"
+                        style={{ borderColor: '#ef4444', color: '#ef4444' }}
                         onClick={() => {
-                          const raw = fileStates[field.name]?.rawSrc || previewSrc;
-                          if (raw) {
-                            setCropModal({
-                              isOpen: true,
-                              fieldName: field.name,
-                              src: raw,
-                              zoom: fileStates[field.name]?.zoom || 1,
-                              panX: fileStates[field.name]?.panX || 0,
-                              panY: fileStates[field.name]?.panY || 0,
-                              rotate: 0,
-                              aspectRatio: field.aspectRatio || 1,
-                              cropWidth: field.cropWidth || 800,
-                              cropHeight: field.cropHeight || 800,
-                              isMultiple: false,
+                          if (isMultiple) {
+                            const newArray = [...previews];
+                            newArray.splice(idx, 1);
+                            handleChange(field.name, newArray);
+                          } else {
+                            setFileStates((prev) => {
+                              const copy = { ...prev };
+                              delete copy[field.name];
+                              return copy;
                             });
+                            handleChange(field.name, '');
                           }
                         }}
                       >
-                        Crop
+                        Remove
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      className="skf-reset-crop"
-                      style={{ borderColor: '#ef4444', color: '#ef4444' }}
-                      onClick={() => {
-                        if (isMultiple) {
-                          const newArray = [...previews];
-                          newArray.splice(idx, 1);
-                          handleChange(field.name, newArray);
-                        } else {
-                          setFileStates((prev) => {
-                            const copy = { ...prev };
-                            delete copy[field.name];
-                            return copy;
-                          });
-                          handleChange(field.name, '');
-                        }
-                      }}
-                    >
-                      Remove
-                    </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
               {(!previews.length || isMultiple) && (
                 <label className="skf-file-picker" style={{ width: isMultiple && previews.length ? '150px' : '100%', alignSelf: 'stretch' }}>
                   <UploadCloud size={32} style={{ color: '#94a3b8', marginBottom: '4px' }} />
@@ -1274,8 +1306,8 @@ export default function SkeletonForm({
       // Normalise booleans: backend sends true/false, toggle stores true/false
       const normalise = (v: any) =>
         v === true || v === 'true' || v === 1 || v === '1' ? true
-        : v === false || v === 'false' || v === 0 || v === '0' ? false
-        : v;
+          : v === false || v === 'false' || v === 0 || v === '0' ? false
+            : v;
       if (normalise(watchedValue) !== normalise(expectedValue)) return null;
     }
 

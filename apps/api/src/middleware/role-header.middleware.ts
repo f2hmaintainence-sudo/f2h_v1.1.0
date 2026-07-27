@@ -11,8 +11,7 @@
 //               X-Csrf (uuid)   → x-csrf-token
 //               This ensures zero breaking changes to downstream guards and
 //               services while keeping the wire-format as small as possible.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import { Injectable, NestMiddleware } from '@nestjs/common';

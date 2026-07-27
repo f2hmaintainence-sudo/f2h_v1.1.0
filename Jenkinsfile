@@ -27,9 +27,10 @@ pipeline {
                     cp -f ../../ecosystem.config.js "$LIVE_DIR/" 2>/dev/null || true
                     cp -f ../../package.json "$LIVE_DIR/" 2>/dev/null || true
 
-                    # Copy backend dist & package.json
+                    # Copy backend
                     cp -Rf ../api/dist "$LIVE_DIR/apps/api/" 2>/dev/null || true
                     cp -Rf ../api/src "$LIVE_DIR/apps/api/" 2>/dev/null || true
+                    cp -Rf ../api/uploads "$LIVE_DIR/apps/api/" 2>/dev/null || true
                     cp -f ../api/package.json "$LIVE_DIR/apps/api/" 2>/dev/null || true
 
                     # Copy frontend .next & package.json & public

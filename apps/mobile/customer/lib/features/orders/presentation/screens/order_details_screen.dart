@@ -275,7 +275,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.12),
+              color: statusColor.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: Icon(statusIcon, color: statusColor, size: 26),
@@ -382,7 +382,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: order.items.length,
-            separatorBuilder: (_, __) => Divider(color: kBorder.withOpacity(0.5)),
+            separatorBuilder: (_, _) => Divider(color: kBorder.withValues(alpha: 0.5)),
             itemBuilder: (context, idx) {
               final item = order.items[idx];
               return Column(
@@ -399,9 +399,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       Navigator.push(
                         context,
                         PageRouteBuilder(
-                          pageBuilder: (_, a, __) =>
+                          pageBuilder: (_, a, _) =>
                               ProductDetailViewScreen(product: product),
-                          transitionsBuilder: (_, a, __, child) =>
+                          transitionsBuilder: (_, a, _, child) =>
                               FadeTransition(opacity: a, child: child),
                           transitionDuration: const Duration(milliseconds: 220),
                         ),
@@ -689,10 +689,10 @@ class _ProductRatingWidget extends StatefulWidget {
   final String orderId;
   final OrderItem item;
   const _ProductRatingWidget({
-    Key? key,
+    super.key,
     required this.orderId,
     required this.item,
-  }) : super(key: key);
+  });
 
   @override
   State<_ProductRatingWidget> createState() => _ProductRatingWidgetState();
@@ -774,7 +774,7 @@ class _ProductRatingWidgetState extends State<_ProductRatingWidget> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: kPrimary.withOpacity(0.12),
+                    color: kPrimary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: const Text(

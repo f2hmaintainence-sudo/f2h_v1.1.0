@@ -43,6 +43,7 @@ type Props = {
   enableCardView?: boolean;
   buttonLabel?: string;
   breadcrumbs?: Array<{ label: string; url?: string }>;
+  modalsOnly?: boolean;
 };
 
 export default function TableComponents({
@@ -55,6 +56,7 @@ export default function TableComponents({
   enableCardView = false,
   buttonLabel,
   breadcrumbs = [],
+  modalsOnly = false,
 }: Props) {
   const [tableKey, setTableKey] = useState(0);
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
@@ -214,12 +216,115 @@ export default function TableComponents({
       setAddOpen(true);
     };
 
-    window.addEventListener('table:add', handleOpenAdd);
+    const handleCustomAction = (e: Event) => {
+      const detail = (e as CustomEvent).detail || {};
+      const { type, id, row } = detail;
+      const targetId = String(id || row?.id || row?.warehouse_id || row?.category_id || row?.product_id || '');
 
+      if (type === 'add') {
+        setAddOpen(true);
+      } else if (type === 'edit') {
+        if (targetId) {
+          setEditId(targetId);
+          setEditOpen(true);
+        }
+      } else if (type === 'view') {
+        if (targetId) {
+          setViewId(targetId);
+          setViewRow(row || {});
+          setViewOpen(true);
+        }
+      } else if (type === 'delete') {
+        if (targetId) {
+          setDeleteId(targetId);
+          setDeleteRow(row || {});
+          setDeleteOpen(true);
+        }
+      }
+    };
+
+    window.addEventListener('table:add', handleOpenAdd);
+    window.addEventListener('table:action', handleCustomAction as EventListener);
+    window.addEventListener('table:edit', handleCustomAction as EventListener);
+    window.addEventListener('table:view', handleCustomAction as EventListener);
     return () => {
       window.removeEventListener('table:add', handleOpenAdd);
+      window.removeEventListener('table:action', handleCustomAction as EventListener);
+      window.removeEventListener('table:edit', handleCustomAction as EventListener);
+      window.removeEventListener('table:view', handleCustomAction as EventListener);
     };
   }, []);
+
+  if (modalsOnly) {
+    return (
+      <>
+        {/* Add Drawer */}
+        <SkeletonForm
+          isOpen={addOpen}
+          onClose={() => setAddOpen(false)}
+          apiEndpoint={api.showAdd}
+          submitEndpoint={api.saveAdd}
+          onSuccess={() => {
+            setAddOpen(false);
+            refreshTable();
+            if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('table:refresh'));
+          }}
+        />
+
+        {/* Edit Drawer */}
+        {editId && (
+          <SkeletonForm
+            isOpen={editOpen}
+            onClose={() => {
+              setEditOpen(false);
+              setEditId(null);
+            }}
+            apiEndpoint={api.showEdit(editId)}
+            submitEndpoint={api.saveEdit(editId)}
+            onSuccess={() => {
+              setEditOpen(false);
+              setEditId(null);
+              refreshTable();
+              if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('table:refresh'));
+            }}
+          />
+        )}
+
+        {/* View Drawer */}
+        <SkeletonViewDrawer
+          isOpen={viewOpen}
+          onClose={() => {
+            setViewOpen(false);
+            setViewId(null);
+            setViewRow(null);
+          }}
+          title={`${title || ''} Details`}
+          rowData={viewRow}
+          viewEndpoint={viewId ? api.view(viewId) : undefined}
+        />
+
+        <DeleteConfirmModal
+          isOpen={deleteOpen}
+          loading={deleteLoading}
+          title={`Delete ${title || ''}?`}
+          message={`Are you sure you want to delete this ${title || 'item'}? This action cannot be undone.`}
+          itemName={
+            deleteRow?.name ||
+            deleteRow?.title ||
+            deleteRow?.code ||
+            deleteId ||
+            undefined
+          }
+          onClose={() => {
+            setDeleteOpen(false);
+            setDeleteId(null);
+            setDeleteRow(null);
+          }}
+          onConfirm={handleDeleteConfirm}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="space-y-1 font-sans min-h-screen">

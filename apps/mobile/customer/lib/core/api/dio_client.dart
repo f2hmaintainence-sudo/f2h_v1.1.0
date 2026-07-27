@@ -11,8 +11,7 @@
 //                 refreshes expired access tokens using the refresh token.
 //               - CSRF: auto-reads csrf_token cookie for mutations (non-web).
 //               - PersistCookieJar: survives app restarts.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'dart:io';
