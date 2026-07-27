@@ -16,7 +16,7 @@ export default function InventoryHealthChart({
   outOfStock,
 }: InventoryHealthChartProps) {
   const data = [
-    { name: "In Stock", value: inStock > 0 ? inStock : 1, color: "#16a34a" },
+    { name: "In Stock", value: inStock, color: "#16a34a" },
     { name: "Low Stock", value: lowStock, color: "#f59e0b" },
     { name: "Out of Stock", value: outOfStock, color: "#ef4444" },
   ];

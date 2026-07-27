@@ -23,10 +23,16 @@ interface StockMovementChartProps {
   isLoading?: boolean;
 }
 
-export default function StockMovementChart({ data, isLoading }: StockMovementChartProps) {
-  const chartData = data && data.length > 0 ? data : [];
+// Labeled day indices — only these 7 ticks show on the X-axis
+const LABELED_INDICES = [0, 4, 9, 14, 19, 24, 29];
 
-  // Check if there's any real data at all
+export default function StockMovementChart({ data, isLoading }: StockMovementChartProps) {
+  // Add a numeric index field so XAxis can use it as a stable coordinate key
+  const chartData = (data && data.length > 0 ? data : []).map((d, i) => ({
+    ...d,
+    index: i,
+  }));
+
   const hasRealData = chartData.some((d) => d.stockIn > 0 || d.stockOut > 0);
 
   return (
@@ -56,7 +62,7 @@ export default function StockMovementChart({ data, isLoading }: StockMovementCha
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorStockIn" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%"  stopColor="#16a34a" stopOpacity={0.35} />
@@ -68,13 +74,19 @@ export default function StockMovementChart({ data, isLoading }: StockMovementCha
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+
+              {/* Use numeric index as the axis key — ticks are stable numbers, labels mapped back via tickFormatter */}
               <XAxis
-                dataKey="day"
+                dataKey="index"
+                type="number"
+                domain={[0, 29]}
+                ticks={LABELED_INDICES}
+                tickFormatter={(idx: number) => chartData[idx]?.day ?? ""}
                 tick={{ fontSize: 11, fill: "#64748b" }}
                 axisLine={false}
                 tickLine={false}
-                interval={0}
               />
+
               <YAxis
                 tick={{ fontSize: 11, fill: "#64748b" }}
                 axisLine={false}
@@ -89,11 +101,14 @@ export default function StockMovementChart({ data, isLoading }: StockMovementCha
                   fontSize: "12px",
                   fontWeight: "600",
                 }}
-                formatter={(value: number, name: string) => [
-                  value,
-                  name === "stockIn" ? "Stock In" : "Stock Out",
+                labelFormatter={(idx: number) => {
+                  const label = chartData[idx]?.day;
+                  return label ? `📅 ${label}` : `📅 Day ${idx + 1}`;
+                }}
+                formatter={(value, name) => [
+                  value ?? 0,
+                  name === "Stock In" ? "Stock In" : "Stock Out",
                 ]}
-                labelFormatter={(label: string) => label ? `📅 ${label}` : ""}
               />
               <Area
                 type="monotone"

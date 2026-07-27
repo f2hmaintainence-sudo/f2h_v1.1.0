@@ -86,8 +86,8 @@ function buildChartData(movements: RawMovement[]): MovementPoint[] {
 
 // Map low-stock API rows to LowStockCards format
 function mapLowStockItems(rows: LowStockRaw[]) {
-  return rows.map((r) => ({
-    id: r.product_variant_id,
+  return rows.map((r, i) => ({
+    id: `${r.product_variant_id}-${r.warehouse_id}-${i}`,
     productName: r.product_name,
     sku: r.product_variant_id,
     warehouse: r.warehouse_name,
