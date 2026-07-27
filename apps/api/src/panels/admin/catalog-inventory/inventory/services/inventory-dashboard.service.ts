@@ -114,9 +114,9 @@ export class InventoryDashboardService {
           GROUP BY branch_id
         ) orders ON orders.branch_id = b.branch_id
         LEFT JOIN (
-          SELECT branch_id AS branch_id, SUM(total_quantity)::int AS total_dispatched
+          SELECT target_branch_id AS branch_id, SUM(total_quantity)::int AS total_dispatched
           FROM dispatch_plans WHERE dispatch_date = $1 AND status IN ('dispatched', 'in_transit', 'received')
-          GROUP BY branch_id
+          GROUP BY target_branch_id
         ) dispatched ON dispatched.branch_id = b.branch_id
         WHERE b.is_active = true AND b.deleted_at IS NULL
         ORDER BY b.branch_name
@@ -233,13 +233,13 @@ export class InventoryDashboardService {
       const targetDate = date || todayIST();
       const sql = `
         SELECT
-          ob.batch_id, ob.branch_id, ob.delivery_date, ob.slot,
+          ob.batch_id, ob.branch_id, ob.production_date, ob.slot,
           ob.status, ob.total_quantity,
           ob.prepared_quantity,
           b.branch_name
         FROM order_batches ob
         LEFT JOIN branches b ON b.branch_id = ob.branch_id
-        WHERE ob.delivery_date = $1
+        WHERE ob.production_date = $1
         ORDER BY ob.branch_id, ob.slot
       `;
       return await this.db.query(sql, [targetDate]);
