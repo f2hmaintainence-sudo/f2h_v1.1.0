@@ -89,7 +89,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
         _step = 1;
       });
       _startCountdown();
-      _showSnack('OTP sent to $email ✅');
+      _showSnack('OTP sent to $email');
     } on DioException catch (e) {
       setState(() => _isLoading = false);
       _showSnack(e.response?.data?['message'] ?? 'Failed to send OTP', isError: true);
