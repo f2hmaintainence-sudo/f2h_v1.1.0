@@ -52,7 +52,9 @@ const adminNav = [
   {
     label: "CATALOG & INVENTORY",
     items: [
+      { name: "Categories", href: "/admin/catalog/categories", icon: Layers },
       { name: "Products", href: "/admin/catalog/products", icon: Package },
+      { name: "Product Variants", href: "/admin/catalog/variants", icon: Tag },
       { name: "Offers", href: "/admin/catalog/offers", icon: Tag },
       {
         name: "Inventory & Warehouse",
