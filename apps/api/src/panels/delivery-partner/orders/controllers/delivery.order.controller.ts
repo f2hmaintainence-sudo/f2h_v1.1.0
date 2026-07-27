@@ -1901,5 +1901,4 @@ async markOrdersOutForDelivery(@Request() req: any) {
       message: 'Container checklist & statuses updated successfully',
     };
   }
->>>>>>> f30ab41b63505b06a6650caa6274197655c17dfc
 }
