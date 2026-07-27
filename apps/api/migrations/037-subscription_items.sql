@@ -11,10 +11,7 @@ CREATE TABLE IF NOT EXISTS subscription_items (
     coupon_amount NUMERIC(10,2) DEFAULT 0,
     final_price NUMERIC(10,2) GENERATED ALWAYS AS (GREATEST(unit_price - discount_amount - coupon_amount, 0)) STORED,
     is_free BOOLEAN NOT NULL DEFAULT false,
-    status subscription_status_enum DEFAULT 'active',
-    start_date DATE,
-    
-    end_date DATE,
+
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );

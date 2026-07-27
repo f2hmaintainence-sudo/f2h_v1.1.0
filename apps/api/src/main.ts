@@ -229,7 +229,7 @@ async function bootstrap() {
       'X-Ver',    // compact: semver build string e.g. 1.0.3+10
       'X-Csrf',   // compact: CSRF uuid for mutations
       // Legacy verbose headers (kept for admin panel / web clients during migration)
-      'x-client-role',
+      'x-role',
       'x-csrf-token',
     ].join(', '),
     credentials: true,

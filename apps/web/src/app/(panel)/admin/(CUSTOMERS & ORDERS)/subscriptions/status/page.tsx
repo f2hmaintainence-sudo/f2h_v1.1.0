@@ -12,9 +12,10 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import TableComponents from '@/components/Table Generator/TableComponents';
+import { getApiBaseUrl } from '@/lib/api-config';
 
 const API = '/api/subscriptions/subscriptions';
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+const API_URL = typeof window !== 'undefined' ? getApiBaseUrl() : 'http://localhost:5001/api/v1';
 
 interface SummaryData {
   total: number;

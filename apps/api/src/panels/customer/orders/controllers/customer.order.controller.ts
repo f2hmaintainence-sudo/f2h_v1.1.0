@@ -72,11 +72,11 @@ export class CustomerOrderController {
              pv.sku,
              p.name     AS product_name,
              p.product_id,
-             pi.url     AS image_path
+             COALESCE(pi.url, p.image_path) AS image_path
            FROM order_items oi
            LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
            LEFT JOIN products p          ON p.product_id = pv.product_id
-           LEFT JOIN product_images pi   ON pi.variant_id = oi.variant_id
+           LEFT JOIN product_images pi   ON (pi.variant_id = oi.variant_id OR (pi.variant_id IS NULL AND pi.product_id = p.product_id)) AND (pi.is_primary = true OR pi.is_primary IS NULL)
            WHERE oi.order_id IN (${placeholders})`,
           orderIds,
         );
@@ -85,7 +85,7 @@ export class CustomerOrderController {
 
       // Group items by order_id
       const itemsByOrder = new Map<string, any[]>();
-      const baseUrl = process.env.BACKEND_URL || 'http://localhost:8000';
+      const baseUrl = process.env.MOBILE_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:5001';
       const mapImagePath = (imagePath: string | null) => {
         if (!imagePath) return null;
         if (imagePath.startsWith('http')) return imagePath;

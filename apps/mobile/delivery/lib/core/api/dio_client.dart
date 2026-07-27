@@ -43,7 +43,7 @@ class DioClient {
         headers: {
           'Content-Type': 'application/json',
           'Accept':       'application/json',
-          'X-Role': 'D',   // DELIVERY_BOY → expanded by backend RoleHeaderMiddleware
+          'X-role': 'D',   // DELIVERY_BOY → expanded by backend RoleHeaderMiddleware
           'X-Plt':  _platformCode(),
           'X-Ver':  const String.fromEnvironment('F2H_APP_VERSION', defaultValue: '1.0.0+1'),
         },

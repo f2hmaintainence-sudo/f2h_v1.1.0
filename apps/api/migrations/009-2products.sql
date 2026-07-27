@@ -9,13 +9,11 @@ CREATE TABLE public.products
     slug VARCHAR(200) NOT NULL,
 
     category_id VARCHAR(100) NOT NULL,
-    vendor_id VARCHAR(100),
-
     description TEXT,
     highlights TEXT,
     ingredients TEXT,
     legal_info TEXT,
-
+    image_path TEXT,
     is_out_of_stock BOOLEAN NOT NULL DEFAULT false,
     is_subscribable BOOLEAN NOT NULL DEFAULT false,
     is_one_time BOOLEAN NOT NULL DEFAULT true,

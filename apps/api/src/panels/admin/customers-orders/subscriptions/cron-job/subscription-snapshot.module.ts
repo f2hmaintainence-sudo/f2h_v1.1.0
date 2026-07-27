@@ -9,9 +9,10 @@ import { DispatchController } from './dispatch.controller';
 import { PdfModule } from '../../../../../common/pdf';
 import { NotificationModule } from 'src/notifications/notification.module';
 import { AdminAuthModule } from 'src/panels/admin/auth/auth.module';
+import { SharedDatabaseModule } from 'src/shared/database/Database.module';
 
 @Module({
-  imports: [RedisModule, PdfModule, NotificationModule, AdminAuthModule],
+  imports: [SharedDatabaseModule, RedisModule, PdfModule, NotificationModule, AdminAuthModule],
   controllers: [DispatchController],
   providers: [
     DeveloperService,
