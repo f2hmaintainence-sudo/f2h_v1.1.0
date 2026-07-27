@@ -37,6 +37,7 @@ import '../bloc/cart/cart_event.dart';
 import '../../../notifications/presentation/bloc/notifications_bloc.dart';
 import '../../../notifications/presentation/bloc/notifications_state.dart';
 import '../../../notifications/presentation/bloc/notifications_event.dart';
+import '../../../../core/guards/auth_guard.dart';
 
 // ══════════════════════════════════════════════════════════
 //  HOME SCREEN
@@ -2194,173 +2195,268 @@ class _HomeReferralBanner extends StatelessWidget {
     return BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
       builder: (context, sessionState) {
         final profile = sessionState.profile;
+        final isLoggedIn = profile != null;
         final rawCode = profile?.referralCode ?? sessionState.wallet['referral_code']?.toString();
-        final code = (rawCode != null && rawCode.isNotEmpty) ? rawCode : 'F2HPUR636';
+        final rawStatus = profile?.referralStatus ?? sessionState.wallet['referral_status']?.toString();
+        final isLocked = isLoggedIn && (rawStatus?.toLowerCase() == 'locked');
+        final code = (isLoggedIn && !isLocked && rawCode != null && rawCode.isNotEmpty) ? rawCode : null;
+
+        // ponytail: scale factor based on screen width for 320-430+ range
+        final sw = MediaQuery.of(context).size.width;
+        final scale = (sw / 375).clamp(0.82, 1.15);
 
         return GestureDetector(
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ReferralScreen()),
-            );
+            if (!isLoggedIn) {
+              context.runWithAuth(() {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ReferralScreen()),
+                );
+              });
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ReferralScreen(
+                    referralCode: rawCode,
+                    referralStatus: rawStatus,
+                  ),
+                ),
+              );
+            }
           },
           child: Container(
-            margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            margin: EdgeInsets.fromLTRB(sw < 340 ? 10 : 16, 10, sw < 340 ? 10 : 16, 8),
+            padding: EdgeInsets.all(12 * scale),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFFFF0F0), Color(0xFFFFF7F7)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
+                colors: [
+                  Color(0xFF0D5432),
+                  Color(0xFF16653A),
+                  Color(0xFF043927),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFFFC5C5), width: 1.2),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: const Color(0xFF34D399).withOpacity(0.35),
+                width: 1.2,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFFF0000).withOpacity(0.03),
+                  color: const Color(0xFF064E3B).withOpacity(0.2),
                   blurRadius: 8,
-                  offset: const Offset(0, 2),
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
             child: Row(
               children: [
-                // Left Icon
+                // Icon badge — fixed size, scales with screen
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: 34 * scale,
+                  height: 34 * scale,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFEF3C7), Color(0xFFFDE68A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1.5),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
-                        blurRadius: 6,
+                        color: const Color(0xFFD97706).withOpacity(0.25),
+                        blurRadius: 5,
                         offset: const Offset(0, 2),
                       ),
                     ],
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Icon(
-                      Icons.card_giftcard_rounded,
-                      color: Color(0xFFE53935),
-                      size: 24,
+                      isLocked ? Icons.lock_outline_rounded : Icons.card_giftcard_rounded,
+                      color: const Color(0xFFB45309),
+                      size: 17 * scale,
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-
-                // Center Text (Title & Subtitle)
+                SizedBox(width: 8 * scale),
+                // Text content — expands to fill
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
-                        'Invite Friends, Earn Rewards!',
+                      Text(
+                        'Invite Friends & Earn ₹50!',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12 * scale,
                           fontWeight: FontWeight.w900,
-                          color: Color(0xFF1E293B),
+                          color: Colors.white,
                           height: 1.2,
+                          letterSpacing: -0.2,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 3),
-                      const Text(
-                        'You & your friend both get ₹50 on your first order.',
+                      SizedBox(height: 2 * scale),
+                      Text(
+                        isLocked
+                            ? 'Make your 1st order to unlock referral code.'
+                            : 'You & your friend both get ₹50 on first order.',
                         style: TextStyle(
-                          fontSize: 10.5,
+                          fontSize: 9.5 * scale,
                           fontWeight: FontWeight.w500,
-                          color: Color(0xFF64748B),
+                          color: const Color(0xFFA7F3D0),
                           height: 1.2,
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 10),
-
-                // Right Section (Referral Code + Share Now)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Your Referral Code',
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Dashed-style Pill for Code (Clicking navigates to ReferralScreen)
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const ReferralScreen()),
-                            );
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFF16653A), width: 1),
-                            ),
-                            child: Text(
-                              code,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF16653A),
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-
-                        // Green Share Now Button
-                        GestureDetector(
-                          onTap: () => _shareCode(context, code),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF16653A),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.share, color: Colors.white, size: 12),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Share Now',
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                SizedBox(width: 6 * scale),
+                // CTA button — wraps to fit
+                _buildCta(context, isLoggedIn, isLocked, code, scale),
               ],
             ),
           ),
         );
       },
     );
+  }
+
+  Widget _buildCta(BuildContext ctx, bool isLoggedIn, bool isLocked, String? code, double scale) {
+    if (!isLoggedIn) {
+      return Container(
+        padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 6 * scale),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.10),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.login_rounded, color: const Color(0xFF064E3B), size: 12 * scale),
+            SizedBox(width: 4 * scale),
+            Text(
+              'Login',
+              style: TextStyle(
+                fontSize: 10 * scale,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF064E3B),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (isLocked) {
+      return Container(
+        padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 5 * scale),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFEF3C7), Color(0xFFFDE68A)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white, width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.lock_rounded, color: const Color(0xFFB45309), size: 11 * scale),
+            SizedBox(width: 3 * scale),
+            Text(
+              'Unlock',
+              style: TextStyle(
+                fontSize: 10 * scale,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFFB45309),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (code != null) {
+      return Flexible(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 7 * scale, vertical: 4 * scale),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white.withOpacity(0.4), width: 1),
+                ),
+                child: Text(
+                  code,
+                  style: TextStyle(
+                    fontSize: 10 * scale,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: 0.3,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            SizedBox(width: 5 * scale),
+            GestureDetector(
+              onTap: () => _shareCode(ctx, code),
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 4 * scale),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.share_rounded, color: const Color(0xFF064E3B), size: 11 * scale),
+                    SizedBox(width: 3 * scale),
+                    Text(
+                      'Share',
+                      style: TextStyle(
+                        fontSize: 9.5 * scale,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFF064E3B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 
   static Future<void> _shareCode(BuildContext context, String code) async {

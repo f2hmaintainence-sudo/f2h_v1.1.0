@@ -21,6 +21,7 @@ import 'package:f2h_customer/features/notifications/presentation/bloc/notificati
 import 'package:f2h_customer/features/notifications/presentation/screens/notifications_screen.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/referral_screen.dart';
+import 'package:f2h_customer/features/profile/presentation/screens/customer_bills_screen.dart';
 
 // ----------------------------------------------------------
 //  PROFILE SCREEN - Premium farm-market design
@@ -1652,6 +1653,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         referralCode: profile.referralCode,
                                         referralStatus: profile.referralStatus,
                                       ),
+                                    ),
+                                  );
+                                } else {
+                                  _showLoginDrawer(context);
+                                }
+                              },
+                            ),
+                            _divider(),
+                            _menuItem(
+                              Icons.receipt_long_outlined,
+                              'Customer Bills',
+                              const Color(0xFFEDE9FE),
+                              const Color(0xFF7C3AED),
+                              onTap: () {
+                                if (isLoggedIn) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const CustomerBillsScreen(),
                                     ),
                                   );
                                 } else {

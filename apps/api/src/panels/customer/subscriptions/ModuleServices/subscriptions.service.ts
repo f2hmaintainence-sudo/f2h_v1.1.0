@@ -95,6 +95,26 @@ export class SubscriptionsService {
     const paymentMethod = (body.payment_method || 'wallet').toLowerCase();
     const walletBalance = Number(customer.wallet_balance || 0);
 
+    // 1b. Validate against outstanding unpaid bills in customer_bills table
+    const unpaidBillsRes = await this.db.query(
+      `SELECT COUNT(*)::int AS cnt, COALESCE(SUM(due_amount), 0) AS total_due
+       FROM customer_bills
+       WHERE customer_id = $1
+         AND status IN ('unpaid', 'due', 'overdue')
+         AND due_amount > 0`,
+      [customerId],
+    );
+    const unpaidCount = Number(unpaidBillsRes?.[0]?.cnt || 0);
+    const unpaidDue = Number(unpaidBillsRes?.[0]?.total_due || 0);
+
+    if (unpaidCount > 0 && paymentType === 'postpaid') {
+      return {
+        status: false,
+        error_code: 'outstanding_bills_exist',
+        message: `You have ${unpaidCount} unpaid bill(s) totaling ₹${unpaidDue.toFixed(2)} in customer bills. Please clear outstanding bills before placing new postpaid subscriptions.`,
+      };
+    }
+
     // 2. PREPAID validation & wallet deduction
     if (paymentType === 'prepaid') {
       if (paymentMethod === 'wallet') {
@@ -181,9 +201,13 @@ export class SubscriptionsService {
         customerId,
       });
 
-      
-        // Deduct from wallet
-        const newBalance = walletBalance - estimatedTotal;
+        // Deduct from wallet atomically
+        const updateRes = await this.db.query(
+          `UPDATE customers SET wallet_balance = COALESCE(wallet_balance, 0) - $1, updated_at = NOW() WHERE customer_id = $2 RETURNING wallet_balance`,
+          [estimatedTotal, customerId],
+        );
+        const newBalance = Number(updateRes?.[0]?.wallet_balance ?? (walletBalance - estimatedTotal));
+
         this.developer.debug('SubscriptionsService.checkout deducting wallet balance', {
           customerId,
           walletBalance,
@@ -191,22 +215,22 @@ export class SubscriptionsService {
           newBalance,
         });
 
-        await this.db.query(
-          `UPDATE customers SET wallet_balance = $1 WHERE customer_id = $2`,
-          [newBalance, customerId],
-        );
-
         // Record wallet transaction ledger entry
+        const ts = Math.floor(Date.now() / 1000).toString(36);
+        const rnd = Math.floor(Math.random() * 9000 + 1000);
+        const txId = `WT${ts}${rnd}`;
+
         await this.data.insert(
           'customer_wallet_transactions',
           {
+            transaction_id: txId,
             customer_id: customerId,
             transaction_type: 'debit',
             amount: estimatedTotal,
             balance_after: newBalance,
             remarks: 'Subscription prepaid wallet payment',
             reference_type: 'subscription',
-            reference_id: 'PENDING_SUB',
+            reference_id: createResult.subscription_id,
             created_by: customerId,
             created_at: new Date(),
           },
@@ -381,11 +405,11 @@ export class SubscriptionsService {
           body.auto_renew,
           body.auto_renew ? 3 : 0,
           body.notes || 'Created from customer subscription form',
-          {
+          JSON.stringify({
             source: 'customer_app',
             branch_id: branchId,
             custom_dates: body.custom_dates || [],
-          },
+          }),
           customerIdStr,
         ],
       );
@@ -394,18 +418,15 @@ export class SubscriptionsService {
 
       for (let index = 0; index < validItems.length; index += 1) {
         const item = validItems[index];
-        const itemId = this.makeId(`SBI${index + 1}`);
 
         this.developer.debug('SubscriptionsService.create inserting item', {
-          itemId,
           product_variant_id: item.product_variant_id,
           unit_price: item.unit_price,
         });
 
-        await client.query(
+        const itemInsertRes = await client.query(
           `
           INSERT INTO subscription_items (
-            subscription_item_id,
             subscription_id,
             product_variant_id,
             unit_price,
@@ -413,14 +434,12 @@ export class SubscriptionsService {
             coupon_id,
             discount_amount,
             coupon_amount,
-            status,
-            start_date,
-            end_date
+            status
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', $9, $10)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
+          RETURNING id
           `,
           [
-            itemId,
             subscriptionId,
             item.product_variant_id,
             item.unit_price || 0,
@@ -428,10 +447,10 @@ export class SubscriptionsService {
             item.coupon_id || null,
             item.discount_amount || 0,
             item.coupon_amount || 0,
-            body.start_date,
-            body.end_date || null,
           ],
         );
+
+        const itemId = itemInsertRes.rows?.[0]?.id;
 
         await this.insertWeeklySchedule(client, itemId, subscriptionId, item, body);
 
@@ -450,12 +469,12 @@ export class SubscriptionsService {
           [
             subscriptionId,
             itemId,
-            {
+            JSON.stringify({
               product_variant_id: item.product_variant_id,
               schedule_type: body.schedule_type,
               schedules: item.schedules,
               custom_dates: body.custom_dates || [],
-            },
+            }),
             customerIdStr,
           ],
         );

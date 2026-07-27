@@ -4,6 +4,9 @@ import { DeveloperService } from '../../../shared/logger/Developer.service';
 import { NotificationService } from 'src/notifications/notification.service';
 import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
 
+import { FirstOrderDetectorService } from '../../customer/referral/services/first-order-detector.service';
+import { ReferralRewardEngineService } from '../../customer/referral/services/referral-reward-engine.service';
+
 function todayIST(): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Kolkata',
@@ -22,6 +25,8 @@ export class DeliveryManagementService {
     private readonly developer: DeveloperService,
     private readonly notificationService: NotificationService,
     private readonly pushNotificationService: PushNotificationService,
+    private readonly firstOrderDetector: FirstOrderDetectorService,
+    private readonly referralRewardEngine: ReferralRewardEngineService,
   ) { }
 
   private async notifyPartner(partnerId: string, title: string, messageBody: string): Promise<void> {
@@ -548,14 +553,25 @@ export class DeliveryManagementService {
         UPDATE orders
         SET ${updateFields.join(', ')}
         WHERE order_id = $1
-        RETURNING order_id, status
+        RETURNING order_id, customer_id, status
       `;
 
       const rows = await this.db.query(sql, params);
+      const updatedOrder = rows?.[0];
+
+      if (status === 'delivered' && updatedOrder?.customer_id) {
+        try {
+          await this.firstOrderDetector.detectAndMarkFirstOrder(updatedOrder.customer_id, orderId);
+          await this.firstOrderDetector.unlockReferralCode(updatedOrder.customer_id);
+          await this.referralRewardEngine.processReferralReward(updatedOrder.customer_id, orderId);
+        } catch (refErr) {
+          this.developer.error('DeliveryManagementService: Failed to process referral reward', refErr);
+        }
+      }
 
       return {
         status: true,
-        data: rows[0] ?? null,
+        data: updatedOrder ?? null,
         message: `Order ${orderId} status updated to ${status}`,
       };
     } catch (error) {

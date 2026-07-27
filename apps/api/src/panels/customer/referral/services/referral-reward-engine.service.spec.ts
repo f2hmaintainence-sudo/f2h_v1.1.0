@@ -1,67 +1,28 @@
 import { ReferralRewardEngineService } from './referral-reward-engine.service';
 
-/**
- * Step 15 – Testing & QA: Referral Reward Engine
- *
- * Test cases covered:
- * - Reward credited once (pending referral found)
- * - Wallet balance updated (both referrer & referee)
- * - No pending referral → graceful exit
- * - Missing referrer ID
- */
-
-const mockDataService = () => ({
-  query: jest.fn(),
-  queryWithConnection: jest.fn(),
-  update: jest.fn(),
-  insert: jest.fn(),
-  executeTransaction: jest.fn((fn) => fn({})),
-});
-
 describe('ReferralRewardEngineService', () => {
   let service: ReferralRewardEngineService;
-  let dataService: ReturnType<typeof mockDataService>;
+  let mockDataService: any;
+  let mockDatabaseService: any;
+  let mockClient: any;
 
   beforeEach(() => {
-    dataService = mockDataService();
-    service = new ReferralRewardEngineService(dataService as any);
-  });
+    mockClient = {
+      query: jest.fn(),
+      release: jest.fn(),
+    };
+    mockDataService = {
+      insert: jest.fn(),
+      update: jest.fn(),
+    };
+    mockDatabaseService = {
+      getClient: jest.fn().mockResolvedValue(mockClient),
+    };
 
-  // ─── Test Case: Reward credited once ────────────────────────
-  it('should credit ₹50 to both referrer and referee', async () => {
-    // Referee profile
-    dataService.query.mockResolvedValueOnce({
-      data: [{ customer_id: 'C2', phone: '9876543210', referred_by: 'C1', wallet_balance: 100 }],
-    });
-    // Pending referral record
-    dataService.query.mockResolvedValueOnce({
-      data: [{ id: 'REF-001', referrer_id: 'C1', referee_phone: '9876543210', status: 'pending' }],
-    });
-    // Referrer customer (inside transaction via queryWithConnection)
-    dataService.queryWithConnection.mockResolvedValueOnce({
-      data: [{ customer_id: 'C1', wallet_balance: 200 }],
-    });
-    dataService.update.mockResolvedValue({});
-    dataService.insert.mockResolvedValue({});
-
-    const result = await service.processReferralReward('C2', 'ORD-1');
-
-    expect(result.status).toBe(true);
-    expect(result.referrer_new_balance).toBe(250); // 200 + 50
-    expect(result.referee_new_balance).toBe(150);  // 100 + 50
-  });
-
-  // ─── Test Case: No pending referral ─────────────────────────
-  it('should return false if no pending referral exists', async () => {
-    dataService.query
-      .mockResolvedValueOnce({ data: [{ customer_id: 'C3', phone: '1234567890', referred_by: null }] })
-      .mockResolvedValueOnce({ data: [] })  // no by referrer_id
-      .mockResolvedValueOnce({ data: [] }); // no by phone
-
-    const result = await service.processReferralReward('C3', 'ORD-2');
-
-    expect(result.status).toBe(false);
-    expect(result.message).toContain('No pending referral');
+    service = new ReferralRewardEngineService(
+      mockDataService as any,
+      mockDatabaseService as any,
+    );
   });
 
   // ─── Test Case: Invalid customer ID ─────────────────────────
@@ -72,11 +33,75 @@ describe('ReferralRewardEngineService', () => {
 
   // ─── Test Case: Referee not found ───────────────────────────
   it('should return false if referee profile not found', async () => {
-    dataService.query.mockResolvedValueOnce({ data: [] });
+    mockClient.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // SELECT referee customer
+      .mockResolvedValueOnce({}); // COMMIT
 
     const result = await service.processReferralReward('C999', 'ORD-4');
 
     expect(result.status).toBe(false);
     expect(result.message).toContain('Referee profile not found');
+  });
+
+  // ─── Test Case: Reward credited once (Customer to Customer) ─
+  it('should credit ₹50 to both customer referrer and referee inside transaction', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({
+        rows: [{ customer_id: 'C2', phone: '9876543210', referred_by: 'C1', wallet_balance: 100 }],
+      }) // SELECT referee profile
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'REF-001',
+            refer_id: 'REF001',
+            referrer_customer_id: 'C1',
+            referred_customer_id: 'C2',
+            referrer_reward_amount: 50,
+            referred_reward_amount: 50,
+            status: 'pending',
+          },
+        ],
+      }) // SELECT FOR UPDATE referrals
+      .mockResolvedValueOnce({ rows: [] }) // SELECT delivery_partners (not DP)
+      .mockResolvedValueOnce({ rows: [{ wallet_balance: 150 }] }) // UPDATE referrer wallet balance (+50)
+      .mockResolvedValueOnce({}) // INSERT referrer wallet transaction
+      .mockResolvedValueOnce({}) // INSERT referrer notification
+      .mockResolvedValueOnce({}) // INSERT referrer notification recipient
+      .mockResolvedValueOnce({ rows: [{ wallet_balance: 150 }] }) // UPDATE referee wallet balance (+50)
+      .mockResolvedValueOnce({}) // INSERT referee wallet transaction
+      .mockResolvedValueOnce({}) // UPDATE referrals status = 'rewarded'
+      .mockResolvedValueOnce({}) // INSERT referee notification
+      .mockResolvedValueOnce({}) // INSERT referee notification recipient
+      .mockResolvedValueOnce({}); // COMMIT
+
+    const result = await service.processReferralReward('C2', 'ORD-1');
+
+    expect(result.status).toBe(true);
+    expect(result.referrer_reward).toBe(50);
+    expect(result.referee_reward).toBe(50);
+    expect(result.referee_new_balance).toBe(150);
+    expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
+    expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
+    expect(mockClient.release).toHaveBeenCalled();
+  });
+
+  // ─── Test Case: No pending referral ─────────────────────────
+  it('should return false if no eligible pending referral exists', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({
+        rows: [{ customer_id: 'C3', phone: '1234567890', referred_by: null }],
+      }) // SELECT referee
+      .mockResolvedValueOnce({ rows: [] }) // SELECT FOR UPDATE referrals (no pending referral)
+      .mockResolvedValueOnce({}); // COMMIT
+
+    const result = await service.processReferralReward('C3', 'ORD-2');
+
+    expect(result.status).toBe(false);
+    expect(result.message).toContain('No eligible referral record found');
+    expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
+    expect(mockClient.release).toHaveBeenCalled();
   });
 });

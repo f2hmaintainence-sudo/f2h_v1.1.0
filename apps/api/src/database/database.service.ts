@@ -35,6 +35,10 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       connectionTimeoutMillis: 10000,
     });
 
+    this.pool.on('error', (err: Error) => {
+      this.logger.warn(`Unexpected idle client error in pg pool: ${err.message}`);
+    });
+
     this.logger.log('Database pool initialized (PostgreSQL)');
   }
 

@@ -27,11 +27,7 @@ class _WalletScreenState extends State<WalletScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final state = context.read<CustomerSessionCubit>().state;
-      if (state.status == CustomerSessionStatus.initial ||
-          state.status == CustomerSessionStatus.failure) {
-        context.read<CustomerSessionCubit>().bootstrap();
-      }
+      context.read<CustomerSessionCubit>().bootstrap();
     });
   }
 

@@ -717,4 +717,107 @@ export class CustomerOrderController {
       eta_minutes: etaMinutes,
     };
   }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // GET /customer/orders/bills
+  // Returns all bills for the logged-in customer from customer_bills table + orders.
+  // ─────────────────────────────────────────────────────────────────────────────
+  @Get('bills')
+  async getBills(@Req() req: Request) {
+    try {
+      const user = req.user as any;
+      const userId = user?.user_id;
+      const email = user?.email;
+
+      // Resolve customer ID
+      let customerId = userId;
+      if (email || userId) {
+        const cRes = await this.db.query(
+          `SELECT customer_id FROM customers WHERE customer_id = $1 OR (email IS NOT NULL AND email = $2 AND email != '') LIMIT 1`,
+          [userId || '', email || ''],
+        );
+        if (cRes?.[0]?.customer_id) {
+          customerId = cRes[0].customer_id;
+        }
+      }
+
+      if (!customerId) {
+        return { status: true, bills: [] };
+      }
+
+      const bills: any[] = [];
+
+      // 1. Fetch from customer_bills table if table exists
+      try {
+        const billRows = await this.db.query(
+          `SELECT bill_id, bill_type, reference_id, payment_type, payment_method,
+                  billing_from, billing_to, due_date,
+                  subtotal, discount_amount, tax_amount, total_amount,
+                  paid_amount, due_amount, status, remarks, created_at
+           FROM customer_bills
+           WHERE customer_id = $1
+           ORDER BY created_at DESC`,
+          [customerId],
+        );
+        if (billRows && billRows.length > 0) {
+          bills.push(...billRows);
+        }
+      } catch (err) {
+        console.error('getBills: Error querying customer_bills table', err);
+      }
+
+      const existingRefIds = new Set(bills.map(b => b.reference_id).filter(Boolean));
+
+      // 2. Fetch orders to synthesize bills if any orders are missing from customer_bills
+      try {
+        const orderRows = await this.db.query(
+          `SELECT order_id, order_source, payment_status, COALESCE(payment_mode, 'wallet') AS payment_method,
+                  subtotal, discount_amount, total_amount,
+                  status, created_at, scheduled_date
+           FROM orders
+           WHERE customer_id = $1 AND deleted_at IS NULL
+           ORDER BY created_at DESC`,
+          [customerId],
+        );
+
+        if (orderRows && orderRows.length > 0) {
+          for (const ord of orderRows) {
+            if (!existingRefIds.has(ord.order_id)) {
+              const isPaid = (ord.payment_status || '').toLowerCase() === 'paid' || (ord.status || '').toLowerCase() === 'delivered';
+              const total = Number(ord.total_amount || 0);
+              bills.push({
+                bill_id: `BILL_${ord.order_id}`,
+                bill_type: ord.order_source === 'subscription' ? 'subscription' : 'order',
+                reference_id: ord.order_id,
+                payment_type: 'prepaid',
+                payment_method: ord.payment_method || 'wallet',
+                billing_from: ord.scheduled_date || ord.created_at,
+                billing_to: ord.scheduled_date || ord.created_at,
+                due_date: ord.created_at,
+                subtotal: Number(ord.subtotal || total),
+                discount_amount: Number(ord.discount_amount || 0),
+                tax_amount: 0,
+                total_amount: total,
+                paid_amount: isPaid ? total : 0,
+                due_amount: isPaid ? 0 : total,
+                status: isPaid ? 'paid' : (ord.payment_status || 'pending'),
+                remarks: `Order checkout (${ord.order_id})`,
+                created_at: ord.created_at,
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.error('getBills: Error synthesizing bills from orders table', err);
+      }
+
+      // Sort combined by created_at DESC
+      bills.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      return { status: true, bills };
+    } catch (error) {
+      console.error('getBills error', error);
+      return { status: true, bills: [] };
+    }
+  }
 }

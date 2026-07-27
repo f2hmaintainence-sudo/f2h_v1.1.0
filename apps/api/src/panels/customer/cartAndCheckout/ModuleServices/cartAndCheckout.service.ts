@@ -343,20 +343,15 @@ export class CartService {
     const onetimeGroups = new Map<string, OnetimeGroup>();
 
     for (const item of itemsToCheckout) {
-      const productDetails = await this.Data.query('product_variants', {
-        select: ['product_variants.price', 'products.name AS product_name'],
-        joins: [
-          {
-            type: 'left',
-            table: 'products',
-            on: [{ column: 'product_variants.product_id', operator: '=', value: 'products.product_id' }],
-          },
-        ],
-        where: [{ column: 'product_variants.variant_id', operator: '=', value: item.product_variant_id }],
-        limit: 1,
-      });
-      const price = productDetails?.data?.[0]?.price ? Number(productDetails.data[0].price) : 150;
-      const productName = productDetails?.data?.[0]?.product_name || 'Product';
+      const productRows = await this.db.query(
+        `SELECT pv.price, p.name AS product_name
+         FROM product_variants pv
+         LEFT JOIN products p ON pv.product_id = p.product_id
+         WHERE pv.variant_id = $1 LIMIT 1`,
+        [item.product_variant_id],
+      );
+      const price = productRows?.[0]?.price ? Number(productRows[0].price) : 150;
+      const productName = productRows?.[0]?.product_name || 'Product';
       const onetimeItem = item as OnetimeCheckoutItemDto;
       const qty = onetimeItem.onetime_details?.quantity || 1;
       const subtotal = price * qty;
@@ -558,8 +553,13 @@ export class CartService {
     let runningBalance = walletBalance;
     for (const tx of transactions) {
       if (tx.amount > 0) {
-        runningBalance -= tx.amount;
-        // ponytail: compact transaction ID to fit character varying(20) limit
+        // Atomic wallet debit in customers table
+        const updateRes = await this.db.query(
+          `UPDATE customers SET wallet_balance = COALESCE(wallet_balance, 0) - $1, updated_at = NOW() WHERE customer_id = $2 RETURNING wallet_balance`,
+          [tx.amount, customerId],
+        );
+        runningBalance = Number(updateRes?.[0]?.wallet_balance ?? (runningBalance - tx.amount));
+
         const ts = Math.floor(Date.now() / 1000).toString(36);
         const rnd = Math.floor(Math.random() * 9000 + 1000);
         const txId = `WT${ts}${rnd}`;

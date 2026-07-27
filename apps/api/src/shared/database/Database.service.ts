@@ -58,6 +58,10 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       ),
     });
 
+    this.pool.on('error', (err: Error) => {
+      this.logger.warn(`Unexpected idle client error in pg pool: ${err.message}`);
+    });
+
     await this.verifyConnectionWithRetry();
     await this.createRequiredTables();
   }

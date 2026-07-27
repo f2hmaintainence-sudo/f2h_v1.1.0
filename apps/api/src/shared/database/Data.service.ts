@@ -73,6 +73,7 @@ export const AVOID_DELETED_AT = [
   'categories',
   'packaging_types',
   'product_images',
+  'delivery_partner_referral_bonuses',
 ];
 export const AVOID_DATACHANGE_TABLES = [
   'notifications',

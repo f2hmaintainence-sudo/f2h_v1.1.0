@@ -102,6 +102,15 @@ async function bootstrap() {
     },
   });
 
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+    prefix: '/api/v1/uploads/',
+    maxAge: 31536000000, // 1 year in milliseconds
+    setHeaders: (res: any) => {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    },
+  });
+
 
   // Enable Global Validation Pipe
   app.useGlobalPipes(
