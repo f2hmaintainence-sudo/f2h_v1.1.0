@@ -53,6 +53,7 @@ export class CustomersService {
           COALESCE(c.full_name, '') ILIKE $${pIdx} OR 
           COALESCE(c.first_name, '') ILIKE $${pIdx} OR 
           COALESCE(c.last_name, '') ILIKE $${pIdx} OR 
+          COALESCE(c.mobile, '') ILIKE $${pIdx} OR 
           COALESCE(c.phone, '') ILIKE $${pIdx} OR 
           COALESCE(c.email, '') ILIKE $${pIdx}
         )`);
@@ -150,8 +151,8 @@ export class CustomersService {
           COALESCE(c.first_name, '') as first_name,
           COALESCE(c.last_name, '') as last_name,
           COALESCE(NULLIF(c.full_name, ''), (COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, ''))) as full_name,
-          COALESCE(c.phone, '') as phone,
-          '' as alternate_phone,
+          COALESCE(NULLIF(c.mobile, ''), NULLIF(c.phone, ''), '') as phone,
+          COALESCE(c.alternate_mobile, '') as alternate_phone,
           c.email,
           c.gender,
           c.dob,
@@ -358,18 +359,68 @@ export class CustomersService {
       const maxOrderValue = completedOrders.reduce((max, o) => Math.max(max, o.total_amount), 0);
       const totalDiscounts = formattedOrders.reduce((sum, o) => sum + o.discount_amount, 0);
 
-      const billsRes = await this.databaseService.query(
+      // Subscription Orders & Postpaid Ledger Query
+      const subOrdersRes = await this.databaseService.query(
+        `SELECT o.*, s.subscription_number
+         FROM orders o
+         LEFT JOIN subscriptions s ON (s.subscription_id = o.subscription_id OR s.subscription_number = o.subscription_id)
+         WHERE o.customer_id = ?
+           AND (o.subscription_id IS NOT NULL OR o.order_source = 'subscription' OR o.generation_type = 'subscription')
+           AND o.deleted_at IS NULL
+         ORDER BY o.created_at DESC`,
+        [customerId]
+      ).catch(() => []);
+
+      const subOrderIds = subOrdersRes.map(o => o.order_id).filter(Boolean);
+      let subOrderItemsMap: Record<string, any[]> = {};
+      if (subOrderIds.length > 0) {
+        const placeholders = subOrderIds.map(() => '?').join(',');
+        const orderItemsRes = await this.databaseService.query(
+          `SELECT oi.*, COALESCE(pv.name, p.name, 'Subscribed Item') as product_name, pv.name as variant_name
+           FROM order_items oi
+           LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
+           LEFT JOIN products p ON p.product_id = pv.product_id
+           WHERE oi.order_id IN (${placeholders})`,
+          subOrderIds
+        ).catch(() => []);
+
+        orderItemsRes.forEach((item: any) => {
+          if (!subOrderItemsMap[item.order_id]) subOrderItemsMap[item.order_id] = [];
+          subOrderItemsMap[item.order_id].push(item);
+        });
+      }
+
+      const formattedSubOrders = subOrdersRes.map(o => ({
+        ...o,
+        total_amount: Number(o.total_amount || 0),
+        items: subOrderItemsMap[o.order_id] || [],
+      }));
+
+      const subOrdersDue = formattedSubOrders
+        .filter(o => o.payment_status !== 'paid' && o.status !== 'cancelled')
+        .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+
+      const subOrdersTotalBilled = formattedSubOrders
+        .filter(o => o.status !== 'cancelled')
+        .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+
+      const subOrdersPaid = formattedSubOrders
+        .filter(o => o.payment_status === 'paid' && o.status !== 'cancelled')
+        .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+
+      const postpaidLimit = Number(customer.postpaid_credit_limit || 0);
+
+      const billsRes: any[] = await this.databaseService.query(
         `SELECT * FROM customer_bills WHERE customer_id = ? ORDER BY created_at DESC`,
         [customerId]
-      );
+      ).catch(() => []);
 
-      const outstandingDue = billsRes
-        .filter(b => b.status !== 'paid' && b.status !== 'cancelled')
-        .reduce((sum, b) => sum + Number(b.due_amount || 0), 0);
+      const outstandingDue = subOrdersDue > 0
+        ? subOrdersDue
+        : billsRes.filter((b: any) => b.status !== 'paid' && b.status !== 'cancelled').reduce((sum: number, b: any) => sum + Number(b.due_amount || 0), 0);
 
-      const totalCreditGiven = billsRes.reduce((sum, b) => sum + Number(b.total_amount || 0), 0);
-      const totalPostpaidPaid = billsRes.reduce((sum, b) => sum + Number(b.paid_amount || 0), 0);
-      const postpaidLimit = Number(customer.postpaid_credit_limit || 0);
+      const totalCreditGiven = subOrdersTotalBilled || billsRes.reduce((sum: number, b: any) => sum + Number(b.total_amount || 0), 0);
+      const totalPostpaidPaid = subOrdersPaid || billsRes.reduce((sum: number, b: any) => sum + Number(b.paid_amount || 0), 0);
 
       const walletTxns = await this.databaseService.query(
         `SELECT * FROM customer_wallet_transactions WHERE customer_id = ? ORDER BY created_at DESC`,
@@ -636,6 +687,7 @@ export class CustomersService {
               paid_amount: Number(b.paid_amount || 0),
               due_amount: Number(b.due_amount || 0),
             })),
+            subscription_orders: formattedSubOrders,
           },
           wallet_ledger: {
             summary: {

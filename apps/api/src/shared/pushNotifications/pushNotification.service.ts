@@ -5,33 +5,51 @@ import * as admin from 'firebase-admin';
 import * as fs from 'fs';
 import * as path from 'path';
 
+let firebaseInitialized = false;
+
 if (!admin.apps.length) {
-    const serviceAccountPath = path.join(
-        process.cwd(),
-        'src/shared/secrets/firebasepushnotification.json',
-    );
-    const distServiceAccountPath = path.join(
-        process.cwd(),
-        'dist/shared/secrets/firebasepushnotification.json',
-    );
+    try {
+        const serviceAccountPath = path.join(
+            process.cwd(),
+            'src/shared/secrets/firebasepushnotification.json',
+        );
+        const distServiceAccountPath = path.join(
+            process.cwd(),
+            'dist/shared/secrets/firebasepushnotification.json',
+        );
 
-    let finalPath = serviceAccountPath;
-    if (fs.existsSync(distServiceAccountPath)) {
-        finalPath = distServiceAccountPath;
-    }
+        let finalPath = serviceAccountPath;
+        if (fs.existsSync(distServiceAccountPath)) {
+            finalPath = distServiceAccountPath;
+        }
 
-    if (fs.existsSync(finalPath)) {
-        admin.initializeApp({
-            credential: admin.credential.cert(finalPath),
-        });
-    } else {
-        console.error('CRITICAL: Firebase service account key not found!');
+        if (fs.existsSync(finalPath)) {
+            const rawContent = fs.readFileSync(finalPath, 'utf8').trim();
+            if (rawContent && rawContent.startsWith('{')) {
+                const serviceAccount = JSON.parse(rawContent);
+                admin.initializeApp({
+                    credential: admin.credential.cert(serviceAccount),
+                });
+                firebaseInitialized = true;
+            }
+        }
+    } catch (e: any) {
+        console.warn('Firebase push notification initialization warning:', e?.message || e);
     }
+} else {
+    firebaseInitialized = true;
 }
 
 @Injectable()
 export class PushNotificationService {
-    private readonly messaging = admin.messaging();
+    private get messaging() {
+        if (!admin.apps.length) return null;
+        try {
+            return admin.messaging();
+        } catch {
+            return null;
+        }
+    }
 
     constructor(
         private readonly developerService: DeveloperService,
@@ -41,6 +59,10 @@ export class PushNotificationService {
     async sendToMultipleDevices(tokens: string[], title: string, body: string) {
         if (!tokens || tokens.length === 0)
             return { success: false, error: 'No tokens provided' };
+
+        if (!this.messaging) {
+            return { success: false, error: 'Firebase messaging not initialized' };
+        }
 
         const message = {
             notification: { title, body },

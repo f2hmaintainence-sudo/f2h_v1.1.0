@@ -32,26 +32,30 @@ function normalizeStatus(value: unknown): string {
 }
 
 function extractSimpleFilters(query: any): string[] {
+  const result: string[] = [];
+
+  if (query?.status) result.push(String(query.status).toLowerCase());
+  if (query?.statusFilter) result.push(String(query.statusFilter).toLowerCase());
+  if (query?.filter) result.push(String(query.filter).toLowerCase());
+
   const rawFilters = query?.filters;
-
   if (Array.isArray(rawFilters)) {
-    return rawFilters.map((item: any) => String(item).toLowerCase());
-  }
-
-  if (rawFilters && typeof rawFilters === 'object') {
-    return Object.values(rawFilters).map((item: any) =>
-      String(item).toLowerCase(),
+    rawFilters.forEach((item: any) => result.push(String(item).toLowerCase()));
+  } else if (rawFilters && typeof rawFilters === 'object') {
+    Object.values(rawFilters).forEach((item: any) =>
+      result.push(String(item).toLowerCase()),
     );
+  } else if (rawFilters) {
+    result.push(String(rawFilters).toLowerCase());
   }
 
-  if (rawFilters) {
-    return [String(rawFilters).toLowerCase()];
+  for (const [key, value] of Object.entries(query || {})) {
+    if (/^filters\[\d+\]$/.test(key) && value) {
+      result.push(String(value).toLowerCase());
+    }
   }
 
-  return Object.entries(query || {})
-    .filter(([key]) => /^filters\[\d+\]$/.test(key))
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([, value]) => String(value).toLowerCase());
+  return Array.from(new Set(result));
 }
 
 @Injectable()
@@ -62,60 +66,59 @@ export class SubscriptionsTableService {
   ) {}
 
   async getSubscriptionsTable(query: any) {
-  try {
-    const tableFilters = extractFilters(query);
-    const conditions: any[] = [];
+    try {
+      const tableFilters = extractFilters(query);
+      const conditions: any[] = [];
 
-    // Simple filters sent from frontend:
-    // ?filters[0]=active&filters[1]=today
-    const simpleFilters = extractSimpleFilters(query);
+      // Simple filters sent from frontend:
+      const simpleFilters = extractSimpleFilters(query);
 
-    const scheduleType = String(query.schedule_type || '').toLowerCase();
-    const paymentType = String(query.payment_type || '').toLowerCase();
+      const scheduleType = String(query.schedule_type || '').toLowerCase();
+      const paymentType = String(query.payment_type || '').toLowerCase();
 
-    /*
-    |--------------------------------------------------------------------------
-    | Simple Filter Handling
-    |--------------------------------------------------------------------------
-    | Frontend examples:
-    | filters={['active']}
-    | filters={['paused']}
-    | filters={['today']}
-    | filters={['paid']}
-    */
+      // Status filter
+      const statusValues = ['active', 'paused', 'cancelled', 'expired'];
 
-    // Status filter
-    const statusValues = ['active', 'paused', 'cancelled', 'expired'];
+      const status = simpleFilters.find((filter) =>
+        statusValues.includes(filter),
+      );
 
-    const status = simpleFilters.find((filter) =>
-      statusValues.includes(filter),
-    );
+      if (status && status !== 'all') {
+        conditions.push({
+          column: 'subscriptions.status',
+          operator: '=',
+          value: status,
+        });
+      }
 
-    if (status) {
-      conditions.push({
-        column: 'subscriptions.status',
-        operator: '=',
-        value: status,
-      });
-    }
+      // Target date filter for scheduled subscriptions
+      const targetDate = query.targetDate || query.date;
+      if (targetDate) {
+        const dateStr = String(targetDate).slice(0, 10);
+        conditions.push({
+          column: 'subscriptions.start_date',
+          operator: '<=',
+          value: dateStr,
+        });
+      }
 
-    // Today filter
-    if (simpleFilters.includes('today')) {
-      conditions.push({
-        column: 'DATE(subscriptions.created_at)',
-        operator: '=',
-        value: new Date().toISOString().split('T')[0],
-      });
-    }
+      // Today filter
+      if (simpleFilters.includes('today')) {
+        conditions.push({
+          column: 'DATE(subscriptions.created_at)',
+          operator: '=',
+          value: new Date().toISOString().split('T')[0],
+        });
+      }
 
-    // Auto renew enabled
-    if (simpleFilters.includes('auto_renew')) {
-      conditions.push({
-        column: 'subscriptions.auto_renew',
-        operator: '=',
-        value: true,
-      });
-    }
+      // Auto renew enabled
+      if (simpleFilters.includes('auto_renew')) {
+        conditions.push({
+          column: 'subscriptions.auto_renew',
+          operator: '=',
+          value: true,
+        });
+      }
 
     /*
     |--------------------------------------------------------------------------

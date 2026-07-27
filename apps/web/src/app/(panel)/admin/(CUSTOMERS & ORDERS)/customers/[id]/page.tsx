@@ -889,27 +889,80 @@ function ContainersTab({ containerData, customerId, onRefresh }: { containerData
 
 function PostpaidTab({ ledger }: { ledger: any }) {
   if (!ledger) return <div className="text-sm text-gray-500 py-8 text-center bg-gray-50 rounded-xl">No Postpaid Ledger Data Available</div>;
-  const { summary = {}, bills = [] } = ledger;
+  const { summary = {}, bills = [], subscription_orders = [] } = ledger;
+
+  // Calculate current month's subscription bill statement
+  const currentMonthYear = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const currentMonthPrefix = new Date().toISOString().slice(0, 7); // e.g. "2026-07"
+
+  const thisMonthOrders = subscription_orders.filter((o: any) => {
+    const d = o.scheduled_date ? String(o.scheduled_date).slice(0, 7) : (o.created_at ? String(o.created_at).slice(0, 7) : '');
+    return d === currentMonthPrefix;
+  });
+
+  const thisMonthDue = thisMonthOrders
+    .filter((o: any) => String(o.payment_status).toLowerCase() !== 'paid' && String(o.status).toLowerCase() !== 'cancelled')
+    .reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
+
+  const thisMonthBilled = thisMonthOrders
+    .filter((o: any) => String(o.status).toLowerCase() !== 'cancelled')
+    .reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
+
+  const thisMonthPaid = thisMonthOrders
+    .filter((o: any) => String(o.payment_status).toLowerCase() === 'paid' && String(o.status).toLowerCase() !== 'cancelled')
+    .reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
 
   return (
     <div className="space-y-6 font-sans">
+      {/* Current Month Bill Statement Card (Light Theme) */}
+      <div className="bg-gradient-to-r from-emerald-50 via-teal-50/70 to-slate-50 text-slate-900 p-6 rounded-2xl shadow-2xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border border-emerald-200/80">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-extrabold text-emerald-800 uppercase tracking-wider mb-1">
+            <Sparkles size={14} className="text-emerald-600" /> Current Month Statement ({currentMonthYear})
+          </div>
+          <h2 className="text-3xl font-black tracking-tight text-slate-900">
+            ₹{(thisMonthDue > 0 ? thisMonthDue : Number(summary?.current_due || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </h2>
+          <p className="text-xs text-slate-600 font-medium mt-1">
+            {(thisMonthDue > 0 || Number(summary?.current_due || 0) > 0)
+              ? `Current amount customer needs to pay for ${currentMonthYear} subscription orders`
+              : `All subscription charges for ${currentMonthYear} have been fully paid.`}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-4 text-xs font-medium bg-white/90 p-3.5 rounded-xl border border-emerald-100 shadow-2xs">
+          <div>
+            <span className="block text-[10px] text-slate-500 uppercase font-extrabold">Month Billed</span>
+            <span className="font-bold text-slate-900 text-sm">₹{thisMonthBilled.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div className="border-l border-slate-200 pl-4">
+            <span className="block text-[10px] text-slate-500 uppercase font-extrabold">Month Paid</span>
+            <span className="font-bold text-emerald-700 text-sm">₹{thisMonthPaid.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div className="border-l border-slate-200 pl-4">
+            <span className="block text-[10px] text-slate-500 uppercase font-extrabold">Amount To Pay</span>
+            <span className="font-bold text-rose-600 text-sm">₹{thisMonthDue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          </div>
+        </div>
+      </div>
+
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Credit Limit</p>
-          <p className="text-xl font-black text-gray-900">₹{Number(summary?.credit_limit || 0).toLocaleString()}</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Postpaid Credit Limit</p>
+          <p className="text-xl font-black text-gray-900">₹{Number(summary?.credit_limit || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
         </div>
         <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Current Due</p>
-          <p className="text-xl font-black text-rose-600">₹{Number(summary?.current_due || 0).toLocaleString()}</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Outstanding Due</p>
+          <p className="text-xl font-black text-rose-600">₹{Number(summary?.current_due || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
         </div>
         <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Credit Given</p>
-          <p className="text-xl font-black text-blue-600">₹{Number(summary?.total_credit_given || 0).toLocaleString()}</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Subscription Billed Total</p>
+          <p className="text-xl font-black text-blue-600">₹{Number(summary?.total_credit_given || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
         </div>
         <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Paid</p>
-          <p className="text-xl font-black text-emerald-600">₹{Number(summary?.total_paid || 0).toLocaleString()}</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Subscription Paid Total</p>
+          <p className="text-xl font-black text-emerald-600">₹{Number(summary?.total_paid || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
         </div>
       </div>
 
@@ -917,7 +970,7 @@ function PostpaidTab({ ledger }: { ledger: any }) {
       <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs">
         <div className="flex justify-between items-center mb-2 text-xs font-bold text-gray-700">
           <span>Credit Utilization ({Number(summary?.credit_utilization_pct || 0).toFixed(1)}%)</span>
-          <span>₹{Number(summary?.current_due || 0).toLocaleString()} / ₹{Number(summary?.credit_limit || 0).toLocaleString()}</span>
+          <span>₹{Number(summary?.current_due || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / ₹{Number(summary?.credit_limit || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
         </div>
         <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
           <div 
@@ -930,14 +983,14 @@ function PostpaidTab({ ledger }: { ledger: any }) {
         </div>
       </div>
 
-      {/* Bills Table */}
+      {/* Subscription Orders Charges Ledger Table */}
       <div>
         <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-          <CreditCard size={16} className="text-blue-600" /> Postpaid Bills History ({bills.length})
+          <CreditCard size={16} className="text-emerald-600" /> Subscription Postpaid Orders Ledger ({subscription_orders.length})
         </h3>
-        {bills.length === 0 ? (
+        {subscription_orders.length === 0 ? (
           <p className="text-xs text-gray-500 italic py-8 text-center bg-gray-50 rounded-xl border border-gray-100">
-            No postpaid bills generated for this customer yet.
+            No subscription orders recorded for this customer yet.
           </p>
         ) : (
           <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-2xs">
@@ -945,42 +998,60 @@ function PostpaidTab({ ledger }: { ledger: any }) {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
                   <tr>
-                    <th className="text-left px-4 py-3 font-semibold">Bill ID</th>
-                    <th className="text-left px-4 py-3 font-semibold">Period / Date</th>
-                    <th className="text-right px-4 py-3 font-semibold">Total</th>
-                    <th className="text-right px-4 py-3 font-semibold">Paid</th>
-                    <th className="text-right px-4 py-3 font-semibold">Due</th>
-                    <th className="text-center px-4 py-3 font-semibold">Status</th>
+                    <th className="text-left px-4 py-3 font-semibold">Order ID</th>
+                    <th className="text-left px-4 py-3 font-semibold">Sub Ref</th>
+                    <th className="text-left px-4 py-3 font-semibold">Date & Slot</th>
+                    <th className="text-left px-4 py-3 font-semibold">Ordered Subscription Items</th>
+                    <th className="text-right px-4 py-3 font-semibold">Charged Amount</th>
+                    <th className="text-center px-4 py-3 font-semibold">Payment Mode</th>
+                    <th className="text-center px-4 py-3 font-semibold">Payment Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {bills.map((bill: any, i: number) => (
-                    <tr key={i} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 font-bold text-gray-900">
-                        #{bill.bill_id || bill.id}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-600">
-                        {bill.billing_period || (bill.created_at ? new Date(bill.created_at).toLocaleDateString('en-GB') : 'N/A')}
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-gray-900">
-                        ₹{Number(bill.total_amount || 0).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-emerald-600">
-                        ₹{Number(bill.paid_amount || 0).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-rose-600">
-                        ₹{Number(bill.due_amount || 0).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                          bill.status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
-                          bill.status === 'partially_paid' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
-                        }`}>
-                          {bill.status || 'UNPAID'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                <tbody className="divide-y divide-gray-100 text-xs">
+                  {subscription_orders.map((order: any, i: number) => {
+                    const itemsText = order.items && order.items.length > 0
+                      ? order.items.map((it: any) => `${it.product_name || it.variant_name} (${it.quantity || 1})`).join(', ')
+                      : 'Subscription Delivery Item';
+                    
+                    const isPaid = String(order.payment_status).toLowerCase() === 'paid';
+                    const isCancelled = String(order.status).toLowerCase() === 'cancelled';
+
+                    return (
+                      <tr key={i} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3 font-bold text-gray-900 font-mono">
+                          {order.order_id}
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-emerald-700 font-mono">
+                          {order.subscription_number || order.subscription_id || 'Subscription'}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          <span className="block font-bold text-gray-800">
+                            {order.scheduled_date ? String(order.scheduled_date).slice(0, 10) : (order.created_at ? String(order.created_at).slice(0, 10) : '—')}
+                          </span>
+                          <span className="block text-[11px] capitalize text-gray-400">
+                            Slot: {order.delivery_slot || 'Morning'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-800">
+                          {itemsText}
+                        </td>
+                        <td className="px-4 py-3 text-right font-black text-slate-900">
+                          ₹{Number(order.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-4 py-3 text-center uppercase font-bold text-slate-700">
+                          {order.payment_mode || 'Postpaid'}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-block text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase border ${
+                            isCancelled ? 'bg-slate-100 text-slate-600 border-slate-200' :
+                            isPaid ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-rose-100 text-rose-800 border-rose-200'
+                          }`}>
+                            {isCancelled ? 'Cancelled' : isPaid ? 'Paid' : 'Postpaid Due'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
