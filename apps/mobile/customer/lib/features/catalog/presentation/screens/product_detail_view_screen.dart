@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
-import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
-import 'package:f2h_customer/features/catalog/presentation/widgets/product_tile.dart';
+import '../../data/models/product_model.dart';
+import '../widgets/product_tile.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/catalog_bloc.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/catalog_state.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_bloc.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_event.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_state.dart';
-import 'package:f2h_customer/features/catalog/domain/entities/cart/cart_item_entity.dart';
-import 'package:f2h_customer/core/guards/auth_guard.dart';
-import 'package:f2h_customer/features/catalog/presentation/screens/cart_screen.dart';
-import 'package:f2h_customer/core/widgets/custom_button.dart';
-import 'package:f2h_customer/features/catalog/presentation/widgets/cart_widgets.dart';
+import '../bloc/catalog_bloc.dart';
+import '../bloc/catalog_state.dart';
+import '../bloc/cart/cart_bloc.dart';
+import '../bloc/cart/cart_event.dart';
+import '../bloc/cart/cart_state.dart';
+import '../../domain/entities/cart/cart_item_entity.dart';
+import '../../../../core/guards/auth_guard.dart';
+import 'cart_screen.dart';
+import '../../../../core/widgets/custom_button.dart';
+import '../widgets/cart_widgets.dart';
+import '../../../subscription/presentation/widgets/subscription_button.dart';
 
 // ══════════════════════════════════════════════════════════
 //  PRODUCT DETAIL VIEW SCREEN — Blinkit / Zepto Style
@@ -30,7 +31,7 @@ class ProductDetailViewScreen extends StatefulWidget {
 class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
     with SingleTickerProviderStateMixin {
   bool _detailsExpanded = false;
-  final int _selectedRelatedIdx = 0;
+  int _selectedRelatedIdx = 0;
   int _currentImageIndex = 0;
   late final PageController _pageController;
   late final AnimationController _slideCtrl;
@@ -186,7 +187,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.08),
+                                    color: Colors.black.withOpacity(0.08),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -203,25 +204,14 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                           child: CartBtn(),
                         ),
 
-                        // Discount badge
-                        if (false)
+                        // Green subscription banner overlay on product image
+                        if (_selectedVariant.subscriptionPrice != null && _selectedVariant.subscriptionPrice! > 0)
                           Positioned(
                             bottom: 14,
                             left: 16,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF0C831F),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                '$discPct% OFF',
-                                style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white),
-                              ),
+                            child: SubscriptionPriceBadge.full(
+                              subscriptionPrice: _selectedVariant.subscriptionPrice!,
+                              normalPrice: _selectedVariant.price,
                             ),
                           ),
 
@@ -243,7 +233,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                   decoration: BoxDecoration(
                                     color: _currentImageIndex == index
                                         ? const Color(0xFF0C831F)
-                                        : Colors.grey.withValues(alpha: 0.5),
+                                        : Colors.grey.withOpacity(0.5),
                                     borderRadius: BorderRadius.circular(3),
                                   ),
                                 ),
@@ -257,43 +247,6 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
               ),
             ],
           ),
-
-          // ── DELIVERY TIME STRIP ──────────────────────────
-          // Positioned(
-          //   top: MediaQuery.of(context).size.height * 0.44 +
-          //       MediaQuery.of(context).padding.top -
-          //       1,
-          //   left: 0,
-          //   right: 0,
-          //   child: Container(
-          //     color: const Color(0xFF0C831F),
-          //     padding:
-          //         const EdgeInsets.symmetric(horizontal: 20, vertical: 7),
-          //     child: const Row(
-          //       children: [
-          //         Icon(Icons.electric_bolt, color: Colors.white, size: 14),
-          //         SizedBox(width: 4),
-          //         Text(
-          //           '4 MINS delivery',
-          //           style: TextStyle(
-          //               fontSize: 12,
-          //               fontWeight: FontWeight.w800,
-          //               color: Colors.white),
-          //         ),
-          //         Spacer(),
-          //         Icon(Icons.star_rounded, color: Colors.white, size: 14),
-          //         SizedBox(width: 3),
-          //         Text(
-          //           '4.6 (42.7k)',
-          //           style: TextStyle(
-          //               fontSize: 12,
-          //               fontWeight: FontWeight.w700,
-          //               color: Colors.white),
-          //         ),
-          //       ],
-          //     ),
-          //   ),
-          // ),
 
           // ── BOTTOM SLIDING CARD ──────────────────────────
           Positioned(
@@ -336,6 +289,32 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                             style: const TextStyle(
                                 fontSize: 13, color: kTextSub),
                           ),
+                          if (p.isLowStock || p.isOutOfStock || _selectedVariant.isLowStock) ...[
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFEBEE),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFFEF5350)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.warning_amber_rounded, size: 14, color: Color(0xFFD32F2F)),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'LOW STOCK — One-Time Order Unavailable',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFFD32F2F),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 12),
 
                           if (p.allVariants.length > 1) ...[
@@ -350,14 +329,15 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                             ),
                             const SizedBox(height: 8),
                             SizedBox(
-                              height: 58,
+                              height: p.allVariants.any((v) => v.subscriptionPrice != null && v.subscriptionPrice! > 0) ? 84 : 64,
                               child: ListView.separated(
                                 scrollDirection: Axis.horizontal,
                                 itemCount: p.allVariants.length,
-                                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                                separatorBuilder: (_, __) => const SizedBox(width: 10),
                                 itemBuilder: (context, index) {
                                   final v = p.allVariants[index];
                                   final isSel = v.id == _selectedVariant.id;
+                                  final hasSub = v.subscriptionPrice != null && v.subscriptionPrice! > 0;
                                   return GestureDetector(
                                     onTap: () {
                                       setState(() {
@@ -365,42 +345,77 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                       });
                                     },
                                     child: Container(
-                                      width: 104,
+                                      width: 128,
                                       decoration: BoxDecoration(
-                                        color: isSel ? const Color(0xFFFFE600) : Colors.white,
-                                        borderRadius: BorderRadius.circular(10),
+                                        color: isSel ? const Color(0xFFF4FBF7) : Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
-                                          color: isSel ? Colors.black : const Color(0xFFE2E8F0),
-                                          width: isSel ? 1.6 : 1.0,
+                                          color: isSel ? const Color(0xFF0C831F) : const Color(0xFFE2E8F0),
+                                          width: isSel ? 2.0 : 1.0,
                                         ),
-                                        boxShadow: isSel ? const [
+                                        boxShadow: isSel ? [
                                           BoxShadow(
-                                            color: Colors.black12,
-                                            offset: Offset(1, 2),
-                                            blurRadius: 4,
+                                            color: const Color(0xFF0C831F).withOpacity(0.12),
+                                            offset: const Offset(0, 3),
+                                            blurRadius: 6,
                                           ),
                                         ] : null,
                                       ),
                                       child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
-                                          Text(
-                                            v.label,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: isSel ? FontWeight.w900 : FontWeight.w700,
-                                              color: Colors.black,
+                                          Expanded(
+                                            child: Padding(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                              child: Column(
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  Text(
+                                                    v.label,
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight: isSel ? FontWeight.w900 : FontWeight.w700,
+                                                      color: isSel ? const Color(0xFF0C831F) : Colors.black,
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    '₹${v.price.toStringAsFixed(0)}',
+                                                    style: TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight: FontWeight.w900,
+                                                      color: isSel ? const Color(0xFF0C831F) : const Color(0xFF2D3748),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
                                           ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            '₹${v.price.toStringAsFixed(0)}',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w900,
-                                              color: isSel ? Colors.black : const Color(0xFF0C831F),
+                                          if (hasSub)
+                                            Container(
+                                              width: double.infinity,
+                                              padding: const EdgeInsets.symmetric(vertical: 4),
+                                              decoration: const BoxDecoration(
+                                                color: Color(0xFF0C831F),
+                                                borderRadius: BorderRadius.vertical(bottom: Radius.circular(10)),
+                                              ),
+                                              child: Row(
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  const Icon(Icons.sync_rounded, size: 10, color: Colors.white),
+                                                  const SizedBox(width: 3),
+                                                  Text(
+                                                    'Subscribe @ ₹${v.subscriptionPrice!.toStringAsFixed(0)}',
+                                                    style: const TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.w800,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
-                                          ),
                                         ],
                                       ),
                                     ),
@@ -412,36 +427,12 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                           ] else
                             const SizedBox(height: 16),
 
-                          // Price + ADD row
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFFE600),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: Colors.black, width: 1.5),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Colors.black,
-                                      offset: Offset(1.5, 1.5),
-                                      blurRadius: 0,
-                                    ),
-                                  ],
-                                ),
-                                child: Text(
-                                  _selectedVariant.label.isNotEmpty ? '₹${_selectedVariant.price.toStringAsFixed(0)} / ${_selectedVariant.label}' : '₹${_selectedVariant.price.toStringAsFixed(0)}',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                              ),
-                              if (discPct > 0) ...[
-                                const SizedBox(width: 8),
+                          // Discount tag if available
+                          if (discPct > 0) ...[
+                            Row(
+                              children: [
                                 Text(
-                                  '₹${_selectedVariant.originalPrice.toStringAsFixed(0)}',
+                                  'MRP ₹${_selectedVariant.originalPrice.toStringAsFixed(0)}',
                                   style: const TextStyle(
                                     fontSize: 13,
                                     color: kTextSub,
@@ -465,19 +456,28 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                   ),
                                 ),
                               ],
-                              const Spacer(),
-                              _buildAddButton(p),
-                            ],
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+
+                          // 1. ADD TO CART Button (Full Screen Width)
+                          SizedBox(
+                            width: double.infinity,
+                            child: _buildAddButton(p),
                           ),
-                          const SizedBox(height: 4),
-                          if (_selectedVariant.subscriptionPrice != null && _selectedVariant.subscriptionPrice! > 0)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: SubscriptionPriceBadge.full(
-                                subscriptionPrice: _selectedVariant.subscriptionPrice!,
-                                normalPrice: _selectedVariant.price,
+
+                          // 2. Subscription section (Full Screen Width Subscription Button)
+                          if (p.isSubscribable) ...[
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: SubscriptionButton(
+                                product: p,
+                                selectedVariant: _selectedVariant,
+                                isCompact: false,
                               ),
                             ),
+                          ],
                           const SizedBox(height: 16),
 
                           // Divider
@@ -531,16 +531,72 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    'Sourced from locally vetted farms. Pasteurized under strict temperature controls to keep nutrients intact. FSSAI certified and tested for 75+ adulterants.',
+                                    (p.description != null && p.description!.isNotEmpty)
+                                        ? p.description!
+                                        : 'Sourced from locally vetted farms. Pasteurized under strict temperature controls to keep nutrients intact. FSSAI certified and tested for 75+ adulterants.',
                                     style: const TextStyle(
                                         fontSize: 12,
                                         color: kTextSub,
                                         height: 1.5),
                                   ),
+                                  if (p.highlights != null && p.highlights!.isNotEmpty) ...[
+                                    const SizedBox(height: 10),
+                                    const Text(
+                                      'Highlights',
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: kText),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      p.highlights!,
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          color: kTextSub,
+                                          height: 1.4),
+                                    ),
+                                  ],
+                                  if (p.ingredients != null && p.ingredients!.isNotEmpty) ...[
+                                    const SizedBox(height: 10),
+                                    const Text(
+                                      'Ingredients',
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: kText),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      p.ingredients!,
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          color: kTextSub,
+                                          height: 1.4),
+                                    ),
+                                  ],
+                                  if (p.legalInfo != null && p.legalInfo!.isNotEmpty) ...[
+                                    const SizedBox(height: 10),
+                                    const Text(
+                                      'Legal Information',
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: kText),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      p.legalInfo!,
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          color: kTextSub,
+                                          height: 1.4),
+                                    ),
+                                  ],
                                   const SizedBox(height: 10),
-                                  _infoRow('Shelf Life', '2 Days (Refrigerated)'),
-                                  _infoRow('FSSAI', 'Certified · All Clear'),
-                                  _infoRow('Delivery', 'Before 7 AM guaranteed'),
+                                  // _infoRow('Shelf Life', '2 Days (Refrigerated)'),
+                                  // _infoRow('FSSAI', 'Certified · All Clear'),
+                                  // _infoRow('Delivery', 'Before 7 AM guaranteed'),
                                 ],
                               ),
                             ),
@@ -585,11 +641,11 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                           ),
                           const SizedBox(height: 12),
                           SizedBox(
-                            height: 242,
+                            height: 220,
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
                               itemCount: related.length,
-                              separatorBuilder: (_, _) =>
+                              separatorBuilder: (_, __) =>
                                   const SizedBox(width: 10),
                               itemBuilder: (_, i) =>
                                   ProductCardH(related[i]),
@@ -647,7 +703,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
                               itemCount: _reviews.length,
-                              separatorBuilder: (_, _) => const SizedBox(height: 8),
+                              separatorBuilder: (_, __) => const SizedBox(height: 8),
                               itemBuilder: (context, idx) {
                                 final r = _reviews[idx];
                                 final rating = double.tryParse(r['rating']?.toString() ?? '') ?? 0.0;
@@ -733,9 +789,9 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
               Navigator.pushReplacement(
                 context,
                 PageRouteBuilder(
-                  pageBuilder: (_, a, _) =>
+                  pageBuilder: (_, a, __) =>
                       ProductDetailViewScreen(product: stripProducts[i]),
-                  transitionsBuilder: (_, a, _, child) =>
+                  transitionsBuilder: (_, a, __, child) =>
                       FadeTransition(opacity: a, child: child),
                   transitionDuration: const Duration(milliseconds: 200),
                 ),
@@ -757,7 +813,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: kPrimary.withValues(alpha: 0.15),
+                          color: kPrimary.withOpacity(0.15),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         )
@@ -792,7 +848,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
+              color: Colors.black.withOpacity(0.08),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -810,18 +866,10 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
         if (state is CartLoadedState) {
           qty = state.items
               .where((item) => item.productId == p.id && item.variantId == _selectedVariant.id)
-              .fold(0, (sum, item) => sum + (item.purchaseType == 'subscription' ? 1 : (item.quantity ?? 1)));
+              .fold(0, (sum, item) => sum + (item.quantity ?? 1));
         }
 
         void dispatchAdd() {
-          final items = ctx.read<CartBloc>().currentItems;
-          CartItemEntity? matchedItem;
-          try {
-            matchedItem = items.firstWhere((item) => item.productId == p.id && item.variantId == _selectedVariant.id);
-          } catch (_) {}
-
-          final purchaseType = matchedItem?.purchaseType ?? (p.isSubscribable ? 'subscription' : 'onetime');
-          final isSub = purchaseType == 'subscription';
           final variantId = _selectedVariant.id;
           final variantLabel = _selectedVariant.label;
 
@@ -831,11 +879,11 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
             productName: p.name,
             variantName: variantLabel,
             unitPrice: _selectedVariant.price,
-            purchaseType: purchaseType,
-            quantity: !isSub ? 1 : null,
-            schedules: isSub ? [SubscriptionSchedule(day: 0, mQuantity: 1, eQuantity: 0)] : null,
-            deliveryDate: !isSub ? DateTime.now().add(const Duration(days: 1)).toString().split(' ')[0] : null,
-            deliverySlot: !isSub ? 'Morning' : null,
+            purchaseType: 'onetime',
+            quantity: 1,
+            schedules: null,
+            deliveryDate: DateTime.now().add(const Duration(days: 1)).toString().split(' ')[0],
+            deliverySlot: 'Morning',
             imageAsset: p.imageAsset,
             isSubscribable: p.isSubscribable,
             isOneTime: p.isOneTime,
@@ -875,61 +923,73 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
           ctx.read<CartBloc>().add(RemoveFromCartEvent(cartItem));
         }
 
+        final isLowStockOrNoOneTime = !p.isOneTime || p.isLowStock || p.isOutOfStock || _selectedVariant.isLowStock;
+
         if (qty == 0) {
           return SizedBox(
-            width: 120,
-            height: 46,
+            width: double.infinity,
+            height: 48,
             child: ElevatedButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                ctx.runWithAuth(() => showPurchaseOptionsSheet(context, p, selectedVariantId: _selectedVariant.id));
-              },
+              onPressed: isLowStockOrNoOneTime
+                  ? null
+                  : () {
+                      HapticFeedback.lightImpact();
+                      ctx.runWithAuth(() => dispatchAdd());
+                    },
               style: ElevatedButton.styleFrom(
-                backgroundColor: kPrimary,
-                foregroundColor: Colors.white,
+                backgroundColor: isLowStockOrNoOneTime ? const Color(0xFFE0E0E0) : kPrimary,
+                foregroundColor: isLowStockOrNoOneTime ? const Color(0xFF757575) : Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
-              child: const Text(
-                'ADD',
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1),
+              child: Text(
+                isLowStockOrNoOneTime
+                    ? 'LOW STOCK — ONE TIME ORDER UNAVAILABLE'
+                    : 'ADD TO CART — ₹${_selectedVariant.price.toStringAsFixed(0)}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.5,
+                ),
               ),
             ),
           );
         }
         return Container(
-          height: 46,
+          width: double.infinity,
+          height: 48,
           decoration: BoxDecoration(
             color: kPrimary,
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton(
-                icon: const Icon(Icons.remove, color: Colors.white, size: 20),
+                icon: const Icon(Icons.remove, color: Colors.white, size: 22),
                 onPressed: () {
                   HapticFeedback.lightImpact();
                   ctx.runWithAuth(() => dispatchRemove());
                 },
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
               ),
-              Text('$qty',
-                  style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white)),
+              Text(
+                'ADDED ($qty) — ₹${(_selectedVariant.price * qty).toStringAsFixed(0)}',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                ),
+              ),
               IconButton(
-                icon: const Icon(Icons.add, color: Colors.white, size: 20),
+                icon: const Icon(Icons.add, color: Colors.white, size: 22),
                 onPressed: () {
                   HapticFeedback.lightImpact();
                   ctx.runWithAuth(() => dispatchAdd());
                 },
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
               ),
             ],
           ),
@@ -1009,7 +1069,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFFE5A93B).withValues(alpha: 0.35),
+                        color: const Color(0xFFE5A93B).withOpacity(0.35),
                         blurRadius: 12,
                         offset: const Offset(0, 6),
                       ),

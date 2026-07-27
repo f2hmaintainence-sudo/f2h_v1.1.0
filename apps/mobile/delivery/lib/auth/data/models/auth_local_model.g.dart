@@ -15,7 +15,7 @@ extension GetAuthLocalModelCollection on Isar {
 
 const AuthLocalModelSchema = CollectionSchema(
   name: r'AuthLocalModel',
-  id: 6534368418452784128,
+  id: 6534368418452784373,
   properties: {
     r'cachedAt': PropertySchema(
       id: 0,

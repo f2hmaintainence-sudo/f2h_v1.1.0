@@ -71,11 +71,29 @@ export class CatalogShowAddService {
         { label: 'Pack', value: 'pack' },
       ];
 
+      // Fetch active packaging types
+      const packagingTypesResult = await this.dataService.query('packaging_types', {
+        select: ['id', 'name'],
+        where: [
+          { column: 'status', operator: '=', value: 'active' },
+        ],
+        orderBy: 'name',
+        orderDirection: 'ASC',
+      });
+
+      const packagingOptions = [
+        { value: '', label: 'No Returnable Packaging (Disposable)' },
+        ...(packagingTypesResult.data || []).map((pkg: any) => ({
+          value: String(pkg.id),
+          label: pkg.name,
+        })),
+      ];
+
       // =====================================================
       // GENERATE FIELDS
       // =====================================================
 
-      const fields = this.catalogFields(categoryOptions, unitOptions);
+      const fields = this.catalogFields(categoryOptions, packagingOptions);
 
       // =====================================================
       // RESPONSE
@@ -167,12 +185,11 @@ export class CatalogShowAddService {
   /** Shared field definitions — used by both showAdd and showEdit */
   catalogFields(
     categoryOptions: any[] = [],
-    unitOptions: any[] = [],
+    packagingOptions: any[] = [],
   ): FieldDef[] {
     return [
-      { name: 'name', label: 'Product Name', type: 'text', required: true, width: 'third', group: 'Basic Identity', placeholder: 'Enter product name', validation: { minLength: 2, maxLength: 200 }, },
-      { name: 'slug', label: 'URL Slug', type: 'text', required: true, width: 'third', group: 'Basic Identity', placeholder: 'product-url-slug', validation: { minLength: 2, maxLength: 200 }, },
-      { name: 'category_id', label: 'Category', type: 'select', required: true, width: 'third', group: 'Basic Identity', options: categoryOptions, },
+      { name: 'name', label: 'Product Name', type: 'text', required: true, width: 'half', group: 'Basic Identity', placeholder: 'Enter product name', validation: { minLength: 2, maxLength: 200 }, },
+      { name: 'category_id', label: 'Category', type: 'select', required: true, width: 'half', group: 'Basic Identity', options: categoryOptions, },
       { name: 'description', label: 'Description', type: 'textarea', required: false, width: 'half', group: 'Content & Media', placeholder: 'Enter product description', validation: { maxLength: 5000 }, },
       { name: 'highlights', label: 'Highlights', type: 'textarea', required: false, width: 'half', group: 'Content & Media', placeholder: 'Key product highlights', validation: { maxLength: 2000 }, },
       { name: 'ingredients', label: 'Ingredients', type: 'textarea', required: false, width: 'half', group: 'Content & Media', placeholder: 'Product ingredients', validation: { maxLength: 2000 }, },
@@ -181,12 +198,13 @@ export class CatalogShowAddService {
       { name: 'product_image', label: 'Or Upload Primary Image', type: 'file', required: false, width: 'half', group: 'Product Images (Min 1 Mandatory, Max 2)', accept: 'image/png,image/jpeg,image/webp', crop: true, aspectRatio: 1, cropWidth: 800, cropHeight: 800, },
       { name: 'secondary_image_url', label: 'Secondary Image URL (Optional - 2nd Image)', type: 'text', required: false, width: 'half', group: 'Product Images (Min 1 Mandatory, Max 2)', placeholder: 'https://images.unsplash.com/... or /uploads/...', validation: { maxLength: 1000 }, },
       { name: 'secondary_image_file', label: 'Or Upload Secondary Image', type: 'file', required: false, width: 'half', group: 'Product Images (Min 1 Mandatory, Max 2)', accept: 'image/png,image/jpeg,image/webp', crop: true, aspectRatio: 1, cropWidth: 800, cropHeight: 800, },
-      { type: 'select', name: 'unit_type', label: 'Unit Type', required: true, width: 'third', group: 'Units & Rules', options: unitOptions, },
-      { name: 'lift_days', label: 'Lift Days', type: 'number', required: false, width: 'third', group: 'Units & Rules', placeholder: 'Days for subscription lift', validation: { min: 0, max: 365 }, },
-      { name: 'gst_percentage', label: 'GST Percentage', type: 'number', required: false, width: 'third', group: 'Units & Rules', defaultValue: 0, placeholder: '0.00', validation: { min: 0, max: 100 }, },
+      { name: 'lift_days', label: 'Lift Days', type: 'number', required: false, width: 'half', group: 'Units & Rules', placeholder: 'Days for subscription lift', validation: { min: 0, max: 365 }, },
+      { name: 'gst_percentage', label: 'GST Percentage', type: 'number', required: false, width: 'half', group: 'Units & Rules', defaultValue: 0, placeholder: '0.00', validation: { min: 0, max: 100 }, },
+      { name: 'packaging_type_id', label: 'Packaging Type (Returnable)', type: 'select', required: false, width: 'half', group: 'Units & Rules', options: packagingOptions, },
       { name: 'is_subscribable', label: 'Subscribable', type: 'toggle', required: false, width: 'quarter', group: 'Permissions', defaultValue: false, },
       { name: 'is_one_time', label: 'One-time Purchase', type: 'toggle', required: false, width: 'quarter', group: 'Permissions', defaultValue: true, },
       { name: 'is_returnable', label: 'Returnable', type: 'toggle', required: false, width: 'quarter', group: 'Permissions', defaultValue: false, },
+      { name: 'is_out_of_stock', label: 'Out of Stock', type: 'toggle', required: false, width: 'quarter', group: 'Permissions', defaultValue: false, },
       { name: 'is_active', label: 'Active', type: 'toggle', required: false, width: 'quarter', group: 'Permissions', defaultValue: true, },
     ];
   }
@@ -205,24 +223,23 @@ export class CatalogShowAddService {
       { name: 'additional_image_urls', label: 'Additional Image URLs (Optional - Up to 4 more URLs separated by comma/newline)', type: 'textarea', required: false, width: 'full', group: 'Variant Images (Min 1 Mandatory, Max 5)', placeholder: 'https://images.unsplash.com/...\nhttps://images.unsplash.com/...', validation: { maxLength: 4000 }, },
       { name: 'price', label: 'Price', type: 'number', required: true, width: 'half', group: 'Pricing & Value', placeholder: '0.00', validation: { min: 0.01, max: 999999, message: 'Price must be greater than 0' }, },
       { name: 'subscription_price', label: 'Subscription Price', type: 'number', required: false, width: 'half', group: 'Pricing & Value', placeholder: '0.00', validation: { min: 0.01, max: 999999, message: 'Subscription price must be greater than 0' }, },
-      { name: 'unit_value', label: 'Unit Value', type: 'number', required: false, width: 'half', group: 'Pricing & Value', placeholder: 'e.g., 500 for 500ml', validation: { min: 0.01, max: 99999, message: 'Unit value must be greater than 0' }, },
       { name: 'unit_type', label: 'Unit Type', type: 'select', required: false, width: 'half', group: 'Pricing & Value', options: [{ value: 'ltr', label: 'Liters' }, { value: 'ml', label: 'Milliliters' }, { value: 'kg', label: 'Kilograms' }, { value: 'gm', label: 'Grams' }, { value: 'piece', label: 'Pieces' }, { value: 'pack', label: 'Pack' },], },
+      { name: 'unit_value', label: 'Unit Value', type: 'number', required: false, width: 'half', group: 'Pricing & Value', placeholder: 'e.g., 500 for 500ml', validation: { min: 0.01, max: 99999, message: 'Unit value must be greater than 0' }, },
       { name: 'fulfillment_mode', label: 'Fulfillment Mode', type: 'select', required: false, width: 'half', defaultValue: 'prepacked', options: [{ value: 'bulk', label: 'Bulk' }, { value: 'prepacked', label: 'Pre Packed' },], },
-      { name: 'status', label: 'Status', type: 'toggle', required: false, width: 'half', group: 'Management', defaultValue: true, toggleOptions: { onLabel: 'Active', offLabel: 'Inactive', pill: true }, },
-      { name: 'manageable_qty', label: 'Manageable Quantity', type: 'number', required: false, width: 'half', group: 'Management', defaultValue: 0, placeholder: '0', validation: { min: 0, max: 99999 }, },
-      { name: 'sort_order', label: 'Sort Order', type: 'number', required: false, width: 'half', group: 'Management', defaultValue: 0, placeholder: '0', validation: { min: 0, max: 9999 }, },
-      { name: 'is_out_of_stock', label: 'Out of Stock', type: 'toggle', required: false, width: 'half', group: 'Management', defaultValue: false, },
-      { name: 'packaging_type_id', label: 'Packaging Type (Returnable)', type: 'select', required: false, width: 'half', group: 'Management', options: packagingOptions, },
+      { name: 'manageable_qty', label: 'Manageable Quantity', type: 'number', required: false, width: 'third', group: 'Management', defaultValue: 0, placeholder: '0', validation: { min: 0, max: 99999 }, },
+      { name: 'sort_order', label: 'Sort Order', type: 'number', required: false, width: 'third', group: 'Management', defaultValue: 0, placeholder: '0', validation: { min: 0, max: 9999 }, },
+      // { name: 'is_out_of_stock', label: 'Out of Stock', type: 'toggle', required: false, width: 'half', group: 'Management', defaultValue: false, },
+      { name: 'packaging_type_id', label: 'Packaging Type (Returnable)', type: 'select', required: false, width: 'third', group: 'Management', options: packagingOptions, },
+      { name: 'status', label: 'Status', type: 'toggle', required: false, width: 'third', group: 'Management', defaultValue: true, toggleOptions: { onLabel: 'Active', offLabel: 'Inactive', pill: true }, },
+
     ];
   }
 
   /** Category field definitions */
   categoryFields(parentOptions: any[] = []): FieldDef[] {
     return [
-
-      { name: 'name', label: 'Category Name', type: 'text', required: true, width: 'third', group: 'Identity', placeholder: 'Enter category name', validation: { minLength: 2, maxLength: 100 }, },
-      { name: 'slug', label: 'URL Slug', type: 'text', required: true, width: 'third', group: 'Identity', placeholder: 'category-url-slug', validation: { minLength: 2, maxLength: 100 }, },
-      { name: 'parent_id', label: 'Parent Category', type: 'select', required: false, width: 'third', group: 'Identity', options: parentOptions, },
+      { name: 'name', label: 'Category Name', type: 'text', required: true, width: 'half', group: 'Identity', placeholder: 'Enter category name', validation: { minLength: 2, maxLength: 100 }, },
+      { name: 'parent_id', label: 'Parent Category', type: 'select', required: false, width: 'half', group: 'Identity', options: parentOptions, },
       { name: 'description', label: 'Description', type: 'textarea', required: false, width: 'full', group: 'Additional Info', placeholder: 'Enter category description', validation: { maxLength: 1000 }, },
       { name: 'image_url', label: 'Category Image URL (Mandatory - Min 1)', type: 'text', required: false, width: 'half', group: 'Additional Info', placeholder: 'https://images.unsplash.com/... or /uploads/...', validation: { maxLength: 1000 }, },
       { name: 'image', label: 'Or Upload Category Image', type: 'file', required: false, width: 'half', group: 'Additional Info', accept: 'image/png,image/jpeg,image/webp', crop: true, aspectRatio: 1, cropWidth: 800, cropHeight: 800 },

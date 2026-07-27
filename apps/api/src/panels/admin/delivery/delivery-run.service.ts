@@ -39,6 +39,9 @@ interface PartnerInfo {
   current_load: number;
 }
 
+import { FirstOrderDetectorService } from '../../customer/referral/services/first-order-detector.service';
+import { ReferralRewardEngineService } from '../../customer/referral/services/referral-reward-engine.service';
+
 @Injectable()
 export class DeliveryRunService {
   private readonly logger = new Logger(DeliveryRunService.name);
@@ -48,6 +51,8 @@ export class DeliveryRunService {
     private readonly developer: DeveloperService,
     private notificationService: NotificationService,
     private authServices: AuthService,
+    private firstOrderDetector: FirstOrderDetectorService,
+    private referralRewardEngine: ReferralRewardEngineService,
   ) { }
 
   // ────────────────────────────────────────────────
@@ -822,6 +827,19 @@ export class DeliveryRunService {
           `UPDATE orders SET status = 'delivered', delivered_at = NOW(), updated_at = NOW() WHERE order_id = $1`,
           [orderId],
         );
+
+        // Process referral rewards only when order is delivered
+        try {
+          const ordRows = await this.db.query(`SELECT customer_id FROM orders WHERE order_id = $1 LIMIT 1`, [orderId]);
+          const custId = ordRows?.[0]?.customer_id;
+          if (custId) {
+            await this.firstOrderDetector.detectAndMarkFirstOrder(custId, orderId);
+            await this.firstOrderDetector.unlockReferralCode(custId);
+            await this.referralRewardEngine.processReferralReward(custId, orderId);
+          }
+        } catch (refErr) {
+          this.developer.error('DeliveryRunService: Failed to process referral reward on order delivery', refErr);
+        }
       } else if (newStatus === 'failed') {
         await this.db.query(
           `UPDATE orders SET status = 'failed', updated_at = NOW() WHERE order_id = $1`,

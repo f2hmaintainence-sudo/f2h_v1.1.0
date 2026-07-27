@@ -16,8 +16,9 @@ import {
   Users,
   PackageCheck,
 } from 'lucide-react';
+import { getApiBaseUrl } from '@/lib/api-config';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+const API_URL = typeof window !== 'undefined' ? getApiBaseUrl() : 'http://localhost:5001/api/v1';
 
 interface Branch {
   branch_id: string;

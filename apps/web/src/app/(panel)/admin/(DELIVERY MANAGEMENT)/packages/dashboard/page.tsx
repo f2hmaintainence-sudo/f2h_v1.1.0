@@ -55,6 +55,7 @@ export default function ContainersPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [selectedType, setSelectedType] = useState('All');
   const [page, setPage] = useState(1);
   const [adjusting, setAdjusting] = useState<AdjustState | null>(null);
   const [saving, setSaving] = useState(false);
@@ -145,36 +146,77 @@ export default function ContainersPage() {
         </button>
       </div>
 
-      {/* Summary strip */}
-      <div className="rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 px-5 py-4 flex items-center gap-4">
-        <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
-          <Container size={18} className="text-amber-600" />
-        </div>
-        <div>
-          <p className="font-bold text-amber-900 text-base">
-            {total} customer{total !== 1 ? 's' : ''} have returnable containers pending
-          </p>
-          <p className="text-xs text-amber-600 mt-0.5">
-            These are auto-tracked from delivered orders. Delivery partners collect on next visit.
-            Use the Adjust button to manually record returns, damage, or loss.
-          </p>
-        </div>
-      </div>
+      {/* Summary KPI Cards */}
+      {(() => {
+        const totalIssued = rows.reduce((acc, r) => acc + Number(r.issued_quantity || 0), 0);
+        const totalReturned = rows.reduce((acc, r) => acc + Number(r.returned_quantity || 0), 0);
+        const totalPending = rows.reduce((acc, r) => acc + Number(r.pending_count || 0), 0);
+        const totalDamagedLost = rows.reduce((acc, r) => acc + Number(r.damaged_quantity || 0) + Number(r.lost_quantity || 0), 0);
+        const returnRate = totalIssued > 0 ? ((totalReturned / totalIssued) * 100).toFixed(1) : '100.0';
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          className="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-fresh-green/30 focus:border-fresh-green"
-          placeholder="Search by name, phone or container…"
-          value={search}
-          onChange={(e) => onSearch(e.target.value)}
-        />
-        {search && (
-          <button className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" onClick={() => onSearch('')}>
-            <X size={14} />
-          </button>
-        )}
+        return (
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="bg-white p-3.5 rounded-xl border border-gray-100 shadow-2xs">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Issued</p>
+              <p className="text-xl font-black text-gray-900">{totalIssued}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">Containers distributed</p>
+            </div>
+            <div className="bg-white p-3.5 rounded-xl border border-emerald-100 bg-emerald-50/20 shadow-2xs">
+              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Total Returned</p>
+              <p className="text-xl font-black text-emerald-700">{totalReturned}</p>
+              <p className="text-[10px] text-emerald-600/70 mt-0.5">Collected back</p>
+            </div>
+            <div className="bg-white p-3.5 rounded-xl border border-amber-100 bg-amber-50/20 shadow-2xs">
+              <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-1">Pending Return</p>
+              <p className="text-xl font-black text-amber-700">{totalPending}</p>
+              <p className="text-[10px] text-amber-600/70 mt-0.5">With customers</p>
+            </div>
+            <div className="bg-white p-3.5 rounded-xl border border-rose-100 bg-rose-50/20 shadow-2xs">
+              <p className="text-[10px] font-bold text-rose-600 uppercase tracking-wider mb-1">Damaged / Lost</p>
+              <p className="text-xl font-black text-rose-700">{totalDamagedLost}</p>
+              <p className="text-[10px] text-rose-600/70 mt-0.5">Uncollectible</p>
+            </div>
+            <div className="bg-white p-3.5 rounded-xl border border-blue-100 bg-blue-50/20 shadow-2xs col-span-2 sm:col-span-1">
+              <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1">Return Rate</p>
+              <p className="text-xl font-black text-blue-700">{returnRate}%</p>
+              <p className="text-[10px] text-blue-600/70 mt-0.5">Efficiency rating</p>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Filter Toolbar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-gray-100 shadow-2xs">
+        <div className="relative w-full sm:w-80">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-fresh-green/30 focus:border-fresh-green"
+            placeholder="Search by customer name, phone or container…"
+            value={search}
+            onChange={(e) => onSearch(e.target.value)}
+          />
+          {search && (
+            <button className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" onClick={() => onSearch('')}>
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+          {['All', 'Bottle', 'Bucket', 'Can', 'Crate'].map((type) => (
+            <button
+              key={type}
+              onClick={() => setSelectedType(type)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+                selectedType === type
+                  ? 'bg-fresh-green text-white shadow-xs'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {type === 'All' ? 'All Container Types' : `${type}s`}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Table */}
@@ -205,7 +247,9 @@ export default function ContainersPage() {
                   </tr>
                 ))
               )}
-              {!loading && rows.map((row) => (
+              {!loading && rows
+                .filter(r => selectedType === 'All' || (r.container_name || '').toLowerCase().includes(selectedType.toLowerCase()))
+                .map((row) => (
                 <tr key={`${row.customer_id}_${row.container_type_id}`} className="hover:bg-amber-50/40 transition-colors">
                   <td className="px-4 py-3">
                     <div className="font-semibold text-gray-800">{row.customer_name || row.customer_id}</div>

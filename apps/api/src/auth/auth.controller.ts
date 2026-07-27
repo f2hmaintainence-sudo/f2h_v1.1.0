@@ -40,15 +40,15 @@ export class AuthController {
   ) {
     const ip = req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
     const userAgent = req.headers['user-agent'] || 'unknown';
-    // 1. Extract x-client-role strictly from header (ignore any role sent in request body)
-    const rawClientRole = req.headers['x-client-role'];
+    // 1. Extract x-role strictly from header (ignore any role sent in request body)
+    const rawClientRole = req.headers['x-role'];
     const clientRole = typeof rawClientRole === 'string' ? rawClientRole.trim().toUpperCase() : '';
 
-    if (!clientRole || !['CUSTOMER', 'DELIVERY_PARTNER', 'ADMIN'].includes(clientRole)) {
+    if (!clientRole || !['CUSTOMER', 'DELIVERY_PARTNER', 'DELIVERY_BOY', 'ADMIN'].includes(clientRole)) {
       console.log(
-        `[AuthController:login] Login rejected: Missing or invalid x-client-role header: "${rawClientRole}"`,
+        `[AuthController:login] Login rejected: Missing or invalid x-role header: "${rawClientRole}"`,
       );
-      throw new UnauthorizedException('Missing or invalid x-client-role header');
+      throw new UnauthorizedException('Missing or invalid x-role header');
     }
 
     console.log(
@@ -75,7 +75,7 @@ export class AuthController {
         isRoleAllowed = userRole === 'CUSTOMER';
         break;
 
-      case 'DELIVERY_BOY':
+      case 'DELIVERY_PARTNER':
         // Delivery Partner App: only DELIVERY_BOY / DELIVERY_PARTNER users
         isRoleAllowed = userRole === 'DELIVERY_BOY' || userRole === 'DELIVERY_PARTNER';
         break;
@@ -150,8 +150,44 @@ export class AuthController {
   @Public()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  async register(@Body() body: RegisterDto) {
-    return this.authService.register(body);
+  async register(
+    @Body() body: RegisterDto,
+    @Res({ passthrough: true }) res: Response,
+    @Req() req: Request,
+  ) {
+    const regResult = await this.authService.register(body);
+    const ip = req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+
+    const userId = regResult.userId;
+    const roleId = body.role || 'CUSTOMER';
+
+    const { accessToken, refreshToken } = await this.authService.generateTokens(
+      {
+        user_id: userId,
+        email: body.email || null,
+        role_id: roleId,
+      },
+      {
+        fcmToken: body.fcm_token,
+        ipAddress: ip,
+        userAgent,
+      },
+    );
+
+    this.setCookies(res, accessToken, refreshToken);
+
+    return {
+      message: 'Registration successful',
+      user: {
+        user_id: userId,
+        email: body.email,
+        role_id: roleId,
+      },
+      accessToken,
+      refreshToken,
+      token: accessToken,
+    };
   }
 
   @Public()
@@ -161,7 +197,7 @@ export class AuthController {
     @Body() body: { email?: string; phone?: string; identifier?: string },
     @Req() req: Request,
   ) {
-    const rawClientRole = req.headers['x-client-role'];
+    const rawClientRole = req.headers['x-role'];
     const clientRole = typeof rawClientRole === 'string' ? rawClientRole.trim().toUpperCase() : undefined;
     const identifier = body.email || body.phone || body.identifier || '';
     return this.authService.forgotPassword(identifier, clientRole);
@@ -174,7 +210,7 @@ export class AuthController {
     @Body() body: { phone?: string; identifier?: string },
     @Req() req: Request,
   ) {
-    const rawClientRole = req.headers['x-client-role'];
+    const rawClientRole = req.headers['x-role'];
     const clientRole = typeof rawClientRole === 'string' ? rawClientRole.trim().toUpperCase() : undefined;
     const identifier = body.phone || body.identifier || '';
     return this.authService.forgotPassword(identifier, clientRole);
@@ -267,12 +303,14 @@ export class AuthController {
     @Query('code') code: string,
     @Query('fcm_token') fcmToken: string,
     @Query('email') email: string,
+    @Query('role') role: string,
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.authService.googleLogin({
       id_token: code,
       email: email || (code?.includes('@') ? code : 'google_user@f2hfresh.com'),
       fcm_token: fcmToken,
+      role: role,
     });
     this.setCookies(res, result.accessToken, result.refreshToken);
     return result;

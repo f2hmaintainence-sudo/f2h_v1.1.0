@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -23,9 +25,7 @@ import 'package:f2h_delivery/services/mock_data_service.dart';
 import 'package:f2h_delivery/core/app_bootstrap.dart';
 
 class F2HApp extends StatelessWidget {
-  final AuthBootResult? bootResult;
-
-  const F2HApp({super.key, this.bootResult});
+  const F2HApp({super.key});
 
   @override
   Widget build(BuildContext context) => MultiBlocProvider(
@@ -283,22 +283,28 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _locationTrackingService = sl<LocationTrackingService>();
 
     // Foreground notification
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print("Foreground: ${message.notification?.title}");
-    });
+    if (Firebase.apps.isNotEmpty) {
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        print("Foreground: ${message.notification?.title}");
+      });
 
-    // When user taps notification
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) async {
-      final url = message.data['url'];
-      if (url != null) {
-        await launchUrl(Uri.parse(url));
+      // When user taps notification
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) async {
+        final url = message.data['url'];
+        if (url != null) {
+          await launchUrl(Uri.parse(url));
+        }
+      });
+
+      // Get token
+      if (!kIsWeb) {
+        FirebaseMessaging.instance.getToken().then((token) {
+          print("FCM TOKEN: $token");
+        }).catchError((e) {
+          print('Error getting FCM token: $e');
+        });
       }
-    });
-
-    // Get token
-    FirebaseMessaging.instance.getToken().then((token) {
-      print("FCM TOKEN: $token");
-    });
+    }
   }
 
   Future<void> _requestLocationPermission() async {

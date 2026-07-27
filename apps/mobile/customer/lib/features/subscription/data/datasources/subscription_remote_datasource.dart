@@ -1,11 +1,12 @@
 import 'dart:convert';
-import 'package:f2h_customer/core/api/dio_client.dart';
-import 'package:f2h_customer/core/api/api_endpoints.dart';
-import 'package:f2h_customer/features/orders/data/models/order_model.dart';
+import '../../../../core/api/dio_client.dart';
+import '../../../../core/api/api_endpoints.dart';
+import '../../../orders/data/models/order_model.dart';
 
 abstract class SubscriptionRemoteDataSource {
   Future<List<dynamic>> getSubscriptions();
   Future<Map<String, dynamic>> createSubscription(Map<String, dynamic> data);
+  Future<Map<String, dynamic>> checkoutSubscription(Map<String, dynamic> data);
   Future<Map<String, dynamic>> placeOrder(Map<String, dynamic> data);
   Future<List<Order>> getOrders();
   Future<Map<String, dynamic>> pauseSubscription(String subscriptionId, {String? startDate, String? endDate});
@@ -14,6 +15,8 @@ abstract class SubscriptionRemoteDataSource {
   Future<Map<String, dynamic>> cancelSubscriptionItem(String subscriptionItemId);
   Future<Map<String, dynamic>> cancelSubscription(String subscriptionId, {String? cancelReason, String? endDate});
   Future<List<dynamic>> getPauseHistory(String subscriptionId);
+  Future<Map<String, dynamic>> getSubscriptionDetail(String subscriptionId);
+  Future<List<dynamic>> getSubscriptionBills(String subscriptionId);
 }
 
 class SubscriptionRemoteDataSourceImpl implements SubscriptionRemoteDataSource {
@@ -33,6 +36,13 @@ class SubscriptionRemoteDataSourceImpl implements SubscriptionRemoteDataSource {
   Future<Map<String, dynamic>> createSubscription(Map<String, dynamic> data) async {
     await dioClient.fetchCsrfToken();
     final response = await dioClient.dio.post(ApiEndpoints.subscriptions, data: data);
+    return response.data as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> checkoutSubscription(Map<String, dynamic> data) async {
+    await dioClient.fetchCsrfToken();
+    final response = await dioClient.dio.post(ApiEndpoints.subscriptionCheckout, data: data);
     return response.data as Map<String, dynamic>;
   }
 
@@ -125,7 +135,7 @@ class SubscriptionRemoteDataSourceImpl implements SubscriptionRemoteDataSource {
   Future<Map<String, dynamic>> cancelSubscriptionItem(String subscriptionItemId) async {
     await dioClient.fetchCsrfToken();
     final response = await dioClient.dio.post(
-      '${ApiEndpoints.cancelSubscriptionItem}$subscriptionItemId/cancel',
+      '${ApiEndpoints.subscriptions}$subscriptionItemId/cancel',
     );
     return response.data as Map<String, dynamic>;
   }
@@ -152,5 +162,34 @@ class SubscriptionRemoteDataSourceImpl implements SubscriptionRemoteDataSource {
     if (raw is Map && raw['data'] is List) return raw['data'] as List;
     if (raw is List) return raw;
     return [];
+  }
+
+  @override
+  Future<Map<String, dynamic>> getSubscriptionDetail(String subscriptionId) async {
+    try {
+      final response = await dioClient.dio.get(
+        '${ApiEndpoints.subscriptions}/$subscriptionId/detail',
+      );
+      final raw = response.data;
+      if (raw is Map<String, dynamic>) return raw;
+      return {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  @override
+  Future<List<dynamic>> getSubscriptionBills(String subscriptionId) async {
+    try {
+      final response = await dioClient.dio.get(
+        '${ApiEndpoints.subscriptions}/$subscriptionId/bills',
+      );
+      final raw = response.data;
+      if (raw is Map && raw['data'] is List) return raw['data'] as List;
+      if (raw is List) return raw;
+      return [];
+    } catch (e) {
+      return [];
+    }
   }
 }

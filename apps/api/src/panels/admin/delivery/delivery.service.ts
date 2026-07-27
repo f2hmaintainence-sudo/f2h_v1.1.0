@@ -778,4 +778,84 @@ export class DeliveryManagementService {
       throw error;
     }
   }
+
+  async getPartnerPortfolio(id: string) {
+    try {
+      const partnerRows = await this.db.query(
+        `SELECT db.*, b.branch_name
+         FROM delivery_partners db
+         LEFT JOIN branches b ON b.branch_id = db.branch_id
+         WHERE db.delivery_partner_id = $1 OR db.user_id = $1 OR db.id::text = $1`,
+        [id],
+      );
+
+      if (!partnerRows || partnerRows.length === 0) {
+        throw new BadRequestException('Delivery partner not found');
+      }
+
+      const partner = partnerRows[0];
+      const partnerId = partner.delivery_partner_id;
+
+      const orders = await this.db.query(
+        `SELECT o.order_id, o.customer_id, c.full_name as customer_name, o.total_amount, o.status, o.delivery_slot, o.created_at, o.scheduled_date
+         FROM orders o
+         LEFT JOIN customers c ON c.customer_id = o.customer_id
+         WHERE o.delivery_partner_id = $1 OR o.delivery_partner_id = $2
+         ORDER BY o.created_at DESC
+         LIMIT 20`,
+        [partnerId, partner.user_id || partnerId],
+      ).catch(() => []);
+
+      const docs = await this.db.query(
+        `SELECT * FROM delivery_partner_documents WHERE delivery_partner_id = $1 OR delivery_partner_id = $2`,
+        [partnerId, partner.user_id || partnerId],
+      ).catch(() => []);
+
+      const banks = await this.db.query(
+        `SELECT * FROM delivery_partner_bank_accounts WHERE delivery_partner_id = $1 OR delivery_partner_id = $2`,
+        [partnerId, partner.user_id || partnerId],
+      ).catch(() => []);
+
+      const vehicles = await this.db.query(
+        `SELECT * FROM delivery_partner_vehicles WHERE delivery_partner_id = $1 OR delivery_partner_id = $2`,
+        [partnerId, partner.user_id || partnerId],
+      ).catch(() => []);
+
+      const completedOrders = (orders || []).filter((o: any) => o.status === 'delivered');
+      const totalDelivered = completedOrders.length;
+      const totalAssigned = (orders || []).length;
+
+      return {
+        status: true,
+        data: {
+          partner: {
+            ...partner,
+            full_name: partner.full_name || 'Delivery Partner',
+            phone: partner.phone || 'N/A',
+            email: partner.email || 'N/A',
+            daily_salary: Number(partner.daily_salary || 0),
+            average_rating: Number(partner.average_rating || 5.0),
+            total_deliveries: Number(partner.total_deliveries || totalDelivered),
+          },
+          stats: {
+            total_assigned: totalAssigned,
+            total_delivered: totalDelivered,
+            active_runs: Number(partner.total_runs || 0),
+            daily_salary: Number(partner.daily_salary || 0),
+            rating: Number(partner.average_rating || 5.0),
+            is_active: partner.is_active || false,
+            is_verified: partner.is_verified || false,
+          },
+          orders: orders || [],
+          documents: docs || [],
+          bank_accounts: banks || [],
+          vehicles: vehicles || [],
+        },
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      this.developer.error('getPartnerPortfolio error', { error, id });
+      throw new InternalServerErrorException('Failed to fetch delivery partner portfolio');
+    }
+  }
 }

@@ -16,6 +16,7 @@ class OtpScreen extends StatefulWidget {
   final String email;
   final String phone;
   final String password;
+  final String? referralCode;
 
   const OtpScreen({
     super.key,
@@ -23,6 +24,7 @@ class OtpScreen extends StatefulWidget {
     required this.email,
     required this.phone,
     required this.password,
+    this.referralCode,
   });
 
   @override
@@ -64,6 +66,7 @@ class _OtpScreenState extends State<OtpScreen> {
               phone: widget.phone,
               password: widget.password,
               verificationToken: token,
+              referralCode: widget.referralCode,
             ),
           );
     } catch (e) {

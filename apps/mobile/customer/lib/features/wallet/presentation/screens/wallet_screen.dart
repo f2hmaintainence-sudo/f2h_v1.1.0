@@ -231,9 +231,13 @@ class _WalletScreenState extends State<WalletScreen> {
           child: BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
             builder: (context, state) {
               final profile = state.profile;
+              final pBal = profile?.walletBalance ?? 0.0;
+              final wBal = double.tryParse(state.wallet['balance']?.toString() ?? '') ?? 0.0;
+              final balanceToDisplay = (pBal > wBal ? pBal : wBal);
+
               return _buildBalanceCard(
                 context,
-                double.tryParse((profile?.walletBalance ?? 0).toString()) ?? 0,
+                balanceToDisplay,
                 isLoading: state.status == CustomerSessionStatus.loading,
               );
             },

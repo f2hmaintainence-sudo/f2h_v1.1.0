@@ -47,14 +47,18 @@ class ApiClient {
   private errorInterceptors: ErrorInterceptor[] = [];
 
   private getBaseUrl(): string {
+    // If we're on the server (SSR/RSC), use the internal Docker network name
+    if (typeof window === 'undefined') {
+      return process.env.INTERNAL_API_URL || 'http://api:5001/api/v1';
+    }
+
+    // If we're on the client (Browser), use the public URL
     if (process.env.NEXT_PUBLIC_API_URL) {
       const raw = process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '');
       return raw.endsWith('/api/v1') ? raw : `${raw}/api/v1`;
     }
-    if (typeof window !== 'undefined') {
-      return `${window.location.origin}/api/v1`;
-    }
-    return 'http://127.0.0.1:5001/api/v1';
+
+    return `${window.location.origin}/api/v1`;
   }
 
   constructor() {
@@ -158,7 +162,7 @@ class ApiClient {
       url,
       headers: {
         'Content-Type': 'application/json',
-        'x-client-role': 'ADMIN',
+        'x-role': 'A',
         ...options.headers,
       },
       credentials: 'include', // SECURITY: Always include credentials for httpOnly cookies

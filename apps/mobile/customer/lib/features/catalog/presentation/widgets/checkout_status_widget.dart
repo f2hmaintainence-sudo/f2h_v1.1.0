@@ -11,7 +11,7 @@ class CheckoutStatusWidget extends StatelessWidget {
 
   const CheckoutStatusWidget({
     super.key,
-    required this.isSubscription,
+    this.isSubscription = false,
     required this.status,
     this.deliveryAddress,
     this.orderId,

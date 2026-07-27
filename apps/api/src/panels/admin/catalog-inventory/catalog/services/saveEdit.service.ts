@@ -65,47 +65,21 @@ export class CatalogSaveEditService {
     secondaryUrl?: string,
     adminId: string = '1',
   ) {
-    const urlsToProcess: string[] = [];
+    let fileUrl: string | null = null;
 
     if (primaryUrl && primaryUrl.trim()) {
-      urlsToProcess.push(primaryUrl.trim());
+      fileUrl = primaryUrl.trim();
     } else if (primaryImage?.url) {
-      urlsToProcess.push(primaryImage.url);
+      fileUrl = primaryImage.url;
     } else if (primaryImage?.dataUrl) {
-      urlsToProcess.push(saveImageUpload(primaryImage.dataUrl, `products/${productId}`));
+      fileUrl = saveImageUpload(primaryImage.dataUrl, 'products');
     }
 
-    if (secondaryUrl && secondaryUrl.trim()) {
-      urlsToProcess.push(secondaryUrl.trim());
-    } else if (secondaryImage?.url) {
-      urlsToProcess.push(secondaryImage.url);
-    } else if (secondaryImage?.dataUrl) {
-      urlsToProcess.push(saveImageUpload(secondaryImage.dataUrl, `products/${productId}`));
-    }
-
-    const finalUrls = Array.from(new Set(urlsToProcess)).slice(0, 2);
-
-    if (finalUrls.length > 0) {
-      const primaryUrlStr = finalUrls[0];
+    if (fileUrl) {
       await this.dataService.query(
-        `UPDATE products SET image_url = $1, image_path = $1, images = $2::jsonb WHERE product_id = $3`,
-        [primaryUrlStr, JSON.stringify(finalUrls), productId],
+        `UPDATE products SET image_path = $1 WHERE product_id = $2`,
+        [fileUrl, productId],
       );
-
-      for (const [index, fileUrl] of finalUrls.entries()) {
-        await this.dataService.insert('product_images', {
-          product_id: productId,
-          url: fileUrl,
-          storage_key: `db/products/${productId}/image_${index}`,
-          alt_text: String(productName || 'Product image').slice(0, 255),
-          width: 800,
-          height: 800,
-          sort_order: index,
-          is_primary: index === 0,
-          created_by: String(adminId),
-          updated_by: String(adminId),
-        });
-      }
     }
   }
 
@@ -133,10 +107,16 @@ export class CatalogSaveEditService {
       const imageArray = Array.isArray(images) ? images : [images];
       for (const image of imageArray) {
         if (!image) continue;
-        if (image.url) {
+        if (typeof image === 'string') {
+          if (image.startsWith('data:image')) {
+            urlsToProcess.push(saveImageUpload(image, 'variants'));
+          } else if (image.trim()) {
+            urlsToProcess.push(image.trim());
+          }
+        } else if (image.url) {
           urlsToProcess.push(image.url);
         } else if (image.dataUrl) {
-          const fileUrl = saveImageUpload(image.dataUrl, `products/${productId}`);
+          const fileUrl = saveImageUpload(image.dataUrl, 'variants');
           urlsToProcess.push(fileUrl);
         }
       }
@@ -145,10 +125,9 @@ export class CatalogSaveEditService {
     const finalUrls = Array.from(new Set(urlsToProcess)).slice(0, 5);
 
     if (finalUrls.length > 0) {
-      const firstImage = finalUrls[0];
       await this.dataService.query(
-        `UPDATE product_variants SET image_url = $1, image_path = $1 WHERE variant_id = $2`,
-        [firstImage, variantId],
+        `DELETE FROM product_images WHERE variant_id = $1`,
+        [variantId],
       );
 
       for (const [index, fileUrl] of finalUrls.entries()) {
@@ -156,7 +135,7 @@ export class CatalogSaveEditService {
           product_id: productId,
           variant_id: variantId,
           url: fileUrl,
-          storage_key: `db/products/${productId}/variant_${index}`,
+          storage_key: `variants/${fileUrl.split('/').pop()}`,
           alt_text: String(variantName || 'Variant image').slice(0, 255),
           width: 800,
           height: 800,
@@ -179,6 +158,7 @@ export class CatalogSaveEditService {
         'is_subscribable',
         'is_one_time',
         'is_returnable',
+        'is_out_of_stock',
         'is_active',
       ];
 
@@ -277,6 +257,8 @@ export class CatalogSaveEditService {
         'is_subscribable',
         'is_one_time',
         'is_returnable',
+        'is_out_of_stock',
+        'packaging_type_id',
         'unit_type',
         'lift_days',
         'gst_percentage',
@@ -291,6 +273,12 @@ export class CatalogSaveEditService {
           if (typeof value === 'string') value = value.trim();
           updateData[fieldName] = value;
         }
+      }
+
+      const primaryUrl = body.primary_image_url || body.image_url;
+      if (primaryUrl && primaryUrl.trim()) {
+        updateData.image_url = primaryUrl.trim();
+        updateData.image_path = primaryUrl.trim();
       }
 
       if (Object.keys(updateData).length === 0 && !productImage) {
@@ -310,7 +298,6 @@ export class CatalogSaveEditService {
         }
       }
 
-      const primaryUrl = body.primary_image_url || body.image_url;
       const secondaryUrl = body.secondary_image_url;
       const secondaryImage = body.secondary_image_file ? this.normalizeProductImage(body.secondary_image_file) : undefined;
 
@@ -598,7 +585,7 @@ export class CatalogSaveEditService {
             {
               column: 'id',
               operator: '=',
-              value: id,
+              value: Number(id),
             },
           ],
         });

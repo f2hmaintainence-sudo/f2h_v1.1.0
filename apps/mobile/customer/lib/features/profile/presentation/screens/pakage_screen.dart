@@ -8,6 +8,8 @@ import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
+import 'package:f2h_customer/core/session/customer_session_cubit.dart';
+import 'package:f2h_customer/core/session/customer_session_state.dart';
 import 'package:f2h_customer/features/profile/data/models/container_balance_model.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_screen.dart';
 
@@ -74,7 +76,8 @@ class _ContainerBalanceScreenState extends State<ContainerBalanceScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthBloc>().state;
-    final isLoggedIn = authState is Authenticated;
+    final sessionState = context.watch<CustomerSessionCubit>().state;
+    final isLoggedIn = authState is Authenticated || sessionState.profile != null;
 
     if (!isLoggedIn) {
       return Scaffold(

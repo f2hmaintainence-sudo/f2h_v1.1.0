@@ -8,6 +8,7 @@ abstract class AuthRepository {
     String password, {
     required String phone,
     required String verificationToken,
+    String? referralCode,
     String? fcmToken,
   });
   Future<User> signInWithGoogle({String? fcmToken});

@@ -12,7 +12,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ClipboardCheck, CalendarCheck, Boxes, AlignLeft, TriangleAlert, Users, Package, Truck, BarChart3, Menu, X, ShoppingCart, Wallet, Settings, ClipboardList, UserCog, Shield, RefreshCw, AlertTriangle, PieChart, ChevronDown, MapPin, Banknote, LineChart, BookOpen, Box, Archive, Factory, Clipboard, Building, ArrowRightLeft, Container, CreditCard, FileText, ShieldAlert, Ticket, Percent, Gift, TrendingUp, Bell, Layers, Calendar, AlertOctagon, ShoppingBag, Clock, Orbit, Activity, IndianRupee, Target, Zap, Eye, UserCheck, BarChart, Gauge, CalendarOff, Tag } from "lucide-react";
+import { LayoutDashboard, ClipboardCheck, CalendarCheck, Boxes, AlignLeft, TriangleAlert, Users, Package, Truck, BarChart3, Menu, X, ShoppingCart, Wallet, Settings, ClipboardList, UserCog, Shield, RefreshCw, AlertTriangle, PieChart, ChevronDown, MapPin, Banknote, LineChart, BookOpen, Box, Archive, Factory, Clipboard, Building, Building2, ArrowRightLeft, Container, CreditCard, FileText, ShieldAlert, Ticket, Percent, Gift, TrendingUp, Bell, Layers, Calendar, AlertOctagon, ShoppingBag, Clock, Orbit, Activity, IndianRupee, Target, Zap, Eye, UserCheck, BarChart, Gauge, CalendarOff, Tag } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
 const adminNav = [
@@ -29,6 +29,34 @@ const adminNav = [
     items: [
       { name: "Customers", href: "/admin/customers/allcustomers", icon: Users },
       { name: "Subscriptions", href: "/admin/subscriptions/generate-orders", icon: RefreshCw },
+    ],
+  },
+  {
+    label: "CATALOG & INVENTORY",
+    items: [
+      { name: "Categories", href: "/admin/catalog/categories", icon: Layers },
+      { name: "Products", href: "/admin/catalog/products", icon: Package },
+      { name: "Product Variants", href: "/admin/catalog/variants", icon: Tag },
+      {
+        name: "Inventory",
+        icon: Boxes,
+        subItems: [
+          { name: "Overview", href: "/admin/inventory/overview", icon: BarChart3 },
+          { name: "Production Batches", href: "/admin/inventory/production", icon: Factory },
+          { name: "Reconciliation", href: "/admin/inventory/reconciliation", icon: ClipboardCheck },
+          { name: "Expiry Tracker", href: "/admin/inventory/expiry", icon: Clock },
+          { name: "Stock Forecast", href: "/admin/inventory/forecast", icon: LineChart },
+        ]
+      },
+      {
+        name: "Warehouse",
+        icon: Building,
+        subItems: [
+          { name: "Warehouse Stock", href: "/admin/inventory/warehouse", icon: Building2 },
+          { name: "Warehouse Dispatch", href: "/admin/warehouse/dispatch", icon: Box },
+          { name: "Inter-Warehouse Transfers", href: "/admin/warehouse/transfers", icon: ArrowRightLeft },
+        ]
+      },
     ],
   },
   {

@@ -97,6 +97,7 @@ flutter:
     - assets/icon/
     - assets/bg/
     - assets/splash/
+    - assets/images/
     - shorebird.yaml
 
 

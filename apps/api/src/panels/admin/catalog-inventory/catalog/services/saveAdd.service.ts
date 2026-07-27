@@ -66,47 +66,21 @@ export class CatalogSaveAddService {
     secondaryUrl?: string,
     adminId: string = '1',
   ) {
-    const urlsToProcess: string[] = [];
+    let fileUrl: string | null = null;
 
     if (primaryUrl && primaryUrl.trim()) {
-      urlsToProcess.push(primaryUrl.trim());
+      fileUrl = primaryUrl.trim();
     } else if (primaryImage?.url) {
-      urlsToProcess.push(primaryImage.url);
+      fileUrl = primaryImage.url;
     } else if (primaryImage?.dataUrl) {
-      urlsToProcess.push(saveImageUpload(primaryImage.dataUrl, `products/${productId}`));
+      fileUrl = saveImageUpload(primaryImage.dataUrl, 'products');
     }
 
-    if (secondaryUrl && secondaryUrl.trim()) {
-      urlsToProcess.push(secondaryUrl.trim());
-    } else if (secondaryImage?.url) {
-      urlsToProcess.push(secondaryImage.url);
-    } else if (secondaryImage?.dataUrl) {
-      urlsToProcess.push(saveImageUpload(secondaryImage.dataUrl, `products/${productId}`));
-    }
-
-    const finalUrls = Array.from(new Set(urlsToProcess)).slice(0, 2);
-
-    if (finalUrls.length > 0) {
-      const primaryUrlStr = finalUrls[0];
+    if (fileUrl) {
       await this.dataService.query(
-        `UPDATE products SET image_url = $1, image_path = $1, images = $2::jsonb WHERE product_id = $3`,
-        [primaryUrlStr, JSON.stringify(finalUrls), productId],
+        `UPDATE products SET image_path = $1 WHERE product_id = $2`,
+        [fileUrl, productId],
       );
-
-      for (const [index, fileUrl] of finalUrls.entries()) {
-        await this.dataService.insert('product_images', {
-          product_id: productId,
-          url: fileUrl,
-          storage_key: `db/products/${productId}/image_${index}`,
-          alt_text: String(productName || 'Product image').slice(0, 255),
-          width: 800,
-          height: 800,
-          sort_order: index,
-          is_primary: index === 0,
-          created_by: String(adminId),
-          updated_by: String(adminId),
-        });
-      }
     }
   }
 
@@ -134,10 +108,16 @@ export class CatalogSaveAddService {
       const imageArray = Array.isArray(images) ? images : [images];
       for (const image of imageArray) {
         if (!image) continue;
-        if (image.url) {
+        if (typeof image === 'string') {
+          if (image.startsWith('data:image')) {
+            urlsToProcess.push(saveImageUpload(image, 'variants'));
+          } else if (image.trim()) {
+            urlsToProcess.push(image.trim());
+          }
+        } else if (image.url) {
           urlsToProcess.push(image.url);
         } else if (image.dataUrl) {
-          const fileUrl = saveImageUpload(image.dataUrl, `products/${productId}`);
+          const fileUrl = saveImageUpload(image.dataUrl, 'variants');
           urlsToProcess.push(fileUrl);
         }
       }
@@ -147,10 +127,9 @@ export class CatalogSaveAddService {
     const finalUrls = Array.from(new Set(urlsToProcess)).slice(0, 5);
 
     if (finalUrls.length > 0) {
-      const firstImage = finalUrls[0];
       await this.dataService.query(
-        `UPDATE product_variants SET image_url = $1, image_path = $1 WHERE variant_id = $2`,
-        [firstImage, variantId],
+        `DELETE FROM product_images WHERE variant_id = $1`,
+        [variantId],
       );
 
       for (const [index, fileUrl] of finalUrls.entries()) {
@@ -158,7 +137,7 @@ export class CatalogSaveAddService {
           product_id: productId,
           variant_id: variantId,
           url: fileUrl,
-          storage_key: `db/products/${productId}/variant_${index}`,
+          storage_key: `variants/${fileUrl.split('/').pop()}`,
           alt_text: String(variantName || 'Variant image').slice(0, 255),
           width: 800,
           height: 800,
@@ -189,6 +168,7 @@ export class CatalogSaveAddService {
         'is_subscribable',
         'is_one_time',
         'is_returnable',
+        'is_out_of_stock',
         'is_active',
       ];
 
@@ -197,7 +177,9 @@ export class CatalogSaveAddService {
         is_subscribable: false,
         is_one_time: true,
         is_returnable: false,
+        is_out_of_stock: false,
         gst_percentage: 0,
+        unit_type: 'piece',
       };
 
       // =====================================================
@@ -268,6 +250,10 @@ export class CatalogSaveAddService {
       const productImage = insertData.product_image;
       delete insertData.product_image;
       delete insertData.vendor_id;
+      delete insertData.primary_image_url;
+      delete insertData.secondary_image_url;
+      delete insertData.primary_image_file;
+      delete insertData.secondary_image_file;
 
       // =====================================================
       // 5. REQUIRED FIELD VALIDATION
@@ -284,13 +270,10 @@ export class CatalogSaveAddService {
       }
 
       if (!insertData.slug) {
-        throw new BadRequestException({
-          status: false,
-          message: 'Validation failed',
-          errors: {
-            slug: 'Slug is required',
-          },
-        });
+        insertData.slug = String(insertData.name || 'product')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '') + '-' + Date.now().toString().slice(-4);
       }
 
       if (!insertData.category_id) {
@@ -318,18 +301,8 @@ export class CatalogSaveAddService {
       }
 
       const allowedUnitTypes = ['kg', 'ltr', 'ml', 'gm', 'piece', 'pack'];
-      if (
-        insertData.unit_type !== undefined &&
-        insertData.unit_type !== null &&
-        !allowedUnitTypes.includes(insertData.unit_type)
-      ) {
-        throw new BadRequestException({
-          status: false,
-          message: 'Validation failed',
-          errors: {
-            unit_type: 'Invalid unit type',
-          },
-        });
+      if (!insertData.unit_type || !allowedUnitTypes.includes(insertData.unit_type)) {
+        insertData.unit_type = 'piece';
       }
 
       // =====================================================
@@ -364,9 +337,14 @@ export class CatalogSaveAddService {
 
       // 7. System fields
       insertData.product_id = generateId('PRD', 12);
-
-      insertData.created_by = Number(adminId);
-      insertData.updated_by = Number(adminId);
+      
+      if (!insertData.sku) {
+        insertData.sku = insertData.product_id; // Or generate a new one, but product_id is fine and unique. Let's use generateId('SKU', 10) for clarity
+        insertData.sku = generateId('SKU', 10);
+      }
+      insertData.is_out_of_stock = insertData.is_out_of_stock ?? false;
+      insertData.created_by = String(adminId);
+      insertData.updated_by = String(adminId);
 
       // =====================================================
       // 9. INSERT
@@ -414,6 +392,7 @@ export class CatalogSaveAddService {
         id: newId,
       };
     } catch (error) {
+      console.error('SAVE_PRODUCT_ERROR:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
@@ -672,10 +651,13 @@ export class CatalogSaveAddService {
       insertData.status = insertData.status ?? 'active';
       insertData.manageable_qty = insertData.manageable_qty ?? 0;
       insertData.sort_order = insertData.sort_order ?? 0;
-      insertData.is_out_of_stock = insertData.is_out_of_stock ?? false;
+      
 
       const variantImage = insertData.variant_image;
       delete insertData.variant_image;
+      delete insertData.primary_image_url;
+      delete insertData.additional_image_urls;
+      delete insertData.variant_image_file;
 
       // 6. Insert
       const result = await this.dataService.insert(
@@ -850,6 +832,13 @@ export class CatalogSaveAddService {
       }
 
       // 6. Defaults
+      if (!insertData.slug) {
+        insertData.slug = String(insertData.name || 'category')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '') + '-' + Date.now().toString().slice(-4);
+      }
+
       if (insertData.is_active === undefined) {
         insertData.is_active = true;
       }

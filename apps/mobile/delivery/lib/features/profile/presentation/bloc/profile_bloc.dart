@@ -160,6 +160,13 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       }
     });
 
+    on<ClearProfileMessageEvent>((event, emit) {
+      final currentState = state;
+      if (currentState is ProfileLoaded) {
+        emit(currentState.copyWith(successMessage: null));
+      }
+    });
+
     on<FetchDocumentsEvent>((event, emit) async {
       final currentState = state;
       if (currentState is ProfileLoaded) {

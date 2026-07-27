@@ -1,21 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:f2h_customer/core/errors/error_handler.dart';
-import 'package:f2h_customer/features/catalog/domain/usecases/cart/sync_cart_usecase.dart';
-import 'package:f2h_customer/features/catalog/domain/usecases/cart/get_cart_usecase.dart';
-import 'package:f2h_customer/features/catalog/domain/entities/cart/cart_item_entity.dart';
-import 'package:f2h_customer/features/catalog/domain/entities/cart/cart_calculations_entity.dart';
+import '../../../../../core/errors/error_handler.dart';
+import '../../../domain/usecases/cart/sync_cart_usecase.dart';
+import '../../../domain/usecases/cart/get_cart_usecase.dart';
+import '../../../domain/entities/cart/cart_item_entity.dart';
+import '../../../domain/entities/cart/cart_calculations_entity.dart';
 
-import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_event.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_state.dart';
-import 'package:f2h_customer/core/session/customer_session_cache.dart';
+import '../../../data/models/product_model.dart';
+import 'cart_event.dart';
+import 'cart_state.dart';
+import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 
 class CartBloc extends Bloc<CartEvent, CartState> {
   final SyncCartUseCase syncCartUseCase;
   final GetCartUseCase getCartUseCase;
   List<CartItemEntity> _currentItems = [];
   List<CartItemEntity> get currentItems => _currentItems;
+  String? _cachedCustomerId; // Stored from LoadCartEvent for subsequent syncs
 
   CartBloc({
     required this.syncCartUseCase,
@@ -116,8 +117,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       final currentCalcs1 = state is CartLoadedState ? (state as CartLoadedState).calculations : CartCalculationsEntity(subtotal: 0, deliveryFee: 0, taxes: 0, grandTotal: 0);
       emit(CartLoadedState(items: List.from(_currentItems), calculations: currentCalcs1));
 
-      final cachedSession = await CustomerSessionCache().read();
-      final customerId = cachedSession?.profile?.customerId;
+      final customerId = _cachedCustomerId;
       print('=== [CartBloc] AddToCartEvent, retrieved customerId: $customerId');
 
       final calculations = await syncCartUseCase(_currentItems, customerId: customerId);
@@ -156,8 +156,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       final currentCalcs2 = state is CartLoadedState ? (state as CartLoadedState).calculations : CartCalculationsEntity(subtotal: 0, deliveryFee: 0, taxes: 0, grandTotal: 0);
       emit(CartLoadedState(items: List.from(_currentItems), calculations: currentCalcs2));
 
-      final cachedSession = await CustomerSessionCache().read();
-      final customerId = cachedSession?.profile?.customerId;
+      final customerId = _cachedCustomerId;
       print('=== [CartBloc] RemoveFromCartEvent, retrieved customerId: $customerId');
 
       final calculations = await syncCartUseCase(_currentItems, customerId: customerId);
@@ -189,8 +188,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       final currentCalcs3 = state is CartLoadedState ? (state as CartLoadedState).calculations : CartCalculationsEntity(subtotal: 0, deliveryFee: 0, taxes: 0, grandTotal: 0);
       emit(CartLoadedState(items: List.from(_currentItems), calculations: currentCalcs3));
 
-      final cachedSession = await CustomerSessionCache().read();
-      final customerId = cachedSession?.profile?.customerId;
+      final customerId = _cachedCustomerId;
       print('=== [CartBloc] SyncCartEvent, retrieved customerId: $customerId');
 
       final calculations = await syncCartUseCase(_currentItems, customerId: customerId);
@@ -213,8 +211,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       final currentCalcs4 = state is CartLoadedState ? (state as CartLoadedState).calculations : CartCalculationsEntity(subtotal: 0, deliveryFee: 0, taxes: 0, grandTotal: 0);
       emit(CartLoadedState(items: List.from(_currentItems), calculations: currentCalcs4));
 
-      final cachedSession = await CustomerSessionCache().read();
-      final customerId = cachedSession?.profile?.customerId;
+      final customerId = _cachedCustomerId;
       print('=== [CartBloc] DeleteCartItemEvent, retrieved customerId: $customerId');
 
       final calculations = await syncCartUseCase(_currentItems, customerId: customerId);
@@ -227,6 +224,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
   Future<void> _onLoadCart(LoadCartEvent event, Emitter<CartState> emit) async {
     emit(CartLoadingState());
     try {
+      _cachedCustomerId = event.userId; // Cache for subsequent add/remove/sync/delete ops
       final result = await getCartUseCase(event.userId);
       print('=== [CartBloc] LoadCartEvent success. Fetched ${result.items.length} items. Details:');
       for (var i = 0; i < result.items.length; i++) {
@@ -273,7 +271,12 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       emit(CartLoadedState(items: _currentItems, calculations: result.calculations));
     } catch (e) {
       print('=== [CartBloc] Error loading cart from backend: $e');
-      emit(CartErrorState(extractErrorMessage(e)));
+      final errMsg = extractErrorMessage(e);
+      if (errMsg.toLowerCase().contains('unauthorized') || errMsg.contains('401')) {
+        emit(CartLoadedState(items: _currentItems));
+      } else {
+        emit(CartErrorState(errMsg));
+      }
     }
   }
 

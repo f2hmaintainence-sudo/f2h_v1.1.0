@@ -1,4 +1,4 @@
-import 'package:f2h_customer/core/utils/extensions.dart';
+import '../../../../core/utils/extensions.dart';
 
 String? _asString(dynamic value) {
   if (value == null) return null;
@@ -42,6 +42,55 @@ String _emojiForProduct(String name) {
   return '📦';
 }
 
+class DayQty {
+  final String dayName;
+  final int quantity;
+  final int morningQty;
+  final int eveningQty;
+
+  const DayQty({
+    required this.dayName,
+    required this.quantity,
+    this.morningQty = 0,
+    this.eveningQty = 0,
+  });
+
+  String get formattedText => '$dayName $quantity';
+}
+
+class SubscriptionDetailInfo {
+  final double walletBalance;
+  final double nextRenewalEstimate;
+  final int outstandingBillCount;
+  final double outstandingAmount;
+  final bool alertLowBalance;
+  final bool alertOutstandingBills;
+  final List<SubscriptionBillModel> latestBills;
+
+  const SubscriptionDetailInfo({
+    this.walletBalance = 0,
+    this.nextRenewalEstimate = 0,
+    this.outstandingBillCount = 0,
+    this.outstandingAmount = 0,
+    this.alertLowBalance = false,
+    this.alertOutstandingBills = false,
+    this.latestBills = const [],
+  });
+
+  factory SubscriptionDetailInfo.fromJson(Map<String, dynamic> json) {
+    final rawBills = _asListOfMaps(json['latest_bills']);
+    return SubscriptionDetailInfo(
+      walletBalance: _asDouble(json['wallet_balance']),
+      nextRenewalEstimate: _asDouble(json['next_renewal_estimate']),
+      outstandingBillCount: _asInt(json['outstanding_bill_count']),
+      outstandingAmount: _asDouble(json['outstanding_amount']),
+      alertLowBalance: _isTruthy(json['alert_low_balance']),
+      alertOutstandingBills: _isTruthy(json['alert_outstanding_bills']),
+      latestBills: rawBills.map(SubscriptionBillModel.fromJson).toList(),
+    );
+  }
+}
+
 class SubscriptionScheduleModel {
   final String? subscriptionItemId;
   final int dayOfWeek;
@@ -64,9 +113,19 @@ class SubscriptionScheduleModel {
       subscriptionItemId: _asString(
         json['subscription_item_id'] ?? json['subscriptionItemId'],
       ),
-      dayOfWeek: _asInt(json['day_of_week'] ?? json['dayOfWeek']),
-      mQuantity: _asInt(json['m_quantity'] ?? json['mQuantity']),
-      eQuantity: _asInt(json['e_quantity'] ?? json['eQuantity']),
+      dayOfWeek: _asInt(json['day_of_week'] ?? json['dayOfWeek'] ?? json['day']),
+      mQuantity: _asInt(
+        json['m_quantity'] ??
+            json['mQuantity'] ??
+            json['m_qty'] ??
+            json['morning_qty'],
+      ),
+      eQuantity: _asInt(
+        json['e_quantity'] ??
+            json['eQuantity'] ??
+            json['e_qty'] ??
+            json['evening_qty'],
+      ),
       effectiveFrom: _asString(json['effective_from'] ?? json['effectiveFrom']),
       effectiveTo: _asString(json['effective_to'] ?? json['effectiveTo']),
     );
@@ -177,6 +236,98 @@ class SubscriptionPauseModel {
 
   String? get pausedAt => startDate;
   String? get resumedAt => endDate;
+}
+
+class SubscriptionBillItemModel {
+  final String billItemId;
+  final String billId;
+  final String productVariantId;
+  final int quantity;
+  final double unitPrice;
+  final double totalAmount;
+
+  const SubscriptionBillItemModel({
+    required this.billItemId,
+    required this.billId,
+    required this.productVariantId,
+    required this.quantity,
+    required this.unitPrice,
+    required this.totalAmount,
+  });
+
+  factory SubscriptionBillItemModel.fromJson(Map<String, dynamic> json) {
+    return SubscriptionBillItemModel(
+      billItemId: _asString(json['bill_item_id'] ?? json['id']) ?? '',
+      billId: _asString(json['bill_id']) ?? '',
+      productVariantId: _asString(json['product_variant_id']) ?? '',
+      quantity: _asInt(json['quantity']),
+      unitPrice: _asDouble(json['unit_price']),
+      totalAmount: _asDouble(json['total_amount']),
+    );
+  }
+}
+
+class SubscriptionBillModel {
+  final String billId;
+  final String customerId;
+  final String billType;
+  final String referenceId;
+  final String paymentType;
+  final String? billingFrom;
+  final String? billingTo;
+  final String? dueDate;
+  final double subtotal;
+  final double discountAmount;
+  final double taxAmount;
+  final double totalAmount;
+  final double paidAmount;
+  final double dueAmount;
+  final String status;
+  final String? remarks;
+  final List<SubscriptionBillItemModel> items;
+
+  const SubscriptionBillModel({
+    required this.billId,
+    required this.customerId,
+    required this.billType,
+    required this.referenceId,
+    required this.paymentType,
+    this.billingFrom,
+    this.billingTo,
+    this.dueDate,
+    required this.subtotal,
+    required this.discountAmount,
+    required this.taxAmount,
+    required this.totalAmount,
+    required this.paidAmount,
+    required this.dueAmount,
+    required this.status,
+    this.remarks,
+    this.items = const [],
+  });
+
+  factory SubscriptionBillModel.fromJson(Map<String, dynamic> json) {
+    final rawItems = _asListOfMaps(json['items']);
+    return SubscriptionBillModel(
+      billId: _asString(json['bill_id'] ?? json['id']) ?? '',
+      customerId: _asString(json['customer_id']) ?? '',
+      billType: _asString(json['bill_type']) ?? 'subscription',
+      referenceId: _asString(json['reference_id']) ?? '',
+      paymentType: _asString(json['payment_type']) ?? 'prepaid',
+      billingFrom: _asString(json['billing_from']),
+      billingTo: _asString(json['billing_to']),
+      dueDate: _asString(json['due_date']),
+      subtotal: _asDouble(json['subtotal']),
+      discountAmount: _asDouble(json['discount_amount']),
+      taxAmount: _asDouble(json['tax_amount']),
+      totalAmount: _asDouble(json['total_amount']),
+      paidAmount: _asDouble(json['paid_amount']),
+      dueAmount: _asDouble(json['due_amount']),
+      status: _asString(json['status']) ?? 'paid',
+      remarks: _asString(json['remarks']),
+      items: rawItems.map(SubscriptionBillItemModel.fromJson).toList(),
+    );
+  }
 }
 
 class SubscriptionItemModel {
@@ -299,6 +450,8 @@ class Subscription {
   final List<SubscriptionScheduleModel> weeklySchedules;
   final List<SubscriptionCustomDateModel> customDates;
   final List<SubscriptionPauseModel> pauses;
+  final List<SubscriptionBillModel> bills;
+  final Map<String, dynamic>? customerInfo;
 
   final String productName;
   final String vendorName;
@@ -332,6 +485,8 @@ class Subscription {
     this.weeklySchedules = const [],
     this.customDates = const [],
     this.pauses = const [],
+    this.bills = const [],
+    this.customerInfo,
     required this.productName,
     required this.vendorName,
     required this.emoji,
@@ -387,6 +542,85 @@ class Subscription {
   String get displayLabel =>
       subscriptionNumber.isNotEmpty ? subscriptionNumber : id;
 
+  List<DayQty> getSelectedDayQuantities([
+    List<SubscriptionScheduleModel>? itemSchedules,
+  ]) {
+    final schedules = (itemSchedules != null && itemSchedules.isNotEmpty)
+        ? itemSchedules
+        : (weeklySchedules.isNotEmpty
+            ? weeklySchedules
+            : items.expand((i) => i.weeklySchedules).toList());
+
+    const fullDayNames = [
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+    ];
+
+    if (schedules.isNotEmpty) {
+      final Map<int, ({int m, int e})> dayMap = {};
+      for (final sch in schedules) {
+        final dow = sch.dayOfWeek.clamp(0, 6);
+        final current = dayMap[dow] ?? (m: 0, e: 0);
+        dayMap[dow] = (
+          m: current.m + sch.mQuantity,
+          e: current.e + sch.eQuantity
+        );
+      }
+
+      final result = <DayQty>[];
+      final sortedKeys = dayMap.keys.toList()..sort();
+      for (final dow in sortedKeys) {
+        final data = dayMap[dow]!;
+        final total = data.m + data.e;
+        if (total > 0) {
+          result.add(DayQty(
+            dayName: fullDayNames[dow],
+            quantity: total,
+            morningQty: data.m,
+            eveningQty: data.e,
+          ));
+        }
+      }
+      if (result.isNotEmpty) return result;
+    }
+
+    final freq = frequency.toLowerCase();
+    final defaultQty = qty > 0 ? qty : 1;
+
+    if (freq.contains('daily') || freq.contains('everyday')) {
+      return List.generate(
+        7,
+        (i) => DayQty(
+          dayName: fullDayNames[i],
+          quantity: defaultQty,
+        ),
+      );
+    }
+
+    final result = <DayQty>[];
+    for (int i = 0; i < fullDayNames.length; i++) {
+      final fullName = fullDayNames[i];
+      final shortKey = fullName.substring(0, 3).toLowerCase();
+      if (freq.contains(shortKey) || freq.contains(fullName.toLowerCase())) {
+        result.add(DayQty(
+          dayName: fullName,
+          quantity: defaultQty,
+        ));
+      }
+    }
+
+    if (result.isNotEmpty) return result;
+
+    return [
+      DayQty(dayName: 'Everyday', quantity: defaultQty),
+    ];
+  }
+
   factory Subscription.fromJson(Map<String, dynamic> json) {
     final rawItems = _asListOfMaps(json['items']);
     final items = rawItems.map(SubscriptionItemModel.fromJson).toList();
@@ -399,6 +633,14 @@ class Subscription {
     final pauses = _asListOfMaps(
       json['pauses'],
     ).map(SubscriptionPauseModel.fromJson).toList();
+    final bills = _asListOfMaps(
+      json['bills'],
+    ).map(SubscriptionBillModel.fromJson).toList();
+    final customerInfo = json['customer_info'] is Map<String, dynamic>
+        ? json['customer_info'] as Map<String, dynamic>
+        : (json['customer_info'] is Map
+            ? Map<String, dynamic>.from(json['customer_info'])
+            : null);
 
     final normalizedItems = items.isNotEmpty
         ? items
@@ -510,6 +752,8 @@ class Subscription {
       weeklySchedules: weeklySchedules,
       customDates: customDates,
       pauses: pauses,
+      bills: bills,
+      customerInfo: customerInfo,
       productName: productLabel,
       vendorName: vendorLabel,
       emoji: emoji,

@@ -72,11 +72,11 @@ export class CustomerOrderController {
              pv.sku,
              p.name     AS product_name,
              p.product_id,
-             pi.url     AS image_path
+             COALESCE(pi.url, p.image_path) AS image_path
            FROM order_items oi
            LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
            LEFT JOIN products p          ON p.product_id = pv.product_id
-           LEFT JOIN product_images pi   ON pi.variant_id = oi.variant_id
+           LEFT JOIN product_images pi   ON (pi.variant_id = oi.variant_id OR (pi.variant_id IS NULL AND pi.product_id = p.product_id)) AND (pi.is_primary = true OR pi.is_primary IS NULL)
            WHERE oi.order_id IN (${placeholders})`,
           orderIds,
         );
@@ -85,7 +85,7 @@ export class CustomerOrderController {
 
       // Group items by order_id
       const itemsByOrder = new Map<string, any[]>();
-      const baseUrl = process.env.BACKEND_URL || 'http://localhost:8000';
+      const baseUrl = process.env.MOBILE_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:5001';
       const mapImagePath = (imagePath: string | null) => {
         if (!imagePath) return null;
         if (imagePath.startsWith('http')) return imagePath;
@@ -135,90 +135,90 @@ export class CustomerOrderController {
       });
 
       // ── Query 4: Subscriptions + items + product name in one JOIN ─────────
-      const [subRows]: any = await conn.query(
-        `SELECT
-           s.id,
-           s.subscription_number,
-           s.customer_id,
-           s.schedule_type,
-           s.branch_id,
-           s.address_id,
-           s.payment_type,
-           s.billing_cycle,
-           s.start_date,
-           s.end_date,
-           s.auto_renew,
-           s.status,
-           s.pause_from_date,
-           s.pause_to_date,
-           s.created_at,
-           s.updated_at,
-           si.id              AS si_id,
-           si.product_variant_id,
-           si.default_m_quantity,
-           si.default_e_quantity,
-           si.unit_price      AS si_unit_price,
-           si.final_price     AS si_final_price,
-           si.status          AS si_status,
-           pv.name            AS variant_name,
-           pv.sku,
-           p.name             AS product_name,
-           p.product_id
-         FROM subscriptions s
-         LEFT JOIN subscription_items si ON si.subscription_id = s.subscription_id
-         LEFT JOIN product_variants pv   ON pv.variant_id = si.product_variant_id
-         LEFT JOIN products p            ON p.product_id = pv.product_id
-         WHERE s.customer_id = $1
-         ORDER BY s.created_at DESC`,
-        [customerId],
-      );
+      // const [subRows]: any = await conn.query(
+      //   `SELECT
+      //      s.id,
+      //      s.subscription_number,
+      //      s.customer_id,
+      //      s.schedule_type,
+      //      s.branch_id,
+      //      s.address_id,
+      //      s.payment_type,
+      //      s.billing_cycle,
+      //      s.start_date,
+      //      s.end_date,
+      //      s.auto_renew,
+      //      s.status,
+      //      s.pause_from_date,
+      //      s.pause_to_date,
+      //      s.created_at,
+      //      s.updated_at,
+      //      si.id              AS si_id,
+      //      si.product_variant_id,
+      //      si.default_m_quantity,
+      //      si.default_e_quantity,
+      //      si.unit_price      AS si_unit_price,
+      //      si.final_price     AS si_final_price,
+      //      si.status          AS si_status,
+      //      pv.name            AS variant_name,
+      //      pv.sku,
+      //      p.name             AS product_name,
+      //      p.product_id
+      //    FROM subscriptions s
+      //    LEFT JOIN subscription_items si ON si.subscription_id = s.subscription_id
+      //    LEFT JOIN product_variants pv   ON pv.variant_id = si.product_variant_id
+      //    LEFT JOIN products p            ON p.product_id = pv.product_id
+      //    WHERE s.customer_id = $1
+      //    ORDER BY s.created_at DESC`,
+      //   [customerId],
+      // );
 
       // Collapse flat JOIN rows into nested subscription objects
-      const subsMap = new Map<string, any>();
-      for (const row of (subRows || [])) {
-        if (!subsMap.has(row.id)) {
-          subsMap.set(row.id, {
-            id: row.id,
-            subscription_number: row.subscription_number,
-            customer_id: row.customer_id,
-            schedule_type: row.schedule_type,
-            branch_id: row.branch_id,
-            address_id: row.address_id,
-            payment_type: row.payment_type,
-            billing_cycle: row.billing_cycle,
-            start_date: row.start_date,
-            end_date: row.end_date,
-            auto_renew: row.auto_renew,
-            status: row.status,
-            pause_start_date: row.pause_from_date,
-            pause_end_date: row.pause_to_date,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
-            items: [],
-          });
-        }
-        if (row.si_id) {
-          subsMap.get(row.id).items.push({
-            id: row.si_id,
-            subscription_id: row.id,
-            product_variant_id: row.product_variant_id,
-            default_m_quantity: row.default_m_quantity,
-            default_e_quantity: row.default_e_quantity,
-            unit_price: row.si_unit_price,
-            final_price: row.si_final_price,
-            status: row.si_status,
-            variant_name: row.variant_name ?? '',
-            sku: row.sku ?? '',
-            product_name: row.product_name ?? 'Product',
-            product_id: row.product_id,
-          });
-        }
-      }
+      // const subsMap = new Map<string, any>();
+      // for (const row of (subRows || [])) {
+      //   if (!subsMap.has(row.id)) {
+      //     subsMap.set(row.id, {
+      //       id: row.id,
+      //       subscription_number: row.subscription_number,
+      //       customer_id: row.customer_id,
+      //       schedule_type: row.schedule_type,
+      //       branch_id: row.branch_id,
+      //       address_id: row.address_id,
+      //       payment_type: row.payment_type,
+      //       billing_cycle: row.billing_cycle,
+      //       start_date: row.start_date,
+      //       end_date: row.end_date,
+      //       auto_renew: row.auto_renew,
+      //       status: row.status,
+      //       pause_start_date: row.pause_from_date,
+      //       pause_end_date: row.pause_to_date,
+      //       created_at: row.created_at,
+      //       updated_at: row.updated_at,
+      //       items: [],
+      //     });
+      //   }
+      //   if (row.si_id) {
+      //     subsMap.get(row.id).items.push({
+      //       id: row.si_id,
+      //       subscription_id: row.id,
+      //       product_variant_id: row.product_variant_id,
+      //       default_m_quantity: row.default_m_quantity,
+      //       default_e_quantity: row.default_e_quantity,
+      //       unit_price: row.si_unit_price,
+      //       final_price: row.si_final_price,
+      //       status: row.si_status,
+      //       variant_name: row.variant_name ?? '',
+      //       sku: row.sku ?? '',
+      //       product_name: row.product_name ?? 'Product',
+      //       product_id: row.product_id,
+      //     });
+      //   }
+      // }
 
       return {
         status: true,
         orders: formattedOrders,              // includes order_source field; frontend splits
-        subscriptions: Array.from(subsMap.values()),
+        // subscriptions: Array.from(subsMap.values()),
       };
     } finally {
       conn?.release?.();

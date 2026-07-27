@@ -113,6 +113,7 @@ export class NotificationService {
     try {
       // 1. Insert into notifications table
       const notificationData = {
+        id: Date.now() + Math.floor(Math.random() * 1000),
         notification_id: notificationId,
         title: dto.title,
         message: dto.message,
@@ -136,9 +137,10 @@ export class NotificationService {
       }
 
       // 2. Insert recipients into notification_recipients table
-      const recipientData = uniqueRecipients.map((userId) => {
+      const recipientData = uniqueRecipients.map((userId, idx) => {
         const isOnline = !!this.gateway?.isUserOnline?.(userId);
         return {
+          id: Date.now() + idx + Math.floor(Math.random() * 1000),
           notification_id: notificationId,
           user_id: userId,
           html: dto.html || null,

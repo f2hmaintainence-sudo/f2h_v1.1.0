@@ -25,17 +25,17 @@ class AppConfig {
   }
 
   // Dynamic server configurations
-  static String firebaseApiKey = 'AIzaSyDROn5BjA4Dsn_qcdZnqprhQYsElrUXztI';
-  static String firebaseAppId = '1:445665408019:android:c83b72549e1885c959fbe6';
-  static String firebaseMessagingSenderId = '445665408019';
-  static String firebaseProjectId = 'f2hdeliverypartnerapp';
-  static String firebaseStorageBucket = 'f2hdeliverypartnerapp.firebasestorage.app';
+  static String firebaseApiKey = '';
+  static String firebaseAppId = '';
+  static String firebaseMessagingSenderId = '';
+  static String firebaseProjectId = '';
+  static String firebaseStorageBucket = '';
 
-  static String firebaseIosApiKey = 'AIzaSyAtT56n3QZdD7ZFYyXOwVPlFoLEuVkkOFk';
-  static String firebaseIosAppId = '1:445665408019:ios:8b7b36e7cca52b2d59fbe6';
-  static String firebaseIosBundleId = 'com.f2h.delivery';
+  static String firebaseIosApiKey = '';
+  static String firebaseIosAppId = '';
+  static String firebaseIosBundleId = '';
 
-  static String googleServerClientId = '605526160181-00mmui7o3uuijjgvhgjjs5qbldai544g.apps.googleusercontent.com';
+  static String googleServerClientId = '';
   static String googleMapsApiKey = '';
 
   static double maxDeliveryRadiusKm = 15.0;

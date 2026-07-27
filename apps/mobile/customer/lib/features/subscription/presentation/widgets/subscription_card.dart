@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
-import 'package:f2h_customer/core/widgets/hot_toast.dart';
-import 'package:f2h_customer/features/subscription/data/models/subscription_model.dart';
-import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
-import 'package:f2h_customer/features/catalog/domain/entities/cart/cart_item_entity.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_bloc.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_event.dart';
-import 'package:f2h_customer/features/catalog/presentation/screens/cart_screen.dart';
-import 'package:f2h_customer/features/wallet/presentation/screens/wallet_screen.dart';
-import 'package:f2h_customer/features/subscription/presentation/screens/subscription_detail_screen.dart';
+import '../../../../core/widgets/hot_toast.dart';
+import '../../data/models/subscription_model.dart';
+import '../../../catalog/data/models/product_model.dart';
+import '../../../catalog/domain/entities/cart/cart_item_entity.dart';
+import '../../../catalog/presentation/bloc/cart/cart_bloc.dart';
+import '../../../catalog/presentation/bloc/cart/cart_event.dart';
+import '../../../catalog/presentation/screens/cart_screen.dart';
+import '../screens/subscription_detail_screen.dart';
+
 
 class SubCard extends StatelessWidget {
   final Subscription s;
@@ -227,70 +227,7 @@ class SubCard extends StatelessWidget {
                           ),
                         ],
 
-                        // Frequency
-                        Row(
-                          children: [
-                            Icon(Icons.loop_rounded, size: 12, color: isActive ? kPrimary : kTextSub),
-                            const SizedBox(width: 4),
-                            Text(
-                              s.frequency,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                                color: isActive ? kTextMid : kTextSub,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        if (s.items.isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          ...s.items.map((item) {
-                            final List<String> parts = [];
-                            if (item.defaultMQty > 0) parts.add('${item.defaultMQty} AM');
-                            if (item.defaultEQty > 0) parts.add('${item.defaultEQty} PM');
-                            final qtyLabel = parts.join(' + ');
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 3),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.subdirectory_arrow_right_rounded,
-                                    size: 11,
-                                    color: isActive
-                                        ? kPrimary.withValues(alpha: 0.5)
-                                        : kTextSub.withValues(alpha: 0.5),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      item.displayName,
-                                      style: TextStyle(
-                                        fontSize: 10.5,
-                                        fontWeight: FontWeight.w600,
-                                        color: isActive ? kTextMid : kTextSub,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  if (qtyLabel.isNotEmpty) ...[
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      qtyLabel,
-                                      style: TextStyle(
-                                        fontSize: 10.5,
-                                        fontWeight: FontWeight.w800,
-                                        color: isActive ? kPrimary : kTextSub,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            );
-                          }),
-                        ],
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
 
                         // Price row
                         Row(
@@ -340,6 +277,7 @@ class SubCard extends StatelessWidget {
                             ),
                           ],
                         ),
+                        _buildSubCardDaysWidget(s),
                       ],
                     ),
                   ),
@@ -429,69 +367,16 @@ class SubCard extends StatelessWidget {
                   ),
                 ),
               ] else if (isExpired) ...[
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  height: 38,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const WalletScreen(),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.account_balance_wallet_rounded, size: 15, color: Colors.white),
-                    label: const Text(
-                      'PAY OUTSTANDING BILLS',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: kRed,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-              ] else if (isActive && s.paymentType == 'prepaid' && s.autoRenew && s.pricePerDay > 0) ...[
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  height: 36,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const WalletScreen(),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.account_balance_wallet_outlined, size: 14, color: kPrimary),
-                    label: const Text(
-                      'TOP-UP WALLET',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: kPrimary),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      side: const BorderSide(color: kPrimary, width: 1),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                ),
+                // No button for expired — user can tap to view details
               ],
+
             ],
           ),
         ),
       ),
     );
   }
+
 }
 
 String _prettifyName(String name) {
@@ -503,4 +388,78 @@ String _prettifyName(String name) {
         return word[0].toUpperCase() + word.substring(1);
       })
       .join(' ');
+}
+
+Widget _buildSubCardDaysWidget(Subscription s) {
+  final dayQtys = s.getSelectedDayQuantities();
+  if (dayQtys.isEmpty) return const SizedBox.shrink();
+
+  return Container(
+    margin: const EdgeInsets.only(top: 8),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF8FAFC),
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: const Color(0xFFE2E8F0)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(
+              Icons.calendar_today_rounded,
+              size: 11,
+              color: kPrimary,
+            ),
+            SizedBox(width: 5),
+            Text(
+              'Selected Days & Quantity:',
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+                color: kTextSub,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        Wrap(
+          spacing: 5,
+          runSpacing: 5,
+          children: dayQtys.map((dq) {
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
+              ),
+              child: RichText(
+                text: TextSpan(
+                  style: const TextStyle(fontSize: 10.5, color: kText),
+                  children: [
+                    TextSpan(
+                      text: '${dq.dayName} ',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: kTextSub,
+                      ),
+                    ),
+                    TextSpan(
+                      text: '${dq.quantity}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: kPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    ),
+  );
 }

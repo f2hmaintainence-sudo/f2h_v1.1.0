@@ -11,6 +11,7 @@ abstract class AuthRemoteDataSource {
     String password, {
     required String phone,
     required String verificationToken,
+    String? referralCode,
     String? fcmToken,
   });
   Future<UserModel> signInWithGoogle(String serverAuthCode, {String? fcmToken});
@@ -99,21 +100,26 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     String password, {
     required String phone,
     required String verificationToken,
+    String? referralCode,
     String? fcmToken,
   }) async {
     await dioClient.fetchCsrfToken();
 
     try {
-      final response = await dioClient.dio.post(
-        ApiEndpoints.register,
-        data: {
+      final body = <String, dynamic>{
           'user_name': userName,
           'email': email,
           'phone': phone,
           'password': password,
           'verification_token': verificationToken,
           'fcm_token': fcmToken,
-        },
+        };
+      if (referralCode != null && referralCode.isNotEmpty) {
+        body['referral_code'] = referralCode;
+      }
+      final response = await dioClient.dio.post(
+        ApiEndpoints.register,
+        data: body,
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {

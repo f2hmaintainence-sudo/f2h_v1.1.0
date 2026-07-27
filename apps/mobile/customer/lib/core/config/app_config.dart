@@ -29,19 +29,19 @@ class AppConfig {
   // ---------------------------------------------------------------------------
   // Dynamic Dynamic Server Configs (Loaded from API & cached locally)
   // ---------------------------------------------------------------------------
-  static String firebaseApiKey = 'AIzaSyAv0aMZBt7L7021HzVHX8I2PEi2h8paAcE';
-  static String firebaseAppId = '1:1060833982707:android:51bfa93dfd661022f31f86';
-  static String firebaseMessagingSenderId = '1060833982707';
-  static String firebaseProjectId = 'f2hcustomerapp';
-  static String firebaseStorageBucket = 'f2hcustomerapp.firebasestorage.app';
+  static String firebaseApiKey = '';
+  static String firebaseAppId = '';
+  static String firebaseMessagingSenderId = '';
+  static String firebaseProjectId = '';
+  static String firebaseStorageBucket = '';
 
-  static String firebaseIosApiKey = 'AIzaSyBR4Xs71YQTs8Hzlp5Ql5a15ZxD2FfzGxg';
-  static String firebaseIosAppId = '1:1060833982707:ios:64708d0f2c64294ef31f86';
-  static String firebaseIosBundleId = 'com.f2h.customer';
+  static String firebaseIosApiKey = '';
+  static String firebaseIosAppId = '';
+  static String firebaseIosBundleId = '';
 
-  static String googleServerClientId = '605526160181-00mmui7o3uuijjgvhgjjs5qbldai544g.apps.googleusercontent.com';
+  static String googleServerClientId = '';
   static String googleMapsApiKey = '';
-  static String razorpayKeyId = 'rzp_test_default';
+  static String razorpayKeyId = '';
 
   static double minOrderAmount = 100.0;
   static double freeDeliveryThreshold = 500.0;

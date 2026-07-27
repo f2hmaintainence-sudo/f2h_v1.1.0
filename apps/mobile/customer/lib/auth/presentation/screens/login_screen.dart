@@ -31,18 +31,26 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _onLoginPressed() {
-    if (_usernameController.text.isNotEmpty && _passwordController.text.isNotEmpty) {
-      context.read<AuthBloc>().add(
-        LoginRequested(
-          identifier: _usernameController.text.trim(),
-          password: _passwordController.text,
-        ),
-      );
-    } else {
+    final identifier = _usernameController.text.trim();
+    final password = _passwordController.text;
+
+    if (identifier.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter email or mobile number and password'))
+        const SnackBar(content: Text('Please enter your email or mobile number')),
       );
+      return;
     }
+
+    if (password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your password')),
+      );
+      return;
+    }
+
+    context.read<AuthBloc>().add(
+      LoginRequested(identifier: identifier, password: password),
+    );
   }
 
   @override
@@ -307,7 +315,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             // Username Input
                             Container(
                               decoration: BoxDecoration(
-                                color: kPrimaryPl.withValues(alpha: 0.55),
+                                color: Colors.white,
                                 borderRadius: BorderRadius.circular(30),
                                 border: Border.all(color: kBorder.withValues(alpha: 0.35), width: 1.2),
                                 boxShadow: [
@@ -338,7 +346,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             // Password Input
                             Container(
                               decoration: BoxDecoration(
-                                color: kPrimaryPl.withValues(alpha: 0.55),
+                                color: Colors.white,
                                 borderRadius: BorderRadius.circular(30),
                                 border: Border.all(color: kBorder.withValues(alpha: 0.35), width: 1.2),
                                 boxShadow: [

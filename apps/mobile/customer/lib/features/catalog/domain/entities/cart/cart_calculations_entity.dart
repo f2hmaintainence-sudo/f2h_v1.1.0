@@ -4,7 +4,7 @@ class CartCalculationsEntity {
   final double taxes;
   final double grandTotal;
 
-  CartCalculationsEntity({
+  const CartCalculationsEntity({
     required this.subtotal,
     required this.deliveryFee,
     required this.taxes,

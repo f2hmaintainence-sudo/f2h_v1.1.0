@@ -1,10 +1,10 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:f2h_customer/core/errors/error_handler.dart';
-import 'package:f2h_customer/features/subscription/domain/repositories/subscription_repository.dart';
-import 'package:f2h_customer/features/subscription/data/models/subscription_model.dart';
-import 'package:f2h_customer/features/orders/data/models/order_model.dart';
-import 'package:f2h_customer/features/subscription/presentation/bloc/subscription_event.dart';
-import 'package:f2h_customer/features/subscription/presentation/bloc/subscription_state.dart';
+import '../../../../core/errors/error_handler.dart';
+import '../../domain/repositories/subscription_repository.dart';
+import '../../data/models/subscription_model.dart';
+import '../../../orders/data/models/order_model.dart';
+import 'subscription_event.dart';
+import 'subscription_state.dart';
 
 class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
   final SubscriptionRepository subscriptionRepository;
@@ -12,6 +12,7 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
   SubscriptionBloc({required this.subscriptionRepository}) : super(SubscriptionInitial()) {
     on<LoadSubscriptions>(_onLoadSubscriptions);
     on<CreateSubscriptionRequested>(_onCreateSubscription);
+    on<SubscriptionCheckoutRequested>(_onSubscriptionCheckout);
     on<PlaceOneTimeOrderRequested>(_onPlaceOneTimeOrder);
     on<PauseSubscriptionRequested>(_onPauseSubscription);
     on<ResumeSubscriptionRequested>(_onResumeSubscription);
@@ -36,22 +37,46 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
     }
   }
 
+  // ══════════════════════════════════════════════════════════
+  //  CREATE SUBSCRIPTION
+  //
+  //  Called from SubscriptionSetupScreen (dedicated flow).
+  //  Passes paymentType, autoRenew, morningQty, eveningQty
+  //  to the repository and extracts the subscription ID from
+  //  the backend response for the success screen.
+  // ══════════════════════════════════════════════════════════
+
   Future<void> _onCreateSubscription(CreateSubscriptionRequested event, Emitter<SubscriptionState> emit) async {
     emit(SubscriptionLoading());
     try {
-      final success = await subscriptionRepository.createSubscription(
+      final result = await subscriptionRepository.createSubscription(
         customerId: event.customerId,
         branchId: event.branchId,
         variantId: event.variantId,
         quantity: event.quantity,
+        morningQty: event.morningQty,
+        eveningQty: event.eveningQty,
         scheduleType: event.scheduleType,
         deliverySlot: event.deliverySlot,
         startDate: event.startDate,
         unitPrice: event.unitPrice,
         customDays: event.customDays,
+        paymentType: event.paymentType,
+        autoRenew: event.autoRenew,
       );
-      if (success) {
-        emit(const SubscriptionActionSuccess('Subscription created successfully'));
+
+      if (result['success'] == true || result['status'] == true || result['id'] != null) {
+        final subscriptionId = result['id']?.toString()
+            ?? result['subscription_id']?.toString()
+            ?? result['data']?['id']?.toString();
+
+        emit(SubscriptionActionSuccess(
+          'Subscription created successfully',
+          subscriptionId: subscriptionId,
+          paymentType: event.paymentType,
+          autoRenew: event.autoRenew,
+        ));
+
         final results = await Future.wait([
           subscriptionRepository.getSubscriptions(),
           subscriptionRepository.getOrders(),
@@ -61,7 +86,83 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
           orders: results[1] as List<Order>,
         ));
       } else {
-        emit(const SubscriptionError('Failed to create subscription. Check your balance.'));
+        final errMsg = result['message']?.toString()
+            ?? result['error']?.toString()
+            ?? 'Failed to create subscription. Check your balance.';
+        emit(SubscriptionError(errMsg));
+      }
+    } catch (e) {
+      emit(SubscriptionError(extractErrorMessage(e)));
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  SUBSCRIPTION CHECKOUT — payment validation flow
+  // ══════════════════════════════════════════════════════════
+
+  Future<void> _onSubscriptionCheckout(SubscriptionCheckoutRequested event, Emitter<SubscriptionState> emit) async {
+    emit(SubscriptionLoading());
+    try {
+      final result = await subscriptionRepository.checkoutSubscription(
+        customerId: event.customerId,
+        branchId: event.branchId,
+        addressId: event.addressId,
+        variantId: event.variantId,
+        quantity: event.quantity,
+        morningQty: event.morningQty,
+        eveningQty: event.eveningQty,
+        weeklySchedule: event.weeklySchedule,
+        scheduleType: event.scheduleType,
+        deliverySlot: event.deliverySlot,
+        startDate: event.startDate,
+        unitPrice: event.unitPrice,
+        customDays: event.customDays,
+        paymentType: event.paymentType,
+        paymentMethod: event.paymentMethod,
+        autoRenew: event.autoRenew,
+        estimatedTotal: event.estimatedTotal,
+      );
+
+
+      // Handle structured error codes from backend
+      final errorCode = result['error_code']?.toString();
+      if (errorCode != null) {
+        emit(SubscriptionCheckoutError(
+          errorCode: errorCode,
+          message: result['message']?.toString() ?? 'Checkout failed',
+          walletBalance: (result['wallet_balance'] as num?)?.toDouble(),
+          required_: (result['required'] as num?)?.toDouble(),
+          creditLimit: (result['credit_limit'] as num?)?.toDouble(),
+          existingCommitted: (result['existing_committed'] as num?)?.toDouble(),
+        ));
+        return;
+      }
+
+      if (result['success'] == true || result['status'] == true || result['id'] != null) {
+        final subscriptionId = result['id']?.toString()
+            ?? result['subscription_id']?.toString()
+            ?? result['data']?['id']?.toString();
+
+        emit(SubscriptionActionSuccess(
+          'Subscription created successfully',
+          subscriptionId: subscriptionId,
+          paymentType: event.paymentType,
+          autoRenew: event.autoRenew,
+        ));
+
+        final results = await Future.wait([
+          subscriptionRepository.getSubscriptions(),
+          subscriptionRepository.getOrders(),
+        ]);
+        emit(SubscriptionLoaded(
+          subscriptions: results[0] as List<Subscription>,
+          orders: results[1] as List<Order>,
+        ));
+      } else {
+        final errMsg = result['message']?.toString()
+            ?? result['error']?.toString()
+            ?? 'Checkout failed. Please try again.';
+        emit(SubscriptionError(errMsg));
       }
     } catch (e) {
       emit(SubscriptionError(extractErrorMessage(e)));
@@ -201,4 +302,3 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
     }
   }
 }
-

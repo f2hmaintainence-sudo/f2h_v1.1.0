@@ -1098,17 +1098,26 @@ export default function SkeletonForm({
         let previews: string[] = [];
 
         if (isMultiple) {
-          previews = Array.isArray(formData[field.name]) ? formData[field.name] : (formData[field.name] ? [formData[field.name]] : []);
+          const raw = Array.isArray(formData[field.name])
+            ? formData[field.name]
+            : formData[field.name]
+            ? [formData[field.name]]
+            : [];
+          // Flatten one level (in case of nested arrays), filter to non-empty strings only
+          previews = ([] as any[])
+            .concat(...raw)
+            .filter((v: any) => v && typeof v === 'string' && v.trim() !== '') as string[];
         } else {
           const fileState = fileStates[field.name];
           const singleSrc = fileState?.src || formData[field.name] || '';
-          if (singleSrc) previews = [singleSrc];
+          if (singleSrc && typeof singleSrc === 'string') previews = [singleSrc];
         }
 
         input = (
           <div className={`skf-file-wrap${errorClass}`}>
             <div className="skf-multiple-previews" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               {previews.map((previewSrc, idx) => {
+                // previewSrc is guaranteed to be a non-empty string at this point
                 let fullUrl = previewSrc;
                 if (previewSrc && !previewSrc.startsWith('http') && !previewSrc.startsWith('data:')) {
                   const apiBase = apiBaseUrl || getApiBaseUrl();

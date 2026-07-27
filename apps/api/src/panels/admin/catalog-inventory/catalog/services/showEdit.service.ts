@@ -43,31 +43,9 @@ export class CatalogShowEditService {
 
       const product = result.data[0];
 
-      const imageResult = await this.dataService.query('product_images', {
-        select: ['url'],
-        where: [
-          {
-            column: 'product_id',
-            operator: '=',
-            value: product.product_id,
-          },
-          {
-            column: 'is_primary',
-            operator: '=',
-            value: true,
-          },
-          {
-            column: 'deleted_at',
-            operator: 'IS',
-            value: null,
-          },
-        ],
-        orderBy: 'sort_order',
-        orderDirection: 'ASC',
-        limit: 1,
-      });
-
-      const productImage = imageResult?.data?.[0]?.url || '';
+      // Product images are stored exclusively in products.image_path.
+      // product_images table is for variant images only.
+      const productImage = product.image_path || '';
 
       // =====================================================
       // FETCH CATEGORIES
@@ -109,18 +87,22 @@ export class CatalogShowEditService {
         })),
       ];
 
-      // =====================================================
-      // UNIT OPTIONS
-      // MUST MATCH ENUM EXACTLY
-      // =====================================================
+      // Fetch active packaging types
+      const packagingTypesResult = await this.dataService.query('packaging_types', {
+        select: ['id', 'name'],
+        where: [
+          { column: 'status', operator: '=', value: 'active' },
+        ],
+        orderBy: 'name',
+        orderDirection: 'ASC',
+      });
 
-      const unitOptions = [
-        { label: 'Liter', value: 'ltr' },
-        { label: 'Milliliter', value: 'ml' },
-        { label: 'Kilogram', value: 'kg' },
-        { label: 'Gram', value: 'gm' },
-        { label: 'Piece', value: 'piece' },
-        { label: 'Pack', value: 'pack' },
+      const packagingOptions = [
+        { value: '', label: 'No Returnable Packaging (Disposable)' },
+        ...(packagingTypesResult.data || []).map((pkg: any) => ({
+          value: String(pkg.id),
+          label: pkg.name,
+        })),
       ];
 
       // =====================================================
@@ -129,7 +111,7 @@ export class CatalogShowEditService {
 
       const fields = this.showAddService.catalogFields(
         categoryOptions,
-        unitOptions,
+        packagingOptions,
       );
 
       // =====================================================
@@ -141,7 +123,7 @@ export class CatalogShowEditService {
 
         category_id: String(product.category_id || ''),
 
-        unit_type: String(product.unit_type || 'piece'),
+        packaging_type_id: String(product.packaging_type_id || ''),
 
         product_image: productImage,
       };
