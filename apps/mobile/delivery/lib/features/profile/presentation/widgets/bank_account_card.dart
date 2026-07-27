@@ -66,7 +66,7 @@ class BankAccountCard extends StatelessWidget {
         border: Border.all(color: kBorder),
         boxShadow: [
           BoxShadow(
-            color: kText.withOpacity(0.01),
+            color: kText.withValues(alpha: 0.01),
             blurRadius: 8,
             offset: const Offset(0, 4),
           )

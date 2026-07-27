@@ -34,8 +34,12 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
-    for (var c in _otpCtrl) c.dispose();
-    for (var f in _otpFocus) f.dispose();
+    for (var c in _otpCtrl) {
+      c.dispose();
+    }
+    for (var f in _otpFocus) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -184,7 +188,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
               width: 44,
               height: 5,
               decoration: BoxDecoration(
-                color: kMuted.withOpacity(0.3),
+                color: kMuted.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(10),
               ),
             ),

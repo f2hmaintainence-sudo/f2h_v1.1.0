@@ -76,7 +76,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String _selectedPaymentType = 'prepaid';
 
   /// Whether the user opted into donation
-  bool _donating = false;
+  final bool _donating = false;
 
   /// Whether the order has been successfully placed (or failed checkout completed)
   bool _isOrderPlaced = false;
@@ -499,7 +499,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               decoration: BoxDecoration(
                                 color: kSurface,
                                 borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: kRed.withOpacity(0.4)),
+                                border: Border.all(color: kRed.withValues(alpha: 0.4)),
                               ),
                               child: Row(
                                 children: [
@@ -651,7 +651,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   shrinkWrap: true,
                                   physics: const NeverScrollableScrollPhysics(),
                                   itemCount: checkoutItems.length,
-                                  separatorBuilder: (_, __) => const Divider(color: kBorderLt, height: 1),
+                                  separatorBuilder: (_, _) => const Divider(color: kBorderLt, height: 1),
                                   itemBuilder: (context, index) {
                                     final item = checkoutItems[index];
                                     // Use getEffectivePrice for consistent pricing
@@ -769,9 +769,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                       Container(
                                         padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
-                                          color: kPrimary.withOpacity(0.04),
+                                          color: kPrimary.withValues(alpha: 0.04),
                                           borderRadius: BorderRadius.circular(24),
-                                          border: Border.all(color: kPrimary.withOpacity(0.15)),
+                                          border: Border.all(color: kPrimary.withValues(alpha: 0.15)),
                                         ),
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -898,7 +898,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                                       const SizedBox(height: 2),
                                                       Text(
                                                         'Starts today onwards',
-                                                        style: TextStyle(fontSize: 9, color: kTextSub.withOpacity(0.6)),
+                                                        style: TextStyle(fontSize: 9, color: kTextSub.withValues(alpha: 0.6)),
                                                       ),
                                                     ],
                                                   ),
@@ -945,7 +945,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                                       const SizedBox(height: 2),
                                                       Text(
                                                         'Renew automatically every month',
-                                                        style: TextStyle(fontSize: 9, color: kTextSub.withOpacity(0.6)),
+                                                        style: TextStyle(fontSize: 9, color: kTextSub.withValues(alpha: 0.6)),
                                                       ),
                                                     ],
                                                   ),
@@ -974,7 +974,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                                          borderRadius: BorderRadius.circular(2),
                                                          boxShadow: [
                                                            BoxShadow(
-                                                             color: Colors.black.withOpacity(0.1),
+                                                             color: Colors.black.withValues(alpha: 0.1),
                                                              blurRadius: 2,
                                                            ),
                                                          ],
@@ -1280,7 +1280,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       border: const Border(top: BorderSide(color: kBorder)),
                       boxShadow: [
                         BoxShadow(
-                          color: kPrimary.withOpacity(0.04),
+                          color: kPrimary.withValues(alpha: 0.04),
                           blurRadius: 16,
                           offset: const Offset(0, -4),
                         )
@@ -1355,7 +1355,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? kPrimaryPl.withOpacity(0.4) : kBgDeep.withOpacity(0.6),
+          color: isSelected ? kPrimaryPl.withValues(alpha: 0.4) : kBgDeep.withValues(alpha: 0.6),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? kPrimary : kBorder,
@@ -1566,7 +1566,7 @@ class _SlideToPayButtonState extends State<SlideToPayButton> {
           decoration: BoxDecoration(
             color: kPrimaryPl,
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: kPrimary.withOpacity(0.12)),
+            border: Border.all(color: kPrimary.withValues(alpha: 0.12)),
           ),
           child: Stack(
             alignment: Alignment.centerLeft,

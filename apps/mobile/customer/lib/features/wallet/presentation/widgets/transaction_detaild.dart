@@ -471,7 +471,7 @@ class _TransactionDetaildScreenState extends State<TransactionDetaildScreen> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: order.items.length,
-            separatorBuilder: (_, __) => const Divider(color: kBorderLt, height: 16),
+            separatorBuilder: (_, _) => const Divider(color: kBorderLt, height: 16),
             itemBuilder: (context, idx) {
               final item = order.items[idx];
               return Row(

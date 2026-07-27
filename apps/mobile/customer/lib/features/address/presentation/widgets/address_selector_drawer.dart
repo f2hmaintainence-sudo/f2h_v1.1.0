@@ -90,7 +90,7 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
                   border: Border.all(color: _panelBorder, width: 2),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: Colors.black.withValues(alpha: 0.08),
                       blurRadius: 18,
                       offset: const Offset(0, 8),
                     ),
@@ -122,10 +122,10 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
             decoration: BoxDecoration(
               color: kSurface,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: kPrimary.withOpacity(0.20), width: 1.5),
+              border: Border.all(color: kPrimary.withValues(alpha: 0.20), width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: kPrimary.withOpacity(0.04),
+                  color: kPrimary.withValues(alpha: 0.04),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -189,7 +189,7 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
             border: Border.all(color: kBorder),
             boxShadow: [
               BoxShadow(
-                color: kPrimary.withOpacity(0.04),
+                color: kPrimary.withValues(alpha: 0.04),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -210,14 +210,14 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: list.length,
-                separatorBuilder: (_, __) => const Divider(color: kBorderLt, height: 1),
+                separatorBuilder: (_, _) => const Divider(color: kBorderLt, height: 1),
                 itemBuilder: (context, index) {
                   final addr = list[index];
                   final isSelected = addr.addressId == _selectedAddressId;
                   final isExpanded = addr.addressId == _expandedAddressId;
 
                   return Container(
-                    color: isSelected ? kPrimaryPl.withOpacity(0.12) : Colors.transparent,
+                    color: isSelected ? kPrimaryPl.withValues(alpha: 0.12) : Colors.transparent,
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Row(
                       crossAxisAlignment: isExpanded ? CrossAxisAlignment.start : CrossAxisAlignment.center,

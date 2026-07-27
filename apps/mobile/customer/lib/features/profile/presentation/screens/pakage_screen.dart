@@ -280,7 +280,7 @@ class _ContainerBalanceScreenState extends State<ContainerBalanceScreen> {
             ),
             boxShadow: [
               BoxShadow(
-                color: kPrimary.withOpacity(0.15),
+                color: kPrimary.withValues(alpha: 0.15),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -435,7 +435,7 @@ class _ContainerBalanceScreenState extends State<ContainerBalanceScreen> {
             border: Border.all(color: kBorder),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.01),
+                color: Colors.black.withValues(alpha: 0.01),
                 blurRadius: 8,
                 offset: const Offset(0, 4),
               ),
@@ -519,7 +519,7 @@ class _ContainerBalanceScreenState extends State<ContainerBalanceScreen> {
         border: Border.all(color: kBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.01),
+            color: Colors.black.withValues(alpha: 0.01),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -575,7 +575,7 @@ class _ContainerBalanceScreenState extends State<ContainerBalanceScreen> {
         border: Border.all(color: kBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.01),
+            color: Colors.black.withValues(alpha: 0.01),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),

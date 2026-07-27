@@ -69,7 +69,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                   const Text('Document Type', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: kTextMid)),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
-                    value: selectedType,
+                    initialValue: selectedType,
                     onChanged: document == null
                         ? (val) {
                             if (val != null) setModalState(() => selectedType = val);

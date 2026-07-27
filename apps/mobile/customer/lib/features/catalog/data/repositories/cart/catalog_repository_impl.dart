@@ -222,7 +222,7 @@ class CatalogRepositoryImpl implements CatalogRepository {
           _refreshCategoriesSilently(prefs);
           return cachedCategories;
         }
-      };
+      }
     } catch (e) {
       print('Error parsing local cached categories: $e');
     }

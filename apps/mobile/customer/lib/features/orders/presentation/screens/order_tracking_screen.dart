@@ -118,7 +118,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.teal.withOpacity(0.3),
+                  color: Colors.teal.withValues(alpha: 0.3),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 )
@@ -171,7 +171,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: AppColors.primary.withOpacity(0.1),
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                   child: const Icon(Icons.person, color: AppColors.primary),
                 ),
                 title: Text(

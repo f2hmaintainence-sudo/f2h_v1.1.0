@@ -135,7 +135,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
               // Animated Location Radar Visual
               AnimatedBuilder(
                 animation: _pulseAnim,
-                builder: (_, __) => Container(
+                builder: (_, _) => Container(
                   height: 160 + _pulseAnim.value * 12,
                   width: 160 + _pulseAnim.value * 12,
                   decoration: BoxDecoration(

@@ -93,7 +93,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
     try {
       final response = await dioClient.dio.get(
-        ApiEndpoints.googleAuth + '/callback',
+        '${ApiEndpoints.googleAuth}/callback',
         queryParameters: {
           'code': serverAuthCode,
           'fcm_token': fcmToken,

@@ -74,8 +74,12 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
   void dispose() {
     _nameCtrl.dispose(); _emailCtrl.dispose();
     _passwordCtrl.dispose(); _confirmCtrl.dispose();
-    for (var c in _otpCtrl) c.dispose();
-    for (var f in _otpFocus) f.dispose();
+    for (var c in _otpCtrl) {
+      c.dispose();
+    }
+    for (var f in _otpFocus) {
+      f.dispose();
+    }
     _bgAnim.dispose(); _stepAnim.dispose(); _iconAnim.dispose();
     super.dispose();
   }
@@ -325,7 +329,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
         Center(
           child: AnimatedBuilder(
             animation: _iconAnim,
-            builder: (_, __) => Transform.translate(
+            builder: (_, _) => Transform.translate(
               offset: Offset(0, math.sin(_iconAnim.value * math.pi) * 6),
               child: Container(
                 width: 100, height: 100,
@@ -403,7 +407,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
         Center(
           child: AnimatedBuilder(
             animation: _iconAnim,
-            builder: (_, __) => Stack(
+            builder: (_, _) => Stack(
               alignment: Alignment.topRight,
               children: [
                 Transform.translate(
@@ -527,7 +531,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
         Center(
           child: AnimatedBuilder(
             animation: _iconAnim,
-            builder: (_, __) => Transform.translate(
+            builder: (_, _) => Transform.translate(
               offset: Offset(0, math.sin(_iconAnim.value * math.pi) * 6),
               child: Container(
                 width: 100, height: 100,
@@ -856,7 +860,7 @@ class _AnimatedBg extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: controller,
-      builder: (_, __) {
+      builder: (_, _) {
         final t = controller.value;
         final y = math.sin(t * math.pi * 2) * 50;
         final x = math.cos(t * math.pi * 1.5) * 35;

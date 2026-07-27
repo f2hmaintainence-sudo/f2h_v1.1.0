@@ -124,7 +124,7 @@ class _FloatingPlusOneState extends State<FloatingPlusOne>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _ctrl,
-      builder: (_, __) => Positioned(
+      builder: (_, _) => Positioned(
         left: widget.startPosition.dx - 16,
         top: widget.startPosition.dy + _y.value - 20,
         child: Opacity(
@@ -460,7 +460,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
                   width: 300,
                   height: 300,
                   decoration: BoxDecoration(
-                    color: themeColor.withOpacity(0.04),
+                    color: themeColor.withValues(alpha: 0.04),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -474,7 +474,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
                   width: 350,
                   height: 350,
                   decoration: BoxDecoration(
-                    color: themeColor.withOpacity(0.03),
+                    color: themeColor.withValues(alpha: 0.03),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -493,9 +493,9 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(
-                        color: themeColor.withOpacity(0.12),
+                        color: themeColor.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: themeColor.withOpacity(0.2), width: 1),
+                        border: Border.all(color: themeColor.withValues(alpha: 0.2), width: 1),
                       ),
                       child: Text(
                         isSub ? 'VIP SUBSCRIPTION ACTIVE' : 'ORDER CONFIRMED',
@@ -516,11 +516,11 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
                         // Ripple 2
                         AnimatedBuilder(
                           animation: _iconCtrl,
-                          builder: (_, __) => Container(
+                          builder: (_, _) => Container(
                             width: 170 * _iconScale.value,
                             height: 170 * _iconScale.value,
                             decoration: BoxDecoration(
-                              color: themeColor.withOpacity(0.04),
+                              color: themeColor.withValues(alpha: 0.04),
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -528,11 +528,11 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
                         // Ripple 1
                         AnimatedBuilder(
                           animation: _iconCtrl,
-                          builder: (_, __) => Container(
+                          builder: (_, _) => Container(
                             width: 130 * _iconScale.value,
                             height: 130 * _iconScale.value,
                             decoration: BoxDecoration(
-                              color: themeColor.withOpacity(0.08),
+                              color: themeColor.withValues(alpha: 0.08),
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -554,7 +554,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: themeColor.withOpacity(0.24),
+                                  color: themeColor.withValues(alpha: 0.24),
                                   blurRadius: 20,
                                   offset: const Offset(0, 10),
                                 ),
@@ -598,15 +598,15 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
                       margin: const EdgeInsets.symmetric(horizontal: 24),
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: themeColorPl.withOpacity(0.12),
+                        color: themeColorPl.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: themeColor.withOpacity(0.24),
+                          color: themeColor.withValues(alpha: 0.24),
                           width: 2.0,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: themeColor.withOpacity(0.04),
+                            color: themeColor.withValues(alpha: 0.04),
                             blurRadius: 16,
                             offset: const Offset(0, 8),
                           ),
@@ -654,7 +654,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
                           ),
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Divider(color: themeColor.withOpacity(0.06), height: 1),
+                            child: Divider(color: themeColor.withValues(alpha: 0.06), height: 1),
                           ),
                           _buildInfoRow(
                             isSub ? Icons.vpn_key_rounded : Icons.receipt_long_rounded, 
@@ -662,7 +662,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: themeColor.withOpacity(0.06),
+                                color: themeColor.withValues(alpha: 0.06),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
@@ -700,7 +700,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: themeColor.withOpacity(0.24),
+                              color: themeColor.withValues(alpha: 0.24),
                               blurRadius: 16,
                               offset: const Offset(0, 6),
                             ),
@@ -743,7 +743,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
   Widget _buildAnimatedCheckmark() {
     return AnimatedBuilder(
       animation: _checkProgress,
-      builder: (_, __) => CustomPaint(
+      builder: (_, _) => CustomPaint(
         size: const Size(60, 60),
         painter: _CheckmarkPainter(_checkProgress.value),
       ),
@@ -757,7 +757,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: themeColor.withOpacity(0.06),
+            color: themeColor.withValues(alpha: 0.06),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: themeColor, size: 18),
@@ -884,7 +884,7 @@ class _RippleTapEffectState extends State<RippleTapEffect>
             if (_rippling)
               AnimatedBuilder(
                 animation: _ctrl,
-                builder: (_, __) => Positioned.fill(
+                builder: (_, _) => Positioned.fill(
                   child: CustomPaint(
                     painter: _RipplePainter(_tapPos, _radius.value, _opacity.value),
                   ),
@@ -1181,7 +1181,7 @@ class InitialLoadingScreen extends StatelessWidget {
                     child: Image.asset(
                       'assets/icon/app_icon.png',
                       fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.spa, color: kPrimary, size: 36),
+                      errorBuilder: (_, _, _) => const Icon(Icons.spa, color: kPrimary, size: 36),
                     ),
                   ),
                 ),

@@ -86,15 +86,15 @@ class Product {
     final isLiquid = category == 'Milk' || category == 'Oil' || unitLower.contains('ml') || unitLower.contains('l') || nameLower.contains('milk') || nameLower.contains('ghee') || nameLower.contains('oil');
     if (isLiquid) {
       return [
-        ProductVariant(id: '${id}-200ml', label: '200 ml', price: (price * 0.45).roundToDouble(), originalPrice: (originalPrice * 0.45).roundToDouble()),
-        ProductVariant(id: '${id}-500ml', label: '500 ml', price: price, originalPrice: originalPrice),
-        ProductVariant(id: '${id}-1L', label: '1 Litre', price: (price * 1.8).roundToDouble(), originalPrice: (originalPrice * 1.8).roundToDouble()),
+        ProductVariant(id: '$id-200ml', label: '200 ml', price: (price * 0.45).roundToDouble(), originalPrice: (originalPrice * 0.45).roundToDouble()),
+        ProductVariant(id: '$id-500ml', label: '500 ml', price: price, originalPrice: originalPrice),
+        ProductVariant(id: '$id-1L', label: '1 Litre', price: (price * 1.8).roundToDouble(), originalPrice: (originalPrice * 1.8).roundToDouble()),
       ];
     } else {
       return [
-        ProductVariant(id: '${id}-200g', label: '200 g', price: (price * 0.45).roundToDouble(), originalPrice: (originalPrice * 0.45).roundToDouble()),
-        ProductVariant(id: '${id}-500g', label: '500 g', price: price, originalPrice: originalPrice),
-        ProductVariant(id: '${id}-1kg', label: '1 kg', price: (price * 1.8).roundToDouble(), originalPrice: (originalPrice * 1.8).roundToDouble()),
+        ProductVariant(id: '$id-200g', label: '200 g', price: (price * 0.45).roundToDouble(), originalPrice: (originalPrice * 0.45).roundToDouble()),
+        ProductVariant(id: '$id-500g', label: '500 g', price: price, originalPrice: originalPrice),
+        ProductVariant(id: '$id-1kg', label: '1 kg', price: (price * 1.8).roundToDouble(), originalPrice: (originalPrice * 1.8).roundToDouble()),
       ];
     }
   }
@@ -117,7 +117,7 @@ class Product {
       'isOrganic': isOrganic,
       'isSubscribable': isSubscribable,
       'isOneTime': isOneTime,
-      'badgeColor': badgeColor.value,
+      'badgeColor': badgeColor.toARGB32(),
       'variants': variants.map((v) => v.toJson()).toList(),
       'imageAsset': imageAsset,
       'images': images,

@@ -230,7 +230,7 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                         border: Border.all(color: kBorder),
                         boxShadow: [
                           BoxShadow(
-                            color: kText.withOpacity(0.02),
+                            color: kText.withValues(alpha: 0.02),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           )
@@ -307,7 +307,7 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
-                              color: kPrimary.withOpacity(0.08),
+                              color: kPrimary.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -425,23 +425,23 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                                     }
 
                                     if (!isCurrentMonth || !dateFromBackend) {
-                                      textCol = kMuted.withOpacity(0.5);
-                                      bgCol = kBgDeep.withOpacity(0.3);
+                                      textCol = kMuted.withValues(alpha: 0.5);
+                                      bgCol = kBgDeep.withValues(alpha: 0.3);
                                     } else {
                                       if (isSelected) {
                                         border = Border.all(color: kPrimary, width: 2);
                                       } else if (isToday) {
-                                        border = Border.all(color: kPrimary.withOpacity(0.3), width: 1.5);
+                                        border = Border.all(color: kPrimary.withValues(alpha: 0.3), width: 1.5);
                                       } else {
                                         border = Border.all(color: kBorder);
                                       }
 
                                       if (isDel) {
-                                        bgCol = isPastDateTile ? kPrimaryPl.withOpacity(0.4) : kPrimaryPl;
-                                        textCol = isPastDateTile ? kPrimary.withOpacity(0.5) : kPrimary;
+                                        bgCol = isPastDateTile ? kPrimaryPl.withValues(alpha: 0.4) : kPrimaryPl;
+                                        textCol = isPastDateTile ? kPrimary.withValues(alpha: 0.5) : kPrimary;
                                       } else if (isSk) {
-                                        bgCol = isPastDateTile ? kRedLt.withOpacity(0.4) : kRedLt;
-                                        textCol = isPastDateTile ? kRed.withOpacity(0.5) : kRed;
+                                        bgCol = isPastDateTile ? kRedLt.withValues(alpha: 0.4) : kRedLt;
+                                        textCol = isPastDateTile ? kRed.withValues(alpha: 0.5) : kRed;
                                       } else {
                                         bgCol = kSurface;
                                       }
@@ -502,7 +502,7 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                                                   Icon(
                                                     Icons.lock,
                                                     size: 9,
-                                                    color: kTextSub.withOpacity(0.4),
+                                                    color: kTextSub.withValues(alpha: 0.4),
                                                   ),
                                                 ],
                                               ],
@@ -552,7 +552,7 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                                                             width: 4,
                                                             height: 4,
                                                             decoration: BoxDecoration(
-                                                              color: isSk ? kRed.withOpacity(0.7) : kAccent,
+                                                              color: isSk ? kRed.withValues(alpha: 0.7) : kAccent,
                                                               shape: BoxShape.circle,
                                                             ),
                                                           ),
@@ -562,7 +562,7 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                                                             style: TextStyle(
                                                               fontSize: 8,
                                                               fontWeight: FontWeight.w900,
-                                                              color: isSk ? kRed.withOpacity(0.7) : kAccent,
+                                                              color: isSk ? kRed.withValues(alpha: 0.7) : kAccent,
                                                               decoration: isSk ? TextDecoration.lineThrough : null,
                                                             ),
                                                           ),
@@ -639,7 +639,7 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                                   Container(
                                     padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
-                                      color: kBgDeep.withOpacity(0.5),
+                                      color: kBgDeep.withValues(alpha: 0.5),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Row(

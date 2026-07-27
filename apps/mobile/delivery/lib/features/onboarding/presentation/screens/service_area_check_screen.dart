@@ -203,7 +203,7 @@ class _ServiceAreaCheckScreenState extends State<ServiceAreaCheckScreen>
           // Background glow — soft mint
           AnimatedBuilder(
             animation: _bgAnim,
-            builder: (_, __) {
+            builder: (_, _) {
               final t = _bgAnim.value;
               return Stack(children: [
                 Positioned(
@@ -240,7 +240,7 @@ class _ServiceAreaCheckScreenState extends State<ServiceAreaCheckScreen>
                           height: 52,
                           child: AnimatedBuilder(
                             animation: _radarAnim,
-                            builder: (_, __) => Stack(
+                            builder: (_, _) => Stack(
                               alignment: Alignment.center,
                               children: [
                                 // Radar rings
@@ -367,7 +367,7 @@ class _ServiceAreaCheckScreenState extends State<ServiceAreaCheckScreen>
                     children: [
                       AnimatedBuilder(
                         animation: _radarAnim,
-                        builder: (_, __) => Stack(
+                        builder: (_, _) => Stack(
                           alignment: Alignment.center,
                           children: [
                             ...List.generate(3, (i) {
@@ -407,7 +407,7 @@ class _ServiceAreaCheckScreenState extends State<ServiceAreaCheckScreen>
     return Center(
       child: AnimatedBuilder(
         animation: _radarAnim,
-        builder: (_, __) => Column(
+        builder: (_, _) => Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Stack(

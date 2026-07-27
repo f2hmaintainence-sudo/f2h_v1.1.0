@@ -528,7 +528,7 @@ class ProfileScreen extends StatelessWidget {
                               decoration: BoxDecoration(
                                 color: kRedLt,
                                 borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: kRed.withOpacity(0.2), width: 1.5),
+                                border: Border.all(color: kRed.withValues(alpha: 0.2), width: 1.5),
                               ),
                               child: const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,

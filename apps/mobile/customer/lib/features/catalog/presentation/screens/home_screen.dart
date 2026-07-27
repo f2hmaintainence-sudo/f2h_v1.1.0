@@ -216,8 +216,8 @@ class _HomeScreenState extends State<HomeScreen>
                             scrollDirection: Axis.horizontal,
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             itemCount: 4,
-                            separatorBuilder: (_, __) => const SizedBox(width: 12),
-                            itemBuilder: (_, __) => const SizedBox(
+                            separatorBuilder: (_, _) => const SizedBox(width: 12),
+                            itemBuilder: (_, _) => const SizedBox(
                               width: 162,
                               child: _HomeSkeletonCard(),
                             ),
@@ -337,8 +337,8 @@ class _HomeScreenState extends State<HomeScreen>
                             scrollDirection: Axis.horizontal,
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             itemCount: 4,
-                            separatorBuilder: (_, __) => const SizedBox(width: 12),
-                            itemBuilder: (_, __) => const SizedBox(
+                            separatorBuilder: (_, _) => const SizedBox(width: 12),
+                            itemBuilder: (_, _) => const SizedBox(
                               width: 162,
                               child: _HomeSkeletonCard(),
                             ),
@@ -432,7 +432,7 @@ class _HomeScreenState extends State<HomeScreen>
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.06),
+                      color: Colors.black.withValues(alpha: 0.06),
                       blurRadius: 8,
                       offset: const Offset(0, 3),
                     ),
@@ -548,7 +548,7 @@ class _HomeScreenState extends State<HomeScreen>
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),
@@ -825,8 +825,8 @@ class _HomeScreenState extends State<HomeScreen>
       onTap: () => Navigator.push(
         context,
         PageRouteBuilder(
-          pageBuilder: (_, a, __) => ProductDetailViewScreen(product: p),
-          transitionsBuilder: (_, a, __, child) =>
+          pageBuilder: (_, a, _) => ProductDetailViewScreen(product: p),
+          transitionsBuilder: (_, a, _, child) =>
               FadeTransition(opacity: a, child: child),
           transitionDuration: const Duration(milliseconds: 220),
         ),
@@ -960,12 +960,12 @@ class _HomeScreenState extends State<HomeScreen>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: const Color(0xFFFFE0B2), width: 0.8),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: Colors.black.withValues(alpha: 0.04),
                         blurRadius: 4,
                         offset: const Offset(0, 2),
                       ),
@@ -1018,8 +1018,8 @@ class _HomeScreenState extends State<HomeScreen>
       onTap: () => Navigator.push(
         context,
         PageRouteBuilder(
-          pageBuilder: (_, a, __) => ProductDetailViewScreen(product: p),
-          transitionsBuilder: (_, a, __, child) =>
+          pageBuilder: (_, a, _) => ProductDetailViewScreen(product: p),
+          transitionsBuilder: (_, a, _, child) =>
               FadeTransition(opacity: a, child: child),
           transitionDuration: const Duration(milliseconds: 220),
         ),
@@ -1130,12 +1130,12 @@ class _HomeScreenState extends State<HomeScreen>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: const Color(0xFFFFE0B2), width: 0.8),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: Colors.black.withValues(alpha: 0.04),
                         blurRadius: 4,
                         offset: const Offset(0, 2),
                       ),
@@ -2026,7 +2026,7 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
               'assets/bg/home_intro.jpg',
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
-              errorBuilder: (_, __, ___) => Container(color: kBg),
+              errorBuilder: (_, _, _) => Container(color: kBg),
             ),
           ),
 
@@ -2056,7 +2056,7 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
                         width: 36,
                         height: 36,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.spa, color: kPrimary, size: 26),
+                        errorBuilder: (_, _, _) => const Icon(Icons.spa, color: kPrimary, size: 26),
                       ),
                     ),
                   ),

@@ -113,7 +113,7 @@ class _NotServiceableScreenState extends State<NotServiceableScreen>
           // Background blobs — soft light version
           AnimatedBuilder(
             animation: _bgAnim,
-            builder: (_, __) => Stack(children: [
+            builder: (_, _) => Stack(children: [
               Positioned(
                 top: -100 + math.sin(_bgAnim.value * math.pi * 2) * 40,
                 right: -60,
@@ -174,7 +174,7 @@ class _NotServiceableScreenState extends State<NotServiceableScreen>
               Center(
                 child: AnimatedBuilder(
                   animation: Listenable.merge([_floatAnim, _signalAnim, _pulseAnim]),
-                  builder: (_, __) => SizedBox(
+                  builder: (_, _) => SizedBox(
                     width: 160, height: 160,
                     child: Stack(alignment: Alignment.center, children: [
                       // Outer pulse
@@ -333,7 +333,7 @@ class _NotServiceableScreenState extends State<NotServiceableScreen>
               // Animated checkmark
               AnimatedBuilder(
                 animation: _pulseAnim,
-                builder: (_, __) => Stack(alignment: Alignment.center, children: [
+                builder: (_, _) => Stack(alignment: Alignment.center, children: [
                   Container(
                     width: 100 + _pulseAnim.value * 20,
                     height: 100 + _pulseAnim.value * 20,

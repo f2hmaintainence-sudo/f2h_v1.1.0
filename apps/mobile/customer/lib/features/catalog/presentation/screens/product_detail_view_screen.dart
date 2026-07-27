@@ -30,7 +30,7 @@ class ProductDetailViewScreen extends StatefulWidget {
 class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
     with SingleTickerProviderStateMixin {
   bool _detailsExpanded = false;
-  int _selectedRelatedIdx = 0;
+  final int _selectedRelatedIdx = 0;
   int _currentImageIndex = 0;
   late final PageController _pageController;
   late final AnimationController _slideCtrl;
@@ -186,7 +186,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.08),
+                                    color: Colors.black.withValues(alpha: 0.08),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -243,7 +243,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                   decoration: BoxDecoration(
                                     color: _currentImageIndex == index
                                         ? const Color(0xFF0C831F)
-                                        : Colors.grey.withOpacity(0.5),
+                                        : Colors.grey.withValues(alpha: 0.5),
                                     borderRadius: BorderRadius.circular(3),
                                   ),
                                 ),
@@ -354,7 +354,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                               child: ListView.separated(
                                 scrollDirection: Axis.horizontal,
                                 itemCount: p.allVariants.length,
-                                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                                separatorBuilder: (_, _) => const SizedBox(width: 8),
                                 itemBuilder: (context, index) {
                                   final v = p.allVariants[index];
                                   final isSel = v.id == _selectedVariant.id;
@@ -589,7 +589,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
                               itemCount: related.length,
-                              separatorBuilder: (_, __) =>
+                              separatorBuilder: (_, _) =>
                                   const SizedBox(width: 10),
                               itemBuilder: (_, i) =>
                                   ProductCardH(related[i]),
@@ -647,7 +647,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
                               itemCount: _reviews.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 8),
+                              separatorBuilder: (_, _) => const SizedBox(height: 8),
                               itemBuilder: (context, idx) {
                                 final r = _reviews[idx];
                                 final rating = double.tryParse(r['rating']?.toString() ?? '') ?? 0.0;
@@ -733,9 +733,9 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
               Navigator.pushReplacement(
                 context,
                 PageRouteBuilder(
-                  pageBuilder: (_, a, __) =>
+                  pageBuilder: (_, a, _) =>
                       ProductDetailViewScreen(product: stripProducts[i]),
-                  transitionsBuilder: (_, a, __, child) =>
+                  transitionsBuilder: (_, a, _, child) =>
                       FadeTransition(opacity: a, child: child),
                   transitionDuration: const Duration(milliseconds: 200),
                 ),
@@ -757,7 +757,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: kPrimary.withOpacity(0.15),
+                          color: kPrimary.withValues(alpha: 0.15),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         )
@@ -792,7 +792,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -1009,7 +1009,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFFE5A93B).withOpacity(0.35),
+                        color: const Color(0xFFE5A93B).withValues(alpha: 0.35),
                         blurRadius: 12,
                         offset: const Offset(0, 6),
                       ),

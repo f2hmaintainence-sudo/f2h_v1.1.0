@@ -64,7 +64,7 @@ class _CartScreenState extends State<CartScreen> {
 
   /// Whether the address is currently being loaded (unused, preserved for compatibility).
   // ignore: unused_field
-  bool _isAddressLoading = false;
+  final bool _isAddressLoading = false;
 
   /// Whether subscription information is expanded.
   bool _showSubscriptionInfo = false;
@@ -721,7 +721,7 @@ class _CartScreenState extends State<CartScreen> {
                           ? Icons.repeat_rounded
                           : Icons.shopping_basket_rounded,
                       size: 40,
-                      color: kTextSub.withOpacity(0.4),
+                      color: kTextSub.withValues(alpha: 0.4),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -744,7 +744,7 @@ class _CartScreenState extends State<CartScreen> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: itemKeys.length,
-              separatorBuilder: (_, __) =>
+              separatorBuilder: (_, _) =>
                   const Divider(color: kBorderLt, height: 1),
               itemBuilder: (context, i) {
                 final key = itemKeys[i];
@@ -1210,7 +1210,7 @@ class _CartScreenState extends State<CartScreen> {
         border: const Border(top: BorderSide(color: kBorderLt)),
         boxShadow: [
           BoxShadow(
-            color: kPrimary.withOpacity(0.04),
+            color: kPrimary.withValues(alpha: 0.04),
             blurRadius: 16,
             offset: const Offset(0, -4),
           ),
@@ -1724,7 +1724,7 @@ class _CartItemTileState extends State<_CartItemTile> {
               decoration: BoxDecoration(
                 color: isSelected ? Colors.white : kBg,
                 shape: BoxShape.circle,
-                border: Border.all(color: isSelected ? color.withOpacity(0.15) : kBorderLt),
+                border: Border.all(color: isSelected ? color.withValues(alpha: 0.15) : kBorderLt),
               ),
               child: Icon(
                 Icons.remove,
@@ -1756,7 +1756,7 @@ class _CartItemTileState extends State<_CartItemTile> {
               decoration: BoxDecoration(
                 color: isSelected ? Colors.white : kBg,
                 shape: BoxShape.circle,
-                border: Border.all(color: isSelected ? color.withOpacity(0.15) : kBorderLt),
+                border: Border.all(color: isSelected ? color.withValues(alpha: 0.15) : kBorderLt),
               ),
               child: Icon(
                 Icons.add,
@@ -2002,7 +2002,7 @@ class _CartItemTileState extends State<_CartItemTile> {
                                 color: kRedLt,
                                 borderRadius: BorderRadius.circular(6),
                                 border: Border.all(
-                                  color: kRed.withOpacity(0.15),
+                                  color: kRed.withValues(alpha: 0.15),
                                 ),
                               ),
                               child: const Row(
@@ -2255,7 +2255,7 @@ class _CartItemTileState extends State<_CartItemTile> {
                 ],
               ),
             );
-          }).toList(),
+          }),
 
           const SizedBox(height: 20),
           const Divider(height: 1, color: kBorder),

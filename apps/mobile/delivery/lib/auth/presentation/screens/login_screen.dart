@@ -399,7 +399,7 @@ class _AnimatedBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: controller,
-      builder: (_, __) {
+      builder: (_, _) {
         final t = controller.value;
         final y = math.sin(t * math.pi * 2) * 60;
         final x = math.cos(t * math.pi * 1.5) * 40;

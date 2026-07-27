@@ -40,7 +40,7 @@ class StatusBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderAndIconColor.withOpacity(0.3), width: 1.5),
+        border: Border.all(color: borderAndIconColor.withValues(alpha: 0.3), width: 1.5),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

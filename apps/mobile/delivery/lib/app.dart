@@ -152,7 +152,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 border: const Border(top: BorderSide(color: kBorderLt)),
                 boxShadow: [
                   BoxShadow(
-                    color: kPrimary.withOpacity(0.04),
+                    color: kPrimary.withValues(alpha: 0.04),
                     blurRadius: 16,
                     offset: const Offset(0, -4),
                   ),
@@ -243,7 +243,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                       ? activeColor
                                       : (isTabEnabled
                                             ? kMuted
-                                            : kMuted.withOpacity(0.3)),
+                                            : kMuted.withValues(alpha: 0.3)),
                                 ),
                               ),
                             ],
