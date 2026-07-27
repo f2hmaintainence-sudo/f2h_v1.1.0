@@ -77,10 +77,10 @@ export class CatalogSaveAddService {
     }
 
     if (fileUrl) {
-      await this.dataService.query(
-        `UPDATE products SET image_path = $1 WHERE product_id = $2`,
-        [fileUrl, productId],
-      );
+      await this.dataService.query('products', {
+        update: { image_path: fileUrl },
+        where: [{ column: 'product_id', operator: '=', value: productId }],
+      });
     }
   }
 
@@ -127,10 +127,10 @@ export class CatalogSaveAddService {
     const finalUrls = Array.from(new Set(urlsToProcess)).slice(0, 5);
 
     if (finalUrls.length > 0) {
-      await this.dataService.query(
-        `DELETE FROM product_images WHERE variant_id = $1`,
-        [variantId],
-      );
+      await this.dataService.query('product_images', {
+        delete: true,
+        where: [{ column: 'variant_id', operator: '=', value: variantId }],
+      });
 
       for (const [index, fileUrl] of finalUrls.entries()) {
         await this.dataService.insert('product_images', {
@@ -358,19 +358,7 @@ export class CatalogSaveAddService {
         );
       }
 
-      const primaryUrl = body.primary_image_url || body.image_url;
-      const secondaryUrl = body.secondary_image_url;
-      const secondaryImage = body.secondary_image_file ? this.normalizeProductImage(body.secondary_image_file) : null;
-
-      await this.savePrimaryProductImage(
-        insertData.product_id,
-        insertData.name,
-        productImage,
-        secondaryImage,
-        primaryUrl,
-        secondaryUrl,
-        adminId,
-      );
+      // Primary product images are managed on product_variants level
 
       // =====================================================
       // 10. AUDIT LOG
@@ -653,8 +641,19 @@ export class CatalogSaveAddService {
       insertData.sort_order = insertData.sort_order ?? 0;
       
 
-      const variantImage = insertData.variant_image;
+      const variantImages = [
+        body.variant_image,
+        body.variant_image_2,
+        body.variant_image_3,
+        body.variant_image_4,
+        body.variant_image_5,
+      ].filter((img) => img !== undefined && img !== null && img !== '');
+
       delete insertData.variant_image;
+      delete insertData.variant_image_2;
+      delete insertData.variant_image_3;
+      delete insertData.variant_image_4;
+      delete insertData.variant_image_5;
       delete insertData.primary_image_url;
       delete insertData.additional_image_urls;
       delete insertData.variant_image_file;
@@ -678,7 +677,7 @@ export class CatalogSaveAddService {
         insertData.product_id,
         insertData.variant_id,
         insertData.name,
-        variantImage,
+        variantImages,
         adminId,
         primaryUrl,
         additionalUrls,
