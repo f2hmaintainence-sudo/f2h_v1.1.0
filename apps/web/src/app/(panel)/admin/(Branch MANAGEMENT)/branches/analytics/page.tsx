@@ -36,7 +36,7 @@ export default function BranchAnalyticsPage() {
   const [daysRange, setDaysRange] = useState("30");
   const [selectedBranch, setSelectedBranch] = useState("");
   const [branchesList, setBranchesList] = useState<any[]>([]);
-  const [viewMode, setViewMode] = useState<"table" | "grid" | "charts">("table");
+  const [viewMode, setViewMode] = useState<"table" | "grid" | "charts">("charts");
 
   // Tooltip state for popovers
   const [activePartnerPopover, setActivePartnerPopover] = useState<string | null>(null);
@@ -196,6 +196,17 @@ export default function BranchAnalyticsPage() {
           <div className="inline-flex h-9 rounded-xl bg-gray-100/90 p-1 border border-gray-200/80 items-center">
             <button
               type="button"
+              onClick={() => setViewMode("charts")}
+              className={`inline-flex items-center gap-1.5 h-7 px-3 text-xs font-semibold rounded-lg transition-all ${
+                viewMode === "charts"
+                  ? "bg-white text-emerald-800 shadow-2xs border border-gray-200 font-bold"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              <BarChart3 size={14} className="text-emerald-600" /> Visual Analytics
+            </button>
+            <button
+              type="button"
               onClick={() => setViewMode("table")}
               className={`inline-flex items-center gap-1.5 h-7 px-3 text-xs font-semibold rounded-lg transition-all ${
                 viewMode === "table"
@@ -215,17 +226,6 @@ export default function BranchAnalyticsPage() {
               }`}
             >
               <LayoutGrid size={14} /> Hub Cards
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("charts")}
-              className={`inline-flex items-center gap-1.5 h-7 px-3 text-xs font-semibold rounded-lg transition-all ${
-                viewMode === "charts"
-                  ? "bg-white text-emerald-800 shadow-2xs border border-gray-200 font-bold"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              <BarChart3 size={14} className="text-emerald-600" /> Visual Analytics
             </button>
           </div>
 
