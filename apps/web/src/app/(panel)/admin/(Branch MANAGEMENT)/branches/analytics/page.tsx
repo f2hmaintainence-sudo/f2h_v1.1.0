@@ -4,8 +4,8 @@
 //
 // Project     : F2H Fresh
 // File        : page.tsx
-// Description : Executive Branch Analytics with Downward Light-Themed Tooltips for Delivery Boys & Warehouses,
-//               Portfolio Links, and Interactive Visual Analytics Charts Tab.
+// Description : Executive Branch Analytics with Zero Top Gap, Compact Hub Cards Padding,
+//               Executive Table Pagination, Downward Light Tooltips, and Visual Analytics Charts Tab.
 //
 // ============================================================================
 
@@ -17,7 +17,8 @@ import {
   BarChart3, RefreshCw, Home, ChevronRight, TrendingUp,
   Users, ShoppingCart, Truck, IndianRupee, Warehouse,
   Percent, Table as TableIcon, LayoutGrid, Building2,
-  ExternalLink, Phone, ShieldCheck, UserCheck, PieChart, LineChart
+  ExternalLink, Phone, ShieldCheck, UserCheck, PieChart, LineChart,
+  ChevronLeft, PackageCheck
 } from "lucide-react";
 import Link from "next/link";
 
@@ -37,6 +38,8 @@ export default function BranchAnalyticsPage() {
   const [selectedBranch, setSelectedBranch] = useState("");
   const [branchesList, setBranchesList] = useState<any[]>([]);
   const [viewMode, setViewMode] = useState<"table" | "grid" | "charts">("charts");
+  const [tablePage, setTablePage] = useState(1);
+  const tablePageSize = 10;
 
   // Tooltip state for popovers
   const [activePartnerPopover, setActivePartnerPopover] = useState<string | null>(null);
@@ -91,11 +94,22 @@ export default function BranchAnalyticsPage() {
     return Math.max(...branches.map((b: any) => Number(b.total_sales || 0)), 1);
   }, [analytics]);
 
+  const paginatedBranches = useMemo(() => {
+    const branches = analytics?.branches || [];
+    const start = (tablePage - 1) * tablePageSize;
+    return branches.slice(start, start + tablePageSize);
+  }, [analytics, tablePage]);
+
+  const totalTablePages = useMemo(() => {
+    const branches = analytics?.branches || [];
+    return Math.max(1, Math.ceil(branches.length / tablePageSize));
+  }, [analytics]);
+
   return (
-    <div className="pt-6 md:pt-8 px-4 md:px-7 pb-10 space-y-6 font-sans min-h-screen bg-slate-50/60">
+    <div className="pt-3 md:pt-4 px-4 md:px-6 pb-8 space-y-4 font-sans min-h-screen bg-slate-50/60">
       
       {/* ── Breadcrumb & Top Action Header ── */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-white p-5 md:p-6 rounded-2xl border border-gray-200/80 shadow-2xs">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-white p-4 md:p-5 rounded-2xl border border-gray-200/80 shadow-2xs">
         <div>
           <nav className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100/90 rounded-lg border border-slate-200/70 text-xs text-slate-500 mb-2 font-medium" aria-label="Breadcrumb">
             <Link href="/admin/dashboard" className="inline-flex items-center gap-1 hover:text-emerald-700 transition-colors font-semibold text-slate-600">
@@ -190,7 +204,7 @@ export default function BranchAnalyticsPage() {
 
       {/* ── Enterprise Filter & Controls ── */}
       <div className="bg-white rounded-2xl p-3 border border-gray-200/90 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-3">
-        {/* Left: View Mode Switcher (Table | Cards | Visual Analytics) */}
+        {/* Left: View Mode Switcher (Visual Analytics | Executive Table | Hub Cards) */}
         <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
           {/* View Switcher */}
           <div className="inline-flex h-9 rounded-xl bg-gray-100/90 p-1 border border-gray-200/80 items-center">
@@ -285,8 +299,8 @@ export default function BranchAnalyticsPage() {
         </div>
       ) : viewMode === "table" ? (
         /* Executive Branch Performance Table with Downward Light Tooltips & Links */
-        <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs">
-          <div className="overflow-x-auto min-h-[300px] pb-24">
+        <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
+          <div className="overflow-x-auto min-h-[300px] pb-12">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-100/90 text-slate-700 uppercase text-[10px] font-bold border-b border-gray-200">
                 <tr>
@@ -299,7 +313,7 @@ export default function BranchAnalyticsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white font-medium">
-                {(analytics?.branches || []).map((b: any) => {
+                {paginatedBranches.map((b: any) => {
                   const partners = b.partners_list || [];
                   const warehouses = b.warehouses_list || [];
 
@@ -399,7 +413,7 @@ export default function BranchAnalyticsPage() {
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 text-sky-800 border border-sky-200/80 text-xs font-extrabold hover:bg-sky-100 hover:border-sky-300 transition-all cursor-pointer shadow-2xs group"
                           >
                             <Warehouse size={13} className="text-sky-600" />
-                            <span>{b.warehouses_count} Warehouse(s)</span>
+                            <span>{b.warehouses_count} Warehouses</span>
                             <ExternalLink size={12} className="text-sky-600 opacity-60 group-hover:opacity-100 transition-opacity" />
                           </Link>
 
@@ -488,64 +502,113 @@ export default function BranchAnalyticsPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Table Pagination Footer */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 bg-slate-50/90 border-t border-gray-200/80 rounded-b-2xl text-xs font-medium text-slate-600">
+            <div>
+              Showing <span className="font-bold text-slate-900">{(tablePage - 1) * tablePageSize + 1}</span> to{" "}
+              <span className="font-bold text-slate-900">{Math.min(tablePage * tablePageSize, analytics?.branches?.length || 0)}</span> of{" "}
+              <span className="font-bold text-slate-900">{analytics?.branches?.length || 0}</span> branches
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setTablePage((p) => Math.max(1, p - 1))}
+                disabled={tablePage === 1}
+                className="inline-flex items-center gap-1 h-8 px-3 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-white transition-colors font-semibold"
+              >
+                <ChevronLeft size={14} /> Previous
+              </button>
+
+              <span className="px-3 py-1 bg-white rounded-lg text-slate-800 font-bold border border-gray-200">
+                Page {tablePage} of {totalTablePages}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setTablePage((p) => Math.min(totalTablePages, p + 1))}
+                disabled={tablePage >= totalTablePages}
+                className="inline-flex items-center gap-1 h-8 px-3 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-white transition-colors font-semibold"
+              >
+                Next <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
         </div>
       ) : viewMode === "grid" ? (
-        /* Branch Hub Cards View with Light Tooltips & Links */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        /* Executive Spacious Hub Cards View */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {(analytics?.branches || []).map((b: any) => {
             const partners = b.partners_list || [];
             const warehouses = b.warehouses_list || [];
+            const sales = Number(b.total_sales || b.revenue || 0);
+            const profit = Number(b.net_profit || 0);
 
             return (
-              <div key={b.branch_id} className="bg-white rounded-2xl p-4.5 border border-gray-200/90 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4">
-                <div>
+              <div key={b.branch_id} className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col justify-between space-y-5 group">
+                <div className="space-y-4">
+                  {/* Top Card Header */}
                   <div className="flex items-start justify-between">
-                    <div>
-                      <Link href={`/admin/branches/${b.branch_id}`} className="font-extrabold text-slate-900 text-base hover:text-emerald-700 transition-colors">
-                        {b.branch_name}
-                      </Link>
-                      <p className="text-xs text-slate-500 font-medium">{b.city || "Hub Region"}</p>
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 font-extrabold flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
+                        <Building2 size={22} />
+                      </div>
+                      <div>
+                        <Link href={`/admin/branches/${b.branch_id}`} className="font-extrabold text-slate-900 text-lg hover:text-emerald-700 transition-colors">
+                          {b.branch_name}
+                        </Link>
+                        <p className="text-xs text-slate-500 font-medium mt-0.5">
+                          {b.city || "Hub Region"} {b.state ? `• ${b.state}` : ""}
+                        </p>
+                      </div>
                     </div>
 
                     <Link
                       href="/admin/delivery/partners"
-                      className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors"
-                      title={partners.map((p: any) => p.name).join(", ")}
+                      className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs"
                     >
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      {b.active_partners} Drivers
-                      <ExternalLink size={10} className="ml-0.5" />
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>{b.active_partners} Drivers</span>
+                      <ExternalLink size={11} className="text-emerald-600" />
                     </Link>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 mt-3.5 text-xs">
-                    <Link href="/admin/warehouse/list" className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 hover:border-sky-200 transition-colors">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase">Warehouses</span>
-                      <p className="font-extrabold text-slate-900 text-sm mt-0.5 flex items-center gap-1">
-                        <Warehouse size={12} className="text-sky-600" />
-                        {b.warehouses_count} Unit(s)
+                  {/* Operational Metrics Badges */}
+                  <div className="grid grid-cols-2 gap-3 text-xs pt-1">
+                    <Link href="/admin/warehouse/list" className="bg-slate-50/90 p-3.5 rounded-2xl border border-slate-100 hover:border-sky-300 transition-all space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Warehouses</span>
+                      <p className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
+                        <Warehouse size={15} className="text-sky-600" />
+                        {b.warehouses_count} Warehouses
                       </p>
                     </Link>
-                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase">Stock Items</span>
-                      <p className="font-extrabold text-slate-900 text-sm mt-0.5">{b.total_items_count} SKUs</p>
+
+                    <div className="bg-slate-50/90 p-3.5 rounded-2xl border border-slate-100 space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Stock SKUs</span>
+                      <p className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
+                        <PackageCheck size={15} className="text-emerald-600" />
+                        {b.total_items_count} Items
+                      </p>
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-100 space-y-2">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-500 font-semibold">Total Branch Sales:</span>
-                    <span className="font-black text-slate-900">{formatMoney(b.total_sales || b.revenue)}</span>
+                {/* Financial Performance Section */}
+                <div className="pt-4 border-t border-slate-100 space-y-3 text-xs">
+                  <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
+                    <span className="font-bold text-slate-700">Total Branch Sales</span>
+                    <span className="font-black text-slate-900 text-base">{formatMoney(sales)}</span>
                   </div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-500 font-semibold">Net Profit:</span>
-                    <span className="font-black text-teal-700 flex items-center gap-1">
-                      {formatMoney(b.net_profit)}
-                      <span className="text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200 px-1.5 py-0.5 rounded">
+
+                  <div className="flex items-center justify-between p-3.5 rounded-2xl bg-teal-50/70 border border-teal-100">
+                    <span className="font-bold text-teal-900">Net Profit</span>
+                    <div className="text-right flex items-center gap-1.5">
+                      <span className="font-black text-teal-800 text-base">{formatMoney(profit)}</span>
+                      <span className="text-xs font-extrabold bg-teal-200/80 text-teal-900 px-2 py-0.5 rounded-lg border border-teal-300">
                         {b.profit_margin}%
                       </span>
-                    </span>
+                    </div>
                   </div>
                 </div>
               </div>

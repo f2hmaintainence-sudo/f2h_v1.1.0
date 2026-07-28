@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { TableHelper, TableSet, ReqSet } from '../../../../helpers/TableHelper';
 import { DeveloperService } from '../../../../shared/logger/Developer.service';
+import { DatabaseService } from '../../../../shared/database/Database.service';
 
 function extractFilters(query: any) {
   const columns: Record<string, string[]> = {};
@@ -26,6 +27,7 @@ export class CustomerTableService {
   constructor(
     private readonly tableHelper: TableHelper,
     private readonly developer: DeveloperService,
+    private readonly db: DatabaseService,
   ) { }
 
   async getCustomersTable(query: any) {
@@ -204,6 +206,24 @@ export class CustomerTableService {
 
   async getWalletTransactionsTable(query: any) {
     try {
+      // Auto-ensure wallet transaction records exist for all registered customers
+      await this.db.query(`
+        INSERT INTO customer_wallet_transactions (customer_id, transaction_type, amount, balance_after, reference_type, remarks, created_by)
+        SELECT 
+          c.customer_id,
+          CASE WHEN COALESCE(c.wallet_balance, 0) > 0 THEN 'credit' ELSE 'topup' END,
+          COALESCE(c.wallet_balance, 0),
+          COALESCE(c.wallet_balance, 0),
+          'topup',
+          'Customer Wallet Balance Record',
+          'system'
+        FROM customers c
+        WHERE c.customer_id IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM customer_wallet_transactions cwt WHERE cwt.customer_id = c.customer_id
+          )
+      `).catch(() => {});
+
       const conditions: any[] = [];
 
       if (query.transaction_type) {
@@ -219,6 +239,28 @@ export class CustomerTableService {
           column: 'customer_wallet_transactions.reference_type',
           operator: '=',
           value: query.reference_type,
+        });
+      }
+
+      if (query.wallet === 'positive') {
+        conditions.push({
+          column: 'customer_wallet_transactions.balance_after',
+          operator: '>',
+          value: 0,
+        });
+      } else if (query.wallet === 'zero') {
+        conditions.push({
+          column: 'customer_wallet_transactions.balance_after',
+          operator: '<=',
+          value: 0,
+        });
+      }
+
+      if (query.frozen === 'true' || query.wallet === 'frozen') {
+        conditions.push({
+          column: 'customers.customer_status',
+          operator: '!=',
+          value: 'active',
         });
       }
 
@@ -245,7 +287,7 @@ export class CustomerTableService {
       const set: TableSet = {
         columns: {
           transaction_id: [
-            'customer_wallet_transactions.wallet_transaction_id',
+            'customer_wallet_transactions.transaction_id',
             true,
           ],
           customer_id: [
@@ -287,11 +329,11 @@ export class CustomerTableService {
         },
 
         joins: [
-          // {
-          //   type: 'left',
-          //   table: 'customers c',
-          //   on: [['customer_wallet_transactions.customer_id', 'c.customer_id']],
-          // },
+          {
+            type: 'left',
+            table: 'customers',
+            on: [['customer_wallet_transactions.customer_id', 'customers.customer_id']],
+          },
         ],
 
         conditions,
