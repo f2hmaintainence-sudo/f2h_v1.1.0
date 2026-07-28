@@ -66,7 +66,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     await this.createRequiredTables();
   }
 
+  private static isTablesCreated = false;
+
   private async createRequiredTables() {
+    if (DatabaseService.isTablesCreated) return;
+    DatabaseService.isTablesCreated = true;
     try {
       this.logger.log('Ensuring dispatch_requirements and dispatch_balances tables exist...');
       

@@ -192,14 +192,6 @@ export default function LeaveRequestsPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
-            onClick={() => setIsAddModalOpen(true)}
-            className="inline-flex items-center gap-1.5 h-9 px-4 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-2xs hover:shadow-xs transition-all"
-          >
-            <Plus size={15} /> Add Leave Record
-          </button>
-
-          <button
-            type="button"
             onClick={fetchLeaveRequests}
             className="inline-flex items-center justify-center gap-2 h-9 px-4 bg-white text-slate-800 text-xs font-bold rounded-xl border border-gray-200 shadow-2xs hover:border-emerald-500 hover:text-emerald-700 transition-colors"
           >
