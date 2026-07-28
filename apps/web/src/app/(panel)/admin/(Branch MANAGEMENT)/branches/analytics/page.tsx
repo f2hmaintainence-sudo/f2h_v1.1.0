@@ -4,7 +4,7 @@
 //
 // Project     : F2H Fresh
 // File        : page.tsx
-// Description : Executive Branch Analytics with Tooltips for Delivery Boys & Warehouses,
+// Description : Executive Branch Analytics with Downward Light-Themed Tooltips for Delivery Boys & Warehouses,
 //               Portfolio Links, and Interactive Visual Analytics Charts Tab.
 //
 // ============================================================================
@@ -284,9 +284,9 @@ export default function BranchAnalyticsPage() {
           <p className="text-xs text-slate-400">Try selecting a different timeframe or branch.</p>
         </div>
       ) : viewMode === "table" ? (
-        /* Executive Branch Performance Table with Tooltips & Links */
-        <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs overflow-visible">
-          <div className="overflow-x-auto overflow-y-visible">
+        /* Executive Branch Performance Table with Downward Light Tooltips & Links */
+        <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs">
+          <div className="overflow-x-auto min-h-[300px] pb-24">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-100/90 text-slate-700 uppercase text-[10px] font-bold border-b border-gray-200">
                 <tr>
@@ -322,7 +322,7 @@ export default function BranchAnalyticsPage() {
                         </div>
                       </td>
 
-                      {/* Delivery Boys Count with Interactive Tooltip & Links */}
+                      {/* Delivery Boys Count with Light Panel Popover (Opens Downward) */}
                       <td className="px-4 py-3.5 text-center relative">
                         <div
                           className="relative inline-block"
@@ -331,7 +331,7 @@ export default function BranchAnalyticsPage() {
                         >
                           <Link
                             href="/admin/delivery/partners"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200/80 text-xs font-extrabold hover:bg-emerald-100/80 hover:border-emerald-300 transition-all cursor-pointer shadow-2xs group"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200/80 text-xs font-extrabold hover:bg-emerald-100 hover:border-emerald-300 transition-all cursor-pointer shadow-2xs group"
                           >
                             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                             <span>{b.active_partners} Active</span>
@@ -339,43 +339,47 @@ export default function BranchAnalyticsPage() {
                             <ExternalLink size={12} className="text-emerald-600 opacity-60 group-hover:opacity-100 transition-opacity" />
                           </Link>
 
-                          {/* Hover Tooltip listing Delivery Boys */}
+                          {/* Light Panel Hover Tooltip */}
                           {activePartnerPopover === b.branch_id && (
-                            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-3 bg-slate-900 text-white rounded-xl shadow-xl z-50 text-left pointer-events-auto border border-slate-700 animate-in fade-in zoom-in-95 duration-150">
-                              <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
-                                <span className="font-bold text-xs text-emerald-400 flex items-center gap-1">
-                                  <Truck size={13} /> {b.branch_name} Fleet
+                            <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-72 p-3.5 bg-white text-slate-900 rounded-xl shadow-2xl z-[999] text-left border border-emerald-200/90 animate-in fade-in zoom-in-95 duration-150 ring-1 ring-black/5">
+                              <div className="flex items-center justify-between border-b border-emerald-100 pb-2 mb-2 bg-emerald-50/80 p-2 rounded-lg">
+                                <span className="font-bold text-xs text-emerald-900 flex items-center gap-1.5">
+                                  <Truck size={14} className="text-emerald-600" /> {b.branch_name} Drivers
                                 </span>
-                                <span className="text-[10px] text-slate-400">{partners.length} assigned</span>
+                                <span className="text-[11px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md">
+                                  {partners.length} assigned
+                                </span>
                               </div>
+
                               {partners.length === 0 ? (
-                                <p className="text-xs text-slate-400 italic">No partners assigned</p>
+                                <p className="text-xs text-slate-400 italic p-2">No partners assigned</p>
                               ) : (
-                                <ul className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                                <ul className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                                   {partners.map((p: any, idx: number) => (
-                                    <li key={p.id || idx} className="text-xs flex items-center justify-between bg-slate-800/80 p-1.5 rounded-lg hover:bg-slate-800">
+                                    <li key={p.id || idx} className="text-xs flex items-center justify-between bg-slate-50 hover:bg-emerald-50/70 p-2 rounded-lg border border-slate-100 transition-colors">
                                       <Link
                                         href="/admin/delivery/partners"
-                                        className="font-bold text-slate-200 hover:text-emerald-400 flex items-center gap-1.5 transition-colors"
+                                        className="font-bold text-slate-800 hover:text-emerald-700 flex items-center gap-1.5 transition-colors"
                                       >
-                                        <UserCheck size={12} className={p.is_active ? "text-emerald-400" : "text-slate-500"} />
+                                        <UserCheck size={13} className={p.is_active ? "text-emerald-600" : "text-slate-400"} />
                                         <span>{p.name}</span>
                                       </Link>
                                       {p.phone && (
-                                        <span className="text-[10px] text-slate-400 flex items-center gap-1 font-mono">
-                                          <Phone size={9} /> {p.phone}
+                                        <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1 font-mono">
+                                          <Phone size={10} className="text-slate-400" /> {p.phone}
                                         </span>
                                       )}
                                     </li>
                                   ))}
                                 </ul>
                               )}
-                              <div className="mt-2.5 pt-2 border-t border-slate-800 text-center">
+
+                              <div className="mt-3 pt-2 border-t border-slate-100 text-center">
                                 <Link
                                   href="/admin/delivery/partners"
-                                  className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center justify-center gap-1"
+                                  className="text-xs font-extrabold text-emerald-700 hover:text-emerald-800 flex items-center justify-center gap-1.5 py-1 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200/80 transition-colors"
                                 >
-                                  View Full Fleet Portfolio <ExternalLink size={10} />
+                                  View Full Fleet Portfolio <ExternalLink size={12} />
                                 </Link>
                               </div>
                             </div>
@@ -383,7 +387,7 @@ export default function BranchAnalyticsPage() {
                         </div>
                       </td>
 
-                      {/* Warehouses Count with Interactive Tooltip & Links */}
+                      {/* Warehouses Count with Light Panel Popover (Opens Downward) */}
                       <td className="px-4 py-3.5 text-center relative">
                         <div
                           className="relative inline-block"
@@ -392,35 +396,38 @@ export default function BranchAnalyticsPage() {
                         >
                           <Link
                             href="/admin/warehouse/list"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 text-sky-800 border border-sky-200/80 text-xs font-extrabold hover:bg-sky-100/80 hover:border-sky-300 transition-all cursor-pointer shadow-2xs group"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 text-sky-800 border border-sky-200/80 text-xs font-extrabold hover:bg-sky-100 hover:border-sky-300 transition-all cursor-pointer shadow-2xs group"
                           >
                             <Warehouse size={13} className="text-sky-600" />
                             <span>{b.warehouses_count} Warehouse(s)</span>
                             <ExternalLink size={12} className="text-sky-600 opacity-60 group-hover:opacity-100 transition-opacity" />
                           </Link>
 
-                          {/* Hover Tooltip listing Warehouses */}
+                          {/* Light Panel Hover Tooltip */}
                           {activeWarehousePopover === b.branch_id && (
-                            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-3 bg-slate-900 text-white rounded-xl shadow-xl z-50 text-left pointer-events-auto border border-slate-700 animate-in fade-in zoom-in-95 duration-150">
-                              <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
-                                <span className="font-bold text-xs text-sky-400 flex items-center gap-1">
-                                  <Warehouse size={13} /> {b.city || b.branch_name} Hubs
+                            <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-72 p-3.5 bg-white text-slate-900 rounded-xl shadow-2xl z-[999] text-left border border-sky-200/90 animate-in fade-in zoom-in-95 duration-150 ring-1 ring-black/5">
+                              <div className="flex items-center justify-between border-b border-sky-100 pb-2 mb-2 bg-sky-50/80 p-2 rounded-lg">
+                                <span className="font-bold text-xs text-sky-900 flex items-center gap-1.5">
+                                  <Warehouse size={14} className="text-sky-600" /> {b.city || b.branch_name} Hubs
                                 </span>
-                                <span className="text-[10px] text-slate-400">{warehouses.length} active</span>
+                                <span className="text-[11px] bg-sky-100 text-sky-800 font-bold px-2 py-0.5 rounded-md">
+                                  {warehouses.length} active
+                                </span>
                               </div>
+
                               {warehouses.length === 0 ? (
-                                <p className="text-xs text-slate-400 italic">Central Storage Hub</p>
+                                <p className="text-xs text-slate-400 italic p-2">Central Storage Hub</p>
                               ) : (
-                                <ul className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                                <ul className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                                   {warehouses.map((w: any, idx: number) => (
-                                    <li key={w.id || idx} className="text-xs bg-slate-800/80 p-1.5 rounded-lg hover:bg-slate-800">
+                                    <li key={w.id || idx} className="text-xs bg-slate-50 hover:bg-sky-50/70 p-2 rounded-lg border border-slate-100 transition-colors">
                                       <Link
                                         href="/admin/warehouse/list"
-                                        className="font-bold text-slate-200 hover:text-sky-400 flex items-center justify-between transition-colors"
+                                        className="font-bold text-slate-800 hover:text-sky-700 flex items-center justify-between transition-colors"
                                       >
                                         <span>{w.name}</span>
                                         {w.code && (
-                                          <span className="text-[10px] bg-slate-700 text-sky-300 px-1.5 py-0.5 rounded font-mono">
+                                          <span className="text-[10px] bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded font-mono font-bold">
                                             {w.code}
                                           </span>
                                         )}
@@ -429,12 +436,13 @@ export default function BranchAnalyticsPage() {
                                   ))}
                                 </ul>
                               )}
-                              <div className="mt-2.5 pt-2 border-t border-slate-800 text-center">
+
+                              <div className="mt-3 pt-2 border-t border-slate-100 text-center">
                                 <Link
                                   href="/admin/warehouse/list"
-                                  className="text-[11px] font-bold text-sky-400 hover:text-sky-300 flex items-center justify-center gap-1"
+                                  className="text-xs font-extrabold text-sky-700 hover:text-sky-800 flex items-center justify-center gap-1.5 py-1 bg-sky-50 hover:bg-sky-100 rounded-lg border border-sky-200/80 transition-colors"
                                 >
-                                  View Warehouse Inventory <ExternalLink size={10} />
+                                  View Warehouse Inventory <ExternalLink size={12} />
                                 </Link>
                               </div>
                             </div>
@@ -482,7 +490,7 @@ export default function BranchAnalyticsPage() {
           </div>
         </div>
       ) : viewMode === "grid" ? (
-        /* Branch Hub Cards View with Tooltips & Links */
+        /* Branch Hub Cards View with Light Tooltips & Links */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {(analytics?.branches || []).map((b: any) => {
             const partners = b.partners_list || [];
