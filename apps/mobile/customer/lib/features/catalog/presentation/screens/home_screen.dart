@@ -379,9 +379,6 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 ),
 
-                // 6. Referral Program Banner
-                SliverToBoxAdapter(child: _referralBanner()),
-
                 // 7. The F2H Promise
                 SliverToBoxAdapter(child: _promiseStrip()),
 
