@@ -18,10 +18,18 @@ interface DeliveryPartner {
   phone?: string;
   vehicle_type?: string;
   is_available?: boolean;
+  is_online?: boolean;
   is_active?: boolean;
   branch_id?: string;
   branch_name?: string;
   rating?: number;
+}
+
+interface Branch {
+  branch_id: string;
+  branch_name: string;
+  lat?: number;
+  lng?: number;
 }
 
 interface OrderItem {
@@ -67,6 +75,10 @@ function formatMoney(v: number | string) {
   return "₹" + Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function isPartnerOnDuty(p: DeliveryPartner): boolean {
+  return Boolean(p.is_online ?? p.is_available);
+}
+
 // Kuppam Hub & Sector Coordinates (Light Map GPS Locations)
 const KUPPAM_HUB = { lat: 12.7483, lng: 78.3644, name: "Kuppam Main Hub" };
 
@@ -80,10 +92,12 @@ const DEMO_STOPS = [
 export default function DeliveryTrackingPage() {
   const [partners, setPartners] = useState<DeliveryPartner[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [branchFilter, setBranchFilter] = useState<string>("all");
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
 
   // Layout mode: "split" (7:5 side-by-side), "map_expanded" (Map occupies full 12 cols), "timeline_expanded" (Timeline occupies full 12 cols)
@@ -105,9 +119,10 @@ export default function DeliveryTrackingPage() {
 
     try {
       const today = todayIST();
-      const [partnersRes, ordersRes] = await Promise.all([
+      const [partnersRes, ordersRes, branchesRes] = await Promise.all([
         api.get<any>("/admin/delivery/partners?limit=100"),
         api.get<any>(`/admin/delivery/tracking?date=${today}`),
+        api.get<any>("/admin/zone/branches-list").catch(() => ({ data: [] })),
       ]);
 
       const partnersList: DeliveryPartner[] = Array.isArray(partnersRes.data?.data)
@@ -118,8 +133,13 @@ export default function DeliveryTrackingPage() {
         ? ordersRes.data.data
         : Array.isArray(ordersRes.data) ? ordersRes.data : [];
 
+      const branchesList: Branch[] = Array.isArray(branchesRes.data?.data)
+        ? branchesRes.data.data
+        : Array.isArray(branchesRes.data) ? branchesRes.data : [];
+
       setPartners(partnersList);
       setOrders(ordersList);
+      setBranches(branchesList);
 
       if (partnersList.length > 0 && !selectedPartnerId) {
         setSelectedPartnerId(partnersList[0].delivery_partner_id);
@@ -144,25 +164,66 @@ export default function DeliveryTrackingPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // Consolidate branches list from API + loaded partners + loaded orders
+  const availableBranches = useMemo(() => {
+    const map = new Map<string, Branch>();
+    branches.forEach(b => {
+      if (b.branch_id && b.branch_name) map.set(b.branch_id, b);
+    });
+    partners.forEach(p => {
+      if (p.branch_id && p.branch_name && !map.has(p.branch_id)) {
+        map.set(p.branch_id, { branch_id: p.branch_id, branch_name: p.branch_name });
+      }
+    });
+    orders.forEach(o => {
+      if (o.branch_id && o.branch_name && !map.has(o.branch_id)) {
+        map.set(o.branch_id, { branch_id: o.branch_id, branch_name: o.branch_name });
+      }
+    });
+    return Array.from(map.values());
+  }, [branches, partners, orders]);
+
   const filteredPartners = useMemo(() => {
     return partners.filter(p => {
-      if (statusFilter === "active" && !p.is_available) return false;
-      if (statusFilter === "idle" && p.is_available) return false;
+      const onDuty = isPartnerOnDuty(p);
+      if (statusFilter === "active" && !onDuty) return false;
+      if (statusFilter === "idle" && onDuty) return false;
+      if (branchFilter !== "all" && p.branch_id !== branchFilter) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         return (
           p.full_name?.toLowerCase().includes(q) ||
           p.phone?.includes(q) ||
-          p.vehicle_type?.toLowerCase().includes(q)
+          p.vehicle_type?.toLowerCase().includes(q) ||
+          p.branch_name?.toLowerCase().includes(q)
         );
       }
       return true;
     });
-  }, [partners, statusFilter, searchQuery]);
+  }, [partners, statusFilter, branchFilter, searchQuery]);
 
   const selectedPartner = useMemo(() => {
-    return partners.find(p => p.delivery_partner_id === selectedPartnerId) || partners[0] || null;
-  }, [partners, selectedPartnerId]);
+    if (selectedPartnerId) {
+      const matched = partners.find(p => p.delivery_partner_id === selectedPartnerId);
+      if (matched) return matched;
+    }
+    return filteredPartners[0] || partners[0] || null;
+  }, [partners, filteredPartners, selectedPartnerId]);
+
+  // Active hub/branch for selected partner or selected filter
+  const activeBranch = useMemo(() => {
+    const targetBranchId = selectedPartner?.branch_id || (branchFilter !== "all" ? branchFilter : null);
+    if (!targetBranchId) return KUPPAM_HUB;
+    const found = availableBranches.find(b => b.branch_id === targetBranchId);
+    if (found && found.lat && found.lng) {
+      return { lat: found.lat, lng: found.lng, name: found.branch_name };
+    }
+    return {
+      lat: KUPPAM_HUB.lat,
+      lng: KUPPAM_HUB.lng,
+      name: selectedPartner?.branch_name || found?.branch_name || KUPPAM_HUB.name
+    };
+  }, [selectedPartner, branchFilter, availableBranches]);
 
   // Partner assigned orders
   const partnerOrders = useMemo(() => {
@@ -195,6 +256,8 @@ export default function DeliveryTrackingPage() {
         scheduled_date: todayIST(),
         distance_km: 1.2,
         estimated_time: "Delivered 08:45 AM",
+        branch_id: selectedPartner?.branch_id,
+        branch_name: selectedPartner?.branch_name || "Main Branch",
         lat: DEMO_STOPS[0].lat,
         lng: DEMO_STOPS[0].lng,
         items: [{ product_name: "Fresh Milk 500ml", quantity: 2, unit_price: 35, final_price: 70 }, { product_name: "Farm Curd 1kg", quantity: 1, unit_price: 90, final_price: 90 }],
@@ -210,6 +273,8 @@ export default function DeliveryTrackingPage() {
         scheduled_date: todayIST(),
         distance_km: 2.8,
         estimated_time: "In Transit (ETA 6 mins)",
+        branch_id: selectedPartner?.branch_id,
+        branch_name: selectedPartner?.branch_name || "Main Branch",
         lat: DEMO_STOPS[1].lat,
         lng: DEMO_STOPS[1].lng,
         items: [{ product_name: "Organic Paneer 200g", quantity: 2, unit_price: 110, final_price: 220 }, { product_name: "Butter 500g", quantity: 1, unit_price: 300, final_price: 300 }],
@@ -225,6 +290,8 @@ export default function DeliveryTrackingPage() {
         scheduled_date: todayIST(),
         distance_km: 4.5,
         estimated_time: "Scheduled 11:15 AM",
+        branch_id: selectedPartner?.branch_id,
+        branch_name: selectedPartner?.branch_name || "Main Branch",
         lat: DEMO_STOPS[2].lat,
         lng: DEMO_STOPS[2].lng,
         items: [{ product_name: "Fresh Cow Milk 1L", quantity: 2, unit_price: 70, final_price: 140 }],
@@ -279,7 +346,7 @@ export default function DeliveryTrackingPage() {
 
       if (!mapRef.current) {
         const map = L.map(container, {
-          center: [KUPPAM_HUB.lat, KUPPAM_HUB.lng],
+          center: [activeBranch.lat, activeBranch.lng],
           zoom: 14,
           zoomControl: true,
         });
@@ -298,7 +365,7 @@ export default function DeliveryTrackingPage() {
       markersRef.current.forEach(m => m.remove());
       markersRef.current = [];
 
-      // 1. Hub Marker (Green Hub)
+      // 1. Hub Marker (Green Hub with Branch Name)
       const hubIcon = L.divIcon({
         className: "custom-leaflet-hub",
         html: `
@@ -306,17 +373,18 @@ export default function DeliveryTrackingPage() {
             🏢
           </div>
           <div style="background:#ffffff;color:#065f46;font-size:10px;font-weight:800;padding:2px 6px;border-radius:6px;margin-top:4px;box-shadow:0 2px 6px rgba(0,0,0,0.15);white-space:nowrap;border:1px solid #a7f3d0;">
-            Kuppam Main Hub
+            ${activeBranch.name}
           </div>
         `,
         iconSize: [36, 60],
         iconAnchor: [18, 18],
       });
-      const hubMarker = L.marker([KUPPAM_HUB.lat, KUPPAM_HUB.lng], { icon: hubIcon }).addTo(map);
+      const hubMarker = L.marker([activeBranch.lat, activeBranch.lng], { icon: hubIcon }).addTo(map);
       markersRef.current.push(hubMarker);
 
-      // 2. Selected Partner Marker (Pulsing Bike Pin)
+      // 2. Selected Partner Marker (Pulsing Bike Pin with Branch tag)
       if (selectedPartner && livePartnerPos) {
+        const partnerBranch = selectedPartner.branch_name || activeBranch.name;
         const partnerIcon = L.divIcon({
           className: "custom-leaflet-partner",
           html: `
@@ -326,11 +394,11 @@ export default function DeliveryTrackingPage() {
                 🛵
               </div>
               <div style="background:#ffffff;color:#065f46;font-size:11px;font-weight:900;padding:3px 8px;border-radius:8px;margin-top:4px;box-shadow:0 4px 12px rgba(0,0,0,0.15);white-space:nowrap;border:1px solid #6ee7b7;">
-                🟢 ${selectedPartner.full_name} (${livePartnerPos.area})
+                🏢 ${partnerBranch} | 🟢 ${selectedPartner.full_name} (${livePartnerPos.area})
               </div>
             </div>
           `,
-          iconSize: [40, 70],
+          iconSize: [40, 75],
           iconAnchor: [20, 20],
         });
         const partnerMarker = L.marker([livePartnerPos.lat, livePartnerPos.lng], { icon: partnerIcon }).addTo(map);
@@ -339,7 +407,7 @@ export default function DeliveryTrackingPage() {
         map.panTo([livePartnerPos.lat, livePartnerPos.lng], { animate: true });
 
         const hubLine = L.polyline(
-          [[KUPPAM_HUB.lat, KUPPAM_HUB.lng], [livePartnerPos.lat, livePartnerPos.lng]],
+          [[activeBranch.lat, activeBranch.lng], [livePartnerPos.lat, livePartnerPos.lng]],
           { color: '#059669', weight: 3, dashArray: '6, 6', opacity: 0.8 }
         ).addTo(map);
         markersRef.current.push(hubLine);
@@ -379,11 +447,15 @@ export default function DeliveryTrackingPage() {
         }
       });
     });
-  }, [selectedPartner, livePartnerPos, partnerOrders, activeLayoutMode]);
+  }, [selectedPartner, livePartnerPos, partnerOrders, activeLayoutMode, activeBranch]);
 
   const formattedToday = useMemo(() => {
     return new Date().toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" });
   }, []);
+
+  const onDutyCount = useMemo(() => {
+    return partners.filter(p => isPartnerOnDuty(p)).length;
+  }, [partners]);
 
   return (
     <div className="space-y-4 p-4 md:p-6 max-w-[1600px] mx-auto">
@@ -412,7 +484,7 @@ export default function DeliveryTrackingPage() {
               </span>
             </div>
             <p className="text-[11px] text-slate-400 font-medium">
-              Real-time Google/CartoDB light map tracking &amp; order timeline progression for delivery boys.
+              Real-time Google/CartoDB light map tracking, branch-wise delivery boy filtering &amp; timeline progression.
             </p>
           </div>
         </div>
@@ -438,18 +510,19 @@ export default function DeliveryTrackingPage() {
       {/* Light KPI Stats Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
         {[
-          { l: "Total Fleet", v: partners.length, cls: "bg-emerald-50 border-emerald-200 text-emerald-950", icon: Users },
-          { l: "On Duty", v: partners.filter(p => p.is_available).length, cls: "bg-teal-50 border-teal-200 text-teal-950", icon: Truck },
-          { l: "In Transit", v: orders.filter(o => o.status === "out_for_delivery").length, cls: "bg-blue-50 border-blue-200 text-blue-950", icon: Navigation },
-          { l: "Delivered", v: orders.filter(o => o.status === "delivered").length, cls: "bg-green-50 border-green-200 text-green-950", icon: CheckCircle2 },
-          { l: "Pending", v: orders.filter(o => o.status === "confirmed" || o.status === "placed").length, cls: "bg-amber-50 border-amber-200 text-amber-950", icon: Clock },
-          { l: "On-Time Rate", v: "98.4%", cls: "bg-indigo-50 border-indigo-200 text-indigo-950", icon: Award },
+          { l: "Total Fleet", v: partners.length, sub: `${availableBranches.length} Branches`, cls: "bg-emerald-50 border-emerald-200 text-emerald-950", icon: Users },
+          { l: "On Duty (Online)", v: onDutyCount, sub: `${partners.length - onDutyCount} Offline`, cls: "bg-teal-50 border-teal-200 text-teal-950", icon: Truck },
+          { l: "In Transit", v: orders.filter(o => o.status === "out_for_delivery").length, sub: "En Route", cls: "bg-blue-50 border-blue-200 text-blue-950", icon: Navigation },
+          { l: "Delivered", v: orders.filter(o => o.status === "delivered").length, sub: "Completed Today", cls: "bg-green-50 border-green-200 text-green-950", icon: CheckCircle2 },
+          { l: "Pending", v: orders.filter(o => o.status === "confirmed" || o.status === "placed").length, sub: "Queued", cls: "bg-amber-50 border-amber-200 text-amber-950", icon: Clock },
+          { l: "On-Time Rate", v: "98.4%", sub: "SLA Target 95%", cls: "bg-indigo-50 border-indigo-200 text-indigo-950", icon: Award },
         ].map(c => (
           <div key={c.l} className={`${c.cls} rounded-xl border p-3 flex items-center gap-2.5 hover:scale-[1.01] transition-transform`}>
             <c.icon size={18} className="shrink-0 opacity-80" />
             <div>
               <p className="text-[9px] font-extrabold uppercase tracking-wider opacity-75">{c.l}</p>
               <p className="text-base font-black mt-0.5">{c.v}</p>
+              {c.sub && <p className="text-[8px] opacity-70 font-semibold mt-0.5">{c.sub}</p>}
             </div>
           </div>
         ))}
@@ -463,29 +536,49 @@ export default function DeliveryTrackingPage() {
               <Users size={14} className="text-emerald-600" /> Delivery Partners
             </h2>
             <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-              {filteredPartners.length} Total ({partners.filter(p => p.is_available).length} On Duty)
+              {filteredPartners.length} Shown ({onDutyCount} On Duty)
             </span>
           </div>
 
-          {/* Status Filter Tabs */}
-          <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[10px]">
-            {[
-              { id: "all", label: "All" },
-              { id: "active", label: "On Duty" },
-              { id: "idle", label: "Idle" },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setStatusFilter(tab.id)}
-                className={`px-3 py-1 rounded-md font-extrabold transition-all ${
-                  statusFilter === tab.id
-                    ? "bg-white text-emerald-700 shadow-2xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Branch Filter Dropdown */}
+            <div className="flex items-center gap-1.5 border border-slate-200 rounded-xl px-2.5 py-1 bg-slate-50 text-xs font-bold text-slate-700">
+              <Building2 size={13} className="text-emerald-600 shrink-0" />
+              <span className="text-[10px] text-slate-400 font-extrabold uppercase shrink-0">Branch:</span>
+              <select
+                value={branchFilter}
+                onChange={e => setBranchFilter(e.target.value)}
+                className="bg-transparent text-xs font-bold focus:outline-none cursor-pointer pr-1"
               >
-                {tab.label}
-              </button>
-            ))}
+                <option value="all">All Branches ({availableBranches.length})</option>
+                {availableBranches.map(b => (
+                  <option key={b.branch_id} value={b.branch_id}>
+                    {b.branch_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Status Filter Tabs (On Duty / Idle) */}
+            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[10px]">
+              {[
+                { id: "all", label: "All" },
+                { id: "active", label: `On Duty (${onDutyCount})` },
+                { id: "idle", label: `Offline (${partners.length - onDutyCount})` },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setStatusFilter(tab.id)}
+                  className={`px-3 py-1 rounded-md font-extrabold transition-all ${
+                    statusFilter === tab.id
+                      ? "bg-white text-emerald-700 shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -497,7 +590,7 @@ export default function DeliveryTrackingPage() {
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search 15+ delivery partners by name, phone..."
+              placeholder="Search delivery partners by name, phone, branch, vehicle..."
               className="w-full pl-8 pr-7 py-1.5 border border-slate-200 rounded-xl text-[11px] font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-slate-50/50"
             />
             {searchQuery && (
@@ -531,35 +624,50 @@ export default function DeliveryTrackingPage() {
           className="flex items-center gap-2.5 overflow-x-auto pb-1.5 pt-0.5 scrollbar-none snap-x"
         >
           {filteredPartners.length === 0 ? (
-            <p className="text-xs text-slate-400 py-1">No delivery partners found.</p>
+            <p className="text-xs text-slate-400 py-1">No delivery partners match the selected branch / status filter.</p>
           ) : (
             filteredPartners.map(p => {
-              const isSelected = p.delivery_partner_id === selectedPartnerId;
+              const isSelected = p.delivery_partner_id === selectedPartner?.delivery_partner_id;
               const pOrds = orders.filter(o => o.delivery_partner_id === p.delivery_partner_id);
               const delCnt = pOrds.filter(o => o.status === "delivered").length;
+              const onDuty = isPartnerOnDuty(p);
 
               return (
                 <button
                   key={p.delivery_partner_id}
                   onClick={() => setSelectedPartnerId(p.delivery_partner_id)}
-                  className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border text-xs font-bold transition-all shrink-0 snap-start ${
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all shrink-0 snap-start ${
                     isSelected
                       ? "bg-emerald-600 text-white border-emerald-700 shadow-md ring-2 ring-emerald-500/30"
                       : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300"
                   }`}
                 >
-                  <span className={`w-6 h-6 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 ${
+                  <span className={`w-7 h-7 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 ${
                     isSelected ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-800"
                   }`}>
                     {p.full_name?.[0]?.toUpperCase() || "P"}
                   </span>
+
                   <div className="text-left min-w-0">
-                    <p className="truncate max-w-[110px] leading-tight text-[11px]">{p.full_name}</p>
+                    <p className="truncate max-w-[120px] leading-tight text-[11px] font-extrabold">{p.full_name}</p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                        isSelected ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                      }`}>
+                        <Building2 size={8} /> {p.branch_name || "Main Hub"}
+                      </span>
+                    </div>
                     <p className={`text-[9px] font-normal leading-tight mt-0.5 ${isSelected ? "text-emerald-100" : "text-slate-400"}`}>
-                      {delCnt} delivered
+                      {delCnt} delivered today
                     </p>
                   </div>
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${p.is_available ? "bg-emerald-400" : "bg-amber-400"}`} />
+
+                  <div className="flex flex-col items-center gap-1 shrink-0 ml-1">
+                    <span
+                      title={onDuty ? "On Duty / Online" : "Offline"}
+                      className={`w-2.5 h-2.5 rounded-full ${onDuty ? "bg-emerald-400 ring-2 ring-emerald-200 animate-pulse" : "bg-slate-300"}`}
+                    />
+                  </div>
                 </button>
               );
             })
@@ -580,9 +688,13 @@ export default function DeliveryTrackingPage() {
           {/* Map Header */}
           <div className="px-4 py-2.5 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between text-xs shrink-0">
             <div className="flex items-center gap-2 font-black text-slate-900">
-              <Compass size={14} className="text-emerald-600" /> Live GPS Map View (Kuppam Hub)
+              <Compass size={14} className="text-emerald-600" />
+              <span>Live GPS Map View</span>
+              <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1">
+                <Building2 size={10} /> {activeBranch.name}
+              </span>
             </div>
-            
+
             <div className="flex items-center gap-2">
               {selectedPartner && (
                 <div className="flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
@@ -628,15 +740,24 @@ export default function DeliveryTrackingPage() {
 
           {/* Map Telemetry Footer Overlay */}
           {selectedPartner && (
-            <div className="p-3 bg-white border-t border-slate-200 flex items-center justify-between text-xs text-slate-700 shadow-inner shrink-0">
+            <div className="p-3 bg-white border-t border-slate-200 flex items-center justify-between text-xs text-slate-700 shadow-inner shrink-0 flex-wrap gap-2">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1.5">
+                  <Building2 size={13} className="text-emerald-600" />
+                  <div>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase">Assigned Branch</p>
+                    <p className="text-xs font-black text-emerald-800">{selectedPartner.branch_name || activeBranch.name}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 border-l border-slate-200 pl-4">
                   <Navigation size={13} className="text-emerald-600" />
                   <div>
-                    <p className="text-[9px] text-slate-400 font-bold uppercase">Speed</p>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase">Live Speed</p>
                     <p className="text-xs font-black text-slate-900">28 km/h</p>
                   </div>
                 </div>
+
                 <div className="flex items-center gap-1.5 border-l border-slate-200 pl-4">
                   <BatteryCharging size={13} className="text-teal-600" />
                   <div>
@@ -702,19 +823,28 @@ export default function DeliveryTrackingPage() {
           {/* Partner Profile Summary Card */}
           {selectedPartner && (
             <div className="p-3 bg-emerald-50/60 border-b border-emerald-100 space-y-2 shrink-0">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center border-2 border-emerald-400 shadow-xs">
                     {selectedPartner.full_name?.[0]?.toUpperCase() || "P"}
                   </div>
                   <div>
-                    <h3 className="text-xs font-black text-slate-900">{selectedPartner.full_name}</h3>
+                    <h3 className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                      {selectedPartner.full_name}
+                      <span className={`w-2 h-2 rounded-full ${isPartnerOnDuty(selectedPartner) ? "bg-emerald-500" : "bg-slate-300"}`} />
+                    </h3>
                     <p className="text-[10px] text-emerald-800 font-medium">📞 {selectedPartner.phone || "No contact"}</p>
                   </div>
                 </div>
-                <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-lg bg-white text-emerald-800 border border-emerald-200 shadow-2xs">
-                  {selectedPartner.vehicle_type || "Bike"}
-                </span>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1">
+                    <Building2 size={10} /> {selectedPartner.branch_name || "Main Branch"}
+                  </span>
+                  <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-lg bg-white text-emerald-800 border border-emerald-200 shadow-2xs">
+                    {selectedPartner.vehicle_type || "Bike"}
+                  </span>
+                </div>
               </div>
 
               {/* Stats Row */}
@@ -747,6 +877,7 @@ export default function DeliveryTrackingPage() {
                 const isDelivered = o.status === "delivered";
                 const isInTransit = o.status === "out_for_delivery";
                 const isLast = idx === partnerOrders.length - 1;
+                const orderBranch = o.branch_name || selectedPartner?.branch_name || "Main Branch";
 
                 return (
                   <div key={o.order_id} className="relative flex items-start gap-3 pb-5 group">
@@ -776,19 +907,24 @@ export default function DeliveryTrackingPage() {
                         ? "bg-blue-50/60 border-blue-300 shadow-2xs"
                         : "bg-white border-slate-200 hover:bg-slate-50"
                     }`}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                      <div className="flex items-center justify-between mb-1 gap-1">
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1">
                           Stop {idx + 1} • #{o.order_id.slice(0, 14)}
                         </span>
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${
-                          isDelivered
-                            ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                            : isInTransit
-                            ? "bg-blue-100 text-blue-800 border-blue-300 animate-pulse"
-                            : "bg-slate-100 text-slate-600 border-slate-200"
-                        }`}>
-                          {isDelivered ? "Delivered ✓" : isInTransit ? "In Transit 🚚" : "Scheduled"}
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[9px] font-extrabold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 flex items-center gap-0.5">
+                            <Building2 size={8} /> {orderBranch}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${
+                            isDelivered
+                              ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                              : isInTransit
+                              ? "bg-blue-100 text-blue-800 border-blue-300 animate-pulse"
+                              : "bg-slate-100 text-slate-600 border-slate-200"
+                          }`}>
+                            {isDelivered ? "Delivered ✓" : isInTransit ? "In Transit 🚚" : "Scheduled"}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="flex items-center justify-between mt-1">

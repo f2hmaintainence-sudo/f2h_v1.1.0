@@ -4,7 +4,7 @@ services:
       context: ./apps/api
       dockerfile: Dockerfile
       target: development
-    container_name: f2hapi-dev-2
+    container_name: f2hapi-dev-server
     command: node dist/main.js
     ports:
       - "5001:5001"
@@ -40,7 +40,7 @@ services:
       context: ./apps/web
       dockerfile: Dockerfile
       target: development
-    container_name: f2hfrontend-dev-2
+    container_name: f2hfrontend-dev-main
     ports:
       - "3000:5002"
     volumes:
@@ -56,7 +56,7 @@ services:
 
   redis:
     image: redis:alpine
-    container_name: f2hredis-dev-2
+    container_name: f2hredis-dev-main
     ports:
       - "6379:6379"
     restart: unless-stopped
