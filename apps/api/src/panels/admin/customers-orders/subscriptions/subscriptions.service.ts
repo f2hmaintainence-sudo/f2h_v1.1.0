@@ -57,9 +57,9 @@ export class SubscriptionsService {
           'subscription_items.coupon_amount',
           'subscription_items.final_price',
           'subscription_items.is_free',
-          'subscription_items.status',
-          'subscription_items.start_date',
-          'subscription_items.end_date',
+          // 'subscription_items.status',
+          // 'subscription_items.start_date',
+          // 'subscription_items.end_date',
           'subscription_items.created_at',
         ],
         joins: [

@@ -583,9 +583,6 @@ export class SubscriptionsService {
         'subscription_items.coupon_amount',
         'subscription_items.final_price',
         'subscription_items.is_free',
-        'subscription_items.status AS item_status',
-        'subscription_items.start_date AS item_start_date',
-        'subscription_items.end_date AS item_end_date',
         'product_variants.product_id',
         'product_variants.name',
         'product_variants.sku',
@@ -593,8 +590,6 @@ export class SubscriptionsService {
         'product_variants.subscription_price',
         'product_variants.unit_value',
         'product_variants.unit_type',
-        'product_variants.fulfillment_mode',
-        'product_variants.is_out_of_stock',
         'product_variants.manageable_qty',
         'product_variants.sort_order',
         'product_variants.variant_id',
@@ -628,7 +623,7 @@ export class SubscriptionsService {
     });
 
     const items = subsDetails.data || [];
-    const baseUrl = process.env.BACKEND_URL || 'http://localhost:8000';
+    const baseUrl = process.env.BACKEND_URL || 'http://localhost:5001';
     if (items.length === 0) {
       this.developer.debug('SubscriptionsService.getSubscriptions no subscriptions found for customer', { customer_id: customer.customer_id });
       return { status: true, data: [] };

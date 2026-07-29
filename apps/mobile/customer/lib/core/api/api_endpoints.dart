@@ -26,7 +26,7 @@ class ApiEndpoints {
     if (kReleaseMode) {
       return 'https://f2hfresh.com';
     }
-    return 'http://192.168.1.5:5001';
+    return 'http://192.168.1.7:5001';
   }
 
   /// Root host (scheme + host + port), no trailing slash.

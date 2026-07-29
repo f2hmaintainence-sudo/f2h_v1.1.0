@@ -210,7 +210,7 @@ class _HomeScreenState extends State<HomeScreen>
                       final isOffline = context.read<NetworkBloc>().state is NetworkOffline;
                       if (state is CatalogLoading || state is CatalogInitial || isOffline) {
                         return SizedBox(
-                          height: 225,
+                          height: 245,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -226,7 +226,7 @@ class _HomeScreenState extends State<HomeScreen>
 
                       if (state is CatalogError) {
                         return SizedBox(
-                          height: 225,
+                          height: 245,
                           child: Center(
                             child: TextButton.icon(
                               onPressed: () => context.read<CatalogBloc>().add(LoadCatalog()),
@@ -239,11 +239,11 @@ class _HomeScreenState extends State<HomeScreen>
 
                       List<Product> products = [];
                       if (state is CatalogLoaded) {
-                        products = state.products.where((p) => p.isSubscribable).toList();
+                         products = state.products.where((p) => p.isSubscribable).toList();
                       }
                       if (products.isEmpty) {
                         return SizedBox(
-                          height: 225,
+                          height: 245,
                           child: Center(
                             child: TextButton.icon(
                               onPressed: () => context.read<CatalogBloc>().add(LoadCatalog()),
@@ -254,7 +254,7 @@ class _HomeScreenState extends State<HomeScreen>
                         );
                       }
                       return InfiniteAutoScrollList(
-                        height: 230,
+                        height: 245,
                         itemWidth: 170,
                         autoScrollInterval: const Duration(milliseconds: 10000),
                         scrollDuration: const Duration(milliseconds: 1000),
@@ -334,7 +334,7 @@ class _HomeScreenState extends State<HomeScreen>
                       final isOffline = context.read<NetworkBloc>().state is NetworkOffline;
                       if (state is CatalogLoading || state is CatalogInitial || isOffline) {
                         return SizedBox(
-                          height: 225,
+                          height: 245,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -354,13 +354,13 @@ class _HomeScreenState extends State<HomeScreen>
 
                       List<Product> products = [];
                       if (state is CatalogLoaded) {
-                        products = state.products.where((p) => !p.isSubscribable).toList();
+                         products = state.products.where((p) => !p.isSubscribable).toList();
                       }
                       if (products.isEmpty) {
                         return const SizedBox.shrink();
                       }
                       return InfiniteAutoScrollList(
-                        height: 230,
+                        height: 245,
                         itemWidth: 170,
                         autoScrollInterval: const Duration(milliseconds: 12000),
                         scrollDuration: const Duration(milliseconds: 1000),
@@ -850,14 +850,14 @@ class _HomeScreenState extends State<HomeScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  height: 140,
+                  height: 120,
                   width: double.infinity,
                   decoration: const BoxDecoration(
                     color: Color(0xFFE8F5E9),
                     borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(10.0),
+                    padding: const EdgeInsets.all(8.0),
                     child: buildProductImage(
                       p.name,
                       imageAsset: p.imageAsset,
@@ -868,32 +868,45 @@ class _HomeScreenState extends State<HomeScreen>
                 const SizedBox(height: 6),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Text(
-                    p.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      color: kText,
-                      letterSpacing: -0.2,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        p.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: kText,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      if (p.formattedUnit.isNotEmpty && p.formattedUnit.toLowerCase() != p.name.toLowerCase()) ...[
+                        const SizedBox(height: 3),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
+                          ),
+                          child: Text(
+                            p.formattedUnit,
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF475569),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                if (p.unit.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Text(
-                      p.unit,
-                      style: const TextStyle(
-                        fontSize: 10.5,
-                        color: kTextSub,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  )
-                else
-                  const SizedBox(height: 15),
+                const SizedBox(height: 10),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
                   child: Row(
@@ -929,7 +942,7 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             if (p.isSubscribable && p.subscriptionPrice != null && p.subscriptionPrice! > 0)
               Positioned(
-                top: 114,
+                top: 94,
                 left: 0,
                 right: 0,
                 child: Container(
@@ -981,7 +994,24 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 ),
               ),
-            if (p.isOrganic)
+            if (p.isLowStock || p.isOutOfStock)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFEBEE),
+                    borderRadius: BorderRadius.circular(100),
+                    border: Border.all(color: const Color(0xFFEF5350), width: 0.8),
+                  ),
+                  child: Text(
+                    p.isOutOfStock ? 'OUT OF STOCK' : 'LOW STOCK',
+                    style: const TextStyle(fontSize: 6.5, fontWeight: FontWeight.w900, color: Color(0xFFD32F2F), letterSpacing: 0.3),
+                  ),
+                ),
+              )
+            else if (p.isOrganic)
               Positioned(
                 top: 8,
                 right: 8,
@@ -1043,7 +1073,7 @@ class _HomeScreenState extends State<HomeScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  height: 140,
+                  height: 120,
                   width: double.infinity,
                   decoration: const BoxDecoration(
                     color: Colors.transparent,
@@ -1061,32 +1091,45 @@ class _HomeScreenState extends State<HomeScreen>
                 const SizedBox(height: 6),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Text(
-                    p.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      color: kText,
-                      letterSpacing: -0.2,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        p.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: kText,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      if (p.formattedUnit.isNotEmpty && p.formattedUnit.toLowerCase() != p.name.toLowerCase()) ...[
+                        const SizedBox(height: 3),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
+                          ),
+                          child: Text(
+                            p.formattedUnit,
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF475569),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                if (p.unit.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Text(
-                      p.unit,
-                      style: const TextStyle(
-                        fontSize: 10.5,
-                        color: kTextSub,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  )
-                else
-                  const SizedBox(height: 15),
+                const SizedBox(height: 10),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
                   child: Row(
@@ -1151,7 +1194,24 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 ),
               ),
-            if (p.isOrganic)
+            if (p.isLowStock || p.isOutOfStock)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFEBEE),
+                    borderRadius: BorderRadius.circular(100),
+                    border: Border.all(color: const Color(0xFFEF5350), width: 0.8),
+                  ),
+                  child: Text(
+                    p.isOutOfStock ? 'OUT OF STOCK' : 'LOW STOCK',
+                    style: const TextStyle(fontSize: 6.5, fontWeight: FontWeight.w900, color: Color(0xFFD32F2F), letterSpacing: 0.3),
+                  ),
+                ),
+              )
+            else if (p.isOrganic)
               Positioned(
                 top: 8,
                 right: 8,
