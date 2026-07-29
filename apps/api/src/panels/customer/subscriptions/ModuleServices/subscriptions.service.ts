@@ -297,6 +297,11 @@ export class SubscriptionsService {
 
     const customerIdStr = (body.customer_id || '').trim();
 
+    const rawScheduleType = (body.schedule_type || 'weekly').toLowerCase();
+    const dbScheduleType = (rawScheduleType === 'custom' || rawScheduleType === 'custom_days' || rawScheduleType === 'custom_dates')
+      ? 'custom_dates'
+      : 'weekly';
+
     if (!customerIdStr) {
       throw new BadRequestException('customer_id is required');
     }
@@ -305,20 +310,26 @@ export class SubscriptionsService {
       throw new BadRequestException('start_date is required');
     }
 
-    if (body.schedule_type === 'weekly' && validItems.length === 0) {
-
-      throw new BadRequestException('Add at least one weekly quantity');
+    if (dbScheduleType === 'weekly' && validItems.length === 0) {
+      throw new BadRequestException('Add at least one quantity');
     }
 
-    if (body.schedule_type === 'custom_dates' && (body.custom_dates || []).length === 0) {
-
+    if (dbScheduleType === 'custom_dates' && (body.custom_dates || []).length === 0) {
       throw new BadRequestException('Add at least one custom date');
     }
 
     const branchId = body.branch_id || DEFAULT_BRANCH_ID;
-    const addressId = body.address_id || DEFAULT_ADDRESS_ID;
 
     return this.db.transaction(async (client) => {
+      let addressId = body.address_id?.trim();
+      if (!addressId || addressId === DEFAULT_ADDRESS_ID) {
+        const addrRes = await client.query(
+          `SELECT address_id FROM customer_addresses WHERE customer_id = $1 ORDER BY is_default DESC, id ASC LIMIT 1`,
+          [customerIdStr],
+        );
+        addressId = addrRes?.rows?.[0]?.address_id || 'ADDR_DEFAULT';
+      }
+
       // 1. Fetch or generate subscription_number from customers table
       const custRes = await client.query(
         `SELECT subscription_number FROM customers WHERE customer_id = $1 LIMIT 1`,
@@ -354,19 +365,6 @@ export class SubscriptionsService {
         validItemsCount: validItems.length,
       });
 
-      // 2. Remove existing subscription records for this customer (customer_id is UNIQUE in subscriptions table)
-      // const existingSub = await client.query(
-      //   `SELECT subscription_id FROM subscriptions WHERE customer_id = $1 LIMIT 1`,
-      //   [customerIdStr],
-      // );
-      // if (existingSub?.rows?.length > 0) {
-      //   const oldSubId = existingSub.rows[0].subscription_id;
-      //   this.developer.debug('SubscriptionsService.create replacing existing subscription', { oldSubId, customerIdStr });
-      //   await client.query(`DELETE FROM subscription_weekly_schedule WHERE subscription_id = $1`, [oldSubId]);
-      //   await client.query(`DELETE FROM subscription_items WHERE subscription_id = $1`, [oldSubId]);
-      //   await client.query(`DELETE FROM subscriptions WHERE customer_id = $1`, [customerIdStr]);
-      // }
-
       // 3. Insert new subscription row using varchar subscription_id
       await client.query(
         `
@@ -397,9 +395,9 @@ export class SubscriptionsService {
           customerIdStr,
           branchId,
           addressId,
-          body.schedule_type,
+          dbScheduleType,
           body.payment_type,
-          body.schedule_type === 'custom_dates' ? 'custom' : 'monthly',
+          dbScheduleType === 'custom_dates' ? 'custom' : 'monthly',
           body.start_date,
           body.end_date || null,
           body.auto_renew,
