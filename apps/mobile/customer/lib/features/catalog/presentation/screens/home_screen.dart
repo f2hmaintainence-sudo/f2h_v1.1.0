@@ -379,23 +379,11 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 ),
 
-                // 6. Quick Features Strip - MOVED DOWN!
-                SliverToBoxAdapter(child: _quickFeatures()),
+                // 6. Referral Program Banner
+                SliverToBoxAdapter(child: _referralBanner()),
 
-                // 7. Subscription Promotion Banner - MOVED DOWN!
-                //  SliverToBoxAdapter(child: _subscriptionBanner()),
-
-                // 8. Today's Fresh Batch
-                SliverToBoxAdapter(child: _freshBatchStepper()),
-
-                // 9. The F2H Promise
+                // 7. The F2H Promise
                 SliverToBoxAdapter(child: _promiseStrip()),
-
-                // 10. Customer Reviews
-                // SliverToBoxAdapter(child: _reviewsCard()),
-
-                // 11. Referral Program (Removed by request)
-                // SliverToBoxAdapter(child: _referralBanner()),
 
                 const SliverToBoxAdapter(child: SizedBox(height: 100)),
               ],
@@ -1690,49 +1678,67 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _referralBanner() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 18, 16, 20),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFF16653A),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF16653A).withValues(alpha: 0.15),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Refer & Earn',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
+    return GestureDetector(
+      onTap: () {
+        final session = context.read<CustomerSessionCubit>().state;
+        final profile = session.profile;
+        if (profile != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ReferralScreen(
+                referralCode: profile.referralCode,
+                myReferralsCount: profile.myReferralsCount,
+                totalEarned: profile.totalEarned,
+              ),
+            ),
+          );
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ReferralScreen()),
+          );
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: const Color(0xFF16653A),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF16653A).withValues(alpha: 0.15),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '🎁 Refer & Earn',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Invite friends & earn ₹100 F2H Cash',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white70,
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Invite friends & earn ₹50 F2H Cash for every referral!',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white70,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                GestureDetector(
-                  onTap: () {
-                    // Invite
-                  },
-                  child: Container(
+                  const SizedBox(height: 14),
+                  Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -1742,22 +1748,22 @@ class _HomeScreenState extends State<HomeScreen>
                       'Invite Now',
                       style: TextStyle(
                         color: Color(0xFF16653A),
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 10),
-          const Icon(
-            Icons.card_giftcard_rounded,
-            color: Colors.white,
-            size: 64,
-          ),
-        ],
+            const SizedBox(width: 10),
+            const Icon(
+              Icons.card_giftcard_rounded,
+              color: Colors.white,
+              size: 64,
+            ),
+          ],
+        ),
       ),
     );
   }

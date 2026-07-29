@@ -28,24 +28,36 @@ export class SubscriptionsController {
 
   @Public()
   @Post('checkout')
-  checkout(@Req() req: Request, @Body() body: CreateSubscriptionDto) {
-    console.log("i am from subscription checkout", body);
-    const user = req?.user as any;
-    let customerId = body.customer_id?.trim() || user?.user_id || (req.headers['x-user-id'] as string)?.trim();
-    if (!customerId && req.headers['authorization']) {
-      try {
-        const token = (req.headers['authorization'] as string).replace(/^Bearer\s+/i, '');
-        const jwt = require('jsonwebtoken');
-        const decoded: any = jwt.decode(token);
-        if (decoded?.user_id || decoded?.sub) {
-          customerId = decoded.user_id || decoded.sub;
-        }
-      } catch (_) {}
+  async checkout(@Req() req: Request, @Body() body: CreateSubscriptionDto) {
+    try {
+      console.log("i am from subscription checkout", JSON.stringify(body));
+      const user = req?.user as any;
+      let customerId = body.customer_id?.trim() || user?.user_id || (req.headers['x-user-id'] as string)?.trim();
+      if (!customerId && req.headers['authorization']) {
+        try {
+          const token = (req.headers['authorization'] as string).replace(/^Bearer\s+/i, '');
+          const jwt = require('jsonwebtoken');
+          const decoded: any = jwt.decode(token);
+          if (decoded?.user_id || decoded?.sub) {
+            customerId = decoded.user_id || decoded.sub;
+          }
+        } catch (_) {}
+      }
+      if (customerId) {
+        body.customer_id = customerId;
+      }
+      const result = await this.service.checkout(body, req);
+      return result;
+    } catch (err) {
+      console.error('SUBSCRIPTION CHECKOUT ERROR:', err?.message || err, err?.stack);
+      // Return structured error instead of raw 500
+      return {
+        status: false,
+        error_code: 'server_error',
+        message: err?.message || 'Subscription checkout failed',
+        debug: String(err),
+      };
     }
-    if (customerId) {
-      body.customer_id = customerId;
-    }
-    return this.service.checkout(body, req);
   }
 
   @Public()
