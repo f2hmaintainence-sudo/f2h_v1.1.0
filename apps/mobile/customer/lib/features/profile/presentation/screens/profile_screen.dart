@@ -873,7 +873,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ? profile.email
                 : 'Complete your email for faster support';
 
-            customerInfo = profile.isMember ? 'F2H MEMBER' : 'NORMAL';
+            customerInfo = profile.isMember ? 'CUSTOMER VIP' : 'NORMAL';
           }
 
           return Scaffold(
@@ -1008,55 +1008,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       const SizedBox(height: 6),
-                                      // Verified badge pill
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                        decoration: BoxDecoration(
-                                          gradient: profile?.isMember == true
-                                              ? const LinearGradient(
-                                                  colors: [Colors.white, Colors.white],
-                                                  begin: Alignment.topLeft,
-                                                  end: Alignment.bottomRight,
-                                                )
-                                              : const LinearGradient(
-                                                  colors: [Color(0xFFFFD56B), _marketGold],
-                                                  begin: Alignment.topLeft,
-                                                  end: Alignment.bottomRight,
-                                                ),
-                                          borderRadius: BorderRadius.circular(30),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withValues(alpha: 0.06),
-                                              blurRadius: 4,
-                                              offset: const Offset(0, 2),
-                                            )
-                                          ],
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              Icons.verified_rounded,
-                                              size: 13,
-                                              color: profile?.isMember == true ? const Color(0xFF8A6E2D) : const Color(0xFF332000),
-                                            ),
-                                            const SizedBox(width: 5),
-                                            Flexible(
-                                              child: Text(
-                                                customerInfo,
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w900,
-                                                  color: profile?.isMember == true ? const Color(0xFF8A6E2D) : const Color(0xFF332000),
-                                                  letterSpacing: 0.5,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
+                                       // Verified badge pill
+                                       Container(
+                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                         decoration: BoxDecoration(
+                                           gradient: profile?.isMember == true
+                                               ? const LinearGradient(
+                                                   colors: [Color(0xFFB8860B), Color(0xFFFFD700)],
+                                                   begin: Alignment.topLeft,
+                                                   end: Alignment.bottomRight,
+                                                 )
+                                               : const LinearGradient(
+                                                   colors: [Color(0xFFFFD56B), _marketGold],
+                                                   begin: Alignment.topLeft,
+                                                   end: Alignment.bottomRight,
+                                                 ),
+                                           borderRadius: BorderRadius.circular(30),
+                                           boxShadow: [
+                                             BoxShadow(
+                                               color: profile?.isMember == true
+                                                   ? const Color(0xFFFFD700).withValues(alpha: 0.3)
+                                                   : Colors.black.withValues(alpha: 0.06),
+                                               blurRadius: 6,
+                                               offset: const Offset(0, 2),
+                                             )
+                                           ],
+                                         ),
+                                         child: Row(
+                                           mainAxisSize: MainAxisSize.min,
+                                           children: [
+                                             Icon(
+                                               profile?.isMember == true
+                                                   ? Icons.workspace_premium_rounded
+                                                   : Icons.verified_rounded,
+                                               size: 13,
+                                               color: profile?.isMember == true ? Colors.white : const Color(0xFF332000),
+                                             ),
+                                             const SizedBox(width: 5),
+                                             Flexible(
+                                               child: Text(
+                                                 customerInfo,
+                                                 style: TextStyle(
+                                                   fontSize: 10,
+                                                   fontWeight: FontWeight.w900,
+                                                   color: profile?.isMember == true ? Colors.white : const Color(0xFF332000),
+                                                   letterSpacing: 0.5,
+                                                 ),
+                                                 maxLines: 1,
+                                                 overflow: TextOverflow.ellipsis,
+                                               ),
+                                             ),
+                                           ],
+                                         ),
+                                       ),
                                     ],
                                   ),
                                 ),

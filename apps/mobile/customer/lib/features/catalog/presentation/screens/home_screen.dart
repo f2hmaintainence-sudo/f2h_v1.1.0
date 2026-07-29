@@ -520,33 +520,48 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _profileBtn() {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const ProfileScreen()),
+    return BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
+      builder: (context, state) {
+        final isVip = state.profile?.isMember == true;
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+            );
+          },
+          child: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              gradient: isVip
+                  ? const LinearGradient(
+                      colors: [Color(0xFFB8860B), Color(0xFFFFD700)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+              color: isVip ? null : Colors.white,
+              shape: BoxShape.circle,
+              border: isVip ? Border.all(color: Colors.white, width: 1.5) : null,
+              boxShadow: [
+                BoxShadow(
+                  color: isVip
+                      ? const Color(0xFFFFD700).withValues(alpha: 0.4)
+                      : Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Icon(
+              isVip ? Icons.workspace_premium_rounded : Icons.person_outline_rounded,
+              color: isVip ? Colors.white : const Color(0xFF16653A),
+              size: 20,
+            ),
+          ),
         );
       },
-      child: Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: const Icon(
-          Icons.person_outline_rounded,
-          color: Color(0xFF16653A),
-          size: 20,
-        ),
-      ),
     );
   }
 
