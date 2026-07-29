@@ -194,14 +194,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     Navigator.pop(ctx);
-                    Navigator.push(
+                    final success = await Navigator.push<bool>(
                       context,
                       MaterialPageRoute(
                         builder: (_) => const LoginScreen(popOnSuccess: true),
                       ),
                     );
+                    if (success == true && context.mounted) {
+                      context.read<CustomerSessionCubit>().bootstrap();
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kPrimary,

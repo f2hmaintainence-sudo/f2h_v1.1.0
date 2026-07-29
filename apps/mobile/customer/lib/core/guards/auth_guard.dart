@@ -31,8 +31,12 @@ extension AuthGuardExtension on BuildContext {
 
       // If login succeeded, wait for session bootstrap and cart load to complete sequentially
       if (loginSuccess == true && mounted) {
-        // 1. Wait for CustomerSessionCubit to finish loading
+        // 1. Ensure session bootstrap is triggered and wait for it to finish loading
         final sessionCubit = read<CustomerSessionCubit>();
+        if (sessionCubit.state.status != CustomerSessionStatus.ready &&
+            sessionCubit.state.status != CustomerSessionStatus.loading) {
+          sessionCubit.bootstrap();
+        }
         if (sessionCubit.state.status != CustomerSessionStatus.ready &&
             sessionCubit.state.status != CustomerSessionStatus.cached) {
           await sessionCubit.stream.firstWhere((state) =>
