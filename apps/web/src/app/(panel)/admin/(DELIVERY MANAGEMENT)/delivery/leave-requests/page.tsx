@@ -208,7 +208,7 @@ export default function LeaveRequestsPage() {
             <span className="flex items-center gap-1.5">
               <FileText size={15} className="text-emerald-600" /> Total Applications
             </span>
-            <span className="text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full border border-slate-200 font-mono">
+            <span className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full border border-slate-200 font-mono inline-flex items-center shrink-0 whitespace-nowrap h-fit self-center">
               All
             </span>
           </div>
@@ -222,8 +222,8 @@ export default function LeaveRequestsPage() {
             <span className="flex items-center gap-1.5">
               <Clock size={15} className="text-amber-600" /> Pending Review
             </span>
-            <span className="text-[11px] bg-amber-50 text-amber-800 px-2 py-0.5 rounded-full border border-amber-200 font-bold flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" /> Action Needed
+            <span className="text-[10px] bg-amber-50 text-amber-800 px-2 py-0.5 rounded-full border border-amber-200 font-bold inline-flex items-center gap-1 shrink-0 whitespace-nowrap h-fit self-center">
+              <span className="w-1.2 h-1.2 rounded-full bg-amber-500 animate-pulse" /> Action Needed
             </span>
           </div>
           <p className="text-2xl font-extrabold text-amber-700 pt-1">{metrics.pending}</p>
@@ -236,7 +236,7 @@ export default function LeaveRequestsPage() {
             <span className="flex items-center gap-1.5">
               <CheckCircle2 size={15} className="text-emerald-600" /> Approved Absences
             </span>
-            <span className="text-[11px] bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200 font-bold">
+            <span className="text-[10px] bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200 font-bold inline-flex items-center shrink-0 whitespace-nowrap h-fit self-center">
               Approved
             </span>
           </div>
@@ -250,7 +250,7 @@ export default function LeaveRequestsPage() {
             <span className="flex items-center gap-1.5">
               <XCircle size={15} className="text-rose-600" /> Rejected Applications
             </span>
-            <span className="text-[11px] bg-rose-50 text-rose-800 px-2 py-0.5 rounded-full border border-rose-200 font-bold">
+            <span className="text-[10px] bg-rose-50 text-rose-800 px-2 py-0.5 rounded-full border border-rose-200 font-bold inline-flex items-center shrink-0 whitespace-nowrap h-fit self-center">
               Rejected
             </span>
           </div>
@@ -451,12 +451,28 @@ export default function LeaveRequestsPage() {
             const StatusIcon = badge.icon;
             const initial = (item.partner_name || 'D')[0].toUpperCase();
 
+            const statusColors = {
+              APPROVED: { border: 'hover:border-emerald-300', accent: 'bg-emerald-500' },
+              REJECTED: { border: 'hover:border-rose-300', accent: 'bg-rose-500' },
+              PENDING: { border: 'hover:border-amber-300', accent: 'bg-amber-500' },
+            };
+            const colors = statusColors[normStatus] || statusColors.PENDING;
+
+            const leaveDateStr = item.leave_date
+              ? new Date(item.leave_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+              : item.start_date
+              ? new Date(item.start_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+              : 'Date N/A';
+
             return (
-              <div key={item.id} className="bg-white rounded-2xl p-4 border border-gray-200/90 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-3">
-                <div className="space-y-2.5">
+              <div key={item.id} className={`relative overflow-hidden bg-white rounded-2xl p-4 border border-gray-200/90 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-3 group ${colors.border}`}>
+                {/* Colored top accent line based on status */}
+                <div className={`absolute top-0 left-0 right-0 h-1 ${colors.accent}`} />
+
+                <div className="space-y-2.5 pt-1">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-9 h-9 shrink-0 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 font-extrabold flex items-center justify-center text-xs text-white shadow-2xs">
+                      <div className="w-9 h-9 shrink-0 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 font-extrabold flex items-center justify-center text-xs text-white shadow-2xs group-hover:scale-105 transition-transform">
                         {initial}
                       </div>
                       <div className="min-w-0">
@@ -466,22 +482,29 @@ export default function LeaveRequestsPage() {
                         </p>
                       </div>
                     </div>
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${badge.bg}`}>
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${badge.bg}`}>
                       <StatusIcon size={11} /> {badge.label}
                     </span>
                   </div>
 
                   <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-100 space-y-1.5 text-xs">
                     <div className="flex items-center justify-between text-slate-700">
-                      <span className="text-slate-400 font-medium">Leave Date:</span>
-                      <span className="font-extrabold text-slate-900">{item.leave_date || item.start_date || 'N/A'}</span>
+                      <span className="text-slate-400 font-medium flex items-center gap-1"><CalendarDays size={12} className="text-emerald-600" /> Leave Period:</span>
+                      <span className="font-extrabold text-slate-900 flex items-center gap-1">
+                        {leaveDateStr}
+                        {item.end_date && item.end_date !== item.leave_date && (
+                          <span className="text-slate-500 font-normal">
+                            ➔ {new Date(item.end_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                          </span>
+                        )}
+                      </span>
                     </div>
-                    <div className="text-slate-600 pt-1 border-t border-slate-200/60">
+                    <div className="text-slate-600 pt-1.5 border-t border-slate-200/60">
                       <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Reason:</span>
                       <p className="text-xs font-semibold text-slate-800 mt-0.5 leading-snug">{item.reason || item.leave_type || 'Personal Leave'}</p>
                     </div>
                     {item.admin_remarks && (
-                      <div className="text-slate-500 text-[11px] pt-1">
+                      <div className="text-slate-500 text-[11px] pt-1.5 border-t border-slate-100">
                         <span className="font-bold text-slate-400">Admin Remarks:</span> {item.admin_remarks}
                       </div>
                     )}
@@ -495,14 +518,14 @@ export default function LeaveRequestsPage() {
                       <button
                         type="button"
                         onClick={() => setActionTarget({ item, targetStatus: 'APPROVED' })}
-                        className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1 transition-colors"
+                        className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs active:scale-[0.98]"
                       >
                         <CheckCircle2 size={13} /> Approve
                       </button>
                       <button
                         type="button"
                         onClick={() => setActionTarget({ item, targetStatus: 'REJECTED' })}
-                        className="flex-1 py-1.5 px-3 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-600 hover:text-white font-bold text-xs flex items-center justify-center gap-1 transition-colors"
+                        className="flex-1 py-1.5 px-3 rounded-xl bg-rose-50 text-rose-700 border border-rose-200/50 hover:bg-rose-600 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-[0.98]"
                       >
                         <XCircle size={13} /> Reject
                       </button>
@@ -511,9 +534,9 @@ export default function LeaveRequestsPage() {
                   <button
                     type="button"
                     onClick={() => setSelectedRequestForEdit(item)}
-                    className="py-1.5 px-3 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold text-xs border border-slate-200"
+                    className="py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-200/80 transition-colors flex items-center gap-1 cursor-pointer"
                   >
-                    Edit
+                    <Edit2 size={11} /> Edit
                   </button>
                 </div>
               </div>
