@@ -122,16 +122,20 @@ class _ImageBannerState extends State<ImageBanner> {
     if (_loading) {
       return Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        height: 150,
-        decoration: BoxDecoration(
+        child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          color: Colors.grey.shade200,
-        ),
-        child: const Center(
-          child: SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2),
+          child: AspectRatio(
+            aspectRatio: 2.45,
+            child: Container(
+              color: Colors.grey.shade200,
+              child: const Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
           ),
         ),
       );
@@ -143,8 +147,8 @@ class _ImageBannerState extends State<ImageBanner> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: SizedBox(
-          height: 150,
+        child: AspectRatio(
+          aspectRatio: 2.45,
           child: Stack(
             children: [
               PageView.builder(
