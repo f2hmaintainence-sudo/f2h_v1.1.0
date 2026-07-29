@@ -76,7 +76,12 @@ export class CustomerOrderController {
            FROM order_items oi
            LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
            LEFT JOIN products p          ON p.product_id = pv.product_id
-           LEFT JOIN product_images pi   ON (pi.variant_id = oi.variant_id OR (pi.variant_id IS NULL AND pi.product_id = p.product_id)) AND (pi.is_primary = true OR pi.is_primary IS NULL)
+           LEFT JOIN LATERAL (
+             SELECT url FROM product_images pi2
+             WHERE pi2.variant_id = oi.variant_id OR (pi2.variant_id IS NULL AND pi2.product_id = p.product_id)
+             ORDER BY pi2.is_primary DESC NULLS LAST, pi2.id ASC
+             LIMIT 1
+           ) pi ON true
            WHERE oi.order_id IN (${placeholders})`,
           orderIds,
         );
@@ -419,11 +424,16 @@ export class CustomerOrderController {
            pv.sku,
            p.name     AS product_name,
            p.product_id,
-           pi.url     AS image_path
+           COALESCE(pi.url, p.image_path) AS image_path
          FROM order_items oi
          LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
          LEFT JOIN products p          ON p.product_id = pv.product_id
-         LEFT JOIN product_images pi   ON pi.variant_id = oi.variant_id
+         LEFT JOIN LATERAL (
+            SELECT url FROM product_images pi2
+            WHERE pi2.variant_id = oi.variant_id OR (pi2.variant_id IS NULL AND pi2.product_id = p.product_id)
+            ORDER BY pi2.is_primary DESC NULLS LAST, pi2.id ASC
+            LIMIT 1
+          ) pi ON true
          WHERE oi.order_id = $1`,
         [orderId],
       );

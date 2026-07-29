@@ -54,14 +54,13 @@ export class ReferralRewardEngineService {
          WHERE (
            referred_customer_id = $1 OR
            referred_customer_id = $2 OR
-           (referee_phone = $3 AND $3 != '') OR
-           (referee_email = $4 AND $4 != '')
+           (referee_phone = $3 AND $3 != '')
          )
          AND status != 'rewarded'
          AND rewarded_at IS NULL
          ORDER BY created_at DESC
          FOR UPDATE LIMIT 1`,
-        [refereeCustomerId, realRefereeId, refereePhone, refereeEmail],
+        [refereeCustomerId, realRefereeId, refereePhone],
       );
 
       let referralRecord = refRes.rows?.[0];

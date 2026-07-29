@@ -113,8 +113,8 @@ export class CategoriesProductsService {
           p.highlights,
           p.ingredients,
           p.legal_info,
-          (COALESCE(p.is_out_of_stock, false) OR COALESCE(sb.is_out_of_stock, false)) AS is_out_of_stock,
-          sb.available_quantity,
+          (COALESCE(p.is_out_of_stock, false) OR COALESCE(sb.is_out_of_stock, false) OR COALESCE(sb.available_quantity, 0) <= 0) AS is_out_of_stock,
+          COALESCE(sb.available_quantity, 0) AS available_quantity,
           sb.low_stock_threshold,
           p.is_subscribable,
           p.is_one_time,
@@ -125,11 +125,21 @@ export class CategoriesProductsService {
         FROM product_variants pv
         LEFT JOIN products p ON pv.product_id = p.product_id
         LEFT JOIN categories c ON p.category_id = c.category_id
-        LEFT JOIN stock_balances sb ON sb.product_variant_id = pv.variant_id
-        LEFT JOIN product_images pi
-          ON pi.variant_id = pv.variant_id
-          AND pi.is_primary = true
-          AND pi.deleted_at IS NULL
+        LEFT JOIN (
+          SELECT
+            product_variant_id,
+            COALESCE(SUM(available_quantity), 0) AS available_quantity,
+            COALESCE(MIN(low_stock_threshold), 0) AS low_stock_threshold,
+            BOOL_AND(COALESCE(is_out_of_stock, false)) AS is_out_of_stock
+          FROM stock_balances
+          GROUP BY product_variant_id
+        ) sb ON sb.product_variant_id = pv.variant_id
+        LEFT JOIN LATERAL (
+          SELECT url FROM product_images pi2
+          WHERE pi2.variant_id = pv.variant_id AND pi2.deleted_at IS NULL
+          ORDER BY pi2.is_primary DESC NULLS LAST, pi2.id ASC
+          LIMIT 1
+        ) pi ON true
         WHERE (pv.status = 'active' OR pv.status IS NULL)
           AND (p.is_active = true OR p.is_active IS NULL)
           AND p.deleted_at IS NULL
@@ -182,8 +192,8 @@ export class CategoriesProductsService {
           p.highlights,
           p.ingredients,
           p.legal_info,
-          (COALESCE(p.is_out_of_stock, false) OR COALESCE(sb.is_out_of_stock, false)) AS is_out_of_stock,
-          sb.available_quantity,
+          (COALESCE(p.is_out_of_stock, false) OR COALESCE(sb.is_out_of_stock, false) OR COALESCE(sb.available_quantity, 0) <= 0) AS is_out_of_stock,
+          COALESCE(sb.available_quantity, 0) AS available_quantity,
           sb.low_stock_threshold,
           p.is_subscribable,
           p.is_one_time,
@@ -194,11 +204,21 @@ export class CategoriesProductsService {
         FROM product_variants pv
         LEFT JOIN products p ON pv.product_id = p.product_id
         LEFT JOIN categories c ON p.category_id = c.category_id
-        LEFT JOIN stock_balances sb ON sb.product_variant_id = pv.variant_id
-        LEFT JOIN product_images pi
-          ON pi.variant_id = pv.variant_id
-          AND pi.is_primary = true
-          AND pi.deleted_at IS NULL
+        LEFT JOIN (
+          SELECT
+            product_variant_id,
+            COALESCE(SUM(available_quantity), 0) AS available_quantity,
+            COALESCE(MIN(low_stock_threshold), 0) AS low_stock_threshold,
+            BOOL_AND(COALESCE(is_out_of_stock, false)) AS is_out_of_stock
+          FROM stock_balances
+          GROUP BY product_variant_id
+        ) sb ON sb.product_variant_id = pv.variant_id
+        LEFT JOIN LATERAL (
+          SELECT url FROM product_images pi2
+          WHERE pi2.variant_id = pv.variant_id AND pi2.deleted_at IS NULL
+          ORDER BY pi2.is_primary DESC NULLS LAST, pi2.id ASC
+          LIMIT 1
+        ) pi ON true
         WHERE (pv.status = 'active' OR pv.status IS NULL)
           AND (p.is_active = true OR p.is_active IS NULL)
           AND p.deleted_at IS NULL

@@ -110,7 +110,12 @@ export class CartService {
           COALESCE(pi.url, p.image_path) AS image_path
          FROM product_variants pv
          LEFT JOIN products p ON pv.product_id = p.product_id
-         LEFT JOIN product_images pi ON (pv.variant_id = pi.variant_id OR (pi.variant_id IS NULL AND p.product_id = pi.product_id)) AND (pi.is_primary = true OR pi.is_primary IS NULL)
+         LEFT JOIN LATERAL (
+            SELECT url FROM product_images pi2
+            WHERE pi2.variant_id = pv.variant_id OR (pi2.variant_id IS NULL AND pi2.product_id = p.product_id)
+            ORDER BY pi2.is_primary DESC NULLS LAST, pi2.id ASC
+            LIMIT 1
+          ) pi ON true
          WHERE pv.variant_id = ANY($1) AND pv.status = 'active'`,
         [variantIds],
       );
@@ -553,12 +558,7 @@ export class CartService {
     let runningBalance = walletBalance;
     for (const tx of transactions) {
       if (tx.amount > 0) {
-        // Atomic wallet debit in customers table
-        const updateRes = await this.db.query(
-          `UPDATE customers SET wallet_balance = COALESCE(wallet_balance, 0) - $1, updated_at = NOW() WHERE customer_id = $2 RETURNING wallet_balance`,
-          [tx.amount, customerId],
-        );
-        runningBalance = Number(updateRes?.[0]?.wallet_balance ?? (runningBalance - tx.amount));
+        runningBalance = Math.max(0, runningBalance - tx.amount);
 
         const ts = Math.floor(Date.now() / 1000).toString(36);
         const rnd = Math.floor(Math.random() * 9000 + 1000);
