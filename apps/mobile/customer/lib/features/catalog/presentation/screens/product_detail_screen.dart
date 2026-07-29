@@ -12,7 +12,7 @@ import '../bloc/catalog_event.dart';
 import '../bloc/cart/cart_bloc.dart';
 import '../bloc/cart/cart_state.dart';
 import '../../../../core/widgets/custom_button.dart';
-import 'package:f2h_customer/features/profile/presentation/bloc/customer_session_cubit.dart';
+import '../../../../core/session/customer_session_cubit.dart';
 
 // ══════════════════════════════════════════════════════════
 //  BROWSE SCREEN — Blinkit-style top chips + sidebar + grid
