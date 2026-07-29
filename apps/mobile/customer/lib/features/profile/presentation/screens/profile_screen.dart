@@ -1274,20 +1274,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             _divider(),
                             _menuItem(
-                              Icons.person_outline_rounded,
-                              'Personal Details',
-                              const Color(0xFFFFF3E0),
-                              const Color(0xFFEF6C00),
-                              onTap: () {
-                                if (isLoggedIn) {
-                                  _showPersonalDetails(context, profile);
-                                } else {
-                                  _showLoginDrawer(context);
-                                }
-                              },
-                            ),
-                            _divider(),
-                            _menuItem(
                               Icons.notifications_none_outlined,
                               'My Notifications',
                               const Color(0xFFE8F5E9),
