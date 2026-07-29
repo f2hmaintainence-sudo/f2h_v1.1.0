@@ -28,6 +28,7 @@ import '../../../catalog/presentation/helpers/cart_helpers.dart';
 import '../widgets/monthly_estimation_card.dart';
 import '../widgets/subscription_payment_sheet.dart';
 import 'subscription_success_screen.dart';
+import '../../../wallet/presentation/screens/wallet_screen.dart';
 
 // ── Day abbreviations ─────────────────────────────────────
 const _kDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -358,6 +359,61 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
 
   }
 
+  void _showInsufficientWalletDialog(BuildContext context, {required double requiredAmt, required double availableAmt}) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.account_balance_wallet_outlined, color: Color(0xFFDC2626)),
+            SizedBox(width: 8),
+            Text('Insufficient Wallet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAlignment.start,
+          children: [
+            Text(
+              'Your wallet balance is ₹${availableAmt.toStringAsFixed(2)}. You need ₹${requiredAmt.toStringAsFixed(2)} for this subscription.',
+              style: const TextStyle(fontSize: 14, color: Color(0xFF4B5563)),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'Shortfall: ₹${(requiredAmt - availableAmt).toStringAsFixed(2)}',
+                style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGreen,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(ctx, MaterialPageRoute(builder: (_) => const WalletScreen()));
+            },
+            child: const Text('Add Money', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ══════════════════════════════════════════════════════
   //  BUILD
   // ══════════════════════════════════════════════════════
@@ -399,9 +455,13 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
           Navigator.pop(context);
         } else if (state is SubscriptionCheckoutError) {
           setState(() => _isLoading = false);
-          if (state.errorCode == 'insufficient_wallet') {
-            F2HToast.error(context, '${state.message}. Please top up your wallet.');
-          } else if (state.errorCode == 'credit_limit_exceeded') {
+          if (state.errorCode == 'insufficient_wallet' || state.errorCode == 'insufficient wallet') {
+            _showInsufficientWalletDialog(
+              context,
+              requiredAmt: state.required_ ?? estimate.total,
+              availableAmt: state.walletBalance ?? 0.0,
+            );
+          } else if (state.errorCode == 'credit_limit_exceeded' || state.errorCode == 'credit limit exceeded') {
             F2HToast.error(context, '${state.message}. Switched to Prepaid option.');
             setState(() => _paymentType = 'prepaid');
           } else {

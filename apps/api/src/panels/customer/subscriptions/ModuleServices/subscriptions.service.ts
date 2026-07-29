@@ -141,7 +141,7 @@ export class SubscriptionsService {
           });
           return {
             status: false,
-            error_code: 'insufficient wallet',
+            error_code: 'insufficient_wallet',
             message: 'Insufficient wallet balance',
             wallet_balance: walletBalance,
             required: estimatedTotal,
@@ -161,7 +161,7 @@ export class SubscriptionsService {
       if (!isPostpaidEnabled) {
         return {
           status: false,
-          error_code: 'postpaid not enabled',
+          error_code: 'postpaid_not_enabled',
           message: 'Postpaid facility is not enabled on your account. Please select Prepaid option.',
         };
       }
@@ -196,7 +196,7 @@ export class SubscriptionsService {
       if (creditLimit > 0 && combinedTotal > creditLimit) {
         return {
           status: false,
-          error_code: 'credit limit exceeded',
+          error_code: 'credit_limit_exceeded',
           message: 'Postpaid credit limit exceeded. Please re-select Prepaid option.',
           credit_limit: creditLimit,
           existing_committed: existingCommitted,
