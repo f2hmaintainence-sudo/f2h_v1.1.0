@@ -1703,8 +1703,6 @@ class _HomeScreenState extends State<HomeScreen>
             MaterialPageRoute(
               builder: (_) => ReferralScreen(
                 referralCode: profile.referralCode,
-                myReferralsCount: profile.myReferralsCount,
-                totalEarned: profile.totalEarned,
               ),
             ),
           );
