@@ -555,7 +555,7 @@ class _HomeScreenState extends State<HomeScreen>
               ],
             ),
             child: Icon(
-              isVip ? Icons.workspace_premium_rounded : Icons.person_outline_rounded,
+              Icons.person_outline_rounded,
               color: isVip ? Colors.white : const Color(0xFF16653A),
               size: 20,
             ),
