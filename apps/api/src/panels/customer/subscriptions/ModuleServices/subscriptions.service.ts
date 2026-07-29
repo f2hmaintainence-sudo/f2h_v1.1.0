@@ -22,7 +22,22 @@ export class SubscriptionsService {
   async checkout(body: CreateSubscriptionDto, req?: any) {
     this.developer.debug('SubscriptionsService.checkout called', { body });
 
-    const customerId = body.customer_id?.trim();
+    let customerId = body.customer_id?.trim() || (req?.headers?.['x-user-id'] as string)?.trim() || (req?.user as any)?.user_id;
+    if (!customerId && req?.headers?.['authorization']) {
+      try {
+        const token = (req.headers['authorization'] as string).replace(/^Bearer\s+/i, '');
+        const jwt = require('jsonwebtoken');
+        const decoded: any = jwt.decode(token);
+        if (decoded?.user_id || decoded?.sub) {
+          customerId = decoded.user_id || decoded.sub;
+        }
+      } catch (_) {}
+    }
+
+    if (customerId) {
+      body.customer_id = customerId;
+    }
+
     const estimatedTotal = Number(body.estimated_total || 0);
 
     if (!customerId) {

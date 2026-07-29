@@ -31,10 +31,21 @@ export class SubscriptionsController {
   checkout(@Req() req: Request, @Body() body: CreateSubscriptionDto) {
     console.log("i am from subscription checkout", body);
     const user = req?.user as any;
-    if (!body.customer_id && user?.user_id) {
-      body.customer_id = user.user_id;
+    let customerId = body.customer_id?.trim() || user?.user_id || (req.headers['x-user-id'] as string)?.trim();
+    if (!customerId && req.headers['authorization']) {
+      try {
+        const token = (req.headers['authorization'] as string).replace(/^Bearer\s+/i, '');
+        const jwt = require('jsonwebtoken');
+        const decoded: any = jwt.decode(token);
+        if (decoded?.user_id || decoded?.sub) {
+          customerId = decoded.user_id || decoded.sub;
+        }
+      } catch (_) {}
     }
-    return this.service.checkout(body);
+    if (customerId) {
+      body.customer_id = customerId;
+    }
+    return this.service.checkout(body, req);
   }
 
   @Get()
