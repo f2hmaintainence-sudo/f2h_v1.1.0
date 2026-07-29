@@ -487,7 +487,8 @@ class AppShellState extends State<AppShell> {
               );
             },
           ),
-        );
+        ),
+      );
   }
 
 // class F2HDialogs {
