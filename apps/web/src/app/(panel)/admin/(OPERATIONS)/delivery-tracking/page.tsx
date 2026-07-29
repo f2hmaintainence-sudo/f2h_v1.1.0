@@ -394,7 +394,7 @@ export default function DeliveryTrackingPage() {
                 🛵
               </div>
               <div style="background:#ffffff;color:#065f46;font-size:11px;font-weight:900;padding:3px 8px;border-radius:8px;margin-top:4px;box-shadow:0 4px 12px rgba(0,0,0,0.15);white-space:nowrap;border:1px solid #6ee7b7;">
-                🏢 ${partnerBranch} | 🟢 ${selectedPartner.full_name} (${livePartnerPos.area})
+                🟢 ${selectedPartner.full_name} (${livePartnerPos.area})
               </div>
             </div>
           `,
@@ -911,20 +911,15 @@ export default function DeliveryTrackingPage() {
                         <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1">
                           Stop {idx + 1} • #{o.order_id.slice(0, 14)}
                         </span>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[9px] font-extrabold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 flex items-center gap-0.5">
-                            <Building2 size={8} /> {orderBranch}
-                          </span>
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${
-                            isDelivered
-                              ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                              : isInTransit
-                              ? "bg-blue-100 text-blue-800 border-blue-300 animate-pulse"
-                              : "bg-slate-100 text-slate-600 border-slate-200"
-                          }`}>
-                            {isDelivered ? "Delivered ✓" : isInTransit ? "In Transit 🚚" : "Scheduled"}
-                          </span>
-                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${
+                          isDelivered
+                            ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                            : isInTransit
+                            ? "bg-blue-100 text-blue-800 border-blue-300 animate-pulse"
+                            : "bg-slate-100 text-slate-600 border-slate-200"
+                        }`}>
+                          {isDelivered ? "Delivered ✓" : isInTransit ? "In Transit 🚚" : "Scheduled"}
+                        </span>
                       </div>
 
                       <div className="flex items-center justify-between mt-1">
