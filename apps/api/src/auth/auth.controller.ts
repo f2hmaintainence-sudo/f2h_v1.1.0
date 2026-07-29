@@ -17,7 +17,7 @@ import { JwtService } from '@nestjs/jwt';
 import { RedisService } from 'src/shared/redis/redis.service';
 import { DeviceFingerprintService } from './device-fingerprint.service';
 import { AuditLoggerService } from './audit-logger.service';
-import { RegisterDto, LoginDto, SendOtpDto, VerifyOtpDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, SendOtpDto, VerifyOtpDto, SendEmailOtpDto, VerifyEmailOtpDto } from './dto/auth.dto';
 import { Public } from './decorators/public.decorator';
 
 @Controller({ path: 'auth', version: '1' })
@@ -247,6 +247,21 @@ export class AuthController {
   async verifyOtp(@Body() body: VerifyOtpDto, @Req() req: Request) {
     const ip = req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
     return this.authService.verifyMobileOtp(body, ip);
+  }
+
+  @Public()
+  @Post('send-email-otp')
+  @HttpCode(HttpStatus.OK)
+  async sendEmailOtp(@Body() body: SendEmailOtpDto) {
+    return this.authService.requestMobileOtp({ email: body.email });
+  }
+
+  @Public()
+  @Post('verify-email-otp')
+  @HttpCode(HttpStatus.OK)
+  async verifyEmailOtp(@Body() body: VerifyEmailOtpDto, @Req() req: Request) {
+    const ip = req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
+    return this.authService.verifyMobileOtp({ email: body.email, otp: body.otp }, ip);
   }
 
   @Post('logout')

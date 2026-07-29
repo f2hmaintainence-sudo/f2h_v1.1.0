@@ -148,7 +148,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
       await dioClient.fetchCsrfToken();
 
       await dioClient.dio.post(
-        '/DeliveryPartner/auth/reset-password',
+        '/auth/reset-password',
         data: {
           'email': _emailCtrl.text.trim(),
           'token': otp,

@@ -105,7 +105,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
       await dioClient.fetchCsrfToken();
       
       await dioClient.dio.post(
-        '/DeliveryPartner/auth/send-email-otp',
+        '/auth/send-email-otp',
         data: {'email': email},
       );
       setState(() { _isLoading = false; _step = 1; });
@@ -141,7 +141,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
       await dioClient.fetchCsrfToken();
       
       final res = await dioClient.dio.post(
-        '/DeliveryPartner/auth/verify-email-otp',
+        '/auth/verify-email-otp',
         data: {'email': _emailCtrl.text.trim(), 'otp': otp},
       );
       setState(() {
@@ -514,7 +514,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                       await dioClient.fetchCsrfToken();
                       
                       await dioClient.dio.post(
-                        '/DeliveryPartner/auth/send-email-otp',
+                        '/auth/send-email-otp',
                         data: {'email': _emailCtrl.text.trim()},
                       );
                       setState(() => _isLoading = false);
