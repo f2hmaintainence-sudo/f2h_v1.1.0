@@ -165,8 +165,10 @@ export default function GenerateOrdersPage() {
         page: 1,
         limit: 100,
         search: searchQuery,
+        targetDate: selectedDate,
       };
       if (statusFilter !== 'all') {
+        params['status'] = statusFilter;
         params['filters[0]'] = statusFilter;
       }
       const res = await api.get('/subscriptions/subscriptions/table', { params });
@@ -188,7 +190,7 @@ export default function GenerateOrdersPage() {
     } finally {
       setLoadingSubs(false);
     }
-  }, [statusFilter, searchQuery]);
+  }, [statusFilter, searchQuery, selectedDate]);
 
   // Load metrics & tables on filter change
   useEffect(() => {
@@ -251,11 +253,62 @@ export default function GenerateOrdersPage() {
     window.open(`${API_URL}/admin/orders/dispatch/export-pdf?${q.toString()}`, '_blank');
   };
 
+  // Filter subscriptions dynamically by statusFilter, selectedBranch, selectedDate, and searchQuery
+  const filteredSubscriptions = subscriptionsList.filter((sub: any) => {
+    // Status Filter
+    if (statusFilter !== 'all') {
+      const subStatus = String(sub.status || '').toLowerCase();
+      if (subStatus !== statusFilter.toLowerCase()) return false;
+    }
+
+    // Branch Filter
+    if (selectedBranch) {
+      if (sub.branch_id && sub.branch_id !== selectedBranch) return false;
+    }
+
+    // Target Date Filter (Active on Target Date)
+    if (selectedDate) {
+      const subStart = sub.start_date ? String(sub.start_date).slice(0, 10) : null;
+      const subEnd = sub.end_date ? String(sub.end_date).slice(0, 10) : null;
+
+      if (subStart && subStart > selectedDate) return false;
+      if (subEnd && subEnd < selectedDate) return false;
+    }
+
+    // Search Query Filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const name = String(sub.customer_name || sub.full_name || '').toLowerCase();
+      const phone = String(sub.phone || sub.mobile || '').toLowerCase();
+      const subNum = String(sub.subscription_number || sub.subscription_id || '').toLowerCase();
+
+      if (!name.includes(q) && !phone.includes(q) && !subNum.includes(q)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
   // Pagination Math (10 items per page)
-  const totalItemsCount = subscriptionsList.length;
+  const totalItemsCount = filteredSubscriptions.length;
   const totalPagesCount = Math.ceil(totalItemsCount / pageSize) || 1;
   const startIndex = (currentPage - 1) * pageSize;
-  const paginatedSubscriptions = subscriptionsList.slice(startIndex, startIndex + pageSize);
+  const paginatedSubscriptions = filteredSubscriptions.slice(startIndex, startIndex + pageSize);
+
+  // Dynamic summary counts from list
+  const activeCount = subscriptionsList.filter(s => String(s.status).toLowerCase() === 'active').length;
+  const pausedCount = subscriptionsList.filter(s => String(s.status).toLowerCase() === 'paused').length;
+  const expiredCount = subscriptionsList.filter(s => String(s.status).toLowerCase() === 'expired').length;
+  const cancelledCount = subscriptionsList.filter(s => String(s.status).toLowerCase() === 'cancelled').length;
+
+  const displaySummary = {
+    total: subSummary.total || subscriptionsList.length,
+    active: subSummary.active || activeCount,
+    paused: subSummary.paused || pausedCount,
+    expired: subSummary.expired || expiredCount,
+    cancelled: subSummary.cancelled || cancelledCount,
+  };
 
   // Summary Metrics calculations
   const totalQuantity = dispatchItems.reduce((acc, item) => acc + Number(item.total_quantity || 0), 0);
@@ -306,7 +359,7 @@ export default function GenerateOrdersPage() {
             <CheckCircle className={`w-4 h-4 ${statusFilter === 'active' ? 'text-white' : 'text-emerald-600'}`} />
           </div>
           <div className={`text-2xl font-black mt-2 ${statusFilter === 'active' ? 'text-white' : 'text-emerald-700'}`}>
-            {subSummary.active || 0}
+            {displaySummary.active || 0}
           </div>
         </button>
 
@@ -325,7 +378,7 @@ export default function GenerateOrdersPage() {
             <PauseCircle className={`w-4 h-4 ${statusFilter === 'paused' ? 'text-white' : 'text-amber-500'}`} />
           </div>
           <div className={`text-2xl font-black mt-2 ${statusFilter === 'paused' ? 'text-white' : 'text-amber-600'}`}>
-            {subSummary.paused || 0}
+            {displaySummary.paused || 0}
           </div>
         </button>
 
@@ -344,7 +397,7 @@ export default function GenerateOrdersPage() {
             <Clock className={`w-4 h-4 ${statusFilter === 'expired' ? 'text-white' : 'text-slate-500'}`} />
           </div>
           <div className={`text-2xl font-black mt-2 ${statusFilter === 'expired' ? 'text-white' : 'text-slate-700'}`}>
-            {subSummary.expired || 0}
+            {displaySummary.expired || 0}
           </div>
         </button>
 
@@ -363,7 +416,7 @@ export default function GenerateOrdersPage() {
             <XCircle className={`w-4 h-4 ${statusFilter === 'cancelled' ? 'text-white' : 'text-rose-600'}`} />
           </div>
           <div className={`text-2xl font-black mt-2 ${statusFilter === 'cancelled' ? 'text-white' : 'text-rose-700'}`}>
-            {subSummary.cancelled || 0}
+            {displaySummary.cancelled || 0}
           </div>
         </button>
 
@@ -382,7 +435,7 @@ export default function GenerateOrdersPage() {
             <LayoutDashboard className={`w-4 h-4 ${statusFilter === 'all' ? 'text-white' : 'text-slate-700'}`} />
           </div>
           <div className={`text-2xl font-black mt-2 ${statusFilter === 'all' ? 'text-white' : 'text-slate-900'}`}>
-            {subSummary.total || 0}
+            {displaySummary.total || 0}
           </div>
         </button>
       </div>

@@ -58,11 +58,19 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       ),
     });
 
+    this.pool.on('error', (err: Error) => {
+      this.logger.warn(`Unexpected idle client error in pg pool: ${err.message}`);
+    });
+
     await this.verifyConnectionWithRetry();
     await this.createRequiredTables();
   }
 
+  private static isTablesCreated = false;
+
   private async createRequiredTables() {
+    if (DatabaseService.isTablesCreated) return;
+    DatabaseService.isTablesCreated = true;
     try {
       this.logger.log('Ensuring dispatch_requirements and dispatch_balances tables exist...');
       

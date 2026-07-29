@@ -1,0 +1,312 @@
+// ============================================================================
+// ChronoSparkSolutions — A Software Company
+// © 2026 ChronoSparkSolutions. All rights reserved.
+//
+// Project     : F2H Fresh
+// File        : OrderDetailsDrawer.tsx
+// Description : Offcanvas drawer fitting between admin header navbar and screen bottom
+//
+// ============================================================================
+
+'use client';
+
+import React from 'react';
+import {
+  X,
+  PackageOpen,
+  User,
+  Phone,
+  MapPin,
+  Clock,
+  Package,
+  CheckCircle2,
+  AlertCircle,
+  Truck,
+  Repeat,
+  ShoppingCart,
+  Sparkles,
+} from 'lucide-react';
+
+export interface OrderItem {
+  id: number | string;
+  product_id?: string;
+  product_name?: string;
+  product_variant_id?: string;
+  variant_id?: string;
+  variant_name?: string;
+  unit_price?: string | number;
+  discount_amount?: string | number;
+  coupon_amount?: string | number;
+  final_price?: string | number;
+  is_free?: boolean;
+  quantity?: string | number;
+  default_m_quantity?: string | number;
+  default_e_quantity?: string | number;
+}
+
+interface OrderDetailsDrawerProps {
+  order: Record<string, any> | null;
+  items: OrderItem[];
+  loadingItems: boolean;
+  itemsError: string;
+  onClose: () => void;
+  onUpdateStatus?: (orderId: string, newStatus: string) => void;
+}
+
+export function stripHtml(input: unknown): string {
+  if (input === null || input === undefined) return '';
+  const str = String(input);
+  return str.replace(/<[^>]*>/g, '').trim();
+}
+
+function formatMoney(value: unknown) {
+  const amount = Number(value ?? 0);
+  return amount.toLocaleString('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 2,
+  });
+}
+
+function getLightStatusBadge(statusRaw: unknown) {
+  const status = stripHtml(statusRaw).toLowerCase().replace(/[\s_-]+/g, '_');
+
+  if (status.includes('out_for_delivery') || status.includes('outfordelivery') || status.includes('dispatch')) {
+    return { label: 'Out for Delivery', bg: 'bg-blue-50 text-blue-900 border-blue-200', icon: Truck };
+  }
+  if (status.includes('deliver')) {
+    return { label: 'Delivered', bg: 'bg-emerald-50 text-emerald-900 border-emerald-200', icon: CheckCircle2 };
+  }
+  if (status.includes('pack')) {
+    return { label: 'Packed', bg: 'bg-indigo-50 text-indigo-900 border-indigo-200', icon: Package };
+  }
+  if (status.includes('confirm')) {
+    return { label: 'Confirmed', bg: 'bg-teal-50 text-teal-900 border-teal-200', icon: CheckCircle2 };
+  }
+  if (status.includes('cancel')) {
+    return { label: 'Cancelled', bg: 'bg-rose-50 text-rose-900 border-rose-200', icon: AlertCircle };
+  }
+  return { label: 'Pending', bg: 'bg-amber-50 text-amber-900 border-amber-200', icon: Clock };
+}
+
+export default function OrderDetailsDrawer({
+  order,
+  items,
+  loadingItems,
+  itemsError,
+  onClose,
+  onUpdateStatus,
+}: OrderDetailsDrawerProps) {
+  if (!order) return null;
+
+  const orderId = stripHtml(order.order_id || order.id || 'N/A');
+  const rawSource = stripHtml(order.order_source || order.order_type || '');
+  const isSubscription = Boolean(
+    order.is_subscription ||
+    rawSource.toLowerCase().includes('sub') ||
+    order.subscription_id
+  );
+
+  const statusInfo = getLightStatusBadge(order.order_status || order.status);
+  const StatusIcon = statusInfo.icon;
+  const itemTotal = items.reduce((sum, item) => sum + Number(item.final_price ?? 0), 0);
+
+  const customerName = stripHtml(order.customer_name || order.customer_id || 'Guest Customer');
+  const customerPhone = stripHtml(order.customer_phone || order.phone || order.contact_number || '');
+  const addressStr = stripHtml(order.delivery_address || order.address || order.area || order.pincode || 'Address not specified');
+  const deliverySlot = stripHtml(order.delivery_slot || order.slot || 'Standard Slot');
+
+  return (
+    <div className="fixed top-16 right-0 bottom-0 left-0 z-40 bg-slate-900/30 backdrop-blur-2xs flex justify-end">
+      {/* Drawer Container - Positioned top-16 to start below navbar header */}
+      <div className="relative w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col justify-between overflow-hidden border-l border-gray-200 animate-in slide-in-from-right duration-300">
+        
+        {/* Light Drawer Header */}
+        <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-emerald-50/90 via-teal-50/80 to-emerald-50/90 border-b border-emerald-100 text-slate-900 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className={`p-2.5 rounded-xl border ${isSubscription ? 'bg-purple-100 text-purple-800 border-purple-200' : 'bg-emerald-100 text-emerald-800 border-emerald-200'}`}>
+              {isSubscription ? <Repeat size={20} /> : <ShoppingCart size={20} />}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base md:text-lg font-extrabold text-slate-900 tracking-tight">Order #{orderId}</h2>
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold border ${statusInfo.bg}`}>
+                  <StatusIcon size={12} />
+                  {statusInfo.label}
+                </span>
+              </div>
+              <p className="text-xs font-semibold text-slate-500 mt-0.5">
+                {isSubscription ? 'Subscribed Order' : 'One-Time Checkout Order'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 text-gray-400 hover:text-slate-900 rounded-xl hover:bg-emerald-100/60 transition-colors border border-transparent hover:border-emerald-200"
+            title="Close Drawer"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Scrollable Content Body */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
+
+          {/* Customer & Delivery Information */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Customer Box */}
+            <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <User size={13} className="text-emerald-700" /> Customer Information
+              </span>
+              <p className="text-sm font-extrabold text-slate-900">
+                {customerName}
+              </p>
+              {customerPhone && (
+                <p className="text-xs text-slate-600 flex items-center gap-1.5 font-medium">
+                  <Phone size={12} className="text-slate-400" />
+                  {customerPhone}
+                </p>
+              )}
+            </div>
+
+            {/* Delivery Box */}
+            <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <MapPin size={13} className="text-emerald-700" /> Delivery Details
+              </span>
+              <p className="text-xs text-slate-700 font-medium leading-relaxed">
+                {addressStr}
+              </p>
+              <div className="pt-1 flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">
+                  <Clock size={11} />
+                  {deliverySlot}
+                </span>
+                {order.created_at && (
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    Placed: {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Status Update Bar */}
+          {onUpdateStatus && (
+            <div className="bg-emerald-50/80 p-3.5 rounded-2xl border border-emerald-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
+              <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                <Sparkles size={14} className="text-emerald-600" /> Update Order Stage:
+              </span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {(['CONFIRMED', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED'] as const).map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => onUpdateStatus(String(orderId), st)}
+                    className="px-3 py-1.5 text-xs font-bold bg-white text-emerald-800 hover:bg-emerald-700 hover:text-white border border-emerald-300 rounded-xl shadow-2xs transition-colors"
+                  >
+                    {st.replace(/_/g, ' ')}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Order Items Table */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                <PackageOpen size={16} className="text-emerald-600" /> Items Breakdown
+              </h3>
+              <span className="text-xs text-slate-500 font-semibold">{items.length} item(s) total</span>
+            </div>
+
+            {loadingItems ? (
+              <div className="flex flex-col items-center justify-center py-12 text-slate-500 space-y-2">
+                <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-600" />
+                <span className="text-xs font-semibold">Fetching order items...</span>
+              </div>
+            ) : itemsError ? (
+              <div className="p-4 rounded-xl border border-rose-200 bg-rose-50 text-xs font-medium text-rose-700">
+                {itemsError}
+              </div>
+            ) : items.length === 0 ? (
+              <div className="p-8 rounded-2xl border border-dashed border-slate-200 text-center text-xs font-semibold text-slate-400 bg-white">
+                No individual item rows found for this order.
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xs">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-100/90 text-slate-700 uppercase text-[10px] font-bold border-b border-gray-200">
+                    <tr>
+                      <th className="px-3.5 py-2.5">Item / Variant</th>
+                      <th className="px-3.5 py-2.5 text-center">Qty</th>
+                      <th className="px-3.5 py-2.5 text-right">Price</th>
+                      <th className="px-3.5 py-2.5 text-right">Discount</th>
+                      <th className="px-3.5 py-2.5 text-right">Final Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white text-slate-800 font-medium">
+                    {items.map((item) => (
+                      <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-3.5 py-2.5 font-semibold text-slate-900">
+                          {stripHtml(item.variant_name || item.product_name || 'Product')}
+                          {item.is_free && (
+                            <span className="ml-1.5 bg-amber-100 text-amber-900 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-300">
+                              FREE
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-center font-bold">
+                          {item.quantity ?? `${item.default_m_quantity ?? 0}/${item.default_e_quantity ?? 0}`}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-right font-medium text-slate-600">
+                          {formatMoney(item.unit_price)}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-right font-medium text-rose-600">
+                          {Number(item.discount_amount) > 0 ? `-${formatMoney(item.discount_amount)}` : '-'}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-right font-bold text-emerald-700">
+                          {formatMoney(item.final_price)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Pricing & Billing Summary */}
+          <div className="bg-emerald-50/80 border border-emerald-200 p-4 rounded-2xl space-y-2 shadow-2xs">
+            <div className="flex justify-between text-xs text-slate-600 font-semibold">
+              <span>Items Subtotal:</span>
+              <span className="font-bold text-slate-900">{formatMoney(itemTotal)}</span>
+            </div>
+            {order.total_amount && (
+              <div className="flex justify-between text-sm font-extrabold border-t border-emerald-200/90 pt-2 text-emerald-900">
+                <span>Grand Total:</span>
+                <span className="text-base text-emerald-700">{formatMoney(order.total_amount)}</span>
+              </div>
+            )}
+          </div>
+
+        </div>
+
+        {/* Light Drawer Footer */}
+        <div className="px-6 py-3.5 bg-white border-t border-gray-200 flex justify-end shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl shadow-2xs transition-colors"
+          >
+            Close Details
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}

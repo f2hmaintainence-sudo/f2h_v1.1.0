@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataService } from 'src/shared/database/Data.service';
+import { DataService } from '../../../../shared/database/Data.service';
 
 @Injectable()
 export class FirstOrderDetectorService {

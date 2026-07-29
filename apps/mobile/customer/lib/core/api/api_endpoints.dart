@@ -22,10 +22,11 @@ class ApiEndpoints {
   // ---------------------------------------------------------------------------
   static const String _envBaseUrl = String.fromEnvironment('F2H_API_BASE_URL');
   static String get _devBaseUrl {
-    if (kReleaseMode) {
-      return 'https://f2hfresh.com';
+    if (kReleaseMode && _envBaseUrl.isEmpty) {
+      // Default to local backend IP for local testing
+      return 'http://192.168.1.35:5001';
     }
-    return 'http://192.168.1.5:5001';
+    return 'http://192.168.1.35:5001';
   }
 
   /// Root host (scheme + host + port), no trailing slash.
@@ -99,6 +100,7 @@ class ApiEndpoints {
   static const String cartItems = '$_customer/cart-items';
   static const String cartData = cartItems;
   static const String checkout = '$_customer/checkout/payment';
+  static const String customerBills = '$_customer/orders/bills';
 
   // Referrals  →  /api/v1/customer/referrals/…
   static const String customerReferrals = '$_customer/referrals/dashboard';

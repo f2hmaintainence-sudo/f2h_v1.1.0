@@ -16,6 +16,9 @@ import {
   CreditCard,
   User,
   ArrowLeft,
+  ChevronRight,
+  ChevronDown,
+  Home,
   FileText,
   DollarSign,
   Activity,
@@ -25,23 +28,34 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/services/api.client';
 
-export default function DeliveryPartnerPortfolioPage() {
-  const params = useParams();
+export default function DeliveryPartnerPortfolioPage({ params }: { params?: any }) {
+  const routeParams = useParams();
   const router = useRouter();
-  const id = params?.id as string;
 
+  const [partnerId, setPartnerId] = useState<string>('');
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Overview & Performance');
 
   useEffect(() => {
-    if (id) fetchPortfolio();
-  }, [id]);
+    const rawId = (routeParams?.id as string) || '';
+    if (rawId) {
+      setPartnerId(rawId);
+    } else if (params) {
+      Promise.resolve(params).then((p: any) => {
+        if (p?.id) setPartnerId(p.id);
+      });
+    }
+  }, [params, routeParams]);
 
-  const fetchPortfolio = async () => {
+  useEffect(() => {
+    if (partnerId) fetchPortfolio(partnerId);
+  }, [partnerId]);
+
+  const fetchPortfolio = async (targetId: string) => {
     setLoading(true);
     try {
-      const res = await api.get(`/admin/delivery/partners/${id}/portfolio`);
+      const res = await api.get(`/admin/delivery/partners/${targetId}/portfolio`);
       if (res.data) {
         const payload = (res.data as any).data || res.data;
         setData(payload);

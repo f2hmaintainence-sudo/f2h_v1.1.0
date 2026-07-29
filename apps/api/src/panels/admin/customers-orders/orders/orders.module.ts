@@ -8,9 +8,10 @@ import { PdfModule } from '../../../../common/pdf/pdf.module';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 import { OrdersTableService } from './services/table.service';
+import { ReferralModule } from '../../../customer/referral/referral.module';
 
 @Module({
-  imports: [HelpersModule, FieldEncryptionModule, PdfModule],
+  imports: [HelpersModule, FieldEncryptionModule, PdfModule, ReferralModule],
   controllers: [OrdersController],
   providers: [
     OrdersService,

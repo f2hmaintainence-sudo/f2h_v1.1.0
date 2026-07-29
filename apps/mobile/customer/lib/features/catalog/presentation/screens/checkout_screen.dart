@@ -467,64 +467,69 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                     final qty = getItemQuantity(item);
                                     final displayPrice = effectivePrice;
                                     return Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: 60,
-                                            height: 60,
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
-                                              borderRadius: BorderRadius.circular(10),
-                                              border: Border.all(color: kBorderLt, width: 1),
-                                            ),
-                                            child: ClipRRect(
-                                              borderRadius: BorderRadius.circular(9),
-                                              child: Padding(
-                                                padding: const EdgeInsets.all(2),
-                                                child: buildProductImage(
-                                                  p.name,
-                                                  imageAsset: p.imageAsset,
-                                                  fit: BoxFit.contain,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                      child: LayoutBuilder(
+                                        builder: (ctx, cst) {
+                                          // ponytail: scale for 320-430+ screens
+                                          final s = (cst.maxWidth / 340).clamp(0.8, 1.15);
+                                          return Row(
+                                            children: [
+                                              Container(
+                                                width: 50 * s,
+                                                height: 50 * s,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                  border: Border.all(color: kBorderLt, width: 1),
+                                                ),
+                                                child: ClipRRect(
+                                                  borderRadius: BorderRadius.circular(9),
+                                                  child: Padding(
+                                                    padding: const EdgeInsets.all(2),
+                                                    child: buildProductImage(
+                                                      p.name,
+                                                      imageAsset: p.imageAsset,
+                                                      fit: BoxFit.contain,
+                                                    ),
+                                                  ),
                                                 ),
                                               ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 14),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  p.name,
-                                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kText),
+                                              SizedBox(width: 10 * s),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      p.name,
+                                                      style: TextStyle(fontSize: 12 * s, fontWeight: FontWeight.w700, color: kText),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                    Text(
+                                                      '${p.unit} · ₹${displayPrice.toStringAsFixed(0)}',
+                                                      style: TextStyle(fontSize: 10 * s, color: kTextSub),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
                                                 ),
-                                                Text(
-                                                  '${p.unit} · ₹${displayPrice.toStringAsFixed(0)}',
-                                                  style: const TextStyle(fontSize: 11, color: kTextSub),
+                                              ),
+                                              SizedBox(width: 6 * s),
+                                              SizedBox(
+                                                width: 70 * s,
+                                                child: Align(
+                                                  alignment: Alignment.centerRight,
+                                                  child: _buildCheckoutItemCounter(item),
                                                 ),
-                                              ],
-                                            ),
-                                          ),
-                                          SizedBox(
-                                            width: 80,
-                                            child: Align(
-                                              alignment: Alignment.centerRight,
-                                              child: _buildCheckoutItemCounter(item),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          SizedBox(
-                                            width: 55,
-                                            child: Align(
-                                              alignment: Alignment.centerRight,
-                                              child: Text(
+                                              ),
+                                              SizedBox(width: 6 * s),
+                                              Text(
                                                 '₹${(displayPrice * qty).toStringAsFixed(0)}',
-                                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: kText),
+                                                style: TextStyle(fontSize: 12 * s, fontWeight: FontWeight.w800, color: kText),
                                               ),
-                                            ),
-                                          ),
-                                        ],
+                                            ],
+                                          );
+                                        },
                                       ),
                                     );
                                   },

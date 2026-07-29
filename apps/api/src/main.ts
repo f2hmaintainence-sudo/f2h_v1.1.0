@@ -101,6 +101,15 @@ async function bootstrap() {
     },
   });
 
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+    prefix: '/api/v1/uploads/',
+    maxAge: 31536000000, // 1 year in milliseconds
+    setHeaders: (res: any) => {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    },
+  });
+
 
   // Enable Global Validation Pipe
   app.useGlobalPipes(
@@ -235,7 +244,7 @@ async function bootstrap() {
     maxAge: 86400, // 24-hour preflight cache
   });
 
-  const port = env.Backend_Port || 4000;
+  const port = env.PORT || env.Backend_Port || 5001;
   await app.listen(port, '0.0.0.0');
   console.log(`Server running on http://0.0.0.0:${port}`);
 }
