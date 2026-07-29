@@ -373,7 +373,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Your wallet balance is ₹${availableAmt.toStringAsFixed(2)}. You need ₹${requiredAmt.toStringAsFixed(2)} for this subscription.',
@@ -400,7 +400,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryGreen,
+              backgroundColor: AppColors.primary,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () {
