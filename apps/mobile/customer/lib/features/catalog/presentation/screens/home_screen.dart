@@ -2108,51 +2108,60 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
             left: 16,
             right: 16,
             top: topPadding + 170 - (shrinkFactor * 162), // Interpolates from topPadding+170 to topPadding+8
-            child: GestureDetector(
-              onTap: onSearchTap,
-              child: Container(
-                height: 46,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: const Color(0xFF16653A).withValues(alpha: 0.12),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF16653A).withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.search_rounded,
-                      color: Color(0xFF16653A),
-                      size: 20,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        searchHint,
-                        style: const TextStyle(
-                          color: kTextSub,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
+            child: BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
+              builder: (context, sessionState) {
+                final isVip = sessionState.profile?.isMember == true;
+
+                return GestureDetector(
+                  onTap: onSearchTap,
+                  child: Container(
+                    height: 46,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(
+                        color: isVip ? const Color(0xFFFFD700) : const Color(0xFF16653A).withValues(alpha: 0.12),
+                        width: isVip ? 1.5 : 1.0,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: isVip
+                              ? const Color(0xFFFFD700).withValues(alpha: 0.3)
+                              : const Color(0xFF16653A).withValues(alpha: 0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    const Icon(
-                      Icons.tune_rounded,
-                      color: Color(0xFF16653A),
-                      size: 20,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.search_rounded,
+                          color: isVip ? const Color(0xFFB8860B) : const Color(0xFF16653A),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            searchHint,
+                            style: const TextStyle(
+                              color: kTextSub,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.tune_rounded,
+                          color: isVip ? const Color(0xFFB8860B) : const Color(0xFF16653A),
+                          size: 20,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             ),
           ),
         ],
