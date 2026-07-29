@@ -1163,6 +1163,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               },
                             ),
                             _quickAction(
+                              Icons.location_on_outlined,
+                              'Address',
+                              const Color(0xFFF3E5F5),
+                              const Color(0xFF7B1FA2),
+                              () {
+                                if (isLoggedIn) {
+                                  AddressSelectorDrawer.show(context);
+                                } else {
+                                  _showLoginDrawer(context);
+                                }
+                              },
+                            ),
+                            _quickAction(
                               Icons.receipt_long_outlined,
                               'Orders',
                               const Color(0xFFE3F2FD),
