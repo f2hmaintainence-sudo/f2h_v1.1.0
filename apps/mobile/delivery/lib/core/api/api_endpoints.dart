@@ -16,7 +16,10 @@ class ApiEndpoints {
   ApiEndpoints._();
 
   static const String _envBaseUrl = String.fromEnvironment('F2H_API_BASE_URL');
-  static const String _devBaseUrl = 'http://192.168.1.39:5001';
+  static const String _devBaseUrl = 'http://192.168.1.16:5001';
+  // static const String _devBaseUrl = 'https://api.f2hfresh.com';
+
+
 
   static String get host {
     if (_envBaseUrl.isNotEmpty) return _envBaseUrl;
@@ -43,6 +46,8 @@ class ApiEndpoints {
   static const String googleAuth       = '$_auth/google';
   static const String sendEmailOtp     = '$_auth/send-email-otp';
   static const String verifyEmailOtp   = '$_auth/verify-email-otp';
+  static const String forgotPassword   = '$_auth/forgot-password';
+  static const String resetPassword    = '$_auth/reset-password';
 
   // ---------------------------------------------------------------------------
   // Delivery Partner Location & SOS

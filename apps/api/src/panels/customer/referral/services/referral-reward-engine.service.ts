@@ -59,43 +59,60 @@ export class ReferralRewardEngineService {
       return { status: false, message: 'Referrer ID missing' };
     }
 
-    const rewardAmount = 50.00;
+    // Check if referrer is a delivery partner (rider)
+    let isDeliveryPartner = false;
+    try {
+      const dpCheck = await this.db.query(
+        `SELECT delivery_partner_id FROM delivery_partners WHERE delivery_partner_id = $1 OR user_id = $1 LIMIT 1`,
+        [targetReferrerId],
+      );
+      if (dpCheck?.length > 0) {
+        isDeliveryPartner = true;
+      }
+    } catch (_) {}
+
+    const referrerRewardAmount = isDeliveryPartner ? 75.00 : 50.00;
+    const refereeRewardAmount = 50.00;
     const now = new Date();
 
-    // ── A. Credit Referrer (+₹50) ──────────────────────────────
-    const referrerRes = await this.dataService.query('customers', {
-      select: ['customer_id', 'wallet_balance'],
-      where: [{ column: 'customer_id', operator: '=', value: targetReferrerId }],
-      limit: 1,
-    });
-    const referrerCust = referrerRes?.data?.[0];
-    const referrerOldBalance = Number(referrerCust?.wallet_balance || 0);
-    const referrerNewBalance = referrerOldBalance + rewardAmount;
+    // ── A. Credit Referrer (Only if referrer is a Customer) ──────────────────────
+    if (!isDeliveryPartner) {
+      const referrerRes = await this.dataService.query('customers', {
+        select: ['customer_id', 'wallet_balance'],
+        where: [{ column: 'customer_id', operator: '=', value: targetReferrerId }],
+        limit: 1,
+      });
+      const referrerCust = referrerRes?.data?.[0];
+      if (referrerCust) {
+        const referrerOldBalance = Number(referrerCust.wallet_balance || 0);
+        const referrerNewBalance = referrerOldBalance + referrerRewardAmount;
 
-    await this.dataService.update(
-      'customers',
-      { wallet_balance: referrerNewBalance, updated_at: now },
-      [{ column: 'customer_id', operator: '=', value: targetReferrerId }],
-    );
+        await this.dataService.update(
+          'customers',
+          { wallet_balance: referrerNewBalance, updated_at: now },
+          [{ column: 'customer_id', operator: '=', value: targetReferrerId }],
+        );
 
-    await this.dataService.insert(
-      'customer_wallet_transactions',
-      {
-        customer_id: targetReferrerId,
-        transaction_type: 'credit',
-        amount: rewardAmount,
-        balance_after: referrerNewBalance,
-        reference_type: 'referral_bonus',
-        reference_id: orderId || referralRecord.refer_id || referralRecord.id,
-        remarks: `Referral Reward: Invited customer (${referee.first_name || 'Friend'}) completed first order`,
-        created_by: refereeCustomerId,
-        created_at: now,
-      },
-    );
+        await this.dataService.insert(
+          'customer_wallet_transactions',
+          {
+            customer_id: targetReferrerId,
+            transaction_type: 'credit',
+            amount: referrerRewardAmount,
+            balance_after: referrerNewBalance,
+            reference_type: 'referral_bonus',
+            reference_id: orderId || referralRecord.refer_id || referralRecord.id,
+            remarks: `Referral Reward: Invited customer (${referee.first_name || 'Friend'}) completed first order`,
+            created_by: refereeCustomerId,
+            created_at: now,
+          },
+        );
+      }
+    }
 
     // ── B. Credit Referred Customer (+₹50) ────────────────
     const refereeOldBalance = Number(referee.wallet_balance || 0);
-    const refereeNewBalance = refereeOldBalance + rewardAmount;
+    const refereeNewBalance = refereeOldBalance + refereeRewardAmount;
 
     await this.dataService.update(
       'customers',
@@ -108,7 +125,7 @@ export class ReferralRewardEngineService {
       {
         customer_id: refereeCustomerId,
         transaction_type: 'credit',
-        amount: rewardAmount,
+        amount: refereeRewardAmount,
         balance_after: refereeNewBalance,
         reference_type: 'referral_bonus',
         reference_id: orderId || referralRecord.refer_id || referralRecord.id,
@@ -118,7 +135,7 @@ export class ReferralRewardEngineService {
       },
     );
 
-    // ── C. STEP 12: Mark Referral = 'rewarded' (Direct SQL) ────────
+    // ── C. Mark Referral = 'rewarded' (Direct SQL) ────────
     await this.db.query(
       `UPDATE referrals 
        SET status = 'rewarded', 
@@ -128,8 +145,8 @@ export class ReferralRewardEngineService {
            updated_at = $3 
        WHERE id = $4 OR refer_id = $5`,
       [
-        rewardAmount,
-        rewardAmount,
+        referrerRewardAmount,
+        refereeRewardAmount,
         now,
         referralRecord.id,
         referralRecord.refer_id,
@@ -193,8 +210,9 @@ export class ReferralRewardEngineService {
 
     return {
       status: true,
-      message: `Successfully processed referral rewards! ₹${rewardAmount} credited to referrer and referred customer.`,
-      referrer_new_balance: referrerNewBalance,
+      message: `Successfully processed referral rewards! ₹${referrerRewardAmount} for referrer and ₹${refereeRewardAmount} for referred customer.`,
+      is_delivery_partner: isDeliveryPartner,
+      referrer_reward_amount: referrerRewardAmount,
       referee_new_balance: refereeNewBalance,
     };
   }

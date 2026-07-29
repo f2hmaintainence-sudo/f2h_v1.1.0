@@ -44,6 +44,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
     String? paymentMode,
     String? paymentStatus,
     String? deliveryImage,
+    List<Map<String, dynamic>>? containerReturns,
   }) async {
     try {
       String? resolvedImageUrl = deliveryImage;
@@ -87,6 +88,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
           if (paymentMode != null) 'payment_mode': paymentMode,
           if (paymentStatus != null) 'payment_status': paymentStatus,
           if (resolvedImageUrl != null) 'delivery_image': resolvedImageUrl,
+          if (containerReturns != null) 'container_returns': containerReturns,
         },
       );
       final data = response.data;
@@ -143,6 +145,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
     String? deliveryImage,
     double? latitude,
     double? longitude,
+    List<Map<String, dynamic>>? containerReturns,
   }) async {
     try {
       String? resolvedImageUrl = deliveryImage;
@@ -178,6 +181,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
         ApiEndpoints.markStopDelivered(runId, addressId),
         data: {
           'status': status,
+          if (orderId != null) 'order_id': orderId,
           if (remarks != null) 'remarks': remarks,
           if (emptyBottlesCollected != null) 'empty_bottles_collected': emptyBottlesCollected,
           if (returnedContainers != null) 'returned_containers': returnedContainers,
@@ -188,6 +192,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
           if (resolvedImageUrl != null) 'delivery_image': resolvedImageUrl,
           if (latitude != null) 'latitude': latitude,
           if (longitude != null) 'longitude': longitude,
+          if (containerReturns != null) 'container_returns': containerReturns,
         },
       );
       final data = response.data;

@@ -1,14 +1,17 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_event.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
+import 'package:f2h_delivery/features/profile/data/profile_model.dart';
 import 'package:f2h_delivery/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:f2h_delivery/features/profile/presentation/bloc/profile_event.dart';
 import 'package:f2h_delivery/features/profile/presentation/bloc/profile_state.dart';
@@ -269,31 +272,7 @@ class ProfileScreen extends StatelessWidget {
                     SliverToBoxAdapter(
                       child: _buildHeader(context, state, partnerName, partnerId),
                     ),
-                    if (state.isOffline)
-                      SliverToBoxAdapter(
-                        child: Container(
-                          color: Colors.amber.shade800,
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 16),
-                              const SizedBox(width: 8),
-                              Text(
-                                profile.deliveryPartnerId.isEmpty
-                                    ? 'Offline Mode · No cached profile data'
-                                    : 'Offline Mode · Showing cached profile data',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
@@ -372,6 +351,8 @@ class ProfileScreen extends StatelessWidget {
                               ],
                             ),
                             const SizedBox(height: 16),
+                            _buildReferralCard(context, profile),
+                            const SizedBox(height: 16),
                             SectionCard(
                               title: 'Performance & Operations',
                               icon: Icons.dashboard_customize_rounded,
@@ -423,65 +404,33 @@ class ProfileScreen extends StatelessWidget {
                                     ),
                                   ),
                                 ),
+                                InfoTile(
+                                  label: 'Security Settings',
+                                  value: 'Password and session management',
+                                  leadingIcon: Icons.shield_rounded,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => BlocProvider.value(
+                                        value: context.read<ProfileBloc>(),
+                                        child: const SecurityScreen(),
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
                             const SizedBox(height: 16),
 
-                            // ── SYSTEM PREFERENCES ─────────────────────────────────────
+                            // ── REFERRAL SECTION ─────────────────────────────────────
                             _buildSectionHeader(
-                              'System Preferences',
-                              'Configure app and system settings',
+                              'Refer & Earn',
+                              'Invite friends and earn rewards',
                             ),
-                            _buildPremiumWideCard(
-                              'Notifications & Preferences',
-                              'Config alerts and app language',
-                              Icons.notifications_rounded,
-                              const Color(0xFF09AD42),
-                              () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => BlocProvider.value(
-                                    value: context.read<ProfileBloc>(),
-                                    child: const NotificationsPreferencesScreen(),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            _buildPremiumWideCard(
-                              'Activity Logs',
-                              'Device info and app version',
-                              Icons.assessment_rounded,
-                              const Color(0xFF09AD42),
-                              () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => BlocProvider.value(
-                                    value: context.read<ProfileBloc>(),
-                                    child: const ActivityScreen(),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            _buildPremiumWideCard(
-                              'Security Settings',
-                              'Password and session management',
-                              Icons.shield_rounded,
-                              const Color(0xFF09AD42),
-                              () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => BlocProvider.value(
-                                    value: context.read<ProfileBloc>(),
-                                    child: const SecurityScreen(),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-
-                            // ── LOG OUT SESSION ─────────────────────────────────────
+                            _buildReferralLinkCard(context, profile),
+                            const SizedBox(height: 12),
                             _buildLogoutCard(() {
-                              context.read<AuthBloc>().add(LogoutRequested());
+                              _showLogoutConfirmationDialog(context);
                             }),
                             const SizedBox(height: 32),
 
@@ -997,6 +946,529 @@ class ProfileScreen extends StatelessWidget {
       Icons.logout_rounded,
       const Color(0xFFEF4444),
       onTap,
+    );
+  }
+
+  void _showLogoutConfirmationDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          backgroundColor: Colors.white,
+          title: Row(
+            children: const [
+              Icon(
+                Icons.warning_amber_rounded,
+                color: Color(0xFFEF4444),
+                size: 28,
+              ),
+              SizedBox(width: 10),
+              Text(
+                'Confirm Log Out',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 18,
+                  color: kText,
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Are you sure you want to log out of your session? You will need your credentials to log back in.',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: kTextSub,
+              height: 1.4,
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: kTextSub,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                context.read<AuthBloc>().add(LogoutRequested());
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text(
+                'Log Out',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildReferralLinkCard(BuildContext context, ProfileModel profile) {
+    final code = (profile.referralCode ?? '').isNotEmpty ? profile.referralCode! : 'F2HDR-RIDER';
+    return _buildPremiumWideCard(
+      'Refer & Earn ₹75',
+      'Share code "$code" & earn ₹75 per referral',
+      Icons.share_rounded,
+      const Color(0xFF09AD42),
+      () => _showReferralShareDialog(context, code),
+    );
+  }
+
+  void _showReferralShareDialog(BuildContext context, String code) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      backgroundColor: Colors.white,
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF09AD42).withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.card_giftcard_rounded,
+                  color: Color(0xFF09AD42),
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Refer & Earn ₹75',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: kText,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Invite friends to join F2H Fresh. You earn ₹75 cash bonus for every partner or customer who registers using your code!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: kTextSub,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'YOUR REFERRAL CODE',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            color: kTextSub,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          code,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF09AD42),
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF09AD42),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      ),
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: code));
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Referral code "$code" copied to clipboard!'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: const Color(0xFF09AD42),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.copy_rounded, size: 16),
+                      label: const Text(
+                        'Copy Code',
+                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Referral Share Link Box
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.link_rounded, color: Color(0xFF09AD42), size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'REFERRAL SHARE LINK',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: kTextSub,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'https://f2hfresh.com/refer?code=$code',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: kText,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF09AD42), width: 1.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: 'https://f2hfresh.com/refer?code=$code'));
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Referral link "https://f2hfresh.com/refer?code=$code" copied to clipboard!'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: const Color(0xFF09AD42),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.link_rounded, size: 16, color: Color(0xFF09AD42)),
+                      label: const Text(
+                        'Copy Link',
+                        style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF09AD42)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF25D366),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onPressed: () async {
+                        final msg = 'Join F2H Fresh with my referral code "$code" and get ₹100 bonus on your first order!\n\nLink: https://f2hfresh.com/refer?code=$code';
+                        final url = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(msg)}');
+                        if (await canLaunchUrl(url)) {
+                          await launchUrl(url, mode: LaunchMode.externalApplication);
+                        } else {
+                          Clipboard.setData(ClipboardData(text: msg));
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Referral invite message copied to clipboard!'),
+                                backgroundColor: Color(0xFF09AD42),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.share_rounded, size: 16),
+                      label: const Text(
+                        'Share Link',
+                        style: TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildReferralCard(BuildContext context, ProfileModel profile) {
+    final earnings = profile.referralEarnings ?? 0.0;
+    final count = profile.referralCount ?? 0;
+    final code = (profile.referralCode ?? '').isNotEmpty ? profile.referralCode! : 'F2HDR-RIDER';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: kBorder, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF09AD42).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.card_giftcard_rounded,
+                      color: Color(0xFF09AD42),
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Referral Earnings',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: kText,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Earn ₹75 per successful referral',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: kTextSub,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF09AD42).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFF09AD42).withOpacity(0.2)),
+                ),
+                child: const Text(
+                  '₹75 / Refer',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF09AD42),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'TOTAL EARNED',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          color: kTextSub,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '₹${earnings.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF09AD42),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 36,
+                  color: const Color(0xFFE2E8F0),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'TOTAL REFERRED',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            color: kTextSub,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$count Partners',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: kText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Text(
+                    'Your Code: ',
+                    style: TextStyle(fontSize: 12, color: kTextSub, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    code,
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF09AD42), fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                  ),
+                ],
+              ),
+              InkWell(
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Referral Code "$code" copied to clipboard!'),
+                      behavior: SnackBarBehavior.floating,
+                      backgroundColor: const Color(0xFF09AD42),
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.copy_rounded, size: 14, color: Color(0xFF09AD42)),
+                      SizedBox(width: 4),
+                      Text(
+                        'Copy Code',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF09AD42)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

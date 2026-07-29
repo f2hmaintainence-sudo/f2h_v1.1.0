@@ -76,16 +76,7 @@ export class ReferralRepository implements IReferralRepository {
       }
     }
 
-    // 2. Search users table by referral_code variations
-    for (const varCode of variations) {
-      const userRes = await this.dataService.query('users', {
-        where: [{ column: 'referral_code', operator: '=', value: varCode }],
-        limit: 1,
-      });
-      if (userRes?.data?.length > 0) {
-        return userRes.data[0];
-      }
-    }
+
 
     // 3. Fallback for old phone-suffix referral codes e.g. F2H-0305, F2H0305, REF0305, 0305
     const digitsOnly = raw.replace(/\D/g, '');

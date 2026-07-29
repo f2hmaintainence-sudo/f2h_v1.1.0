@@ -12,7 +12,8 @@ class ReloadSessionEvent extends DeliverySessionEvent {}
 /// Toggle the driver's online / offline shift status.
 class ToggleOnlineEvent extends DeliverySessionEvent {
   final bool val;
-  ToggleOnlineEvent(this.val);
+  final void Function(String? error)? callback;
+  ToggleOnlineEvent(this.val, {this.callback});
 }
 
 /// Mark a stop as delivered or failed and sync to the backend.
@@ -27,6 +28,7 @@ class UpdateStopStatusEvent extends DeliverySessionEvent {
   final String? paymentMode;
   final String? paymentStatus;
   final String? deliveryImage;
+  final List<Map<String, dynamic>>? containerReturns;
 
   UpdateStopStatusEvent({
     required this.orderId,
@@ -39,6 +41,7 @@ class UpdateStopStatusEvent extends DeliverySessionEvent {
     this.paymentMode,
     this.paymentStatus,
     this.deliveryImage,
+    this.containerReturns,
   });
 }
 

@@ -25,6 +25,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
   bool _obscurePass = true;
   bool _obscureConfirm = true;
   bool _isLoading = false;
+  String? _verificationToken;
 
   int _countdown = 60;
   bool _canResend = false;
@@ -81,7 +82,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
       
       await dioClient.dio.post(
         ApiEndpoints.sendEmailOtp,
-        data: {'email': email},
+        data: {'email': email, 'purpose': 'forgot_password'},
       );
 
       setState(() {
@@ -89,7 +90,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
         _step = 1;
       });
       _startCountdown();
-      _showSnack('OTP sent to $email');
+      _showSnack('OTP sent to $email ✅');
     } on DioException catch (e) {
       setState(() => _isLoading = false);
       _showSnack(e.response?.data?['message'] ?? 'Failed to send OTP', isError: true);
@@ -108,10 +109,17 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
       final dioClient = sl<DioClient>();
       await dioClient.fetchCsrfToken();
 
-      await dioClient.dio.post(
+      final response = await dioClient.dio.post(
         ApiEndpoints.verifyEmailOtp,
-        data: {'email': _emailCtrl.text.trim(), 'otp': otp},
+        data: {
+          'email': _emailCtrl.text.trim(),
+          'otp': otp,
+          'purpose': 'forgot_password',
+        },
       );
+
+      final resData = Map<String, dynamic>.from(response.data as Map? ?? {});
+      _verificationToken = resData['verification_token']?.toString();
 
       setState(() {
         _isLoading = false;
@@ -148,10 +156,11 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
       await dioClient.fetchCsrfToken();
 
       await dioClient.dio.post(
-        '/auth/reset-password',
+        ApiEndpoints.resetPassword,
         data: {
           'email': _emailCtrl.text.trim(),
-          'token': otp,
+          'token': _verificationToken ?? otp,
+          'otp': otp,
           'newPassword': pass,
         },
       );

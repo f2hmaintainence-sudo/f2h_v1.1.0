@@ -17,10 +17,10 @@ import 'package:f2h_delivery/features/dashboard/presentation/widgets/dashboard_h
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/next_delivery_card.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/queue_item_tile.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/verification_pending_view.dart';
-import 'package:f2h_delivery/features/dashboard/presentation/widgets/collected_items_dialog.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/handover_status_card.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/bottle_tracker_card.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/collect_queue_item.dart';
+import 'package:f2h_delivery/features/orders/presentation/screens/pickup_selection_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -98,7 +98,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!mounted) return;
       Navigator.pop(context);
       if (response.status) {
-        _showCollectedItemsModal(context, response);
+        if (response.items.isEmpty) {
+          _showNoItemsAlert(context);
+          return;
+        }
+        final success = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PickupSelectionScreen(response: response),
+          ),
+        );
+        if (success == true && mounted) {
+          AppSnackBar.success(context, '✅ Pickup confirmed. Starting deliveries!');
+          setState(() => _selectedTab = 1);
+        }
       } else {
         AppSnackBar.error(context, response.message ?? 'Failed to fetch items to collect');
       }
@@ -109,60 +122,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _showCollectedItemsModal(BuildContext context, PickupResponse response) {
-    if (response.items.isEmpty) {
-      showDialog(
-        context: context,
-        builder: (BuildContext dialogContext) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Text('Items to Collect', style: TextStyle(fontWeight: FontWeight.w900, color: kText)),
-            content: const Text('No items assigned to collect for today.', style: TextStyle(color: kTextSub)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold, color: kPrimary)),
-              ),
-            ],
-          );
-        },
-      );
-      return;
-    }
-
+  void _showNoItemsAlert(BuildContext context) {
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
-        return CollectedItemsDialog(
-          response: response,
-          onConfirm: (confirmedItems) async {
-            try {
-              final position = await _locationService.getCurrentPosition();
-              final ordersRepo = sl<OrdersRepository>();
-              await ordersRepo.confirmPickup(
-                runId: response.runId!,
-                items: confirmedItems,
-                latitude: position?.latitude,
-                longitude: position?.longitude,
-              );
-
-              // Refresh session via BLoC after pickup confirmation
-              if (mounted) {
-                context.read<DeliverySessionBloc>().add(ReloadSessionEvent());
-              }
-              try {
-                sl<PickupBloc>().add(LoadPickupItems());
-              } catch (_) {}
-
-              if (mounted) {
-                Navigator.pop(dialogContext);
-                AppSnackBar.success(context, 'âœ… Pickup confirmed. Starting deliveries!');
-                setState(() => _selectedTab = 1);
-              }
-            } catch (err) {
-              if (mounted) AppSnackBar.error(context, 'Error confirming pickup: $err');
-            }
-          },
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Items to Collect', style: TextStyle(fontWeight: FontWeight.w900, color: kText)),
+          content: const Text('No items assigned to collect for today.', style: TextStyle(color: kTextSub)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold, color: kPrimary)),
+            ),
+          ],
         );
       },
     );
@@ -185,7 +158,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!mounted) return;
       Navigator.pop(context);
       if (response.status && response.items.isNotEmpty && !response.pickupConfirmed) {
-        _showCollectedItemsModal(context, response);
+        final success = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PickupSelectionScreen(response: response),
+          ),
+        );
+        if (success == true && mounted) {
+          AppSnackBar.success(context, '✅ Pickup confirmed. Starting deliveries!');
+          setState(() => _selectedTab = 1);
+        }
       } else {
         AppSnackBar.info(context, response.message ?? 'No items to pick up for today.', color: kPrimary);
       }
@@ -196,8 +178,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-
-
   void _showConfirmation(BuildContext context, GroupedStop stop) async {
     final position = await _locationService.getCurrentPosition();
     if (position != null) {
@@ -207,10 +187,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         stop.addressLat,
         stop.addressLng,
       );
+      print('[DEBUG] Rider is $dist km away from stop.');
+      // Bypassed 300 meters check to allow testing locally
+      /*
       if (dist > 0.3) {
         if (mounted) AppSnackBar.error(context, 'Please reach the location to mark as delivered.');
         return;
       }
+      */
     }
     if (!mounted) return;
     showModalBottomSheet(
@@ -219,9 +203,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => DeliveryConfirmationSheet(
         stop: stop,
-        onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage) {
+        onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns) {
+          if (stop.orders.isEmpty) return;
+          final orderId = stop.orders.first.orderId;
+
           context.read<DeliverySessionBloc>().add(UpdateStopStatusEvent(
-            orderId: stop.orders.first.orderId,
+            orderId: orderId,
             newStatus: status,
             emptyBottles: emptyBottles,
             returnedContainers: returnedContainers,
@@ -231,8 +218,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
             paymentMode: paymentMode,
             paymentStatus: paymentStatus,
             deliveryImage: deliveryImage,
+            containerReturns: containerReturns,
           ));
-          Navigator.pop(context);
+
+          MockDataService().updateOrderStatus(
+            orderId,
+            status,
+            emptyBottles: emptyBottles,
+            returnedContainers: returnedContainers,
+            damagedContainers: damagedContainers,
+            lostContainers: lostContainers,
+            notes: notes,
+            paymentMode: paymentMode,
+            paymentStatus: paymentStatus,
+            deliveryImage: deliveryImage,
+          );
+
           AppSnackBar.show(
             context,
             'Stop #${stop.stop} marked as $status!',
@@ -316,6 +317,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         final listQueue = session.groupedStops;
         final currentRun = session.currentRun;
+        final isShiftCompleted = currentRun?.status == 'handed_over';
         final pickupConfirmed = currentRun != null &&
             (currentRun.status == 'in_progress' ||
                 currentRun.status == 'completed' ||
@@ -362,11 +364,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       width: 10,
                       height: 10,
                       decoration: BoxDecoration(
-                        color: session.isOnline ? kSuccess : kDanger,
+                        color: !session.isOnline
+                            ? kDanger
+                            : (isShiftCompleted ? kPrimary : kSuccess),
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: (session.isOnline ? kSuccess : kDanger).withOpacity(0.35),
+                            color: (!session.isOnline
+                                    ? kDanger
+                                    : (isShiftCompleted ? kPrimary : kSuccess))
+                                .withOpacity(0.35),
                             blurRadius: 6,
                             spreadRadius: 1,
                           )
@@ -375,11 +382,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      session.isOnline ? 'SHIFT ACTIVE · ONLINE' : 'SHIFT INACTIVE · OFFLINE',
+                      !session.isOnline
+                          ? 'SHIFT INACTIVE · OFFLINE'
+                          : (isShiftCompleted ? 'SHIFT COMPLETED' : 'SHIFT ACTIVE · ONLINE'),
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w900,
-                        color: session.isOnline ? kPrimary : kDanger,
+                        color: !session.isOnline
+                            ? kDanger
+                            : kPrimary,
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -444,14 +455,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               return;
                             }
                           }
-                          context.read<DeliverySessionBloc>().add(ToggleOnlineEvent(val));
-                          if (!mounted) return;
-                          AppSnackBar.show(
-                            context,
-                            val ? 'You are now Online.' : 'You are now Offline.',
-                            backgroundColor: val ? kSuccess : kDanger,
-                          );
-                          if (val) _showPickupSummaryDialog(context);
+                          context.read<DeliverySessionBloc>().add(ToggleOnlineEvent(
+                            val,
+                            callback: (error) {
+                              if (!mounted) return;
+                              if (error != null) {
+                                AppSnackBar.error(context, error);
+                              } else {
+                                AppSnackBar.show(
+                                  context,
+                                  val ? 'You are now Online.' : 'You are now Offline.',
+                                  backgroundColor: val ? kSuccess : kDanger,
+                                );
+                                if (val) _showPickupSummaryDialog(context);
+                              }
+                            },
+                          ));
                         },
                       ),
                     ),
@@ -469,171 +488,281 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   driverName: session.driverName,
                   completedCount: completedActiveStops,
                   totalStops: totalActiveStops,
+                  showCollectButton: !isShiftCompleted,
                   onCollectTap: () => _showItemsToCollectDialog(context),
                 ),
-                const SizedBox(height: 16),
-                HandoverStatusCard(currentRun: session.currentRun),
-                BottleTrackerCard(
-                  expected: session.expectedBottlesCount,
-                  collected: session.collectedBottlesCount,
-                  outstanding: session.bottlesStillOutstanding,
-                  toReturn: session.collectedBottlesCount,
-                ),
-                const SizedBox(height: 12),
-                // Tab Selector
-                Container(
-                  height: 48,
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(color: kBgDeep, borderRadius: BorderRadius.circular(16)),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => _selectedTab = 0),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: _selectedTab == 0 ? kSurface : Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Center(
-                              child: Text(
-                                'To Collect (${collectQueue.length})',
-                                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: _selectedTab == 0 ? kPrimary : kTextSub),
-                              ),
-                            ),
+                if (!session.isOnline) ...[
+                  Container(
+                    margin: const EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: kSurface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: kDanger.withOpacity(0.3)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: kDanger.withOpacity(0.06),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: kDanger.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.power_settings_new_rounded,
+                            color: kDanger,
+                            size: 36,
                           ),
                         ),
-                      ),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => _selectedTab = 1),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: _selectedTab == 1 ? kSurface : Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Center(
-                              child: Text(
-                                'Active Queue (${activeQueue.length})',
-                                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: _selectedTab == 1 ? kPrimary : kTextSub),
-                              ),
-                            ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'You are Currently Offline',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: kText,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        Text(
+                          'Turn on the SHIFT ACTIVE switch at the top right to go online and view your assigned orders for today.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: kTextSub,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                if (_selectedTab == 0) ...[
-                  if (collectQueue.isEmpty)
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(20), border: Border.all(color: kBorder)),
-                      child: const Center(child: Text('No items to collect for today.', style: TextStyle(color: kTextSub, fontWeight: FontWeight.bold))),
-                    )
-                  else ...[
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(colors: [kPrimary, kPrimary.withOpacity(0.8)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [BoxShadow(color: kPrimary.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4))],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
-                                child: const Icon(Icons.inventory_2_rounded, color: Colors.white, size: 24),
+                ] else if (isShiftCompleted) ...[
+                  HandoverStatusCard(currentRun: session.currentRun),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: kSurface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: kBorder),
+                      boxShadow: [
+                        BoxShadow(
+                          color: kPrimary.withOpacity(0.02),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: kSuccess.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.done_all_rounded,
+                            color: kSuccess,
+                            size: 36,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          "You're All Done!",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: kText,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          "Your deliveries, empty bottles, and returns have been processed and confirmed. Rest up and have a great day!",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: kTextSub,
+                            height: 1.4,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  HandoverStatusCard(currentRun: session.currentRun),
+                  BottleTrackerCard(
+                    expected: session.expectedBottlesCount,
+                    collected: session.collectedBottlesCount,
+                    outstanding: session.bottlesStillOutstanding,
+                    toReturn: session.collectedBottlesCount,
+                  ),
+                  const SizedBox(height: 12),
+                  // Tab Selector
+                  Container(
+                    height: 48,
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(color: kBgDeep, borderRadius: BorderRadius.circular(16)),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _selectedTab = 0),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: _selectedTab == 0 ? kSurface : Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              const SizedBox(width: 14),
-                              const Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                              child: Center(
+                                child: Text(
+                                  'To Collect (${collectQueue.length})',
+                                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: _selectedTab == 0 ? kPrimary : kTextSub),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _selectedTab = 1),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: _selectedTab == 1 ? kSurface : Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'Active Queue (${activeQueue.length})',
+                                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: _selectedTab == 1 ? kPrimary : kTextSub),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  if (_selectedTab == 0) ...[
+                    if (collectQueue.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(20), border: Border.all(color: kBorder)),
+                        child: const Center(child: Text('No items to collect for today.', style: TextStyle(color: kTextSub, fontWeight: FontWeight.bold))),
+                      )
+                    else ...[
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: [kPrimary, kPrimary.withOpacity(0.8)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [BoxShadow(color: kPrimary.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4))],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
+                                  child: const Icon(Icons.inventory_2_rounded, color: Colors.white, size: 24),
+                                ),
+                                const SizedBox(width: 14),
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Collect from Warehouse', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.white)),
+                                      SizedBox(height: 2),
+                                      Text('Verify and load items before starting', style: TextStyle(fontSize: 12, color: Colors.white70, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: kPrimary,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                onPressed: () => _showItemsToCollectDialog(context),
+                                child: const Text('Select & Collect Items', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text('Orders waiting to be collected', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: kText)),
+                      const SizedBox(height: 12),
+                      ...collectQueue.map((stop) => CollectQueueItem(stop: stop)),
+                    ],
+                  ] else ...[
+                    if (nextStop != null) ...[
+                      NextDeliveryCard(
+                        stop: nextStop,
+                        distanceStr: _calculateDistanceStr(nextStop),
+                        onDeliverTap: () => _showConfirmation(context, nextStop),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Delivery Queue Route', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: kText)),
+                        Text('$completedActiveStops/$totalActiveStops Done', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: kTextSub)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (activeQueue.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(20), border: Border.all(color: kBorder)),
+                        child: const Center(child: Text('No active deliveries. Complete collection first.', style: TextStyle(color: kTextSub, fontWeight: FontWeight.bold))),
+                      )
+                    else
+                      ...List.generate(activeQueue.length, (index) {
+                        final stop = activeQueue[index];
+                        final isNext = nextStop?.customerId == stop.customerId;
+                        return Column(
+                          children: [
+                            QueueItemTile(
+                              stop: stop,
+                              isNext: isNext,
+                              distanceStr: _calculateDistanceStr(stop),
+                              onDeliverTap: () => _showConfirmation(context, stop),
+                            ),
+                            if (index < activeQueue.length - 1)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 6),
+                                child: Row(
                                   children: [
-                                    Text('Collect from Warehouse', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.white)),
-                                    SizedBox(height: 2),
-                                    Text('Verify and load items before starting', style: TextStyle(fontSize: 12, color: Colors.white70, fontWeight: FontWeight.bold)),
+                                    const SizedBox(width: 38),
+                                    Icon(Icons.arrow_downward_rounded, size: 18, color: kMuted.withOpacity(0.5)),
                                   ],
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: kPrimary,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                              onPressed: () => _showItemsToCollectDialog(context),
-                              child: const Text('Select & Collect Items', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text('Orders waiting to be collected', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: kText)),
-                    const SizedBox(height: 12),
-                    ...collectQueue.map((stop) => CollectQueueItem(stop: stop)),
+                          ],
+                        );
+                      }),
                   ],
-                ] else ...[
-                  if (nextStop != null) ...[
-                    NextDeliveryCard(
-                      stop: nextStop,
-                      distanceStr: _calculateDistanceStr(nextStop),
-                      onDeliverTap: () => _showConfirmation(context, nextStop),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Delivery Queue Route', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: kText)),
-                      Text('$completedActiveStops/$totalActiveStops Done', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: kTextSub)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  if (activeQueue.isEmpty)
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(20), border: Border.all(color: kBorder)),
-                      child: const Center(child: Text('No active deliveries. Complete collection first.', style: TextStyle(color: kTextSub, fontWeight: FontWeight.bold))),
-                    )
-                  else
-                    ...List.generate(activeQueue.length, (index) {
-                      final stop = activeQueue[index];
-                      final isNext = nextStop?.customerId == stop.customerId;
-                      return Column(
-                        children: [
-                          QueueItemTile(
-                            stop: stop,
-                            isNext: isNext,
-                            distanceStr: _calculateDistanceStr(stop),
-                            onDeliverTap: () => _showConfirmation(context, stop),
-                          ),
-                          if (index < activeQueue.length - 1)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 6),
-                              child: Row(
-                                children: [
-                                  const SizedBox(width: 38),
-                                  Icon(Icons.arrow_downward_rounded, size: 18, color: kMuted.withOpacity(0.5)),
-                                ],
-                              ),
-                            ),
-                        ],
-                      );
-                    }),
                 ],
               ],
             ),

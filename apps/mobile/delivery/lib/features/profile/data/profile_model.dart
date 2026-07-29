@@ -32,6 +32,11 @@ class ProfileModel {
   final int? totalDeliveries;
   final String? lastLoginAt;
 
+  // Referral details
+  final double? referralEarnings;
+  final int? referralCount;
+  final String? referralCode;
+
   ProfileModel({
     required this.deliveryPartnerId,
     required this.fullName,
@@ -62,6 +67,9 @@ class ProfileModel {
     this.totalRuns,
     this.totalDeliveries,
     this.lastLoginAt,
+    this.referralEarnings,
+    this.referralCount,
+    this.referralCode,
   });
   static String? _imageUrl(dynamic value) {
     if (value == null) return null;
@@ -122,6 +130,9 @@ class ProfileModel {
       totalRuns: json['total_runs'] != null ? int.tryParse(json['total_runs'].toString()) : null,
       totalDeliveries: json['total_deliveries'] != null ? int.tryParse(json['total_deliveries'].toString()) : null,
       lastLoginAt: json['last_login_at']?.toString(),
+      referralEarnings: json['referral_earnings'] != null ? double.tryParse(json['referral_earnings'].toString()) : 0.0,
+      referralCount: json['referral_count'] != null ? int.tryParse(json['referral_count'].toString()) : 0,
+      referralCode: json['referral_code']?.toString(),
     );
   }
 

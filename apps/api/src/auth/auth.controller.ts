@@ -17,7 +17,7 @@ import { JwtService } from '@nestjs/jwt';
 import { RedisService } from 'src/shared/redis/redis.service';
 import { DeviceFingerprintService } from './device-fingerprint.service';
 import { AuditLoggerService } from './audit-logger.service';
-import { RegisterDto, LoginDto, SendOtpDto, VerifyOtpDto, SendEmailOtpDto, VerifyEmailOtpDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, SendOtpDto, VerifyOtpDto } from './dto/auth.dto';
 import { Public } from './decorators/public.decorator';
 
 @Controller({ path: 'auth', version: '1' })
@@ -242,6 +242,17 @@ export class AuthController {
   }
 
   @Public()
+  @Post('send-email-otp')
+  @HttpCode(HttpStatus.OK)
+  async sendEmailOtp(@Body() body: { email?: string; phone?: string; purpose?: string }) {
+    if (body.purpose === 'forgot_password') {
+      const identifier = body.email || body.phone || '';
+      return this.authService.forgotPassword(identifier);
+    }
+    return this.authService.requestMobileOtp({ email: body.email, phone: body.phone });
+  }
+
+  @Public()
   @Post('verify-otp')
   @HttpCode(HttpStatus.OK)
   async verifyOtp(@Body() body: VerifyOtpDto, @Req() req: Request) {
@@ -250,18 +261,12 @@ export class AuthController {
   }
 
   @Public()
-  @Post('send-email-otp')
-  @HttpCode(HttpStatus.OK)
-  async sendEmailOtp(@Body() body: SendEmailOtpDto) {
-    return this.authService.requestMobileOtp({ email: body.email });
-  }
-
-  @Public()
   @Post('verify-email-otp')
   @HttpCode(HttpStatus.OK)
-  async verifyEmailOtp(@Body() body: VerifyEmailOtpDto, @Req() req: Request) {
+  async verifyEmailOtp(@Body() body: { email?: string; phone?: string; otp: string; purpose?: string }, @Req() req: Request) {
     const ip = req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
-    return this.authService.verifyMobileOtp({ email: body.email, otp: body.otp }, ip);
+    const purpose = (body.purpose as 'registration' | 'forgot_password' | 'email_change') || 'registration';
+    return this.authService.verifyMobileOtp({ email: body.email, phone: body.phone, otp: body.otp, purpose }, ip);
   }
 
   @Post('logout')

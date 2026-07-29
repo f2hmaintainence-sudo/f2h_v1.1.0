@@ -181,11 +181,12 @@ class DeliverySessionBloc
   Future<void> _onToggleOnline(
       ToggleOnlineEvent event, Emitter<DeliverySessionState> emit) async {
     final current = _currentLoaded();
-    // Optimistic update
-    emit(current.copyWith(isOnline: event.val));
     try {
       final dioClient = sl<DioClient>();
-      await dioClient.dio.post('/DeliveryPartner/auth/shift-toggle');
+      await dioClient.dio.post(
+        '/DeliveryPartner/auth/shift-toggle',
+        data: {'is_active': event.val},
+      );
 
       final trackingService = sl<LocationTrackingService>();
       if (event.val) {
@@ -193,9 +194,24 @@ class DeliverySessionBloc
       } else {
         await trackingService.stopTracking();
       }
-    } catch (_) {
-      // Roll back on failure
-      emit(current.copyWith(isOnline: !event.val));
+
+      emit(current.copyWith(isOnline: event.val));
+
+      add(ReloadSessionEvent());
+      if (event.callback != null) {
+        event.callback!(null);
+      }
+    } catch (e) {
+      if (event.callback != null) {
+        String msg = 'Failed to update shift status.';
+        try {
+          final resData = (e as dynamic).response?.data;
+          if (resData is Map && resData.containsKey('message')) {
+            msg = resData['message'].toString();
+          }
+        } catch (_) {}
+        event.callback!(msg);
+      }
     }
   }
 
@@ -259,6 +275,7 @@ class DeliverySessionBloc
           deliveryImage: event.deliveryImage,
           latitude: lat,
           longitude: lng,
+          containerReturns: event.containerReturns,
         );
       } else {
         success = await _ordersRepo.updateOrderStatus(
@@ -272,6 +289,7 @@ class DeliverySessionBloc
           paymentMode: event.paymentMode,
           paymentStatus: event.paymentStatus,
           deliveryImage: event.deliveryImage,
+          containerReturns: event.containerReturns,
         );
       }
 

@@ -1,32 +1,20 @@
-// import {
-//   Controller,
-//   Post,
-//   Body,
-//   HttpCode,
-//   HttpStatus,
-//   Req,
-// } from '@nestjs/common';
-// import { Request } from 'express';
-// import { AuthService } from './auth.service';
-// import { Public } from 'src/auth/decorators/public.decorator';
-// import { SendEmailOtpDto, VerifyEmailOtpDto } from 'src/auth/dto/auth.dto';
+import { Controller, Post, Body, UseGuards, Req, HttpCode, HttpStatus } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { Request } from 'express';
+import { AuthService } from './auth.service';
 
-// @Controller({ path: 'DeliveryPartner/auth', version: '1' })
-// export class AuthController {
-//   constructor(private readonly authService: AuthService) {}
+@Controller({ path: 'DeliveryPartner/auth', version: '1' })
+@UseGuards(AuthGuard('jwt'))
+export class AuthController {
+  constructor(private readonly authService: AuthService) {}
 
-//   @Public()
-//   @Post('send-email-otp')
-//   @HttpCode(HttpStatus.OK)
-//   async sendEmailOtp(@Body() body: SendEmailOtpDto) {
-//     return this.authService.requestMobileOtp({ email: body.email });
-//   }
-
-//   @Public()
-//   @Post('verify-email-otp')
-//   @HttpCode(HttpStatus.OK)
-//   async verifyEmailOtp(@Body() body: VerifyEmailOtpDto, @Req() req: Request) {
-//     const ip = req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
-//     return this.authService.verifyMobileOtp({ email: body.email, otp: body.otp }, ip);
-//   }
-// }
+  @Post('shift-toggle')
+  @HttpCode(HttpStatus.OK)
+  async toggleShiftStatus(
+    @Req() req: Request,
+    @Body() body: { is_active?: boolean },
+  ) {
+    const userId = (req.user as any)?.user_id;
+    return this.authService.toggleShiftStatus(userId, body.is_active);
+  }
+}

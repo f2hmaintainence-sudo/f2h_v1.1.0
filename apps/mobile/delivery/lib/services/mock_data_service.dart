@@ -113,7 +113,10 @@ class MockDataService extends ChangeNotifier {
 
     try {
       final dioClient = sl<DioClient>();
-      await dioClient.dio.post('/DeliveryPartner/auth/shift-toggle');
+      await dioClient.dio.post(
+        '/DeliveryPartner/auth/shift-toggle',
+        data: {'is_active': val},
+      );
       
       final trackingService = sl<LocationTrackingService>();
       if (val) {
