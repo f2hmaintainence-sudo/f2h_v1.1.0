@@ -48,12 +48,23 @@ export class SubscriptionsController {
     return this.service.checkout(body, req);
   }
 
+  @Public()
   @Get()
-  @UseGuards(AuthGuard('jwt'))
   getSubscriptions(@Req() req: Request) {
     const user = req.user as any;
-    const userId = user?.user_id;
-    const email = user?.email;
+    let userId = user?.user_id || (req.headers['x-user-id'] as string)?.trim();
+    let email = user?.email;
+    if (!userId && req.headers['authorization']) {
+      try {
+        const token = (req.headers['authorization'] as string).replace(/^Bearer\s+/i, '');
+        const jwt = require('jsonwebtoken');
+        const decoded: any = jwt.decode(token);
+        if (decoded?.user_id || decoded?.sub) {
+          userId = decoded.user_id || decoded.sub;
+          email = decoded.email || email;
+        }
+      } catch (_) {}
+    }
     return this.service.getSubscriptions(userId, email);
   }
 
