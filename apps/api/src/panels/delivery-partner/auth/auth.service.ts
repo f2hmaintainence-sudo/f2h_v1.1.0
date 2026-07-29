@@ -25,8 +25,7 @@ export class AuthService extends SharedAuthService {
         `SELECT COUNT(*)::int AS pending_count 
          FROM orders 
          WHERE (delivery_partner_id::text = $1::text OR delivery_partner_id::text = $2::text)
-           AND status IN ('assigned', 'out_for_delivery')
-           AND (scheduled_date = CURRENT_DATE OR created_at::date = CURRENT_DATE)`,
+           AND status NOT IN ('delivered', 'failed', 'cancelled')`,
         [boyRes[0].delivery_partner_id, boyRes[0].user_id],
       );
       const pendingCount = Number(pendingRes?.[0]?.pending_count ?? 0);
