@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import {
   MapPin, Building2, Hexagon, Users, Activity, Globe, ArrowLeft, Pencil, CheckCircle2,
-  AlertTriangle, Phone, Mail, Truck, ShieldCheck, DollarSign, Package, UserPlus, Trash2, ArrowUpRight, Search, Check
+  AlertTriangle, Phone, Mail, Truck, ShieldCheck, DollarSign, Package, UserPlus, Trash2, ArrowUpRight, Search, Check, ChevronDown, User
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -30,6 +30,18 @@ export default function Branch360PortfolioPage() {
   const [selectedPartnerToAssign, setSelectedPartnerToAssign] = useState('');
   const [partnerSearchQuery, setPartnerSearchQuery] = useState('');
   const [allocating, setAllocating] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const fetchBranchDetail = useCallback(async () => {
     if (!id) return;
@@ -91,6 +103,7 @@ export default function Branch360PortfolioPage() {
         });
         showSuccessToast(targetBranchId ? 'Delivery partner allocated to branch!' : 'Delivery partner de-allocated!', 3000);
         setSelectedPartnerToAssign('');
+        setPartnerSearchQuery('');
         await fetchBranchDetail();
       }
     } catch (e) {
@@ -300,20 +313,87 @@ export default function Branch360PortfolioPage() {
 
                 {/* Search & Rich Select Bar */}
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                  <div className="md:col-span-8 relative">
-                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <select
-                      value={selectedPartnerToAssign}
-                      onChange={(e) => setSelectedPartnerToAssign(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:border-emerald-600 focus:outline-none shadow-2xs"
-                    >
-                      <option value="">Choose delivery boy by name, phone or vehicle...</option>
-                      {filteredUnassignedPartners.map((p) => (
-                        <option key={p.delivery_partner_id || p.id} value={p.delivery_partner_id || p.id}>
-                          👤 {p.full_name || 'Delivery Partner'} — 📞 {p.phone || 'No Phone'} — 🏍️ {p.vehicle_type || 'Bike'} (Current Hub: {p.branch_name || p.branch_id || 'Unassigned'})
-                        </option>
-                      ))}
-                    </select>
+                  <div className="md:col-span-8 relative" ref={dropdownRef}>
+                    <div className="relative">
+                      <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Choose delivery boy by name, phone or vehicle..."
+                        value={partnerSearchQuery}
+                        onFocus={() => setDropdownOpen(true)}
+                        onChange={(e) => {
+                          setPartnerSearchQuery(e.target.value);
+                          setDropdownOpen(true);
+                          if (selectedPartnerToAssign) {
+                            setSelectedPartnerToAssign('');
+                          }
+                        }}
+                        className="w-full pl-10 pr-10 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:border-emerald-600 focus:outline-none shadow-2xs placeholder-slate-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setDropdownOpen(!dropdownOpen)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <ChevronDown size={16} className={`transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                    </div>
+
+                    {/* Dropdown Menu */}
+                    {dropdownOpen && (
+                      <div className="absolute left-0 right-0 mt-1.5 max-h-60 overflow-y-auto bg-white border border-slate-200 rounded-2xl shadow-xl z-50 divide-y divide-slate-100 py-1.5 scrollbar-thin">
+                        {filteredUnassignedPartners.length === 0 ? (
+                          <div className="p-4 text-center text-xs text-slate-400">
+                            No unallocated partners found
+                          </div>
+                        ) : (
+                          filteredUnassignedPartners.map((p) => {
+                            const partnerId = p.delivery_partner_id || p.id;
+                            const isSelected = selectedPartnerToAssign === partnerId;
+                            return (
+                              <button
+                                key={partnerId}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedPartnerToAssign(partnerId);
+                                  setPartnerSearchQuery(p.full_name || '');
+                                  setDropdownOpen(false);
+                                }}
+                                className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between text-xs gap-3 ${
+                                  isSelected ? 'bg-emerald-50/50 hover:bg-emerald-50' : ''
+                                }`}
+                              >
+                                <div className="flex flex-col min-w-0 gap-1.5">
+                                  {/* Name */}
+                                  <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                                    <User size={13} className="text-slate-400 shrink-0" />
+                                    <span className="truncate">{p.full_name || 'Delivery Partner'}</span>
+                                  </div>
+                                  {/* Details */}
+                                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500 font-semibold">
+                                    <span className="flex items-center gap-1">
+                                      <Phone size={10} className="text-slate-400 shrink-0" />
+                                      {p.phone || 'No Phone'}
+                                    </span>
+                                    <span className="flex items-center gap-1 capitalize">
+                                      <Truck size={10} className="text-slate-400 shrink-0" />
+                                      {p.vehicle_type || 'Bike'}
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <Building2 size={10} className="text-slate-400 shrink-0" />
+                                      Hub: {p.branch_name || p.branch_id || 'Unassigned'}
+                                    </span>
+                                  </div>
+                                </div>
+                                {isSelected && (
+                                  <Check size={14} className="text-emerald-600 shrink-0 animate-scale-in" />
+                                )}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="md:col-span-4">
@@ -339,49 +419,55 @@ export default function Branch360PortfolioPage() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {branchPartners.map((p) => (
-                      <div key={p.delivery_partner_id || p.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs flex flex-col justify-between space-y-4 hover:border-slate-300 hover:shadow-sm transition-all">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-inner">
-                              {(p.full_name || 'D').charAt(0).toUpperCase()}
+                    {branchPartners.map((p) => {
+                      const isActive = p.is_active;
+                      return (
+                        <div key={p.delivery_partner_id || p.id} className="relative overflow-hidden bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-4 hover:border-emerald-300 hover:shadow-md transition-all group">
+                          {/* Colored top accent line based on status */}
+                          <div className={`absolute top-0 left-0 right-0 h-1 transition-opacity ${isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+
+                          <div className="flex items-start justify-between gap-3 pt-1">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${isActive ? 'from-emerald-500 to-teal-600' : 'from-slate-400 to-slate-500'} text-white font-black text-sm flex items-center justify-center shrink-0 shadow-inner group-hover:scale-105 transition-transform`}>
+                                {(p.full_name || 'D').charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <Link href={`/admin/delivery/partners/${p.delivery_partner_id || p.id}`} className="text-xs font-black text-slate-900 hover:text-emerald-600 transition-colors flex items-center gap-1">
+                                  {p.full_name} <ArrowUpRight size={12} className="text-slate-400 group-hover:text-emerald-500 transition-colors" />
+                                </Link>
+                                <p className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5 mt-0.5">
+                                  <Phone size={11} className="text-slate-400" /> {p.phone || 'N/A'}
+                                </p>
+                              </div>
                             </div>
-                            <div>
-                              <Link href={`/admin/delivery/partners/${p.delivery_partner_id || p.id}`} className="text-xs font-black text-slate-900 hover:text-emerald-600 transition-colors flex items-center gap-1">
-                                {p.full_name} <ArrowUpRight size={12} />
-                              </Link>
-                              <p className="text-[11px] text-slate-500 font-medium flex items-center gap-1 mt-0.5">
-                                <Phone size={11} className="text-emerald-600" /> {p.phone || 'N/A'}
-                              </p>
-                            </div>
+
+                            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                              isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-100 text-slate-600 border border-slate-200'
+                            }`}>
+                              {isActive ? 'Active' : 'Inactive'}
+                            </span>
                           </div>
 
-                          <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${
-                            p.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600'
-                          }`}>
-                            {p.is_active ? 'Active' : 'Inactive'}
-                          </span>
-                        </div>
+                          <div className="flex items-center justify-between text-[11px] bg-slate-50/50 p-3 rounded-xl border border-slate-100 group-hover:bg-slate-50 transition-colors">
+                            <span className="text-slate-600 font-bold flex items-center gap-1.5">
+                              <Truck size={13} className="text-slate-400" /> {p.vehicle_type || 'Bike'}
+                            </span>
+                            <span className="text-emerald-700 font-extrabold bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100/50">
+                              ₹{Number(p.daily_salary || 0).toLocaleString()} / day
+                            </span>
+                          </div>
 
-                        <div className="flex items-center justify-between text-[11px] bg-slate-50 p-3 rounded-xl border border-slate-100">
-                          <span className="text-slate-600 font-bold flex items-center gap-1">
-                            <Truck size={13} className="text-slate-400" /> {p.vehicle_type || 'Bike'}
-                          </span>
-                          <span className="text-emerald-700 font-extrabold">
-                            ₹{Number(p.daily_salary || 0).toLocaleString()} / day
-                          </span>
+                          <button
+                            type="button"
+                            disabled={allocating}
+                            onClick={() => handleAllocatePartner(p.delivery_partner_id || p.id, null)}
+                            className="w-full py-2 bg-rose-50/60 hover:bg-rose-600 hover:text-white text-rose-600 text-xs font-bold rounded-xl border border-rose-200/50 hover:border-rose-600 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-[0.98]"
+                          >
+                            <Trash2 size={13} /> De-assign from Branch
+                          </button>
                         </div>
-
-                        <button
-                          type="button"
-                          disabled={allocating}
-                          onClick={() => handleAllocatePartner(p.delivery_partner_id || p.id, null)}
-                          className="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold rounded-xl border border-rose-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                        >
-                          <Trash2 size={13} /> De-assign from Branch
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
