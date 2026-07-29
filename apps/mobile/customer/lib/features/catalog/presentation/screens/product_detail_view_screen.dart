@@ -728,6 +728,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                             crossFadeState: _detailsExpanded
                                 ? CrossFadeState.showSecond
                                 : CrossFadeState.showFirst,
+                            duration: const Duration(milliseconds: 250),
                           ),
 
                           const SizedBox(height: 12),

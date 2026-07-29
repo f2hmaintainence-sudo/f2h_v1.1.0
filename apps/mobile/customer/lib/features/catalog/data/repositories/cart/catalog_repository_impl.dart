@@ -105,21 +105,6 @@ class CatalogRepositoryImpl implements CatalogRepository {
         final isCurdOrNonSub = pNameLower.contains('curd') || vNameLower.contains('curd') || pNameLower.contains('paneer') || vNameLower.contains('paneer');
         final subscriptionPrice = isCurdOrNonSub ? null : double.tryParse(item['subscription_price']?.toString() ?? '');
 
-        final availQty = item['available_quantity'] != null ? double.tryParse(item['available_quantity'].toString()) : null;
-        final lowThreshold = item['low_stock_threshold'] != null ? double.tryParse(item['low_stock_threshold'].toString()) : 10.0;
-
-        bool isVariantLowStock = false;
-        if (!isProductOutOfStock) {
-          if (_readBool(item['is_low_stock'], fallback: false) ||
-              (availQty != null && lowThreshold != null && availQty < lowThreshold && availQty > 0)) {
-            isVariantLowStock = true;
-          }
-        }
-
-        if (isVariantLowStock) {
-          productHasLowStock = true;
-        }
-
         vars.add(ProductVariant(
           id: variantId,
           label: variantName.trim().isNotEmpty ? variantName.trim() : 'Standard',
