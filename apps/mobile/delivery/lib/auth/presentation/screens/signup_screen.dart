@@ -31,7 +31,6 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
-  final _referralCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   final List<TextEditingController> _otpCtrl = List.generate(6, (_) => TextEditingController());
@@ -75,7 +74,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
 
   @override
   void dispose() {
-    _nameCtrl.dispose(); _emailCtrl.dispose(); _phoneCtrl.dispose(); _referralCtrl.dispose();
+    _nameCtrl.dispose(); _emailCtrl.dispose(); _phoneCtrl.dispose();
     _passwordCtrl.dispose(); _confirmCtrl.dispose();
     for (var c in _otpCtrl) c.dispose();
     for (var f in _otpFocus) f.dispose();
@@ -105,8 +104,8 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
       await dioClient.fetchCsrfToken();
       
       await dioClient.dio.post(
-        '/DeliveryPartner/auth/send-email-otp',
-        data: {'email': email},
+        ApiEndpoints.sendEmailOtp,
+        data: {'email': email, 'purpose': 'registration'},
       );
       setState(() { _isLoading = false; _step = 1; });
       _stepAnim.forward(from: 0);
@@ -141,9 +140,9 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
       await dioClient.fetchCsrfToken();
       
       final res = await dioClient.dio.post(
-        '/DeliveryPartner/auth/verify-email-otp',
-        data: {'email': _emailCtrl.text.trim(), 'otp': otp},
-      );
+        ApiEndpoints.verifyEmailOtp,
+        data: {'email': _emailCtrl.text.trim(), 'otp': otp, 'purpose': 'registration'},
+      );  
       setState(() {
         _verificationToken = res.data['verification_token'] as String?;
         _isLoading = false;
@@ -207,7 +206,6 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
       latitude: latitude,
       longitude: longitude,
       verificationToken: _verificationToken,
-      referralCode: _referralCtrl.text.trim().isEmpty ? null : _referralCtrl.text.trim(),
     ));
   }
 
@@ -376,13 +374,6 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
         _LightField(controller: _emailCtrl, hint: 'Email Address', icon: Icons.email_outlined, keyboard: TextInputType.emailAddress),
         const SizedBox(height: 14),
         _LightField(controller: _phoneCtrl, hint: 'Phone Number', icon: Icons.phone_android_rounded, keyboard: TextInputType.phone),
-        const SizedBox(height: 14),
-        _LightField(
-          controller: _referralCtrl,
-          hint: 'Referral Code (Optional)',
-          icon: Icons.card_giftcard_outlined,
-          keyboard: TextInputType.text,
-        ),
         const SizedBox(height: 32),
 
         _GreenButton(
@@ -514,8 +505,8 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                       await dioClient.fetchCsrfToken();
                       
                       await dioClient.dio.post(
-                        '/DeliveryPartner/auth/send-email-otp',
-                        data: {'email': _emailCtrl.text.trim()},
+                        ApiEndpoints.sendEmailOtp,
+                        data: {'email': _emailCtrl.text.trim(), 'purpose': 'registration'},
                       );
                       setState(() => _isLoading = false);
                       _startCountdown();

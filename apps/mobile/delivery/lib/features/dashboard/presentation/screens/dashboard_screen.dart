@@ -17,10 +17,10 @@ import 'package:f2h_delivery/features/dashboard/presentation/widgets/dashboard_h
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/next_delivery_card.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/queue_item_tile.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/verification_pending_view.dart';
-import 'package:f2h_delivery/features/dashboard/presentation/widgets/collected_items_dialog.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/handover_status_card.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/bottle_tracker_card.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/collect_queue_item.dart';
+import 'package:f2h_delivery/features/orders/presentation/screens/pickup_selection_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -98,7 +98,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!mounted) return;
       Navigator.pop(context);
       if (response.status) {
-        _showCollectedItemsModal(context, response);
+        if (response.items.isEmpty) {
+          _showNoItemsAlert(context);
+          return;
+        }
+        final success = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PickupSelectionScreen(response: response),
+          ),
+        );
+        if (success == true && mounted) {
+          AppSnackBar.success(context, '✅ Pickup confirmed. Starting deliveries!');
+          setState(() => _selectedTab = 1);
+        }
       } else {
         AppSnackBar.error(context, response.message ?? 'Failed to fetch items to collect');
       }
@@ -109,60 +122,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _showCollectedItemsModal(BuildContext context, PickupResponse response) {
-    if (response.items.isEmpty) {
-      showDialog(
-        context: context,
-        builder: (BuildContext dialogContext) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Text('Items to Collect', style: TextStyle(fontWeight: FontWeight.w900, color: kText)),
-            content: const Text('No items assigned to collect for today.', style: TextStyle(color: kTextSub)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold, color: kPrimary)),
-              ),
-            ],
-          );
-        },
-      );
-      return;
-    }
-
+  void _showNoItemsAlert(BuildContext context) {
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
-        return CollectedItemsDialog(
-          response: response,
-          onConfirm: (confirmedItems) async {
-            try {
-              final position = await _locationService.getCurrentPosition();
-              final ordersRepo = sl<OrdersRepository>();
-              await ordersRepo.confirmPickup(
-                runId: response.runId!,
-                items: confirmedItems,
-                latitude: position?.latitude,
-                longitude: position?.longitude,
-              );
-
-              // Refresh session via BLoC after pickup confirmation
-              if (mounted) {
-                context.read<DeliverySessionBloc>().add(ReloadSessionEvent());
-              }
-              try {
-                sl<PickupBloc>().add(LoadPickupItems());
-              } catch (_) {}
-
-              if (mounted) {
-                Navigator.pop(dialogContext);
-                AppSnackBar.success(context, 'âœ… Pickup confirmed. Starting deliveries!');
-                setState(() => _selectedTab = 1);
-              }
-            } catch (err) {
-              if (mounted) AppSnackBar.error(context, 'Error confirming pickup: $err');
-            }
-          },
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Items to Collect', style: TextStyle(fontWeight: FontWeight.w900, color: kText)),
+          content: const Text('No items assigned to collect for today.', style: TextStyle(color: kTextSub)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold, color: kPrimary)),
+            ),
+          ],
         );
       },
     );
@@ -185,7 +158,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!mounted) return;
       Navigator.pop(context);
       if (response.status && response.items.isNotEmpty && !response.pickupConfirmed) {
-        _showCollectedItemsModal(context, response);
+        final success = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PickupSelectionScreen(response: response),
+          ),
+        );
+        if (success == true && mounted) {
+          AppSnackBar.success(context, '✅ Pickup confirmed. Starting deliveries!');
+          setState(() => _selectedTab = 1);
+        }
       } else {
         AppSnackBar.info(context, response.message ?? 'No items to pick up for today.', color: kPrimary);
       }
@@ -195,8 +177,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       AppSnackBar.error(context, 'Failed to load pickup items: $e');
     }
   }
-
-
 
   void _showConfirmation(BuildContext context, GroupedStop stop) async {
     final position = await _locationService.getCurrentPosition();
@@ -223,7 +203,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => DeliveryConfirmationSheet(
         stop: stop,
-        onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage) {
+        onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns) {
           if (stop.orders.isEmpty) return;
           final orderId = stop.orders.first.orderId;
 
@@ -238,6 +218,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             paymentMode: paymentMode,
             paymentStatus: paymentStatus,
             deliveryImage: deliveryImage,
+            containerReturns: containerReturns,
           ));
 
           MockDataService().updateOrderStatus(

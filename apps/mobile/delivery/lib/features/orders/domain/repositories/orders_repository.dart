@@ -15,6 +15,7 @@ abstract class OrdersRepository {
     String? paymentMode,
     String? paymentStatus,
     String? deliveryImage,
+    List<Map<String, dynamic>>? containerReturns,
   });
   Future<DeliveryRun?> fetchTodayRun({String? status});
   Future<bool> startRun(String runId);
@@ -33,6 +34,7 @@ abstract class OrdersRepository {
     String? deliveryImage,
     double? latitude,
     double? longitude,
+    List<Map<String, dynamic>>? containerReturns,
   });
   Future<PickupResponse> getPickupItems({String? date});
   Future<bool> confirmPickup({

@@ -181,8 +181,6 @@ class DeliverySessionBloc
   Future<void> _onToggleOnline(
       ToggleOnlineEvent event, Emitter<DeliverySessionState> emit) async {
     final current = _currentLoaded();
-    // Optimistic update
-    emit(current.copyWith(isOnline: event.val));
     try {
       final dioClient = sl<DioClient>();
       await dioClient.dio.post(
@@ -197,13 +195,13 @@ class DeliverySessionBloc
         await trackingService.stopTracking();
       }
 
+      emit(current.copyWith(isOnline: event.val));
+
       add(ReloadSessionEvent());
       if (event.callback != null) {
         event.callback!(null);
       }
     } catch (e) {
-      // Roll back on failure
-      emit(current.copyWith(isOnline: !event.val));
       if (event.callback != null) {
         String msg = 'Failed to update shift status.';
         try {
@@ -277,6 +275,7 @@ class DeliverySessionBloc
           deliveryImage: event.deliveryImage,
           latitude: lat,
           longitude: lng,
+          containerReturns: event.containerReturns,
         );
       } else {
         success = await _ordersRepo.updateOrderStatus(
@@ -290,6 +289,7 @@ class DeliverySessionBloc
           paymentMode: event.paymentMode,
           paymentStatus: event.paymentStatus,
           deliveryImage: event.deliveryImage,
+          containerReturns: event.containerReturns,
         );
       }
 

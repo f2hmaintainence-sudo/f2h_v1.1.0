@@ -6,6 +6,26 @@ import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 
 
+class ContainerReturnInput {
+  final String containerId;
+  final String name;
+  final int balance;
+  bool isChecked;
+  int returned;
+  int damaged;
+  int lost;
+
+  ContainerReturnInput({
+    required this.containerId,
+    required this.name,
+    required this.balance,
+    this.isChecked = false,
+    this.returned = 0,
+    this.damaged = 0,
+    this.lost = 0,
+  });
+}
+
 class DeliveryConfirmationSheet extends StatefulWidget {
   final GroupedStop stop;
   final Function(
@@ -18,6 +38,7 @@ class DeliveryConfirmationSheet extends StatefulWidget {
     String? paymentMode,
     String? paymentStatus,
     String? deliveryImage,
+    List<Map<String, dynamic>> containerReturns,
   ) onConfirm;
 
   const DeliveryConfirmationSheet({
@@ -41,14 +62,54 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
   bool _isUpi = true;
   bool _paymentConfirmed = false;
   String? _imagePath;
+  final Map<String, ContainerReturnInput> _containerInputs = {};
+
+  void _syncLegacyCounts() {
+    int returned = 0;
+    int damaged = 0;
+    int lost = 0;
+    for (var input in _containerInputs.values) {
+      returned += input.returned;
+      damaged += input.damaged;
+      lost += input.lost;
+    }
+    _returnedContainers = returned;
+    _damagedContainers = damaged;
+    _lostContainers = lost;
+  }
   
   @override
   void initState() {
     super.initState();
-    final outstanding = widget.stop.bottlesWithCustomer;
-    _returnedContainers = (outstanding + widget.stop.emptyBottlesExpected) > 0
-        ? widget.stop.emptyBottlesExpected
-        : 0;
+    
+    // Populate container inputs from stop containerBalances
+    for (var bal in widget.stop.containerBalances) {
+      final expected = widget.stop.emptyBottlesExpected;
+      final isGlass = bal.name.toLowerCase().contains('bottle') || bal.containerId == 'PKG_GLASS_BOTTLE';
+      
+      _containerInputs[bal.containerId] = ContainerReturnInput(
+        containerId: bal.containerId,
+        name: bal.name,
+        balance: bal.balance,
+        isChecked: (isGlass && expected > 0),
+        returned: (isGlass && expected > 0) ? expected : 0,
+      );
+    }
+    
+    // Also support fallback default Glass Bottle if containerBalances is empty
+    if (_containerInputs.isEmpty) {
+      final expected = widget.stop.emptyBottlesExpected;
+      final outstanding = widget.stop.bottlesWithCustomer;
+      _containerInputs['PKG_GLASS_BOTTLE'] = ContainerReturnInput(
+        containerId: 'PKG_GLASS_BOTTLE',
+        name: 'Glass Bottle',
+        balance: outstanding,
+        isChecked: expected > 0,
+        returned: expected > 0 ? expected : 0,
+      );
+    }
+
+    _syncLegacyCounts();
     _checkLostImage();
   }
 
@@ -61,7 +122,11 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         setState(() {
           _imagePath = response.file!.path;
           _photoTaken = true;
-          _currentStep = 3;
+          // Only restore to step 3 if user had already reached step 3.
+          // Do NOT skip steps 1→2 by jumping to 3 from the start.
+          if (_currentStep >= 3) {
+            _currentStep = 3;
+          }
         });
       }
     } catch (_) {}
@@ -161,6 +226,16 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
 
     final totalEmptyBottles = _returnedContainers + _damagedContainers + _lostContainers;
 
+    final List<Map<String, dynamic>> containerReturns = _containerInputs.entries.map((e) {
+      final input = e.value;
+      return {
+        'container_id': input.containerId,
+        'returned': input.returned,
+        'damaged': input.damaged,
+        'lost': input.lost,
+      };
+    }).toList();
+
     // Immediately trigger status update so data is submitted right away
     widget.onConfirm(
       'delivered',
@@ -172,6 +247,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
       finalPaymentMode,
       finalPaymentStatus,
       mockPhotoPath,
+      containerReturns,
     );
 
     // Show success animation briefly then pop sheet safely
@@ -262,7 +338,9 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
             
             return GestureDetector(
               onTap: () {
-                if (_currentStep < 4) {
+                // Only allow going BACK to already-completed steps.
+                // Forward skipping (e.g. 1→3) is NOT allowed.
+                if (stepNum < _currentStep) {
                   setState(() {
                     _currentStep = stepNum;
                   });
@@ -277,7 +355,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                     width: 34,
                     height: 34,
                     decoration: BoxDecoration(
-                      color: isCompleted 
+                      color: isCompleted
                           ? kPrimaryPl
                           : (isActive ? kPrimary : kSurface),
                       shape: BoxShape.circle,
@@ -296,14 +374,17 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                     child: Center(
                       child: isCompleted
                           ? const Icon(Icons.check_rounded, color: kPrimary, size: 18)
-                          : Text(
-                              '$stepNum',
-                              style: TextStyle(
-                                color: isActive ? Colors.white : kTextSub,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 13,
-                              ),
-                            ),
+                          : stepNum > _currentStep
+                              // Future step: show lock icon to signal it's not tappable
+                              ? Icon(Icons.lock_outline_rounded, color: kMuted, size: 14)
+                              : Text(
+                                  '$stepNum',
+                                  style: TextStyle(
+                                    color: isActive ? Colors.white : kTextSub,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 13,
+                                  ),
+                                ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -395,7 +476,9 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
             ],
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
+        _buildItemsSection(showReturnsInfo: true),
+        const SizedBox(height: 8),
         ElevatedButton(
           onPressed: _nextStep,
           style: ElevatedButton.styleFrom(
@@ -421,31 +504,109 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
     );
   }
 
-  Widget _buildStepConfirmCustomer() {
-    final outstanding = widget.stop.bottlesWithCustomer;
-    final displayedOutstanding = outstanding > 0 ? -outstanding : 0;
-    int deliveredToday = 0;
-    for (var p in widget.stop.products) {
-      if (p.productName.toLowerCase().contains('bottle') || p.productName.toLowerCase().contains('milk')) {
-        deliveredToday += p.quantity;
-      }
-    }
-    final expectedToday = widget.stop.emptyBottlesExpected;
-    final projectedBalance = outstanding + deliveredToday - _returnedContainers - _damagedContainers - _lostContainers;
-    final displayedProjected = projectedBalance > 0 ? -projectedBalance : 0;
+  /// Compact section label with icon used across Step 2 sections
+  Widget _buildSectionHeader(IconData icon, String label) {
+    return Row(
+      children: [
+        Icon(icon, size: 15, color: kTextSub),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+            color: kTextSub,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ],
+    );
+  }
 
+  /// Compact stepper widget: label on top, [−] value [+] in a pill card
+  Widget _buildCompactCounter({
+    required String label,
+    required int value,
+    required Color color,
+    required VoidCallback? onDec,
+    required VoidCallback? onInc,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+      decoration: BoxDecoration(
+        color: value > 0 ? color.withAlpha(20) : kBgDeep,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: value > 0 ? color.withAlpha(80) : kBorder),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              color: value > 0 ? color : kTextSub,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              GestureDetector(
+                onTap: onDec,
+                child: Icon(
+                  Icons.remove_circle_rounded,
+                  size: 20,
+                  color: onDec != null ? color : kMuted,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Text(
+                  '$value',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: value > 0 ? color : kText,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: onInc,
+                child: Icon(
+                  Icons.add_circle_rounded,
+                  size: 20,
+                  color: onInc != null ? color : kMuted,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepConfirmCustomer() {
     return Column(
       key: const ValueKey('step_confirm'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Text(
-          'Step 2: Confirm Customer',
+          'Step 2: Confirm & Collect',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: kText),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 16),
-        
-        // Handover Mode Selector
+        const SizedBox(height: 4),
+        const Text(
+          'Collect containers, confirm handover & payment.',
+          style: TextStyle(fontSize: 12, color: kTextSub),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 20),
+
+        // ── Handover Mode Selector ──────────────────────────────────────────
+        _buildSectionHeader(Icons.swap_horiz_rounded, 'HANDOVER MODE'),
+        const SizedBox(height: 10),
         IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -521,215 +682,205 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
           ),
         ),
         const SizedBox(height: 20),
-        
-        // Empty Bottle Returns Section
-        if (outstanding > 0 || expectedToday > 0 || deliveredToday > 0)
+
+        // ── Container / Bottle Returns ──────────────────────────────────────
+        if (_containerInputs.isNotEmpty) ...[
+          _buildSectionHeader(Icons.swap_vert_circle_outlined, 'EMPTY CONTAINER RETURNS'),
+          const SizedBox(height: 10),
           Container(
-            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: kSurface,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(color: kBorder),
             ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
-                  children: [
-                    Icon(Icons.opacity_rounded, color: Colors.teal, size: 18),
-                    SizedBox(width: 8),
-                    Text(
-                      'EMPTY BOTTLE RETURNS',
-                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: kTextSub, letterSpacing: 0.5),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                
-                // 1. Returned Counter Row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Returned Bottles',
-                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: kText),
+                // Summary row at the top
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.inventory_2_outlined, size: 16, color: Colors.teal),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          '${_containerInputs.values.where((i) => i.isChecked).length} of ${_containerInputs.length} container type(s) being returned',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: kTextSub),
                         ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Good condition bottles returned',
-                          style: TextStyle(fontSize: 10, color: kTextSub, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.remove_circle_outline_rounded, color: Colors.teal, size: 26),
-                          onPressed: _returnedContainers > 0
-                              ? () => setState(() => _returnedContainers--)
-                              : null,
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Text(
-                            '$_returnedContainers',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: kText),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.teal, size: 26),
-                          onPressed: () => setState(() => _returnedContainers++),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                // 2. Damaged Counter Row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Damaged Bottles',
-                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: kText),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Broken or unusable bottles',
-                          style: TextStyle(fontSize: 10, color: kTextSub, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.remove_circle_outline_rounded, color: Colors.orange, size: 26),
-                          onPressed: _damagedContainers > 0
-                              ? () => setState(() => _damagedContainers--)
-                              : null,
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Text(
-                            '$_damagedContainers',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: kText),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.orange, size: 26),
-                          onPressed: () => setState(() => _damagedContainers++),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                // 3. Lost Counter Row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Lost Bottles',
-                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: kText),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Bottles declared lost by customer',
-                          style: TextStyle(fontSize: 10, color: kTextSub, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.remove_circle_outline_rounded, color: Colors.red, size: 26),
-                          onPressed: _lostContainers > 0
-                              ? () => setState(() => _lostContainers--)
-                              : null,
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Text(
-                            '$_lostContainers',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: kText),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.red, size: 26),
-                          onPressed: () => setState(() => _lostContainers++),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-
-                const Divider(height: 24, color: kBorderLt),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        children: [
-                          const Text(
-                            'Outstanding',
-                            style: TextStyle(fontSize: 9, color: kTextSub, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '$displayedOutstanding',
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: kText),
-                          ),
-                        ],
                       ),
-                    ),
-                    Container(width: 1, height: 25, color: kBorderLt),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          const Text(
-                            'Delivered',
-                            style: TextStyle(fontSize: 9, color: kTextSub, fontWeight: FontWeight.bold),
+                      if (_containerInputs.values.any((i) => i.isChecked))
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFECFDF5),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFF6EE7B7)),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '+$deliveredToday',
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: kPrimary),
+                          child: Text(
+                            '${_containerInputs.values.fold(0, (s, i) => s + i.returned)} returned',
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.teal),
                           ),
-                        ],
-                      ),
-                    ),
-                    Container(width: 1, height: 25, color: kBorderLt),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          const Text(
-                            'Projected',
-                            style: TextStyle(fontSize: 9, color: kTextSub, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '$displayedProjected',
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.teal),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                        ),
+                    ],
+                  ),
                 ),
+                const Divider(height: 1, color: kBorderLt),
+
+                // One row per container type
+                ..._containerInputs.values.map((input) {
+                  final outstanding = input.balance;
+                  final projected = outstanding - input.returned - input.damaged - input.lost;
+
+                  return Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Row 1: checkbox + name + balance badge
+                            Row(
+                              children: [
+                                SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: Checkbox(
+                                    value: input.isChecked,
+                                    activeColor: kPrimary,
+                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    onChanged: (val) {
+                                      setState(() {
+                                        input.isChecked = val ?? false;
+                                        if (input.isChecked) {
+                                          input.returned = outstanding > 0 ? outstanding : 0;
+                                          input.damaged = 0;
+                                          input.lost = 0;
+                                        } else {
+                                          input.returned = 0;
+                                          input.damaged = 0;
+                                          input.lost = 0;
+                                        }
+                                        _syncLegacyCounts();
+                                      });
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    input.name,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 13,
+                                      color: input.isChecked ? kText : kTextSub,
+                                    ),
+                                  ),
+                                ),
+                                // Balance badge
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: outstanding > 0 ? const Color(0xFFFFF7ED) : kBgDeep,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: outstanding > 0 ? const Color(0xFFFED7AA) : kBorder,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    outstanding > 0 ? 'Balance: $outstanding' : 'None due',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                      color: outstanding > 0 ? Colors.orange.shade700 : kMuted,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            // Row 2 (when checked): Returned, Damaged, Lost counters
+                            if (input.isChecked) ...[
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  // Returned counter
+                                  Expanded(
+                                    child: _buildCompactCounter(
+                                      label: 'Returned',
+                                      value: input.returned,
+                                      color: Colors.teal,
+                                      onDec: input.returned > 0
+                                          ? () => setState(() { input.returned--; _syncLegacyCounts(); })
+                                          : null,
+                                      onInc: (input.returned + input.lost) < outstanding
+                                          ? () => setState(() { input.returned++; _syncLegacyCounts(); })
+                                          : null,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // Lost / Damaged counter
+                                  Expanded(
+                                    child: _buildCompactCounter(
+                                      label: 'Lost/Damaged',
+                                      value: input.lost,
+                                      color: Colors.red,
+                                      onDec: input.lost > 0
+                                          ? () => setState(() { input.lost--; _syncLegacyCounts(); })
+                                          : null,
+                                      onInc: (input.returned + input.lost) < outstanding
+                                          ? () => setState(() { input.lost++; _syncLegacyCounts(); })
+                                          : null,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              // Projected balance chip
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  const Icon(Icons.account_balance_wallet_outlined, size: 12, color: kTextSub),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'After return: ',
+                                    style: const TextStyle(fontSize: 10, color: kTextSub),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: projected <= 0
+                                          ? const Color(0xFFECFDF5)
+                                          : const Color(0xFFFFF1F2),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      projected <= 0 ? 'Cleared ✓' : '$projected remaining',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                        color: projected <= 0 ? Colors.teal : kDanger,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1, color: kBorderLt),
+                    ],
+                  );
+                }),
               ],
             ),
           ),
-        const SizedBox(height: 16),
+          const SizedBox(height: 16),
+        ],
+
+        // ── Payment Details ─────────────────────────────────────────────────
+        _buildSectionHeader(Icons.payments_outlined, 'PAYMENT'),
+        const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -740,11 +891,6 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'PAYMENT DETAILS',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: kTextSub, letterSpacing: 0.5),
-              ),
-              const SizedBox(height: 10),
               if (!widget.stop.isCod || widget.stop.codAmount == 0)
                 Row(
                   children: [
@@ -990,7 +1136,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
                 child: const Text(
-                  'CONFIRM CUSTOMER & DETAILS',
+                  'DONE — TAKE PROOF PHOTO →',
                   style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5),
                 ),
               ),
@@ -1017,7 +1163,30 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
           style: TextStyle(fontSize: 12, color: kTextSub),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: kPrimaryPl,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: kPrimary.withOpacity(0.2)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline_rounded, color: kPrimary, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Take a photo of: ' + widget.stop.products.map((p) => '${p.quantity}x ${p.productName}').join(', '),
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5, color: kPrimary),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
         
         // Camera Viewfinder
         GestureDetector(
@@ -1205,6 +1374,125 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         ),
         const SizedBox(height: 30),
       ],
+    );
+  }
+
+  Widget _buildItemsSection({bool showReturnsInfo = true}) {
+    final expectedToday = widget.stop.emptyBottlesExpected;
+    final outstanding = widget.stop.bottlesWithCustomer;
+    final hasReturnable = outstanding > 0 || expectedToday > 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: kBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              children: [
+                const Icon(Icons.shopping_bag_rounded, color: kPrimary, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  'ITEMS TO DELIVER (${widget.stop.products.length})',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 11,
+                    color: kTextSub,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Deliver Items List
+          ...widget.stop.products.map((item) {
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: kBorderLt)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.productName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        color: kText,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${item.quantity} ${item.unit}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                      color: kPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+
+          // Returns Info Section if applicable
+          if (showReturnsInfo && hasReturnable) ...[
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: kBorder, width: 1)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.swap_horizontal_circle_rounded, color: Colors.teal, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'EXPECTED RETURNS',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 11,
+                      color: Colors.teal.shade700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Empty Bottles to Collect',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      color: kText,
+                    ),
+                  ),
+                  Text(
+                    '$expectedToday bottles',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                      color: Colors.teal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

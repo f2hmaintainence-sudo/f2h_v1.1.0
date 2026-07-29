@@ -82,7 +82,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
       
       await dioClient.dio.post(
         ApiEndpoints.sendEmailOtp,
-        data: {'email': email},
+        data: {'email': email, 'purpose': 'forgot_password'},
       );
 
       setState(() {

@@ -142,7 +142,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => DeliveryConfirmationSheet(
         stop: _currentStop,
-        onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage) {
+        onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns) {
           if (_currentStop.orders.isEmpty) return;
           final orderId = _currentStop.orders.first.orderId;
 
@@ -157,6 +157,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             paymentMode: paymentMode,
             paymentStatus: paymentStatus,
             deliveryImage: deliveryImage,
+            containerReturns: containerReturns,
           ));
 
           _dataService.updateOrderStatus(

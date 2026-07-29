@@ -265,7 +265,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async verifyEmailOtp(@Body() body: { email?: string; phone?: string; otp: string; purpose?: string }, @Req() req: Request) {
     const ip = req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
-    const purpose = (body.purpose as 'registration' | 'forgot_password' | 'email_change') || 'forgot_password';
+    const purpose = (body.purpose as 'registration' | 'forgot_password' | 'email_change') || 'registration';
     return this.authService.verifyMobileOtp({ email: body.email, phone: body.phone, otp: body.otp, purpose }, ip);
   }
 

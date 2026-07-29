@@ -148,8 +148,14 @@ export class DeliveryOrderController implements OnModuleInit {
 
     const customerIds = [...new Set(orders.map((o: any) => o.customer_id))];
     const bottlesWithCustomerByCustomer: Record<string, number> = {};
+    const containerBalancesByCustomer: Record<string, Array<{ container_id: string; name: string; balance: number }>> = {};
+
+    for (const cid of customerIds) {
+      containerBalancesByCustomer[String(cid)] = [];
+    }
+
     if (customerIds.length > 0) {
-      const balanceRes = await this.db.query(
+      const balanceResSimple = await this.db.query(
         `SELECT customer_id, 
                 COALESCE(SUM(issued_quantity - returned_quantity - damaged_quantity - lost_quantity), 0) AS balance
          FROM customer_container_balances
@@ -157,8 +163,43 @@ export class DeliveryOrderController implements OnModuleInit {
          GROUP BY customer_id`,
         [customerIds],
       );
-      for (const row of balanceRes || []) {
+      for (const row of balanceResSimple || []) {
         bottlesWithCustomerByCustomer[String(row.customer_id)] = Number(row.balance);
+      }
+
+      let balanceRes: any[];
+      try {
+        // Try querying customer_container_balances with containers table
+        balanceRes = await this.db.query(
+          `SELECT ccb.customer_id, ccb.container_id as packaging_type_id, c.name,
+                  COALESCE(ccb.balance_quantity, (ccb.issued_quantity - ccb.returned_quantity - ccb.damaged_quantity - ccb.lost_quantity)) as balance
+           FROM customer_container_balances ccb
+           INNER JOIN containers c ON ccb.container_id = c.container_id
+           WHERE ccb.customer_id = ANY($1)`,
+          [customerIds],
+        );
+      } catch (e) {
+        // Fallback to packaging_types
+        balanceRes = await this.db.query(
+          `SELECT ccb.customer_id, ccb.packaging_type_id, pt.name,
+                  COALESCE(ccb.issued_quantity - ccb.returned_quantity - ccb.damaged_quantity - ccb.lost_quantity, 0) as balance
+           FROM customer_container_balances ccb
+           INNER JOIN packaging_types pt ON ccb.packaging_type_id = pt.id
+           WHERE ccb.customer_id = ANY($1)`,
+          [customerIds],
+        );
+      }
+
+      for (const row of balanceRes || []) {
+        const cid = String(row.customer_id);
+        if (!containerBalancesByCustomer[cid]) {
+          containerBalancesByCustomer[cid] = [];
+        }
+        containerBalancesByCustomer[cid].push({
+          container_id: row.packaging_type_id ?? row.container_id,
+          name: row.name,
+          balance: Number(row.balance),
+        });
       }
     }
 
@@ -201,6 +242,7 @@ export class DeliveryOrderController implements OnModuleInit {
       empty_bottles_expected: expectedBottlesByOrder[String(o.order_id)] || 0,
       empty_bottles_collected: collectedBottlesByOrder[String(o.order_id)] || 0,
       bottles_with_customer: bottlesWithCustomerByCustomer[String(o.customer_id)] || 0,
+      container_balances: containerBalancesByCustomer[String(o.customer_id)] || [],
       products: itemsByOrder[String(o.order_id)] || [],
     }));
   }
@@ -469,6 +511,75 @@ export class DeliveryOrderController implements OnModuleInit {
     );
   }
 
+  private async handleContainerReturn(
+    executor: { query: (sql: string, params?: any[]) => Promise<any> },
+    params: {
+      customerId: string;
+      referenceOrderId: string;
+      containerId: string;
+      returned: number;
+      damaged: number;
+      lost: number;
+      remarks: string | null;
+      createdBy: string;
+    },
+  ): Promise<void> {
+    const total = params.returned + params.damaged + params.lost;
+    if (total <= 0) return;
+
+    let colName = 'packaging_type_id';
+    try {
+      // Test if container_id column exists in customer_container_balances
+      await executor.query(`SELECT container_id FROM customer_container_balances LIMIT 1`);
+      colName = 'container_id';
+    } catch (_) {}
+
+    if (params.returned > 0) {
+      await executor.query(
+        `INSERT INTO container_transactions (
+           customer_id, ${colName}, reference_type, reference_id,
+           transaction_type, quantity, remarks, transaction_date, created_by
+         ) VALUES ($1, $2, 'order', $3, 'return', $4, $5, CURRENT_DATE, $6)`,
+        [params.customerId, params.containerId, params.referenceOrderId, params.returned,
+         params.remarks || 'Collected by delivery boy', params.createdBy],
+      );
+    }
+
+    if (params.damaged > 0) {
+      await executor.query(
+        `INSERT INTO container_transactions (
+           customer_id, ${colName}, reference_type, reference_id,
+           transaction_type, quantity, remarks, transaction_date, created_by
+         ) VALUES ($1, $2, 'order', $3, 'damaged', $4, 'Damaged during delivery', CURRENT_DATE, $5)`,
+        [params.customerId, params.containerId, params.referenceOrderId, params.damaged, params.createdBy],
+      );
+    }
+
+    if (params.lost > 0) {
+      await executor.query(
+        `INSERT INTO container_transactions (
+           customer_id, ${colName}, reference_type, reference_id,
+           transaction_type, quantity, remarks, transaction_date, created_by
+         ) VALUES ($1, $2, 'order', $3, 'lost', $4, 'Lost during delivery', CURRENT_DATE, $5)`,
+        [params.customerId, params.containerId, params.referenceOrderId, params.lost, params.createdBy],
+      );
+    }
+
+    await executor.query(
+      `INSERT INTO customer_container_balances (
+         customer_id, ${colName}, issued_quantity, returned_quantity,
+         damaged_quantity, lost_quantity, updated_at
+       ) VALUES ($1, $2, 0, $3, $4, $5, NOW())
+       ON CONFLICT (customer_id, ${colName})
+       DO UPDATE SET
+         returned_quantity = customer_container_balances.returned_quantity + EXCLUDED.returned_quantity,
+         damaged_quantity = customer_container_balances.damaged_quantity + EXCLUDED.damaged_quantity,
+         lost_quantity = customer_container_balances.lost_quantity + EXCLUDED.lost_quantity,
+         updated_at = NOW()`,
+      [params.customerId, params.containerId, params.returned, params.damaged, params.lost],
+    );
+  }
+
   private async handleBottleIssue(
     executor: { query: (sql: string, params?: any[]) => Promise<any> },
     params: {
@@ -617,6 +728,8 @@ export class DeliveryOrderController implements OnModuleInit {
       damagedContainers?: number;
       lost_containers?: number;
       lostContainers?: number;
+      container_returns?: Array<{ container_id: string; returned: number; damaged: number; lost: number }>;
+      containerReturns?: Array<{ container_id: string; returned: number; damaged: number; lost: number }>;
     },
   ) {
     const userId = req.user?.user_id;
@@ -812,15 +925,37 @@ export class DeliveryOrderController implements OnModuleInit {
 
     // Handle empty bottles collection
     if (newStatus === 'delivered') {
-      await this.handleBottleReturn(this.db, {
-        customerId: order.customer_id,
-        referenceOrderId: orderId,
-        returned: norm.returnedContainers,
-        damaged: norm.damagedContainers,
-        lost: norm.lostContainers,
-        remarks: norm.notes,
-        createdBy: String(boy.id),
-      });
+      const containerReturns = body.container_returns || body.containerReturns || [];
+      if (Array.isArray(containerReturns) && containerReturns.length > 0) {
+        for (const item of containerReturns) {
+          const containerId = item.container_id;
+          const returned = Number(item.returned || 0);
+          const damaged = Number(item.damaged || 0);
+          const lost = Number(item.lost || 0);
+          if (returned + damaged + lost > 0) {
+            await this.handleContainerReturn(this.db, {
+              customerId: order.customer_id,
+              referenceOrderId: orderId,
+              containerId,
+              returned,
+              damaged,
+              lost,
+              remarks: norm.notes,
+              createdBy: String(boy.id),
+            });
+          }
+        }
+      } else {
+        await this.handleBottleReturn(this.db, {
+          customerId: order.customer_id,
+          referenceOrderId: orderId,
+          returned: norm.returnedContainers,
+          damaged: norm.damagedContainers,
+          lost: norm.lostContainers,
+          remarks: norm.notes,
+          createdBy: String(boy.id),
+        });
+      }
     }
 
     return {
@@ -1778,11 +1913,22 @@ export class DeliveryOrderController implements OnModuleInit {
           [run.id]
         );
 
-        const runAddressesRes = await client.query(
-          `SELECT order_id FROM orders WHERE delivery_run_id = ANY($1)`,
-          [runIds],
-        );
-        const orderIds = (runAddressesRes.rows || []).map((row) => String(row.order_id));
+        const selectedVariantIds = (body.items || [])
+          .filter((item) => Number(item.confirmed_qty) > 0)
+          .map((item) => item.product_variant_id);
+
+        let orderIds: string[] = [];
+        if (selectedVariantIds.length > 0) {
+          const runAddressesRes = await client.query(
+            `SELECT DISTINCT oi.order_id 
+             FROM order_items oi
+             JOIN orders o ON o.order_id = oi.order_id
+             WHERE o.delivery_run_id = ANY($1)
+               AND oi.variant_id = ANY($2)`,
+            [runIds, selectedVariantIds],
+          );
+          orderIds = (runAddressesRes.rows || []).map((row) => String(row.order_id));
+        }
 
         if (orderIds.length > 0) {
           await client.query(
@@ -1795,24 +1941,26 @@ export class DeliveryOrderController implements OnModuleInit {
                AND status IN ('pending', 'placed', 'confirmed', 'packed', 'assigned')`,
             [boy.user_id, runIdentifier, orderIds],
           );
-        }
 
-        // Update existing delivery_logs for this run with pickup confirmation
-        await client.query(
-          `UPDATE delivery_logs
-           SET status = 'pickup_confirmed',
-               latitude = COALESCE($2, latitude),
-               longitude = COALESCE($3, longitude),
-               delivery_time = NOW(),
-               remarks = 'Warehouse pickup confirmed'
-           WHERE run_id = ANY($1)
-             AND status = 'pending'`,
-          [
-            runIds,
-            body.latitude ? Number(body.latitude) : null,
-            body.longitude ? Number(body.longitude) : null
-          ]
-        );
+          // Update existing delivery_logs for this run with pickup confirmation for selected orders
+          await client.query(
+            `UPDATE delivery_logs
+             SET status = 'pickup_confirmed',
+                 latitude = COALESCE($2, latitude),
+                 longitude = COALESCE($3, longitude),
+                 delivery_time = NOW(),
+                 remarks = 'Warehouse pickup confirmed'
+             WHERE run_id = ANY($1)
+               AND order_id = ANY($4)
+               AND status = 'pending'`,
+            [
+              runIds,
+              body.latitude ? Number(body.latitude) : null,
+              body.longitude ? Number(body.longitude) : null,
+              orderIds
+            ]
+          );
+        }
       });
 
       return {
