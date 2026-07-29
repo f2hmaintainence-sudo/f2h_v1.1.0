@@ -488,10 +488,7 @@ class AppShellState extends State<AppShell> {
             },
           ),
         );
-          ),
-        ),
-      );
-}
+  }
 
 // class F2HDialogs {
 //   static void showEmptyCartDialog(BuildContext context) {
