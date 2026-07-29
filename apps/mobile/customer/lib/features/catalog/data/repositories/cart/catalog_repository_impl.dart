@@ -170,12 +170,9 @@ class CatalogRepositoryImpl implements CatalogRepository {
         final lowThreshold = item['low_stock_threshold'] != null ? double.tryParse(item['low_stock_threshold'].toString()) : 10.0;
 
         bool isVariantLowStock = false;
-        if (isProductOutOfStock) {
+        if (!isProductOutOfStock) {
           if (_readBool(item['is_low_stock'], fallback: false) ||
-              availQty == null ||
-              lowThreshold == null ||
-              availQty < lowThreshold ||
-              availQty <= 0) {
+              (availQty != null && lowThreshold != null && availQty < lowThreshold && availQty > 0)) {
             isVariantLowStock = true;
           }
         }

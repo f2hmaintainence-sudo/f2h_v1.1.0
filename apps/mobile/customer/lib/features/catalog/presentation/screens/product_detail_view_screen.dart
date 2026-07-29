@@ -515,95 +515,92 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                           ),
 
                           // Expanded content
-                          AnimatedCrossFade(
-                            firstChild: const SizedBox.shrink(),
-                            secondChild: Padding(
-                              padding: const EdgeInsets.only(top: 12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'About this product',
-                                    style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: kText),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    (p.description != null && p.description!.isNotEmpty)
-                                        ? p.description!
-                                        : 'Sourced from locally vetted farms. Pasteurized under strict temperature controls to keep nutrients intact. FSSAI certified and tested for 75+ adulterants.',
-                                    style: const TextStyle(
-                                        fontSize: 12,
-                                        color: kTextSub,
-                                        height: 1.5),
-                                  ),
-                                  if (p.highlights != null && p.highlights!.isNotEmpty) ...[
-                                    const SizedBox(height: 10),
-                                    const Text(
-                                      'Highlights',
-                                      style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
-                                          color: kText),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      p.highlights!,
-                                      style: const TextStyle(
-                                          fontSize: 12,
-                                          color: kTextSub,
-                                          height: 1.4),
-                                    ),
-                                  ],
-                                  if (p.ingredients != null && p.ingredients!.isNotEmpty) ...[
-                                    const SizedBox(height: 10),
-                                    const Text(
-                                      'Ingredients',
-                                      style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
-                                          color: kText),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      p.ingredients!,
-                                      style: const TextStyle(
-                                          fontSize: 12,
-                                          color: kTextSub,
-                                          height: 1.4),
-                                    ),
-                                  ],
-                                  if (p.legalInfo != null && p.legalInfo!.isNotEmpty) ...[
-                                    const SizedBox(height: 10),
-                                    const Text(
-                                      'Legal Information',
-                                      style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
-                                          color: kText),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      p.legalInfo!,
-                                      style: const TextStyle(
-                                          fontSize: 12,
-                                          color: kTextSub,
-                                          height: 1.4),
-                                    ),
-                                  ],
-                                  const SizedBox(height: 10),
-                                  // _infoRow('Shelf Life', '2 Days (Refrigerated)'),
-                                  // _infoRow('FSSAI', 'Certified · All Clear'),
-                                  // _infoRow('Delivery', 'Before 7 AM guaranteed'),
-                                ],
-                              ),
-                            ),
-                            crossFadeState: _detailsExpanded
-                                ? CrossFadeState.showSecond
-                                : CrossFadeState.showFirst,
+                          AnimatedSize(
                             duration: const Duration(milliseconds: 250),
+                            curve: Curves.fastOutSlowIn,
+                            alignment: Alignment.topCenter,
+                            child: _detailsExpanded
+                                ? Padding(
+                                    padding: const EdgeInsets.only(top: 12),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'About this product',
+                                          style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                              color: kText),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          (p.description != null && p.description!.isNotEmpty)
+                                              ? p.description!
+                                              : 'Sourced from locally vetted farms. Pasteurized under strict temperature controls to keep nutrients intact. FSSAI certified and tested for 75+ adulterants.',
+                                          style: const TextStyle(
+                                              fontSize: 12,
+                                              color: kTextSub,
+                                              height: 1.5),
+                                        ),
+                                        if (p.highlights != null && p.highlights!.isNotEmpty) ...[
+                                          const SizedBox(height: 10),
+                                          const Text(
+                                            'Highlights',
+                                            style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w700,
+                                                color: kText),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            p.highlights!,
+                                            style: const TextStyle(
+                                                fontSize: 12,
+                                                color: kTextSub,
+                                                height: 1.4),
+                                          ),
+                                        ],
+                                        if (p.ingredients != null && p.ingredients!.isNotEmpty) ...[
+                                          const SizedBox(height: 10),
+                                          const Text(
+                                            'Ingredients',
+                                            style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w700,
+                                                color: kText),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            p.ingredients!,
+                                            style: const TextStyle(
+                                                fontSize: 12,
+                                                color: kTextSub,
+                                                height: 1.4),
+                                          ),
+                                        ],
+                                        if (p.legalInfo != null && p.legalInfo!.isNotEmpty) ...[
+                                          const SizedBox(height: 10),
+                                          const Text(
+                                            'Legal Information',
+                                            style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w700,
+                                                color: kText),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            p.legalInfo!,
+                                            style: const TextStyle(
+                                                fontSize: 12,
+                                                color: kTextSub,
+                                                height: 1.4),
+                                          ),
+                                        ],
+                                        const SizedBox(height: 10),
+                                      ],
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
                           ),
 
                           const SizedBox(height: 12),

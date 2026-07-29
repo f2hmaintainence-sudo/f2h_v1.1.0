@@ -22,11 +22,7 @@ class ApiEndpoints {
   // ---------------------------------------------------------------------------
   static const String _envBaseUrl = String.fromEnvironment('F2H_API_BASE_URL');
   static String get _devBaseUrl {
-    if (kReleaseMode && _envBaseUrl.isEmpty) {
-      // Default to local backend IP for local testing
-      return 'http://192.168.1.35:5001';
-    }
-    return 'http://192.168.1.35:5001';
+    return 'http://127.0.0.1:5001';
   }
 
   /// Root host (scheme + host + port), no trailing slash.
