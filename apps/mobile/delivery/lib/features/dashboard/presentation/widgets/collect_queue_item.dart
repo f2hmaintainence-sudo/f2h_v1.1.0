@@ -24,7 +24,7 @@ class CollectQueueItem extends StatelessWidget {
       child: Row(
         children: [
           CircleAvatar(
-            backgroundColor: kPrimary.withOpacity(0.1),
+            backgroundColor: kPrimary.withValues(alpha: 0.1),
             child: Text(
               '#${stop.stop}',
               style: const TextStyle(
@@ -61,7 +61,7 @@ class CollectQueueItem extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: kAccent.withOpacity(0.12),
+              color: kAccent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(

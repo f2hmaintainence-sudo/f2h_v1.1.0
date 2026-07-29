@@ -377,14 +377,8 @@ export class WarehouseSaveAddService {
   // Never trust direction from client
   // =====================================================
   private static readonly DIRECTION_MAP: Record<string, 1 | -1> = {
-    stock_in: 1,
-    return: 1,
-    transfer_in: 1,
-    adjustment: 1,   // adjustment can be +, handle sign via quantity sign if needed
+    stock_in:  1,
     stock_out: -1,
-    transfer_out: -1,
-    damage: -1,
-    expiry: -1,
   };
 
   private getDirection(movementType: string): 1 | -1 {

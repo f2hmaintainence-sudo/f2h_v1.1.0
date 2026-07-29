@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import '../../data/models/product_model.dart';
@@ -563,7 +563,7 @@ class ProductCardH extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorIndex = (p.id?.hashCode ?? p.name.hashCode).abs() % 5;
+    final colorIndex = (p.id.hashCode ?? p.name.hashCode).abs() % 5;
     final borderColor = [
       const Color(0xFFC8E6C9), // soft green
       const Color(0xFFC8E6C9), // soft blue
@@ -576,8 +576,8 @@ class ProductCardH extends StatelessWidget {
       onTap: () => Navigator.push(
         context,
         PageRouteBuilder(
-          pageBuilder: (_, a, __) => ProductDetailViewScreen(product: p),
-          transitionsBuilder: (_, a, __, child) =>
+          pageBuilder: (_, a, _) => ProductDetailViewScreen(product: p),
+          transitionsBuilder: (_, a, _, child) =>
               FadeTransition(opacity: a, child: child),
           transitionDuration: const Duration(milliseconds: 220),
         ),
@@ -623,7 +623,7 @@ class ProductCardH extends StatelessWidget {
                         vertical: 2.5,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withValues(alpha: 0.9),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
                           color: const Color(0xFFFFE0B2),
@@ -631,7 +631,7 @@ class ProductCardH extends StatelessWidget {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
+                            color: Colors.black.withValues(alpha: 0.04),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
@@ -839,8 +839,8 @@ class ProductCardV extends StatelessWidget {
       onTap: () => Navigator.push(
         context,
         PageRouteBuilder(
-          pageBuilder: (_, a, __) => ProductDetailViewScreen(product: p),
-          transitionsBuilder: (_, a, __, child) =>
+          pageBuilder: (_, a, _) => ProductDetailViewScreen(product: p),
+          transitionsBuilder: (_, a, _, child) =>
               FadeTransition(opacity: a, child: child),
           transitionDuration: const Duration(milliseconds: 220),
         ),
@@ -886,7 +886,7 @@ class ProductCardV extends StatelessWidget {
                                 vertical: 2.5,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.9),
+                                color: Colors.white.withValues(alpha: 0.9),
                                 borderRadius: BorderRadius.circular(6),
                                 border: Border.all(
                                   color: const Color(0xFFFFE0B2),
@@ -894,7 +894,7 @@ class ProductCardV extends StatelessWidget {
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.04),
+                                    color: Colors.black.withValues(alpha: 0.04),
                                     blurRadius: 4,
                                     offset: const Offset(0, 2),
                                   ),
@@ -1336,7 +1336,7 @@ class ZeptoAddButtonState extends State<ZeptoAddButton>
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: kPrimary.withOpacity(0.04),
+                            color: kPrimary.withValues(alpha: 0.04),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
@@ -1364,7 +1364,7 @@ class ZeptoAddButtonState extends State<ZeptoAddButton>
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: kPrimary.withOpacity(0.04),
+                            color: kPrimary.withValues(alpha: 0.04),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
@@ -1401,7 +1401,7 @@ class ZeptoAddButtonState extends State<ZeptoAddButton>
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: kPrimary.withOpacity(0.2),
+                  color: kPrimary.withValues(alpha: 0.2),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),

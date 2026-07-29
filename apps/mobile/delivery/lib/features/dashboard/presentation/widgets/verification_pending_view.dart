@@ -34,7 +34,7 @@ class VerificationPendingView extends StatelessWidget {
                   border: Border.all(color: kBorderLt, width: 1.5),
                   boxShadow: [
                     BoxShadow(
-                      color: kText.withOpacity(0.04),
+                      color: kText.withValues(alpha: 0.04),
                       blurRadius: 24,
                       offset: const Offset(0, 8),
                     )

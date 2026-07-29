@@ -63,6 +63,8 @@ export class CustomerBootstrapController {
       addresses: (addressesResult?.data || []).map((addr: any) => this.normalizeAddress(addr)),
       wallet: {
         balance: Number(profile?.wallet_balance || 0),
+        referral_code: profile?.referral_code || null,
+        referral_status: profile?.referral_status || 'unlocked',
       },
       subscription_summary: subscriptionSummary,
       notifications_count: 0,
@@ -137,8 +139,9 @@ export class CustomerBootstrapController {
         const computedStatus = isUnlocked ? 'active' : 'locked';
 
         if (!customer.referral_code || !customer.referral_code.trim()) {
-          const cleanName = (customer.first_name || customer.name || 'USR').replace(/[^a-zA-Z]/g, '').toUpperCase();
-          const prefix = cleanName.length >= 3 ? cleanName.slice(0, 3) : 'USR';
+          const nameSeed = customer.first_name || customer.name || (customer.email ? customer.email.split('@')[0] : 'USR');
+          const cleanName = nameSeed.replace(/[^a-zA-Z]/g, '').toUpperCase();
+          const prefix = cleanName.length >= 3 ? cleanName.slice(0, 3) : (cleanName.length > 0 ? cleanName.padEnd(3, 'X') : 'USR');
           const cleanPhone = (customer.mobile || customer.phone || '').replace(/\D/g, '');
           const phoneSuffix = cleanPhone.length >= 3 ? cleanPhone.slice(-3) : Math.floor(100 + Math.random() * 900).toString();
           customer.referral_code = `F2H${prefix}${phoneSuffix}`;
@@ -150,7 +153,7 @@ export class CustomerBootstrapController {
         await this.Data.update(
           'customers',
           { referral_code: customer.referral_code, referral_status: computedStatus, first_order_completed: isUnlocked, updated_at: new Date() },
-          [{ column: 'customer_id', operator: '=', value: userId }],
+          [{ column: 'customer_id', operator: '=', value: customer.customer_id || userId }],
         );
       } catch (err) {
         this.Developer.error('[CustomerBootstrapController] Failed to auto-assign referral_code', err);
@@ -170,6 +173,8 @@ export class CustomerBootstrapController {
           const refCode = referrerCust?.data?.[0]?.referral_code || 'F2HREF';
           const ts = Math.floor(Date.now() / 1000).toString(36).toUpperCase();
           const rnd = Math.floor(Math.random() * 9000 + 1000);
+          const refereeName = customer.first_name || customer.name || customer.email || 'Customer';
+          const refereePhone = customer.phone || '';
           await this.Data.insert('referrals', {
             refer_id: `REF${ts}${rnd}`,
             referrer_customer_id: customer.referred_by,
@@ -177,6 +182,10 @@ export class CustomerBootstrapController {
             referral_code: refCode,
             referrer_reward_amount: 50.00,
             referred_reward_amount: 50.00,
+            referrer_id: customer.referred_by,
+            reward_amount: '50.00',
+            referee_name: refereeName,
+            referee_phone: refereePhone,
             status: customer.first_order_completed ? 'completed' : 'pending',
             remarks: 'Referral registered - pending first delivered order',
             created_at: new Date(),

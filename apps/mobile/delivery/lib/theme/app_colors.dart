@@ -1,14 +1,3 @@
-// ============================================================================
-// ChronoSparkSolutions — A Software Company
-// © 2026 ChronoSparkSolutions. All rights reserved.
-//
-// Project     : F2H Fresh
-// File        : app_colors.dart
-// Description : Web Admin aligned theme colors with glassmorphism palette.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
-// ============================================================================
-
 import 'package:flutter/material.dart';
 
 // ══════════════════════════════════════════════════════════

@@ -1,5 +1,4 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:f2h_customer/core/errors/error_handler.dart';
 import 'package:f2h_customer/features/notifications/data/models/notification_model.dart';
 import 'package:f2h_customer/features/notifications/data/repositories/notifications_repository.dart';
 import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_event.dart';

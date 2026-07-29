@@ -104,7 +104,7 @@ class _WarehouseHandoverScreenState extends State<WarehouseHandoverScreen> {
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: kSuccess.withOpacity(0.1),
+                          color: kSuccess.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.verified_rounded, size: 80, color: kSuccess),
@@ -199,12 +199,12 @@ class _WarehouseHandoverScreenState extends State<WarehouseHandoverScreen> {
                             end: Alignment.bottomRight,
                           ),
                           borderRadius: BorderRadius.circular(20),
-                          boxShadow: [BoxShadow(color: Colors.teal.withOpacity(0.15), blurRadius: 10, offset: const Offset(0, 4))],
+                          boxShadow: [BoxShadow(color: Colors.teal.withValues(alpha: 0.15), blurRadius: 10, offset: const Offset(0, 4))],
                         ),
                         child: Row(
                           children: [
                             CircleAvatar(
-                              backgroundColor: Colors.white.withOpacity(0.18),
+                              backgroundColor: Colors.white.withValues(alpha: 0.18),
                               radius: 24,
                               child: const Icon(Icons.hail_rounded, color: Colors.white, size: 24),
                             ),
@@ -240,7 +240,7 @@ class _WarehouseHandoverScreenState extends State<WarehouseHandoverScreen> {
                         decoration: BoxDecoration(
                           color: kSurface,
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: _bottlesReturnedCheck ? kSuccess.withOpacity(0.3) : kBorder),
+                          border: Border.all(color: _bottlesReturnedCheck ? kSuccess.withValues(alpha: 0.3) : kBorder),
                         ),
                         child: CheckboxListTile(
                           value: _bottlesReturnedCheck,
@@ -298,7 +298,7 @@ class _WarehouseHandoverScreenState extends State<WarehouseHandoverScreen> {
                             decoration: BoxDecoration(
                               color: kSurface,
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: isChecked ? kSuccess.withOpacity(0.3) : kBorder),
+                              border: Border.all(color: isChecked ? kSuccess.withValues(alpha: 0.3) : kBorder),
                             ),
                             child: CheckboxListTile(
                               value: isChecked,
@@ -362,7 +362,7 @@ class _WarehouseHandoverScreenState extends State<WarehouseHandoverScreen> {
                             decoration: BoxDecoration(
                               color: kSurface,
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: isChecked ? kSuccess.withOpacity(0.3) : kBorder),
+                              border: Border.all(color: isChecked ? kSuccess.withValues(alpha: 0.3) : kBorder),
                             ),
                             child: CheckboxListTile(
                               value: isChecked,

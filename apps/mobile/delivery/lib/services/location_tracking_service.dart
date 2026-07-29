@@ -30,7 +30,7 @@ class LocationTrackingService {
 
     // Get user ID from local storage
     final user = await _getCachedUser();
-    if (user == null || user.userId == null) {
+    if (user == null) {
       print('LocationTrackingService: No user found, cannot start tracking');
       return;
     }

@@ -22,7 +22,7 @@ export default function WarehouseStockPage() {
           setWarehouses(res.data.data);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const handleAdd = () => {

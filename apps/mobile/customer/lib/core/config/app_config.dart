@@ -7,8 +7,7 @@
 // Description : Dynamic runtime configuration for F2H Customer app.
 //               Loads Firebase, Google OAuth, Google Maps, and Razorpay
 //               configurations dynamically from server / local cache.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'package:firebase_core/firebase_core.dart';

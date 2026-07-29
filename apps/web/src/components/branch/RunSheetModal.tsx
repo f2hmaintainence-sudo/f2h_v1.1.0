@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : RunSheetModal.tsx
 // Description : Run sheet modal component for branch management
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 'use client';
@@ -39,7 +38,7 @@ export default function RunSheetModal({ routeId, onClose }: RunSheetModalProps) 
       .then(d => {
         if (d.status) setData(d.data);
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, [routeId, date]);
 

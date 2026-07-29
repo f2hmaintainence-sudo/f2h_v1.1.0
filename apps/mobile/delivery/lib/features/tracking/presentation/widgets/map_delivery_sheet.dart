@@ -32,7 +32,7 @@ class _MapDeliverySheetState extends State<MapDeliverySheet> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: stops.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final stop = stops[index];
         Color statusColor = StopStatusHelper.colorFor(stop.status);
@@ -53,7 +53,7 @@ class _MapDeliverySheetState extends State<MapDeliverySheet> {
               border: Border.all(color: kBorder),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
+                  color: Colors.black.withValues(alpha: 0.02),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 )
@@ -68,7 +68,7 @@ class _MapDeliverySheetState extends State<MapDeliverySheet> {
                       width: 24,
                       height: 24,
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.12),
+                        color: statusColor.withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                         border: Border.all(color: statusColor, width: 1.5),
                       ),
@@ -99,7 +99,7 @@ class _MapDeliverySheetState extends State<MapDeliverySheet> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.08),
+                        color: statusColor.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
@@ -149,7 +149,7 @@ class _MapDeliverySheetState extends State<MapDeliverySheet> {
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.12),
+                color: Colors.black.withValues(alpha: 0.12),
                 blurRadius: 16,
                 offset: const Offset(0, -4),
               )
@@ -167,7 +167,7 @@ class _MapDeliverySheetState extends State<MapDeliverySheet> {
                   height: 5,
                   margin: const EdgeInsets.only(bottom: 12, top: 4),
                   decoration: BoxDecoration(
-                    color: kMuted.withOpacity(0.5),
+                    color: kMuted.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
@@ -178,7 +178,7 @@ class _MapDeliverySheetState extends State<MapDeliverySheet> {
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: kBorder.withOpacity(0.5),
+                  color: kBorder.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -192,7 +192,7 @@ class _MapDeliverySheetState extends State<MapDeliverySheet> {
                             color: !_showAllStopsList ? kSurface : Colors.transparent,
                             borderRadius: BorderRadius.circular(8),
                             boxShadow: !_showAllStopsList
-                                ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)]
+                                ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]
                                 : null,
                           ),
                           child: Center(
@@ -228,7 +228,7 @@ class _MapDeliverySheetState extends State<MapDeliverySheet> {
                             color: _showAllStopsList ? kSurface : Colors.transparent,
                             borderRadius: BorderRadius.circular(8),
                             boxShadow: _showAllStopsList
-                                ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)]
+                                ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]
                                 : null,
                           ),
                           child: Center(
@@ -311,7 +311,7 @@ class _MapDeliverySheetState extends State<MapDeliverySheet> {
                 Row(
                   children: [
                     CircleAvatar(
-                      backgroundColor: primaryColor.withOpacity(0.08),
+                      backgroundColor: primaryColor.withValues(alpha: 0.08),
                       radius: 20,
                       child: Text(
                         nextStop.customerName.isNotEmpty ? nextStop.customerName[0].toUpperCase() : '?',
@@ -350,11 +350,11 @@ class _MapDeliverySheetState extends State<MapDeliverySheet> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.keyboard_double_arrow_up_rounded, size: 12, color: kTextSub.withOpacity(0.7)),
+                      Icon(Icons.keyboard_double_arrow_up_rounded, size: 12, color: kTextSub.withValues(alpha: 0.7)),
                       const SizedBox(width: 4),
                       Text(
                         'Swipe up to see summary details',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: kTextSub.withOpacity(0.7)),
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: kTextSub.withValues(alpha: 0.7)),
                       ),
                     ],
                   ),

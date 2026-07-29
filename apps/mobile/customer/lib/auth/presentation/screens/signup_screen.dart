@@ -48,12 +48,16 @@ class _SignupScreenState extends State<SignupScreen> {
   void initState() {
     super.initState();
     _referralCodeController.addListener(_onReferralChanged);
+    _passwordController.addListener(_onPasswordChanged);
+    _confirmPasswordController.addListener(_onPasswordChanged);
   }
 
   @override
   void dispose() {
     _referralDebounce?.cancel();
     _referralCodeController.removeListener(_onReferralChanged);
+    _passwordController.removeListener(_onPasswordChanged);
+    _confirmPasswordController.removeListener(_onPasswordChanged);
     _usernameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
@@ -61,6 +65,10 @@ class _SignupScreenState extends State<SignupScreen> {
     _confirmPasswordController.dispose();
     _referralCodeController.dispose();
     super.dispose();
+  }
+
+  void _onPasswordChanged() {
+    if (mounted) setState(() {});
   }
 
   void _onReferralChanged() {
@@ -205,6 +213,13 @@ class _SignupScreenState extends State<SignupScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+
+    final passText = _passwordController.text;
+    final confirmText = _confirmPasswordController.text;
+    final hasConfirmText = confirmText.isNotEmpty;
+    final isPassMatching = hasConfirmText
+        ? (passText.isNotEmpty && passText == confirmText)
+        : null;
 
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
@@ -666,7 +681,11 @@ class _SignupScreenState extends State<SignupScreen> {
                                               30,
                                             ),
                                             border: Border.all(
-                                              color: kBorder.withOpacity(0.35),
+                                              color: isPassMatching == true
+                                                  ? Colors.green
+                                                  : isPassMatching == false
+                                                      ? Colors.red
+                                                      : kBorder.withOpacity(0.35),
                                               width: 1.2,
                                             ),
                                             boxShadow: [
@@ -708,24 +727,33 @@ class _SignupScreenState extends State<SignupScreen> {
                                                     horizontal: 16,
                                                     vertical: 12,
                                                   ),
-                                              suffixIcon: IconButton(
-                                                icon: Icon(
-                                                  _obscurePassword
-                                                      ? Icons
-                                                            .visibility_off_outlined
-                                                      : Icons
-                                                            .visibility_outlined,
-                                                  color: const Color(
-                                                    0xFF94A3B8,
+                                              suffixIcon: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  if (isPassMatching == true)
+                                                    const Icon(Icons.check_circle_rounded, color: Colors.green, size: 20)
+                                                  else if (isPassMatching == false)
+                                                    const Icon(Icons.cancel_rounded, color: Colors.red, size: 20),
+                                                  IconButton(
+                                                    icon: Icon(
+                                                      _obscurePassword
+                                                          ? Icons
+                                                                .visibility_off_outlined
+                                                          : Icons
+                                                                .visibility_outlined,
+                                                      color: const Color(
+                                                        0xFF94A3B8,
+                                                      ),
+                                                      size: 20,
+                                                    ),
+                                                    onPressed: () {
+                                                      setState(() {
+                                                        _obscurePassword =
+                                                            !_obscurePassword;
+                                                      });
+                                                    },
                                                   ),
-                                                  size: 20,
-                                                ),
-                                                onPressed: () {
-                                                  setState(() {
-                                                    _obscurePassword =
-                                                        !_obscurePassword;
-                                                  });
-                                                },
+                                                ],
                                               ),
                                             ),
                                           ),
@@ -733,78 +761,110 @@ class _SignupScreenState extends State<SignupScreen> {
                                         const SizedBox(height: 12),
 
                                         // Confirm Password Input
-                                        Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(
-                                              30,
-                                            ),
-                                            border: Border.all(
-                                              color: kBorder.withOpacity(0.35),
-                                              width: 1.2,
-                                            ),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.black.withOpacity(
-                                                  0.015,
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Container(
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                borderRadius: BorderRadius.circular(
+                                                  30,
                                                 ),
-                                                blurRadius: 8,
-                                                offset: const Offset(0, 2),
-                                              ),
-                                            ],
-                                          ),
-                                          child: TextField(
-                                            controller:
-                                                _confirmPasswordController,
-                                            obscureText:
-                                                _obscureConfirmPassword,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.bold,
-                                              color: Color(0xFF1A1A1A),
-                                            ),
-                                            enableInteractiveSelection: true,
-                                            onTapOutside: (event) =>
-                                                FocusScope.of(
-                                                  context,
-                                                ).unfocus(),
-                                            decoration: InputDecoration(
-                                              prefixIcon: const Icon(
-                                                Icons.lock_outline_rounded,
-                                                color: Color(0xFF94A3B8),
-                                              ),
-                                              hintText: 'Confirm Password',
-                                              hintStyle: const TextStyle(
-                                                color: Color(0xFF94A3B8),
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                              border: InputBorder.none,
-                                              contentPadding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 16,
-                                                    vertical: 12,
-                                                  ),
-                                              suffixIcon: IconButton(
-                                                icon: Icon(
-                                                  _obscureConfirmPassword
-                                                      ? Icons
-                                                            .visibility_off_outlined
-                                                      : Icons
-                                                            .visibility_outlined,
-                                                  color: const Color(
-                                                    0xFF94A3B8,
-                                                  ),
-                                                  size: 20,
+                                                border: Border.all(
+                                                  color: isPassMatching == true
+                                                      ? Colors.green
+                                                      : isPassMatching == false
+                                                          ? Colors.red
+                                                          : kBorder.withOpacity(0.35),
+                                                  width: 1.2,
                                                 ),
-                                                onPressed: () {
-                                                  setState(() {
-                                                    _obscureConfirmPassword =
-                                                        !_obscureConfirmPassword;
-                                                  });
-                                                },
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black.withOpacity(
+                                                      0.015,
+                                                    ),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 2),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: TextField(
+                                                controller:
+                                                    _confirmPasswordController,
+                                                obscureText:
+                                                    _obscureConfirmPassword,
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF1A1A1A),
+                                                ),
+                                                enableInteractiveSelection: true,
+                                                onTapOutside: (event) =>
+                                                    FocusScope.of(
+                                                      context,
+                                                    ).unfocus(),
+                                                decoration: InputDecoration(
+                                                  prefixIcon: const Icon(
+                                                    Icons.lock_outline_rounded,
+                                                    color: Color(0xFF94A3B8),
+                                                  ),
+                                                  hintText: 'Confirm Password',
+                                                  hintStyle: const TextStyle(
+                                                    color: Color(0xFF94A3B8),
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                  border: InputBorder.none,
+                                                  contentPadding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 16,
+                                                        vertical: 12,
+                                                      ),
+                                                  suffixIcon: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      if (isPassMatching == true)
+                                                        const Icon(Icons.check_circle_rounded, color: Colors.green, size: 20)
+                                                      else if (isPassMatching == false)
+                                                        const Icon(Icons.cancel_rounded, color: Colors.red, size: 20),
+                                                      IconButton(
+                                                        icon: Icon(
+                                                          _obscureConfirmPassword
+                                                              ? Icons
+                                                                    .visibility_off_outlined
+                                                              : Icons
+                                                                    .visibility_outlined,
+                                                          color: const Color(
+                                                            0xFF94A3B8,
+                                                          ),
+                                                          size: 20,
+                                                        ),
+                                                        onPressed: () {
+                                                          setState(() {
+                                                            _obscureConfirmPassword =
+                                                                !_obscureConfirmPassword;
+                                                          });
+                                                        },
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
                                               ),
                                             ),
-                                          ),
+                                            if (hasConfirmText && isPassMatching != null)
+                                              Padding(
+                                                padding: const EdgeInsets.only(left: 16, top: 4),
+                                                child: Text(
+                                                  isPassMatching
+                                                      ? 'Passwords match ✓'
+                                                      : 'Passwords do not match',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: isPassMatching ? Colors.green : Colors.red,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
                                         ),
                                         const SizedBox(height: 12),
 

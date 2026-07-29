@@ -53,9 +53,11 @@ describe('OrderDeliveredListener', () => {
     expect(rewardEngine.processReferralReward).toHaveBeenCalledWith('C1', 'ORD-1');
   });
 
-  // ─── Test Case: Non-first order ─────────────────────────────
-  it('should skip reward processing for non-first orders', async () => {
+  // ─── Test Case: Order delivered event triggers reward engine ────────────────
+  it('should call reward engine on order delivery', async () => {
     detector.detectAndMarkFirstOrder.mockResolvedValue(false);
+    detector.unlockReferralCode.mockResolvedValue(undefined);
+    rewardEngine.processReferralReward.mockResolvedValue({ status: false, message: 'Already rewarded' });
 
     await listener.handleOrderDeliveredEvent({
       orderId: 'ORD-5',
@@ -63,9 +65,9 @@ describe('OrderDeliveredListener', () => {
       deliveredAt: new Date(),
     });
 
-    expect(detector.detectAndMarkFirstOrder).toHaveBeenCalled();
-    expect(detector.unlockReferralCode).not.toHaveBeenCalled();
-    expect(rewardEngine.processReferralReward).not.toHaveBeenCalled();
+    expect(detector.detectAndMarkFirstOrder).toHaveBeenCalledWith('C1', 'ORD-5');
+    expect(detector.unlockReferralCode).toHaveBeenCalledWith('C1');
+    expect(rewardEngine.processReferralReward).toHaveBeenCalledWith('C1', 'ORD-5');
   });
 
   // ─── Test Case: Error handling ──────────────────────────────

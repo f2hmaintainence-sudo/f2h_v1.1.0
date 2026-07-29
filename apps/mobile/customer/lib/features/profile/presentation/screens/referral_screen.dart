@@ -39,7 +39,7 @@ class ReferralScreen extends StatefulWidget {
 class _ReferralScreenState extends State<ReferralScreen>
     with SingleTickerProviderStateMixin {
   bool _isLoading = true;
-  String _code = 'F2HPUR410';
+  String _code = '';
   String _status = 'unlocked';
   double _totalEarnings = 0.0;
   int _totalCount = 0;
@@ -732,6 +732,9 @@ class _ReferralScreenState extends State<ReferralScreen>
 
   // ── STATS ROW ─────────────────────────────────────────────
   Widget _buildStatsRow() {
+    // ponytail: scale for 320-430+ screens
+    final sw = MediaQuery.of(context).size.width;
+    final s = (sw / 375).clamp(0.78, 1.15);
     return Row(
       children: [
         Expanded(
@@ -745,9 +748,10 @@ class _ReferralScreenState extends State<ReferralScreen>
             value: '₹${_totalEarnings.toStringAsFixed(2)}',
             valueColor: const Color(0xFF16A34A),
             subtitle: 'All time earnings',
+            scale: s,
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: 8 * s),
         Expanded(
           child: _buildStatCard(
             icon: Icons.group_rounded,
@@ -759,6 +763,7 @@ class _ReferralScreenState extends State<ReferralScreen>
             value: '$_totalCount',
             valueColor: const Color(0xFFD97706),
             subtitle: 'Successful referrals',
+            scale: s,
           ),
         ),
       ],
@@ -775,44 +780,53 @@ class _ReferralScreenState extends State<ReferralScreen>
     required String value,
     required Color valueColor,
     required String subtitle,
+    required double scale,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(12 * scale),
       decoration: BoxDecoration(
         color: cardBg,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: cardBorder),
       ),
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 36 * scale,
+            height: 36 * scale,
             decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
-            child: Icon(icon, color: iconColor, size: 22),
+            child: Icon(icon, color: iconColor, size: 18 * scale),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 8 * scale),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
-                    style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: _kTextSecond)),
-                const SizedBox(height: 2),
-                Text(value,
                     style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: valueColor)),
-                const SizedBox(height: 1),
+                        fontSize: 10 * scale,
+                        fontWeight: FontWeight.w600,
+                        color: _kTextSecond),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+                SizedBox(height: 2 * scale),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(value,
+                      style: TextStyle(
+                          fontSize: 18 * scale,
+                          fontWeight: FontWeight.w900,
+                          color: valueColor)),
+                ),
+                SizedBox(height: 1 * scale),
                 Text(subtitle,
-                    style: const TextStyle(
-                        fontSize: 10,
+                    style: TextStyle(
+                        fontSize: 9 * scale,
                         fontWeight: FontWeight.w500,
-                        color: Color(0xFF94A3B8))),
+                        color: const Color(0xFF94A3B8)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
@@ -823,6 +837,8 @@ class _ReferralScreenState extends State<ReferralScreen>
 
   // ── HOW IT WORKS ──────────────────────────────────────────
   Widget _buildHowItWorksSection() {
+    final sw = MediaQuery.of(context).size.width;
+    final s = (sw / 375).clamp(0.78, 1.15);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -849,34 +865,35 @@ class _ReferralScreenState extends State<ReferralScreen>
             Expanded(child: Divider(color: Color(0xFFCBD5E1))),
           ],
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 14 * s),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _stepTile('1', Icons.assignment_turned_in_rounded,
                   'Place Your\nFirst Order',
-                  bg: const Color(0xFFECFDF5), fg: const Color(0xFF059669)),
-              _stepArrow(),
+                  bg: const Color(0xFFECFDF5), fg: const Color(0xFF059669), scale: s),
+              _stepArrow(s),
               _stepTile('2', Icons.confirmation_number_rounded,
                   'Get Your\nReferral Code',
-                  bg: const Color(0xFFECFDF5), fg: const Color(0xFF059669)),
-              _stepArrow(),
+                  bg: const Color(0xFFECFDF5), fg: const Color(0xFF059669), scale: s),
+              _stepArrow(s),
               _stepTile('3', Icons.chat_rounded, 'Share With\nFriends',
-                  bg: const Color(0xFFDCFCE7), fg: const Color(0xFF25D366)),
-              _stepArrow(),
+                  bg: const Color(0xFFDCFCE7), fg: const Color(0xFF25D366), scale: s),
+              _stepArrow(s),
               _stepTile(
                   '4', Icons.people_alt_rounded, 'Friend Joins\nF2H',
-                  bg: const Color(0xFFFEF3C7), fg: const Color(0xFFD97706)),
-              _stepArrow(),
+                  bg: const Color(0xFFFEF3C7), fg: const Color(0xFFD97706), scale: s),
+              _stepArrow(s),
               _stepTile('5', Icons.local_shipping_rounded,
                   'First Order\nDelivered',
-                  bg: const Color(0xFFECFDF5), fg: const Color(0xFF047857)),
-              _stepArrow(),
+                  bg: const Color(0xFFECFDF5), fg: const Color(0xFF047857), scale: s),
+              _stepArrow(s),
               _stepTile(
                   '6', Icons.card_giftcard_rounded, 'You Both\nEarn',
-                  bg: const Color(0xFFFEF3C7), fg: const Color(0xFFCA8A04)),
+                  bg: const Color(0xFFFEF3C7), fg: const Color(0xFFCA8A04), scale: s),
             ],
           ),
         ),
@@ -885,60 +902,60 @@ class _ReferralScreenState extends State<ReferralScreen>
   }
 
   Widget _stepTile(String num, IconData icon, String label,
-      {required Color bg, required Color fg}) {
+      {required Color bg, required Color fg, required double scale}) {
     return SizedBox(
-      width: 96,
+      width: 80 * scale,
       child: Column(
         children: [
           Stack(
             clipBehavior: Clip.none,
             children: [
               Container(
-                width: 60,
-                height: 60,
+                width: 50 * scale,
+                height: 50 * scale,
                 decoration: BoxDecoration(
                   color: bg,
                   shape: BoxShape.circle,
                   border: Border.all(color: fg.withOpacity(0.2)),
                 ),
-                child: Icon(icon, color: fg, size: 26),
+                child: Icon(icon, color: fg, size: 22 * scale),
               ),
               Positioned(
                 top: -2,
                 left: -2,
                 child: Container(
-                  width: 20,
-                  height: 20,
+                  width: 18 * scale,
+                  height: 18 * scale,
                   alignment: Alignment.center,
                   decoration: const BoxDecoration(
                       color: _kGreenDark, shape: BoxShape.circle),
                   child: Text(num,
-                      style: const TextStyle(
-                          fontSize: 10,
+                      style: TextStyle(
+                          fontSize: 9 * scale,
                           fontWeight: FontWeight.w900,
                           color: Colors.white)),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 6 * scale),
           Text(label,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 11,
+              style: TextStyle(
+                  fontSize: 10 * scale,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF334155),
+                  color: const Color(0xFF334155),
                   height: 1.2)),
         ],
       ),
     );
   }
 
-  Widget _stepArrow() {
+  Widget _stepArrow(double scale) {
     return Padding(
-      padding: const EdgeInsets.only(top: 20, left: 2, right: 2),
+      padding: EdgeInsets.only(top: 16 * scale, left: 1, right: 1),
       child: Icon(Icons.arrow_forward_rounded,
-          color: Colors.grey.shade400, size: 16),
+          color: Colors.grey.shade400, size: 14 * scale),
     );
   }
 

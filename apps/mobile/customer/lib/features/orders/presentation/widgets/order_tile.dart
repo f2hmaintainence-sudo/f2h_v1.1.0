@@ -21,7 +21,7 @@ class ORow extends StatelessWidget {
       statusIcon = Icons.check_circle;
       statusText = 'Delivered';
     } else if (normalizedStatus == 'cancelled') {
-      statusBgColor = kRedLt.withOpacity(0.5);
+      statusBgColor = kRedLt.withValues(alpha: 0.5);
       statusFgColor = kRed;
       statusIcon = Icons.cancel;
       statusText = 'Cancelled';
@@ -31,7 +31,7 @@ class ORow extends StatelessWidget {
       statusIcon = Icons.hourglass_empty;
       statusText = 'placed';
     } else if (normalizedStatus == 'skipped') {
-      statusBgColor = kRedLt.withOpacity(0.5);
+      statusBgColor = kRedLt.withValues(alpha: 0.5);
       statusFgColor = kRed;
       statusIcon = Icons.skip_next;
       statusText = 'Skipped';
@@ -56,7 +56,7 @@ class ORow extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: kText.withOpacity(0.02),
+            color: kText.withValues(alpha: 0.02),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),

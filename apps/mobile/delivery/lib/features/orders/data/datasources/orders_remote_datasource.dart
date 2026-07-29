@@ -40,8 +40,8 @@ class OrdersRemoteDataSource {
         data: {
           'run_id': runId,
           'items': items,
-          if (latitude != null) 'latitude': latitude,
-          if (longitude != null) 'longitude': longitude,
+          'latitude': ?latitude,
+          'longitude': ?longitude,
         },
       );
       final data = response.data;

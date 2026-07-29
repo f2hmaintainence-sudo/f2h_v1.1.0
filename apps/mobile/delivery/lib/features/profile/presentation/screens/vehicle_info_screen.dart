@@ -75,7 +75,7 @@ class _VehicleInfoScreenState extends State<VehicleInfoScreen> {
                   const Text('Vehicle Type', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: kTextMid)),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
-                    value: selectedType,
+                    initialValue: selectedType,
                     onChanged: (val) {
                       if (val != null) setModalState(() => selectedType = val);
                     },
@@ -177,7 +177,7 @@ class _VehicleInfoScreenState extends State<VehicleInfoScreen> {
                   SwitchListTile(
                     title: const Text('Mark as Primary Vehicle', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     value: isPrimary,
-                    activeColor: kPrimary,
+                    activeThumbColor: kPrimary,
                     onChanged: (val) {
                       setModalState(() => isPrimary = val);
                     },

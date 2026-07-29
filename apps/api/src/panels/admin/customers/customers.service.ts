@@ -53,6 +53,7 @@ export class CustomersService {
           COALESCE(c.full_name, '') ILIKE $${pIdx} OR 
           COALESCE(c.first_name, '') ILIKE $${pIdx} OR 
           COALESCE(c.last_name, '') ILIKE $${pIdx} OR 
+          COALESCE(c.mobile, '') ILIKE $${pIdx} OR 
           COALESCE(c.phone, '') ILIKE $${pIdx} OR 
           COALESCE(c.email, '') ILIKE $${pIdx}
         )`);
@@ -150,8 +151,8 @@ export class CustomersService {
           COALESCE(c.first_name, '') as first_name,
           COALESCE(c.last_name, '') as last_name,
           COALESCE(NULLIF(c.full_name, ''), (COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, ''))) as full_name,
-          COALESCE(c.phone, '') as phone,
-          '' as alternate_phone,
+          COALESCE(NULLIF(c.mobile, ''), NULLIF(c.phone, ''), '') as phone,
+          COALESCE(c.alternate_mobile, '') as alternate_phone,
           c.email,
           c.gender,
           c.dob,
@@ -265,7 +266,9 @@ export class CustomersService {
       );
 
       const ordersRes = await this.databaseService.query(
-        `SELECT o.*, dp.full_name as delivery_partner_name
+        `SELECT o.*, 
+                dp.full_name as delivery_partner_name,
+                dp.phone as delivery_partner_phone
          FROM orders o
          LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = o.delivery_partner_id
          WHERE o.customer_id = ?
@@ -274,6 +277,8 @@ export class CustomersService {
       );
 
       let orderItemsMap: Record<string, any[]> = {};
+      let orderContainerMap: Record<string, any[]> = {};
+
       if (ordersRes.length > 0) {
         const orderIds = ordersRes.map(o => o.order_id);
         const itemsRes = await this.databaseService.query(
@@ -297,10 +302,32 @@ export class CustomersService {
             total_price: Number(item.final_price || item.total_price || item.total_amount || 0),
           });
         }
+
+        const containerLinesRes = await this.databaseService.query(
+          `SELECT dcl.*, pt.name as packaging_name, pt.unit as packaging_unit, pt.is_returnable
+           FROM delivery_container_lines dcl
+           LEFT JOIN packaging_types pt ON pt.id = dcl.packaging_type_id
+           WHERE dcl.reference_id = ANY(?) OR dcl.customer_id = ?`,
+          [orderIds, customerId]
+        ).catch(() => []);
+        for (const line of containerLinesRes) {
+          const key = line.reference_id;
+          if (key) {
+            if (!orderContainerMap[key]) orderContainerMap[key] = [];
+            orderContainerMap[key].push({
+              id: line.id,
+              packaging_name: line.packaging_name || 'Container / Bottle',
+              quantity: Number(line.quantity || 0),
+              packaging_type_id: line.packaging_type_id,
+              is_returnable: line.is_returnable ?? true,
+            });
+          }
+        }
       }
 
       const formattedOrders = ordersRes.map(o => {
         const status = (o.status || 'pending').toString().toLowerCase();
+        const isSubscription = Boolean(o.subscription_id || o.order_source === 'subscription');
         const timeline = [
           { title: 'Order Placed', completed: true, time: o.created_at },
           { title: 'Packed', completed: ['packed', 'dispatched', 'delivered'].includes(status), time: null },
@@ -312,6 +339,10 @@ export class CustomersService {
         }
         return {
           ...o,
+          order_type: isSubscription ? 'Subscription Order' : 'One-Time Purchase',
+          is_subscription: isSubscription,
+          delivery_partner_phone: o.delivery_partner_phone || null,
+          containers: orderContainerMap[o.order_id] || [],
           total_amount: Number(o.total_amount || 0),
           subtotal: Number(o.subtotal || 0),
           discount_amount: Number(o.discount_amount || 0),
@@ -328,18 +359,68 @@ export class CustomersService {
       const maxOrderValue = completedOrders.reduce((max, o) => Math.max(max, o.total_amount), 0);
       const totalDiscounts = formattedOrders.reduce((sum, o) => sum + o.discount_amount, 0);
 
-      const billsRes = await this.databaseService.query(
+      // Subscription Orders & Postpaid Ledger Query
+      const subOrdersRes = await this.databaseService.query(
+        `SELECT o.*, s.subscription_number
+         FROM orders o
+         LEFT JOIN subscriptions s ON (s.subscription_id = o.subscription_id OR s.subscription_number = o.subscription_id)
+         WHERE o.customer_id = ?
+           AND (o.subscription_id IS NOT NULL OR o.order_source = 'subscription' OR o.generation_type = 'subscription')
+           AND o.deleted_at IS NULL
+         ORDER BY o.created_at DESC`,
+        [customerId]
+      ).catch(() => []);
+
+      const subOrderIds = subOrdersRes.map(o => o.order_id).filter(Boolean);
+      let subOrderItemsMap: Record<string, any[]> = {};
+      if (subOrderIds.length > 0) {
+        const placeholders = subOrderIds.map(() => '?').join(',');
+        const orderItemsRes = await this.databaseService.query(
+          `SELECT oi.*, COALESCE(pv.name, p.name, 'Subscribed Item') as product_name, pv.name as variant_name
+           FROM order_items oi
+           LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
+           LEFT JOIN products p ON p.product_id = pv.product_id
+           WHERE oi.order_id IN (${placeholders})`,
+          subOrderIds
+        ).catch(() => []);
+
+        orderItemsRes.forEach((item: any) => {
+          if (!subOrderItemsMap[item.order_id]) subOrderItemsMap[item.order_id] = [];
+          subOrderItemsMap[item.order_id].push(item);
+        });
+      }
+
+      const formattedSubOrders = subOrdersRes.map(o => ({
+        ...o,
+        total_amount: Number(o.total_amount || 0),
+        items: subOrderItemsMap[o.order_id] || [],
+      }));
+
+      const subOrdersDue = formattedSubOrders
+        .filter(o => o.payment_status !== 'paid' && o.status !== 'cancelled')
+        .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+
+      const subOrdersTotalBilled = formattedSubOrders
+        .filter(o => o.status !== 'cancelled')
+        .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+
+      const subOrdersPaid = formattedSubOrders
+        .filter(o => o.payment_status === 'paid' && o.status !== 'cancelled')
+        .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+
+      const postpaidLimit = Number(customer.postpaid_credit_limit || 0);
+
+      const billsRes: any[] = await this.databaseService.query(
         `SELECT * FROM customer_bills WHERE customer_id = ? ORDER BY created_at DESC`,
         [customerId]
-      );
+      ).catch(() => []);
 
-      const outstandingDue = billsRes
-        .filter(b => b.status !== 'paid' && b.status !== 'cancelled')
-        .reduce((sum, b) => sum + Number(b.due_amount || 0), 0);
+      const outstandingDue = subOrdersDue > 0
+        ? subOrdersDue
+        : billsRes.filter((b: any) => b.status !== 'paid' && b.status !== 'cancelled').reduce((sum: number, b: any) => sum + Number(b.due_amount || 0), 0);
 
-      const totalCreditGiven = billsRes.reduce((sum, b) => sum + Number(b.total_amount || 0), 0);
-      const totalPostpaidPaid = billsRes.reduce((sum, b) => sum + Number(b.paid_amount || 0), 0);
-      const postpaidLimit = Number(customer.postpaid_credit_limit || 0);
+      const totalCreditGiven = subOrdersTotalBilled || billsRes.reduce((sum: number, b: any) => sum + Number(b.total_amount || 0), 0);
+      const totalPostpaidPaid = subOrdersPaid || billsRes.reduce((sum: number, b: any) => sum + Number(b.paid_amount || 0), 0);
 
       const walletTxns = await this.databaseService.query(
         `SELECT * FROM customer_wallet_transactions WHERE customer_id = ? ORDER BY created_at DESC`,
@@ -498,6 +579,36 @@ export class CustomersService {
 
       timelineEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
+      const containerBalancesRes = await this.databaseService.query(
+        `SELECT ccb.*, COALESCE(cnt.name, pt.name, ccb.packaging_type_id) as packaging_name, COALESCE(pt.unit, 'PCS') as packaging_unit, COALESCE(pt.deposit_amount, 0) as deposit_amount
+         FROM customer_container_balances ccb
+         LEFT JOIN packaging_types pt ON pt.id = ccb.packaging_type_id AND pt.deleted_at IS NULL
+         LEFT JOIN containers cnt ON cnt.container_id = ccb.packaging_type_id AND cnt.deleted_at IS NULL
+         WHERE ccb.customer_id = ? AND ccb.deleted_at IS NULL`,
+        [customerId]
+      ).catch(() => []);
+
+      const containerTxnsRes = await this.databaseService.query(
+        `SELECT ct.*, COALESCE(cnt.name, pt.name, ct.packaging_type_id) as packaging_name
+         FROM container_transactions ct
+         LEFT JOIN packaging_types pt ON pt.id = ct.packaging_type_id AND pt.deleted_at IS NULL
+         LEFT JOIN containers cnt ON cnt.container_id = ct.packaging_type_id AND cnt.deleted_at IS NULL
+         WHERE ct.customer_id = ? AND ct.deleted_at IS NULL
+         ORDER BY ct.created_at DESC`,
+        [customerId]
+      ).catch(() => []);
+
+      const packagingTypesRes = await this.databaseService.query(
+        `SELECT container_id as id, name, 1 as capacity, 'PCS' as unit, is_returnable, 0 as deposit_amount 
+         FROM containers 
+         WHERE (status = 'active' OR status IS NULL) AND deleted_at IS NULL
+         UNION ALL
+         SELECT id, name, capacity, unit, is_returnable, deposit_amount 
+         FROM packaging_types 
+         WHERE (status = 'active' OR status IS NULL) AND deleted_at IS NULL
+         ORDER BY name ASC`
+      ).catch(() => []);
+
       const customerProfileObj = {
         id: customer.id,
         customer_id: customer.customer_id,
@@ -576,6 +687,7 @@ export class CustomersService {
               paid_amount: Number(b.paid_amount || 0),
               due_amount: Number(b.due_amount || 0),
             })),
+            subscription_orders: formattedSubOrders,
           },
           wallet_ledger: {
             summary: {
@@ -593,6 +705,21 @@ export class CustomersService {
             active_plan: activeSub,
             items: subItems,
             history: subRes,
+          },
+          container_tracking: {
+            balances: containerBalancesRes.map(b => ({
+              ...b,
+              issued_quantity: Number(b.issued_quantity || 0),
+              returned_quantity: Number(b.returned_quantity || 0),
+              damaged_quantity: Number(b.damaged_quantity || 0),
+              lost_quantity: Number(b.lost_quantity || 0),
+              balance_quantity: Number(b.balance_quantity ?? (Number(b.issued_quantity || 0) - Number(b.returned_quantity || 0) - Number(b.damaged_quantity || 0) - Number(b.lost_quantity || 0))),
+            })),
+            transactions: containerTxnsRes.map(t => ({
+              ...t,
+              quantity: Number(t.quantity || 0),
+            })),
+            packaging_types: packagingTypesRes,
           },
           revenue_analytics: {
             monthly_trend: monthlyRevenueRes.map(m => ({
@@ -1495,6 +1622,60 @@ export class CustomersService {
       throw new InternalServerErrorException(
         'Failed to delete wallet transaction',
       );
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // CONTAINER & RETURN TRACKING LOGGING
+  // ═══════════════════════════════════════════════════════════════
+
+  async logContainerTransaction(id: string, body: any, adminId: string = 'system') {
+    try {
+      const custRes = await this.databaseService.query(
+        `SELECT customer_id FROM customers WHERE customer_id = ? OR id::text = ?`,
+        [id, id]
+      );
+      if (!custRes || custRes.length === 0) {
+        throw new BadRequestException('Customer not found');
+      }
+      const customerId = custRes[0].customer_id;
+
+      const { packaging_type_id, transaction_type, quantity, remarks, reference_type = 'manual', reference_id } = body;
+      const qty = Math.abs(Number(quantity || 0));
+      if (!packaging_type_id || !transaction_type || qty <= 0) {
+        throw new BadRequestException('Packaging type, valid transaction type, and quantity > 0 are required');
+      }
+
+      await this.databaseService.query(
+        `INSERT INTO container_transactions 
+         (customer_id, packaging_type_id, reference_type, reference_id, transaction_type, quantity, remarks, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [customerId, packaging_type_id, reference_type, reference_id || null, transaction_type, qty, remarks || null, adminId]
+      );
+
+      const issueAdd = transaction_type === 'issue' ? qty : 0;
+      const returnAdd = transaction_type === 'return' ? qty : 0;
+      const damagedAdd = transaction_type === 'damaged' ? qty : 0;
+      const lostAdd = transaction_type === 'lost' ? qty : 0;
+
+      await this.databaseService.query(
+        `INSERT INTO customer_container_balances 
+         (customer_id, packaging_type_id, issued_quantity, returned_quantity, damaged_quantity, lost_quantity)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (customer_id, packaging_type_id) DO UPDATE SET
+           issued_quantity = customer_container_balances.issued_quantity + EXCLUDED.issued_quantity,
+           returned_quantity = customer_container_balances.returned_quantity + EXCLUDED.returned_quantity,
+           damaged_quantity = customer_container_balances.damaged_quantity + EXCLUDED.damaged_quantity,
+           lost_quantity = customer_container_balances.lost_quantity + EXCLUDED.lost_quantity,
+           updated_at = NOW()`,
+        [customerId, packaging_type_id, issueAdd, returnAdd, damagedAdd, lostAdd]
+      );
+
+      return { status: true, message: 'Container transaction logged successfully' };
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      this.developer.error('logContainerTransaction error', { error, id });
+      throw new InternalServerErrorException('Failed to log container transaction');
     }
   }
 }

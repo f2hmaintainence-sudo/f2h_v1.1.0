@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : csrf.ts
 // Description : CSRF token helper for web application
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 "use client";

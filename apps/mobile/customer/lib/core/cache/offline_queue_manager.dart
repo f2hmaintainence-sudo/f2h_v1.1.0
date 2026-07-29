@@ -6,8 +6,7 @@
 // File        : offline_queue_manager.dart
 // Description : Queues HTTP mutations (POST/PUT/DELETE) when offline and
 //               automatically flushes them sequentially when network returns.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'dart:async';

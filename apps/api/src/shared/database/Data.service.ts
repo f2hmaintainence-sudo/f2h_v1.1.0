@@ -23,6 +23,8 @@ export const WORKER_THRESHOLD = 3;
 export const CHUNK_SIZE = 1000;
 export const BULK_CHUNK_SIZE = 500;
 export const AVOID_DELETED_AT = [
+  'packaging_types',
+  'product_images',
   'user_documents',
   'user_vehicles',
   'zones',
@@ -61,18 +63,15 @@ export const AVOID_DELETED_AT = [
   'subscription_logs',
   'customers',
   'customer_addresses',
-  'customer_wallet_transactions',
-  'container_transactions',
-  'delivery_container_lines',
-  'customer_container_balances',
   'customer_feedback',
   'products',
   'product_variants',
   'stock_balances',
+  'stock_movements',
   'product_images',
   'categories',
   'packaging_types',
-  'product_images',
+  'delivery_partner_referral_bonuses',
 ];
 export const AVOID_DATACHANGE_TABLES = [
   'notifications',
@@ -1610,6 +1609,7 @@ export async function qualifySelect(
   const sourceMap: Record<string, { table: string; col: string }> = {};
   const identifierRegex = /^[a-zA-Z0-9_.*]+$/;
   for (const col of select) {
+    let colTable = table;
     let alias: string | null = null;
     let rawCol = col;
     // Handle "column AS alias"
@@ -1620,7 +1620,17 @@ export async function qualifySelect(
         alias = match[2].trim();
       }
     }
-    let colTable = table;
+    // Handle raw SQL expressions / subqueries e.g. (SELECT ...) or COALESCE(...)
+    if (typeof rawCol === 'string' && (rawCol.trim().startsWith('(') || rawCol.trim().toUpperCase().startsWith('COALESCE('))) {
+      const resultKey = alias ?? 'expr';
+      qualified.push(`${rawCol} AS "${resultKey}"`);
+      sourceMap[resultKey] = {
+        table: colTable,
+        col: resultKey,
+      };
+      aliasMap[resultKey] = resultKey;
+      continue;
+    }
     if (!identifierRegex.test(colTable)) {
       throw new Error(`Invalid table name: ${colTable}`);
     }

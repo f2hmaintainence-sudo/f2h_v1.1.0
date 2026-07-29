@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : page.tsx
 // Description : Branch partner allocation page formatted to match F2H theme
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 "use client";

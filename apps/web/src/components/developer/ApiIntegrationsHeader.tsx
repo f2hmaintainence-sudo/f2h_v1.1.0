@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : ApiIntegrationsHeader.tsx
 // Description : Header component for developer API integrations pages
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 "use client";

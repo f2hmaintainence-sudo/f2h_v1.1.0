@@ -119,8 +119,8 @@ export class InventoryController {
   // ── Dashboard & Reports ──
 
   @Get('dashboard')
-  async getInventoryDashboard() {
-    return this.dashboardService.getDashboardData();
+  async getInventoryDashboard(@Query('warehouse_id') warehouseId?: string) {
+    return this.dashboardService.getDashboardData(warehouseId);
   }
 
   @Get('dashboard/warehouse-summary')

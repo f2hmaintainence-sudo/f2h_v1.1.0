@@ -24,7 +24,7 @@ class CartRemoteDataSourceImpl implements CartRemoteDataSource {
         ApiEndpoints.cartSync,
         data: {
           'items': itemsJson,
-          if (customerId != null) 'customer_id': customerId,
+          'customer_id': ?customerId,
         },
       );
 

@@ -41,7 +41,8 @@ export interface FieldDef {
   | 'password'
   | 'file'
   | 'time'
-  | 'html';
+  | 'html'
+  | 'radio';
   /** Whether field is required */
   required?: boolean;
   /** Placeholder text */

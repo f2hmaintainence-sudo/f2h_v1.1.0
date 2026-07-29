@@ -13,24 +13,19 @@ export class SubscriptionsService {
 
   async getSubscriptionView(subscriptionId: string) {
     try {
-      const result = await this.dataService.query('subscriptions', {
-        select: ['subscriptions.*'],
-        where: [
-          {
-            column: 'subscriptions.id',
-            operator: '=',
-            value: subscriptionId,
-          },
-        ],
-        limit: 1,
-      });
+      const rows = await this.databaseService.query(
+        `SELECT s.*, COALESCE(c.full_name, CONCAT(c.first_name, ' ', c.last_name)) AS customer_name, COALESCE(c.mobile, c.phone) AS phone, c.wallet_balance
+         FROM subscriptions s
+         LEFT JOIN customers c ON c.customer_id = s.customer_id
+         WHERE s.id::text = $1 OR s.subscription_id = $1 OR s.subscription_number = $1
+         LIMIT 1`,
+        [subscriptionId],
+      );
 
       return {
         status: true,
-        data: result?.data?.[0] ?? null,
-        message: result?.data?.[0]
-          ? 'Subscription fetched'
-          : 'Subscription not found',
+        data: rows[0] ?? null,
+        message: rows[0] ? 'Subscription fetched' : 'Subscription not found',
       };
     } catch (error) {
       this.developer.error('getSubscriptionView error', {
@@ -43,65 +38,48 @@ export class SubscriptionsService {
 
   async getSubscriptionItems(subscriptionId: string) {
     try {
-      const result = await this.dataService.query('subscription_items', {
-        select: [
-          'subscription_items.id',
-          'subscription_items.subscription_id',
-          'subscription_items.product_variant_id',
-          'products.name AS product_name',
-          'product_variants.name AS variant_name',
-          'subscription_items.unit_price',
-          'subscription_items.discount_id',
-          'subscription_items.coupon_id',
-          'subscription_items.discount_amount',
-          'subscription_items.coupon_amount',
-          'subscription_items.final_price',
-          'subscription_items.is_free',
-          // 'subscription_items.status',
-          // 'subscription_items.start_date',
-          // 'subscription_items.end_date',
-          'subscription_items.created_at',
-        ],
-        joins: [
-          {
-            type: 'left',
-            table: 'product_variants',
-            on: [
-              [
-                'subscription_items.product_variant_id',
-                'product_variants.variant_id',
-              ],
-            ],
-          },
-          {
-            type: 'left',
-            table: 'products',
-            on: [['product_variants.product_id', 'products.product_id']],
-          },
-        ],
-        where: [
-          {
-            column: 'subscription_items.subscription_id',
-            operator: '=',
-            value: subscriptionId,
-          },
-          {
-            column: 'products.is_subscribable',
-            operator: '=',
-            value: true,
-          },
-        ],
-        orderBy: [
-          {
-            column: 'subscription_items.id',
-            direction: 'ASC',
-          },
-        ],
-      });
+      const rows = await this.databaseService.query(
+        `SELECT
+          si.id,
+          si.subscription_item_id,
+          si.subscription_id,
+          si.product_variant_id,
+          p.name AS product_name,
+          pv.name AS variant_name,
+          pv.unit_value,
+          pv.unit_type,
+          COALESCE(MAX(ws.m_quantity), 0)::numeric AS daily_m_quantity,
+          COALESCE(MAX(ws.e_quantity), 0)::numeric AS daily_e_quantity,
+          COALESCE(SUM(ws.m_quantity), 0)::numeric AS total_m_quantity,
+          COALESCE(SUM(ws.e_quantity), 0)::numeric AS total_e_quantity,
+          si.unit_price,
+          si.discount_id,
+          si.coupon_id,
+          si.discount_amount,
+          si.coupon_amount,
+          si.final_price,
+          si.is_free,
+          si.status,
+          si.created_at
+         FROM subscription_items si
+         LEFT JOIN product_variants pv ON pv.variant_id = si.product_variant_id
+         LEFT JOIN products p ON p.product_id = pv.product_id
+         LEFT JOIN subscription_weekly_schedule ws ON (ws.subscription_item_id = si.subscription_item_id OR ws.subscription_item_id = si.id::text)
+         WHERE si.subscription_id = $1
+            OR si.subscription_id IN (
+              SELECT subscription_id FROM subscriptions WHERE id::text = $1 OR subscription_number = $1 OR subscription_id = $1
+            )
+         GROUP BY
+          si.id, si.subscription_item_id, si.subscription_id, si.product_variant_id,
+          p.name, pv.name, pv.unit_value, pv.unit_type, si.unit_price, si.discount_id, si.coupon_id,
+          si.discount_amount, si.coupon_amount, si.final_price, si.is_free, si.status, si.created_at
+         ORDER BY si.id ASC`,
+        [subscriptionId],
+      );
 
       return {
         status: true,
-        data: result?.data ?? [],
+        data: rows,
         message: 'Subscription items fetched',
       };
     } catch (error) {

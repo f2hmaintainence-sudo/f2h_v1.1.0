@@ -4,19 +4,19 @@
 //
 // Project     : F2H Fresh
 // File        : page.tsx
-// Description : Delivery partners management page for admin panel
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+// Description : Formal Executive Fleet Management UI for Delivery Partners
+//
 // ============================================================================
 
 "use client";
 
 import { getApiBaseUrl } from "@/lib/api-config";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { api } from "@/services/api.client";
 import {
   Truck, Users, ChevronRight, Home, RefreshCw, CheckCircle2, XCircle, MapPin,
-  Phone, ShieldCheck, ShieldAlert, Eye, Loader2, Edit2, X, Plus
+  Phone, ShieldCheck, ShieldAlert, Eye, Loader2, Edit2, X, Search, LayoutGrid, Table as TableIcon,
+  Activity, Award, UserCheck, UserX, FileText
 } from "lucide-react";
 import Link from "next/link";
 import { showSuccessToast } from "@/components/Toast";
@@ -42,7 +42,6 @@ const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
   }
 };
 
-// --- Reusable Micro-Components for DRY & Concise Code ---
 const InfoRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div className="bg-slate-50/80 rounded-lg py-1.5 px-2.5 border border-slate-100 flex items-center justify-between truncate text-[11px]">
     <span className="text-slate-400 font-medium mr-1.5">{label}</span>
@@ -75,41 +74,41 @@ const VerifyActionButtons = ({ status, onVerify }: { status?: string; onVerify: 
 
 // --- Memoized Partner Card ---
 const PartnerCard = React.memo(({ partner: p, onOpenEditModal, onOpenDocsModal }: { partner: any; onOpenEditModal: (p: any) => void; onOpenDocsModal: (p: any) => void }) => (
-  <div className="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-sm hover:shadow-md hover:border-slate-300 transition-all flex flex-col justify-between group/card">
+  <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between group/card">
     <div>
       <div className="flex items-start justify-between gap-2.5">
-        <Link href={`/admin/delivery/partners/${p.delivery_partner_id || p.id}`} className="flex items-center gap-2.5 min-w-0 group/link cursor-pointer">
-          <div className={`w-9 h-9 shrink-0 rounded-xl font-extrabold flex items-center justify-center text-xs shadow-inner transition-transform group-hover/link:scale-105 ${p.is_active ? "bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-emerald-500/20" : "bg-gradient-to-br from-slate-100 to-slate-200 text-slate-700 border border-slate-300/50"}`}>
-            {(p.full_name || "U")[0].toUpperCase()}
+        <Link href={`/admin/delivery/partners/${p.delivery_partner_id || p.id}`} className="flex items-center gap-3 min-w-0 group/link cursor-pointer">
+          <div className={`w-10 h-10 shrink-0 rounded-xl font-extrabold flex items-center justify-center text-xs text-white shadow-2xs ${p.is_active ? "bg-gradient-to-br from-emerald-600 to-teal-700" : "bg-slate-400"}`}>
+            {(p.full_name || "D")[0].toUpperCase()}
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-black text-slate-900 truncate group-hover/link:text-emerald-600 transition-colors">{p.full_name || "Delivery partner"}</p>
-            <p className="text-[11px] text-slate-400 font-semibold flex items-center gap-1 truncate mt-0.5"><MapPin size={10} className="shrink-0" /><span className="truncate">{p.branch_name || p.branch_id || "No Branch"}</span></p>
+            <p className="text-xs font-extrabold text-slate-900 truncate group-hover/link:text-emerald-700 transition-colors">{p.full_name || "Delivery Partner"}</p>
+            <p className="text-[11px] text-slate-500 font-semibold flex items-center gap-1 truncate mt-0.5"><MapPin size={11} className="shrink-0 text-slate-400" /><span className="truncate">{p.branch_name || p.branch_id || "Main Hub"}</span></p>
           </div>
         </Link>
-        <button type="button" onClick={() => onOpenEditModal(p)} className="shrink-0 group/edit inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-500/60 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 font-bold text-[10px] transition-all shadow-2xs" title="Edit Partner Profile & Salary">
-          <Edit2 size={11} className="text-emerald-600 group-hover/edit:text-white transition-colors" /><span>Edit</span>
+        <button type="button" onClick={() => onOpenEditModal(p)} className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-600 hover:text-white font-bold text-[11px] transition-colors shadow-2xs" title="Edit Partner Profile">
+          <Edit2 size={11} /><span>Edit</span>
         </button>
       </div>
 
-      <div className="bg-slate-50/80 rounded-xl p-2.5 my-2.5 border border-slate-100 space-y-2">
-        <div className="flex items-center justify-between gap-2 text-[11px]">
-          <div className="flex items-center gap-1.5 font-bold text-slate-700 min-w-0 truncate"><Phone size={11} className="text-slate-400 shrink-0" /><span className="truncate">{p.phone || "NA"}</span></div>
-          <span className={`shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${p.is_active ? "bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 shadow-2xs" : "bg-slate-200/80 text-slate-600 border border-slate-300"}`}>
+      <div className="bg-slate-50/80 rounded-xl p-3 my-3 border border-slate-100 space-y-2">
+        <div className="flex items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-700 min-w-0 truncate"><Phone size={12} className="text-slate-400 shrink-0" /><span className="truncate">{p.phone || "N/A"}</span></div>
+          <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${p.is_active ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-slate-200/80 text-slate-600 border border-slate-300"}`}>
             {p.is_active && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}<span>{p.is_active ? "Active" : "Inactive"}</span>
           </span>
         </div>
         <div>
-          <button type="button" onClick={() => onOpenDocsModal(p)} className={`w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all border ${p.is_verified ? "bg-emerald-50 text-emerald-700 border-emerald-200/80 hover:bg-emerald-100 shadow-xs" : "bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100 shadow-sm shadow-amber-500/20 animate-pulse"}`} title="Click to review KYC documents">
-            {p.is_verified ? <ShieldCheck size={13} className="text-emerald-600 shrink-0" /> : <ShieldAlert size={13} className="text-amber-600 shrink-0 animate-bounce" />}
-            <span className="truncate">{p.is_verified ? "Verified (Docs)" : "Check Docs"}</span>
+          <button type="button" onClick={() => onOpenDocsModal(p)} className={`w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-[11px] font-bold transition-all border ${p.is_verified ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100 shadow-2xs" : "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100 shadow-2xs animate-pulse"}`}>
+            {p.is_verified ? <ShieldCheck size={13} className="text-emerald-600 shrink-0" /> : <ShieldAlert size={13} className="text-amber-600 shrink-0" />}
+            <span className="truncate">{p.is_verified ? "Verified Docs" : "Review Docs"}</span>
           </button>
         </div>
       </div>
     </div>
-    <div className="grid grid-cols-2 gap-2">
-      <div className="flex flex-col items-center justify-center py-1.5 px-2 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100/60 transition-colors"><span className="text-sm font-extrabold text-slate-800 tracking-tight">{p.today_assigned ?? 0}</span><span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mt-0.5">Assigned</span></div>
-      <div className="flex flex-col items-center justify-center py-1.5 px-2 rounded-xl bg-emerald-50/70 border border-emerald-200/50 hover:bg-emerald-100/60 transition-colors"><span className="text-sm font-extrabold text-emerald-600 tracking-tight">{p.today_delivered ?? 0}</span><span className="text-[9px] font-extrabold text-emerald-600/80 uppercase tracking-widest mt-0.5">Delivered</span></div>
+    <div className="grid grid-cols-2 gap-2 text-xs">
+      <div className="flex flex-col items-center justify-center py-2 px-2 rounded-xl bg-slate-50 border border-slate-100"><span className="text-sm font-extrabold text-slate-900">{p.today_assigned ?? 0}</span><span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Assigned</span></div>
+      <div className="flex flex-col items-center justify-center py-2 px-2 rounded-xl bg-emerald-50/70 border border-emerald-200/50"><span className="text-sm font-extrabold text-emerald-700">{p.today_delivered ?? 0}</span><span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider mt-0.5">Delivered</span></div>
     </div>
   </div>
 ));
@@ -186,13 +185,16 @@ const VehicleCard = React.memo(({ veh, onPreview, onVerify }: { veh: any; onPrev
 VehicleCard.displayName = "VehicleCard";
 
 // -----------------------------------------------------------------------------
-// Main Delivery Partners Page
+// Main Formal Delivery Partners Page
 // -----------------------------------------------------------------------------
 export default function DeliveryPartnersPage() {
   const [partners, setPartners] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
+  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [verificationFilter, setVerificationFilter] = useState<"all" | "verified" | "pending">("all");
 
   const [branches, setBranches] = useState<any[]>([]);
   const [selectedPartnerForEdit, setSelectedPartnerForEdit] = useState<any | null>(null);
@@ -210,7 +212,7 @@ export default function DeliveryPartnersPage() {
     try {
       const params = filter !== "all" ? `?status=${filter}` : "";
       const res = await api.get<any>(`/admin/delivery/partners${params}`);
-      if (res.data?.data) { setPartners(res.data.data); setTotal(res.data.total ?? 0); }
+      if (res.data?.data) { setPartners(res.data.data); setTotal(res.data.total ?? res.data.data.length); }
     } catch { } finally { setLoading(false); }
   }, [filter]);
 
@@ -227,6 +229,43 @@ export default function DeliveryPartnersPage() {
     });
   }, [fetchPartners]);
 
+  // Executive Fleet Metrics
+  const metrics = useMemo(() => {
+    const activeCount = partners.filter((p) => p.is_active).length;
+    const verifiedCount = partners.filter((p) => p.is_verified).length;
+    const totalDelivered = partners.reduce((sum, p) => sum + Number(p.today_delivered || 0), 0);
+    const complianceRate = partners.length ? Math.round((verifiedCount / partners.length) * 100) : 100;
+
+    return {
+      total: partners.length,
+      active: activeCount,
+      inactive: partners.length - activeCount,
+      verified: verifiedCount,
+      complianceRate,
+      totalDelivered,
+    };
+  }, [partners]);
+
+  // Filtered partners
+  const filteredPartners = useMemo(() => {
+    return partners.filter((p) => {
+      // 1. Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const name = String(p.full_name || "").toLowerCase();
+        const phone = String(p.phone || "").toLowerCase();
+        const branch = String(p.branch_name || p.branch_id || "").toLowerCase();
+        if (!name.includes(q) && !phone.includes(q) && !branch.includes(q)) return false;
+      }
+
+      // 2. Verification Filter
+      if (verificationFilter === "verified" && !p.is_verified) return false;
+      if (verificationFilter === "pending" && p.is_verified) return false;
+
+      return true;
+    });
+  }, [partners, searchQuery, verificationFilter]);
+
   const handleOpenDocsModal = useCallback(async (partner: any) => {
     setSelectedPartnerForDocs(partner);
     setDocsModalVerifiedToggle(Boolean(partner.is_verified));
@@ -236,14 +275,12 @@ export default function DeliveryPartnersPage() {
     try {
       const res = await api.get<any>(`/admin/delivery/partners/${partnerId}/documents`);
       if (res?.data?.data) setDocsData(res.data.data);
-    } catch (error) {
+    } catch {
       showSuccessToast("Failed to load documents");
     } finally { setDocsLoading(false); }
   }, []);
 
   const handlePreviewImage = useCallback((url: string, title: string) => setPreviewImage({ url, title }), []);
-
-
 
   const hasAnyUploadedProof = Boolean(
     docsData &&
@@ -275,7 +312,7 @@ export default function DeliveryPartnersPage() {
       await api.patch<any>(`/admin/delivery/partners/${partnerId}/verify`, { document_id: docId, document_status: status });
       setDocsData((prev) => prev ? { ...prev, documents: prev.documents.map((d) => (d.id === docId ? { ...d, verification_status: status } : d)) } : null);
       showSuccessToast(`Document marked as ${status}`);
-    } catch (err) { alert("Failed to update document"); }
+    } catch { alert("Failed to update document"); }
   }, [selectedPartnerForDocs]);
 
   const handleVerifyVehicleItem = useCallback(async (vehId: number, status: "verified" | "rejected") => {
@@ -285,7 +322,7 @@ export default function DeliveryPartnersPage() {
       await api.patch<any>(`/admin/delivery/partners/${partnerId}/verify`, { vehicle_id: vehId, vehicle_status: status });
       setDocsData((prev) => prev ? { ...prev, vehicles: prev.vehicles.map((v) => (v.id === vehId ? { ...v, verification_status: status } : v)) } : null);
       showSuccessToast(`Vehicle marked as ${status}`);
-    } catch (err) { alert("Failed to update vehicle"); }
+    } catch { alert("Failed to update vehicle"); }
   }, [selectedPartnerForDocs]);
 
   const handleVerifyBankItem = useCallback(async (bankId: number, status: "verified" | "rejected") => {
@@ -295,7 +332,7 @@ export default function DeliveryPartnersPage() {
       await api.patch<any>(`/admin/delivery/partners/${partnerId}/verify`, { bank_account_id: bankId, bank_status: status });
       setDocsData((prev) => prev ? { ...prev, bank_accounts: prev.bank_accounts?.map((b: any) => (b.id === bankId ? { ...b, verification_status: status } : b)) || [] } : null);
       showSuccessToast(`Bank Account marked as ${status}`);
-    } catch (err) { alert("Failed to update bank account"); }
+    } catch { alert("Failed to update bank account"); }
   }, [selectedPartnerForDocs]);
 
   const handleOpenEditModal = useCallback((p: any) => {
@@ -303,41 +340,308 @@ export default function DeliveryPartnersPage() {
   }, []);
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      <nav className="flex items-center gap-1.5 text-sm text-gray-500">
-        <Link href="/admin/dashboard" className="flex items-center gap-1 hover:text-emerald-600"><Home size={14} /> Dashboard</Link>
-        <ChevronRight size={14} className="text-gray-300" /><span className="font-semibold text-slate-800">Delivery Partners</span>
-      </nav>
-
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="pt-6 md:pt-8 px-4 md:px-7 pb-10 space-y-6 font-sans min-h-screen bg-slate-50/60">
+      
+      {/* ── Breadcrumb & Top Action Header ── */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-white p-5 md:p-6 rounded-2xl border border-gray-200/80 shadow-2xs">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2"><Truck size={24} className="text-[#388E3C]" style={{ color: "#388E3C" }} /> Delivery Partners</h1>
-          <p className="text-sm text-slate-400 mt-1">{total} partners total</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex bg-white rounded-lg border border-slate-200 overflow-hidden shadow-xs">
-            {(["all", "active", "inactive"] as const).map((f) => (
-              <button key={f} onClick={() => setFilter(f)} className={`px-3.5 py-2 text-xs font-bold capitalize transition-all ${filter === f ? "bg-[#388E3C] text-white shadow-xs" : "text-slate-600 hover:bg-[#388E3C]/10 hover:text-[#388E3C]"}`}>{f}</button>
-            ))}
+          <nav className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100/90 rounded-lg border border-slate-200/70 text-xs text-slate-500 mb-2 font-medium" aria-label="Breadcrumb">
+            <Link href="/admin/dashboard" className="inline-flex items-center gap-1 hover:text-emerald-700 transition-colors font-semibold text-slate-600">
+              <Home size={13} className="text-emerald-600" /> Dashboard
+            </Link>
+            <ChevronRight size={13} className="text-slate-400" />
+            <span className="font-bold text-emerald-800">Delivery Fleet Partners</span>
+          </nav>
+          <div className="mt-1 flex items-center gap-2">
+            <Truck size={22} className="text-emerald-600" />
+            <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Delivery Fleet Partners</h1>
+            <span className="bg-emerald-50 text-emerald-800 text-xs font-bold px-2.5 py-0.5 rounded-full border border-emerald-200">
+              {filteredPartners.length} Total Partners
+            </span>
           </div>
-          {/* <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-1.5 px-3.5 py-2 bg-[#388E3C] hover:bg-[#2E7D32] text-white rounded-lg font-bold text-xs transition-all shadow-xs">
-            <Plus size={14} /><span>Add Partner</span>
-          </button> */}
-          <button onClick={fetchPartners} className="px-3 py-2 bg-white border border-slate-200 rounded-lg hover:bg-[#388E3C]/10 hover:text-[#388E3C] hover:border-[#388E3C]/40 transition-all shadow-xs"><RefreshCw size={14} /></button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={fetchPartners}
+            className="inline-flex items-center justify-center gap-2 h-9 px-4 bg-white text-slate-800 text-xs font-bold rounded-xl border border-gray-200 shadow-2xs hover:border-emerald-500 hover:text-emerald-700 transition-colors"
+          >
+            <RefreshCw size={15} />
+            Refresh Fleet
+          </button>
         </div>
       </div>
 
+      {/* ── Executive Fleet Summary Cards ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {/* Total Fleet */}
+        <div className="bg-white rounded-2xl p-4 border border-gray-200/90 shadow-2xs space-y-1">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-600 uppercase tracking-wider">
+            <span className="flex items-center gap-1.5">
+              <Users size={15} className="text-emerald-600" /> Registered Fleet
+            </span>
+            <span className="text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full border border-slate-200 font-mono">
+              Total
+            </span>
+          </div>
+          <p className="text-2xl font-extrabold text-slate-900 pt-1">{metrics.total}</p>
+          <p className="text-[11px] text-gray-500 font-medium">All onboarded delivery personnel</p>
+        </div>
+
+        {/* Active On-Duty */}
+        <div className="bg-white rounded-2xl p-4 border border-gray-200/90 shadow-2xs space-y-1">
+          <div className="flex items-center justify-between text-xs font-bold text-emerald-800 uppercase tracking-wider">
+            <span className="flex items-center gap-1.5">
+              <UserCheck size={15} className="text-emerald-600" /> Active On-Duty
+            </span>
+            <span className="text-[11px] bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200 font-bold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Active
+            </span>
+          </div>
+          <p className="text-2xl font-extrabold text-emerald-700 pt-1">{metrics.active}</p>
+          <p className="text-[11px] text-gray-500 font-medium">Currently online for fulfillment</p>
+        </div>
+
+        {/* KYC Compliance Rate */}
+        <div className="bg-white rounded-2xl p-4 border border-gray-200/90 shadow-2xs space-y-1">
+          <div className="flex items-center justify-between text-xs font-bold text-teal-800 uppercase tracking-wider">
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck size={15} className="text-teal-600" /> KYC Compliance
+            </span>
+            <span className="text-[11px] bg-teal-50 text-teal-800 px-2 py-0.5 rounded-full border border-teal-200 font-bold">
+              {metrics.complianceRate}% Rate
+            </span>
+          </div>
+          <p className="text-2xl font-extrabold text-slate-900 pt-1">{metrics.verified} <span className="text-xs text-slate-400 font-normal">/ {metrics.total} verified</span></p>
+          <p className="text-[11px] text-gray-500 font-medium">Identity & vehicle document verified</p>
+        </div>
+
+        {/* Today Completed Deliveries */}
+        <div className="bg-white rounded-2xl p-4 border border-gray-200/90 shadow-2xs space-y-1">
+          <div className="flex items-center justify-between text-xs font-bold text-sky-800 uppercase tracking-wider">
+            <span className="flex items-center gap-1.5">
+              <Award size={15} className="text-sky-600" /> Today Deliveries
+            </span>
+            <span className="text-[11px] bg-sky-50 text-sky-800 px-2 py-0.5 rounded-full border border-sky-200 font-bold">
+              Completed
+            </span>
+          </div>
+          <p className="text-2xl font-extrabold text-sky-700 pt-1">{metrics.totalDelivered}</p>
+          <p className="text-[11px] text-gray-500 font-medium">Successfully delivered today</p>
+        </div>
+      </div>
+
+      {/* ── Corporate Filter & View Mode Control Toolbar ── */}
+      <div className="bg-white rounded-2xl p-3 border border-gray-200/90 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-3">
+        {/* Left: View Mode Switcher & Status Filter */}
+        <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
+          {/* View Switcher */}
+          <div className="inline-flex h-9 rounded-xl bg-gray-100/90 p-1 border border-gray-200/80 items-center">
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={`inline-flex items-center gap-1.5 h-7 px-3 text-xs font-semibold rounded-lg transition-all ${
+                viewMode === "table"
+                  ? "bg-white text-emerald-800 shadow-2xs border border-gray-200 font-bold"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              <TableIcon size={14} /> Executive Table
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("grid")}
+              className={`inline-flex items-center gap-1.5 h-7 px-3 text-xs font-semibold rounded-lg transition-all ${
+                viewMode === "grid"
+                  ? "bg-white text-emerald-800 shadow-2xs border border-gray-200 font-bold"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              <LayoutGrid size={14} /> Cards Grid
+            </button>
+          </div>
+
+          {/* Status Tabs */}
+          <div className="inline-flex h-9 rounded-xl bg-gray-100/90 p-1 border border-gray-200/80 items-center">
+            {(["all", "active", "inactive"] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFilter(f)}
+                className={`h-7 px-3 text-xs font-semibold capitalize rounded-lg transition-all ${
+                  filter === f
+                    ? "bg-emerald-700 text-white shadow-2xs font-bold"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Right: Search Input & Verification Filter */}
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          {/* Search Box */}
+          <div className="relative flex-1 md:w-64 h-9">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search Partner Name, Phone, Hub..."
+              className="w-full h-9 pl-9 pr-3 bg-gray-50 text-xs font-medium text-gray-800 placeholder-gray-400 border border-gray-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 transition-all"
+            />
+          </div>
+
+          {/* Verification Dropdown */}
+          <div className="inline-flex h-9 rounded-xl bg-gray-100/90 border border-gray-200 p-1 items-center">
+            <button
+              type="button"
+              onClick={() => setVerificationFilter("all")}
+              className={`h-7 px-2.5 text-xs font-semibold rounded-lg transition-all ${
+                verificationFilter === "all" ? "bg-white text-slate-900 shadow-2xs font-bold border border-gray-200" : "text-gray-500"
+              }`}
+            >
+              All Docs
+            </button>
+            <button
+              type="button"
+              onClick={() => setVerificationFilter("verified")}
+              className={`h-7 px-2.5 text-xs font-semibold rounded-lg transition-all ${
+                verificationFilter === "verified" ? "bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs font-bold" : "text-emerald-700"
+              }`}
+            >
+              Verified
+            </button>
+            <button
+              type="button"
+              onClick={() => setVerificationFilter("pending")}
+              className={`h-7 px-2.5 text-xs font-semibold rounded-lg transition-all ${
+                verificationFilter === "pending" ? "bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs font-bold" : "text-amber-700"
+              }`}
+            >
+              Pending
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Main View Container ── */}
       {loading ? (
-        <div className="flex justify-center py-12"><div className="w-8 h-8 border-2 border-[#388E3C]/20 border-t-[#388E3C] rounded-full animate-spin" /></div>
-      ) : partners.length === 0 ? (
-        <div className="text-center py-16 text-slate-400"><Users size={40} className="mx-auto mb-3 opacity-30" /><p className="text-sm font-bold">No delivery partners found</p></div>
+        <div className="flex justify-center py-16"><Loader2 size={32} className="text-emerald-600 animate-spin" /></div>
+      ) : filteredPartners.length === 0 ? (
+        <div className="bg-white rounded-2xl p-12 text-center border border-gray-200 text-slate-400 space-y-2">
+          <Users size={40} className="mx-auto text-slate-300" />
+          <p className="text-sm font-semibold text-slate-700">No delivery partners found</p>
+          <p className="text-xs text-slate-400">Try refining your search or filter parameters.</p>
+        </div>
+      ) : viewMode === "table" ? (
+        /* Formal Corporate Executive Table View */
+        <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-100/90 text-slate-700 uppercase text-[10px] font-bold border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3.5">Delivery Partner</th>
+                  <th className="px-4 py-3.5">Assigned Hub / Branch</th>
+                  <th className="px-4 py-3.5 text-center">Shift Status</th>
+                  <th className="px-4 py-3.5 text-center">KYC Verification</th>
+                  <th className="px-4 py-3.5 text-center">Assigned Today</th>
+                  <th className="px-4 py-3.5 text-center">Delivered Today</th>
+                  <th className="px-4 py-3.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white font-medium">
+                {filteredPartners.map((p) => {
+                  const partnerId = p.delivery_partner_id || p.id;
+                  const initial = (p.full_name || "D")[0].toUpperCase();
+
+                  return (
+                    <tr key={partnerId} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-4 py-3">
+                        <Link href={`/admin/delivery/partners/${partnerId}`} className="flex items-center gap-3 group/link">
+                          <div className={`w-9 h-9 shrink-0 rounded-xl font-extrabold flex items-center justify-center text-xs text-white shadow-2xs ${p.is_active ? "bg-gradient-to-br from-emerald-600 to-teal-700" : "bg-slate-400"}`}>
+                            {initial}
+                          </div>
+                          <div>
+                            <p className="font-extrabold text-slate-900 group-hover/link:text-emerald-700 transition-colors">{p.full_name || "Delivery Partner"}</p>
+                            <p className="text-[11px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
+                              <Phone size={10} className="text-slate-400" /> {p.phone || "N/A"}
+                            </p>
+                          </div>
+                        </Link>
+                      </td>
+
+                      <td className="px-4 py-3 text-slate-700">
+                        <div className="flex items-center gap-1 font-semibold">
+                          <MapPin size={12} className="text-slate-400" />
+                          <span>{p.branch_name || p.branch_id || "Main Hub"}</span>
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold ${
+                          p.is_active ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-slate-100 text-slate-600 border border-slate-200"
+                        }`}>
+                          {p.is_active && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                          {p.is_active ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDocsModal(p)}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold border transition-colors ${
+                            p.is_verified
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
+                              : "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100 animate-pulse"
+                          }`}
+                        >
+                          {p.is_verified ? <ShieldCheck size={13} className="text-emerald-600" /> : <ShieldAlert size={13} className="text-amber-600" />}
+                          <span>{p.is_verified ? "Verified Docs" : "Review Docs"}</span>
+                        </button>
+                      </td>
+
+                      <td className="px-4 py-3 text-center font-bold text-slate-900">
+                        {p.today_assigned ?? 0}
+                      </td>
+
+                      <td className="px-4 py-3 text-center font-extrabold text-emerald-700">
+                        {p.today_delivered ?? 0}
+                      </td>
+
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditModal(p)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-600 hover:text-white font-bold text-[11px] transition-colors shadow-2xs"
+                            title="Edit Partner Profile & Salary"
+                          >
+                            <Edit2 size={11} /> <span>Edit</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {partners.map((p) => <PartnerCard key={p.delivery_partner_id || p.id} partner={p} onOpenEditModal={handleOpenEditModal} onOpenDocsModal={handleOpenDocsModal} />)}
+        /* Executive Cards Grid View */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredPartners.map((p) => (
+            <PartnerCard key={p.delivery_partner_id || p.id} partner={p} onOpenEditModal={handleOpenEditModal} onOpenDocsModal={handleOpenDocsModal} />
+          ))}
         </div>
       )}
 
-      {/* KYC Modal */}
+      {/* KYC Verification Modal */}
       {selectedPartnerForDocs && (
         <div className="skf-overlay !m-0 !p-4" onClick={(e) => { if (e.target === e.currentTarget) setSelectedPartnerForDocs(null); }}>
           <div className="skf-modal !m-auto" style={{ maxWidth: "820px" }}>
@@ -451,7 +755,7 @@ export default function DeliveryPartnersPage() {
         </div>
       )}
 
-      {/* Add Partner Form via SkeletonForm */}
+      {/* Add Partner Form */}
       <SkeletonForm
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
@@ -463,7 +767,7 @@ export default function DeliveryPartnersPage() {
         }}
       />
 
-      {/* Edit Partner Form via SkeletonForm (showEdit / saveEdit) */}
+      {/* Edit Partner Form */}
       {selectedPartnerForEdit && (
         <SkeletonForm
           isOpen={Boolean(selectedPartnerForEdit)}

@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : api.client.ts
 // Description : API Client for web application
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 /**

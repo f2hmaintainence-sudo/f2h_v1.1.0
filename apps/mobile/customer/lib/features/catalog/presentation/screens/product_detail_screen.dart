@@ -34,7 +34,7 @@ class _BrowseState extends State<BrowseScreen> {
   late String _cat;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
-  bool _isLoading = false;
+  final bool _isLoading = false;
 
   @override
   void initState() {
@@ -214,7 +214,7 @@ class _BrowseState extends State<BrowseScreen> {
                               childAspectRatio: 2.3,
                             ),
                         itemCount: 6,
-                        itemBuilder: (_, __) => const _SkeletonCard(),
+                        itemBuilder: (_, _) => const _SkeletonCard(),
                       );
                     }
 
