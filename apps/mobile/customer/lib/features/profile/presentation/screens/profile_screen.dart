@@ -1352,14 +1352,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               },
                             ),
                             _divider(),
-                            _menuItem(
-                              Icons.settings_outlined,
-                              'Notification Preferences',
-                              const Color(0xFFE8EAF6),
-                              const Color(0xFF3F51B5),
-                              onTap: () => _showNotificationPrefs(context),
-                            ),
-                            _divider(),
                             // _menuItem(
                             //   Icons.language_outlined,
                             //   'Language - English',
@@ -1472,14 +1464,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         child: Column(
                           children: [
-                            _menuItem(
-                              Icons.help_outline_rounded,
-                              'Help Center',
-                              const Color(0xFFF3E5F5),
-                              const Color(0xFF7B1FA2),
-                              onTap: () => _showHelpCenter(context),
-                            ),
-                            _divider(),
                             _menuItem(
                               Icons.phone_outlined,
                               'Call Us - +91 91487 73591',
