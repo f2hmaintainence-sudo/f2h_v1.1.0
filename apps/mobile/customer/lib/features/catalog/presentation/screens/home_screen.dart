@@ -275,11 +275,6 @@ class _HomeScreenState extends State<HomeScreen>
 
 
 
-                // 5.5. Referral Banner (Invite Friends, Earn Rewards!)
-                const SliverToBoxAdapter(
-                  child: _HomeReferralBanner(),
-                ),
-
                 // 6. One time Product
                 SliverToBoxAdapter(
                   child: Padding(
@@ -377,6 +372,11 @@ class _HomeScreenState extends State<HomeScreen>
                       );
                     },
                   ),
+                ),
+
+                // 6. Referral Banner (Invite Friends, Earn Rewards!)
+                const SliverToBoxAdapter(
+                  child: _HomeReferralBanner(),
                 ),
 
                 // 7. The F2H Promise
