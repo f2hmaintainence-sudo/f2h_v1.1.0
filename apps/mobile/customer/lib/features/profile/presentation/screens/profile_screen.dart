@@ -1150,13 +1150,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Row(
                           children: [
                             _quickAction(
-                              Icons.location_on_outlined,
-                              'Addresses',
+                              Icons.person_outline_rounded,
+                              'Details',
                               const Color(0xFFE8F5E9),
                               const Color(0xFF2E7D32),
                               () {
                                 if (isLoggedIn) {
-                                  AddressSelectorDrawer.show(context);
+                                  _showPersonalDetails(context, profile);
                                 } else {
                                   _showLoginDrawer(context);
                                 }
