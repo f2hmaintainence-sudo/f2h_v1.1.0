@@ -113,7 +113,9 @@ export class CategoriesProductsService {
           p.highlights,
           p.ingredients,
           p.legal_info,
-          p.is_out_of_stock,
+          (COALESCE(p.is_out_of_stock, false) OR COALESCE(sb.is_out_of_stock, false)) AS is_out_of_stock,
+          sb.available_quantity,
+          sb.low_stock_threshold,
           p.is_subscribable,
           p.is_one_time,
           pv.subscription_price,
@@ -123,6 +125,7 @@ export class CategoriesProductsService {
         FROM product_variants pv
         LEFT JOIN products p ON pv.product_id = p.product_id
         LEFT JOIN categories c ON p.category_id = c.category_id
+        LEFT JOIN stock_balances sb ON sb.product_variant_id = pv.variant_id
         LEFT JOIN product_images pi
           ON pi.variant_id = pv.variant_id
           AND pi.is_primary = true
@@ -176,6 +179,12 @@ export class CategoriesProductsService {
           p.name AS product_name,
           p.slug,
           p.description,
+          p.highlights,
+          p.ingredients,
+          p.legal_info,
+          (COALESCE(p.is_out_of_stock, false) OR COALESCE(sb.is_out_of_stock, false)) AS is_out_of_stock,
+          sb.available_quantity,
+          sb.low_stock_threshold,
           p.is_subscribable,
           p.is_one_time,
           pv.subscription_price,
@@ -185,6 +194,7 @@ export class CategoriesProductsService {
         FROM product_variants pv
         LEFT JOIN products p ON pv.product_id = p.product_id
         LEFT JOIN categories c ON p.category_id = c.category_id
+        LEFT JOIN stock_balances sb ON sb.product_variant_id = pv.variant_id
         LEFT JOIN product_images pi
           ON pi.variant_id = pv.variant_id
           AND pi.is_primary = true
@@ -192,7 +202,7 @@ export class CategoriesProductsService {
         WHERE (pv.status = 'active' OR pv.status IS NULL)
           AND (p.is_active = true OR p.is_active IS NULL)
           AND p.deleted_at IS NULL
-          AND (p.category_id = $1 OR c.category_id = $1)
+          AND (p.category_id = $1 OR c.category_id = $1 OR c.name = $1 OR LOWER(c.name) = LOWER($1) OR c.slug = $1 OR LOWER(c.slug) = LOWER($1))
       `;
       const rows = await this.db.query(query, [categoryId]);
 

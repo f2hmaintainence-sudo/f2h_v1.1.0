@@ -424,9 +424,11 @@ export class SubscriptionsService {
           unit_price: item.unit_price,
         });
 
+        const subscriptionItemId = this.makeId('SBI');
         const itemInsertRes = await client.query(
           `
           INSERT INTO subscription_items (
+            subscription_item_id,
             subscription_id,
             product_variant_id,
             unit_price,
@@ -436,10 +438,11 @@ export class SubscriptionsService {
             coupon_amount,
             status
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
-          RETURNING id
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active')
+          RETURNING id, subscription_item_id
           `,
           [
+            subscriptionItemId,
             subscriptionId,
             item.product_variant_id,
             item.unit_price || 0,
@@ -450,7 +453,7 @@ export class SubscriptionsService {
           ],
         );
 
-        const itemId = itemInsertRes.rows?.[0]?.id;
+        const itemId = itemInsertRes.rows?.[0]?.subscription_item_id || subscriptionItemId;
 
         await this.insertWeeklySchedule(client, itemId, subscriptionId, item, body);
 
@@ -593,7 +596,7 @@ export class SubscriptionsService {
         'subscriptions.pause_to_date',
         'subscriptions.created_at',
         'subscriptions.updated_at',
-        'subscription_items.id AS subscription_item_id',
+        'COALESCE(subscription_items.subscription_item_id, subscription_items.id::text) AS subscription_item_id',
         'subscription_items.product_variant_id',
         'subscription_items.unit_price',
         'subscription_items.discount_id',
@@ -603,8 +606,6 @@ export class SubscriptionsService {
         'subscription_items.final_price',
         'subscription_items.is_free',
         'subscription_items.status AS item_status',
-        'subscription_items.start_date AS item_start_date',
-        'subscription_items.end_date AS item_end_date',
         'product_variants.product_id',
         'product_variants.name',
         'product_variants.sku',
@@ -613,7 +614,6 @@ export class SubscriptionsService {
         'product_variants.unit_value',
         'product_variants.unit_type',
         'product_variants.fulfillment_mode',
-        'product_variants.is_out_of_stock',
         'product_variants.manageable_qty',
         'product_variants.sort_order',
         'product_variants.variant_id',
@@ -825,12 +825,20 @@ export class SubscriptionsService {
         throw new BadRequestException('Subscription not found');
       }
 
-      const updateData: any = { updated_at: new Date().toISOString() };
+      const updateData: any = {
+        status: 'paused',
+        updated_at: new Date().toISOString(),
+      };
       if (startDate) updateData.pause_from_date = startDate;
       if (endDate) updateData.pause_to_date = endDate;
 
       await this.data.query('subscriptions', {
         update: updateData,
+        where: [{ column: 'subscription_id', operator: '=', value: subscriptionId }],
+      }, true);
+
+      await this.data.query('subscription_items', {
+        update: { status: 'paused', updated_at: new Date().toISOString() },
         where: [{ column: 'subscription_id', operator: '=', value: subscriptionId }],
       }, true);
 
