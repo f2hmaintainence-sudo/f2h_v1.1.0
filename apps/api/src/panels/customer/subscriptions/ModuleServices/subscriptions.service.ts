@@ -647,7 +647,7 @@ export class SubscriptionsService {
     });
 
     const items = subsDetails.data || [];
-    const baseUrl = process.env.BACKEND_URL || 'http://localhost:8000';
+    const baseUrl = process.env.BACKEND_URL || 'http://localhost:5001';
     if (items.length === 0) {
       this.developer.debug('SubscriptionsService.getSubscriptions no subscriptions found for customer', { customer_id: customer.customer_id });
       return { status: true, data: [] };

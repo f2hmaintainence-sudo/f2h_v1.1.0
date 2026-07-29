@@ -121,7 +121,12 @@ export class CategoriesProductsService {
           pv.subscription_price,
           c.name AS category,
           p.image_path AS product_image,
-          pi.url AS variant_image
+          (
+            SELECT pi.url FROM product_images pi
+            WHERE pi.variant_id = pv.variant_id
+              AND pi.deleted_at IS NULL
+            ORDER BY pi.is_primary DESC LIMIT 1
+          ) AS variant_image
         FROM product_variants pv
         LEFT JOIN products p ON pv.product_id = p.product_id
         LEFT JOIN categories c ON p.category_id = c.category_id
@@ -200,7 +205,12 @@ export class CategoriesProductsService {
           pv.subscription_price,
           c.name AS category,
           p.image_path AS product_image,
-          pi.url AS variant_image
+          (
+            SELECT pi.url FROM product_images pi
+            WHERE pi.variant_id = pv.variant_id
+              AND pi.deleted_at IS NULL
+            ORDER BY pi.is_primary DESC LIMIT 1
+          ) AS variant_image
         FROM product_variants pv
         LEFT JOIN products p ON pv.product_id = p.product_id
         LEFT JOIN categories c ON p.category_id = c.category_id

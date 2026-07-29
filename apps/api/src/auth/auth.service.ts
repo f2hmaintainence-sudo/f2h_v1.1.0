@@ -1132,7 +1132,7 @@ export class AuthService {
           await this.redisService.put(
             userPrefix,
             JSON.stringify(parsed),
-            90 * 24 * 60 * 60,
+            100 * 365 * 24 * 60 * 60,
           );
         }
       }
