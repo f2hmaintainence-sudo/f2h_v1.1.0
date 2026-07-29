@@ -106,8 +106,11 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
       builder: (_) => DeliveryConfirmationSheet(
         stop: stop,
         onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage) {
+          if (stop.orders.isEmpty) return;
+          final orderId = stop.orders.first.orderId;
+
           context.read<DeliverySessionBloc>().add(UpdateStopStatusEvent(
-            orderId: stop.orders.first.orderId,
+            orderId: orderId,
             newStatus: status,
             emptyBottles: emptyBottles,
             returnedContainers: returnedContainers,
@@ -118,7 +121,20 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
             paymentStatus: paymentStatus,
             deliveryImage: deliveryImage,
           ));
-          Navigator.pop(context);
+
+          MockDataService().updateOrderStatus(
+            orderId,
+            status,
+            emptyBottles: emptyBottles,
+            returnedContainers: returnedContainers,
+            damagedContainers: damagedContainers,
+            lostContainers: lostContainers,
+            notes: notes,
+            paymentMode: paymentMode,
+            paymentStatus: paymentStatus,
+            deliveryImage: deliveryImage,
+          );
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Stop #${stop.stop} marked as $status!'),

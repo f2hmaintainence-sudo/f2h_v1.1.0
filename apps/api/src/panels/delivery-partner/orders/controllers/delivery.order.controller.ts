@@ -28,9 +28,11 @@ import * as fs from 'fs';
 import { FirstOrderDetectorService } from '../../../customer/referral/services/first-order-detector.service';
 import { ReferralRewardEngineService } from '../../../customer/referral/services/referral-reward-engine.service';
 
+import { OnModuleInit } from '@nestjs/common';
+
 @Controller({ path: 'delivery/orders', version: '1' })
 @UseGuards(JwtAuthGuard)
-export class DeliveryOrderController {
+export class DeliveryOrderController implements OnModuleInit {
   constructor(
     private readonly db: DatabaseService,
     private readonly pushNotificationService: PushNotificationService,
@@ -38,6 +40,23 @@ export class DeliveryOrderController {
     private readonly firstOrderDetector: FirstOrderDetectorService,
     private readonly referralRewardEngine: ReferralRewardEngineService,
   ) { }
+
+  async onModuleInit() {
+    try {
+      await this.db.query(`
+        CREATE TABLE IF NOT EXISTS order_status_logs (
+          id SERIAL PRIMARY KEY,
+          order_id VARCHAR(100) NOT NULL,
+          status VARCHAR(50) NOT NULL,
+          notes TEXT,
+          changed_by VARCHAR(100),
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+      `);
+    } catch (e) {
+      this.developer.error('Failed to ensure order_status_logs table exists', e);
+    }
+  }
 
   private cleanDeliveryImagePath(imageUrl: string | null | undefined): string | null {
     if (!imageUrl) return null;
@@ -58,13 +77,21 @@ export class DeliveryOrderController {
 
   private async resolveDeliveryPartner(userId: string) {
     const boyRes = await this.db.query(
-      `SELECT id, user_id, full_name, branch_id FROM delivery_partners WHERE user_id = $1 OR delivery_partner_id = $1 LIMIT 1`,
+      `SELECT id, user_id, delivery_partner_id, full_name, branch_id, is_active FROM delivery_partners WHERE user_id = $1 OR delivery_partner_id = $1 OR id::text = $1 LIMIT 1`,
       [userId],
     );
     if (!boyRes?.length) {
       throw new NotFoundException('Delivery boy profile not found for this account');
     }
     return boyRes[0];
+  }
+
+  private getPartnerIdentifiers(boy: any): string[] {
+    const ids = [String(boy.id), String(boy.user_id)];
+    if (boy.delivery_partner_id) {
+      ids.push(String(boy.delivery_partner_id));
+    }
+    return [...new Set(ids.filter(Boolean))];
   }
 
   private async buildDeliveryResponses(orders: any[]) {
@@ -193,7 +220,7 @@ export class DeliveryOrderController {
     if (!identifier) return null;
     const idStr = String(identifier);
     const runRes = await this.db.query(
-      `SELECT id, run_id, status, delivery_slot AS slot, run_date, branch_id
+      `SELECT id, run_id, status, delivery_slot AS slot, run_date, branch_id, delivery_partner_id
        FROM delivery_runs
        WHERE id::text = $1 OR run_id::text = $1
        LIMIT 1`,
@@ -207,12 +234,13 @@ export class DeliveryOrderController {
 
 
   private async findDeliveryRunByIdAndBoy(runId: string, boy: any) {
+    const partnerIds = this.getPartnerIdentifiers(boy);
     const runRes = await this.db.query(
       `SELECT id, run_id, status, delivery_slot AS slot, run_date, branch_id FROM delivery_runs
-       WHERE delivery_partner_id = $1
+       WHERE (delivery_partner_id::text = ANY($1::text[]) OR id::text = $2::text OR run_id::text = $2::text)
          AND (id::text = $2::text OR run_id::text = $2::text)
        LIMIT 1`,
-      [String(boy.user_id), runId],
+      [partnerIds, runId],
     );
     if (!runRes?.length) {
       throw new NotFoundException('Delivery run not found');
@@ -354,7 +382,8 @@ export class DeliveryOrderController {
         [
           params.runIdentifier, params.customerId, orderId, params.addressId,
           params.deliveryPartnerId, params.deliveryDate, params.slot,
-          JSON.stringify(params.itemsJson), norm.deliveryImage,
+          JSON.stringify(params.itemsJson),
+          norm.deliveryImage ? path.basename(norm.deliveryImage).substring(0, 30) : null,
           norm.bottles, cashCollected, norm.notes,
           norm.latitude, norm.longitude, status,
           norm.returnedContainers, norm.damagedContainers,
@@ -602,15 +631,34 @@ export class DeliveryOrderController {
     );
     if (!orderRes?.length) throw new NotFoundException('Order not found');
     const order = orderRes[0];
-    if (['delivered', 'cancelled'].includes(order.status)) {
-      throw new ForbiddenException('Order already completed');
+    if (['delivered', 'cancelled', 'failed'].includes(order.status)) {
+      return { status: true, message: 'Order already completed', order_id: orderId };
     }
     // Match on both possible delivery-boy identifier forms, same as every
     // other query in this controller, and compare as strings — the previous
     // strict `!==` check could reject a legitimate match purely on type
     // mismatch (e.g. numeric id vs string id).
+    const partnerIds = this.getPartnerIdentifiers(boy);
     const orderOwner = String(order.delivery_partner_id ?? '');
-    if (orderOwner !== String(boy.id) && orderOwner !== String(boy.user_id)) {
+    const isOwner = partnerIds.includes(orderOwner);
+    let isRunOwner = false;
+    if (order.delivery_session_id) {
+      const resolvedRun = await this.resolveRunByIdentifier(order.delivery_session_id);
+      if (resolvedRun) {
+        const runOwner = String(resolvedRun.run.delivery_partner_id ?? '');
+        isRunOwner = partnerIds.includes(runOwner);
+      }
+    }
+    // Pass if any of:
+    //  (a) isOwner        — order.delivery_partner_id directly matches this partner
+    //  (b) isRunOwner     — the run is owned by this partner (now works because
+    //                       resolveRunByIdentifier fetches delivery_partner_id)
+    //  (c) isRunLinked    — order was dispatched via a run; startTodayRun may have
+    //                       written user_id while admin stored delivery_partners.id,
+    //                       so trust the run linkage when direct column doesn't match
+    //  (d) orderOwner=''  — no partner assigned yet (open order), allow update
+    const isRunLinked = !!order.delivery_session_id;
+    if (!isOwner && !isRunOwner && !isRunLinked && orderOwner !== '') {
       throw new ForbiddenException('Order not assigned to this delivery partner');
     }
 
@@ -618,11 +666,6 @@ export class DeliveryOrderController {
     const norm = this.normalizeDeliveryBody(body);
 
     await this.db.transaction(async (client) => {
-      // WHERE also re-checks status here (not just in the pre-check above) to
-      // close a race window: two concurrent requests for the same order could
-      // both pass the earlier "not already completed" check before either
-      // writes. This guard makes the second one a safe no-op instead of
-      // silently overwriting a terminal state.
       const updateRes = await client.query(
         `UPDATE orders 
          SET status = $1, 
@@ -631,19 +674,20 @@ export class DeliveryOrderController {
              delivery_image = COALESCE($4, delivery_image),
              updated_at = NOW() 
          WHERE order_id = $5
-           AND status NOT IN ('delivered', 'cancelled')`,
+           AND status IN ('assigned', 'out_for_delivery', 'confirmed', 'packed', 'pending', 'placed')`,
         [newStatus, norm.paymentMode, norm.paymentStatus, norm.deliveryImage, orderId],
       );
-      if (!updateRes?.rowCount) {
-        throw new ForbiddenException('Order already completed');
-      }
 
       // Log status change
-      await client.query(
-        `INSERT INTO order_status_logs (order_id, status, notes, changed_by, created_at)
-         VALUES ($1, $2, $3, $4, NOW())`,
-        [orderId, newStatus, body.notes || null, String(boy.user_id)],
-      );
+      try {
+        await client.query(
+          `INSERT INTO order_status_logs (order_id, status, notes, changed_by, created_at)
+           VALUES ($1, $2, $3, $4, NOW())`,
+          [orderId, newStatus, body.notes || null, String(boy.user_id)],
+        );
+      } catch (err) {
+        this.developer.error('Failed to log order status change in order_status_logs', err);
+      }
 
 
       const resolvedRun = order.delivery_session_id
@@ -677,7 +721,7 @@ export class DeliveryOrderController {
 
         await this.upsertDeliveryLog(client, {
           orderId, runIdentifier, customerId: order.customer_id,
-          addressId: order.address_id, deliveryPartnerId: String(boy.id),
+          addressId: order.address_id, deliveryPartnerId: boy.delivery_partner_id || String(boy.user_id),
           deliveryDate: order.scheduled_date || new Date().toISOString().split('T')[0],
           slot: (order.delivery_slot || 'morning').substring(0, 5),
           itemsJson, status: newStatus, norm, cashCollected,
@@ -736,7 +780,7 @@ export class DeliveryOrderController {
         const pendingCount = parseInt(pendingRes.rows[0]?.pending_count || '0', 10);
         if (pendingCount === 0) {
           await client.query(
-            `UPDATE delivery_runs SET status = 'completed', completed_at = NOW(), updated_at = NOW() WHERE id::text = ANY($1) OR run_id::text = ANY($1)`,
+            `UPDATE delivery_runs SET status = 'completed', actual_end_time = NOW(), updated_at = NOW() WHERE id::text = ANY($1) OR run_id::text = ANY($1)`,
             [runIds],
           );
         }
@@ -802,6 +846,25 @@ export class DeliveryOrderController {
     const boy = await this.resolveDeliveryPartner(userId);
     const { targetDate, targetSlot } = this.getKolkataDateAndSlot(dateParam);
 
+    const isActive = boy.is_active === true || boy.is_active === 1 || String(boy.is_active).toLowerCase() === 'true';
+    if (!isActive) {
+      this.developer.debug('getTodayRun: Delivery partner is inactive, returning empty run', { userId });
+      return {
+        status: true,
+        is_active: false,
+        delivery_partner: {
+          id: boy.id,
+          name: boy.full_name,
+        },
+        date: targetDate,
+        run_id: null,
+        run_status: null,
+        total: 0,
+        deliveries: [],
+        message: 'Delivery partner is inactive/off-duty.',
+      };
+    }
+
     this.developer.debug('getTodayRun: Parameters resolved', {
       deliveryPartnerId: boy.id,
       deliveryPartnerName: boy.full_name,
@@ -810,15 +873,16 @@ export class DeliveryOrderController {
       targetSlot,
     });
 
+    const partnerIds = this.getPartnerIdentifiers(boy);
     const runs = await this.db.query(
       `SELECT id, run_id, status, delivery_slot, run_date
      FROM delivery_runs
-     WHERE delivery_partner_id = $1
-       AND DATE(run_date AT TIME ZONE 'Asia/Kolkata') = $2::date
+     WHERE delivery_partner_id::text = ANY($1::text[])
+       AND run_date::date = $2::date
        AND delivery_slot = $3
        AND status != 'cancelled'
      ORDER BY run_date DESC, created_at DESC`,
-      [String(boy.user_id), targetDate, targetSlot],
+      [partnerIds, targetDate, targetSlot],
     );
 
     this.developer.debug('getTodayRun: Queried delivery runs', {
@@ -841,6 +905,8 @@ export class DeliveryOrderController {
         }
       }
     }
+
+    const runIds = runs?.flatMap((r: any) => [String(r.id), String(r.run_id)].filter(Boolean)) || [];
 
     this.developer.debug('getTodayRun: Active run state resolved', {
       activeRunId,
@@ -904,17 +970,21 @@ export class DeliveryOrderController {
        ON drc.customer_id = c.id
      LEFT JOIN delivery_routes r
        ON r.id = drc.route_id
-      WHERE o.delivery_partner_id = $1
+      WHERE (
+        o.delivery_partner_id::text = ANY($1::text[])
+        OR (cardinality($5::text[]) > 0 AND o.delivery_run_id::text = ANY($5::text[]))
+      )
         AND o.status = ANY($3)
-        AND DATE(o.scheduled_date AT TIME ZONE 'Asia/Kolkata') = $2::date
+        AND o.scheduled_date::date = $2::date
         AND o.delivery_slot = $4
       ORDER BY o.run_sequence ASC NULLS LAST,
                o.created_at ASC`,
       [
-        String(boy.user_id),
+        partnerIds,
         targetDate,
         orderStatuses,
         targetSlot,
+        runIds,
       ],
     );
 
@@ -992,9 +1062,9 @@ export class DeliveryOrderController {
     const runIdentifier = run.run_id || String(run.id);
 
     await this.db.transaction(async (client) => {
-      // Set run started_at and status = 'in_progress'
+      // Set run actual_start_time and status = 'in_progress'
       await client.query(
-        `UPDATE delivery_runs SET status = 'in_progress', started_at = NOW(), updated_at = NOW() WHERE id = $1`,
+        `UPDATE delivery_runs SET status = 'in_progress', actual_start_time = NOW(), updated_at = NOW() WHERE id = $1`,
         [run.id],
       );
 
@@ -1032,6 +1102,8 @@ export class DeliveryOrderController {
     @Param('addressId') addressId: string,
     @Body()
     body: {
+      order_id?: string;
+      orderId?: string;
       status: 'delivered' | 'failed' | 'partial' | 'skipped';
       notes?: string;
       remarks?: string;
@@ -1059,20 +1131,97 @@ export class DeliveryOrderController {
 
     // Resolve delivery boy
     const boy = await this.resolveDeliveryPartner(userId);
-
+    const partnerIds = this.getPartnerIdentifiers(boy);
     const run = await this.findDeliveryRunByIdAndBoy(runId, boy);
     const runIdentifier = run.run_id || String(run.id);
     const runIds = this.getRunIdentifiers(run);
 
-    // Find the orders directly from orders matching delivery_partner_id and address_id
-    const addressRes = await this.db.query(
+    const targetOrderId = body.order_id || body.orderId || null;
+
+    // Find the orders matching delivery_partner_id or run_id and address_id/order_id
+    let addressRes = await this.db.query(
       `SELECT order_id, customer_id, address_id, status, delivery_run_id FROM orders
-       WHERE delivery_partner_id = $1
-         AND address_id = $2::text
+       WHERE (
+         delivery_partner_id::text = ANY($1::text[])
+         OR delivery_run_id::text = ANY($2::text[])
+         OR ($4::text IS NOT NULL AND order_id::text = $4::text)
+       )
+         AND (
+           address_id = $3::text
+           OR ($4::text IS NOT NULL AND order_id::text = $4::text)
+           OR address_id IN (
+             SELECT id::text FROM customer_addresses WHERE id::text = $3::text OR address_id = $3::text
+             UNION
+             SELECT address_id FROM customer_addresses WHERE id::text = $3::text OR address_id = $3::text
+           )
+         )
          AND status NOT IN ('cancelled', 'delivered', 'failed')`,
-      [boy.user_id, addressId],
+      [partnerIds, runIds, addressId, targetOrderId],
     );
-    if (!addressRes?.length) throw new NotFoundException('Address stop not found in delivery run');
+
+    if (!addressRes?.length && targetOrderId) {
+      const directOrderRes = await this.db.query(
+        `SELECT order_id, customer_id, address_id, status, delivery_run_id FROM orders WHERE order_id::text = $1::text`,
+        [targetOrderId],
+      );
+      if (directOrderRes?.length) {
+        addressRes = directOrderRes;
+      }
+    }
+
+    if (addressRes?.length) {
+      const customerIds = [...new Set(addressRes.map((o) => o.customer_id).filter(Boolean))];
+      const addressIds = [...new Set(addressRes.map((o) => o.address_id).filter(Boolean))];
+
+      // Expand to ALL pending orders at the same customer or address stop
+      const allStopOrdersRes = await this.db.query(
+        `SELECT order_id, customer_id, address_id, status, delivery_run_id FROM orders
+         WHERE (
+           delivery_partner_id::text = ANY($1::text[])
+           OR delivery_run_id::text = ANY($2::text[])
+           OR ($5::text IS NOT NULL AND order_id::text = $5::text)
+         )
+         AND (
+           customer_id = ANY($3)
+           OR address_id = ANY($4)
+           OR address_id = $6::text
+         )
+         AND status NOT IN ('cancelled', 'delivered', 'failed')`,
+        [partnerIds, runIds, customerIds, addressIds, targetOrderId, addressId],
+      );
+      if (allStopOrdersRes?.length) {
+        addressRes = allStopOrdersRes;
+      }
+    }
+
+    if (!addressRes?.length) {
+      // If no pending orders, check if orders at this address were already completed
+      const completedRes = await this.db.query(
+        `SELECT order_id, status FROM orders
+         WHERE (
+           delivery_partner_id::text = ANY($1::text[])
+           OR delivery_run_id::text = ANY($2::text[])
+           OR ($4::text IS NOT NULL AND order_id::text = $4::text)
+         )
+           AND (
+             address_id = $3::text
+             OR ($4::text IS NOT NULL AND order_id::text = $4::text)
+             OR address_id IN (
+               SELECT id::text FROM customer_addresses WHERE id::text = $3::text OR address_id = $3::text
+               UNION
+               SELECT address_id FROM customer_addresses WHERE id::text = $3::text OR address_id = $3::text
+             )
+           )`,
+        [partnerIds, runIds, addressId, targetOrderId],
+      );
+      if (completedRes?.length) {
+        return {
+          status: true,
+          message: 'Stop address orders are already completed or updated.',
+        };
+      }
+      throw new NotFoundException('Address stop not found in delivery run');
+    }
     const stopAddress = addressRes[0];
 
     const newStatus = body.status;
@@ -1138,7 +1287,7 @@ export class DeliveryOrderController {
 
         await this.upsertDeliveryLog(client, {
           orderId, runIdentifier, customerId: stopAddress.customer_id,
-          addressId, deliveryPartnerId: String(boy.user_id),
+          addressId, deliveryPartnerId: boy.delivery_partner_id || String(boy.user_id),
           deliveryDate: run.run_date,
           slot: (run.slot || 'morning').substring(0, 5),
           itemsJson: orderItemsJson, status: newStatus, norm, cashCollected: orderCashCollected,
@@ -1146,12 +1295,8 @@ export class DeliveryOrderController {
       }
 
       // 4. Map and update each order status
-      // Status mapping: delivered -> delivered, failed -> failed, partial -> out_for_delivery, skipped -> pending
-      let orderMappedStatus = 'pending';
-      if (newStatus === 'delivered') orderMappedStatus = 'delivered';
-      else if (newStatus === 'failed') orderMappedStatus = 'failed';
-      else if (newStatus === 'partial') orderMappedStatus = 'delivered'; // default to delivered per decision
-      else if (newStatus === 'skipped') orderMappedStatus = 'pending';
+      // Status mapping: delivered -> delivered, failed -> failed, partial -> delivered, skipped -> pending
+      let orderMappedStatus = newStatus === 'failed' ? 'failed' : (newStatus === 'skipped' ? 'pending' : 'delivered');
 
       await client.query(
         `UPDATE orders
@@ -1160,17 +1305,22 @@ export class DeliveryOrderController {
              payment_status = COALESCE($3, payment_status),
              delivery_image = COALESCE($4, delivery_image),
              updated_at = NOW()
-         WHERE order_id = ANY($5)`,
+         WHERE order_id = ANY($5)
+           AND status IN ('assigned', 'out_for_delivery', 'confirmed', 'packed', 'pending', 'placed')`,
         [orderMappedStatus, norm.paymentMode, norm.paymentStatus, norm.deliveryImage, orderIds],
       );
 
       // Log status changes in order_status_logs
       for (const orderId of orderIds) {
-        await client.query(
-          `INSERT INTO order_status_logs (order_id, status, notes, changed_by, created_at)
-           VALUES ($1, $2, $3, $4, NOW())`,
-          [orderId, orderMappedStatus, norm.notes, String(boy.user_id)],
-        );
+        try {
+          await client.query(
+            `INSERT INTO order_status_logs (order_id, status, notes, changed_by, created_at)
+             VALUES ($1, $2, $3, $4, NOW())`,
+            [orderId, orderMappedStatus, norm.notes, String(boy.user_id)],
+          );
+        } catch (err) {
+          this.developer.error('Failed to log order status change in order_status_logs', err);
+        }
       }
 
       // 5. Update delivery_dispatch_items delivered quantities
@@ -1186,7 +1336,7 @@ export class DeliveryOrderController {
              SET delivered_qty = delivered_qty + $1,
                  updated_at = NOW()
              WHERE delivery_run_id = $2 AND product_variant_id = $3`,
-            [qty, run.id, variantId],
+            [qty, runIdentifier, variantId],
           );
         }
       }
@@ -1217,69 +1367,6 @@ export class DeliveryOrderController {
         }
       }
 
-      // Send push notification if marked delivered/partial
-      if (['delivered', 'partial'].includes(newStatus)) {
-        try {
-          const uniqueCustomerIds = [...new Set(orders.map((o: any) => o.customer_id))];
-          await this.pushNotificationService.sendNotificationToUsers(
-            uniqueCustomerIds,
-            {
-              title: 'Delivery Confirmed! ✅',
-              body: 'Your F2H Fresh order has been successfully delivered. Thank you!',
-            }
-          );
-
-          // S3.3: Arriving Soon push for next 1-3 upcoming stops in the run
-          const currentRunId = addressRes[0]?.delivery_run_id;
-          const currentSequence = addressRes[0]?.run_sequence || 0;
-          if (currentRunId) {
-            const upcomingOrders = await this.db.query(
-              `SELECT DISTINCT customer_id, run_sequence
-               FROM orders
-               WHERE delivery_run_id = $1
-                 AND run_sequence > $2
-                 AND status NOT IN ('delivered', 'failed', 'cancelled')
-                 AND (is_arriving_notified IS FALSE OR is_arriving_notified IS NULL)
-               ORDER BY run_sequence ASC
-               LIMIT 3`,
-              [currentRunId, currentSequence]
-            );
-            if (upcomingOrders?.length) {
-              for (const upcoming of upcomingOrders) {
-                const stopsAway = Math.max(1, (upcoming.run_sequence || 0) - currentSequence);
-                await this.pushNotificationService.sendNotificationToUsers(
-                  [upcoming.customer_id],
-                  {
-                    title: '🚴 Arriving Soon!',
-                    body: `Your F2H Fresh delivery is arriving soon (approx. ${stopsAway * 4} min, ${stopsAway} stop${stopsAway > 1 ? 's' : ''} away)!`,
-                  }
-                );
-              }
-              const notifiedCustIds = upcomingOrders.map((u: any) => u.customer_id);
-              await this.db.query(
-                `UPDATE orders SET is_arriving_notified = TRUE WHERE delivery_run_id = $1 AND customer_id = ANY($2)`,
-                [currentRunId, notifiedCustIds]
-              );
-            }
-          }
-        } catch (err) {
-          console.error('Failed to send delivery confirmation notification:', err);
-        }
-      } else if (newStatus === 'failed') {
-        try {
-          const uniqueCustomerIds = [...new Set(orders.map((o: any) => o.customer_id))];
-          await this.pushNotificationService.sendNotificationToUsers(
-            uniqueCustomerIds,
-            {
-              title: 'Delivery Attempt Failed ⚠️',
-              body: `We could not complete your delivery. Reason: ${norm.notes || 'Driver was unable to reach'}. Please contact support.`,
-            }
-          );
-        } catch (err) {
-          console.error('Failed to send delivery failure notification:', err);
-        }
-      }
-
       // Check if all address stops are non-pending to auto-complete the run for all involved runs
       for (const runIdVal of runIdsToUpdate) {
         // FIX: cast $1 consistently everywhere it's used, otherwise Postgres
@@ -1297,7 +1384,6 @@ export class DeliveryOrderController {
           await client.query(
             `UPDATE delivery_runs
              SET status = 'completed',
-                 completed_at = NOW(),
                  actual_end_time = NOW(),
                  updated_at = NOW()
              WHERE run_id::text = $1::text OR id::text = $1::text`,
@@ -1306,6 +1392,69 @@ export class DeliveryOrderController {
         }
       }
     });
+
+    // Send push notification if marked delivered/partial (Moved OUTSIDE transaction to prevent DB lock contention & timeout)
+    if (['delivered', 'partial'].includes(newStatus)) {
+      try {
+        const uniqueCustomerIds = [...new Set(orders.map((o: any) => o.customer_id))];
+        await this.pushNotificationService.sendNotificationToUsers(
+          uniqueCustomerIds,
+          {
+            title: 'Delivery Confirmed! ✅',
+            body: 'Your F2H Fresh order has been successfully delivered. Thank you!',
+          }
+        );
+
+        // S3.3: Arriving Soon push for next 1-3 upcoming stops in the run
+        const currentRunId = addressRes[0]?.delivery_run_id;
+        const currentSequence = addressRes[0]?.run_sequence || 0;
+        if (currentRunId) {
+          const upcomingOrders = await this.db.query(
+            `SELECT DISTINCT customer_id, run_sequence
+             FROM orders
+             WHERE delivery_run_id = $1
+               AND run_sequence > $2
+               AND status NOT IN ('delivered', 'failed', 'cancelled')
+               AND (is_arriving_notified IS FALSE OR is_arriving_notified IS NULL)
+             ORDER BY run_sequence ASC
+             LIMIT 3`,
+            [currentRunId, currentSequence]
+          );
+          if (upcomingOrders?.length) {
+            for (const upcoming of upcomingOrders) {
+              const stopsAway = Math.max(1, (upcoming.run_sequence || 0) - currentSequence);
+              await this.pushNotificationService.sendNotificationToUsers(
+                [upcoming.customer_id],
+                {
+                  title: '🚴 Arriving Soon!',
+                  body: `Your F2H Fresh delivery is arriving soon (approx. ${stopsAway * 4} min, ${stopsAway} stop${stopsAway > 1 ? 's' : ''} away)!`,
+                }
+              );
+            }
+            const notifiedCustIds = upcomingOrders.map((u: any) => u.customer_id);
+            await this.db.query(
+              `UPDATE orders SET is_arriving_notified = TRUE WHERE delivery_run_id = $1 AND customer_id = ANY($2)`,
+              [currentRunId, notifiedCustIds]
+            );
+          }
+        }
+      } catch (err) {
+        console.error('Failed to send delivery confirmation notification:', err);
+      }
+    } else if (newStatus === 'failed') {
+      try {
+        const uniqueCustomerIds = [...new Set(orders.map((o: any) => o.customer_id))];
+        await this.pushNotificationService.sendNotificationToUsers(
+          uniqueCustomerIds,
+          {
+            title: 'Delivery Attempt Failed ⚠️',
+            body: `We could not complete your delivery. Reason: ${norm.notes || 'Driver was unable to reach'}. Please contact support.`,
+          }
+        );
+      } catch (err) {
+        console.error('Failed to send delivery failure notification:', err);
+      }
+    }
 
     return {
       status: true,
@@ -1334,7 +1483,7 @@ export class DeliveryOrderController {
     }
 
     await this.db.query(
-      `UPDATE delivery_runs SET status = 'completed', completed_at = NOW(), updated_at = NOW() WHERE id = $1`,
+      `UPDATE delivery_runs SET status = 'completed', actual_end_time = NOW(), updated_at = NOW() WHERE id = $1`,
       [run.id],
     );
 
@@ -1353,15 +1502,30 @@ export class DeliveryOrderController {
       const boy = await this.resolveDeliveryPartner(userId);
       const { targetDate, targetSlot } = this.getKolkataDateAndSlot(dateParam);
 
+      const isActive = boy.is_active === true || boy.is_active === 1 || String(boy.is_active).toLowerCase() === 'true';
+      if (!isActive) {
+        return {
+          status: true,
+          is_active: false,
+          run_id: null,
+          slot: targetSlot,
+          items: [],
+          total_items: 0,
+          total_units: 0,
+          message: 'Delivery partner is inactive/off-duty.',
+        };
+      }
+
       // Find all active delivery runs assigned to this delivery partner
+      const partnerIds = this.getPartnerIdentifiers(boy);
       const runs = await this.db.query(
         `SELECT id, run_id, status, delivery_slot AS slot, run_date FROM delivery_runs
-         WHERE delivery_partner_id = $1
+         WHERE delivery_partner_id::text = ANY($1::text[])
            AND DATE(run_date AT TIME ZONE 'Asia/Kolkata') = $2::date
            AND delivery_slot = $3
            AND status NOT IN ('completed', 'handed_over', 'cancelled')
          ORDER BY run_date DESC, created_at DESC`,
-        [String(boy.user_id), targetDate, targetSlot]
+        [partnerIds, targetDate, targetSlot]
       );
 
       let runIds: string[] = [];
@@ -1420,11 +1584,11 @@ export class DeliveryOrderController {
          FROM orders o
          JOIN customers c ON c.customer_id = o.customer_id
          LEFT JOIN customer_addresses ca ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
-         WHERE o.delivery_partner_id = $1
+         WHERE o.delivery_partner_id::text = ANY($1::text[])
            AND DATE(o.scheduled_date AT TIME ZONE 'Asia/Kolkata') = $2::date
            AND o.status IN ('confirmed', 'out_for_delivery', 'assigned', 'packed')
            AND o.delivery_slot = $3`,
-        [String(boy.user_id), targetDate, targetSlot]
+        [partnerIds, targetDate, targetSlot]
       );
 
       const directStops = directOrders || [];
@@ -1768,13 +1932,13 @@ export class DeliveryOrderController {
     const boy = await this.resolveDeliveryPartner(userId);
     const targetDate = new Date().toISOString().split('T')[0];
 
-    // Fetch all confirmed orders assigned to this boy for today
+    const partnerIds = this.getPartnerIdentifiers(boy);
     const pendingRes = await this.db.query(
       `SELECT order_id FROM orders
-       WHERE delivery_partner_id = $1
-         AND status = 'confirmed'
+       WHERE delivery_partner_id::text = ANY($1::text[])
+         AND status IN ('confirmed', 'assigned', 'packed')
          AND DATE(scheduled_date) <= $2::date`,
-      [String(boy.user_id), targetDate],
+      [partnerIds, targetDate],
     );
 
     if (!pendingRes?.length) {
@@ -1799,13 +1963,17 @@ export class DeliveryOrderController {
       );
 
       // Bulk insert status logs
-      await client.query(
-        `INSERT INTO order_status_logs (order_id, status, notes, changed_by, created_at)
-         SELECT oid, 'out_for_delivery', 'Rider confirmed pickup — marked out for delivery', $2, NOW()
-         FROM unnest($1::text[]) AS oid
-         ON CONFLICT DO NOTHING`,
-        [orderIds, String(boy.user_id)],
-      );
+      try {
+        await client.query(
+          `INSERT INTO order_status_logs (order_id, status, notes, changed_by, created_at)
+           SELECT oid, 'out_for_delivery', 'Rider confirmed pickup — marked out for delivery', $2, NOW()
+           FROM unnest($1::text[]) AS oid
+           ON CONFLICT DO NOTHING`,
+          [orderIds, String(boy.user_id)],
+        );
+      } catch (err) {
+        this.developer.error('Failed to bulk log order status changes in order_status_logs', err);
+      }
     });
 
     return {

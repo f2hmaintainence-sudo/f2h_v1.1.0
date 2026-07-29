@@ -8,6 +8,8 @@ import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/delivery_confirmation_sheet.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/report_issue_screen.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class OrderDetailScreen extends StatefulWidget {
@@ -141,8 +143,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       builder: (_) => DeliveryConfirmationSheet(
         stop: _currentStop,
         onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage) {
+          if (_currentStop.orders.isEmpty) return;
+          final orderId = _currentStop.orders.first.orderId;
+
+          context.read<DeliverySessionBloc>().add(UpdateStopStatusEvent(
+            orderId: orderId,
+            newStatus: status,
+            emptyBottles: emptyBottles,
+            returnedContainers: returnedContainers,
+            damagedContainers: damagedContainers,
+            lostContainers: lostContainers,
+            notes: notes,
+            paymentMode: paymentMode,
+            paymentStatus: paymentStatus,
+            deliveryImage: deliveryImage,
+          ));
+
           _dataService.updateOrderStatus(
-            _currentStop.orders.first.orderId,
+            orderId,
             status,
             emptyBottles: emptyBottles,
             returnedContainers: returnedContainers,
@@ -153,10 +171,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             paymentStatus: paymentStatus,
             deliveryImage: deliveryImage,
           );
-          final messenger = ScaffoldMessenger.of(context);
-          Navigator.pop(context); // Pop bottom sheet
-          Navigator.pop(context); // Pop order detail screen
-          messenger.showSnackBar(
+
+          if (mounted && Navigator.canPop(context)) {
+            Navigator.pop(context); // Pop order detail screen if still open
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Stop #${_currentStop.stop} marked as $status!'),
               backgroundColor: status == 'delivered' ? kSuccess : kDanger,

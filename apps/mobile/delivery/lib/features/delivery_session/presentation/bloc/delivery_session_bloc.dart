@@ -185,7 +185,10 @@ class DeliverySessionBloc
     emit(current.copyWith(isOnline: event.val));
     try {
       final dioClient = sl<DioClient>();
-      await dioClient.dio.post('/DeliveryPartner/auth/shift-toggle');
+      await dioClient.dio.post(
+        '/DeliveryPartner/auth/shift-toggle',
+        data: {'is_active': event.val},
+      );
 
       final trackingService = sl<LocationTrackingService>();
       if (event.val) {
@@ -193,9 +196,24 @@ class DeliverySessionBloc
       } else {
         await trackingService.stopTracking();
       }
-    } catch (_) {
+
+      add(ReloadSessionEvent());
+      if (event.callback != null) {
+        event.callback!(null);
+      }
+    } catch (e) {
       // Roll back on failure
       emit(current.copyWith(isOnline: !event.val));
+      if (event.callback != null) {
+        String msg = 'Failed to update shift status.';
+        try {
+          final resData = (e as dynamic).response?.data;
+          if (resData is Map && resData.containsKey('message')) {
+            msg = resData['message'].toString();
+          }
+        } catch (_) {}
+        event.callback!(msg);
+      }
     }
   }
 

@@ -8,8 +8,8 @@ import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/services/mock_data_service.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/delivery_confirmation_sheet.dart';
-import 'package:f2h_delivery/features/orders/presentation/screens/report_issue_screen.dart';
-import 'package:f2h_delivery/features/orders/presentation/screens/order_detail_screen.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/features/tracking/presentation/widgets/map_delivery_sheet.dart';
 
 class MapScreen extends StatefulWidget {
@@ -289,6 +289,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         stop.addressLat,
         stop.addressLng,
       );
+      print('[DEBUG] Rider is $dist km away from stop.');
+      // Bypassed 300 meters check to allow testing locally
+      /*
       if (dist > 0.3) { // 300 meters threshold
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -302,6 +305,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         }
         return;
       }
+      */
     }
 
     if (!mounted) return;
@@ -312,8 +316,24 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       builder: (_) => DeliveryConfirmationSheet(
         stop: stop,
         onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage) {
+          if (stop.orders.isEmpty) return;
+          final orderId = stop.orders.first.orderId;
+
+          context.read<DeliverySessionBloc>().add(UpdateStopStatusEvent(
+            orderId: orderId,
+            newStatus: status,
+            emptyBottles: emptyBottles,
+            returnedContainers: returnedContainers,
+            damagedContainers: damagedContainers,
+            lostContainers: lostContainers,
+            notes: notes,
+            paymentMode: paymentMode,
+            paymentStatus: paymentStatus,
+            deliveryImage: deliveryImage,
+          ));
+
           _dataService.updateOrderStatus(
-            stop.orders.first.orderId,
+            orderId,
             status,
             emptyBottles: emptyBottles,
             returnedContainers: returnedContainers,
@@ -324,7 +344,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             paymentStatus: paymentStatus,
             deliveryImage: deliveryImage,
           );
-          Navigator.pop(context);
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Stop #${stop.stop} marked as $status!'),

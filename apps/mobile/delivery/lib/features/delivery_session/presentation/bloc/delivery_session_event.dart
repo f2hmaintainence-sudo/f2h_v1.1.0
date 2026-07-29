@@ -12,7 +12,8 @@ class ReloadSessionEvent extends DeliverySessionEvent {}
 /// Toggle the driver's online / offline shift status.
 class ToggleOnlineEvent extends DeliverySessionEvent {
   final bool val;
-  ToggleOnlineEvent(this.val);
+  final void Function(String? error)? callback;
+  ToggleOnlineEvent(this.val, {this.callback});
 }
 
 /// Mark a stop as delivered or failed and sync to the backend.

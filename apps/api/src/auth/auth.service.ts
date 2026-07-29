@@ -219,36 +219,78 @@ export class AuthService {
    ================================================================================================*/
 
   async findReferrer(code: string): Promise<any> {
-    if (!code) return null;
-    const trimmed = code.trim();
+    if (!code || !code.trim()) return null;
+    const raw = code.trim().toUpperCase();
+    const noHyphen = raw.replace(/-/g, '');
+    const withF2H = noHyphen.startsWith('F2H') && !noHyphen.startsWith('F2HDR') && noHyphen.length > 3 ? 'F2H-' + noHyphen.substring(3) : raw;
+    const withF2HDR = noHyphen.startsWith('F2HDR') && noHyphen.length > 5 ? 'F2HDR-' + noHyphen.substring(5) : raw;
 
-    // 1. Search by user_id in users
-    let res = await this.Data.query('users', {
-      where: [{ column: 'user_id', operator: '=', value: trimmed }],
-      limit: 1,
-    });
-    if (res?.data?.length) return res.data[0];
+    const variations = Array.from(new Set([raw, noHyphen, withF2H, withF2HDR]));
 
-    // 2. Search by phone in users
-    res = await this.Data.query('users', {
-      where: [{ column: 'phone', operator: '=', value: trimmed }],
-      limit: 1,
-    });
-    if (res?.data?.length) return res.data[0];
+    // 1. Search customers table by referral_code variations
+    for (const varCode of variations) {
+      const custRes = await this.Data.query('customers', {
+        where: [{ column: 'referral_code', operator: '=', value: varCode }],
+        limit: 1,
+      });
+      if (custRes?.data?.length > 0) {
+        const cust = custRes.data[0];
+        try {
+          const dpRes = await this.Data.query('delivery_partners', {
+            where: [{ column: 'user_id', operator: '=', value: cust.customer_id }],
+            limit: 1,
+          });
+          if (dpRes?.data?.length > 0) {
+            return { ...dpRes.data[0], user_id: dpRes.data[0].user_id || cust.customer_id, customer_id: cust.customer_id };
+          }
+        } catch (_) {}
+        return cust;
+      }
+    }
 
-    // 3. Search by email in users
-    res = await this.Data.query('users', {
-      where: [{ column: 'email', operator: '=', value: trimmed }],
-      limit: 1,
-    });
-    if (res?.data?.length) return res.data[0];
+    // 2. Fallback: Search by phone digits (e.g. F2HDR-SUH7418 -> phone ending with 7418)
+    const digitsOnly = raw.replace(/\D/g, '');
+    if (digitsOnly.length >= 4) {
+      const last4 = digitsOnly.slice(-4);
 
-    // 4. Search by customer_id in customers
-    res = await this.Data.query('customers', {
-      where: [{ column: 'customer_id', operator: '=', value: trimmed }],
-      limit: 1,
-    });
-    if (res?.data?.length) return res.data[0];
+      // Search customers by mobile ending with last4
+      const custMatch = await this.Data.query('customers', {
+        where: [{ column: 'mobile', operator: 'LIKE', value: `%${last4}` }],
+        limit: 1,
+      });
+      if (custMatch?.data?.length > 0) {
+        const cust = custMatch.data[0];
+        try {
+          await this.Data.update(
+            'customers',
+            { referral_code: raw, updated_at: new Date() },
+            [{ column: 'customer_id', operator: '=', value: cust.customer_id }],
+          );
+        } catch (_) {}
+        return cust;
+      }
+
+      // Search delivery_partners by phone ending with last4
+      const dpMatch = await this.Data.query('delivery_partners', {
+        where: [{ column: 'phone', operator: 'LIKE', value: `%${last4}` }],
+        limit: 1,
+      });
+      if (dpMatch?.data?.length > 0) {
+        const dp = dpMatch.data[0];
+        const dpId = dp.user_id || dp.delivery_partner_id || (dp.id ? String(dp.id) : null);
+        if (dpId) {
+          try {
+            await this.ensureCustomerRecordForReferral(dpId, dp.full_name || 'Partner', dp.phone, dp.email);
+            await this.Data.update(
+              'customers',
+              { referral_code: raw, updated_at: new Date() },
+              [{ column: 'customer_id', operator: '=', value: dpId }],
+            );
+          } catch (_) {}
+        }
+        return { ...dp, user_id: dpId, customer_id: dpId };
+      }
+    }
 
     return null;
   }
@@ -265,12 +307,12 @@ export class AuthService {
 
     // Validate referral code if provided
     let referrerId: string | null = null;
-    if (body.referral_code) {
+    if (body.referral_code && body.referral_code.trim().length > 0) {
       const referrer = await this.findReferrer(body.referral_code);
       if (!referrer) {
         throw new BadRequestException('Invalid referral code');
       }
-      referrerId = referrer.user_id || referrer.customer_id || null;
+      referrerId = referrer.user_id || referrer.customer_id || referrer.delivery_partner_id || (referrer.id ? String(referrer.id) : null);
     }
 
     const rawName = body.name || (body as any).name;
@@ -421,14 +463,15 @@ export class AuthService {
             { transaction },
           );
         } else {
+          const safeMobile = phone ? phone.replace(/\D/g, '').slice(0, 15) : ('NP_' + userId.slice(-10));
           await this.Data.insert(
             'customers',
             {
               customer_id: userId,
               first_name: custFirstName,
               last_name: lastName,
-              mobile: phone || ('NO_PHONE_' + userId),
-            
+              mobile: safeMobile,
+              phone: safeMobile,
               email: email || null,
               created_at: now,
               updated_at: now,
@@ -536,6 +579,25 @@ export class AuthService {
       }
     });
 
+    if (referrerId) {
+      try {
+        const partnerFullName = `${firstName} ${lastName}`.trim() || userName || 'Partner';
+        await this.ensureCustomerRecordForReferral(referrerId, 'Referrer');
+        await this.ensureCustomerRecordForReferral(userId, partnerFullName, phone || undefined, email || undefined);
+
+        const referId = 'REF' + Date.now() + Math.floor(Math.random() * 1000);
+        await this.DataBase.query(
+          `INSERT INTO referrals (refer_id, referrer_customer_id, referrer_id, referred_customer_id, referral_code, referrer_reward_amount, status, created_at, updated_at)
+           VALUES ($1, $2, $2, $3, $4, 75.00, 'pending', NOW(), NOW())
+           ON CONFLICT DO NOTHING`,
+          [referId, referrerId, userId, body.referral_code || ''],
+        );
+        this.developer.debug(`[AuthService] Successfully stored pending referral record: refer_id=${referId}, referrer=${referrerId}, referred=${userId}`);
+      } catch (err) {
+        this.developer.error('[AuthService] Pending referral creation on signup error:', { err });
+      }
+    }
+
     if (email) {
       try {
         const name = (firstName || userName || 'User').trim();
@@ -615,17 +677,35 @@ export class AuthService {
     };
   }
 
-  async verifyMobileOtp(body: VerifyOtpDto, ip?: string) {
+  async verifyMobileOtp(body: VerifyOtpDto & { purpose?: string }, ip?: string) {
     const { phone, email, otp } = body;
     if (!phone && !email) {
       throw new BadRequestException('Phone number or email is required');
     }
 
-    const identifier = phone || email!;
-    const redisKey = CACHE_KEYS.AUTH_MOBILE_OTP(identifier);
-    const storedOtp = await this.redisService.fetch(redisKey);
+    const rawIdentifier = (email || phone!).toLowerCase().trim();
+    const cleanDigits = (email || phone!).replace(/\D/g, '');
 
-    if (!storedOtp || String(storedOtp) !== otp) {
+    const possibleKeys = [
+      CACHE_KEYS.AUTH_MOBILE_OTP(rawIdentifier),
+      CACHE_KEYS.AUTH_MOBILE_OTP(email ? email.toLowerCase().trim() : phone!.trim()),
+    ];
+    if (cleanDigits) {
+      possibleKeys.push(CACHE_KEYS.AUTH_MOBILE_OTP(cleanDigits));
+    }
+
+    let storedOtp: any = null;
+    let matchedKey: string | null = null;
+    for (const key of possibleKeys) {
+      const val = await this.redisService.fetch(key);
+      if (val) {
+        storedOtp = val;
+        matchedKey = key;
+        break;
+      }
+    }
+
+    if (!storedOtp || String(storedOtp).trim() !== String(otp).trim()) {
       throw new UnauthorizedException('Invalid OTP');
     }
 
@@ -635,8 +715,9 @@ export class AuthService {
 
     let user: any = null;
     if (phone) {
+      const cleanPhone = phone.replace(/\D/g, '');
       user = (allUsersForOtp?.data ?? []).find(
-        (u: any) => u.phone && u.phone.trim() === phone.trim(),
+        (u: any) => u.phone && (u.phone.trim() === phone.trim() || (cleanPhone.length >= 7 && u.phone.replace(/\D/g, '').endsWith(cleanPhone.slice(-10)))),
       );
     } else if (email) {
       const normalizedEmail = email.toLowerCase().trim();
@@ -698,14 +779,17 @@ export class AuthService {
     await this.redisService.put(
       verificationKey,
       JSON.stringify({
-        phone: phone || null,
-        email: email || null,
-        purpose: 'registration',
+        phone: phone || user?.phone || null,
+        email: email || user?.email || null,
+        purpose: body.purpose || 'forgot_password',
       }),
       CACHE_TTL.FIFTEEN_MINUTES,
     );
 
-    await this.redisService.forget(redisKey);
+    if (matchedKey) {
+      await this.redisService.forget(matchedKey);
+    }
+    await this.redisService.forget(CACHE_KEYS.AUTH_MOBILE_OTP(rawIdentifier));
 
     return {
       message: 'OTP verified successfully',
@@ -1026,6 +1110,7 @@ export class AuthService {
     }
 
     const formattedIdentifier = identifierInput.toLowerCase().trim();
+    const cleanDigitsInput = identifierInput.replace(/\D/g, '');
 
     // Find user in database by email, phone, or username
     const allUsersResult = await this.Data.query('users', {
@@ -1036,6 +1121,11 @@ export class AuthService {
     let user = allUsers.find(
       (u: any) => u.email && u.email.toLowerCase().trim() === formattedIdentifier,
     );
+    if (!user && cleanDigitsInput.length >= 7) {
+      user = allUsers.find(
+        (u: any) => u.phone && u.phone.replace(/\D/g, '').endsWith(cleanDigitsInput.slice(-10)),
+      );
+    }
     if (!user) {
       user = allUsers.find(
         (u: any) => u.phone && u.phone.trim() === identifierInput.trim(),
@@ -1047,8 +1137,51 @@ export class AuthService {
       );
     }
 
+    // Fallback search in delivery_partners table
     if (!user) {
-      throw new NotFoundException('User with provided email or phone not found');
+      try {
+        const dpRes = await this.Data.query('delivery_partners', { limit: 500 });
+        const dps = dpRes?.data ?? [];
+        const matchedDp = dps.find((dp: any) => {
+          const e = (dp.email || '').toLowerCase().trim();
+          const p = (dp.phone || '').replace(/\D/g, '');
+          return (e && e === formattedIdentifier) || (cleanDigitsInput.length >= 7 && p && p.endsWith(cleanDigitsInput.slice(-10)));
+        });
+        if (matchedDp) {
+          const dpUserId = matchedDp.user_id || matchedDp.delivery_partner_id;
+          user = allUsers.find((u: any) => u.user_id === dpUserId) || {
+            user_id: dpUserId,
+            email: matchedDp.email || identifierInput,
+            phone: matchedDp.phone || identifierInput,
+            role_id: 'DELIVERY_PARTNER',
+          };
+        }
+      } catch (_) {}
+    }
+
+    // Fallback search in customers table
+    if (!user) {
+      try {
+        const custRes = await this.Data.query('customers', { limit: 500 });
+        const custs = custRes?.data ?? [];
+        const matchedCust = custs.find((c: any) => {
+          const e = (c.email || '').toLowerCase().trim();
+          const p = (c.mobile || c.phone || '').replace(/\D/g, '');
+          return (e && e === formattedIdentifier) || (cleanDigitsInput.length >= 7 && p && p.endsWith(cleanDigitsInput.slice(-10)));
+        });
+        if (matchedCust) {
+          user = allUsers.find((u: any) => u.user_id === matchedCust.customer_id) || {
+            user_id: matchedCust.customer_id,
+            email: matchedCust.email || identifierInput,
+            phone: matchedCust.mobile || matchedCust.phone || identifierInput,
+            role_id: 'CUSTOMER',
+          };
+        }
+      } catch (_) {}
+    }
+
+    if (!user) {
+      throw new NotFoundException('User with provided email or phone not found. Please check your contact info or register a new account.');
     }
 
     // Role validation if clientRole is supplied
@@ -1084,8 +1217,26 @@ export class AuthService {
     }
 
     const otp = crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
-    const redisKey = CACHE_KEYS.AUTH_MOBILE_OTP(targetKey);
-    await this.redisService.put(redisKey, otp, CACHE_TTL.FIFTEEN_MINUTES);
+    
+    // Store OTP in Redis under all matching identifier representations
+    const keysToStore = new Set<string>();
+    keysToStore.add(CACHE_KEYS.AUTH_MOBILE_OTP(targetKey));
+    keysToStore.add(CACHE_KEYS.AUTH_MOBILE_OTP(formattedIdentifier));
+    if (user.email) {
+      keysToStore.add(CACHE_KEYS.AUTH_MOBILE_OTP(user.email.toLowerCase().trim()));
+    }
+    if (user.phone) {
+      keysToStore.add(CACHE_KEYS.AUTH_MOBILE_OTP(user.phone.trim()));
+      const cDigits = user.phone.replace(/\D/g, '');
+      if (cDigits) keysToStore.add(CACHE_KEYS.AUTH_MOBILE_OTP(cDigits));
+    }
+    if (cleanDigitsInput) {
+      keysToStore.add(CACHE_KEYS.AUTH_MOBILE_OTP(cleanDigitsInput));
+    }
+
+    for (const k of keysToStore) {
+      await this.redisService.put(k, otp, CACHE_TTL.FIFTEEN_MINUTES);
+    }
 
     this.developer.debug(`[AuthService:forgotPassword] Generated OTP for ${targetKey}: ${otp}`);
 
@@ -1124,23 +1275,39 @@ export class AuthService {
     }
 
     const targetKey = rawIdentifier.toLowerCase().trim();
+    const cleanDigits = rawIdentifier.replace(/\D/g, '');
     let isVerified = false;
 
     // 1. Check if inputToken is a verification token generated by verifyMobileOtp (otp_verified:<token>)
     const verificationKey = `otp_verified:${inputToken.trim()}`;
     const verifiedData = await this.redisService.fetch(verificationKey);
+    let tokenMeta: any = null;
 
     if (verifiedData) {
       isVerified = true;
+      try {
+        tokenMeta = typeof verifiedData === 'string' ? JSON.parse(verifiedData) : verifiedData;
+      } catch {
+        tokenMeta = null;
+      }
       await this.redisService.forget(verificationKey);
     } else {
       // 2. Check if inputToken is direct 6-digit OTP in Redis
-      const redisKey = CACHE_KEYS.AUTH_MOBILE_OTP(targetKey);
-      const storedOtp = await this.redisService.fetch(redisKey);
+      const possibleOtpKeys = [
+        CACHE_KEYS.AUTH_MOBILE_OTP(targetKey),
+        CACHE_KEYS.AUTH_MOBILE_OTP(rawIdentifier.trim()),
+      ];
+      if (cleanDigits) {
+        possibleOtpKeys.push(CACHE_KEYS.AUTH_MOBILE_OTP(cleanDigits));
+      }
 
-      if (storedOtp && String(storedOtp).trim() === String(inputToken).trim()) {
-        isVerified = true;
-        await this.redisService.forget(redisKey);
+      for (const key of possibleOtpKeys) {
+        const storedOtp = await this.redisService.fetch(key);
+        if (storedOtp && String(storedOtp).trim() === String(inputToken).trim()) {
+          isVerified = true;
+          await this.redisService.forget(key);
+          break;
+        }
       }
     }
 
@@ -1153,9 +1320,20 @@ export class AuthService {
     });
     const allUsers = allUsersResult?.data ?? [];
 
+    const verifiedEmail = tokenMeta?.email ? String(tokenMeta.email).toLowerCase().trim() : null;
+    const verifiedPhone = tokenMeta?.phone ? String(tokenMeta.phone).trim() : null;
+
     let user = allUsers.find(
-      (u: any) => u.email && u.email.toLowerCase().trim() === targetKey,
+      (u: any) =>
+        (verifiedEmail && u.email && u.email.toLowerCase().trim() === verifiedEmail) ||
+        (u.email && u.email.toLowerCase().trim() === targetKey),
     );
+    if (!user && (verifiedPhone || cleanDigits.length >= 7)) {
+      const searchPhoneDigits = (verifiedPhone || cleanDigits).replace(/\D/g, '');
+      user = allUsers.find(
+        (u: any) => u.phone && u.phone.replace(/\D/g, '').endsWith(searchPhoneDigits.slice(-10)),
+      );
+    }
     if (!user) {
       user = allUsers.find(
         (u: any) => u.phone && u.phone.trim() === rawIdentifier.trim(),
@@ -1172,13 +1350,17 @@ export class AuthService {
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 12);
+    const now = new Date();
 
     await this.Data.update(
       'users',
       {
         password: hashedPassword,
         must_change_password: 0,
-        updated_at: new Date(),
+        locked_at: null,
+        max_logins: 0,
+        password_changed_at: now,
+        updated_at: now,
       },
       [{ column: 'user_id', operator: '=', value: user.user_id }],
     );
@@ -1286,5 +1468,28 @@ export class AuthService {
       }
     }
     return code;
+  }
+
+  private async ensureCustomerRecordForReferral(id: string, name: string, phone?: string, email?: string) {
+    try {
+      const check = await this.DataBase.query(
+        `SELECT customer_id FROM customers WHERE customer_id = $1 LIMIT 1`,
+        [id],
+      );
+      if (!check?.length) {
+        const cleanName = (name || 'User').trim().slice(0, 30);
+        const digits = (phone || id).replace(/\D/g, '');
+        const safePhone = (digits.length >= 7 ? digits.slice(-10) : `99${digits}`).slice(0, 15);
+        const refCode = `F2H-${id.slice(-4).toUpperCase()}`;
+        await this.DataBase.query(
+          `INSERT INTO customers (customer_id, first_name, mobile, phone, email, referral_code, created_at, updated_at)
+           VALUES ($1, $2, $3, $3, $4, $5, NOW(), NOW())
+           ON CONFLICT DO NOTHING`,
+          [id, cleanName, safePhone, email || null, refCode],
+        );
+      }
+    } catch (err) {
+      this.developer.error('[AuthService] ensureCustomerRecordForReferral note:', { err });
+    }
   }
 }

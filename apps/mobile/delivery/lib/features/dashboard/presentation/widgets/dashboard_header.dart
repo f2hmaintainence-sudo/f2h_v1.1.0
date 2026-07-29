@@ -7,6 +7,7 @@ class DashboardHeader extends StatelessWidget {
   final int completedCount;
   final int totalStops;
   final VoidCallback onCollectTap;
+  final bool showCollectButton;
 
   const DashboardHeader({
     super.key,
@@ -14,6 +15,7 @@ class DashboardHeader extends StatelessWidget {
     required this.completedCount,
     required this.totalStops,
     required this.onCollectTap,
+    this.showCollectButton = true,
   });
 
   Widget _buildMetricCard(String label, String value, IconData icon, Color bg, Color fg) {
@@ -93,33 +95,35 @@ class DashboardHeader extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: onCollectTap,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: kPrimary.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: kPrimary.withOpacity(0.3), width: 1.2),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(Icons.playlist_add_check_rounded, color: kPrimary, size: 16),
-                    SizedBox(width: 4),
-                    Text(
-                      'Collect Items',
-                      style: TextStyle(
-                        color: kPrimary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
+            if (showCollectButton) ...[
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: onCollectTap,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: kPrimary.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: kPrimary.withOpacity(0.3), width: 1.2),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.playlist_add_check_rounded, color: kPrimary, size: 16),
+                      SizedBox(width: 4),
+                      Text(
+                        'Collect Items',
+                        style: TextStyle(
+                          color: kPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
         const SizedBox(height: 16),

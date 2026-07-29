@@ -49,6 +49,22 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
     _returnedContainers = (outstanding + widget.stop.emptyBottlesExpected) > 0
         ? widget.stop.emptyBottlesExpected
         : 0;
+    _checkLostImage();
+  }
+
+  Future<void> _checkLostImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final LostDataResponse response = await picker.retrieveLostData();
+      if (response.isEmpty) return;
+      if (response.file != null) {
+        setState(() {
+          _imagePath = response.file!.path;
+          _photoTaken = true;
+          _currentStep = 3;
+        });
+      }
+    } catch (_) {}
   }
 
   void _nextStep() {
@@ -62,14 +78,14 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
     }
   }
 
-  Future<void> _takePhoto() async {
+  Future<void> _takePhoto([ImageSource source = ImageSource.camera]) async {
     try {
       final ImagePicker picker = ImagePicker();
       final XFile? photo = await picker.pickImage(
-        source: ImageSource.camera,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 85,
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 70,
       );
       if (photo != null) {
         setState(() {
@@ -79,42 +95,89 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
       }
     } catch (e) {
       print('Error picking image: $e');
-      // Fallback/Mock just in case
-      setState(() {
-        _imagePath = null;
-        _photoTaken = true;
-      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not access photo: $e. You can use SKIP PHOTO to complete delivery.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
+  void _showImageSourcePicker() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Upload Proof Photo',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.camera_alt_rounded, color: kPrimary),
+                title: const Text('Take Photo with Camera'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _takePhoto(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded, color: Colors.blue),
+                title: const Text('Choose from Gallery'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _takePhoto(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _triggerSuccess() {
-    Timer(const Duration(milliseconds: 3000), () {
-      if (mounted) {
-        String paymentDetails = widget.stop.isCod
-            ? 'Collected via ${_isUpi ? "UPI" : "Cash"}'
-            : 'Prepaid Online';
-        String handoverDetails = _directHandover ? 'Handed over directly' : 'Left with security/doorstep';
-        String finalPaymentMode = widget.stop.isCod
-            ? (_isUpi ? 'upi' : 'cash')
-            : 'prepaid';
-        String finalPaymentStatus = 'paid';
-        String mockPhotoPath = _photoTaken
-            ? (_imagePath ?? 'https://images.unsplash.com/photo-1550583724-b2692b85b150?q=80&w=600&auto=format&fit=crop')
-            : '';
+    String paymentDetails = widget.stop.isCod
+        ? 'Collected via ${_isUpi ? "UPI" : "Cash"}'
+        : 'Prepaid Online';
+    String handoverDetails = _directHandover ? 'Handed over directly' : 'Left with security/doorstep';
+    String finalPaymentMode = widget.stop.isCod
+        ? (_isUpi ? 'upi' : 'cash')
+        : 'prepaid';
+    String finalPaymentStatus = 'paid';
+    String mockPhotoPath = _photoTaken
+        ? (_imagePath ?? 'https://images.unsplash.com/photo-1550583724-b2692b85b150?q=80&w=600&auto=format&fit=crop')
+        : '';
 
-        final totalEmptyBottles = _returnedContainers + _damagedContainers + _lostContainers;
+    final totalEmptyBottles = _returnedContainers + _damagedContainers + _lostContainers;
 
-        widget.onConfirm(
-          'delivered',
-          totalEmptyBottles,
-          _returnedContainers,
-          _damagedContainers,
-          _lostContainers,
-          '$handoverDetails · $paymentDetails',
-          finalPaymentMode,
-          finalPaymentStatus,
-          mockPhotoPath,
-        );
+    // Immediately trigger status update so data is submitted right away
+    widget.onConfirm(
+      'delivered',
+      totalEmptyBottles,
+      _returnedContainers,
+      _damagedContainers,
+      _lostContainers,
+      '$handoverDetails · $paymentDetails',
+      finalPaymentMode,
+      finalPaymentStatus,
+      mockPhotoPath,
+    );
+
+    // Show success animation briefly then pop sheet safely
+    Timer(const Duration(milliseconds: 1500), () {
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
       }
     });
   }
@@ -804,7 +867,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                           padding: const EdgeInsets.all(8),
                           child: _ScannerAnimationWrapper(
                             child: Image.network(
-                              'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${Uri.encodeComponent('upi://pay?pa=f2hfresh@ybl&pn=F2H Fresh&am=${widget.stop.codAmount.round()}&cu=INR&tn=Order_${widget.stop.orders.first.orderId}')}',
+                              'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${Uri.encodeComponent('upi://pay?pa=f2hfresh@ybl&pn=F2H Fresh&am=${widget.stop.codAmount.round()}&cu=INR&tn=Order_${widget.stop.orders.isNotEmpty ? widget.stop.orders.first.orderId : ""}')}',
                               fit: BoxFit.contain,
                               loadingBuilder: (context, child, loadingProgress) {
                                 if (loadingProgress == null) return child;
@@ -958,7 +1021,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         
         // Camera Viewfinder
         GestureDetector(
-          onTap: _takePhoto,
+          onTap: _showImageSourcePicker,
           child: Container(
             height: 180,
             decoration: BoxDecoration(
@@ -1081,7 +1144,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
             const SizedBox(width: 12),
             Expanded(
               child: ElevatedButton(
-                onPressed: _photoTaken ? _nextStep : _takePhoto,
+                onPressed: _photoTaken ? _nextStep : _showImageSourcePicker,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kPrimary,
                   foregroundColor: Colors.white,

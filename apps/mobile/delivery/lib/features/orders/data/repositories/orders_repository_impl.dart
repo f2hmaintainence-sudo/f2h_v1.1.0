@@ -178,6 +178,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
         ApiEndpoints.markStopDelivered(runId, addressId),
         data: {
           'status': status,
+          if (orderId != null) 'order_id': orderId,
           if (remarks != null) 'remarks': remarks,
           if (emptyBottlesCollected != null) 'empty_bottles_collected': emptyBottlesCollected,
           if (returnedContainers != null) 'returned_containers': returnedContainers,
