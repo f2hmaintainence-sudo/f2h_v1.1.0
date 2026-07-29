@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import '../../data/models/product_model.dart';
@@ -10,9 +10,13 @@ import '../bloc/cart/cart_state.dart';
 import '../../domain/entities/cart/cart_item_entity.dart';
 import '../../../../core/guards/auth_guard.dart';
 import '../../../subscription/presentation/widgets/subscription_button.dart';
-import 'cart_widgets.dart';
+
 // ── Product image widget ─────────────────────────────────
-Widget _productImage(Product p, {BoxFit fit = BoxFit.cover, double padding = 0.0}) {
+Widget _productImage(
+  Product p, {
+  BoxFit fit = BoxFit.cover,
+  double padding = 0.0,
+}) {
   return Padding(
     padding: EdgeInsets.all(padding),
     child: buildProductImage(p.name, imageAsset: p.imageAsset, fit: fit),
@@ -24,12 +28,19 @@ Widget _productImage(Product p, {BoxFit fit = BoxFit.cover, double padding = 0.0
 //  Appears when user taps "+" on a product with variants
 // ══════════════════════════════════════════════════════════
 
-void showPurchaseOptionsSheet(BuildContext context, Product product, {String? selectedVariantId}) {
+void showPurchaseOptionsSheet(
+  BuildContext context,
+  Product product, {
+  String? selectedVariantId,
+}) {
   showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (_) => _PurchaseOptionsSheet(product: product, selectedVariantId: selectedVariantId),
+    builder: (_) => _PurchaseOptionsSheet(
+      product: product,
+      selectedVariantId: selectedVariantId,
+    ),
   );
 }
 
@@ -51,7 +62,15 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
     final vars = widget.product.allVariants;
     _selected = vars.firstWhere(
       (v) => v.id == widget.selectedVariantId,
-      orElse: () => vars.isNotEmpty ? vars.first : ProductVariant(id: widget.product.id, label: widget.product.unit, price: widget.product.price, originalPrice: widget.product.originalPrice, subscriptionPrice: widget.product.subscriptionPrice),
+      orElse: () => vars.isNotEmpty
+          ? vars.first
+          : ProductVariant(
+              id: widget.product.id,
+              label: widget.product.unit,
+              price: widget.product.price,
+              originalPrice: widget.product.originalPrice,
+              subscriptionPrice: widget.product.subscriptionPrice,
+            ),
     );
   }
 
@@ -98,29 +117,44 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(p.name,
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: kText)),
-                    Text(p.vendor,
-                        style: const TextStyle(fontSize: 11, color: kTextSub)),
+                    Text(
+                      p.name,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: kText,
+                      ),
+                    ),
+                    Text(
+                      p.vendor,
+                      style: const TextStyle(fontSize: 11, color: kTextSub),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 18),
-          if (p.variants.isNotEmpty) ...[
+          if (p.allVariants.isNotEmpty) ...[
             // "SELECT PACK SIZE" label
             const Text(
               'SELECT PACK SIZE',
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: kTextSub, letterSpacing: 1.2),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                color: kTextSub,
+                letterSpacing: 1.2,
+              ),
             ),
             const SizedBox(height: 10),
             // Variant pills
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: p.variants.map((v) {
+              children: p.allVariants.map((v) {
                 final isSel = v.id == _selected.id;
+                final isVarLowStock =
+                    v.isLowStock || p.isLowStock || p.isOutOfStock;
                 return GestureDetector(
                   onTap: () => setState(() {
                     _selected = v;
@@ -128,12 +162,23 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                   }),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
-                      color: isSel ? kPrimary : kSurface,
+                      color: isSel
+                          ? kPrimary
+                          : (isVarLowStock
+                                ? const Color(0xFFFFF5F5)
+                                : kSurface),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isSel ? kPrimary : kBorder,
+                        color: isSel
+                            ? kPrimary
+                            : (isVarLowStock
+                                  ? const Color(0xFFEF5350)
+                                  : kBorder),
                         width: isSel ? 1.5 : 1.0,
                       ),
                     ),
@@ -143,19 +188,37 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                         Text(
                           v.label,
                           style: TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w800,
-                            color: isSel ? Colors.white : kText,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: isSel
+                                ? Colors.white
+                                : (isVarLowStock
+                                      ? const Color(0xFFD32F2F)
+                                      : kText),
                           ),
                         ),
                         const SizedBox(height: 3),
                         Text(
                           '₹${v.price.toStringAsFixed(0)}',
                           style: TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
                             color: isSel ? Colors.white70 : kPrimary,
                           ),
                         ),
-                        // No discount display
+                        if (isVarLowStock) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            p.isOutOfStock ? 'OUT OF STOCK' : 'LOW STOCK',
+                            style: TextStyle(
+                              fontSize: 7.5,
+                              fontWeight: FontWeight.w900,
+                              color: isSel
+                                  ? Colors.white
+                                  : const Color(0xFFD32F2F),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -169,8 +232,23 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
             builder: (ctx, state) {
               final items = ctx.read<CartBloc>().currentItems;
               int qty = items
-                  .where((item) => item.productId == p.id && item.variantId == _selected.id)
-                  .fold(0, (sum, item) => sum + (item.purchaseType == 'subscription' ? (item.schedules?.fold<int>(0, (s, sc) => s + sc.mQuantity + sc.eQuantity) ?? 1) : (item.quantity ?? 0)));
+                  .where(
+                    (item) =>
+                        item.productId == p.id &&
+                        item.variantId == _selected.id,
+                  )
+                  .fold(
+                    0,
+                    (sum, item) =>
+                        sum +
+                        (item.purchaseType == 'subscription'
+                            ? (item.schedules?.fold<int>(
+                                    0,
+                                    (s, sc) => s + sc.mQuantity + sc.eQuantity,
+                                  ) ??
+                                  1)
+                            : (item.quantity ?? 0)),
+                  );
               final displayPrice = _selected.price;
 
               void dispatchAdd({int quantity = 1}) {
@@ -182,7 +260,10 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                   unitPrice: _selected.price,
                   purchaseType: 'onetime',
                   quantity: quantity,
-                  deliveryDate: DateTime.now().add(const Duration(days: 1)).toString().split(' ')[0],
+                  deliveryDate: DateTime.now()
+                      .add(const Duration(days: 1))
+                      .toString()
+                      .split(' ')[0],
                   deliverySlot: 'Morning',
                   imageAsset: p.imageAsset,
                   isSubscribable: p.isSubscribable,
@@ -191,7 +272,7 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                 );
                 ctx.read<CartBloc>().add(AddToCartEvent(cartItem));
               }
- 
+
               void dispatchRemove() {
                 final cartItem = CartItemEntity(
                   productId: p.id,
@@ -201,7 +282,10 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                   unitPrice: _selected.price,
                   purchaseType: 'onetime',
                   quantity: 1,
-                  deliveryDate: DateTime.now().add(const Duration(days: 1)).toString().split(' ')[0],
+                  deliveryDate: DateTime.now()
+                      .add(const Duration(days: 1))
+                      .toString()
+                      .split(' ')[0],
                   deliverySlot: 'Morning',
                   imageAsset: p.imageAsset,
                   isSubscribable: p.isSubscribable,
@@ -210,7 +294,13 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                 );
                 ctx.read<CartBloc>().add(RemoveFromCartEvent(cartItem));
               }
- 
+
+              final isSelectedOutOfStock =
+                  p.isOutOfStock ||
+                  p.isLowStock ||
+                  _selected.isLowStock ||
+                  !p.isOneTime;
+
               return Row(
                 children: [
                   Column(
@@ -218,19 +308,50 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                     children: [
                       Text(
                         '₹${displayPrice.toStringAsFixed(0)}',
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: kPrimary),
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: kPrimary,
+                        ),
                       ),
                       Text(
                         '₹${_selected.originalPrice.toStringAsFixed(0)}',
                         style: const TextStyle(
-                          fontSize: 12, color: kMuted,
+                          fontSize: 12,
+                          color: kMuted,
                           decoration: TextDecoration.lineThrough,
                         ),
                       ),
                     ],
                   ),
                   const Spacer(),
-                  if (qty == 0)
+                  if (isSelectedOutOfStock)
+                    ElevatedButton(
+                      onPressed: null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFE0E0E0),
+                        foregroundColor: const Color(0xFF757575),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        p.isOutOfStock
+                            ? 'OUT OF STOCK'
+                            : 'LOW STOCK — UNAVAILABLE',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF757575),
+                        ),
+                      ),
+                    )
+                  else if (qty == 0)
                     Row(
                       children: [
                         Container(
@@ -238,7 +359,9 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                           decoration: BoxDecoration(
                             color: kPrimaryPl,
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: kPrimary.withValues(alpha: 0.15)),
+                            border: Border.all(
+                              color: kPrimary.withOpacity(0.15),
+                            ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -251,17 +374,32 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                                 },
                                 child: const Padding(
                                   padding: EdgeInsets.symmetric(horizontal: 14),
-                                  child: Icon(Icons.remove_rounded, color: kPrimary, size: 18),
+                                  child: Icon(
+                                    Icons.remove_rounded,
+                                    color: kPrimary,
+                                    size: 18,
+                                  ),
                                 ),
                               ),
-                              Text('$_sheetQty', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: kPrimary)),
+                              Text(
+                                '$_sheetQty',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  color: kPrimary,
+                                ),
+                              ),
                               GestureDetector(
                                 onTap: () {
                                   setState(() => _sheetQty++);
                                 },
                                 child: const Padding(
                                   padding: EdgeInsets.symmetric(horizontal: 14),
-                                  child: Icon(Icons.add_rounded, color: kPrimary, size: 18),
+                                  child: Icon(
+                                    Icons.add_rounded,
+                                    color: kPrimary,
+                                    size: 18,
+                                  ),
                                 ),
                               ),
                             ],
@@ -279,11 +417,22 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: kPrimary,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 32,
+                              vertical: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                             elevation: 0,
                           ),
-                          child: const Text('ADD', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900)),
+                          child: const Text(
+                            'ADD',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
                         ),
                       ],
                     )
@@ -306,10 +455,21 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                             },
                             child: const Padding(
                               padding: EdgeInsets.symmetric(horizontal: 14),
-                              child: Icon(Icons.remove_rounded, color: Colors.white, size: 18),
+                              child: Icon(
+                                Icons.remove_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              ),
                             ),
                           ),
-                          Text('$qty', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white)),
+                          Text(
+                            '$qty',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
+                          ),
                           GestureDetector(
                             onTap: () {
                               ctx.runWithAuth(() {
@@ -319,7 +479,11 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                             },
                             child: const Padding(
                               padding: EdgeInsets.symmetric(horizontal: 14),
-                              child: Icon(Icons.add_rounded, color: Colors.white, size: 18),
+                              child: Icon(
+                                Icons.add_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              ),
                             ),
                           ),
                         ],
@@ -366,10 +530,18 @@ void _maybeCelebrate(BuildContext context) {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('FREE DELIVERY UNLOCKED!',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
-                    Text('100+ items added — enjoy free delivery!',
-                        style: TextStyle(color: Colors.white70, fontSize: 10)),
+                    Text(
+                      'FREE DELIVERY UNLOCKED!',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
+                      ),
+                    ),
+                    Text(
+                      '100+ items added — enjoy free delivery!',
+                      style: TextStyle(color: Colors.white70, fontSize: 10),
+                    ),
                   ],
                 ),
               ),
@@ -436,22 +608,27 @@ class ProductCardH extends StatelessWidget {
                   child: Container(
                     height: 120,
                     width: double.infinity,
-                    decoration: const BoxDecoration(
-                      color: Colors.transparent,
-                    ),
+                    decoration: const BoxDecoration(color: Colors.transparent),
                     child: _productImage(p, padding: 0.0),
                   ),
                 ),
                 // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
                 if (p.reviews > 0)
                   Positioned(
-                    top: 8, left: 8,
+                    top: 8,
+                    left: 8,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 2.5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4.5,
+                        vertical: 2.5,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.9),
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFFFE0B2), width: 0.8),
+                        border: Border.all(
+                          color: const Color(0xFFFFE0B2),
+                          width: 0.8,
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.04),
@@ -463,11 +640,19 @@ class ProductCardH extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.star_rounded, size: 10, color: Colors.amber),
+                          const Icon(
+                            Icons.star_rounded,
+                            size: 10,
+                            color: Colors.amber,
+                          ),
                           const SizedBox(width: 2.5),
                           Text(
                             '${p.rating.toStringAsFixed(1)} (${p.reviews})',
-                            style: const TextStyle(fontSize: 7.5, fontWeight: FontWeight.w800, color: Color(0xFFE65100)),
+                            style: const TextStyle(
+                              fontSize: 7.5,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFE65100),
+                            ),
                           ),
                         ],
                       ),
@@ -479,40 +664,62 @@ class ProductCardH extends StatelessWidget {
                     top: 8,
                     right: 8,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFFEBEE),
                         borderRadius: BorderRadius.circular(100),
-                        border: Border.all(color: const Color(0xFFEF5350), width: 0.8),
+                        border: Border.all(
+                          color: const Color(0xFFEF5350),
+                          width: 0.8,
+                        ),
                       ),
                       child: const Text(
                         'LOW STOCK',
-                        style: TextStyle(fontSize: 6.5, fontWeight: FontWeight.w900, color: Color(0xFFD32F2F), letterSpacing: 0.3),
+                        style: TextStyle(
+                          fontSize: 6.5,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFFD32F2F),
+                          letterSpacing: 0.3,
+                        ),
                       ),
                     ),
                   )
                 else if (p.isOrganic)
                   Positioned(
-                    top: 8, right: 8,
+                    top: 8,
+                    right: 8,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFE8F5E9),
                         borderRadius: BorderRadius.circular(100),
-                        border: Border.all(color: const Color(0xFFA5D6A7), width: 0.8),
+                        border: Border.all(
+                          color: const Color(0xFFA5D6A7),
+                          width: 0.8,
+                        ),
                       ),
-                      child: const Text('ORGANIC', style: TextStyle(fontSize: 6.5, fontWeight: FontWeight.w900, color: Color(0xFF2E7D32), letterSpacing: 0.3)),
+                      child: const Text(
+                        'ORGANIC',
+                        style: TextStyle(
+                          fontSize: 6.5,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF2E7D32),
+                          letterSpacing: 0.3,
+                        ),
+                      ),
                     ),
                   ),
-                // Subscribe badge — opens SubscriptionSetupScreen when tapped
                 if (p.isSubscribable)
                   Positioned(
                     bottom: 6,
                     left: 6,
-                    child: SubscriptionButton(
-                      product: p,
-                      isCompact: true,
-                    ),
+                    child: SubscriptionButton(product: p, isCompact: true),
                   ),
               ],
             ),
@@ -522,16 +729,39 @@ class ProductCardH extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(p.name,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kText, letterSpacing: -0.2),
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-                   const SizedBox(height: 2),
-                  if (p.unit.isNotEmpty)
-                    Text(p.unit,
-                      style: const TextStyle(fontSize: 10, color: kTextSub, fontWeight: FontWeight.w600))
-                  else
-                    const SizedBox(height: 12),
-                  const SizedBox(height: 6),
+                  Text(
+                    p.name,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: kText,
+                      letterSpacing: -0.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (p.formattedUnit.isNotEmpty && p.formattedUnit.toLowerCase() != p.name.toLowerCase()) ...[
+                    const SizedBox(height: 3),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
+                      ),
+                      child: Text(
+                        p.formattedUnit,
+                        style: const TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF475569),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -541,19 +771,33 @@ class ProductCardH extends StatelessWidget {
                           textBaseline: TextBaseline.alphabetic,
                           children: [
                             Flexible(
-                              child: Text('₹${p.price.toStringAsFixed(0)}',
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: kText),
-                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                              child: Text(
+                                '₹${p.price.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  color: kText,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                             if (p.originalPrice > p.price) ...[
                               const SizedBox(width: 3),
                               Flexible(
-                                child: Text('₹${p.originalPrice.toStringAsFixed(0)}',
-                                  style: const TextStyle(fontSize: 9.5, color: kMuted, decoration: TextDecoration.lineThrough, fontWeight: FontWeight.w600),
-                                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                                child: Text(
+                                  '₹${p.originalPrice.toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    fontSize: 9.5,
+                                    color: kMuted,
+                                    decoration: TextDecoration.lineThrough,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
-
                           ],
                         ),
                       ),
@@ -582,8 +826,7 @@ class ProductCardV extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final discPct = (((p.originalPrice - p.price) / p.originalPrice) * 100).round();
-    final colorIndex = (p.id.hashCode ?? p.name.hashCode).abs() % 5;
+    final colorIndex = (p.id?.hashCode ?? p.name.hashCode).abs() % 5;
     final borderColor = [
       const Color(0xFFC8E6C9), // soft green
       const Color(0xFFC8E6C9), // soft blue
@@ -635,13 +878,20 @@ class ProductCardV extends StatelessWidget {
                         // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
                         if (p.reviews > 0)
                           Positioned(
-                            top: 8, left: 8,
+                            top: 8,
+                            left: 8,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 2.5),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4.5,
+                                vertical: 2.5,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.9),
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFFFFE0B2), width: 0.8),
+                                border: Border.all(
+                                  color: const Color(0xFFFFE0B2),
+                                  width: 0.8,
+                                ),
                                 boxShadow: [
                                   BoxShadow(
                                     color: Colors.black.withValues(alpha: 0.04),
@@ -653,11 +903,19 @@ class ProductCardV extends StatelessWidget {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.star_rounded, size: 10, color: Colors.amber),
+                                  const Icon(
+                                    Icons.star_rounded,
+                                    size: 10,
+                                    color: Colors.amber,
+                                  ),
                                   const SizedBox(width: 2.5),
                                   Text(
                                     '${p.rating.toStringAsFixed(1)} (${p.reviews})',
-                                    style: const TextStyle(fontSize: 7.5, fontWeight: FontWeight.w800, color: Color(0xFFE65100)),
+                                    style: const TextStyle(
+                                      fontSize: 7.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFFE65100),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -669,37 +927,51 @@ class ProductCardV extends StatelessWidget {
                   // 2. Info on the right
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             p.name,
                             style: const TextStyle(
-                              fontSize: 13,
+                              fontSize: 12,
                               fontWeight: FontWeight.w800,
                               color: kText,
                               letterSpacing: -0.2,
                             ),
-                            maxLines: 2,
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                           const SizedBox(height: 2),
-                           if (p.isSubscribable)
-                             Padding(
-                               padding: const EdgeInsets.only(top: 4),
-                               child: SubscriptionButton(
-                                 product: p,
-                                 isCompact: true,
-                               ),
-                             ),
-                           if (p.unit.isNotEmpty)
-                             Text(
-                               p.unit,
-                               style: const TextStyle(
-                                 fontSize: 10.5,
-                                 color: kTextSub,
-                                 fontWeight: FontWeight.w600,
+                          if (p.formattedUnit.isNotEmpty && p.formattedUnit.toLowerCase() != p.name.toLowerCase()) ...[
+                            const SizedBox(height: 3),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
+                              ),
+                              child: Text(
+                                p.formattedUnit,
+                                style: const TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF475569),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                          if (p.isSubscribable)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: SubscriptionButton(
+                                product: p,
+                                isCompact: true,
                               ),
                             ),
                           const Spacer(),
@@ -723,14 +995,6 @@ class ProductCardV extends StatelessWidget {
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
-                                        // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
-                                        // Displays the compact subscription price badge in browse list
-                                        if (p.isSubscribable && p.subscriptionPrice != null && p.subscriptionPrice! > 0) ...[
-                                          const SizedBox(width: 4),
-                                          SubscriptionPriceBadge.compact(
-                                            subscriptionPrice: p.subscriptionPrice!,
-                                          ),
-                                        ],
                                       ],
                                     ),
                                     if (p.originalPrice > p.price) ...[
@@ -740,7 +1004,8 @@ class ProductCardV extends StatelessWidget {
                                         style: const TextStyle(
                                           fontSize: 10,
                                           color: kMuted,
-                                          decoration: TextDecoration.lineThrough,
+                                          decoration:
+                                              TextDecoration.lineThrough,
                                           fontWeight: FontWeight.w600,
                                         ),
                                         maxLines: 1,
@@ -751,7 +1016,11 @@ class ProductCardV extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 4),
-                              ZeptoAddButton(p: p, isSmall: true, isBrowse: isBrowse),
+                              ZeptoAddButton(
+                                p: p,
+                                isSmall: true,
+                                isBrowse: isBrowse,
+                              ),
                             ],
                           ),
                         ],
@@ -763,115 +1032,146 @@ class ProductCardV extends StatelessWidget {
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Image area
-                  Stack(
-                    children: [
-                      Hero(
-                        tag: 'product-v-${p.id}',
-                        child: Container(
-                          height: 112,
+                  // Image container
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        Container(
                           width: double.infinity,
                           decoration: const BoxDecoration(
                             color: Colors.transparent,
                           ),
                           child: _productImage(p, padding: 0.0),
                         ),
-                      ),
-                      // [ADDED BY ANTIGRAVITY] Rating badge on image
-                      if (p.reviews > 0)
-                        Positioned(
-                          top: 8, left: 8,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 2.5),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFFFE0B2), width: 0.8),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.star_rounded, size: 10, color: Colors.amber),
-                                const SizedBox(width: 2.5),
-                                Text(
-                                  '${p.rating.toStringAsFixed(1)} (${p.reviews})',
-                                  style: const TextStyle(fontSize: 7.5, fontWeight: FontWeight.w800, color: Color(0xFFE65100)),
+                        // Rating badge on image
+                        if (p.reviews > 0)
+                          Positioned(
+                            top: 8,
+                            left: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4.5,
+                                vertical: 2.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.9),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: const Color(0xFFFFE0B2),
+                                  width: 0.8,
                                 ),
-                              ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.star_rounded,
+                                    size: 10,
+                                    color: Colors.amber,
+                                  ),
+                                  const SizedBox(width: 2.5),
+                                  Text(
+                                    '${p.rating.toStringAsFixed(1)} (${p.reviews})',
+                                    style: const TextStyle(
+                                      fontSize: 7.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFFE65100),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                   // Info
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(p.name,
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kText, letterSpacing: -0.2),
-                              maxLines: 2, overflow: TextOverflow.ellipsis),
-                          const SizedBox(height: 2),
-                          if (p.unit.isNotEmpty)
-                             Text(p.unit, style: const TextStyle(fontSize: 10, color: kTextSub, fontWeight: FontWeight.w600))
-                           else
-                             const SizedBox(height: 12),
-                           const Spacer(),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Text(
-                                          '₹${p.price.toStringAsFixed(0)}',
-                                          style: const TextStyle(
-                                            fontSize: 13.5,
-                                            fontWeight: FontWeight.w900,
-                                            color: kText,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
-                                        // Displays the compact subscription price badge in grid list
-                                        if (p.subscriptionPrice != null && p.subscriptionPrice! > 0) ...[
-                                          const SizedBox(width: 4),
-                                          SubscriptionPriceBadge.compact(
-                                            subscriptionPrice: p.subscriptionPrice!,
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                    if (p.originalPrice > p.price) ...[
-                                      const SizedBox(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          p.name,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: kText,
+                            letterSpacing: -0.2,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (p.formattedUnit.isNotEmpty && p.formattedUnit.toLowerCase() != p.name.toLowerCase()) ...[
+                          const SizedBox(height: 3),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
+                            ),
+                            child: Text(
+                              p.formattedUnit,
+                              style: const TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF475569),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    children: [
                                       Text(
-                                        '₹${p.originalPrice.toStringAsFixed(0)}',
+                                        '₹${p.price.toStringAsFixed(0)}',
                                         style: const TextStyle(
-                                          fontSize: 9.5,
-                                          color: kMuted,
-                                          decoration: TextDecoration.lineThrough,
-                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w900,
+                                          color: kText,
                                         ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ],
+                                  ),
+                                  if (p.originalPrice > p.price) ...[
+                                    const SizedBox(height: 1),
+                                    Text(
+                                      '₹${p.originalPrice.toStringAsFixed(0)}',
+                                      style: const TextStyle(
+                                        fontSize: 9.5,
+                                        color: kMuted,
+                                        decoration: TextDecoration.lineThrough,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ],
-                                ),
+                                ],
                               ),
-                              const SizedBox(width: 4),
-                              ZeptoAddButton(p: p, isSmall: true, isBrowse: isBrowse),
-                            ],
-                          ),
-                        ],
-                      ),
+                            ),
+                            const SizedBox(width: 4),
+                            ZeptoAddButton(
+                              p: p,
+                              isSmall: true,
+                              isBrowse: isBrowse,
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -890,7 +1190,11 @@ class ZeptoAddButton extends StatefulWidget {
   final Product p;
   final bool isSmall;
   final bool isBrowse;
-  const ZeptoAddButton({super.key, required this.p, this.isSmall = true, this.isBrowse = false});
+  const ZeptoAddButton({
+    required this.p,
+    this.isSmall = true,
+    this.isBrowse = false,
+  });
 
   @override
   State<ZeptoAddButton> createState() => ZeptoAddButtonState();
@@ -904,10 +1208,19 @@ class ZeptoAddButtonState extends State<ZeptoAddButton>
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
     _scale = TweenSequence([
       TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.80), weight: 40),
-      TweenSequenceItem(tween: Tween(begin: 0.80, end: 1.10).chain(CurveTween(curve: Curves.elasticOut)), weight: 60),
+      TweenSequenceItem(
+        tween: Tween(
+          begin: 0.80,
+          end: 1.10,
+        ).chain(CurveTween(curve: Curves.elasticOut)),
+        weight: 60,
+      ),
     ]).animate(_ctrl);
   }
 
@@ -928,17 +1241,23 @@ class ZeptoAddButtonState extends State<ZeptoAddButton>
   void _onRemove(BuildContext ctx) {
     ctx.runWithAuth(() {
       HapticFeedback.lightImpact();
-      
+
       final items = ctx.read<CartBloc>().currentItems;
       CartItemEntity? matchedItem;
       try {
-        matchedItem = items.firstWhere(
-          (item) => item.productId == widget.p.id,
-        );
+        matchedItem = items.firstWhere((item) => item.productId == widget.p.id);
       } catch (_) {}
 
-      final variantId = matchedItem?.variantId ?? (widget.p.variants.isNotEmpty ? widget.p.variants.first.id : widget.p.id);
-      final variantLabel = matchedItem?.variantName ?? (widget.p.variants.isNotEmpty ? widget.p.variants.first.label : widget.p.unit);
+      final variantId =
+          matchedItem?.variantId ??
+          (widget.p.allVariants.isNotEmpty
+              ? widget.p.allVariants.first.id
+              : widget.p.id);
+      final variantLabel =
+          matchedItem?.variantName ??
+          (widget.p.allVariants.isNotEmpty
+              ? widget.p.allVariants.first.label
+              : widget.p.unit);
       final purchaseType = matchedItem?.purchaseType ?? 'onetime';
 
       final cartItem = CartItemEntity(
@@ -949,7 +1268,12 @@ class ZeptoAddButtonState extends State<ZeptoAddButton>
         unitPrice: matchedItem?.unitPrice ?? widget.p.price,
         purchaseType: purchaseType,
         quantity: 1,
-        deliveryDate: matchedItem?.deliveryDate ?? DateTime.now().add(const Duration(days: 1)).toString().split(' ')[0],
+        deliveryDate:
+            matchedItem?.deliveryDate ??
+            DateTime.now()
+                .add(const Duration(days: 1))
+                .toString()
+                .split(' ')[0],
         deliverySlot: matchedItem?.deliverySlot ?? 'Morning',
       );
       ctx.read<CartBloc>().add(RemoveFromCartEvent(cartItem));
@@ -958,12 +1282,41 @@ class ZeptoAddButtonState extends State<ZeptoAddButton>
 
   @override
   Widget build(BuildContext context) {
+    final isOutOfStockOrLow =
+        widget.p.isOutOfStock || widget.p.isLowStock || !widget.p.isOneTime;
+    if (isOutOfStockOrLow) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE0E0E0),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFBDBDBD), width: 1.0),
+        ),
+        child: Text(
+          widget.p.isOutOfStock ? 'OUT OF STOCK' : 'LOW STOCK',
+          style: const TextStyle(
+            fontSize: 8.5,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF757575),
+            letterSpacing: 0.3,
+          ),
+        ),
+      );
+    }
+
     return BlocBuilder<CartBloc, CartState>(
       builder: (ctx, state) {
         final items = ctx.read<CartBloc>().currentItems;
         int qty = items
             .where((item) => item.productId == widget.p.id)
-            .fold(0, (sum, item) => sum + (item.purchaseType == 'subscription' ? 1 : (item.quantity ?? 1)));
+            .fold(
+              0,
+              (sum, item) =>
+                  sum +
+                  (item.purchaseType == 'subscription'
+                      ? 1
+                      : (item.quantity ?? 1)),
+            );
 
         if (qty == 0) {
           return ScaleTransition(
@@ -977,7 +1330,10 @@ class ZeptoAddButtonState extends State<ZeptoAddButton>
                       decoration: BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
-                        border: Border.all(color: kPrimary.withValues(alpha: 0.35), width: 1.5),
+                        border: Border.all(
+                          color: kPrimary.withOpacity(0.35),
+                          width: 1.5,
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: kPrimary.withValues(alpha: 0.04),
@@ -987,15 +1343,25 @@ class ZeptoAddButtonState extends State<ZeptoAddButton>
                         ],
                       ),
                       child: const Center(
-                        child: Icon(Icons.add_rounded, color: kPrimary, size: 16),
+                        child: Icon(
+                          Icons.add_rounded,
+                          color: kPrimary,
+                          size: 16,
+                        ),
                       ),
                     )
                   : Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: kPrimary.withValues(alpha: 0.35), width: 1.5),
+                        border: Border.all(
+                          color: kPrimary.withOpacity(0.35),
+                          width: 1.5,
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: kPrimary.withValues(alpha: 0.04),
@@ -1049,17 +1415,31 @@ class ZeptoAddButtonState extends State<ZeptoAddButton>
                   behavior: HitTestBehavior.opaque,
                   child: const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: Icon(Icons.remove_rounded, color: Colors.white, size: 12),
+                    child: Icon(
+                      Icons.remove_rounded,
+                      color: Colors.white,
+                      size: 12,
+                    ),
                   ),
                 ),
-                Text('$qty',
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.white)),
+                Text(
+                  '$qty',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
                 GestureDetector(
                   onTap: () => _onAdd(ctx),
                   behavior: HitTestBehavior.opaque,
                   child: const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: Icon(Icons.add_rounded, color: Colors.white, size: 12),
+                    child: Icon(
+                      Icons.add_rounded,
+                      color: Colors.white,
+                      size: 12,
+                    ),
                   ),
                 ),
               ],

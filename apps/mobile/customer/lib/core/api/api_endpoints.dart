@@ -24,9 +24,9 @@ class ApiEndpoints {
   static String get _devBaseUrl {
     if (kReleaseMode && _envBaseUrl.isEmpty) {
       // Default to local backend IP for local testing
-      return 'http://192.168.1.35:5001';
+      return 'https://f2hfresh.com';
     }
-    return 'http://192.168.1.35:5001';
+    return 'http://192.168.1.6:5001';
   }
 
   /// Root host (scheme + host + port), no trailing slash.

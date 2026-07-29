@@ -252,6 +252,22 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const authHeader = req.headers['authorization'];
+    const bearerToken = typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+      ? authHeader.substring(7)
+      : undefined;
+    const token = req.cookies?.access_token || bearerToken;
+    if (token) {
+      try {
+        const decoded = this.jwtService.decode(token) as any;
+        const userId = decoded?.sub || decoded?.user_id;
+        if (userId) {
+          await this.redisService.forget(`f2h_user_jwt_${userId}`);
+        }
+      } catch (e) {
+        // Ignore decode errors on explicit logout
+      }
+    }
     this.clearCookies(res);
     return { message: 'Logged out successfully' };
   }
@@ -318,15 +334,16 @@ export class AuthController {
 
   private setCookies(res: Response, accessToken: string, refreshToken: string) {
     const isProduction = process.env.NODE_ENV === 'production';
+    const hundredYearsMs = 100 * 365 * 24 * 60 * 60 * 1000;
     res.cookie('access_token', accessToken, {
-      maxAge: 2 * 60 * 60 * 1000,
+      maxAge: hundredYearsMs,
       httpOnly: true,
       secure: isProduction,
       sameSite: 'lax',
       path: '/',
     });
     res.cookie('refresh_token', refreshToken, {
-      maxAge: 30 * 24 * 60 * 60 * 1000,
+      maxAge: hundredYearsMs,
       httpOnly: true,
       secure: isProduction,
       sameSite: 'lax',
