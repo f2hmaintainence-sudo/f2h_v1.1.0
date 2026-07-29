@@ -382,7 +382,7 @@ class _HomeScreenState extends State<HomeScreen>
                 // 7. The F2H Promise
                 SliverToBoxAdapter(child: _promiseStrip()),
 
-                const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                const SliverToBoxAdapter(child: SizedBox(height: 20)),
               ],
             ),
           ),
