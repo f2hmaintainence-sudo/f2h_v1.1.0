@@ -187,7 +187,7 @@ export class DispatchPlanningService {
           // Variant details is unit representation
           const variantName = unitValue && unitType ? `${unitValue} ${unitType}` : (row.variant_name || '');
           const groupKey = `${productName.trim()}::${variantName.trim()}`;
-          const qty = Number(row.loaded_qty || row.planned_qty || 0);
+          const qty = Number(row.loaded_qty) || Number(row.planned_qty) || 0;
 
           if (!totals[groupKey]) {
             totals[groupKey] = {
