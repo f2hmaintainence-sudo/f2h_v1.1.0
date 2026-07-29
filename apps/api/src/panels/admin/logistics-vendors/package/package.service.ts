@@ -59,6 +59,7 @@ export class PackageService {
           COALESCE(SUM(balance_quantity), 0)::int AS balance_quantity,
           COUNT(*)::int AS customer_package_rows
         FROM customer_container_balances
+        WHERE deleted_at IS NULL
         `,
       );
 
@@ -68,7 +69,7 @@ export class PackageService {
           transaction_type,
           COALESCE(SUM(quantity), 0)::int AS quantity
         FROM container_transactions
-        WHERE transaction_date >= $1::date
+        WHERE deleted_at IS NULL AND transaction_date >= $1::date
         GROUP BY transaction_type
         ORDER BY transaction_type
         `,
@@ -78,16 +79,17 @@ export class PackageService {
       const packaging = await this.db.query(
         `
         SELECT
-          pt.id,
-          pt.name,
+          c.container_id AS id,
+          c.name,
           COALESCE(SUM(ccb.balance_quantity), 0)::int AS balance_quantity,
           COALESCE(SUM(ccb.damaged_quantity), 0)::int AS damaged_quantity,
           COALESCE(SUM(ccb.lost_quantity), 0)::int AS lost_quantity
-        FROM packaging_types pt
+        FROM containers c
         LEFT JOIN customer_container_balances ccb
-          ON ccb.packaging_type_id = pt.id
-        GROUP BY pt.id, pt.name
-        ORDER BY pt.name ASC
+          ON ccb.packaging_type_id = c.container_id AND ccb.deleted_at IS NULL
+        WHERE c.deleted_at IS NULL
+        GROUP BY c.container_id, c.name
+        ORDER BY c.name ASC
         `,
       );
 
@@ -96,13 +98,15 @@ export class PackageService {
         SELECT
           ct.id,
           ct.customer_id,
-          pt.name AS packaging_type,
+          COALESCE(cnt.name, pt.name, ct.packaging_type_id) AS packaging_type,
           ct.transaction_type,
           ct.quantity,
           ct.transaction_date::text,
           ct.created_at::text
         FROM container_transactions ct
-        JOIN packaging_types pt ON pt.id = ct.packaging_type_id
+        LEFT JOIN packaging_types pt ON pt.id = ct.packaging_type_id AND pt.deleted_at IS NULL
+        LEFT JOIN containers cnt ON cnt.container_id = ct.packaging_type_id AND cnt.deleted_at IS NULL
+        WHERE ct.deleted_at IS NULL
         ORDER BY ct.created_at DESC
         LIMIT 8
         `,
@@ -144,6 +148,8 @@ export class PackageService {
           CAST(c.customer_id AS TEXT) ILIKE $${params.length}
           OR COALESCE(c.full_name, CONCAT(c.first_name, ' ', c.last_name)) ILIKE $${params.length}
           OR c.phone ILIKE $${params.length}
+          OR cnt.name ILIKE $${params.length}
+          OR cnt.container_id ILIKE $${params.length}
           OR pt.name ILIKE $${params.length}
         )`;
       }
@@ -153,10 +159,10 @@ export class PackageService {
           ccb.customer_id,
           COALESCE(c.full_name, CONCAT(c.first_name, ' ', c.last_name)) AS customer_name,
           c.phone,
-          pt.id AS container_type_id,
-          pt.name AS container_name,
-          pt.capacity,
-          pt.unit,
+          COALESCE(cnt.container_id, pt.id, ccb.packaging_type_id) AS container_type_id,
+          COALESCE(cnt.name, pt.name, ccb.packaging_type_id) AS container_name,
+          COALESCE(pt.capacity::text, '1') AS capacity,
+          COALESCE(pt.unit, 'PCS') AS unit,
           ccb.issued_quantity,
           ccb.returned_quantity,
           ccb.damaged_quantity,
@@ -165,8 +171,9 @@ export class PackageService {
           ccb.updated_at
         FROM customer_container_balances ccb
         JOIN customers c ON c.customer_id = ccb.customer_id
-        JOIN packaging_types pt ON pt.id = ccb.packaging_type_id
-        WHERE pt.is_returnable = true
+        LEFT JOIN packaging_types pt ON pt.id = ccb.packaging_type_id AND pt.deleted_at IS NULL
+        LEFT JOIN containers cnt ON cnt.container_id = ccb.packaging_type_id AND cnt.deleted_at IS NULL
+        WHERE ccb.deleted_at IS NULL
           AND GREATEST(0, ccb.issued_quantity - ccb.returned_quantity - ccb.damaged_quantity - ccb.lost_quantity) > 0
           ${searchClause}
         ORDER BY ccb.updated_at DESC
@@ -276,7 +283,7 @@ export class PackageService {
     const columns = {
       id: 'ct.id',
       customer_id: 'ct.customer_id',
-      packaging_type: 'pt.name',
+      packaging_type: 'COALESCE(cnt.name, pt.name, ct.packaging_type_id)',
       reference_type: 'ct.reference_type',
       reference_id: 'ct.reference_id',
       transaction_type: 'ct.transaction_type',
@@ -291,13 +298,14 @@ export class PackageService {
       columns,
       fromSql: `
         FROM container_transactions ct
-        JOIN packaging_types pt ON pt.id = ct.packaging_type_id
+        LEFT JOIN packaging_types pt ON pt.id = ct.packaging_type_id
+        LEFT JOIN containers cnt ON cnt.container_id = ct.packaging_type_id
       `,
       selectSql: `
         SELECT
           ct.id,
           ct.customer_id,
-          pt.name AS packaging_type,
+          COALESCE(cnt.name, pt.name, ct.packaging_type_id) AS packaging_type,
           ct.packaging_type_id,
           ct.reference_type,
           ct.reference_id,
@@ -310,6 +318,7 @@ export class PackageService {
       `,
       searchable: [
         'ct.customer_id',
+        'cnt.name',
         'pt.name',
         'ct.reference_type',
         'ct.reference_id',
@@ -358,7 +367,7 @@ export class PackageService {
     const columns = {
       id: 'ccb.id',
       customer_id: 'ccb.customer_id',
-      packaging_type: 'pt.name',
+      packaging_type: 'COALESCE(cnt.name, pt.name, ccb.packaging_type_id)',
       issued_quantity: 'ccb.issued_quantity',
       returned_quantity: 'ccb.returned_quantity',
       damaged_quantity: 'ccb.damaged_quantity',
@@ -372,13 +381,14 @@ export class PackageService {
       columns,
       fromSql: `
         FROM customer_container_balances ccb
-        JOIN packaging_types pt ON pt.id = ccb.packaging_type_id
+        LEFT JOIN packaging_types pt ON pt.id = ccb.packaging_type_id
+        LEFT JOIN containers cnt ON cnt.container_id = ccb.packaging_type_id
       `,
       selectSql: `
         SELECT
           ccb.id,
           ccb.customer_id,
-          pt.name AS packaging_type,
+          COALESCE(cnt.name, pt.name, ccb.packaging_type_id) AS packaging_type,
           ccb.issued_quantity,
           ccb.returned_quantity,
           ccb.damaged_quantity,
@@ -386,7 +396,7 @@ export class PackageService {
           ccb.balance_quantity,
           ccb.updated_at::text AS updated_at
       `,
-      searchable: ['ccb.customer_id', 'pt.name'],
+      searchable: ['ccb.customer_id', 'cnt.name', 'pt.name'],
       defaultSort: 'ccb.updated_at DESC',
       actionTypes: false,
     });
@@ -396,7 +406,7 @@ export class PackageService {
     const columns = {
       id: 'ct.id',
       customer_id: 'ct.customer_id',
-      packaging_type: 'pt.name',
+      packaging_type: 'COALESCE(cnt.name, pt.name, ct.packaging_type_id)',
       transaction_type: 'ct.transaction_type',
       quantity: 'ct.quantity',
       remarks: 'ct.remarks',
@@ -409,21 +419,22 @@ export class PackageService {
       columns,
       fromSql: `
         FROM container_transactions ct
-        JOIN packaging_types pt ON pt.id = ct.packaging_type_id
+        LEFT JOIN packaging_types pt ON pt.id = ct.packaging_type_id
+        LEFT JOIN containers cnt ON cnt.container_id = ct.packaging_type_id
         WHERE ct.transaction_type IN ('damaged', 'lost')
       `,
       selectSql: `
         SELECT
           ct.id,
           ct.customer_id,
-          pt.name AS packaging_type,
+          COALESCE(cnt.name, pt.name, ct.packaging_type_id) AS packaging_type,
           ct.transaction_type,
           ct.quantity,
           ct.remarks,
           ct.transaction_date::text AS transaction_date,
           ct.created_by
       `,
-      searchable: ['ct.customer_id', 'pt.name', 'ct.remarks'],
+      searchable: ['ct.customer_id', 'cnt.name', 'pt.name', 'ct.remarks'],
       defaultSort: 'ct.transaction_date DESC, ct.id DESC',
       actionTypes: false,
     });

@@ -25,7 +25,7 @@ class DashboardHeader extends StatelessWidget {
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: fg.withOpacity(0.1), width: 1),
+          border: Border.all(color: fg.withValues(alpha: 0.1), width: 1),
         ),
         child: Row(
           children: [
@@ -47,7 +47,7 @@ class DashboardHeader extends StatelessWidget {
                   label,
                   style: TextStyle(
                     fontSize: 10,
-                    color: fg.withOpacity(0.7),
+                    color: fg.withValues(alpha: 0.7),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -77,7 +77,7 @@ class DashboardHeader extends StatelessWidget {
                     AppGreeting.get(),
                     style: TextStyle(
                       fontSize: 12,
-                      color: kTextSub.withOpacity(0.8),
+                      color: kTextSub.withValues(alpha: 0.8),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -102,9 +102,9 @@ class DashboardHeader extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: kPrimary.withOpacity(0.12),
+                    color: kPrimary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: kPrimary.withOpacity(0.3), width: 1.2),
+                    border: Border.all(color: kPrimary.withValues(alpha: 0.3), width: 1.2),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,

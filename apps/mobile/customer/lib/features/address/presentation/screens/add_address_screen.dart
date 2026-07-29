@@ -660,7 +660,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                     horizontal: 16,
                   ),
                   decoration: BoxDecoration(
-                    color: kRed.withOpacity(0.08),
+                    color: kRed.withValues(alpha: 0.08),
                     border: const Border(
                       bottom: BorderSide(
                         color: kRed,
@@ -700,7 +700,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                           border: Border.all(color: kBorder),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.02),
+                              color: Colors.black.withValues(alpha: 0.02),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -713,7 +713,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: kPrimary.withOpacity(0.08),
+                                    color: kPrimary.withValues(alpha: 0.08),
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(
@@ -932,7 +932,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                             ),
                             Switch(
                               value: isDefault,
-                              activeColor: kPrimary,
+                              activeThumbColor: kPrimary,
                               onChanged: (val) => setState(() => isDefault = val),
                             ),
                           ],
@@ -1029,8 +1029,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                         point: LatLng(bLat, bLng),
                         radius: radiusKm * 1000,
                         useRadiusInMeter: true,
-                        color: kPrimary.withOpacity(0.12),
-                        borderColor: kPrimary.withOpacity(0.6),
+                        color: kPrimary.withValues(alpha: 0.12),
+                        borderColor: kPrimary.withValues(alpha: 0.6),
                         borderStrokeWidth: 2,
                       );
                     })
@@ -1052,8 +1052,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                           : getSquarePoints(LatLng(bLat, bLng), radiusKm);
                       return Polygon(
                         points: points,
-                        color: kPrimary.withOpacity(0.12),
-                        borderColor: kPrimary.withOpacity(0.6),
+                        color: kPrimary.withValues(alpha: 0.12),
+                        borderColor: kPrimary.withValues(alpha: 0.6),
                         borderStrokeWidth: 2,
                       );
                     })
@@ -1078,7 +1078,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.15),
+                                color: Colors.black.withValues(alpha: 0.15),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),
@@ -1132,7 +1132,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                   borderRadius: BorderRadius.circular(30),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 8,
                       offset: const Offset(0, 3),
                     ),
@@ -1169,7 +1169,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),

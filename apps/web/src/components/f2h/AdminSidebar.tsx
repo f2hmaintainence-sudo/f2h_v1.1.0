@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : AdminSidebar.tsx
 // Description : Admin sidebar component with DEVELOPER section for API integrations
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 "use client";
@@ -33,34 +32,6 @@ const adminNav = [
     ],
   },
   {
-    label: "CATALOG & INVENTORY",
-    items: [
-      { name: "Categories", href: "/admin/catalog/categories", icon: Layers },
-      { name: "Products", href: "/admin/catalog/products", icon: Package },
-      { name: "Product Variants", href: "/admin/catalog/variants", icon: Tag },
-      {
-        name: "Inventory",
-        icon: Boxes,
-        subItems: [
-          { name: "Overview", href: "/admin/inventory/overview", icon: BarChart3 },
-          { name: "Production Batches", href: "/admin/inventory/production", icon: Factory },
-          { name: "Reconciliation", href: "/admin/inventory/reconciliation", icon: ClipboardCheck },
-          { name: "Expiry Tracker", href: "/admin/inventory/expiry", icon: Clock },
-          { name: "Stock Forecast", href: "/admin/inventory/forecast", icon: LineChart },
-        ]
-      },
-      {
-        name: "Warehouse",
-        icon: Building,
-        subItems: [
-          { name: "Warehouse Stock", href: "/admin/inventory/warehouse", icon: Building2 },
-          { name: "Warehouse Dispatch", href: "/admin/warehouse/dispatch", icon: Box },
-          { name: "Inter-Warehouse Transfers", href: "/admin/warehouse/transfers", icon: ArrowRightLeft },
-        ]
-      },
-    ],
-  },
-  {
     label: "ORDERS & DELIVERIES",
     items: [
       { name: "Orders", href: "/admin/orders/allorders", icon: ShoppingBag },
@@ -68,7 +39,6 @@ const adminNav = [
         name: "Delivery Operations",
         icon: Truck,
         subItems: [
-          { name: "Dispatch", href: "/admin/delivery/dispatch", icon: Box },
           { name: "Delivery Runs", href: "/admin/delivery/assign", icon: Zap },
           { name: "Delivery Partners", href: "/admin/delivery/partners", icon: UserCog },
           { name: "Delivery Logs", href: "/admin/delivery/logs", icon: PieChart },
@@ -76,7 +46,34 @@ const adminNav = [
         ]
       },
       { name: "Containers", href: "/admin/packages/dashboard", icon: Container },
-      { name: "Branches", href: "/admin/branches", icon: Building2 },
+    ],
+  },
+  {
+    label: "CATALOG & INVENTORY",
+    items: [
+      { name: "Categories", href: "/admin/catalog/categories", icon: Layers },
+      { name: "Products", href: "/admin/catalog/products", icon: Package },
+      { name: "Product Variants", href: "/admin/catalog/variants", icon: Tag },
+      { name: "Offers", href: "/admin/catalog/offers", icon: Tag },
+      {
+        name: "Inventory & Warehouse",
+        icon: Archive,
+        subItems: [
+          { name: "Warehouses", href: "/admin/warehouse/list", icon: Building },
+          { name: "Stock Overview", href: "/admin/inventory/overview", icon: AlignLeft },
+          { name: "Stock In/Out", href: "/admin/warehouse/stock-movements", icon: ArrowRightLeft },
+          { name: "Dispatch Requirements", href: "/admin/warehouse/dispatch", icon: Truck },
+        ]
+      },
+      {
+        name: "Branch Config",
+        icon: Settings,
+        subItems: [
+          { name: "Branches", href: "/admin/branches", icon: Building },
+          { name: "Partner Allocation", href: "/admin/branches/partners", icon: UserCheck },
+          { name: "Branch Analytics", href: "/admin/branches/analytics", icon: BarChart },
+        ]
+      },
     ],
   },
   {

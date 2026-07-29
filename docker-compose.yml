@@ -1,0 +1,62 @@
+services:
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+      target: development
+    container_name: f2hapi-dev-server
+    command: node dist/main.js
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./apps/api:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - PORT=5001
+      - Backend_Port=5001
+      - DB_CONNECTION=postgresql
+      - DB_HOST=f2hfresh.com
+      - DB_PORT=5432
+      - DB_DATABASE=f2h_fresh
+      - DB_USERNAME=f2h_user
+      - DB_PASSWORD=f2h_password
+      - BACKEND_URL=http://localhost:5001
+      - APP_URL=http://localhost:3000
+      - JWT_SECRET=f2hfresh_super_secret_jwt_key_32chars_min_length!
+      - SESSION_SECRET=f2hfresh_super_secret_session_key_32chars!
+      - ENCRYPTION_SECRET=f2hfresh_super_secret_enc_key_32chars_min_length!
+      - DATA_ENCRYPTION_KEY=f2hfresh_super_secret_data_key_32chars_min_length!
+      - GOOGLE_CLIENT_ID=dummy_google_client_id_dev
+      - GOOGLE_CLIENT_SECRET=dummy_google_client_secret_dev
+      - REDIS_HOST=redis
+    env_file:
+      - path: ./apps/api/.env
+        required: false
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      target: development
+    container_name: f2hfrontend-dev-main
+    ports:
+      - "3000:5002"
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - NEXT_PUBLIC_API_URL=http://localhost:5001
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    container_name: f2hredis-dev-main
+    ports:
+      - "6379:6379"
+    restart: unless-stopped

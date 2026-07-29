@@ -8,7 +8,6 @@ import 'package:f2h_customer/features/orders/presentation/bloc/order_history_eve
 import 'package:f2h_customer/features/orders/presentation/bloc/order_history_state.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_view_screen.dart';
 import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
-import 'package:f2h_customer/features/orders/presentation/screens/order_tracking_screen.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
 // import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_bloc.dart';
 // import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_event.dart';
@@ -275,7 +274,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.12),
+              color: statusColor.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: Icon(statusIcon, color: statusColor, size: 26),
@@ -300,21 +299,32 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   style: const TextStyle(fontSize: 12, color: kTextSub, fontWeight: FontWeight.w600),
                 ),
                 if (['out_for_delivery', 'assigned', 'confirmed'].contains(order.status.toLowerCase())) ...[
-                  const SizedBox(height: 10),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => OrderTrackingScreen(orderId: order.id)),
-                      );
-                    },
-                    icon: const Icon(Icons.location_on, size: 16),
-                    label: const Text('Live Track Delivery'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: kPrimary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFA7F3D0)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.phone_in_talk_rounded, size: 13, color: Color(0xFF047857)),
+                        SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            'Delivery partner will call you soon',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF047857),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -382,7 +392,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: order.items.length,
-            separatorBuilder: (_, __) => Divider(color: kBorder.withOpacity(0.5)),
+            separatorBuilder: (_, _) => Divider(color: kBorder.withValues(alpha: 0.5)),
             itemBuilder: (context, idx) {
               final item = order.items[idx];
               return Column(
@@ -399,9 +409,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       Navigator.push(
                         context,
                         PageRouteBuilder(
-                          pageBuilder: (_, a, __) =>
+                          pageBuilder: (_, a, _) =>
                               ProductDetailViewScreen(product: product),
-                          transitionsBuilder: (_, a, __, child) =>
+                          transitionsBuilder: (_, a, _, child) =>
                               FadeTransition(opacity: a, child: child),
                           transitionDuration: const Duration(milliseconds: 220),
                         ),
@@ -689,10 +699,10 @@ class _ProductRatingWidget extends StatefulWidget {
   final String orderId;
   final OrderItem item;
   const _ProductRatingWidget({
-    Key? key,
+    super.key,
     required this.orderId,
     required this.item,
-  }) : super(key: key);
+  });
 
   @override
   State<_ProductRatingWidget> createState() => _ProductRatingWidgetState();
@@ -774,7 +784,7 @@ class _ProductRatingWidgetState extends State<_ProductRatingWidget> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: kPrimary.withOpacity(0.12),
+                    color: kPrimary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: const Text(

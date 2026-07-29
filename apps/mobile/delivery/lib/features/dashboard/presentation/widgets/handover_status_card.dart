@@ -23,9 +23,9 @@ class HandoverStatusCard extends StatelessWidget {
         margin: const EdgeInsets.only(top: 16, bottom: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: kDanger.withOpacity(0.08),
+          color: kDanger.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: kDanger.withOpacity(0.2), width: 1.5),
+          border: Border.all(color: kDanger.withValues(alpha: 0.2), width: 1.5),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -114,9 +114,9 @@ class HandoverStatusCard extends StatelessWidget {
         margin: const EdgeInsets.only(top: 16, bottom: 16),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: kSuccess.withOpacity(0.08),
+          color: kSuccess.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: kSuccess.withOpacity(0.2), width: 1.5),
+          border: Border.all(color: kSuccess.withValues(alpha: 0.2), width: 1.5),
         ),
         child: Row(
           children: [

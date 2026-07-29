@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : auth_local_datasource.dart
 // Description : Local user cache data source with Isar and memory fallbacks.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'package:flutter/foundation.dart';

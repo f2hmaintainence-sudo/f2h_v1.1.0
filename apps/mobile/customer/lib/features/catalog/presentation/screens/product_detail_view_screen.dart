@@ -25,7 +25,8 @@ class ProductDetailViewScreen extends StatefulWidget {
   const ProductDetailViewScreen({required this.product, super.key});
 
   @override
-  State<ProductDetailViewScreen> createState() => _ProductDetailViewScreenState();
+  State<ProductDetailViewScreen> createState() =>
+      _ProductDetailViewScreenState();
 }
 
 class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
@@ -61,7 +62,15 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
     final vars = p.allVariants;
     _selectedVariant = vars.firstWhere(
       (v) => v.label == p.unit || v.id == p.id,
-      orElse: () => vars.isNotEmpty ? vars.first : ProductVariant(id: p.id, label: p.unit, price: p.price, originalPrice: p.originalPrice, subscriptionPrice: p.subscriptionPrice),
+      orElse: () => vars.isNotEmpty
+          ? vars.first
+          : ProductVariant(
+              id: p.id,
+              label: p.unit,
+              price: p.price,
+              originalPrice: p.originalPrice,
+              subscriptionPrice: p.subscriptionPrice,
+            ),
     );
   }
 
@@ -101,14 +110,14 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
     if (state is CatalogLoaded) {
       allProducts = state.products;
     }
-    
+
     final related = allProducts
         .where((prod) => prod.id != p.id && prod.category == p.category)
         .toList();
     if (related.isEmpty) {
       related.addAll(allProducts.where((prod) => prod.id != p.id).take(4));
     }
-    
+
     final categoryProducts = allProducts
         .where((prod) => prod.category == p.category)
         .toList();
@@ -118,7 +127,12 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
     }
     final stripProducts = categoryProducts.take(4).toList();
 
-    final discPct = _selectedVariant.originalPrice > 0 ? (((_selectedVariant.originalPrice - _selectedVariant.price) / _selectedVariant.originalPrice) * 100).round() : 0;
+    final discPct = _selectedVariant.originalPrice > 0
+        ? (((_selectedVariant.originalPrice - _selectedVariant.price) /
+                      _selectedVariant.originalPrice) *
+                  100)
+              .round()
+        : 0;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F2F2),
@@ -147,7 +161,9 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                 },
                                 itemBuilder: (context, index) {
                                   return Hero(
-                                    tag: index == 0 ? 'product-v-${p.id}' : 'product-v-${p.id}-$index',
+                                    tag: index == 0
+                                        ? 'product-v-${p.id}'
+                                        : 'product-v-${p.id}-$index',
                                     child: SizedBox(
                                       width: double.infinity,
                                       height: double.infinity,
@@ -193,24 +209,25 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                   ),
                                 ],
                               ),
-                              child: const Icon(Icons.keyboard_arrow_down_rounded,
-                                  color: kText, size: 22),
+                              child: const Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                                color: kText,
+                                size: 22,
+                              ),
                             ),
                           ),
                         ),
-                        const Positioned(
-                          top: 8,
-                          right: 12,
-                          child: CartBtn(),
-                        ),
+                        const Positioned(top: 8, right: 12, child: CartBtn()),
 
                         // Green subscription banner overlay on product image
-                        if (_selectedVariant.subscriptionPrice != null && _selectedVariant.subscriptionPrice! > 0)
+                        if (_selectedVariant.subscriptionPrice != null &&
+                            _selectedVariant.subscriptionPrice! > 0)
                           Positioned(
                             bottom: 14,
                             left: 16,
                             child: SubscriptionPriceBadge.full(
-                              subscriptionPrice: _selectedVariant.subscriptionPrice!,
+                              subscriptionPrice:
+                                  _selectedVariant.subscriptionPrice!,
                               normalPrice: _selectedVariant.price,
                             ),
                           ),
@@ -227,7 +244,9 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                 p.images.length,
                                 (index) => AnimatedContainer(
                                   duration: const Duration(milliseconds: 250),
-                                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                  ),
                                   width: _currentImageIndex == index ? 20 : 6,
                                   height: 6,
                                   decoration: BoxDecoration(
@@ -253,7 +272,8 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
             bottom: 0,
             left: 0,
             right: 0,
-            top: MediaQuery.of(context).size.height * 0.44 +
+            top:
+                MediaQuery.of(context).size.height * 0.44 +
                 MediaQuery.of(context).padding.top +
                 1,
             child: SlideTransition(
@@ -261,8 +281,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
               child: Container(
                 decoration: const BoxDecoration(
                   color: Colors.white,
-                  borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(20)),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
                 child: ListView(
                   padding: EdgeInsets.zero,
@@ -282,30 +301,66 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                               height: 1.2,
                             ),
                           ),
-                          const SizedBox(height: 4),
                           // Sub desc
                           Text(
-                            '${p.vendor} · ${_selectedVariant.label}',
+                            '${p.vendor.isNotEmpty ? "${p.vendor} · " : ""}${_selectedVariant.formattedUnit}',
                             style: const TextStyle(
-                                fontSize: 13, color: kTextSub),
+                              fontSize: 13,
+                              color: kTextSub,
+                            ),
                           ),
-                          if (p.isLowStock || p.isOutOfStock || _selectedVariant.isLowStock) ...[
+                          if (p.rating > 0) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.star_rounded,
+                                  size: 14,
+                                  color: Colors.amber,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '${p.rating.toStringAsFixed(1)}${p.reviews > 0 ? " (${p.reviews})" : ""}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFFE65100),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          if (p.isLowStock ||
+                              p.isOutOfStock ||
+                              _selectedVariant.isLowStock) ...[
                             const SizedBox(height: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFFEBEE),
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFFEF5350)),
+                                border: Border.all(
+                                  color: const Color(0xFFEF5350),
+                                ),
                               ),
-                              child: const Row(
+                              child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.warning_amber_rounded, size: 14, color: Color(0xFFD32F2F)),
-                                  SizedBox(width: 4),
+                                  const Icon(
+                                    Icons.warning_amber_rounded,
+                                    size: 14,
+                                    color: Color(0xFFD32F2F),
+                                  ),
+                                  const SizedBox(width: 4),
                                   Text(
-                                    'LOW STOCK — One-Time Order Unavailable',
-                                    style: TextStyle(
+                                    p.isOutOfStock
+                                        ? 'OUT OF STOCK'
+                                        : 'LOW STOCK — One-Time Order Unavailable',
+                                    style: const TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,
                                       color: Color(0xFFD32F2F),
@@ -317,7 +372,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                           ],
                           const SizedBox(height: 12),
 
-                          if (p.allVariants.length > 1) ...[
+                          if (p.allVariants.isNotEmpty) ...[
                             const Text(
                               'Select Pack Size',
                               style: TextStyle(
@@ -329,15 +384,26 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                             ),
                             const SizedBox(height: 8),
                             SizedBox(
-                              height: p.allVariants.any((v) => v.subscriptionPrice != null && v.subscriptionPrice! > 0) ? 84 : 64,
+                              height:
+                                  (p.allVariants.any(
+                                        (v) =>
+                                            v.subscriptionPrice != null &&
+                                            v.subscriptionPrice! > 0,
+                                      )
+                                      ? 84.0
+                                      : 64.0) +
+                                  (p.rating > 0 ? 18.0 : 0.0),
                               child: ListView.separated(
                                 scrollDirection: Axis.horizontal,
                                 itemCount: p.allVariants.length,
-                                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(width: 10),
                                 itemBuilder: (context, index) {
                                   final v = p.allVariants[index];
                                   final isSel = v.id == _selectedVariant.id;
-                                  final hasSub = v.subscriptionPrice != null && v.subscriptionPrice! > 0;
+                                  final hasSub =
+                                      v.subscriptionPrice != null &&
+                                      v.subscriptionPrice! > 0;
                                   return GestureDetector(
                                     onTap: () {
                                       setState(() {
@@ -347,45 +413,73 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                     child: Container(
                                       width: 128,
                                       decoration: BoxDecoration(
-                                        color: isSel ? const Color(0xFFF4FBF7) : Colors.white,
+                                        color: isSel
+                                            ? const Color(0xFFF4FBF7)
+                                            : Colors.white,
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
-                                          color: isSel ? const Color(0xFF0C831F) : const Color(0xFFE2E8F0),
+                                          color: isSel
+                                              ? const Color(0xFF0C831F)
+                                              : const Color(0xFFE2E8F0),
                                           width: isSel ? 2.0 : 1.0,
                                         ),
-                                        boxShadow: isSel ? [
-                                          BoxShadow(
-                                            color: const Color(0xFF0C831F).withOpacity(0.12),
-                                            offset: const Offset(0, 3),
-                                            blurRadius: 6,
-                                          ),
-                                        ] : null,
+                                        boxShadow: isSel
+                                            ? [
+                                                BoxShadow(
+                                                  color: const Color(
+                                                    0xFF0C831F,
+                                                  ).withOpacity(0.12),
+                                                  offset: const Offset(0, 3),
+                                                  blurRadius: 6,
+                                                ),
+                                              ]
+                                            : null,
                                       ),
                                       child: Column(
                                         children: [
                                           Expanded(
                                             child: Padding(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 6,
+                                                  ),
                                               child: Column(
-                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
                                                 children: [
                                                   Text(
-                                                    v.label,
+                                                    v.formattedUnit,
                                                     style: TextStyle(
                                                       fontSize: 12,
-                                                      fontWeight: isSel ? FontWeight.w900 : FontWeight.w700,
-                                                      color: isSel ? const Color(0xFF0C831F) : Colors.black,
+                                                      fontWeight: isSel
+                                                          ? FontWeight.w900
+                                                          : FontWeight.w700,
+                                                      color: isSel
+                                                          ? const Color(
+                                                              0xFF0C831F,
+                                                            )
+                                                          : Colors.black,
                                                     ),
                                                     maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                   ),
+                                                  
                                                   const SizedBox(height: 2),
                                                   Text(
                                                     '₹${v.price.toStringAsFixed(0)}',
                                                     style: TextStyle(
                                                       fontSize: 14,
-                                                      fontWeight: FontWeight.w900,
-                                                      color: isSel ? const Color(0xFF0C831F) : const Color(0xFF2D3748),
+                                                      fontWeight:
+                                                          FontWeight.w900,
+                                                      color: isSel
+                                                          ? const Color(
+                                                              0xFF0C831F,
+                                                            )
+                                                          : const Color(
+                                                              0xFF2D3748,
+                                                            ),
                                                     ),
                                                   ),
                                                 ],
@@ -395,21 +489,35 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                           if (hasSub)
                                             Container(
                                               width: double.infinity,
-                                              padding: const EdgeInsets.symmetric(vertical: 4),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 4,
+                                                  ),
                                               decoration: const BoxDecoration(
                                                 color: Color(0xFF0C831F),
-                                                borderRadius: BorderRadius.vertical(bottom: Radius.circular(10)),
+                                                borderRadius:
+                                                    BorderRadius.vertical(
+                                                      bottom: Radius.circular(
+                                                        10,
+                                                      ),
+                                                    ),
                                               ),
                                               child: Row(
-                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
                                                 children: [
-                                                  const Icon(Icons.sync_rounded, size: 10, color: Colors.white),
+                                                  const Icon(
+                                                    Icons.sync_rounded,
+                                                    size: 10,
+                                                    color: Colors.white,
+                                                  ),
                                                   const SizedBox(width: 3),
                                                   Text(
                                                     'Subscribe @ ₹${v.subscriptionPrice!.toStringAsFixed(0)}',
                                                     style: const TextStyle(
                                                       fontSize: 10,
-                                                      fontWeight: FontWeight.w800,
+                                                      fontWeight:
+                                                          FontWeight.w800,
                                                       color: Colors.white,
                                                     ),
                                                   ),
@@ -441,7 +549,10 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                 ),
                                 const SizedBox(width: 8),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 3,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFE8F5E9),
                                     borderRadius: BorderRadius.circular(6),
@@ -487,7 +598,8 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                           // Expandable details
                           GestureDetector(
                             onTap: () => setState(
-                                () => _detailsExpanded = !_detailsExpanded),
+                              () => _detailsExpanded = !_detailsExpanded,
+                            ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
@@ -506,9 +618,10 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                   turns: _detailsExpanded ? 0.5 : 0,
                                   duration: const Duration(milliseconds: 200),
                                   child: const Icon(
-                                      Icons.keyboard_arrow_down_rounded,
-                                      color: Color(0xFF0C831F),
-                                      size: 18),
+                                    Icons.keyboard_arrow_down_rounded,
+                                    color: Color(0xFF0C831F),
+                                    size: 18,
+                                  ),
                                 ),
                               ],
                             ),
@@ -525,72 +638,84 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                   const Text(
                                     'About this product',
                                     style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: kText),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: kText,
+                                    ),
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    (p.description != null && p.description!.isNotEmpty)
+                                    (p.description != null &&
+                                            p.description!.isNotEmpty)
                                         ? p.description!
                                         : 'Sourced from locally vetted farms. Pasteurized under strict temperature controls to keep nutrients intact. FSSAI certified and tested for 75+ adulterants.',
                                     style: const TextStyle(
-                                        fontSize: 12,
-                                        color: kTextSub,
-                                        height: 1.5),
+                                      fontSize: 12,
+                                      color: kTextSub,
+                                      height: 1.5,
+                                    ),
                                   ),
-                                  if (p.highlights != null && p.highlights!.isNotEmpty) ...[
+                                  if (p.highlights != null &&
+                                      p.highlights!.isNotEmpty) ...[
                                     const SizedBox(height: 10),
                                     const Text(
                                       'Highlights',
                                       style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
-                                          color: kText),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: kText,
+                                      ),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
                                       p.highlights!,
                                       style: const TextStyle(
-                                          fontSize: 12,
-                                          color: kTextSub,
-                                          height: 1.4),
+                                        fontSize: 12,
+                                        color: kTextSub,
+                                        height: 1.4,
+                                      ),
                                     ),
                                   ],
-                                  if (p.ingredients != null && p.ingredients!.isNotEmpty) ...[
+                                  if (p.ingredients != null &&
+                                      p.ingredients!.isNotEmpty) ...[
                                     const SizedBox(height: 10),
                                     const Text(
                                       'Ingredients',
                                       style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
-                                          color: kText),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: kText,
+                                      ),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
                                       p.ingredients!,
                                       style: const TextStyle(
-                                          fontSize: 12,
-                                          color: kTextSub,
-                                          height: 1.4),
+                                        fontSize: 12,
+                                        color: kTextSub,
+                                        height: 1.4,
+                                      ),
                                     ),
                                   ],
-                                  if (p.legalInfo != null && p.legalInfo!.isNotEmpty) ...[
+                                  if (p.legalInfo != null &&
+                                      p.legalInfo!.isNotEmpty) ...[
                                     const SizedBox(height: 10),
                                     const Text(
                                       'Legal Information',
                                       style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
-                                          color: kText),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: kText,
+                                      ),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
                                       p.legalInfo!,
                                       style: const TextStyle(
-                                          fontSize: 12,
-                                          color: kTextSub,
-                                          height: 1.4),
+                                        fontSize: 12,
+                                        color: kTextSub,
+                                        height: 1.4,
+                                      ),
                                     ),
                                   ],
                                   const SizedBox(height: 10),
@@ -603,7 +728,6 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                             crossFadeState: _detailsExpanded
                                 ? CrossFadeState.showSecond
                                 : CrossFadeState.showFirst,
-                            duration: const Duration(milliseconds: 250),
                           ),
 
                           const SizedBox(height: 12),
@@ -614,16 +738,23 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
-                              _trustBadge(Icons.cached_rounded, '48 Hours',
-                                  'Refund*'),
-                              Container(
-                                  width: 1, height: 36, color: kBorderLt),
-                              _trustBadge(Icons.electric_bolt_rounded,
-                                  'Fast', 'Delivery'),
-                              Container(
-                                  width: 1, height: 36, color: kBorderLt),
-                              _trustBadge(Icons.headset_mic_outlined, '24/7',
-                                  'Support'),
+                              _trustBadge(
+                                Icons.cached_rounded,
+                                '48 Hours',
+                                'Refund*',
+                              ),
+                              Container(width: 1, height: 36, color: kBorderLt),
+                              _trustBadge(
+                                Icons.electric_bolt_rounded,
+                                'Fast',
+                                'Delivery',
+                              ),
+                              Container(width: 1, height: 36, color: kBorderLt),
+                              _trustBadge(
+                                Icons.headset_mic_outlined,
+                                '24/7',
+                                'Support',
+                              ),
                             ],
                           ),
 
@@ -635,9 +766,10 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                           const Text(
                             'You may also like',
                             style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                color: kText),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: kText,
+                            ),
                           ),
                           const SizedBox(height: 12),
                           SizedBox(
@@ -647,8 +779,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                               itemCount: related.length,
                               separatorBuilder: (_, __) =>
                                   const SizedBox(width: 10),
-                              itemBuilder: (_, i) =>
-                                  ProductCardH(related[i]),
+                              itemBuilder: (_, i) => ProductCardH(related[i]),
                             ),
                           ),
                           const SizedBox(height: 24),
@@ -660,39 +791,59 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                           const Text(
                             'Customer Reviews',
                             style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                color: kText),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: kText,
+                            ),
                           ),
                           const SizedBox(height: 12),
                           if (_isLoadingReviews)
                             const Center(
                               child: Padding(
                                 padding: EdgeInsets.all(16),
-                                child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  color: kPrimary,
+                                  strokeWidth: 2,
+                                ),
                               ),
                             )
                           else if (_reviews.isEmpty)
                             Container(
                               width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 24,
+                                horizontal: 16,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: const Color(0xFFF5F5F5)),
+                                border: Border.all(
+                                  color: const Color(0xFFF5F5F5),
+                                ),
                               ),
                               child: const Column(
                                 children: [
-                                  Icon(Icons.rate_review_outlined, color: kTextSub, size: 28),
+                                  Icon(
+                                    Icons.rate_review_outlined,
+                                    color: kTextSub,
+                                    size: 28,
+                                  ),
                                   SizedBox(height: 8),
                                   Text(
                                     'No reviews yet',
-                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kTextMid),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: kTextMid,
+                                    ),
                                   ),
                                   SizedBox(height: 4),
                                   Text(
                                     'Be the first to review this product after purchase!',
-                                    style: TextStyle(fontSize: 10, color: kTextSub),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: kTextSub,
+                                    ),
                                     textAlign: TextAlign.center,
                                   ),
                                 ],
@@ -703,14 +854,24 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
                               itemCount: _reviews.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 8),
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 8),
                               itemBuilder: (context, idx) {
                                 final r = _reviews[idx];
-                                final rating = double.tryParse(r['rating']?.toString() ?? '') ?? 0.0;
-                                final name = r['customer_name']?.toString() ?? 'Verified Customer';
-                                final feedback = r['feedback']?.toString() ?? '';
-                                final dateStr = r['created_at'] != null 
-                                    ? DateTime.parse(r['created_at'].toString()).toLocal().toString().split(' ')[0] 
+                                final rating =
+                                    double.tryParse(
+                                      r['rating']?.toString() ?? '',
+                                    ) ??
+                                    0.0;
+                                final name =
+                                    r['customer_name']?.toString() ??
+                                    'Verified Customer';
+                                final feedback =
+                                    r['feedback']?.toString() ?? '';
+                                final dateStr = r['created_at'] != null
+                                    ? DateTime.parse(
+                                        r['created_at'].toString(),
+                                      ).toLocal().toString().split(' ')[0]
                                     : '';
 
                                 return Container(
@@ -718,21 +879,32 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: const Color(0xFFF5F5F5)),
+                                    border: Border.all(
+                                      color: const Color(0xFFF5F5F5),
+                                    ),
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
                                           Text(
                                             name,
-                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kText),
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w800,
+                                              color: kText,
+                                            ),
                                           ),
                                           const Spacer(),
                                           Text(
                                             dateStr,
-                                            style: const TextStyle(fontSize: 10, color: kTextSub, fontWeight: FontWeight.w600),
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              color: kTextSub,
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -740,7 +912,9 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                       Row(
                                         children: List.generate(5, (starIdx) {
                                           return Icon(
-                                            starIdx < rating ? Icons.star_rounded : Icons.star_border_rounded,
+                                            starIdx < rating
+                                                ? Icons.star_rounded
+                                                : Icons.star_border_rounded,
                                             color: Colors.amber,
                                             size: 16,
                                           );
@@ -750,7 +924,11 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                         const SizedBox(height: 6),
                                         Text(
                                           feedback,
-                                          style: const TextStyle(fontSize: 12, color: kTextMid, height: 1.4),
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: kTextMid,
+                                            height: 1.4,
+                                          ),
                                         ),
                                       ],
                                     ],
@@ -816,7 +994,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                           color: kPrimary.withOpacity(0.15),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
-                        )
+                        ),
                       ]
                     : [],
               ),
@@ -865,7 +1043,11 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
         int qty = 0;
         if (state is CartLoadedState) {
           qty = state.items
-              .where((item) => item.productId == p.id && item.variantId == _selectedVariant.id)
+              .where(
+                (item) =>
+                    item.productId == p.id &&
+                    item.variantId == _selectedVariant.id,
+              )
               .fold(0, (sum, item) => sum + (item.quantity ?? 1));
         }
 
@@ -882,7 +1064,10 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
             purchaseType: 'onetime',
             quantity: 1,
             schedules: null,
-            deliveryDate: DateTime.now().add(const Duration(days: 1)).toString().split(' ')[0],
+            deliveryDate: DateTime.now()
+                .add(const Duration(days: 1))
+                .toString()
+                .split(' ')[0],
             deliverySlot: 'Morning',
             imageAsset: p.imageAsset,
             isSubscribable: p.isSubscribable,
@@ -896,10 +1081,16 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
           final items = ctx.read<CartBloc>().currentItems;
           CartItemEntity? matchedItem;
           try {
-            matchedItem = items.firstWhere((item) => item.productId == p.id && item.variantId == _selectedVariant.id);
+            matchedItem = items.firstWhere(
+              (item) =>
+                  item.productId == p.id &&
+                  item.variantId == _selectedVariant.id,
+            );
           } catch (_) {}
 
-          final purchaseType = matchedItem?.purchaseType ?? (p.isSubscribable ? 'subscription' : 'onetime');
+          final purchaseType =
+              matchedItem?.purchaseType ??
+              (p.isSubscribable ? 'subscription' : 'onetime');
           final isSub = purchaseType == 'subscription';
           final variantId = _selectedVariant.id;
           final variantLabel = _selectedVariant.label;
@@ -912,8 +1103,15 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
             unitPrice: _selectedVariant.price,
             purchaseType: purchaseType,
             quantity: !isSub ? 1 : null,
-            schedules: isSub ? [SubscriptionSchedule(day: 0, mQuantity: 1, eQuantity: 0)] : null,
-            deliveryDate: !isSub ? DateTime.now().add(const Duration(days: 1)).toString().split(' ')[0] : null,
+            schedules: isSub
+                ? [SubscriptionSchedule(day: 0, mQuantity: 1, eQuantity: 0)]
+                : null,
+            deliveryDate: !isSub
+                ? DateTime.now()
+                      .add(const Duration(days: 1))
+                      .toString()
+                      .split(' ')[0]
+                : null,
             deliverySlot: !isSub ? 'Morning' : null,
             imageAsset: p.imageAsset,
             isSubscribable: p.isSubscribable,
@@ -923,7 +1121,11 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
           ctx.read<CartBloc>().add(RemoveFromCartEvent(cartItem));
         }
 
-        final isLowStockOrNoOneTime = !p.isOneTime || p.isLowStock || p.isOutOfStock || _selectedVariant.isLowStock;
+        final isLowStockOrNoOneTime =
+            !p.isOneTime ||
+            p.isLowStock ||
+            p.isOutOfStock ||
+            _selectedVariant.isLowStock;
 
         if (qty == 0) {
           return SizedBox(
@@ -937,8 +1139,12 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                       ctx.runWithAuth(() => dispatchAdd());
                     },
               style: ElevatedButton.styleFrom(
-                backgroundColor: isLowStockOrNoOneTime ? const Color(0xFFE0E0E0) : kPrimary,
-                foregroundColor: isLowStockOrNoOneTime ? const Color(0xFF757575) : Colors.white,
+                backgroundColor: isLowStockOrNoOneTime
+                    ? const Color(0xFFE0E0E0)
+                    : kPrimary,
+                foregroundColor: isLowStockOrNoOneTime
+                    ? const Color(0xFF757575)
+                    : Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -946,7 +1152,9 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
               ),
               child: Text(
                 isLowStockOrNoOneTime
-                    ? 'LOW STOCK — ONE TIME ORDER UNAVAILABLE'
+                    ? (p.isOutOfStock
+                          ? 'OUT OF STOCK'
+                          : 'LOW STOCK — ONE TIME ORDER UNAVAILABLE')
                     : 'ADD TO CART — ₹${_selectedVariant.price.toStringAsFixed(0)}',
                 style: const TextStyle(
                   fontSize: 13,
@@ -1004,11 +1212,15 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
       children: [
         Icon(icon, color: kText, size: 22),
         const SizedBox(height: 4),
-        Text(main,
-            style: const TextStyle(
-                fontSize: 12, fontWeight: FontWeight.w800, color: kText)),
-        Text(sub,
-            style: const TextStyle(fontSize: 10, color: kTextSub)),
+        Text(
+          main,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            color: kText,
+          ),
+        ),
+        Text(sub, style: const TextStyle(fontSize: 10, color: kTextSub)),
       ],
     );
   }
@@ -1018,15 +1230,23 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Text(label,
-              style:
-                  const TextStyle(fontSize: 12, color: kTextSub, fontWeight: FontWeight.w500)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: kTextSub,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
           const Spacer(),
-          Text(value,
-              style: const TextStyle(
-                  fontSize: 12,
-                  color: kText,
-                  fontWeight: FontWeight.w700)),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 12,
+              color: kText,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );
@@ -1039,7 +1259,12 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
         int total = 0;
         total = items.fold(0, (sum, item) {
           if (item.purchaseType == 'subscription') {
-            final schedSum = item.schedules?.fold(0, (s, sched) => s + sched.mQuantity + sched.eQuantity) ?? 0;
+            final schedSum =
+                item.schedules?.fold(
+                  0,
+                  (s, sched) => s + sched.mQuantity + sched.eQuantity,
+                ) ??
+                0;
             return sum + (schedSum > 0 ? schedSum : 1);
           }
           return sum + (item.quantity ?? 1);

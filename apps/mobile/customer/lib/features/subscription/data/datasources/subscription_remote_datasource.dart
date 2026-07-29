@@ -146,8 +146,8 @@ class SubscriptionRemoteDataSourceImpl implements SubscriptionRemoteDataSource {
     final response = await dioClient.dio.post(
       '${ApiEndpoints.subscriptions}/$subscriptionId/cancel',
       data: {
-        if (cancelReason != null) 'cancelReason': cancelReason,
-        if (endDate != null) 'endDate': endDate,
+        'cancelReason': ?cancelReason,
+        'endDate': ?endDate,
       },
     );
     return response.data as Map<String, dynamic>;

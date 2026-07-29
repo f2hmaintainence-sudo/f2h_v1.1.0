@@ -46,7 +46,54 @@ class CatalogBloc extends Bloc<CatalogEvent, CatalogState> {
           categoryProducts = await catalogRepository.getProducts();
         } else {
           categoryProducts = await catalogRepository.getProductsByCategoryId(event.categoryId);
+          if (categoryProducts.isEmpty && allProducts.isNotEmpty) {
+            categoryProducts = allProducts.where((p) =>
+              p.category.toLowerCase() == event.categoryId.toLowerCase() ||
+              p.category.toLowerCase().contains(event.categoryId.toLowerCase())
+            ).toList();
+          }
         }
+
+        // Sync stock flags with master catalog to guarantee 100% consistency across category views
+        if (allProducts.isNotEmpty) {
+          categoryProducts = categoryProducts.map((cp) {
+            final master = allProducts.firstWhere(
+              (ap) => ap.id == cp.id || ap.name.toLowerCase() == cp.name.toLowerCase(),
+              orElse: () => cp,
+            );
+            if (master.isOutOfStock || master.isLowStock) {
+              return Product(
+                id: cp.id,
+                name: cp.name,
+                vendor: cp.vendor,
+                unit: cp.unit,
+                category: cp.category,
+                emoji: cp.emoji,
+                price: cp.price,
+                originalPrice: cp.originalPrice,
+                subscriptionPrice: cp.subscriptionPrice,
+                rating: cp.rating,
+                reviews: cp.reviews,
+                isOrganic: cp.isOrganic,
+                isSubscribable: cp.isSubscribable,
+                isOneTime: master.isLowStock ? false : cp.isOneTime,
+                isOutOfStock: master.isOutOfStock || cp.isOutOfStock,
+                isLowStock: master.isLowStock || cp.isLowStock,
+                description: cp.description,
+                highlights: cp.highlights,
+                ingredients: cp.ingredients,
+                legalInfo: cp.legalInfo,
+                badge: cp.badge,
+                badgeColor: cp.badgeColor,
+                imageAsset: cp.imageAsset,
+                images: cp.images,
+                variants: cp.variants,
+              );
+            }
+            return cp;
+          }).toList();
+        }
+
         emit(CatalogLoaded(
           products: allProducts,
           filteredProducts: categoryProducts,

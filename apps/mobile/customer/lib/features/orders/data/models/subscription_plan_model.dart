@@ -14,6 +14,7 @@ class SubscriptionItem {
   final String sku;
   final String productName;
   final String productId;
+  final String? imageUrl;
 
   const SubscriptionItem({
     required this.id,
@@ -28,6 +29,7 @@ class SubscriptionItem {
     required this.sku,
     required this.productName,
     required this.productId,
+    this.imageUrl,
   });
 
   factory SubscriptionItem.fromJson(Map<String, dynamic> json) {
@@ -51,6 +53,11 @@ class SubscriptionItem {
       sku: json['sku']?.toString() ?? '',
       productName: json['product_name']?.toString() ?? 'Product',
       productId: json['product_id']?.toString() ?? '',
+      imageUrl: json['image_url']?.toString() ??
+          json['image_path']?.toString() ??
+          json['url']?.toString() ??
+          json['product_image']?.toString() ??
+          json['variant_image']?.toString(),
     );
   }
 
@@ -156,6 +163,7 @@ class SubscriptionPlan {
   }
 
   String get primaryEmoji => items.isEmpty ? '📦' : items[0].emoji;
+  String? get primaryImageUrl => items.isNotEmpty ? items[0].imageUrl : null;
 
   /// Total morning qty cost per day
   double get dailyMorningCost {

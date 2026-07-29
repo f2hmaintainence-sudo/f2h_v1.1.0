@@ -20,10 +20,10 @@ class MockDataService extends ChangeNotifier {
 
   bool _isVerified = true;
   bool get isVerified => _isVerified;
-  
+
   String _accountStatus = "active";
   String get accountStatus => _accountStatus;
-  
+
   String _driverName = "User";
   String get driverName => _driverName;
 
@@ -32,7 +32,7 @@ class MockDataService extends ChangeNotifier {
 
   // Tab navigation notifier to trigger page transitions in the app shell
   final ValueNotifier<int?> tabNavigationNotifier = ValueNotifier<int?>(null);
-  
+
   // Track if we need to open the KYC section when profile page is shown
   bool shouldOpenKycOnProfile = false;
 
@@ -41,7 +41,7 @@ class MockDataService extends ChangeNotifier {
   final double _performanceBonus = 150.0;
   final double _subscriptionBonus = 200.0;
   final double _distanceBonus = 150.0;
-  
+
   double get todayBasePay => _todayBasePay;
   double get performanceBonus => _performanceBonus;
   double get subscriptionBonus => _subscriptionBonus;
@@ -49,7 +49,11 @@ class MockDataService extends ChangeNotifier {
 
   double get todayEarnings {
     double deliveryPay = deliveredOrdersCount * 15.0;
-    return _todayBasePay + _performanceBonus + _subscriptionBonus + _distanceBonus + deliveryPay;
+    return _todayBasePay +
+        _performanceBonus +
+        _subscriptionBonus +
+        _distanceBonus +
+        deliveryPay;
   }
 
   double get weekEarnings => 5450.0 + (deliveredOrdersCount * 15.0);
@@ -98,14 +102,14 @@ class MockDataService extends ChangeNotifier {
       }
       notifyListeners();
     } catch (e) {
-      print('MockDataService: Error loading today orders/run from database: $e');
+      print(
+        'MockDataService: Error loading today orders/run from database: $e',
+      );
       _orders = [];
       _currentRun = null;
       notifyListeners();
     }
   }
-
- 
 
   Future<void> toggleOnline(bool val) async {
     _isOnline = val;
@@ -117,7 +121,6 @@ class MockDataService extends ChangeNotifier {
         '/DeliveryPartner/auth/shift-toggle',
         data: {'is_active': val},
       );
-      
       final trackingService = sl<LocationTrackingService>();
       if (val) {
         await trackingService.startTracking();
@@ -158,12 +161,15 @@ class MockDataService extends ChangeNotifier {
     return grouped;
   }
 
-  List<GroupedStop> get pendingGroupedStops =>
-      getGroupedStops().where((s) => s.status == 'pending' || s.status == 'out_for_delivery').toList();
+  List<GroupedStop> get pendingGroupedStops => getGroupedStops()
+      .where((s) => s.status == 'pending' || s.status == 'out_for_delivery')
+      .toList();
 
   int get totalGroupedStopsCount => getGroupedStops().length;
-  int get deliveredGroupedStopsCount => getGroupedStops().where((s) => s.status == 'delivered').length;
-  int get failedGroupedStopsCount => getGroupedStops().where((s) => s.status == 'failed').length;
+  int get deliveredGroupedStopsCount =>
+      getGroupedStops().where((s) => s.status == 'delivered').length;
+  int get failedGroupedStopsCount =>
+      getGroupedStops().where((s) => s.status == 'failed').length;
   int get pendingGroupedStopsCount => pendingGroupedStops.length;
 
   GroupedStop? get nextGroupedDelivery {
@@ -172,14 +178,17 @@ class MockDataService extends ChangeNotifier {
     return pending.first;
   }
 
-  List<DeliveryOrderModel> get pendingOrders =>
-      _orders.where((o) => o.status == 'pending' || o.status == 'out_for_delivery').toList();
+  List<DeliveryOrderModel> get pendingOrders => _orders
+      .where((o) => o.status == 'pending' || o.status == 'out_for_delivery')
+      .toList();
 
   int get totalOrdersCount => _orders.length;
-  int get deliveredOrdersCount => _orders.where((o) => o.status == 'delivered').length;
-  int get failedOrdersCount => _orders.where((o) => o.status == 'failed').length;
+  int get deliveredOrdersCount =>
+      _orders.where((o) => o.status == 'delivered').length;
+  int get failedOrdersCount =>
+      _orders.where((o) => o.status == 'failed').length;
   int get pendingOrdersCount => pendingOrders.length;
-  
+
   double get completionRate {
     if (totalOrdersCount == 0) return 0.0;
     return (deliveredOrdersCount / totalOrdersCount) * 100.0;
@@ -188,15 +197,17 @@ class MockDataService extends ChangeNotifier {
   // Bottle returns statistics
   int get expectedBottlesCount =>
       _orders.fold(0, (sum, o) => sum + (o.emptyBottlesExpected ?? 0));
-      
+
   int get collectedBottlesCount =>
       _orders.fold(0, (sum, o) => sum + (o.emptyBottlesCollected ?? 0));
-      
+
   int get pendingBottlesCount => expectedBottlesCount - collectedBottlesCount;
 
   // Next Pending Delivery
   DeliveryOrderModel? get nextDelivery {
-    final pending = _orders.where((o) => o.status != 'delivered' && o.status != 'failed').toList();
+    final pending = _orders
+        .where((o) => o.status != 'delivered' && o.status != 'failed')
+        .toList();
     if (pending.isEmpty) return null;
     pending.sort((a, b) => a.stop.compareTo(b.stop));
     return pending.first;
@@ -224,8 +235,10 @@ class MockDataService extends ChangeNotifier {
 
       // Update all orders at this address/customer stop in local memory
       for (int i = 0; i < _orders.length; i++) {
-        if ((_orders[i].addressId == targetAddressId && targetAddressId.isNotEmpty) ||
-            (_orders[i].customerId == targetCustomerId && targetCustomerId.isNotEmpty)) {
+        if ((_orders[i].addressId == targetAddressId &&
+                targetAddressId.isNotEmpty) ||
+            (_orders[i].customerId == targetCustomerId &&
+                targetCustomerId.isNotEmpty)) {
           _orders[i] = _orders[i].copyWith(
             status: newStatus,
             emptyBottlesCollected: emptyBottles,
@@ -306,7 +319,9 @@ class MockDataService extends ChangeNotifier {
             status: 'in_progress',
             slot: _currentRun!.slot,
             runDate: _currentRun!.runDate,
-            orders: _currentRun!.orders.map((o) => o.copyWith(status: 'out_for_delivery')).toList(),
+            orders: _currentRun!.orders
+                .map((o) => o.copyWith(status: 'out_for_delivery'))
+                .toList(),
           );
           _orders = _currentRun!.orders;
         }
@@ -335,7 +350,7 @@ class MockDataService extends ChangeNotifier {
     }
   }
 
-// Reset data/handover bottles at hub
+  // Reset data/handover bottles at hub
   Future<void> resetData() async {
     try {
       final dioClient = sl<DioClient>();
@@ -382,7 +397,10 @@ class MockDataService extends ChangeNotifier {
   }
 
   int get bottlesStillOutstanding {
-    final sum = _orders.where((o) => o.status != 'delivered').fold(0, (currentSum, o) {
+    final sum = _orders.where((o) => o.status != 'delivered').fold(0, (
+      currentSum,
+      o,
+    ) {
       final val = o.bottlesWithCustomer ?? 0;
       return currentSum + (val > 0 ? val : 0);
     });
@@ -420,7 +438,10 @@ class MockDataService extends ChangeNotifier {
   List<DeliveryOrderItem> get remainingItems {
     final List<DeliveryOrderItem> returned = [];
     for (var order in _orders) {
-      if (order.status == 'pending' || order.status == 'out_for_delivery' || order.status == 'assigned' || order.status == 'packed') {
+      if (order.status == 'pending' ||
+          order.status == 'out_for_delivery' ||
+          order.status == 'assigned' ||
+          order.status == 'packed') {
         returned.addAll(order.products);
       }
     }
@@ -440,7 +461,7 @@ class MockDataService extends ChangeNotifier {
 
   Future<HandoverResult> handoverRun(String runId) async {
     final oldRun = _currentRun;
-    
+
     // Optimistic update
     if (_currentRun != null && _currentRun!.runId == runId) {
       _currentRun = DeliveryRun(
@@ -456,7 +477,7 @@ class MockDataService extends ChangeNotifier {
     try {
       final ordersRepo = sl<OrdersRepository>();
       final result = await ordersRepo.handoverRun(runId);
-      
+
       if (!result.success) {
         // Roll back if failed
         _currentRun = oldRun;

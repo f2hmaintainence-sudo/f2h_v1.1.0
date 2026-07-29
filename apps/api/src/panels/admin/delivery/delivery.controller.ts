@@ -235,6 +235,14 @@ export class DeliveryManagementController {
     return this.deliveryService.updateDeliveryStatus(orderId, body.status, body.notes);
   }
 
+  @Patch('orders/:orderId/assign')
+  async assignPartnerToOrder(
+    @Param('orderId') orderId: string,
+    @Body() body: { partner_id: string },
+  ) {
+    return this.deliveryService.assignPartnerToOrder(orderId, body.partner_id);
+  }
+
   // ── Missed Deliveries ──
 
   @Get('missed')

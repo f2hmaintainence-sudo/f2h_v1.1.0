@@ -76,7 +76,12 @@ export class CustomerOrderController {
            FROM order_items oi
            LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
            LEFT JOIN products p          ON p.product_id = pv.product_id
-           LEFT JOIN product_images pi   ON (pi.variant_id = oi.variant_id OR (pi.variant_id IS NULL AND pi.product_id = p.product_id)) AND (pi.is_primary = true OR pi.is_primary IS NULL)
+           LEFT JOIN LATERAL (
+             SELECT url FROM product_images pi2
+             WHERE pi2.variant_id = oi.variant_id OR (pi2.variant_id IS NULL AND pi2.product_id = p.product_id)
+             ORDER BY pi2.is_primary DESC NULLS LAST, pi2.id ASC
+             LIMIT 1
+           ) pi ON true
            WHERE oi.order_id IN (${placeholders})`,
           orderIds,
         );
@@ -135,93 +140,250 @@ export class CustomerOrderController {
       });
 
       // ── Query 4: Subscriptions + items + product name in one JOIN ─────────
-      // const [subRows]: any = await conn.query(
-      //   `SELECT
-      //      s.id,
-      //      s.subscription_number,
-      //      s.customer_id,
-      //      s.schedule_type,
-      //      s.branch_id,
-      //      s.address_id,
-      //      s.payment_type,
-      //      s.billing_cycle,
-      //      s.start_date,
-      //      s.end_date,
-      //      s.auto_renew,
-      //      s.status,
-      //      s.pause_from_date,
-      //      s.pause_to_date,
-      //      s.created_at,
-      //      s.updated_at,
-      //      si.id              AS si_id,
-      //      si.product_variant_id,
-      //      si.default_m_quantity,
-      //      si.default_e_quantity,
-      //      si.unit_price      AS si_unit_price,
-      //      si.final_price     AS si_final_price,
-      //      si.status          AS si_status,
-      //      pv.name            AS variant_name,
-      //      pv.sku,
-      //      p.name             AS product_name,
-      //      p.product_id
-      //    FROM subscriptions s
-      //    LEFT JOIN subscription_items si ON si.subscription_id = s.subscription_id
-      //    LEFT JOIN product_variants pv   ON pv.variant_id = si.product_variant_id
-      //    LEFT JOIN products p            ON p.product_id = pv.product_id
-      //    WHERE s.customer_id = $1
-      //    ORDER BY s.created_at DESC`,
-      //   [customerId],
-      // );
+      const [subRows]: any = await conn.query(
+        `SELECT
+           s.id,
+           s.subscription_id,
+           s.subscription_number,
+           s.customer_id,
+           s.schedule_type,
+           s.branch_id,
+           s.address_id,
+           s.payment_type,
+           s.billing_cycle,
+           s.start_date,
+           s.end_date,
+           s.auto_renew,
+           s.status,
+           s.pause_from_date,
+           s.pause_to_date,
+           s.created_at,
+           s.updated_at,
+           COALESCE(si.subscription_item_id, si.id::text) AS si_id,
+           si.product_variant_id,
+           si.unit_price      AS si_unit_price,
+           si.final_price     AS si_final_price,
+           si.status          AS si_status,
+           pv.name            AS variant_name,
+           pv.sku,
+           p.name             AS product_name,
+           p.product_id
+         FROM subscriptions s
+         LEFT JOIN subscription_items si ON si.subscription_id = s.subscription_id
+         LEFT JOIN product_variants pv   ON pv.variant_id = si.product_variant_id
+         LEFT JOIN products p            ON p.product_id = pv.product_id
+         WHERE s.customer_id = $1
+         ORDER BY s.created_at DESC`,
+        [customerId],
+      );
 
       // Collapse flat JOIN rows into nested subscription objects
-      // const subsMap = new Map<string, any>();
-      // for (const row of (subRows || [])) {
-      //   if (!subsMap.has(row.id)) {
-      //     subsMap.set(row.id, {
-      //       id: row.id,
-      //       subscription_number: row.subscription_number,
-      //       customer_id: row.customer_id,
-      //       schedule_type: row.schedule_type,
-      //       branch_id: row.branch_id,
-      //       address_id: row.address_id,
-      //       payment_type: row.payment_type,
-      //       billing_cycle: row.billing_cycle,
-      //       start_date: row.start_date,
-      //       end_date: row.end_date,
-      //       auto_renew: row.auto_renew,
-      //       status: row.status,
-      //       pause_start_date: row.pause_from_date,
-      //       pause_end_date: row.pause_to_date,
-      //       created_at: row.created_at,
-      //       updated_at: row.updated_at,
-      //       items: [],
-      //     });
-      //   }
-      //   if (row.si_id) {
-      //     subsMap.get(row.id).items.push({
-      //       id: row.si_id,
-      //       subscription_id: row.id,
-      //       product_variant_id: row.product_variant_id,
-      //       default_m_quantity: row.default_m_quantity,
-      //       default_e_quantity: row.default_e_quantity,
-      //       unit_price: row.si_unit_price,
-      //       final_price: row.si_final_price,
-      //       status: row.si_status,
-      //       variant_name: row.variant_name ?? '',
-      //       sku: row.sku ?? '',
-      //       product_name: row.product_name ?? 'Product',
-      //       product_id: row.product_id,
-      //     });
-      //   }
-      // }
+      const subsMap = new Map<string, any>();
+      for (const row of (subRows || [])) {
+        const subIdKey = row.subscription_id || row.id;
+        if (!subsMap.has(subIdKey)) {
+          subsMap.set(subIdKey, {
+            id: subIdKey,
+            subscription_id: subIdKey,
+            subscription_number: row.subscription_number,
+            customer_id: row.customer_id,
+            schedule_type: row.schedule_type,
+            branch_id: row.branch_id,
+            address_id: row.address_id,
+            payment_type: row.payment_type,
+            billing_cycle: row.billing_cycle,
+            start_date: row.start_date,
+            end_date: row.end_date,
+            auto_renew: row.auto_renew,
+            status: row.status,
+            pause_start_date: row.pause_from_date,
+            pause_end_date: row.pause_to_date,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            items: [],
+          });
+        }
+        if (row.si_id) {
+          subsMap.get(subIdKey).items.push({
+            id: row.si_id,
+            subscription_id: subIdKey,
+            product_variant_id: row.product_variant_id,
+            unit_price: row.si_unit_price,
+            final_price: row.si_final_price,
+            status: row.si_status,
+            variant_name: row.variant_name ?? '',
+            sku: row.sku ?? '',
+            product_name: row.product_name ?? 'Product',
+            product_id: row.product_id,
+          });
+        }
+      }
 
       return {
         status: true,
         orders: formattedOrders,              // includes order_source field; frontend splits
-        // subscriptions: Array.from(subsMap.values()),
+        subscriptions: Array.from(subsMap.values()),
       };
     } finally {
       conn?.release?.();
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // GET /customer/orders/bills
+  // Returns all bills for the logged-in customer from customer_bills table + orders.
+  // ─────────────────────────────────────────────────────────────────────────────
+  @Get('bills')
+  async getBills(@Req() req: Request) {
+    try {
+      const user = req.user as any;
+      const userId = user?.user_id;
+      const email = user?.email;
+
+      // Resolve customer IDs
+      let allCustomerIds = [userId].filter(Boolean);
+      if (email || userId) {
+        const cRes = await this.db.query(
+          `SELECT customer_id FROM customers WHERE customer_id = $1 OR (email IS NOT NULL AND email = $2 AND email != '')`,
+          [userId || '', email || ''],
+        );
+        if (cRes && cRes.length > 0) {
+          allCustomerIds = Array.from(new Set([...allCustomerIds, ...cRes.map((r: any) => r.customer_id)]));
+        }
+      }
+
+      if (!allCustomerIds.length) {
+        return { status: true, bills: [] };
+      }
+
+      const bills: any[] = [];
+
+      // 1. Fetch from customer_bills table if table exists
+      try {
+        const billRows = await this.db.query(
+          `SELECT bill_id, bill_type, reference_id, payment_type, payment_method,
+                  billing_from, billing_to, due_date,
+                  subtotal, discount_amount, tax_amount, total_amount,
+                  paid_amount, due_amount, status, remarks, created_at
+           FROM customer_bills
+           WHERE customer_id = ANY($1::text[])
+           ORDER BY created_at DESC`,
+          [allCustomerIds],
+        );
+        if (billRows && billRows.length > 0) {
+          bills.push(...billRows);
+        }
+      } catch (err) {
+        console.error('getBills: Error querying customer_bills table', err);
+      }
+
+      const existingRefIds = new Set(bills.map(b => b.reference_id).filter(Boolean));
+
+      // 2. Fetch orders to synthesize bills if any orders are missing from customer_bills
+      try {
+        const orderRows = await this.db.query(
+          `SELECT order_id, order_source, payment_status, COALESCE(payment_mode, 'wallet') AS payment_method,
+                  subtotal, discount_amount, total_amount,
+                  status, created_at, scheduled_date
+           FROM orders
+           WHERE customer_id = ANY($1::text[]) AND deleted_at IS NULL
+           ORDER BY created_at DESC`,
+          [allCustomerIds],
+        );
+
+        if (orderRows && orderRows.length > 0) {
+          for (const ord of orderRows) {
+            if (!existingRefIds.has(ord.order_id)) {
+              const isPaid = (ord.payment_status || '').toLowerCase() === 'paid' || (ord.status || '').toLowerCase() === 'delivered';
+              const total = Number(ord.total_amount || 0);
+              bills.push({
+                bill_id: `BILL_${ord.order_id}`,
+                bill_type: ord.order_source === 'subscription' ? 'subscription' : 'order',
+                reference_id: ord.order_id,
+                payment_type: 'prepaid',
+                payment_method: ord.payment_method || 'wallet',
+                billing_from: ord.scheduled_date || ord.created_at,
+                billing_to: ord.scheduled_date || ord.created_at,
+                due_date: ord.created_at,
+                subtotal: Number(ord.subtotal || total),
+                discount_amount: Number(ord.discount_amount || 0),
+                tax_amount: 0,
+                total_amount: total,
+                paid_amount: isPaid ? total : 0,
+                due_amount: isPaid ? 0 : total,
+                status: isPaid ? 'paid' : (ord.payment_status || 'pending'),
+                remarks: `Order checkout (${ord.order_id})`,
+                created_at: ord.created_at,
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.error('getBills: Error synthesizing bills from orders table', err);
+      }
+
+      // 3. Fetch subscriptions to synthesize bills if any subscriptions are missing from customer_bills
+      try {
+        const subRows = await this.db.query(
+          `SELECT subscription_id, subscription_number, payment_type, status, created_at, start_date, end_date
+           FROM subscriptions
+           WHERE customer_id = ANY($1::text[])
+           ORDER BY created_at DESC`,
+          [allCustomerIds],
+        );
+
+        if (subRows && subRows.length > 0) {
+          for (const sub of subRows) {
+            const subId = sub.subscription_id;
+            if (!existingRefIds.has(subId) && !existingRefIds.has(sub.subscription_number)) {
+              const itemRows = await this.db.query(
+                `SELECT unit_price, final_price, default_m_quantity, default_e_quantity
+                 FROM subscription_items
+                 WHERE subscription_id = $1`,
+                [subId],
+              );
+              let total = 0;
+              if (itemRows && itemRows.length > 0) {
+                for (const item of itemRows) {
+                  const price = Number(item.final_price || item.unit_price || 0);
+                  const qty = (Number(item.default_m_quantity || 0) + Number(item.default_e_quantity || 0)) || 1;
+                  total += price * qty;
+                }
+              }
+              const isPaid = (sub.payment_type || '').toLowerCase() === 'prepaid';
+              bills.push({
+                bill_id: `BILL_${sub.subscription_number || subId}`,
+                bill_type: 'subscription',
+                reference_id: subId,
+                payment_type: sub.payment_type || 'prepaid',
+                payment_method: 'wallet',
+                billing_from: sub.start_date || sub.created_at,
+                billing_to: sub.end_date || sub.start_date || sub.created_at,
+                due_date: sub.created_at,
+                subtotal: total,
+                discount_amount: 0,
+                tax_amount: 0,
+                total_amount: total,
+                paid_amount: isPaid ? total : 0,
+                due_amount: isPaid ? 0 : total,
+                status: isPaid ? 'paid' : 'due',
+                remarks: `Subscription (${sub.subscription_number || subId})`,
+                created_at: sub.created_at,
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.error('getBills: Error synthesizing bills from subscriptions table', err);
+      }
+
+      // Sort combined by created_at DESC
+      bills.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      return { status: true, bills };
+    } catch (error) {
+      console.error('getBills error', error);
+      return { status: true, bills: [] };
     }
   }
 
@@ -262,11 +424,16 @@ export class CustomerOrderController {
            pv.sku,
            p.name     AS product_name,
            p.product_id,
-           pi.url     AS image_path
+           COALESCE(pi.url, p.image_path) AS image_path
          FROM order_items oi
          LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
          LEFT JOIN products p          ON p.product_id = pv.product_id
-         LEFT JOIN product_images pi   ON pi.variant_id = oi.variant_id
+         LEFT JOIN LATERAL (
+            SELECT url FROM product_images pi2
+            WHERE pi2.variant_id = oi.variant_id OR (pi2.variant_id IS NULL AND pi2.product_id = p.product_id)
+            ORDER BY pi2.is_primary DESC NULLS LAST, pi2.id ASC
+            LIMIT 1
+          ) pi ON true
          WHERE oi.order_id = $1`,
         [orderId],
       );

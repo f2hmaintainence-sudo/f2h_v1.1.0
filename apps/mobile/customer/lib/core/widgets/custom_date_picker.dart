@@ -97,7 +97,6 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
     }
 
     // 2. Days of current month
-    final todayNormalized = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
     final firstAvailableNormalized = DateTime(widget.firstDate.year, widget.firstDate.month, widget.firstDate.day);
     final lastAvailableNormalized = DateTime(widget.lastDate.year, widget.lastDate.month, widget.lastDate.day);
 
@@ -271,7 +270,7 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
                     border: Border.all(
                       color: isSelected 
                           ? Colors.transparent 
-                          : (isInRange ? kPrimary.withOpacity(0.2) : const Color(0xFFF1F5F9)),
+                          : (isInRange ? kPrimary.withValues(alpha: 0.2) : const Color(0xFFF1F5F9)),
                       width: 1,
                     ),
                   ),
@@ -524,12 +523,12 @@ class _CustomDateRangePickerDialogState extends State<CustomDateRangePickerDialo
           Center(
             child: Text(
               _startDate == null
-                  ? 'Tap a date to select start'
+                  ? 'Tap a date to select start date'
                   : _endDate == null
-                      ? 'Select end date'
+                      ? 'Selected: ${_startDate!.day}/${_startDate!.month} (Tap Done or tap end date)'
                       : 'Range: ${_startDate!.day}/${_startDate!.month} to ${_endDate!.day}/${_endDate!.month}',
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w800,
                 color: _startDate == null ? kTextSub : kPrimary,
               ),
@@ -623,13 +622,13 @@ class _CustomDateRangePickerDialogState extends State<CustomDateRangePickerDialo
                   decoration: BoxDecoration(
                     color: isSelected
                         ? kPrimary
-                        : (inRange ? kPrimary.withOpacity(0.08) : Colors.white),
+                        : (inRange ? kPrimary.withValues(alpha: 0.08) : Colors.white),
                     borderRadius: BorderRadius.circular(10),
                     boxShadow: isSelected || inRange
                         ? []
                         : [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.02),
+                              color: Colors.black.withValues(alpha: 0.02),
                               blurRadius: 4,
                               offset: const Offset(0, 2),
                             ),
@@ -637,7 +636,7 @@ class _CustomDateRangePickerDialogState extends State<CustomDateRangePickerDialo
                     border: Border.all(
                       color: isSelected
                           ? Colors.transparent
-                          : (inRange ? kPrimary.withOpacity(0.15) : const Color(0xFFF1F5F9)),
+                          : (inRange ? kPrimary.withValues(alpha: 0.15) : const Color(0xFFF1F5F9)),
                       width: 1,
                     ),
                   ),
@@ -688,9 +687,11 @@ class _CustomDateRangePickerDialogState extends State<CustomDateRangePickerDialo
                 width: 120,
                 height: 44,
                 child: ElevatedButton(
-                  onPressed: _startDate != null && _endDate != null
+                  onPressed: _startDate != null
                       ? () {
-                          Navigator.pop(context, DateTimeRange(start: _startDate!, end: _endDate!));
+                          final start = _startDate!;
+                          final end = _endDate ?? _startDate!;
+                          Navigator.pop(context, DateTimeRange(start: start, end: end));
                         }
                       : null,
                   style: ElevatedButton.styleFrom(

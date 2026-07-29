@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -103,8 +102,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        kAccent.withOpacity(0.35),
-                        kAccent.withOpacity(0.0),
+                        kAccent.withValues(alpha: 0.35),
+                        kAccent.withValues(alpha: 0.0),
                       ],
                       stops: const [0.3, 1.0],
                     ),
@@ -121,8 +120,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        kPrimaryLt.withOpacity(0.4),
-                        kPrimaryLt.withOpacity(0.0),
+                        kPrimaryLt.withValues(alpha: 0.4),
+                        kPrimaryLt.withValues(alpha: 0.0),
                       ],
                       stops: const [0.3, 1.0],
                     ),
@@ -182,19 +181,19 @@ class _LoginScreenState extends State<LoginScreen> {
                               shape: BoxShape.circle,
                               gradient: LinearGradient(
                                 colors: [
-                                  Colors.white.withOpacity(0.25),
-                                  Colors.white.withOpacity(0.05),
+                                  Colors.white.withValues(alpha: 0.25),
+                                  Colors.white.withValues(alpha: 0.05),
                                 ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.4),
+                                color: Colors.white.withValues(alpha: 0.4),
                                 width: 1.5,
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.08),
+                                  color: Colors.black.withValues(alpha: 0.08),
                                   blurRadius: 15,
                                   offset: const Offset(0, 8),
                                 ),
@@ -213,7 +212,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       shape: BoxShape.circle,
                                       boxShadow: [
                                         BoxShadow(
-                                          color: kPrimary.withOpacity(0.2),
+                                          color: kPrimary.withValues(alpha: 0.2),
                                           blurRadius: 10,
                                           offset: const Offset(0, 4),
                                         ),
@@ -275,7 +274,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Container(
                           width: double.infinity,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.70),
+                            color: Colors.white.withValues(alpha: 0.70),
                           ),
                           child: Stack(
                             children: [
@@ -317,10 +316,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(30),
-                                border: Border.all(color: kBorder.withOpacity(0.35), width: 1.2),
+                                border: Border.all(color: kBorder.withValues(alpha: 0.35), width: 1.2),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.015),
+                                    color: Colors.black.withValues(alpha: 0.015),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -348,10 +347,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(30),
-                                border: Border.all(color: kBorder.withOpacity(0.35), width: 1.2),
+                                border: Border.all(color: kBorder.withValues(alpha: 0.35), width: 1.2),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.015),
+                                    color: Colors.black.withValues(alpha: 0.015),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -421,14 +420,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                     gradient: LinearGradient(
                                       colors: isEnabled
                                           ? [kPrimary, kPrimaryLt]
-                                          : [kPrimary.withOpacity(0.6), kPrimaryLt.withOpacity(0.6)],
+                                          : [kPrimary.withValues(alpha: 0.6), kPrimaryLt.withValues(alpha: 0.6)],
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                     ),
                                     borderRadius: BorderRadius.circular(30),
                                     boxShadow: isEnabled ? [
                                       BoxShadow(
-                                        color: kPrimary.withOpacity(0.25),
+                                        color: kPrimary.withValues(alpha: 0.25),
                                         blurRadius: 10,
                                         offset: const Offset(0, 4),
                                       ),
@@ -586,9 +585,9 @@ class WavyBorderPainter extends CustomPainter {
     final paint = Paint()
       ..shader = LinearGradient(
         colors: [
-          Colors.white.withOpacity(0.55),
-          Colors.white.withOpacity(0.15),
-          Colors.white.withOpacity(0.35),
+          Colors.white.withValues(alpha: 0.55),
+          Colors.white.withValues(alpha: 0.15),
+          Colors.white.withValues(alpha: 0.35),
         ],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,

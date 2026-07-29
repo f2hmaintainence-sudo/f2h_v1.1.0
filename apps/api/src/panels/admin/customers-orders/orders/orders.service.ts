@@ -23,6 +23,9 @@ function formatMoney(value: unknown): string {
   return '₹' + amount.toLocaleString('en-IN', { maximumFractionDigits: 2 });
 }
 
+import { FirstOrderDetectorService } from '../../../customer/referral/services/first-order-detector.service';
+import { ReferralRewardEngineService } from '../../../customer/referral/services/referral-reward-engine.service';
+
 @Injectable()
 export class OrdersService {
   constructor(
@@ -30,6 +33,8 @@ export class OrdersService {
     private readonly databaseService: DatabaseService,
     private readonly developer: DeveloperService,
     private readonly pdfService: PdfService,
+    private readonly firstOrderDetector: FirstOrderDetectorService,
+    private readonly referralRewardEngine: ReferralRewardEngineService,
   ) {}
 
   async getOrderView(orderId: string) {
@@ -192,10 +197,22 @@ export class OrdersService {
                updated_at = CURRENT_TIMESTAMP
         WHERE  scheduled_date = $1
           AND  status = 'out_for_delivery'
-        RETURNING order_id
+        RETURNING order_id, customer_id
       `;
 
       const rows = await this.databaseService.query(sql, [date]);
+
+      if (rows && rows.length > 0) {
+        for (const ord of rows) {
+          if (ord.customer_id && ord.order_id) {
+            try {
+              await this.firstOrderDetector.detectAndMarkFirstOrder(ord.customer_id, ord.order_id);
+              await this.firstOrderDetector.unlockReferralCode(ord.customer_id);
+              await this.referralRewardEngine.processReferralReward(ord.customer_id, ord.order_id);
+            } catch (_) {}
+          }
+        }
+      }
 
       return {
         status: true,

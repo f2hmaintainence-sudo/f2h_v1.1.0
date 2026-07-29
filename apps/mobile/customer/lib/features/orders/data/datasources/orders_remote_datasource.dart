@@ -36,7 +36,7 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
       data: {
         'rating': rating,
         'feedback': feedback,
-        if (productId != null) 'product_id': productId, // [ADDED BY ANTIGRAVITY]
+        'product_id': ?productId, // [ADDED BY ANTIGRAVITY]
       },
     );
     return response.data as Map<String, dynamic>;

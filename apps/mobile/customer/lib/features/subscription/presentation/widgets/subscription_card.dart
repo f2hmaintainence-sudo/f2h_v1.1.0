@@ -215,7 +215,9 @@ class SubCard extends StatelessWidget {
                                 const Icon(Icons.pause_circle_outline_rounded, size: 11, color: kAccent),
                                 const SizedBox(width: 5),
                                 Text(
-                                  'Paused: ${s.pauseFromDate} → ${s.pauseToDate}',
+                                  s.pauseFromDate == s.pauseToDate
+                                      ? 'Paused: ${s.pauseFromDate}'
+                                      : 'Paused: ${s.pauseFromDate} → ${s.pauseToDate}',
                                   style: const TextStyle(
                                     fontSize: 10.5,
                                     fontWeight: FontWeight.w800,

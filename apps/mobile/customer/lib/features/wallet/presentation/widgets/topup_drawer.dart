@@ -145,7 +145,7 @@ class _TopupDrawerState extends State<TopupDrawer> {
                   hintStyle: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w900,
-                    color: kPrimary.withOpacity(0.25),
+                    color: kPrimary.withValues(alpha: 0.25),
                   ),
                   helperText: 'Max ₹${_maxAmount.toStringAsFixed(0)}',
                   helperStyle: const TextStyle(
@@ -245,7 +245,7 @@ class _TopupDrawerState extends State<TopupDrawer> {
                       },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kPrimary,
-                  disabledBackgroundColor: kPrimary.withOpacity(0.55),
+                  disabledBackgroundColor: kPrimary.withValues(alpha: 0.55),
                   foregroundColor: Colors.white,
                   minimumSize: const Size(double.infinity, 52),
                   shape: RoundedRectangleBorder(

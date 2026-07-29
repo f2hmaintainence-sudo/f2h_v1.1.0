@@ -20,18 +20,14 @@ class WalletScreen extends StatefulWidget {
 }
 
 class _WalletScreenState extends State<WalletScreen> {
-  int _transactionsReload = 0;
+  final int _transactionsReload = 0;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final state = context.read<CustomerSessionCubit>().state;
-      if (state.status == CustomerSessionStatus.initial ||
-          state.status == CustomerSessionStatus.failure) {
-        context.read<CustomerSessionCubit>().bootstrap();
-      }
+      context.read<CustomerSessionCubit>().bootstrap();
     });
   }
 
@@ -281,7 +277,7 @@ class _WalletScreenState extends State<WalletScreen> {
         border: Border.all(color: kBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -497,7 +493,7 @@ class _WalletScreenState extends State<WalletScreen> {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kAccent.withOpacity(0.3)),
+        border: Border.all(color: kAccent.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -505,7 +501,7 @@ class _WalletScreenState extends State<WalletScreen> {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: kAccent.withOpacity(0.15),
+              color: kAccent.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(14),
             ),
             child: const Center(
@@ -529,7 +525,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   'Earn 1 point for every ₹10 spent',
                   style: TextStyle(
                     fontSize: 11,
-                    color: kAccent.withOpacity(0.8),
+                    color: kAccent.withValues(alpha: 0.8),
                   ),
                 ),
               ],

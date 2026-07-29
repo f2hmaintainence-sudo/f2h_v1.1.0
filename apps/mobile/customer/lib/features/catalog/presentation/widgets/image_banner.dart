@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
@@ -15,11 +16,35 @@ class ImageBanner extends StatefulWidget {
 class _ImageBannerState extends State<ImageBanner> {
   List<Map<String, dynamic>> _banners = [];
   bool _loading = true;
+  int _currentPage = 0;
+  late final PageController _pageController = PageController();
+  Timer? _autoScrollTimer;
 
   @override
   void initState() {
     super.initState();
     _fetchBanners();
+  }
+
+  @override
+  void dispose() {
+    _autoScrollTimer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _startAutoScroll() {
+    _autoScrollTimer?.cancel();
+    if (_banners.length <= 1) return;
+    _autoScrollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted || !_pageController.hasClients) return;
+      final nextPage = (_currentPage + 1) % _banners.length;
+      _pageController.animateToPage(
+        nextPage,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    });
   }
 
   Future<void> _fetchBanners() async {
@@ -33,7 +58,11 @@ class _ImageBannerState extends State<ImageBanner> {
             .map((b) => Map<String, dynamic>.from(b as Map))
             .toList();
         if (mounted && list.isNotEmpty) {
-          setState(() { _banners = list; _loading = false; });
+          setState(() {
+            _banners = list;
+            _loading = false;
+          });
+          _startAutoScroll();
           return;
         }
       }
@@ -48,6 +77,15 @@ class _ImageBannerState extends State<ImageBanner> {
     setState(() {
       _banners = [
         {
+          'id': 'wallet-banner',
+          'imageUrl': '${ApiEndpoints.host}/uploads/banners/wallet_banner.png',
+          'title': 'F2H Wallet Perks',
+          'subtitle': 'Add funds for instant 1-click checkout & cashback rewards.',
+          'cta': 'Add Money',
+          'route': 'menu',
+          'isActive': true,
+        },
+        {
           'id': 'sub-save-5',
           'imageUrl': '${ApiEndpoints.host}/uploads/banners/subscription_banner.png',
           'title': 'Save Up To 5%',
@@ -55,7 +93,7 @@ class _ImageBannerState extends State<ImageBanner> {
           'cta': 'Order Now',
           'route': 'menu',
           'isActive': true,
-        }
+        },
       ];
       _loading = false;
     });
@@ -91,7 +129,8 @@ class _ImageBannerState extends State<ImageBanner> {
         ),
         child: const Center(
           child: SizedBox(
-            width: 24, height: 24,
+            width: 24,
+            height: 24,
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
         ),
@@ -106,102 +145,136 @@ class _ImageBannerState extends State<ImageBanner> {
         borderRadius: BorderRadius.circular(16),
         child: SizedBox(
           height: 150,
-          child: PageView.builder(
-            itemCount: _banners.length,
-            itemBuilder: (context, index) {
-              final banner = _banners[index];
-              final rawUrl = banner['imageUrl']?.toString() ?? '';
-              final imageUrl = _formatImageUrl(rawUrl);
+          child: Stack(
+            children: [
+              PageView.builder(
+                controller: _pageController,
+                itemCount: _banners.length,
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentPage = index;
+                  });
+                },
+                itemBuilder: (context, index) {
+                  final banner = _banners[index];
+                  final rawUrl = banner['imageUrl']?.toString() ?? '';
+                  final imageUrl = _formatImageUrl(rawUrl);
 
-              return GestureDetector(
-                onTap: () => _onBannerTap(banner),
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  loadingBuilder: (_, child, progress) {
-                    if (progress == null) return child;
-                    return Container(
-                      color: const Color(0xFF16A34A),
-                      child: const Center(
-                        child: SizedBox(
-                          width: 24, height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white,
+                  return GestureDetector(
+                    onTap: () => _onBannerTap(banner),
+                    child: Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      loadingBuilder: (_, child, progress) {
+                        if (progress == null) return child;
+                        return Container(
+                          color: const Color(0xFF16A34A),
+                          child: const Center(
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF16A34A),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white24,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Text(
+                                      'DAILY SUBSCRIPTION',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    banner['title']?.toString() ?? 'Save Up To 5%',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    banner['subtitle']?.toString() ??
+                                        'Subscribe to fresh milk, curd, paneer & more for hassle-free morning deliveries.',
+                                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: const BoxDecoration(
+                                color: Colors.white24,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.calendar_month_rounded,
+                                color: Colors.amber,
+                                size: 26,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF16A34A),
-                      borderRadius: BorderRadius.circular(16),
                     ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: Colors.white24,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text(
-                                  'DAILY SUBSCRIPTION',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    letterSpacing: 0.8,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                banner['title']?.toString() ?? 'Save Up To 5%',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                banner['subtitle']?.toString() ??
-                                    'Subscribe to fresh milk, curd, paneer & more for hassle-free morning deliveries.',
-                                style: const TextStyle(color: Colors.white70, fontSize: 11),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
+                  );
+                },
+              ),
+              if (_banners.length > 1)
+                Positioned(
+                  bottom: 8,
+                  left: 0,
+                  right: 0,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      _banners.length,
+                      (i) => AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        width: _currentPage == i ? 18 : 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: _currentPage == i ? Colors.white : Colors.white.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(3),
                         ),
-                        const SizedBox(width: 12),
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: const BoxDecoration(
-                            color: Colors.white24,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.calendar_month_rounded,
-                            color: Colors.amber,
-                            size: 26,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
-              );
-            },
+            ],
           ),
         ),
       ),

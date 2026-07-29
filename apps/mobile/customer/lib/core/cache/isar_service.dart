@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : isar_service.dart
 // Description : Thread-safe Isar cache database service for Customer App.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'dart:async';

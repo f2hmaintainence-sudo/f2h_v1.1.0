@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : page.tsx
 // Description : Developer API Integrations - Firebase Management Page
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 "use client";
@@ -41,8 +40,8 @@ export default function FirebaseIntegrationsPage() {
       const list = Array.isArray(res.data)
         ? res.data
         : Array.isArray((res.data as any)?.data)
-        ? (res.data as any).data
-        : [];
+          ? (res.data as any).data
+          : [];
       setConfigs(list);
     } catch (err: any) {
       showErrorToast(err?.message || "Failed to load Firebase configurations");
@@ -213,9 +212,8 @@ export default function FirebaseIntegrationsPage() {
                 className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden"
               >
                 <div
-                  className={`absolute top-0 left-0 right-0 h-1 ${
-                    config.is_active ? "bg-[#16a34a]" : "bg-slate-300"
-                  }`}
+                  className={`absolute top-0 left-0 right-0 h-1 ${config.is_active ? "bg-[#16a34a]" : "bg-slate-300"
+                    }`}
                 />
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-3">
@@ -229,11 +227,10 @@ export default function FirebaseIntegrationsPage() {
                     </div>
                     <button
                       onClick={() => handleToggleActive(config)}
-                      className={`flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
-                        config.is_active
+                      className={`flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${config.is_active
                           ? "bg-emerald-50 text-[#16a34a] border-emerald-200"
                           : "bg-slate-50 text-slate-400 border-slate-200"
-                      }`}
+                        }`}
                     >
                       {config.is_active ? (
                         <>

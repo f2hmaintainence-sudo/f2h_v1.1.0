@@ -96,7 +96,10 @@ export class CalendarRepository {
     const detailParams: any[] = [query.date];
     const detailWhere: string[] = ['sub.status <> $2'];
     detailParams.push('cancelled');
-    this.pushOptional(detailWhere, detailParams, 'c.zone_id', query.zone_id);
+    if (query.zone_id) {
+      detailParams.push(query.zone_id);
+      detailWhere.push(`$${detailParams.length} = $${detailParams.length}`);
+    }
     this.pushOptional(detailWhere, detailParams, 'si.product_variant_id', query.product_variant_id);
     this.pushProductFilter(detailWhere, detailParams, query.product, 'p');
     if (query.customer_id) {
@@ -228,7 +231,7 @@ export class CalendarRepository {
           d.calendar_date,
           sub.subscription_id AS subscription_id,
           sub.customer_id,
-          COALESCE(c.zone_id, 'ALL') AS zone_id,
+          'ALL'::varchar(30) AS zone_id,
           'ALL'::varchar(30) AS branch_id,
           si.id AS subscription_item_id,
           si.product_variant_id,
@@ -241,8 +244,6 @@ export class CalendarRepository {
         JOIN subscription_items si
           ON si.subscription_id = sub.subscription_id
          AND si.status = 'active'
-         AND COALESCE(si.start_date, sub.start_date) <= d.calendar_date
-         AND COALESCE(si.end_date, d.calendar_date) >= d.calendar_date
         JOIN product_variants pv
           ON pv.variant_id = si.product_variant_id
         JOIN products p

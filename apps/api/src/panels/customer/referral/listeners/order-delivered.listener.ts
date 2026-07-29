@@ -3,7 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { OrderDeliveredEvent } from '../events/order-delivered.event';
 import { FirstOrderDetectorService } from '../services/first-order-detector.service';
 import { ReferralRewardEngineService } from '../services/referral-reward-engine.service';
-import { DeveloperService } from 'src/shared/logger/Developer.service';
+import { DeveloperService } from '../../../../shared/logger/Developer.service';
 
 @Injectable()
 export class OrderDeliveredListener {
@@ -21,22 +21,18 @@ export class OrderDeliveredListener {
         customerId: event.customerId,
       });
 
-      // Detect first order delivery
-      const isFirstOrder = await this.firstOrderDetector.detectAndMarkFirstOrder(
+      // Detect and mark first order delivery & unlock referral code
+      await this.firstOrderDetector.detectAndMarkFirstOrder(
         event.customerId,
         event.orderId,
       );
+      await this.firstOrderDetector.unlockReferralCode(event.customerId);
 
-      if (isFirstOrder) {
-        // Unlock referral code
-        await this.firstOrderDetector.unlockReferralCode(event.customerId);
-
-        // Credit wallet rewards for referrer & referee
-        await this.referralRewardEngine.processReferralReward(
-          event.customerId,
-          event.orderId,
-        );
-      }
+      // Process referral reward engine (idempotent, checks referrals status != 'rewarded')
+      await this.referralRewardEngine.processReferralReward(
+        event.customerId,
+        event.orderId,
+      );
     } catch (error) {
       this.developer.error('Error in OrderDeliveredListener', { error, event });
     }

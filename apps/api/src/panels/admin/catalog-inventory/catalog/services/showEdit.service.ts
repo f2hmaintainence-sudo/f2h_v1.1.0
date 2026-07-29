@@ -105,6 +105,25 @@ export class CatalogShowEditService {
         })),
       ];
 
+      // Fetch active containers
+      const containersResult = await this.dataService.query('containers', {
+        select: ['container_id', 'name'],
+        where: [
+          { column: 'status', operator: '=', value: 'active' },
+          { column: 'deleted_at', operator: 'IS', value: null },
+        ],
+        orderBy: 'name',
+        orderDirection: 'ASC',
+      }).catch(() => ({ data: [] }));
+
+      const containerOptions = [
+        { value: '', label: 'Select Container (Optional)' },
+        ...(containersResult.data || []).map((c: any) => ({
+          value: String(c.container_id),
+          label: `${c.name} (${c.container_id})`,
+        })),
+      ];
+
       // =====================================================
       // GENERATE FIELDS
       // =====================================================
@@ -112,6 +131,7 @@ export class CatalogShowEditService {
       const fields = this.showAddService.catalogFields(
         categoryOptions,
         packagingOptions,
+        containerOptions,
       );
 
       // =====================================================
@@ -124,6 +144,8 @@ export class CatalogShowEditService {
         category_id: String(product.category_id || ''),
 
         packaging_type_id: String(product.packaging_type_id || ''),
+
+        container_id: String(product.container_id || ''),
 
         product_image: productImage,
       };
@@ -197,6 +219,7 @@ export class CatalogShowEditService {
         select: ['id', 'name'],
         where: [
           { column: 'status', operator: '=', value: 'active' },
+          { column: 'deleted_at', operator: 'IS', value: null },
         ],
         orderBy: 'name',
         orderDirection: 'ASC',
@@ -210,7 +233,26 @@ export class CatalogShowEditService {
         })),
       ];
 
-      let fields = this.showAddService.variantFields(productOptions, packagingOptions);
+      // Fetch active containers
+      const containersResult = await this.dataService.query('containers', {
+        select: ['container_id', 'name'],
+        where: [
+          { column: 'status', operator: '=', value: 'active' },
+          { column: 'deleted_at', operator: 'IS', value: null },
+        ],
+        orderBy: 'name',
+        orderDirection: 'ASC',
+      }).catch(() => ({ data: [] }));
+
+      const containerOptions = [
+        { value: '', label: 'Select Container (Optional)' },
+        ...(containersResult.data || []).map((c: any) => ({
+          value: String(c.container_id),
+          label: `${c.name} (${c.container_id})`,
+        })),
+      ];
+
+      let fields = this.showAddService.variantFields(productOptions, packagingOptions, containerOptions);
 
       // Hide Subscription Price if the variant's product does not allow subscription
       const parentProduct = (productsResult.data || []).find(
@@ -236,7 +278,13 @@ export class CatalogShowEditService {
       const formattedData = {
         ...variant,
         product_id: String(variant.product_id || ''),
-        variant_image: variantImages,
+        packaging_type_id: String(variant.packaging_type_id || ''),
+        container_id: String(variant.container_id || ''),
+        variant_image: variantImages[0] || null,
+        variant_image_2: variantImages[1] || null,
+        variant_image_3: variantImages[2] || null,
+        variant_image_4: variantImages[3] || null,
+        variant_image_5: variantImages[4] || null,
         status: variant.status === 'active' || variant.status === true || variant.status === 1 || variant.status === '1',
       };
 
@@ -370,11 +418,19 @@ export class CatalogShowEditService {
       }
 
       const formRes = await this.showAddService.getOffersForm();
+      const rawImageUrl = result.data[0]?.image_url || '';
+      const isUploadedFile = rawImageUrl.startsWith('/uploads/') || rawImageUrl.startsWith('uploads/');
+
+      const offerData = {
+        ...result.data[0],
+        image_url: isUploadedFile ? '' : rawImageUrl,
+        banner_image: rawImageUrl,
+      };
       return this.formHelper.generateResponse({
         title: 'Edit Offer Banner',
         submitLabel: 'Update Offer',
         fields: formRes.fields,
-        data: result.data[0],
+        data: offerData,
         script: '',
       });
     } catch (error) {

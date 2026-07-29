@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : FirebaseConfigModal.tsx
 // Description : Modal for creating & editing Firebase Cloud Messaging configurations
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 "use client";

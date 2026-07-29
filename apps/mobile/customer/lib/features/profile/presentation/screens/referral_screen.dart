@@ -39,7 +39,7 @@ class ReferralScreen extends StatefulWidget {
 class _ReferralScreenState extends State<ReferralScreen>
     with SingleTickerProviderStateMixin {
   bool _isLoading = true;
-  String _code = 'F2HPUR410';
+  String _code = '';
   String _status = 'unlocked';
   double _totalEarnings = 0.0;
   int _totalCount = 0;
@@ -449,14 +449,14 @@ class _ReferralScreenState extends State<ReferralScreen>
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF0A3D22), Color(0xFF16653A), Color(0xFF1F8A4D)],
+          colors: [Color(0xFF072A17), Color(0xFF0F5132), Color(0xFF146C3E)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: _kGreenDark.withOpacity(0.3),
+            color: const Color(0xFF0A3D22).withOpacity(0.35),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -477,7 +477,7 @@ class _ReferralScreenState extends State<ReferralScreen>
                       'Share Goodness.',
                       style: TextStyle(
                         fontSize: 22,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w900,
                         color: _kGold,
                         height: 1.15,
                       ),
@@ -486,7 +486,7 @@ class _ReferralScreenState extends State<ReferralScreen>
                       'Earn Rewards!',
                       style: TextStyle(
                         fontSize: 22,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w900,
                         color: _kGold,
                         height: 1.15,
                       ),
@@ -495,26 +495,23 @@ class _ReferralScreenState extends State<ReferralScreen>
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.12),
+                  color: Colors.white.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withOpacity(0.2)),
+                  border: Border.all(color: Colors.white.withOpacity(0.25)),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.people_outline_rounded,
-                        color: Colors.white, size: 16),
+                    Icon(Icons.card_giftcard_rounded, color: _kGold, size: 16),
                     SizedBox(width: 6),
                     Text(
-                      'Refer Friends\nEarn ₹50 Each',
+                      'Refer & Earn ₹50',
                       style: TextStyle(
-                        fontSize: 9,
+                        fontSize: 11,
                         fontWeight: FontWeight.w800,
                         color: Colors.white,
-                        height: 1.1,
                       ),
                     ),
                   ],
@@ -522,138 +519,91 @@ class _ReferralScreenState extends State<ReferralScreen>
               ),
             ],
           ),
-          const SizedBox(height: 16),
-
-          // Graphic + Referral Code
-          Row(
-            children: [
-              // F2H 3D graphic
-              ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: Container(
-                  width: 90,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: Colors.white.withOpacity(0.2)),
-                  ),
-                  child: Image.network(
-                    '${ApiEndpoints.host}/uploads/whatsapp_share/referral_banner.png',
-                    fit: BoxFit.cover,
-                    errorBuilder: (ctx, err, stack) => Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: const BoxDecoration(
-                            color: _kGold,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.shopping_bag_rounded,
-                              color: Color(0xFF0A3D22), size: 26),
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'F2H',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-
-              // Code area
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'YOUR REFERRAL CODE',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white70,
-                        letterSpacing: 1.1,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(14, 6, 8, 6),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.25),
-                        borderRadius: BorderRadius.circular(14),
-                        border:
-                            Border.all(color: Colors.white.withOpacity(0.2)),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _isLocked ? '•••••••• 🔒' : _activeCode,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                                color: _isLocked ? _kGold : Colors.white,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          ElevatedButton.icon(
-                            onPressed: () => _copyToClipboard(
-                              _activeCode,
-                              'Referral code $_activeCode copied!',
-                            ),
-                            icon: const Icon(Icons.copy_rounded, size: 14),
-                            label: Text(_isLocked ? 'Locked' : 'Copy'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: const Color(0xFF0A3D22),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10)),
-                              textStyle: const TextStyle(
-                                  fontSize: 12, fontWeight: FontWeight.w800),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Subtitle
+          const SizedBox(height: 10),
           const Text(
             'Share your code or link and earn ₹50 for each successful referral!',
             style: TextStyle(
-                fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white70),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Colors.white70,
+              height: 1.3,
+            ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 16),
 
-          // Referral link row
+          // Dedicated Referral Code Box (Full Width - Zero Truncation)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.12),
+              color: Colors.black.withOpacity(0.28),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.22)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'YOUR REFERRAL CODE',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white60,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _isLocked ? '•••••••• 🔒' : _activeCode,
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w900,
+                          color: _isLocked ? _kGold : Colors.white,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: () => _copyToClipboard(
+                        _activeCode,
+                        'Referral code $_activeCode copied!',
+                      ),
+                      icon: const Icon(Icons.copy_rounded, size: 14),
+                      label: Text(_isLocked ? 'Locked' : 'Copy'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF0A3D22),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Referral Link Box
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
               borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: Colors.white.withOpacity(0.2)),
+              border: Border.all(color: Colors.white.withOpacity(0.18)),
             ),
             child: Row(
               children: [
@@ -661,68 +611,70 @@ class _ReferralScreenState extends State<ReferralScreen>
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    _isLocked
-                        ? 'https://f2h.app.link/locked 🔒'
-                        : _referralLink,
+                    _isLocked ? 'https://f2h.app.link/locked 🔒' : _referralLink,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 GestureDetector(
                   onTap: () => _copyToClipboard(
-                      _referralLink, 'Referral link copied!'),
+                    _referralLink,
+                    'Referral link copied!',
+                  ),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Text(
                       'Copy Link',
                       style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
 
-          // Primary CTA inside hero card
+          // Primary WhatsApp Share Button
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: _shareOnWhatsApp,
-              icon: const Icon(Icons.chat_rounded, size: 18),
+              icon: const Icon(Icons.chat_rounded, size: 20),
               label: const Text('Share on WhatsApp'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF25D366),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 13),
+                padding: const EdgeInsets.symmetric(vertical: 14),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
-                textStyle:
-                    const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
               ),
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           const Center(
             child: Text(
               'Share effortlessly with your friends',
               style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white60),
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: Colors.white60,
+              ),
             ),
           ),
         ],
@@ -732,6 +684,9 @@ class _ReferralScreenState extends State<ReferralScreen>
 
   // ── STATS ROW ─────────────────────────────────────────────
   Widget _buildStatsRow() {
+    // ponytail: scale for 320-430+ screens
+    final sw = MediaQuery.of(context).size.width;
+    final s = (sw / 375).clamp(0.78, 1.15);
     return Row(
       children: [
         Expanded(
@@ -745,9 +700,10 @@ class _ReferralScreenState extends State<ReferralScreen>
             value: '₹${_totalEarnings.toStringAsFixed(2)}',
             valueColor: const Color(0xFF16A34A),
             subtitle: 'All time earnings',
+            scale: s,
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: 8 * s),
         Expanded(
           child: _buildStatCard(
             icon: Icons.group_rounded,
@@ -759,6 +715,7 @@ class _ReferralScreenState extends State<ReferralScreen>
             value: '$_totalCount',
             valueColor: const Color(0xFFD97706),
             subtitle: 'Successful referrals',
+            scale: s,
           ),
         ),
       ],
@@ -775,44 +732,53 @@ class _ReferralScreenState extends State<ReferralScreen>
     required String value,
     required Color valueColor,
     required String subtitle,
+    required double scale,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(12 * scale),
       decoration: BoxDecoration(
         color: cardBg,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: cardBorder),
       ),
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 36 * scale,
+            height: 36 * scale,
             decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
-            child: Icon(icon, color: iconColor, size: 22),
+            child: Icon(icon, color: iconColor, size: 18 * scale),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 8 * scale),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
-                    style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: _kTextSecond)),
-                const SizedBox(height: 2),
-                Text(value,
                     style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: valueColor)),
-                const SizedBox(height: 1),
+                        fontSize: 10 * scale,
+                        fontWeight: FontWeight.w600,
+                        color: _kTextSecond),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+                SizedBox(height: 2 * scale),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(value,
+                      style: TextStyle(
+                          fontSize: 18 * scale,
+                          fontWeight: FontWeight.w900,
+                          color: valueColor)),
+                ),
+                SizedBox(height: 1 * scale),
                 Text(subtitle,
-                    style: const TextStyle(
-                        fontSize: 10,
+                    style: TextStyle(
+                        fontSize: 9 * scale,
                         fontWeight: FontWeight.w500,
-                        color: Color(0xFF94A3B8))),
+                        color: const Color(0xFF94A3B8)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
@@ -823,6 +789,8 @@ class _ReferralScreenState extends State<ReferralScreen>
 
   // ── HOW IT WORKS ──────────────────────────────────────────
   Widget _buildHowItWorksSection() {
+    final sw = MediaQuery.of(context).size.width;
+    final s = (sw / 375).clamp(0.78, 1.15);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -849,34 +817,35 @@ class _ReferralScreenState extends State<ReferralScreen>
             Expanded(child: Divider(color: Color(0xFFCBD5E1))),
           ],
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 14 * s),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _stepTile('1', Icons.assignment_turned_in_rounded,
                   'Place Your\nFirst Order',
-                  bg: const Color(0xFFECFDF5), fg: const Color(0xFF059669)),
-              _stepArrow(),
+                  bg: const Color(0xFFECFDF5), fg: const Color(0xFF059669), scale: s),
+              _stepArrow(s),
               _stepTile('2', Icons.confirmation_number_rounded,
                   'Get Your\nReferral Code',
-                  bg: const Color(0xFFECFDF5), fg: const Color(0xFF059669)),
-              _stepArrow(),
+                  bg: const Color(0xFFECFDF5), fg: const Color(0xFF059669), scale: s),
+              _stepArrow(s),
               _stepTile('3', Icons.chat_rounded, 'Share With\nFriends',
-                  bg: const Color(0xFFDCFCE7), fg: const Color(0xFF25D366)),
-              _stepArrow(),
+                  bg: const Color(0xFFDCFCE7), fg: const Color(0xFF25D366), scale: s),
+              _stepArrow(s),
               _stepTile(
                   '4', Icons.people_alt_rounded, 'Friend Joins\nF2H',
-                  bg: const Color(0xFFFEF3C7), fg: const Color(0xFFD97706)),
-              _stepArrow(),
+                  bg: const Color(0xFFFEF3C7), fg: const Color(0xFFD97706), scale: s),
+              _stepArrow(s),
               _stepTile('5', Icons.local_shipping_rounded,
                   'First Order\nDelivered',
-                  bg: const Color(0xFFECFDF5), fg: const Color(0xFF047857)),
-              _stepArrow(),
+                  bg: const Color(0xFFECFDF5), fg: const Color(0xFF047857), scale: s),
+              _stepArrow(s),
               _stepTile(
                   '6', Icons.card_giftcard_rounded, 'You Both\nEarn',
-                  bg: const Color(0xFFFEF3C7), fg: const Color(0xFFCA8A04)),
+                  bg: const Color(0xFFFEF3C7), fg: const Color(0xFFCA8A04), scale: s),
             ],
           ),
         ),
@@ -885,60 +854,60 @@ class _ReferralScreenState extends State<ReferralScreen>
   }
 
   Widget _stepTile(String num, IconData icon, String label,
-      {required Color bg, required Color fg}) {
+      {required Color bg, required Color fg, required double scale}) {
     return SizedBox(
-      width: 96,
+      width: 80 * scale,
       child: Column(
         children: [
           Stack(
             clipBehavior: Clip.none,
             children: [
               Container(
-                width: 60,
-                height: 60,
+                width: 50 * scale,
+                height: 50 * scale,
                 decoration: BoxDecoration(
                   color: bg,
                   shape: BoxShape.circle,
                   border: Border.all(color: fg.withOpacity(0.2)),
                 ),
-                child: Icon(icon, color: fg, size: 26),
+                child: Icon(icon, color: fg, size: 22 * scale),
               ),
               Positioned(
                 top: -2,
                 left: -2,
                 child: Container(
-                  width: 20,
-                  height: 20,
+                  width: 18 * scale,
+                  height: 18 * scale,
                   alignment: Alignment.center,
                   decoration: const BoxDecoration(
                       color: _kGreenDark, shape: BoxShape.circle),
                   child: Text(num,
-                      style: const TextStyle(
-                          fontSize: 10,
+                      style: TextStyle(
+                          fontSize: 9 * scale,
                           fontWeight: FontWeight.w900,
                           color: Colors.white)),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 6 * scale),
           Text(label,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 11,
+              style: TextStyle(
+                  fontSize: 10 * scale,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF334155),
+                  color: const Color(0xFF334155),
                   height: 1.2)),
         ],
       ),
     );
   }
 
-  Widget _stepArrow() {
+  Widget _stepArrow(double scale) {
     return Padding(
-      padding: const EdgeInsets.only(top: 20, left: 2, right: 2),
+      padding: EdgeInsets.only(top: 16 * scale, left: 1, right: 1),
       child: Icon(Icons.arrow_forward_rounded,
-          color: Colors.grey.shade400, size: 16),
+          color: Colors.grey.shade400, size: 14 * scale),
     );
   }
 

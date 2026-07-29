@@ -10,8 +10,7 @@
 //               refresh on 401. Only returns AuthBootResult.expired (which
 //               shows the login screen) if the refresh token itself is invalid
 //               or absent — enforcing the "never logout unless explicit" rule.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'package:dio/dio.dart';

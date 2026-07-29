@@ -207,7 +207,9 @@ export default function BranchesPage() {
       if (res.data?.status) {
         showSuccessToast(res.data.message || 'Branch updated!', 3000);
         setFormModalOpen(false);
-        await loadBranchDetail({ ...selectedBranch, ...form } as Branch);
+        setStep('list');
+        setMode('list');
+        fetchBranches();
       } else {
         setError(res.data?.message || res.error || 'Failed to update branch');
       }
@@ -464,307 +466,6 @@ export default function BranchesPage() {
         </div>
       </div>
 
-      {/* Modern Right Side Drawer (for Details only) */}
-      <div className={`fixed inset-0 z-40 transition-opacity duration-300 ${step === 'detail' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
-        {/* Glassmorphic Backdrop */}
-        <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={() => { setStep('list'); setMode('list'); }} />
-        
-        {/* Panel Body */}
-        <div className={`absolute top-0 right-0 h-full w-full max-w-[760px] bg-white shadow-2xl flex flex-col transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${step === 'detail' ? 'translate-x-0' : 'translate-x-full'}`}>
-          
-          {/* DETAIL VIEW MODE */}
-          {step === 'detail' && selectedBranch && (
-            <div className="flex flex-col h-full overflow-hidden">
-              {/* Header */}
-              <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
-                <div>
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${selectedBranch.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
-                      {selectedBranch.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                    <span className="text-[9px] font-bold text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-md">CODE: {selectedBranch.branch_code}</span>
-                  </div>
-                  <h2 className="text-xl font-extrabold text-slate-800 tracking-tight">{selectedBranch.branch_name}</h2>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => {
-                      setForm({
-                        branch_name: selectedBranch.branch_name || '',
-                        branch_code: selectedBranch.branch_code || '',
-                        city: selectedBranch.city || '',
-                        state: selectedBranch.state || '',
-                        lat: selectedBranch.lat !== null && selectedBranch.lat !== undefined ? Number(selectedBranch.lat) : null,
-                        lng: selectedBranch.lng !== null && selectedBranch.lng !== undefined ? Number(selectedBranch.lng) : null,
-                        delivery_radius_km: Number(selectedBranch.delivery_radius_km) || 5,
-                        buffer_zone: Number(selectedBranch.buffer_zone) || 0,
-                        allow_buffer_order: !!selectedBranch.allow_buffer_order,
-                        sector_count: Number(selectedBranch.sector_count) || 3,
-                        is_active: selectedBranch.is_active,
-                        hex_shape: normalizeHexShape(selectedBranch.hex_shape),
-                      });
-                      setError('');
-                      setMode('edit');
-                      setStep('form');
-                      setFormStep(1);
-                      setFormModalOpen(true);
-                    }}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-slate-50 border border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
-                  >
-                    <Pencil size={13} /> Edit
-                  </button>
-                  <button
-                    onClick={() => { setStep('list'); setMode('list'); }}
-                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-50 border border-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Navigation Tabs */}
-              <div className="px-8 py-3 border-b border-slate-50 bg-slate-50/50 flex items-center justify-between shrink-0">
-                <div className="flex p-0.5 bg-slate-200/60 rounded-xl border border-slate-200/50 overflow-x-auto">
-                  <button
-                    onClick={() => setDetailStep(1)}
-                    className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${detailStep === 1 ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                  >
-                    Overview
-                  </button>
-                  <button
-                    onClick={() => setDetailStep(2)}
-                    className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${detailStep === 2 ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                  >
-                    Service Zone
-                  </button>
-                  <button
-                    onClick={() => setDetailStep(3)}
-                    className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${detailStep === 3 ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                  >
-                    Partner Allocation ({branchPartners.length})
-                  </button>
-                  <button
-                    onClick={() => setDetailStep(4)}
-                    className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${detailStep === 4 ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                  >
-                    Branch Analytics
-                  </button>
-                </div>
-                {loadingDetail && (
-                  <Loader2 size={16} className="animate-spin text-emerald-600" />
-                )}
-              </div>
-
-              {/* Drawer Body Scroll */}
-              <div className="flex-1 overflow-y-auto p-8 bg-slate-50/20">
-                {loadingDetail && hexes.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full gap-3 py-32">
-                    <Loader2 size={28} className="animate-spin text-emerald-600" />
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Loading details...</p>
-                  </div>
-                ) : (
-                  <div className="h-full">
-                    {detailStep === 1 && (
-                      <div className="space-y-6 animate-in fade-in duration-300">
-                        {/* Address Detail Card */}
-                        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-                          <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Location Details</h4>
-                          <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 flex-shrink-0 border border-slate-100">
-                              <MapPin size={18} />
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold text-slate-700">Hub Coordinates</p>
-                              <p className="text-xs text-slate-500 mt-1">
-                                {selectedBranch.lat ? `${Number(selectedBranch.lat).toFixed(6)}, ${Number(selectedBranch.lng).toFixed(6)}` : 'Not geocoded'}
-                              </p>
-                              <p className="text-xs text-slate-400 mt-2 font-semibold">
-                                {selectedBranch.city ? `${selectedBranch.city}` : ''}{selectedBranch.state ? `, ${selectedBranch.state}` : ''}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Operational Stats Grid */}
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-                            <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-500 mb-4 border border-indigo-100">
-                              <Hexagon size={18} />
-                            </div>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Coverage Density</p>
-                            <p className="text-2xl font-extrabold text-slate-800 mt-1">{hexes.length} <span className="text-xs text-slate-400 font-bold uppercase">Hexes</span></p>
-                          </div>
-
-                          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-                            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-500 mb-4 border border-emerald-100">
-                              <Users size={18} />
-                            </div>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Allocated Partners</p>
-                            <p className="text-2xl font-extrabold text-slate-800 mt-1">{branchPartners.length} <span className="text-xs text-slate-400 font-bold uppercase">Partners</span></p>
-                          </div>
-
-                          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-                            <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-500 mb-4 border border-amber-100">
-                              <MapPin size={18} />
-                            </div>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Service Radius</p>
-                            <p className="text-2xl font-extrabold text-slate-800 mt-1">{selectedBranch.delivery_radius_km || 0} <span className="text-xs text-slate-400 font-bold uppercase">KM</span></p>
-                          </div>
-
-                          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-                            <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center text-purple-500 mb-4 border border-purple-100">
-                              <Activity size={18} />
-                            </div>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Buffer Zone</p>
-                            <p className="text-2xl font-extrabold text-slate-800 mt-1">{selectedBranch.buffer_zone || 0} <span className="text-xs text-slate-400 font-bold uppercase">KM</span></p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {detailStep === 2 && (
-                      <div className="space-y-6 animate-in fade-in duration-300 h-full flex flex-col">
-                        {/* Map Card */}
-                        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] overflow-hidden flex flex-col flex-1 min-h-[350px]">
-                          <div className="px-6 py-4 border-b border-slate-50 flex items-center justify-between shrink-0">
-                            <h3 className="font-bold text-slate-700 uppercase tracking-widest text-[10px]">Service Zone Map</h3>
-                            <div className="flex items-center gap-1.5">
-                              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Radius & Buffer View</span>
-                            </div>
-                          </div>
-                          <div className="flex-1 p-3">
-                            {selectedBranch.lat && selectedBranch.lng ? (
-                              <div className="rounded-2xl overflow-hidden shadow-inner h-full min-h-[280px]">
-                                <HexSectorMap
-                                  hexes={hexes}
-                                  centerLat={Number(selectedBranch.lat)}
-                                  centerLng={Number(selectedBranch.lng)}
-                                  radiusKm={Number(selectedBranch.delivery_radius_km)}
-                                  bufferZoneKm={Number(selectedBranch.buffer_zone)}
-                                  height="100%"
-                                  emptyMessage={hexMessage}
-                                />
-                              </div>
-                            ) : (
-                              <div className="flex flex-col items-center justify-center h-full bg-slate-50 rounded-2xl min-h-[280px]">
-                                <AlertTriangle size={32} className="text-amber-500 mb-2 animate-bounce" />
-                                <p className="font-bold text-slate-700 uppercase tracking-widest text-[10px]">Coordinates Missing</p>
-                                <p className="text-[10px] text-slate-400 mt-1 max-w-xs text-center">Configure map coordinates in branch settings to visualize this service zone.</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Step 3: Partner Allocation */}
-                    {detailStep === 3 && (
-                      <div className="space-y-6 animate-in fade-in duration-300">
-                        {/* Assign Partner Form */}
-                        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] space-y-4">
-                          <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Allocate Delivery Partner</h4>
-                          <div className="flex items-center gap-3">
-                            <select
-                              value={selectedPartnerToAssign}
-                              onChange={(e) => setSelectedPartnerToAssign(e.target.value)}
-                              className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:border-emerald-600 focus:outline-none"
-                            >
-                              <option value="">Select a delivery partner to allocate...</option>
-                              {unassignedPartners.map((p) => (
-                                <option key={p.delivery_partner_id || p.id} value={p.delivery_partner_id || p.id}>
-                                  {p.full_name} ({p.phone}) — Current: {p.branch_name || p.branch_id || 'Unassigned'}
-                                </option>
-                              ))}
-                            </select>
-                            <button
-                              type="button"
-                              disabled={!selectedPartnerToAssign || allocating}
-                              onClick={() => handleAllocatePartner(selectedPartnerToAssign, selectedBranch.branch_id)}
-                              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all disabled:opacity-50 flex items-center gap-1.5 shrink-0"
-                            >
-                              {allocating ? 'Allocating...' : 'Assign to Branch'}
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Allocated Partners Table */}
-                        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] overflow-hidden">
-                          <div className="px-6 py-4 border-b border-slate-50 flex items-center justify-between">
-                            <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Allocated Partners ({branchPartners.length})</h4>
-                            <span className="text-[10px] font-bold text-slate-400">Branch ID: #{selectedBranch.branch_id}</span>
-                          </div>
-                          {branchPartners.length === 0 ? (
-                            <div className="p-12 text-center text-xs text-slate-400">No delivery partners allocated to this branch yet.</div>
-                          ) : (
-                            <div className="divide-y divide-slate-50">
-                              {branchPartners.map((p) => (
-                                <div key={p.delivery_partner_id || p.id} className="px-6 py-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 font-extrabold text-xs flex items-center justify-center border border-emerald-100">
-                                      {(p.full_name || 'D').charAt(0).toUpperCase()}
-                                    </div>
-                                    <div>
-                                      <p className="text-xs font-bold text-slate-900">{p.full_name}</p>
-                                      <p className="text-[11px] text-slate-500 font-medium">{p.phone} • {p.vehicle_type || 'Bike'}</p>
-                                    </div>
-                                  </div>
-
-                                  <button
-                                    type="button"
-                                    disabled={allocating}
-                                    onClick={() => handleAllocatePartner(p.delivery_partner_id || p.id, null)}
-                                    className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-[11px] font-bold rounded-lg transition-colors border border-rose-200"
-                                  >
-                                    De-assign
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Step 4: Branch Analytics */}
-                    {detailStep === 4 && (
-                      <div className="space-y-6 animate-in fade-in duration-300">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Branch Status</p>
-                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider mt-2 ${
-                              selectedBranch.is_active ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600'
-                            }`}>
-                              {selectedBranch.is_active ? 'Active Operation' : 'Inactive'}
-                            </span>
-                          </div>
-
-                          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Active Partners</p>
-                            <p className="text-2xl font-extrabold text-slate-800 mt-1">{branchPartners.filter(p => p.is_active).length} / {branchPartners.length}</p>
-                          </div>
-
-                          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Buffer Orders Allowed</p>
-                            <p className="text-sm font-bold text-slate-800 mt-2">{selectedBranch.allow_buffer_order ? 'Enabled' : 'Disabled'}</p>
-                          </div>
-
-                          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">H3 Resolution</p>
-                            <p className="text-2xl font-extrabold text-slate-800 mt-1">Res-{selectedBranch.h3_resolution || 8}</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-        </div>
-      </div>
-
       {/* Centered Modal (Create/Edit Branch Form) */}
       {formModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -774,8 +475,8 @@ export default function BranchesPage() {
             onClick={() => {
               if (!saving) {
                 setFormModalOpen(false);
-                setStep(mode === 'edit' ? 'detail' : 'list');
-                setMode(mode === 'edit' ? 'detail' : 'list');
+                setStep('list');
+                setMode('list');
               }
             }}
           />
@@ -801,8 +502,8 @@ export default function BranchesPage() {
                 onClick={() => {
                   if (!saving) {
                     setFormModalOpen(false);
-                    setStep(mode === 'edit' ? 'detail' : 'list');
-                    setMode(mode === 'edit' ? 'detail' : 'list');
+                    setStep('list');
+                    setMode('list');
                   }
                 }}
                 className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
@@ -993,8 +694,8 @@ export default function BranchesPage() {
                     if (formStep > 1) { setFormStep(1); }
                     else {
                       setFormModalOpen(false);
-                      setStep(mode === 'edit' ? 'detail' : 'list');
-                      setMode(mode === 'edit' ? 'detail' : 'list');
+                      setStep('list');
+                      setMode('list');
                     }
                   }}
                   disabled={saving}

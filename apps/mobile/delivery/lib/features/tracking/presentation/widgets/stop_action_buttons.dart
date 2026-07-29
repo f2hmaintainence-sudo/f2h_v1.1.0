@@ -46,7 +46,7 @@ class StopActionButtons extends StatelessWidget {
             ),
             style: OutlinedButton.styleFrom(
               padding: EdgeInsets.symmetric(vertical: vertPad),
-              side: BorderSide(color: Colors.blue.withOpacity(compact ? 0.2 : 0.3)),
+              side: BorderSide(color: Colors.blue.withValues(alpha: compact ? 0.2 : 0.3)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(radius),
               ),
@@ -73,7 +73,7 @@ class StopActionButtons extends StatelessWidget {
             ),
             style: OutlinedButton.styleFrom(
               padding: EdgeInsets.symmetric(vertical: vertPad),
-              side: BorderSide(color: kPrimary.withOpacity(compact ? 0.2 : 0.3)),
+              side: BorderSide(color: kPrimary.withValues(alpha: compact ? 0.2 : 0.3)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(radius),
               ),

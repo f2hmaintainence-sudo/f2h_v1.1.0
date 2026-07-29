@@ -278,7 +278,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                 width: 44,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: kMuted.withOpacity(0.3),
+                  color: kMuted.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
@@ -365,7 +365,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                       ),
                       boxShadow: isActive ? [
                         BoxShadow(
-                          color: kPrimary.withOpacity(0.25),
+                          color: kPrimary.withValues(alpha: 0.25),
                           blurRadius: 8,
                           offset: const Offset(0, 3),
                         )
@@ -1207,7 +1207,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                     Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.camera_enhance_rounded, color: kPrimary.withOpacity(0.8), size: 48),
+                        Icon(Icons.camera_enhance_rounded, color: kPrimary.withValues(alpha: 0.8), size: 48),
                         const SizedBox(height: 12),
                         const Text(
                           'Tap to Take Delivery Photo',
@@ -1239,7 +1239,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                         ),
                       ),
                     Container(
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withValues(alpha: 0.2),
                     ),
                     Positioned(
                       top: 12,
@@ -1527,10 +1527,10 @@ class _ScannerAnimationWrapperState extends State<_ScannerAnimationWrapper> {
               child: Container(
                 height: 2,
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.8),
+                  color: Colors.red.withValues(alpha: 0.8),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.red.withOpacity(0.4),
+                      color: Colors.red.withValues(alpha: 0.4),
                       blurRadius: 4,
                       spreadRadius: 1,
                     )

@@ -231,7 +231,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     decoration: BoxDecoration(
-                      color: isSelected ? itemColor.withOpacity(0.08) : kSurface,
+                      color: isSelected ? itemColor.withValues(alpha: 0.08) : kSurface,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: isSelected ? itemColor : kBorder,
@@ -239,7 +239,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: kText.withOpacity(0.01),
+                          color: kText.withValues(alpha: 0.01),
                           blurRadius: 8,
                           offset: const Offset(0, 4),
                         )
@@ -253,7 +253,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: isSelected ? itemColor.withOpacity(0.12) : kBgDeep,
+                            color: isSelected ? itemColor.withValues(alpha: 0.12) : kBgDeep,
                             shape: BoxShape.circle,
                           ),
                           child: Icon(

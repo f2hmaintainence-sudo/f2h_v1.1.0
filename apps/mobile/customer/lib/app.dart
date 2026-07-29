@@ -10,7 +10,6 @@ import 'package:f2h_customer/features/catalog/presentation/screens/home_screen.d
 import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_screen.dart'; // Contains BrowseScreen
 import 'package:f2h_customer/features/catalog/presentation/screens/cart_screen.dart';
 import 'package:f2h_customer/features/subscription/presentation/screens/my_subscriptions_screen.dart'; // Contains SubsScreen
-import 'package:f2h_customer/features/profile/presentation/screens/profile_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
@@ -21,7 +20,6 @@ import 'package:f2h_customer/core/widgets/network_overlay.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/catalog_bloc.dart';
 import 'package:f2h_customer/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:f2h_customer/features/subscription/presentation/bloc/subscription_bloc.dart';
-import 'package:f2h_customer/features/subscription/presentation/bloc/subscription_state.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_bloc.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_state.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_event.dart';
@@ -29,7 +27,6 @@ import 'package:f2h_customer/features/catalog/presentation/bloc/checkout/checkou
 import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_bloc.dart';
 import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_event.dart';
 import 'package:f2h_customer/core/app_bootstrap.dart';
-import 'package:f2h_customer/core/widgets/hot_toast.dart';
 
 
 class F2HApp extends StatelessWidget {
@@ -57,7 +54,9 @@ class F2HApp extends StatelessWidget {
       home: DynamicSplashScreen(
         child: BlocListener<AuthBloc, AuthState>(
           listener: (context, state) {
-            if (state is Unauthenticated || state is AuthFailure) {
+            if (state is Authenticated) {
+              context.read<CustomerSessionCubit>().bootstrap();
+            } else if (state is Unauthenticated || state is AuthFailure) {
               context.read<CartBloc>().add(ClearCartEvent());
             }
           },

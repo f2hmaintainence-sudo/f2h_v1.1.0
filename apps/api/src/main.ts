@@ -7,8 +7,7 @@
 // File        : main.ts
 // Description : NestJS API entry point — URI-versioned (/api/v1/), compact
 //               headers (X-Role, X-Plt, X-Ver, X-Csrf), gzip compression.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import { NestFactory } from '@nestjs/core';
@@ -95,6 +94,15 @@ async function bootstrap() {
 
   app.useStaticAssets(join(process.cwd(), 'uploads'), {
     prefix: '/uploads/',
+    maxAge: 31536000000, // 1 year in milliseconds
+    setHeaders: (res: any) => {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    },
+  });
+
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+    prefix: '/api/v1/uploads/',
     maxAge: 31536000000, // 1 year in milliseconds
     setHeaders: (res: any) => {
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
@@ -236,7 +244,7 @@ async function bootstrap() {
     maxAge: 86400, // 24-hour preflight cache
   });
 
-  const port = env.Backend_Port || 4000;
+  const port = env.PORT || env.Backend_Port || 5001;
   await app.listen(port, '0.0.0.0');
   console.log(`Server running on http://0.0.0.0:${port}`);
 }

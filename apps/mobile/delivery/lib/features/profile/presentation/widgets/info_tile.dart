@@ -74,7 +74,7 @@ class InfoTile extends StatelessWidget {
               },
             ),
           if (onTap != null)
-            Icon(Icons.arrow_forward_ios_rounded, color: kTextSub.withOpacity(0.4), size: 12),
+            Icon(Icons.arrow_forward_ios_rounded, color: kTextSub.withValues(alpha: 0.4), size: 12),
         ],
       ),
     );

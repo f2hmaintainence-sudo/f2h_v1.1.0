@@ -110,7 +110,12 @@ export class CartService {
           COALESCE(pi.url, p.image_path) AS image_path
          FROM product_variants pv
          LEFT JOIN products p ON pv.product_id = p.product_id
-         LEFT JOIN product_images pi ON (pv.variant_id = pi.variant_id OR (pi.variant_id IS NULL AND p.product_id = pi.product_id)) AND (pi.is_primary = true OR pi.is_primary IS NULL)
+         LEFT JOIN LATERAL (
+            SELECT url FROM product_images pi2
+            WHERE pi2.variant_id = pv.variant_id OR (pi2.variant_id IS NULL AND pi2.product_id = p.product_id)
+            ORDER BY pi2.is_primary DESC NULLS LAST, pi2.id ASC
+            LIMIT 1
+          ) pi ON true
          WHERE pv.variant_id = ANY($1) AND pv.status = 'active'`,
         [variantIds],
       );
@@ -343,20 +348,15 @@ export class CartService {
     const onetimeGroups = new Map<string, OnetimeGroup>();
 
     for (const item of itemsToCheckout) {
-      const productDetails = await this.Data.query('product_variants', {
-        select: ['product_variants.price', 'products.name AS product_name'],
-        joins: [
-          {
-            type: 'left',
-            table: 'products',
-            on: [{ column: 'product_variants.product_id', operator: '=', value: 'products.product_id' }],
-          },
-        ],
-        where: [{ column: 'product_variants.variant_id', operator: '=', value: item.product_variant_id }],
-        limit: 1,
-      });
-      const price = productDetails?.data?.[0]?.price ? Number(productDetails.data[0].price) : 150;
-      const productName = productDetails?.data?.[0]?.product_name || 'Product';
+      const productRows = await this.db.query(
+        `SELECT pv.price, p.name AS product_name
+         FROM product_variants pv
+         LEFT JOIN products p ON pv.product_id = p.product_id
+         WHERE pv.variant_id = $1 LIMIT 1`,
+        [item.product_variant_id],
+      );
+      const price = productRows?.[0]?.price ? Number(productRows[0].price) : 150;
+      const productName = productRows?.[0]?.product_name || 'Product';
       const onetimeItem = item as OnetimeCheckoutItemDto;
       const qty = onetimeItem.onetime_details?.quantity || 1;
       const subtotal = price * qty;
@@ -558,8 +558,8 @@ export class CartService {
     let runningBalance = walletBalance;
     for (const tx of transactions) {
       if (tx.amount > 0) {
-        runningBalance -= tx.amount;
-        // ponytail: compact transaction ID to fit character varying(20) limit
+        runningBalance = Math.max(0, runningBalance - tx.amount);
+
         const ts = Math.floor(Date.now() / 1000).toString(36);
         const rnd = Math.floor(Math.random() * 9000 + 1000);
         const txId = `WT${ts}${rnd}`;

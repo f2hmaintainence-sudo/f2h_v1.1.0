@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : app_bootstrap.dart
 // Description : Cold-boot session validation for F2H Delivery App.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'package:dio/dio.dart';

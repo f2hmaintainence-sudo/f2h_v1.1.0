@@ -22,20 +22,20 @@ class VerificationBadge extends StatelessWidget {
 
     switch (status.toLowerCase()) {
       case 'verified':
-        badgeColor = kSuccess.withOpacity(0.12);
+        badgeColor = kSuccess.withValues(alpha: 0.12);
         textColor = kSuccess;
         icon = Icons.check_circle_rounded;
         label = 'Verified';
         break;
       case 'rejected':
-        badgeColor = kDanger.withOpacity(0.12);
+        badgeColor = kDanger.withValues(alpha: 0.12);
         textColor = kDanger;
         icon = Icons.cancel_rounded;
         label = 'Rejected';
         break;
       case 'pending':
       default:
-        badgeColor = kAccent.withOpacity(0.15);
+        badgeColor = kAccent.withValues(alpha: 0.15);
         textColor = kAccent;
         icon = Icons.hourglass_empty_rounded;
         label = 'Pending Verification';

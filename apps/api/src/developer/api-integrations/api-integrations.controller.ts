@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : api-integrations.controller.ts
 // Description : Controller for developer API integrations configurations & DLT templates
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards } from '@nestjs/common';
@@ -16,7 +15,7 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 @Controller({ path: 'admin/developer/api-integrations', version: '1' })
 @UseGuards(JwtAuthGuard)
 export class ApiIntegrationsController {
-  constructor(private readonly apiIntegrationsService: ApiIntegrationsService) {}
+  constructor(private readonly apiIntegrationsService: ApiIntegrationsService) { }
 
   // ── Dedicated SMS DLT Templates Endpoints (must precede :category wildcard) ──
   @Get('sms/templates')

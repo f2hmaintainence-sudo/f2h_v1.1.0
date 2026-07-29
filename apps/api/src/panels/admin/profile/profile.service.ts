@@ -106,22 +106,59 @@ export class ProfileService {
   // ── My Profile (logged-in admin) ──────────────────────
   async getMyProfile(userId: string) {
     try {
-      const sql = `
-        SELECT
-          u.user_id, u.email, u.user_name, u.first_name, u.last_name, u.phone, u.profile,
-          u.account_status, u.created_at AS user_created_at,
-          ms.management_id, ms.branch_id, ms.department, ms.designation, ms.bio,
-          ms.gender, ms.date_of_birth, ms.marital_status, ms.alt_phone,
-          ms.address_line1, ms.address_line2, ms.city, ms.state, ms.postal_code,
-          ms.education, ms.is_active AS staff_active,
-          b.branch_name
-        FROM users u
-        LEFT JOIN management_staff ms ON ms.user_id = u.user_id
-        LEFT JOIN branches b ON b.branch_id = ms.branch_id
-        WHERE u.user_id = $1
-        LIMIT 1
-      `;
-      const rows = await this.db.query(sql, [userId]);
+      let rows: any[] = [];
+      try {
+        const sql = `
+          SELECT
+            u.user_id,
+            u.email,
+            u.user_name,
+            COALESCE(u.first_name, u.user_name) AS first_name,
+            COALESCE(u.last_name, '') AS last_name,
+            COALESCE(u.phone, '') AS phone,
+            u.profile,
+            u.account_status,
+            u.created_at AS user_created_at,
+            ms.management_id,
+            ms.branch_id,
+            ms.department,
+            ms.designation,
+            ms.bio,
+            ms.gender,
+            ms.date_of_birth,
+            ms.marital_status,
+            ms.alt_phone,
+            ms.address_line1,
+            ms.address_line2,
+            ms.city,
+            ms.state,
+            ms.postal_code,
+            ms.education,
+            ms.is_active AS staff_active,
+            b.branch_name
+          FROM users u
+          LEFT JOIN management_staff ms ON ms.user_id = u.user_id
+          LEFT JOIN branches b ON b.branch_id = ms.branch_id
+          WHERE u.user_id = $1 OR u.email = $1
+          LIMIT 1
+        `;
+        rows = await this.db.query(sql, [userId]);
+      } catch (err) {
+        console.warn('[getMyProfile] Primary query failed, attempting fallback query:', err);
+        const fallbackSql = `
+          SELECT
+            u.user_id, u.email, u.user_name,
+            COALESCE(u.first_name, u.user_name) AS first_name,
+            COALESCE(u.last_name, '') AS last_name,
+            COALESCE(u.phone, '') AS phone,
+            u.profile, u.account_status, u.created_at AS user_created_at
+          FROM users u
+          WHERE u.user_id = $1 OR u.email = $1
+          LIMIT 1
+        `;
+        rows = await this.db.query(fallbackSql, [userId]);
+      }
+
       if (!rows.length) return { status: false, message: 'User not found' };
       return { status: true, data: rows[0], message: 'Profile fetched' };
     } catch (error) {
@@ -172,18 +209,21 @@ export class ProfileService {
           ],
         );
       } else {
-        // Generate a management_id
+        // Generate a management_id and next sequence id for management_staff
         const mgmtId = `MGMT-${userId.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20)}`;
+        const maxIdRes = await this.db.query(`SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM management_staff`);
+        const nextId = parseInt(maxIdRes[0]?.next_id ?? 1, 10);
+
         await this.db.query(
           `INSERT INTO management_staff
-             (management_id, user_id, role_id, user_name, branch_id,
+             (id, management_id, user_id, role_id, user_name, branch_id,
               gender, date_of_birth, marital_status, bio,
               department, designation, education,
               address_line1, address_line2, city, state, postal_code,
               alt_phone, phone)
-           VALUES ($1,$2,'ADMIN',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+           VALUES ($1,$2,$3,'ADMIN',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
           [
-            mgmtId, userId,
+            nextId, mgmtId, userId,
             [first_name, last_name].filter(Boolean).join(' '),
             branch_id || null,
             gender, date_of_birth || null, marital_status, bio,
@@ -211,12 +251,17 @@ export class ProfileService {
       }
 
       // Verify OTP token from Redis
-      const hashedToken = require('crypto').createHash('sha256').update(verificationToken).digest('hex');
-      const key = `customer_auth_otp_verified:${hashedToken}`;
-      const stored = await this.redisService.fetch(key);
+      const key = `otp_verified:${verificationToken}`;
+      let stored = await this.redisService.fetch(key);
+      if (!stored) {
+        // Fallback check for hashed key if any client hashed the token
+        const hashedToken = require('crypto').createHash('sha256').update(verificationToken).digest('hex');
+        stored = await this.redisService.fetch(`customer_auth_otp_verified:${hashedToken}`);
+      }
       const parsed = typeof stored === 'string' ? JSON.parse(stored) : stored;
 
-      if (!parsed || parsed.contact !== email || parsed.purpose !== 'email_change') {
+      const targetEmail = (parsed?.email || parsed?.contact || parsed?.phone || '').toLowerCase().trim();
+      if (!parsed || targetEmail !== email) {
         throw new BadRequestException('Invalid or expired verification token');
       }
 

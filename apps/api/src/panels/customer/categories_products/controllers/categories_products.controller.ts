@@ -1,5 +1,7 @@
 import { Body, Controller, Get, Post, Req } from '@nestjs/common';
 import { Request } from 'express';
+import { existsSync, readdirSync } from 'fs';
+import { join } from 'path';
 import { Public } from 'src/auth/decorators/public.decorator';
 import { CreateDeveloperSubscriptionDto } from '../dto/create-developer-subscription.dto';
 import { CategoriesProductsService } from '../ModuleServices/categories_products.service';
@@ -8,24 +10,37 @@ import { CategoriesProductsService } from '../ModuleServices/categories_products
 export class CategoriesController {
   constructor(private readonly service: CategoriesProductsService) { }
 
-  // ponytail: static config — no DB table until banners need CRUD
   @Public()
   @Get('banners')
   async getBanners(@Req() req: Request) {
     const host = `${req.protocol}://${req.get('host')}`;
+    const bannersDir = join(process.cwd(), 'uploads', 'banners');
+    let bannerFiles: string[] = [];
+    try {
+      if (existsSync(bannersDir)) {
+        bannerFiles = readdirSync(bannersDir).filter(
+          (f) => f.endsWith('.png') || f.endsWith('.jpg') || f.endsWith('.jpeg') || f.endsWith('.webp'),
+        );
+      }
+    } catch (_) {}
+
+    if (bannerFiles.length === 0) {
+      bannerFiles = ['subscription_banner.png'];
+    }
+
+    const data = bannerFiles.map((file, idx) => ({
+      id: `banner-${idx + 1}`,
+      imageUrl: `${host}/uploads/banners/${encodeURIComponent(file)}`,
+      title: 'Farm Fresh Essentials',
+      subtitle: 'Subscribe to pure organic milk, paneer, ghee & daily essentials.',
+      cta: 'Order Now',
+      route: 'menu',
+      isActive: true,
+    }));
+
     return {
       status: true,
-      data: [
-        {
-          id: 'sub-save-5',
-          imageUrl: `${host}/uploads/banners/subscription_banner.png`,
-          title: 'Save Up To 5%',
-          subtitle: 'Subscription to fresh milk, curd, paneer & more for hassle free morning deliveries.',
-          cta: 'Order Now',
-          route: 'menu', // tab name in the app
-          isActive: true,
-        },
-      ],
+      data,
     };
   }
 

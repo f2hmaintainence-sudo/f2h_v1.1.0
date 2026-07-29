@@ -20,6 +20,7 @@ const PUBLIC_ROUTES = [
   '/privacy-policy',
   '/terms-and-conditions',
   '/refund-policy',
+  '/delivery-policy',
 ];
 
 // Panel routes use client-side auth guard (AuthProvider + /users/me)

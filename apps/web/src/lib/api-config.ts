@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : api-config.ts
 // Description : Central API URL configuration helper
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 export function getApiBaseUrl(): string {

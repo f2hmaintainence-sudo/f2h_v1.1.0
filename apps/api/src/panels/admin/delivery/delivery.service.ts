@@ -4,6 +4,9 @@ import { DeveloperService } from '../../../shared/logger/Developer.service';
 import { NotificationService } from 'src/notifications/notification.service';
 import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
 
+import { FirstOrderDetectorService } from '../../customer/referral/services/first-order-detector.service';
+import { ReferralRewardEngineService } from '../../customer/referral/services/referral-reward-engine.service';
+
 function todayIST(): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Kolkata',
@@ -22,12 +25,14 @@ export class DeliveryManagementService {
     private readonly developer: DeveloperService,
     private readonly notificationService: NotificationService,
     private readonly pushNotificationService: PushNotificationService,
+    private readonly firstOrderDetector: FirstOrderDetectorService,
+    private readonly referralRewardEngine: ReferralRewardEngineService,
   ) { }
 
   private async notifyPartner(partnerId: string, title: string, messageBody: string): Promise<void> {
     try {
       const boyRows = await this.db.query(
-        `SELECT delivery_partner_id, user_id FROM delivery_partners WHERE delivery_partner_id = $1 OR user_id = $1 OR id::text = $1`,
+        `SELECT delivery_partner_id FROM delivery_partners WHERE delivery_partner_id = $1 OR id::text = $1`,
         [partnerId],
       );
       if (!boyRows || boyRows.length === 0) return;
@@ -88,7 +93,7 @@ export class DeliveryManagementService {
       const sql = `
         SELECT
           db.delivery_partner_id,
-          db.user_id,
+          db.delivery_partner_id AS user_id,
           db.is_verified,
           db.full_name,
           db.phone,
@@ -97,6 +102,7 @@ export class DeliveryManagementService {
           b.branch_name,
           db.is_active,
           db.is_available,
+          CASE WHEN (to_jsonb(db)->>'is_online') IS NOT NULL THEN ((to_jsonb(db)->>'is_online')::boolean) ELSE db.is_available END AS is_online,
           db.daily_salary,
           db.max_daily_orders,
           db.current_lat,
@@ -275,7 +281,7 @@ export class DeliveryManagementService {
           b.branch_name
         FROM delivery_partners db
         LEFT JOIN branches b ON b.branch_id = db.branch_id
-        WHERE db.delivery_partner_id = $1 OR db.user_id = $1 OR db.id::text = $1
+        WHERE db.delivery_partner_id = $1 OR db.id::text = $1
       `;
       const boyRows = await this.db.query(boySql, [partnerId]);
       const partnerObj = boyRows[0] ?? null;
@@ -375,15 +381,14 @@ export class DeliveryManagementService {
         const boySql = `
           UPDATE delivery_partners
           SET is_verified = $1, updated_at = NOW()
-          WHERE delivery_partner_id = $2 OR user_id = $2 OR id::text = $2
+          WHERE delivery_partner_id = $2 OR id::text = $2
           RETURNING delivery_partner_id, full_name, is_verified, is_active
         `;
         const rows = await this.db.query(boySql, [body.is_verified, partnerId]);
 
         if (body.is_verified === true) {
           const boyId = rows[0]?.delivery_partner_id || partnerId;
-          const boyRows = await this.db.query(`SELECT user_id FROM delivery_partners WHERE delivery_partner_id = $1`, [boyId]);
-          const userId = boyRows[0]?.user_id || boyId;
+          const userId = boyId;
 
           await this.db.query(
             `UPDATE user_documents SET verification_status = 'verified', verified_at = NOW() WHERE (delivery_partner_id = $1 OR delivery_partner_id = $2) AND verification_status = 'pending'`,
@@ -460,11 +465,33 @@ export class DeliveryManagementService {
           o.delivery_partner_id,
           o.assignment_method,
           o.assigned_at,
-          o.delivered_at,
+          o.scheduled_date,
+          o.created_at,
+          o.branch_id,
+          b.branch_name,
           db.full_name AS partner_name,
-          db.phone AS partner_phone
+          db.phone AS partner_phone,
+          COALESCE(
+            (
+              SELECT json_agg(
+                json_build_object(
+                  'id', oi.id,
+                  'product_name', COALESCE(p.name, 'Fresh Item'),
+                  'variant_name', pv.name,
+                  'quantity', oi.quantity,
+                  'unit_price', oi.unit_price,
+                  'final_price', COALESCE(oi.final_price, oi.unit_price * oi.quantity)
+                )
+              )
+              FROM order_items oi
+              LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
+              LEFT JOIN products p ON p.product_id = pv.product_id
+              WHERE oi.order_id = o.order_id
+            ), '[]'::json
+          ) AS items
         FROM orders o
         LEFT JOIN delivery_partners db ON db.delivery_partner_id = o.delivery_partner_id
+        LEFT JOIN branches b ON b.branch_id = o.branch_id
         WHERE ${where.join(' AND ')}
         ORDER BY
           CASE o.status
@@ -529,8 +556,9 @@ export class DeliveryManagementService {
 
   async updateDeliveryStatus(orderId: string, status: string, notes?: string) {
     try {
-      const validStatuses = ['confirmed', 'packed', 'out_for_delivery', 'delivered', 'failed'];
-      if (!validStatuses.includes(status)) {
+      const normStatus = String(status || '').toLowerCase().replace(/[\s_-]+/g, '_');
+      const validStatuses = ['pending', 'confirmed', 'packed', 'out_for_delivery', 'delivered', 'cancelled', 'failed'];
+      if (!validStatuses.includes(normStatus)) {
         return { status: false, message: `Invalid status. Valid: ${validStatuses.join(', ')}` };
       }
 
@@ -538,29 +566,61 @@ export class DeliveryManagementService {
         `status = $2`,
         `updated_at = NOW()`,
       ];
-      const params: any[] = [orderId, status];
+      const params: any[] = [orderId, normStatus];
 
-      if (status === 'delivered') {
-        updateFields.push(`delivered_at = NOW()`);
-      }
+      // Note: delivered_at column does not exist on orders table; status update only.
 
       const sql = `
         UPDATE orders
         SET ${updateFields.join(', ')}
-        WHERE order_id = $1
-        RETURNING order_id, status
+        WHERE order_id = $1 OR id::text = $1
+        RETURNING order_id, customer_id, status
       `;
 
       const rows = await this.db.query(sql, params);
+      const updatedOrder = rows?.[0];
+
+      if (status === 'delivered' && updatedOrder?.customer_id) {
+        try {
+          await this.firstOrderDetector.detectAndMarkFirstOrder(updatedOrder.customer_id, orderId);
+          await this.firstOrderDetector.unlockReferralCode(updatedOrder.customer_id);
+          await this.referralRewardEngine.processReferralReward(updatedOrder.customer_id, orderId);
+        } catch (refErr) {
+          this.developer.error('DeliveryManagementService: Failed to process referral reward', refErr);
+        }
+      }
 
       return {
         status: true,
-        data: rows[0] ?? null,
+        data: updatedOrder ?? null,
         message: `Order ${orderId} status updated to ${status}`,
       };
     } catch (error) {
       this.developer.error('updateDeliveryStatus error', { error });
       throw new InternalServerErrorException('Failed to update delivery status');
+    }
+  }
+
+  async assignPartnerToOrder(orderId: string, partnerId: string) {
+    try {
+      const sql = `
+        UPDATE orders
+        SET delivery_partner_id = $1,
+            assignment_method   = 'manual',
+            assigned_at         = NOW(),
+            updated_at          = NOW()
+        WHERE order_id = $2
+        RETURNING order_id, delivery_partner_id, assigned_at
+      `;
+      const rows = await this.db.query(sql, [partnerId, orderId]);
+      return {
+        status: true,
+        data: rows?.[0] ?? null,
+        message: `Delivery partner assigned to order ${orderId}`,
+      };
+    } catch (error) {
+      this.developer.error('assignPartnerToOrder error', { error });
+      throw new InternalServerErrorException('Failed to assign partner to order');
     }
   }
 
@@ -631,8 +691,8 @@ export class DeliveryManagementService {
       }
 
       const dbRes = await this.db.query(
-        `SELECT delivery_partner_id, full_name, user_id FROM delivery_partners 
-         WHERE delivery_partner_id = $1 OR user_id = $1 OR id::text = $1 LIMIT 1`,
+        `SELECT delivery_partner_id, full_name FROM delivery_partners 
+         WHERE delivery_partner_id = $1 OR id::text = $1 LIMIT 1`,
         [dto.delivery_partner_id],
       );
       if (!dbRes || dbRes.length === 0) {

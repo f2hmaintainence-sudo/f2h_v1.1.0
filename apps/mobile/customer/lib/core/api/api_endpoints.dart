@@ -7,8 +7,7 @@
 // Description : Versioned API endpoint definitions for the F2H Customer app.
 //               All paths resolve under /api/v1/ via the baseUrl prefix.
 //               Compact header values (C, D, ac, ic …) are sent by DioClient.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'package:flutter/foundation.dart';
@@ -23,10 +22,10 @@ class ApiEndpoints {
   // ---------------------------------------------------------------------------
   static const String _envBaseUrl = String.fromEnvironment('F2H_API_BASE_URL');
   static String get _devBaseUrl {
-    if (kReleaseMode) {
+    if (kReleaseMode && _envBaseUrl.isEmpty) {
       return 'https://f2hfresh.com';
     }
-    return 'http://192.168.1.16:5001';
+    return 'http://127.0.0.1:5001';
   }
 
   /// Root host (scheme + host + port), no trailing slash.
@@ -100,6 +99,7 @@ class ApiEndpoints {
   static const String cartItems = '$_customer/cart-items';
   static const String cartData = cartItems;
   static const String checkout = '$_customer/checkout/payment';
+  static const String customerBills = '$_customer/orders/bills';
 
   // Referrals  →  /api/v1/customer/referrals/…
   static const String customerReferrals = '$_customer/referrals/dashboard';

@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : AuthContext.tsx
 // Description : Auth Context for web application
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 "use client";
@@ -44,9 +43,9 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   activeRole: null,
-  switchRole: async () => {},
-  refresh: async () => {},
-  logout: () => {},
+  switchRole: async () => { },
+  refresh: async () => { },
+  logout: () => { },
 });
 
 export const useAuth = () => useContext(AuthContext);

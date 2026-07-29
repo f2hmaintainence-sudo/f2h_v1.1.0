@@ -363,6 +363,10 @@ export function Footer() {
             <Link href="/refund-policy" className="text-white/60 hover:text-green-400 transition-colors duration-200">
               Refund Policy
             </Link>
+            <span className="w-1 h-1 rounded-full bg-white/20" />
+            <Link href="/delivery-policy" className="text-white/60 hover:text-green-400 transition-colors duration-200">
+              Delivery Policy
+            </Link>
           </div>
         </div>
       </div>

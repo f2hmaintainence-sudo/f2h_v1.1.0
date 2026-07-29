@@ -344,7 +344,7 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
           border: Border.all(color: kBorderLt),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.02),
+              color: Colors.black.withValues(alpha: 0.02),
               blurRadius: 10,
               offset: const Offset(0, 4),
             )
@@ -372,7 +372,7 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
               const Text('Issue Category', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: kTextMid)),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
-                value: _selectedCategory,
+                initialValue: _selectedCategory,
                 onChanged: (val) {
                   if (val != null) setState(() => _selectedCategory = val);
                 },
@@ -394,7 +394,7 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
               const Text('Priority Level', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: kTextMid)),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
-                value: _selectedPriority,
+                initialValue: _selectedPriority,
                 onChanged: (val) {
                   if (val != null) setState(() => _selectedPriority = val);
                 },
@@ -485,7 +485,7 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
                     height: 80,
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: kBgDeep.withOpacity(0.3),
+                      color: kBgDeep.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: kBorder, style: BorderStyle.solid),
                     ),
@@ -575,7 +575,7 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
             Center(
               child: Column(
                 children: [
-                  Icon(Icons.confirmation_number_outlined, size: 64, color: kMuted.withOpacity(0.5)),
+                  Icon(Icons.confirmation_number_outlined, size: 64, color: kMuted.withValues(alpha: 0.5)),
                   const SizedBox(height: 16),
                   const Text('No tickets raised yet', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: kTextMid)),
                   const SizedBox(height: 4),
@@ -661,7 +661,7 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
         border: Border.all(color: kBorderLt),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -673,7 +673,7 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
           // Card Header
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            color: kBorderLt.withOpacity(0.5),
+            color: kBorderLt.withValues(alpha: 0.5),
             child: Row(
               children: [
                 Text(
@@ -725,8 +725,8 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        border: Border.all(color: priorityColor.withOpacity(0.3)),
-                        color: priorityColor.withOpacity(0.05),
+                        border: Border.all(color: priorityColor.withValues(alpha: 0.3)),
+                        color: priorityColor.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
@@ -798,7 +798,7 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9).withOpacity(0.6),
+                      color: const Color(0xFFE8F5E9).withValues(alpha: 0.6),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: Colors.green.shade100),
                     ),

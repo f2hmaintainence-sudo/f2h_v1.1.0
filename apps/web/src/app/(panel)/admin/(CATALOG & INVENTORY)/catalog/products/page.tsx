@@ -1,14 +1,3 @@
-// ============================================================================
-// ChronoSparkSolutions — A Software Company
-// © 2026 ChronoSparkSolutions. All rights reserved.
-//
-// Project     : F2H Fresh
-// File        : page.tsx
-// Description : Tabbed unified Products and Catalog management page
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
-// ============================================================================
-
 "use client";
 
 import Link from "next/link";

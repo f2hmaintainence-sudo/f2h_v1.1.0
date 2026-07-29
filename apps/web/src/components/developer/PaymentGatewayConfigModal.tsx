@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : PaymentGatewayConfigModal.tsx
 // Description : Modal for creating & editing Payment Gateway configurations
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 "use client";

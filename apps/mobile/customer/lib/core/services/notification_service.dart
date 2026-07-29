@@ -5,8 +5,7 @@
 // Project     : F2H Fresh
 // File        : notification_service.dart
 // Description : High-importance FCM and Flutter Local Notifications service.
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'dart:async';
@@ -30,6 +29,8 @@ class NotificationService {
       return null;
     }
   }
+
+  String? _cachedFcmToken;
 
   Future<void> initialize() async {
     if (kIsWeb) return;
@@ -76,7 +77,8 @@ class NotificationService {
 
       // Retrieve and log FCM device token
       try {
-        final token = await fcm.getToken().timeout(const Duration(seconds: 3));
+        final token = await fcm.getToken().timeout(const Duration(seconds: 2));
+        _cachedFcmToken = token;
         debugPrint('🔥 [FCM] Firebase Connected Successfully! Token: $token');
       } catch (e) {
         debugPrint('🔥 [FCM] Token retrieval log notice: $e');
@@ -152,14 +154,17 @@ class NotificationService {
 
   Future<String?> getToken() async {
     if (kIsWeb) return null;
+    if (_cachedFcmToken != null) return _cachedFcmToken;
     try {
       final fcm = _fcm;
       if (fcm == null) return null;
 
-      return await fcm.getToken().timeout(const Duration(seconds: 3));
+      final token = await fcm.getToken().timeout(const Duration(milliseconds: 300));
+      _cachedFcmToken = token;
+      return token;
     } catch (e) {
       debugPrint('[NotificationService] FCM token retrieval skipped: $e');
-      return null;
+      return _cachedFcmToken;
     }
   }
 }

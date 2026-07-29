@@ -256,7 +256,7 @@ class _AttendanceDayDetailsScreenState extends State<AttendanceDayDetailsScreen>
                 Text(
                   label,
                   style: TextStyle(
-                    color: fg.withOpacity(0.8),
+                    color: fg.withValues(alpha: 0.8),
                     fontWeight: FontWeight.bold,
                     fontSize: 11,
                   ),
@@ -277,7 +277,7 @@ class _AttendanceDayDetailsScreenState extends State<AttendanceDayDetailsScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.assignment_turned_in_outlined, size: 64, color: kMuted.withOpacity(0.5)),
+              Icon(Icons.assignment_turned_in_outlined, size: 64, color: kMuted.withValues(alpha: 0.5)),
               const SizedBox(height: 16),
               Text(
                 'No $_selectedFilter logs found',
@@ -354,7 +354,7 @@ class _AttendanceDayDetailsScreenState extends State<AttendanceDayDetailsScreen>
         border: Border.all(color: kBorderLt),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -368,7 +368,7 @@ class _AttendanceDayDetailsScreenState extends State<AttendanceDayDetailsScreen>
             // Card Header
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              color: kBorderLt.withOpacity(0.5),
+              color: kBorderLt.withValues(alpha: 0.5),
               child: Row(
                 children: [
                   Text(
@@ -581,7 +581,7 @@ class _AttendanceDayDetailsScreenState extends State<AttendanceDayDetailsScreen>
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: kBgDeep.withOpacity(0.5),
+                        color: kBgDeep.withValues(alpha: 0.5),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Column(

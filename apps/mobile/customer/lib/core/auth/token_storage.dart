@@ -9,8 +9,7 @@
 //               Keychain on iOS). Never stores tokens in SharedPreferences or
 //               plain Isar fields. Tokens survive app restarts (never logout
 //               unless user explicitly logs out or refresh token expires).
-// Website     : https://www.chronosparksolutions.com/
-// Copyright   : https://www.chronosparksolutions.com/copyright
+//
 // ============================================================================
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
