@@ -2218,101 +2218,110 @@ class _HomeReferralBanner extends StatelessWidget {
             }
           },
           child: Container(
-            margin: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-            padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 16 * scale),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [
-                  Color(0xFF0B4628),
-                  Color(0xFF145C34),
-                  Color(0xFF043927),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: const Color(0xFF34D399).withOpacity(0.35),
-                width: 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF064E3B).withOpacity(0.25),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                // Icon badge — fixed size, scales with screen
-                Container(
-                  width: 48 * scale,
-                  height: 48 * scale,
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: AspectRatio(
+                aspectRatio: 2.45,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 12 * scale),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFFFEF3C7), Color(0xFFFDE68A)],
+                      colors: [
+                        Color(0xFF0B4628),
+                        Color(0xFF145C34),
+                        Color(0xFF043927),
+                      ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 1.5),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFF34D399).withOpacity(0.35),
+                      width: 1.2,
+                    ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFFD97706).withOpacity(0.25),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
+                        color: const Color(0xFF064E3B).withOpacity(0.25),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
-                  child: Center(
-                    child: Icon(
-                      isLocked ? Icons.lock_outline_rounded : Icons.card_giftcard_rounded,
-                      color: const Color(0xFFB45309),
-                      size: 24 * scale,
-                    ),
-                  ),
-                ),
-                SizedBox(width: 12 * scale),
-                // Text content — expands to fill
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
+                  child: Row(
                     children: [
-                      Text(
-                        'Invite Friends & Earn ₹50!',
-                        style: TextStyle(
-                          fontSize: 15 * scale,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          height: 1.25,
-                          letterSpacing: -0.2,
+                      // Icon badge — fixed size, scales with screen
+                      Container(
+                        width: 44 * scale,
+                        height: 44 * scale,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFEF3C7), Color(0xFFFDE68A)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFD97706).withOpacity(0.25),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      SizedBox(height: 3 * scale),
-                      Text(
-                        isLocked
-                            ? 'Make your 1st order to unlock referral code.'
-                            : 'You & your friend both get ₹50 on first order.',
-                        style: TextStyle(
-                          fontSize: 11.5 * scale,
-                          fontWeight: FontWeight.w500,
-                          color: const Color(0xFFA7F3D0),
-                          height: 1.25,
+                        child: Center(
+                          child: Icon(
+                            isLocked ? Icons.lock_outline_rounded : Icons.card_giftcard_rounded,
+                            color: const Color(0xFFB45309),
+                            size: 22 * scale,
+                          ),
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
+                      SizedBox(width: 12 * scale),
+                      // Text content — expands to fill
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Invite Friends & Earn ₹50!',
+                              style: TextStyle(
+                                fontSize: 14 * scale,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                height: 1.2,
+                                letterSpacing: -0.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            SizedBox(height: 3 * scale),
+                            Text(
+                              isLocked
+                                  ? 'Make your 1st order to unlock referral code.'
+                                  : 'You & your friend both get ₹50 on first order.',
+                              style: TextStyle(
+                                fontSize: 10.5 * scale,
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFFA7F3D0),
+                                height: 1.2,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(width: 8 * scale),
+                      // CTA button — wraps to fit
+                      _buildCta(context, isLoggedIn, isLocked, code, scale),
                     ],
                   ),
                 ),
-                SizedBox(width: 8 * scale),
-                // CTA button — wraps to fit
-                _buildCta(context, isLoggedIn, isLocked, code, scale),
-              ],
+              ),
             ),
           ),
         );
