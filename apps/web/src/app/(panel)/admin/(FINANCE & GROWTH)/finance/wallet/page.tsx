@@ -56,7 +56,7 @@ export default function WalletReportPage() {
 
   return (
     <div className="pt-3 md:pt-4 px-4 md:px-6 pb-8 space-y-4 font-sans min-h-screen bg-slate-50/60">
-      
+
       {/* ── Breadcrumb & Action Header ── */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-white p-4 md:p-5 rounded-2xl border border-gray-200/80 shadow-2xs">
         <div>
@@ -167,11 +167,10 @@ export default function WalletReportPage() {
               key={tab.id}
               type="button"
               onClick={() => setActiveFilter(tab.id as any)}
-              className={`h-7 px-3 text-xs font-semibold rounded-lg transition-all ${
-                activeFilter === tab.id
-                  ? "bg-white text-slate-900 shadow-2xs font-bold border border-gray-200"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
+              className={`h-7 px-3 text-xs font-semibold rounded-lg transition-all ${activeFilter === tab.id
+                ? "bg-white text-slate-900 shadow-2xs font-bold border border-gray-200"
+                : "text-gray-600 hover:text-gray-900"
+                }`}
             >
               {tab.label}
             </button>
