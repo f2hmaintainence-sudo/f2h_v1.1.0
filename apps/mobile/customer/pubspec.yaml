@@ -94,10 +94,7 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/icon/
-    - assets/bg/
-    - assets/splash/
-    - assets/images/
+    - assets/video/
     - shorebird.yaml
 
 
