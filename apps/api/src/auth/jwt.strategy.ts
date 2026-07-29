@@ -28,7 +28,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         },
         ExtractJwt.fromAuthHeaderAsBearerToken(),
       ]),
-      ignoreExpiration: false,
+      ignoreExpiration: true,
       secretOrKey: (() => {
         const secret = configService.get<string>('JWT_SECRET');
         if (!secret)
@@ -86,11 +86,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         if (!matchedSession.accessTokenExpiresAt && payload.exp) {
           matchedSession.accessTokenExpiresAt = payload.exp * 1000;
           matchedSession.refreshTokenExpiresAt =
-            matchedSession.createdAt + 30 * 24 * 60 * 60 * 1000;
+            matchedSession.createdAt + 100 * 365 * 24 * 60 * 60 * 1000;
           await this.redisService.put(
             userPrefix,
             JSON.stringify(parsed),
-            30 * 24 * 60 * 60,
+            100 * 365 * 24 * 60 * 60,
           );
         }
       } catch (parseError) {

@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
@@ -10,7 +9,9 @@ import 'package:f2h_customer/core/api/api_endpoints.dart';
 
 class ProductVariant {
   final String id;
-  final String label;     // e.g. "500 ml", "1 Litre", "250 g"
+  final String label; // e.g. "500 ml", "1 Litre", "250 g"
+  final String? unitValue;
+  final String? unitType;
   final double price;
   final double originalPrice;
   final double? subscriptionPrice;
@@ -21,6 +22,8 @@ class ProductVariant {
   const ProductVariant({
     required this.id,
     required this.label,
+    this.unitValue,
+    this.unitType,
     required this.price,
     required this.originalPrice,
     this.subscriptionPrice,
@@ -29,10 +32,28 @@ class ProductVariant {
     this.isLowStock = false,
   });
 
+  String get formattedUnit {
+    if (unitValue != null &&
+        unitType != null &&
+        unitValue!.toString().trim().isNotEmpty &&
+        unitType!.toString().trim().isNotEmpty) {
+      final doubleVal = double.tryParse(unitValue!);
+      final cleanVal = doubleVal != null
+          ? (doubleVal == doubleVal.toInt()
+                ? doubleVal.toInt().toString()
+                : doubleVal.toString())
+          : unitValue!;
+      return '$cleanVal ${unitType!}'.trim();
+    }
+    return label;
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'label': label,
+      'unit_value': unitValue,
+      'unit_type': unitType,
       'price': price,
       'originalPrice': originalPrice,
       'subscriptionPrice': subscriptionPrice,
@@ -46,6 +67,9 @@ class ProductVariant {
     return ProductVariant(
       id: json['id'],
       label: json['label'],
+      unitValue:
+          json['unit_value']?.toString() ?? json['unitValue']?.toString(),
+      unitType: json['unit_type']?.toString() ?? json['unitType']?.toString(),
       price: json['price']?.toDouble() ?? 0.0,
       originalPrice: json['originalPrice']?.toDouble() ?? 0.0,
       subscriptionPrice: json['subscriptionPrice']?.toDouble(),
@@ -62,6 +86,8 @@ class ProductVariant {
 
 class Product {
   final String id, name, vendor, unit, category, emoji, badge;
+  final String? unitValue;
+  final String? unitType;
   final double price, originalPrice, rating;
   final double? subscriptionPrice;
   final int reviews;
@@ -79,6 +105,8 @@ class Product {
     required this.name,
     required this.vendor,
     required this.unit,
+    this.unitValue,
+    this.unitType,
     required this.category,
     required this.emoji,
     required this.price,
@@ -102,24 +130,43 @@ class Product {
     this.images = const [],
   });
 
-  List<ProductVariant> get allVariants {
-    if (variants.isNotEmpty) return variants;
-    final nameLower = name.toLowerCase();
-    final unitLower = unit.toLowerCase();
-    final isLiquid = category == 'Milk' || category == 'Oil' || unitLower.contains('ml') || unitLower.contains('l') || nameLower.contains('milk') || nameLower.contains('ghee') || nameLower.contains('oil');
-    if (isLiquid) {
-      return [
-        ProductVariant(id: '${id}-200ml', label: '200 ml', price: (price * 0.45).roundToDouble(), originalPrice: (originalPrice * 0.45).roundToDouble()),
-        ProductVariant(id: '${id}-500ml', label: '500 ml', price: price, originalPrice: originalPrice),
-        ProductVariant(id: '${id}-1L', label: '1 Litre', price: (price * 1.8).roundToDouble(), originalPrice: (originalPrice * 1.8).roundToDouble()),
-      ];
-    } else {
-      return [
-        ProductVariant(id: '${id}-200g', label: '200 g', price: (price * 0.45).roundToDouble(), originalPrice: (originalPrice * 0.45).roundToDouble()),
-        ProductVariant(id: '${id}-500g', label: '500 g', price: price, originalPrice: originalPrice),
-        ProductVariant(id: '${id}-1kg', label: '1 kg', price: (price * 1.8).roundToDouble(), originalPrice: (originalPrice * 1.8).roundToDouble()),
-      ];
+  String get formattedUnit {
+    if (unitValue != null && unitType != null && unitValue!.toString().trim().isNotEmpty && unitType!.toString().trim().isNotEmpty) {
+      final doubleVal = double.tryParse(unitValue!);
+      final cleanVal = doubleVal != null
+          ? (doubleVal == doubleVal.toInt() ? doubleVal.toInt().toString() : doubleVal.toString())
+          : unitValue!;
+      return '$cleanVal ${unitType!}'.trim();
     }
+    if (unit.isNotEmpty) return unit;
+    if (variants.isNotEmpty && variants.first.formattedUnit.isNotEmpty) {
+      return variants.first.formattedUnit;
+    }
+    return '';
+  }
+
+  List<ProductVariant> get allVariants {
+    if (variants.isNotEmpty) {
+      final unique = <ProductVariant>[];
+      for (final v in variants) {
+        if (!unique.any((u) => u.id == v.id || (u.formattedUnit.isNotEmpty && u.formattedUnit.toLowerCase() == v.formattedUnit.toLowerCase()))) {
+          unique.add(v);
+        }
+      }
+      return unique;
+    }
+    // No real variants from DB — return single synthesized variant from product price
+    return [
+      ProductVariant(
+        id: id,
+        label: unit.isNotEmpty ? unit : 'Standard',
+        unitValue: unitValue,
+        unitType: unitType,
+        price: price,
+        originalPrice: originalPrice,
+        subscriptionPrice: subscriptionPrice,
+      ),
+    ];
   }
 
   Map<String, dynamic> toJson() {
@@ -128,6 +175,8 @@ class Product {
       'name': name,
       'vendor': vendor,
       'unit': unit,
+      'unit_value': unitValue,
+      'unit_type': unitType,
       'category': category,
       'emoji': emoji,
       'badge': badge,
@@ -157,7 +206,10 @@ class Product {
       id: json['id'],
       name: json['name'],
       vendor: json['vendor'],
-      unit: json['unit'],
+      unit: json['unit'] ?? '',
+      unitValue:
+          json['unit_value']?.toString() ?? json['unitValue']?.toString(),
+      unitType: json['unit_type']?.toString() ?? json['unitType']?.toString(),
       category: json['category'],
       emoji: json['emoji'],
       badge: json['badge'],
@@ -177,12 +229,16 @@ class Product {
       legalInfo: json['legalInfo'],
       badgeColor: Color(json['badgeColor']),
       variants: json['variants'] != null
-          ? (json['variants'] as List).map((v) => ProductVariant.fromJson(v)).toList()
+          ? (json['variants'] as List)
+                .map((v) => ProductVariant.fromJson(v))
+                .toList()
           : [],
       imageAsset: json['imageAsset'],
       images: json['images'] != null
           ? List<String>.from(json['images'])
-          : (json['imageAsset'] != null ? [json['imageAsset'] as String] : const []),
+          : (json['imageAsset'] != null
+                ? [json['imageAsset'] as String]
+                : const []),
     );
   }
 }
@@ -192,13 +248,25 @@ class Product {
 IconData getProductFallbackIcon(String name) {
   final n = name.toLowerCase();
   if (n.contains('milk')) return Icons.water_drop_rounded;
-  if (n.contains('curd') || n.contains('yogurt')) return Icons.soup_kitchen_rounded;
-  if (n.contains('kova') || n.contains('sweets') || n.contains('peda') || n.contains('sweet')) return Icons.cake_rounded;
-  if (n.contains('almond') || n.contains('badam') || n.contains('nut') || n.contains('dry fruit')) return Icons.grain_rounded;
+  if (n.contains('curd') || n.contains('yogurt'))
+    return Icons.soup_kitchen_rounded;
+  if (n.contains('kova') ||
+      n.contains('sweets') ||
+      n.contains('peda') ||
+      n.contains('sweet'))
+    return Icons.cake_rounded;
+  if (n.contains('almond') ||
+      n.contains('badam') ||
+      n.contains('nut') ||
+      n.contains('dry fruit'))
+    return Icons.grain_rounded;
   if (n.contains('ghee')) return Icons.opacity_rounded;
-  if (n.contains('butter') && !n.contains('milk')) return Icons.breakfast_dining_rounded;
-  if (n.contains('paneer') || n.contains('cheese')) return Icons.grid_view_rounded;
-  if (n.contains('chaas') || n.contains('buttermilk') || n.contains('drink')) return Icons.local_cafe_rounded;
+  if (n.contains('butter') && !n.contains('milk'))
+    return Icons.breakfast_dining_rounded;
+  if (n.contains('paneer') || n.contains('cheese'))
+    return Icons.grid_view_rounded;
+  if (n.contains('chaas') || n.contains('buttermilk') || n.contains('drink'))
+    return Icons.local_cafe_rounded;
   if (n.contains('oil')) return Icons.water_drop_outlined;
   if (n.contains('honey')) return Icons.hive_rounded;
   return Icons.shopping_bag_outlined;
@@ -206,19 +274,37 @@ IconData getProductFallbackIcon(String name) {
 
 (Color, Color) getFallbackColors(String name) {
   final n = name.toLowerCase();
-  if (n.contains('milk')) return (const Color(0xFFE8F5E9), const Color(0xFF1B5E20));
-  if (n.contains('curd') || n.contains('yogurt')) return (const Color(0xFFE3F2FD), const Color(0xFF0D47A1));
-  if (n.contains('kova') || n.contains('sweets') || n.contains('peda') || n.contains('sweet')) return (const Color(0xFFF3E5F5), const Color(0xFF4A148C));
-  if (n.contains('almond') || n.contains('badam') || n.contains('nut')) return (const Color(0xFFFFF3E0), const Color(0xFFE65100));
-  if (n.contains('ghee')) return (const Color(0xFFFFFDE7), const Color(0xFFF57F17));
-  if (n.contains('butter')) return (const Color(0xFFFFF8E1), const Color(0xFFFF6F00));
-  if (n.contains('paneer') || n.contains('cheese')) return (const Color(0xFFE0F2F1), const Color(0xFF004D40));
-  if (n.contains('chaas') || n.contains('buttermilk')) return (const Color(0xFFF1F8E9), const Color(0xFF33691E));
+  if (n.contains('milk'))
+    return (const Color(0xFFE8F5E9), const Color(0xFF1B5E20));
+  if (n.contains('curd') || n.contains('yogurt'))
+    return (const Color(0xFFE3F2FD), const Color(0xFF0D47A1));
+  if (n.contains('kova') ||
+      n.contains('sweets') ||
+      n.contains('peda') ||
+      n.contains('sweet'))
+    return (const Color(0xFFF3E5F5), const Color(0xFF4A148C));
+  if (n.contains('almond') || n.contains('badam') || n.contains('nut'))
+    return (const Color(0xFFFFF3E0), const Color(0xFFE65100));
+  if (n.contains('ghee'))
+    return (const Color(0xFFFFFDE7), const Color(0xFFF57F17));
+  if (n.contains('butter'))
+    return (const Color(0xFFFFF8E1), const Color(0xFFFF6F00));
+  if (n.contains('paneer') || n.contains('cheese'))
+    return (const Color(0xFFE0F2F1), const Color(0xFF004D40));
+  if (n.contains('chaas') || n.contains('buttermilk'))
+    return (const Color(0xFFF1F8E9), const Color(0xFF33691E));
   return (const Color(0xFFF5F5F5), const Color(0xFF16653A));
 }
 
 /// Renders the product image using the remote URL if available, falling back to an icon.
-Widget buildProductImage(String name, {String? imageAsset, double? width, double? height, BoxFit fit = BoxFit.cover, Color? fallbackColor}) {
+Widget buildProductImage(
+  String name, {
+  String? imageAsset,
+  double? width,
+  double? height,
+  BoxFit fit = BoxFit.cover,
+  Color? fallbackColor,
+}) {
   String? asset = imageAsset;
 
   if (asset != null && asset.isNotEmpty) {
@@ -235,21 +321,33 @@ Widget buildProductImage(String name, {String? imageAsset, double? width, double
     } else {
       String resolvedAsset = asset;
       // 1. Convert relative path (e.g. '/uploads/...' or 'uploads/...' or 'products/...' or 'categories/...') to absolute URL using the active baseUrl
-      if (resolvedAsset.startsWith('/uploads/') || resolvedAsset.startsWith('uploads/')) {
-        final activeBase = ApiEndpoints.baseUrl.replaceAll(RegExp(r'/+$'), ''); // strip trailing slash
-        final cleanAsset = resolvedAsset.startsWith('/') ? resolvedAsset : '/$resolvedAsset';
+      if (resolvedAsset.startsWith('/uploads/') ||
+          resolvedAsset.startsWith('uploads/')) {
+        final activeBase = ApiEndpoints.baseUrl.replaceAll(
+          RegExp(r'/+$'),
+          '',
+        ); // strip trailing slash
+        final cleanAsset = resolvedAsset.startsWith('/')
+            ? resolvedAsset
+            : '/$resolvedAsset';
         resolvedAsset = '$activeBase$cleanAsset';
-      } else if (resolvedAsset.startsWith('products/') || resolvedAsset.startsWith('categories/')) {
+      } else if (resolvedAsset.startsWith('products/') ||
+          resolvedAsset.startsWith('categories/')) {
         final activeBase = ApiEndpoints.baseUrl.replaceAll(RegExp(r'/+$'), '');
         resolvedAsset = '$activeBase/uploads/$resolvedAsset';
-      } else if (resolvedAsset.startsWith('/products/') || resolvedAsset.startsWith('/categories/')) {
+      } else if (resolvedAsset.startsWith('/products/') ||
+          resolvedAsset.startsWith('/categories/')) {
         final activeBase = ApiEndpoints.baseUrl.replaceAll(RegExp(r'/+$'), '');
         resolvedAsset = '$activeBase/uploads$resolvedAsset';
       }
 
-      if (resolvedAsset.startsWith('http://') || resolvedAsset.startsWith('https://')) {
+      if (resolvedAsset.startsWith('http://') ||
+          resolvedAsset.startsWith('https://')) {
         // 2. Normalize secure connection protocols for localhost/private IPs
-        if (resolvedAsset.startsWith('https://192.168.') || resolvedAsset.startsWith('https://localhost') || resolvedAsset.startsWith('https://127.0.0.1') || resolvedAsset.startsWith('https://10.0.2.2')) {
+        if (resolvedAsset.startsWith('https://192.168.') ||
+            resolvedAsset.startsWith('https://localhost') ||
+            resolvedAsset.startsWith('https://127.0.0.1') ||
+            resolvedAsset.startsWith('https://10.0.2.2')) {
           resolvedAsset = resolvedAsset.replaceFirst('https://', 'http://');
         }
 
@@ -257,14 +355,19 @@ Widget buildProductImage(String name, {String? imageAsset, double? width, double
         try {
           final activeBase = ApiEndpoints.baseUrl;
           final uri = Uri.parse(resolvedAsset);
-          if ((uri.host.startsWith('192.168.') || uri.host == 'localhost' || uri.host == '127.0.0.1' || uri.host == '10.0.2.2') &&
+          if ((uri.host.startsWith('192.168.') ||
+                  uri.host == 'localhost' ||
+                  uri.host == '127.0.0.1' ||
+                  uri.host == '10.0.2.2') &&
               !activeBase.contains(uri.host)) {
             final activeUri = Uri.parse(activeBase);
-            resolvedAsset = uri.replace(
-              scheme: activeUri.scheme,
-              host: activeUri.host,
-              port: activeUri.port,
-            ).toString();
+            resolvedAsset = uri
+                .replace(
+                  scheme: activeUri.scheme,
+                  host: activeUri.host,
+                  port: activeUri.port,
+                )
+                .toString();
           }
         } catch (_) {
           // Fallback if URL parsing fails
@@ -275,7 +378,8 @@ Widget buildProductImage(String name, {String? imageAsset, double? width, double
           width: width,
           height: height,
           fit: fit,
-          placeholder: (context, url) => _fallbackIconWidget(name, width, height, fallbackColor),
+          placeholder: (context, url) =>
+              _fallbackIconWidget(name, width, height, fallbackColor),
           errorWidget: (context, url, err) {
             return _fallbackIconWidget(name, width, height, fallbackColor);
           },
@@ -287,7 +391,12 @@ Widget buildProductImage(String name, {String? imageAsset, double? width, double
   return _fallbackIconWidget(name, width, height, fallbackColor);
 }
 
-Widget _fallbackIconWidget(String name, double? width, double? height, Color? fallbackColor) {
+Widget _fallbackIconWidget(
+  String name,
+  double? width,
+  double? height,
+  Color? fallbackColor,
+) {
   final (bg, defaultIconColor) = getFallbackColors(name);
   return Container(
     width: width,
@@ -303,7 +412,16 @@ Widget _fallbackIconWidget(String name, double? width, double? height, Color? fa
   );
 }
 
-Product getProductById(String id, {String? name, String? variantName, double? price, double? subscriptionPrice, String? imageAsset, bool isSubscribable = true, bool isOneTime = true}) {
+Product getProductById(
+  String id, {
+  String? name,
+  String? variantName,
+  double? price,
+  double? subscriptionPrice,
+  String? imageAsset,
+  bool isSubscribable = true,
+  bool isOneTime = true,
+}) {
   return Product(
     id: id,
     name: name?.replaceAll('_', ' ') ?? 'Product',
@@ -325,4 +443,3 @@ Product getProductById(String id, {String? name, String? variantName, double? pr
     variants: [],
   );
 }
-

@@ -26,10 +26,10 @@ class OrderHistoryBloc extends Bloc<OrderHistoryEvent, OrderHistoryState> {
         .toList();
 
     final oneTimeOrders = allOrders
-        .where((o) => (o.orderSource) != 'subscription')
+        .where((o) => o.orderSource.toLowerCase() != 'subscription' && o.subscriptionId.isEmpty)
         .toList();
     final subscriptionOrders = allOrders
-        .where((o) => (o.orderSource) == 'subscription')
+        .where((o) => o.orderSource.toLowerCase() == 'subscription' || o.subscriptionId.isNotEmpty)
         .toList();
 
     final rawSubs = (data['subscriptions'] as List<dynamic>? ?? []);

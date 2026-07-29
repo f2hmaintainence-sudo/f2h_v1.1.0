@@ -54,7 +54,9 @@ class F2HApp extends StatelessWidget {
       home: DynamicSplashScreen(
         child: BlocListener<AuthBloc, AuthState>(
           listener: (context, state) {
-            if (state is Unauthenticated || state is AuthFailure) {
+            if (state is Authenticated) {
+              context.read<CustomerSessionCubit>().bootstrap();
+            } else if (state is Unauthenticated || state is AuthFailure) {
               context.read<CartBloc>().add(ClearCartEvent());
             }
           },

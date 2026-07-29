@@ -52,18 +52,7 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
         // if (itemId.isNotEmpty) {
         //   rowsBySubscriptionId[subscriptionId]!.add(row);
         // }
-        final itemId = _firstString(
-          row,
-          const [
-            'subscription_item_id',
-            'subscriptionItemId',
-            'si_id',
-          ],
-        );
-
-        if (itemId != null && itemId.isNotEmpty) {
-          rowsBySubscriptionId[subscriptionId]!.add(row);
-        }
+        rowsBySubscriptionId[subscriptionId]!.add(row);
       }
 
       final subscriptions = <Subscription>[];

@@ -276,7 +276,7 @@ textTheme: GoogleFonts.outfitTextTheme(textTheme),
         ),
         clipBehavior: Clip.antiAlias,
         dragHandleColor: AppColors.border,
-        showDragHandle: true,
+        showDragHandle: false,
       ),
 
       tabBarTheme: TabBarThemeData(

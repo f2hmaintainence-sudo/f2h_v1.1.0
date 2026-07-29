@@ -15,9 +15,6 @@ import 'package:f2h_customer/features/address/presentation/widgets/address_selec
 import 'package:f2h_customer/features/profile/data/models/profile_model.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/privacy_screen.dart';
-import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_bloc.dart';
-import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_state.dart';
-import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_event.dart';
 import 'package:f2h_customer/features/notifications/presentation/screens/notifications_screen.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/referral_screen.dart';
@@ -197,14 +194,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     Navigator.pop(ctx);
-                    Navigator.push(
+                    final success = await Navigator.push<bool>(
                       context,
                       MaterialPageRoute(
                         builder: (_) => const LoginScreen(popOnSuccess: true),
                       ),
                     );
+                    if (success == true && context.mounted) {
+                      context.read<CustomerSessionCubit>().bootstrap();
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kPrimary,
@@ -237,286 +237,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     bool isError = false,
   }) {
     F2HToast.show(context, message, isError: isError);
-  }
-
-  void _showPaymentModes(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: kSurface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 48,
-                  height: 5,
-                  margin: const EdgeInsets.only(bottom: 24),
-                  decoration: BoxDecoration(
-                    color: kMuted.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-              const Text(
-                'Saved Payment Methods',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: kText),
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(color: kPrimaryPl, borderRadius: BorderRadius.circular(12)),
-                  child: const Icon(Icons.account_balance_wallet_rounded, color: kPrimary),
-                ),
-                title: const Text('F2H Money Wallet  •  ₹1,250.00', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                trailing: const Icon(Icons.check_circle_rounded, color: kPrimary),
-                onTap: () => Navigator.pop(ctx),
-              ),
-              const Divider(color: kBorderLt),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(color: const Color(0xFFE3F2FD), borderRadius: BorderRadius.circular(12)),
-                  child: const Icon(Icons.credit_card_rounded, color: Colors.blue),
-                ),
-                title: const Text('HDFC Bank Credit Card', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                subtitle: const Text('**** **** **** 4321', style: TextStyle(fontSize: 12)),
-              ),
-              const Divider(color: kBorderLt),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(color: const Color(0xFFF3E5F5), borderRadius: BorderRadius.circular(12)),
-                  child: const Icon(Icons.phone_iphone_rounded, color: Colors.purple),
-                ),
-                title: const Text('Google Pay UPI', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                subtitle: const Text('purushotham@okhdfc', style: TextStyle(fontSize: 12)),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showRefunds(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: kSurface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 48,
-                  height: 5,
-                  margin: const EdgeInsets.only(bottom: 24),
-                  decoration: BoxDecoration(
-                    color: kMuted.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-              const Text(
-                'My Refunds',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: kText),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDF4),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFDCFCE7)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(color: Color(0xFFDCFCE7), shape: BoxShape.circle),
-                      child: const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 20),
-                    ),
-                    const SizedBox(width: 14),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Refund Successful', style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF14532D), fontSize: 14)),
-                          SizedBox(height: 4),
-                          Text('₹46.00 refunded to F2H Wallet for Buffalo Milk (1 qty).', style: TextStyle(fontSize: 11, color: Color(0xFF166534))),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFDBEAFE)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(color: Color(0xFFDBEAFE), shape: BoxShape.circle),
-                      child: const Icon(Icons.pending_rounded, color: Color(0xFF2563EB), size: 20),
-                    ),
-                    const SizedBox(width: 14),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Refund Processing', style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF1E3A8A), fontSize: 14)),
-                          SizedBox(height: 4),
-                          Text('₹80.00 processing for Order F2H-98248. Will reflect within 24 hours.', style: TextStyle(fontSize: 11, color: Color(0xFF1E40AF))),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showCreditCardInfo(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: kSurface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Center(
-                child: Container(
-                  width: 48,
-                  height: 5,
-                  margin: const EdgeInsets.only(bottom: 24),
-                  decoration: BoxDecoration(
-                    color: kMuted.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-              const Text(
-                'F2H HDFC Bank Credit Card',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: kText),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                height: 190,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF334155)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 15,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsets.all(24),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('F2H Platinum', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                        Icon(Icons.wifi, color: Colors.white, size: 20),
-                      ],
-                    ),
-                    Spacer(),
-                    Text('**** **** **** 4321', style: TextStyle(color: Colors.white, fontSize: 22, letterSpacing: 3, fontWeight: FontWeight.w600)),
-                    Spacer(),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('CARD HOLDER', style: TextStyle(color: Colors.white38, fontSize: 8, letterSpacing: 0.5)),
-                            SizedBox(height: 2),
-                            Text('PURUSHOTHAM', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('EXPIRES', style: TextStyle(color: Colors.white38, fontSize: 8, letterSpacing: 0.5)),
-                            SizedBox(height: 2),
-                            Text('09/30', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: kAccentLt.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: kAccent.withValues(alpha: 0.2)),
-                ),
-                child: const ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    backgroundColor: kAccent,
-                    child: Icon(Icons.local_offer_rounded, color: Colors.white, size: 18),
-                  ),
-                  title: Text('5% Unlimited Cashback', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: kText)),
-                  subtitle: Text('On all F2H daily subscriptions and purchases.', style: TextStyle(fontSize: 11, color: kTextMid)),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
   }
 
   void _showPersonalDetails(BuildContext context, ProfileModel? profile) {
@@ -799,43 +519,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildDropdownField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    required List<DropdownMenuItem<String>> items,
-  }) {
-    final lowercaseVal = controller.text.toLowerCase().trim();
-    final matchedItem = items.any((item) => item.value?.toLowerCase().trim() == lowercaseVal);
-    final selectedValue = matchedItem ? items.firstWhere((item) => item.value?.toLowerCase().trim() == lowercaseVal).value : null;
-
-    return DropdownButtonFormField<String>(
-      initialValue: selectedValue,
-      style: const TextStyle(fontWeight: FontWeight.w700, color: kText, fontSize: 15),
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: kPrimaryMid, size: 20),
-        labelStyle: const TextStyle(color: kTextSub, fontWeight: FontWeight.w600, fontSize: 13),
-        floatingLabelStyle: const TextStyle(color: kPrimary, fontWeight: FontWeight.bold),
-        filled: true,
-        fillColor: kBg,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: kBorder, width: 1),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: kPrimary, width: 1.8),
-        ),
-      ),
-      items: items,
-      onChanged: (value) {
-        controller.text = value ?? '';
-      },
-    );
-  }
-
   Widget _buildGenderPill(
     BuildContext context,
     StateSetter setSheetState,
@@ -987,81 +670,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showLanguageSelector(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: kSurface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 48,
-                  height: 5,
-                  margin: const EdgeInsets.only(bottom: 24),
-                  decoration: BoxDecoration(
-                    color: kMuted.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: kPrimaryPl,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.language_rounded, color: kPrimary, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  const Text(
-                    'Select Language',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: kText),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              _buildLanguageTile('English', true, () => Navigator.pop(ctx)),
-              const Divider(color: kBorderLt, height: 1),
-              _buildLanguageTile('Hindi', false, () => Navigator.pop(ctx)),
-              const Divider(color: kBorderLt, height: 1),
-              _buildLanguageTile('Telugu', false, () => Navigator.pop(ctx)),
-              const Divider(color: kBorderLt, height: 1),
-              _buildLanguageTile('Kannada', false, () => Navigator.pop(ctx)),
-            ],
-          ),
-        );
-      },
-    );
-  }
 
-  Widget _buildLanguageTile(String language, bool isSelected, VoidCallback onTap) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      onTap: onTap,
-      title: Text(
-        language,
-        style: TextStyle(
-          fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-          color: isSelected ? kPrimary : kText,
-          fontSize: 15,
-        ),
-      ),
-      trailing: isSelected
-          ? const Icon(Icons.check_circle_rounded, color: kPrimary, size: 22)
-          : null,
-    );
-  }
 
   void _showHelpCenter(BuildContext context) {
     showModalBottomSheet(
@@ -1467,68 +1076,102 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                               child: Column(
                                 children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(6),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: const Icon(
-                                          Icons.phone_iphone_rounded,
-                                          color: Colors.white,
-                                          size: 16,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          customerMobile,
-                                          style: const TextStyle(
+                                  if (isLoggedIn) ...[
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Icon(
+                                            Icons.phone_iphone_rounded,
                                             color: Colors.white,
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w700,
+                                            size: 16,
                                           ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                  const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 10),
-                                    child: Divider(color: Colors.white10, height: 1),
-                                  ),
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(6),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(8),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            customerMobile,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ),
-                                        child: const Icon(
-                                          Icons.mail_outline_rounded,
-                                          color: Colors.white,
-                                          size: 16,
+                                      ],
+                                    ),
+                                    const Padding(
+                                      padding: EdgeInsets.symmetric(vertical: 10),
+                                      child: Divider(color: Colors.white10, height: 1),
+                                    ),
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Icon(
+                                            Icons.mail_outline_rounded,
+                                            color: Colors.white,
+                                            size: 16,
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          customerEmail,
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            customerEmail,
+                                            style: TextStyle(
+                                              color: Colors.white.withValues(alpha: 0.85),
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ] else ...[
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton.icon(
+                                        onPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => const LoginScreen(popOnSuccess: true),
+                                            ),
+                                          );
+                                        },
+                                        icon: const Icon(Icons.login_rounded, size: 18, color: kPrimary),
+                                        label: const Text(
+                                          'Login / Sign Up',
                                           style: TextStyle(
-                                            color: Colors.white.withValues(alpha: 0.85),
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w900,
+                                            color: kPrimary,
                                           ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.white,
+                                          foregroundColor: kPrimary,
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                          elevation: 2,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(14),
+                                          ),
                                         ),
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -2187,159 +1830,5 @@ class _ProfileScreenState extends State<ProfileScreen> {
         indent: 76,
       );
 
-  Widget _recentOrderCard(
-    BuildContext context, {
-    required String orderId,
-    required String store,
-    required String location,
-    required String items,
-    required String date,
-    required String amount,
-    required String status,
-    required bool delivered,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: kBorderLt),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          )
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: kPrimaryPl.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.shopping_bag_outlined, color: kPrimary, size: 18),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      store,
-                      style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w800, color: kText),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '$location  |  $date',
-                      style: const TextStyle(fontSize: 11.5, color: kTextSub),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: delivered
-                      ? const Color(0xFFE8F5E9)
-                      : const Color(0xFFFFF3E0),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      delivered
-                          ? Icons.check_circle_rounded
-                          : Icons.pending_outlined,
-                      color: delivered
-                          ? const Color(0xFF0C831F)
-                          : const Color(0xFFF57C00),
-                      size: 12,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      status,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        color: delivered
-                          ? const Color(0xFF0C831F)
-                          : const Color(0xFFF57C00),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Divider(height: 1, thickness: 1, color: kBorderLt),
-          const SizedBox(height: 12),
-          Text(
-            items,
-            style: const TextStyle(fontSize: 12, color: kTextMid, fontWeight: FontWeight.w600),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Text(
-                amount,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  color: kText,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                orderId,
-                style: const TextStyle(fontSize: 11, color: kMuted, fontWeight: FontWeight.w600),
-              ),
-              const Spacer(),
-              GestureDetector(
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Reordering $store items...'),
-                      backgroundColor: kPrimary,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: kPrimary,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.replay_rounded, color: Colors.white, size: 12),
-                      SizedBox(width: 4),
-                      Text(
-                        'Reorder',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+
 }

@@ -62,45 +62,61 @@ export class AuthService {
     userAgent?: string,
     fingerprintData?: any,
   ) {
-    const formattedIdentifier = identifier.toLowerCase().trim();
+    const rawIdentifier = identifier.trim();
+    const formattedIdentifier = rawIdentifier.toLowerCase();
 
-    const allUsersResult = await this.Data.query('users', {
-      select: [
-        'user_id',
-        'email',
-        'password',
-        'locked_at',
-        'max_logins',
-        'user_name',
-        'phone',
-        'must_change_password',
-        'role_id',
-      ],
+    const selectCols = [
+      'user_id',
+      'email',
+      'password',
+      'locked_at',
+      'max_logins',
+      'user_name',
+      'phone',
+      'must_change_password',
+      'role_id',
+    ];
+
+    let user: any = null;
+
+    // 1. Search by email
+    const emailMatch = await this.Data.query('users', {
+      select: selectCols,
+      where: [{ column: 'email', operator: '=', value: formattedIdentifier }],
+      limit: 1,
     });
-    const allUsers = allUsersResult?.data ?? [];
-
-    let user = allUsers.find(
-      (u: any) =>
-        u.email && u.email.toLowerCase().trim() === formattedIdentifier,
-    );
-    if (!user) {
-      user = allUsers.find(
-        (u: any) =>
-          u.user_name &&
-          u.user_name.toLowerCase().trim() === formattedIdentifier,
-      );
+    if (emailMatch?.data?.length) {
+      user = emailMatch.data[0];
     }
+
+    // 2. Search by user_name
     if (!user) {
-      user = allUsers.find(
-        (u: any) => u.phone && u.phone.trim() === identifier.trim(),
-      );
+      const usernameMatch = await this.Data.query('users', {
+        select: selectCols,
+        where: [{ column: 'user_name', operator: '=', value: formattedIdentifier }],
+        limit: 1,
+      });
+      if (usernameMatch?.data?.length) {
+        user = usernameMatch.data[0];
+      }
+    }
+
+    // 3. Search by phone
+    if (!user) {
+      const phoneMatch = await this.Data.query('users', {
+        select: selectCols,
+        where: [{ column: 'phone', operator: '=', value: rawIdentifier }],
+        limit: 1,
+      });
+      if (phoneMatch?.data?.length) {
+        user = phoneMatch.data[0];
+      }
     }
 
     if (!user) {
       this.developer.debug('[Auth:validateUser] Login failed - user not found', {
         identifier: formattedIdentifier,
         ip: ip || 'unknown',
-        totalUsersChecked: allUsers.length,
       });
 
       this.auditLogger.logLoginFailure({
@@ -349,18 +365,23 @@ export class AuthService {
       await this.consumeVerifiedOtp(body.verification_token, email || phone!, 'registration');
     }
 
-    // Check existing users
-    const allUsersResult = await this.Data.query('users', {
-      select: ['user_id', 'email', 'phone'],
-    });
-    const existingUsers = allUsersResult?.data ?? [];
-
+    // Check existing users via indexed SQL query
     let existingUser: any = null;
     if (email) {
-      existingUser = existingUsers.find((u: any) => u.email && u.email.toLowerCase().trim() === email);
+      const emailRes = await this.Data.query('users', {
+        select: ['user_id', 'email', 'phone'],
+        where: [{ column: 'email', operator: '=', value: email.toLowerCase().trim() }],
+        limit: 1,
+      });
+      existingUser = emailRes?.data?.[0];
     }
     if (!existingUser && phone) {
-      existingUser = existingUsers.find((u: any) => u.phone && u.phone.trim() === phone);
+      const phoneRes = await this.Data.query('users', {
+        select: ['user_id', 'email', 'phone'],
+        where: [{ column: 'phone', operator: '=', value: phone.trim() }],
+        limit: 1,
+      });
+      existingUser = phoneRes?.data?.[0];
     }
 
     // If user exists and no verification token was supplied, reject duplicate registration
@@ -772,20 +793,22 @@ export class AuthService {
       throw new UnauthorizedException('Invalid OTP');
     }
 
-    const allUsersForOtp = await this.Data.query('users', {
-      select: ['user_id', 'email', 'phone', 'role_id'],
-    });
-
     let user: any = null;
     if (phone) {
-      user = (allUsersForOtp?.data ?? []).find(
-        (u: any) => u.phone && u.phone.trim() === phone.trim(),
-      );
+      const phoneRes = await this.Data.query('users', {
+        select: ['user_id', 'email', 'phone', 'role_id'],
+        where: [{ column: 'phone', operator: '=', value: phone.trim() }],
+        limit: 1,
+      });
+      user = phoneRes?.data?.[0];
     } else if (email) {
       const normalizedEmail = email.toLowerCase().trim();
-      user = (allUsersForOtp?.data ?? []).find(
-        (u: any) => u.email && u.email.toLowerCase().trim() === normalizedEmail,
-      );
+      const emailRes = await this.Data.query('users', {
+        select: ['user_id', 'email', 'phone', 'role_id'],
+        where: [{ column: 'email', operator: '=', value: normalizedEmail }],
+        limit: 1,
+      });
+      user = emailRes?.data?.[0];
     }
 
     if (!user) {
@@ -1109,7 +1132,7 @@ export class AuthService {
           await this.redisService.put(
             userPrefix,
             JSON.stringify(parsed),
-            90 * 24 * 60 * 60,
+            100 * 365 * 24 * 60 * 60,
           );
         }
       }
@@ -1121,14 +1144,12 @@ export class AuthService {
   }
 
   async findUserByEmail(email: string) {
-    const allResult = await this.Data.query('users', {
+    const userResult = await this.Data.query('users', {
       select: ['user_id', 'email', 'role_id'],
+      where: [{ column: 'email', operator: '=', value: email.toLowerCase().trim() }],
+      limit: 1,
     });
-    const user = (allResult?.data ?? []).find(
-      (u: any) =>
-        u.email && u.email.toLowerCase().trim() === email.toLowerCase().trim(),
-    );
-    return user || null;
+    return userResult?.data?.[0] || null;
   }
 
   async findUserById(userId: string) {
@@ -1168,26 +1189,34 @@ export class AuthService {
       throw new BadRequestException('Email or phone number is required');
     }
 
-    const formattedIdentifier = identifierInput.toLowerCase().trim();
+    const rawIdentifier = identifierInput.trim();
+    const formattedIdentifier = rawIdentifier.toLowerCase();
+    const selectCols = ['user_id', 'email', 'phone', 'user_name', 'role_id'];
+    let user: any = null;
 
-    // Find user in database by email, phone, or username
-    const allUsersResult = await this.Data.query('users', {
-      select: ['user_id', 'email', 'phone', 'user_name', 'role_id'],
+    const emailRes = await this.Data.query('users', {
+      select: selectCols,
+      where: [{ column: 'email', operator: '=', value: formattedIdentifier }],
+      limit: 1,
     });
-    const allUsers = allUsersResult?.data ?? [];
+    if (emailRes?.data?.length) user = emailRes.data[0];
 
-    let user = allUsers.find(
-      (u: any) => u.email && u.email.toLowerCase().trim() === formattedIdentifier,
-    );
     if (!user) {
-      user = allUsers.find(
-        (u: any) => u.phone && u.phone.trim() === identifierInput.trim(),
-      );
+      const phoneRes = await this.Data.query('users', {
+        select: selectCols,
+        where: [{ column: 'phone', operator: '=', value: rawIdentifier }],
+        limit: 1,
+      });
+      if (phoneRes?.data?.length) user = phoneRes.data[0];
     }
+
     if (!user) {
-      user = allUsers.find(
-        (u: any) => u.user_name && u.user_name.toLowerCase().trim() === formattedIdentifier,
-      );
+      const usernameRes = await this.Data.query('users', {
+        select: selectCols,
+        where: [{ column: 'user_name', operator: '=', value: formattedIdentifier }],
+        limit: 1,
+      });
+      if (usernameRes?.data?.length) user = usernameRes.data[0];
     }
 
     if (!user) {
@@ -1291,23 +1320,33 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired OTP / reset token');
     }
 
-    const allUsersResult = await this.Data.query('users', {
-      select: ['user_id', 'email', 'phone', 'user_name'],
-    });
-    const allUsers = allUsersResult?.data ?? [];
+    const formattedIdentifier = targetKey;
+    const selectCols = ['user_id', 'email', 'phone', 'user_name'];
+    let user: any = null;
 
-    let user = allUsers.find(
-      (u: any) => u.email && u.email.toLowerCase().trim() === targetKey,
-    );
+    const emailRes = await this.Data.query('users', {
+      select: selectCols,
+      where: [{ column: 'email', operator: '=', value: formattedIdentifier }],
+      limit: 1,
+    });
+    if (emailRes?.data?.length) user = emailRes.data[0];
+
     if (!user) {
-      user = allUsers.find(
-        (u: any) => u.phone && u.phone.trim() === rawIdentifier.trim(),
-      );
+      const phoneRes = await this.Data.query('users', {
+        select: selectCols,
+        where: [{ column: 'phone', operator: '=', value: rawIdentifier }],
+        limit: 1,
+      });
+      if (phoneRes?.data?.length) user = phoneRes.data[0];
     }
+
     if (!user) {
-      user = allUsers.find(
-        (u: any) => u.user_name && u.user_name.toLowerCase().trim() === targetKey,
-      );
+      const usernameRes = await this.Data.query('users', {
+        select: selectCols,
+        where: [{ column: 'user_name', operator: '=', value: formattedIdentifier }],
+        limit: 1,
+      });
+      if (usernameRes?.data?.length) user = usernameRes.data[0];
     }
 
     if (!user) {

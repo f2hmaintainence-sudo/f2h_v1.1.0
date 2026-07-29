@@ -20,6 +20,7 @@ import 'package:f2h_customer/features/subscription/presentation/screens/subscrip
 import 'package:f2h_customer/features/wallet/presentation/screens/wallet_screen.dart';
 import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/features/subscription/domain/repositories/subscription_repository.dart';
+import 'package:f2h_customer/features/profile/presentation/screens/customer_bills_screen.dart';
 
 class SubscriptionDetailScreen extends StatefulWidget {
   final Subscription subscription;
@@ -697,7 +698,9 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
-                                        'Paused: ${s.pauseFromDate} → ${s.pauseToDate}',
+                                        s.pauseFromDate == s.pauseToDate
+                                            ? 'Paused: ${s.pauseFromDate}'
+                                            : 'Paused: ${s.pauseFromDate} → ${s.pauseToDate}',
                                         style: const TextStyle(
                                           fontSize: 10.5,
                                           fontWeight: FontWeight.w800,
@@ -740,14 +743,15 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                         _buildSelectedDaysWidget(s),
                         // Delivery slot & payment type pill row
                         const SizedBox(height: 10),
-                        Row(
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
                           children: [
                             _InfoPill(
                               icon: Icons.wb_sunny_rounded,
                               label: s.slot.isNotEmpty ? s.slot : 'Morning',
                               color: const Color(0xFFD97706),
                             ),
-                            const SizedBox(width: 8),
                             _InfoPill(
                               icon: s.paymentType == 'postpaid'
                                   ? Icons.credit_card_rounded
@@ -755,7 +759,6 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                               label: s.paymentType == 'postpaid' ? 'Postpaid' : 'Prepaid',
                               color: s.paymentType == 'postpaid' ? const Color(0xFF7C3AED) : kPrimary,
                             ),
-                            const SizedBox(width: 8),
                             if (s.autoRenew)
                               _InfoPill(
                                 icon: Icons.autorenew_rounded,
@@ -1020,17 +1023,21 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                     size: 17,
                     color: Colors.white,
                   ),
-                  label: Text(
-                    isTerminal
-                        ? (isCompleted
-                              ? 'Subscription Completed'
-                              : isExpired
-                              ? 'Subscription Expired'
-                              : 'Subscription Ended')
-                        : isPaused
-                        ? 'Resume Subscription'
-                        : 'Pause Subscription',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+                  label: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      isTerminal
+                          ? (isCompleted
+                                ? 'Completed'
+                                : isExpired
+                                ? 'Expired'
+                                : 'Ended')
+                          : isPaused
+                          ? 'Resume Subscription'
+                          : 'Pause Subscription',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+                      maxLines: 1,
+                    ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: isTerminal
@@ -1039,6 +1046,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                         ? const Color(0xFF15803D)
                         : kPrimary,
                     foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
                     disabledBackgroundColor: kBorderLt,
                     disabledForegroundColor: kMuted,
                     elevation: 0,
@@ -1048,7 +1056,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
               ),
             ),
             if (!isTerminal) ...[
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 flex: 2,
                 child: SizedBox(
@@ -1056,13 +1064,18 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   child: OutlinedButton(
                     onPressed: _handleCancel,
                     style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
                       side: BorderSide(color: kRed.withValues(alpha: 0.5), width: 1.2),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       backgroundColor: kRed.withValues(alpha: 0.04),
                     ),
-                    child: const Text(
-                      'Cancel',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: kRed),
+                    child: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: kRed),
+                        maxLines: 1,
+                      ),
                     ),
                   ),
                 ),
@@ -1101,13 +1114,17 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Text(
-                        value,
-                        textAlign: TextAlign.end,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: valueColor ?? kText,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          value,
+                          textAlign: TextAlign.end,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: valueColor ?? kText,
+                          ),
                         ),
                       ),
                     ),
@@ -1251,9 +1268,37 @@ class _BillCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(14),
+    final billMap = {
+      'bill_id': bill.billId,
+      'bill_type': bill.billType,
+      'reference_id': bill.referenceId,
+      'payment_type': bill.paymentType,
+      'payment_method': 'wallet',
+      'billing_from': bill.billingFrom,
+      'billing_to': bill.billingTo,
+      'due_date': bill.dueDate,
+      'subtotal': bill.subtotal,
+      'discount_amount': bill.discountAmount,
+      'tax_amount': bill.taxAmount,
+      'total_amount': bill.totalAmount,
+      'paid_amount': bill.paidAmount,
+      'due_amount': bill.dueAmount,
+      'status': bill.status,
+      'remarks': bill.remarks,
+      'created_at': bill.dueDate,
+      'items': bill.items.map((i) => {
+        'product_name': i.productVariantId,
+        'unit_price': i.unitPrice,
+        'final_price': i.totalAmount,
+        'quantity': i.quantity,
+      }).toList(),
+    };
+
+    return GestureDetector(
+      onTap: () => showBillDetailSheet(context, billMap),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: kSurface,
         borderRadius: BorderRadius.circular(14),
@@ -1344,8 +1389,9 @@ class _BillCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class _BillStat extends StatelessWidget {
@@ -1399,7 +1445,7 @@ class _QuickActionButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(14),
@@ -1410,7 +1456,7 @@ class _QuickActionButton extends StatelessWidget {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Icon(icon, color: color, size: 22),
+                Icon(icon, color: color, size: 20),
                 if (badge != null)
                   Positioned(
                     top: -4,
@@ -1430,11 +1476,15 @@ class _QuickActionButton extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 5),
-            Text(
-              label,
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color),
-              textAlign: TextAlign.center,
+            const SizedBox(height: 4),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: color),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+              ),
             ),
           ],
         ),

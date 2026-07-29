@@ -107,6 +107,43 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
               ),
             ],
           ),
+          if (p.isOutOfStock) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFEBEE),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFEF5350)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.error_outline_rounded, size: 14, color: Color(0xFFD32F2F)),
+                  SizedBox(width: 6),
+                  Text('Product is currently Out of Stock', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFD32F2F))),
+                ],
+              ),
+            ),
+          ] else if (p.isLowStock || _selected.isLowStock || !p.isOneTime) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3E0),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFFB74D)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, size: 14, color: Color(0xFFE65100)),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text('LOW STOCK — One-Time Order Unavailable', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFE65100))),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 18),
           if (p.variants.isNotEmpty) ...[
             // "SELECT PACK SIZE" label
@@ -269,21 +306,34 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton(
-                          onPressed: () {
-                            ctx.runWithAuth(() {
-                              HapticFeedback.lightImpact();
-                              dispatchAdd(quantity: _sheetQty);
-                              Navigator.pop(ctx);
-                            });
-                          },
+                          onPressed: (p.isOutOfStock || p.isLowStock || _selected.isLowStock || !p.isOneTime)
+                              ? null
+                              : () {
+                                  ctx.runWithAuth(() {
+                                    HapticFeedback.lightImpact();
+                                    dispatchAdd(quantity: _sheetQty);
+                                    Navigator.pop(ctx);
+                                  });
+                                },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: kPrimary,
-                            foregroundColor: Colors.white,
+                            backgroundColor: (p.isOutOfStock || p.isLowStock || _selected.isLowStock || !p.isOneTime)
+                                ? const Color(0xFFE0E0E0)
+                                : kPrimary,
+                            foregroundColor: (p.isOutOfStock || p.isLowStock || _selected.isLowStock || !p.isOneTime)
+                                ? const Color(0xFF757575)
+                                : Colors.white,
                             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                             elevation: 0,
                           ),
-                          child: const Text('ADD', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900)),
+                          child: Text(
+                            p.isOutOfStock
+                                ? 'OUT OF STOCK'
+                                : ((p.isLowStock || _selected.isLowStock || !p.isOneTime)
+                                    ? 'UNAVAILABLE'
+                                    : 'ADD'),
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+                          ),
                         ),
                       ],
                     )
@@ -473,8 +523,8 @@ class ProductCardH extends StatelessWidget {
                       ),
                     ),
                   ),
-                // Low Stock badge
-                if (p.isLowStock || p.isOutOfStock)
+                // Stock status badge
+                if (p.isOutOfStock)
                   Positioned(
                     top: 8,
                     right: 8,
@@ -486,8 +536,25 @@ class ProductCardH extends StatelessWidget {
                         border: Border.all(color: const Color(0xFFEF5350), width: 0.8),
                       ),
                       child: const Text(
-                        'LOW STOCK',
+                        'OUT OF STOCK',
                         style: TextStyle(fontSize: 6.5, fontWeight: FontWeight.w900, color: Color(0xFFD32F2F), letterSpacing: 0.3),
+                      ),
+                    ),
+                  )
+                else if (p.isLowStock)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF3E0),
+                        borderRadius: BorderRadius.circular(100),
+                        border: Border.all(color: const Color(0xFFFFB74D), width: 0.8),
+                      ),
+                      child: const Text(
+                        'LOW STOCK',
+                        style: TextStyle(fontSize: 6.5, fontWeight: FontWeight.w900, color: Color(0xFFE65100), letterSpacing: 0.3),
                       ),
                     ),
                   )
@@ -582,7 +649,6 @@ class ProductCardV extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final discPct = (((p.originalPrice - p.price) / p.originalPrice) * 100).round();
     final colorIndex = (p.id.hashCode ?? p.name.hashCode).abs() % 5;
     final borderColor = [
       const Color(0xFFC8E6C9), // soft green
@@ -617,148 +683,173 @@ class ProductCardV extends StatelessWidget {
           ],
         ),
         child: isBrowse
-            ? Row(
-                children: [
-                  // 1. Image on the left
-                  Hero(
-                    tag: 'product-v-${p.id}',
-                    child: Stack(
-                      children: [
-                        Container(
-                          width: 104,
-                          height: double.infinity,
-                          decoration: const BoxDecoration(
-                            color: Colors.transparent,
-                          ),
-                          child: _productImage(p, padding: 0.0),
-                        ),
-                        // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
-                        if (p.reviews > 0)
-                          Positioned(
-                            top: 8, left: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 2.5),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.9),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFFFFE0B2), width: 0.8),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.04),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
+            ? IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // 1. Image on the left
+                    SizedBox(
+                      width: MediaQuery.of(context).size.width < 350 ? 90 : 104,
+                      child: Hero(
+                        tag: 'product-v-${p.id}',
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: _productImage(p, padding: 0.0),
+                            ),
+                            if (p.isOutOfStock)
+                              Positioned(
+                                top: 6, left: 6,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFEBEE),
+                                    borderRadius: BorderRadius.circular(100),
+                                    border: Border.all(color: const Color(0xFFEF5350), width: 0.8),
                                   ),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.star_rounded, size: 10, color: Colors.amber),
-                                  const SizedBox(width: 2.5),
-                                  Text(
-                                    '${p.rating.toStringAsFixed(1)} (${p.reviews})',
-                                    style: const TextStyle(fontSize: 7.5, fontWeight: FontWeight.w800, color: Color(0xFFE65100)),
+                                  child: const Text(
+                                    'OUT OF STOCK',
+                                    style: TextStyle(fontSize: 6.5, fontWeight: FontWeight.w900, color: Color(0xFFD32F2F), letterSpacing: 0.3),
                                   ),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  // 2. Info on the right
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            p.name,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              color: kText,
-                              letterSpacing: -0.2,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                           const SizedBox(height: 2),
-                           if (p.isSubscribable)
-                             Padding(
-                               padding: const EdgeInsets.only(top: 4),
-                               child: SubscriptionButton(
-                                 product: p,
-                                 isCompact: true,
-                               ),
-                             ),
-                           if (p.unit.isNotEmpty)
-                             Text(
-                               p.unit,
-                               style: const TextStyle(
-                                 fontSize: 10.5,
-                                 color: kTextSub,
-                                 fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          const Spacer(),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Text(
-                                          '₹${p.price.toStringAsFixed(0)}',
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w900,
-                                            color: kText,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
-                                        // Displays the compact subscription price badge in browse list
-                                        if (p.isSubscribable && p.subscriptionPrice != null && p.subscriptionPrice! > 0) ...[
-                                          const SizedBox(width: 4),
-                                          SubscriptionPriceBadge.compact(
-                                            subscriptionPrice: p.subscriptionPrice!,
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                    if (p.originalPrice > p.price) ...[
-                                      const SizedBox(height: 1),
-                                      Text(
-                                        '₹${p.originalPrice.toStringAsFixed(0)}',
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          color: kMuted,
-                                          decoration: TextDecoration.lineThrough,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ],
+                                ),
+                              )
+                            else if (p.isLowStock)
+                              Positioned(
+                                top: 6, left: 6,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFF3E0),
+                                    borderRadius: BorderRadius.circular(100),
+                                    border: Border.all(color: const Color(0xFFFFB74D), width: 0.8),
+                                  ),
+                                  child: const Text(
+                                    'LOW STOCK',
+                                    style: TextStyle(fontSize: 6.5, fontWeight: FontWeight.w900, color: Color(0xFFE65100), letterSpacing: 0.3),
+                                  ),
                                 ),
                               ),
-                              const SizedBox(width: 4),
-                              ZeptoAddButton(p: p, isSmall: true, isBrowse: isBrowse),
-                            ],
-                          ),
-                        ],
+                            if (p.reviews > 0)
+                              Positioned(
+                                bottom: 6, left: 6,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 2.5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFFFFE0B2), width: 0.8),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.04),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.star_rounded, size: 10, color: Colors.amber),
+                                      const SizedBox(width: 2.5),
+                                      Text(
+                                        '${p.rating.toStringAsFixed(1)} (${p.reviews})',
+                                        style: const TextStyle(fontSize: 7.5, fontWeight: FontWeight.w800, color: Color(0xFFE65100)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                    // 2. Info on the right
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              p.name,
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                                color: kText,
+                                letterSpacing: -0.2,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (p.isSubscribable)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: SubscriptionButton(
+                                  product: p,
+                                  isCompact: true,
+                                ),
+                              ),
+                            if (p.unit.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  p.unit,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: kTextSub,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            const SizedBox(height: 6),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Expanded(
+                                  child: Wrap(
+                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                    spacing: 4,
+                                    runSpacing: 2,
+                                    children: [
+                                      Text(
+                                        '₹${p.price.toStringAsFixed(0)}',
+                                        style: const TextStyle(
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w900,
+                                          color: kText,
+                                        ),
+                                      ),
+                                      if (p.isSubscribable && p.subscriptionPrice != null && p.subscriptionPrice! > 0)
+                                        SubscriptionPriceBadge.compact(
+                                          subscriptionPrice: p.subscriptionPrice!,
+                                        ),
+                                      if (p.originalPrice > p.price)
+                                        Text(
+                                          '₹${p.originalPrice.toStringAsFixed(0)}',
+                                          style: const TextStyle(
+                                            fontSize: 9.5,
+                                            color: kMuted,
+                                            decoration: TextDecoration.lineThrough,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                ZeptoAddButton(p: p, isSmall: true, isBrowse: isBrowse),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               )
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -777,7 +868,39 @@ class ProductCardV extends StatelessWidget {
                           child: _productImage(p, padding: 0.0),
                         ),
                       ),
-                      // [ADDED BY ANTIGRAVITY] Rating badge on image
+                      if (p.isOutOfStock)
+                        Positioned(
+                          top: 8, right: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFEBEE),
+                              borderRadius: BorderRadius.circular(100),
+                              border: Border.all(color: const Color(0xFFEF5350), width: 0.8),
+                            ),
+                            child: const Text(
+                              'OUT OF STOCK',
+                              style: TextStyle(fontSize: 6.5, fontWeight: FontWeight.w900, color: Color(0xFFD32F2F), letterSpacing: 0.3),
+                            ),
+                          ),
+                        )
+                      else if (p.isLowStock)
+                        Positioned(
+                          top: 8, right: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF3E0),
+                              borderRadius: BorderRadius.circular(100),
+                              border: Border.all(color: const Color(0xFFFFB74D), width: 0.8),
+                            ),
+                            child: const Text(
+                              'LOW STOCK',
+                              style: TextStyle(fontSize: 6.5, fontWeight: FontWeight.w900, color: Color(0xFFE65100), letterSpacing: 0.3),
+                            ),
+                          ),
+                        ),
+                      // Rating badge on image
                       if (p.reviews > 0)
                         Positioned(
                           top: 8, left: 8,
@@ -966,6 +1089,33 @@ class ZeptoAddButtonState extends State<ZeptoAddButton>
             .fold(0, (sum, item) => sum + (item.purchaseType == 'subscription' ? 1 : (item.quantity ?? 1)));
 
         if (qty == 0) {
+          if (widget.p.isOutOfStock) {
+            return widget.isBrowse
+                ? Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE0E0E0), width: 1.0),
+                    ),
+                    child: const Text(
+                      'OUT',
+                      style: TextStyle(fontSize: 7.5, fontWeight: FontWeight.w900, color: Color(0xFF9E9E9E)),
+                    ),
+                  )
+                : Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFE0E0E0), width: 1.0),
+                    ),
+                    child: const Text(
+                      'OUT OF STOCK',
+                      style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900, color: Color(0xFF9E9E9E)),
+                    ),
+                  );
+          }
           return ScaleTransition(
             scale: _scale,
             child: GestureDetector(

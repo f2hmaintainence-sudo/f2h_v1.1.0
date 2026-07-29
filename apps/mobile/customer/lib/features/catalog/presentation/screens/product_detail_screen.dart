@@ -245,16 +245,10 @@ class _BrowseState extends State<BrowseScreen> {
                       );
                     }
 
-                    return GridView.builder(
+                    return ListView.separated(
                       padding: const EdgeInsets.fromLTRB(8, 10, 8, 90),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 1,
-                            mainAxisSpacing: 10,
-                            crossAxisSpacing: 10,
-                            childAspectRatio: 2.3,
-                          ),
                       itemCount: filtered.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
                       itemBuilder: (_, i) => RepaintBoundary(
                         child: ProductCardV(filtered[i], isBrowse: true),
                       ),

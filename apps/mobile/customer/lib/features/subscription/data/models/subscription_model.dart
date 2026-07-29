@@ -410,7 +410,9 @@ class SubscriptionItemModel {
   }
 
   String get displayName {
-    if (variantName.isNotEmpty && variantName.toLowerCase() != 'standard') {
+    if (variantName.isNotEmpty &&
+        variantName.toLowerCase() != 'standard' &&
+        variantName.toLowerCase().trim() != productName.toLowerCase().trim()) {
       return '$productName ($variantName)';
     }
     return productName;
@@ -497,8 +499,12 @@ class Subscription {
     this.imageUrl,
   });
 
-  bool get isPaused => false;
-  bool get isActive => status == 'active';
+  bool get isPaused =>
+      status.toLowerCase() == 'paused' ||
+      (pauseFromDate != null && pauseFromDate!.isNotEmpty);
+  bool get isActive =>
+      status.toLowerCase() == 'active' &&
+      (pauseFromDate == null || pauseFromDate!.isEmpty);
   bool get isCompleted => status == 'completed';
   bool get isRenewed => status == 'renewed';
   bool get isExpired => status == 'expired' || status == 'expaired';

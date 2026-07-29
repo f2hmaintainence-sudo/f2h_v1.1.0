@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
 import 'package:f2h_customer/features/subscription/data/models/subscription_model.dart';
 import 'package:f2h_customer/features/subscription/presentation/widgets/subscription_card.dart';
-import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/catalog_bloc.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/catalog_state.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:f2h_customer/core/session/customer_session_state.dart';
 import 'package:f2h_customer/features/subscription/presentation/bloc/subscription_bloc.dart';
@@ -36,10 +34,6 @@ class _SubsScreenState extends State<SubsScreen> {
   late List<Subscription> _subscriptions;
   DateTime? vacationStart;
   DateTime? vacationEnd;
-  final List<DateTime> skippedDates = [];
-
-  List<Map<String, dynamic>> _availableProducts = [];
-
   @override
   void initState() {
     super.initState();
@@ -57,67 +51,7 @@ class _SubsScreenState extends State<SubsScreen> {
     }
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final catalogState = context.read<CatalogBloc>().state;
-    final products = catalogState is CatalogLoaded ? catalogState.products : <Product>[];
-    _availableProducts = products.map((p) => {
-      'name': p.name,
-      'icon': getProductFallbackIcon(p.name),
-      'price': p.price,
-      'vendor': p.vendor,
-      'imageAsset': p.imageAsset,
-    }).toList();
-  }
 
-  bool _isVacation(DateTime date) {
-    if (vacationStart == null || vacationEnd == null) return false;
-    final d = DateTime(date.year, date.month, date.day);
-    final start = DateTime(vacationStart!.year, vacationStart!.month, vacationStart!.day);
-    final end = DateTime(vacationEnd!.year, vacationEnd!.month, vacationEnd!.day);
-    return (d.isAfter(start) || d.isAtSameMomentAs(start)) &&
-        (d.isBefore(end) || d.isAtSameMomentAs(end));
-  }
-
-  bool _isSkipped(DateTime date) {
-    return skippedDates.any((d) => d.year == date.year && d.month == date.month && d.day == date.day);
-  }
-
-  bool _hasDeliveryOn(DateTime date, Subscription sub) {
-    if (sub.status != 'active') return false;
-    final freq = sub.frequency.toLowerCase();
-    if (freq.contains('daily')) return true;
-    if (freq.contains('alternate')) {
-      return date.day % 2 == 0;
-    }
-    if (freq.contains('weekend')) {
-      return date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
-    }
-    final dayName = _getWeekdayShort(date.weekday);
-    return freq.contains(dayName.toLowerCase());
-  }
-
-  String _getWeekdayShort(int weekday) {
-    switch (weekday) {
-      case 1:
-        return 'Mon';
-      case 2:
-        return 'Tue';
-      case 3:
-        return 'Wed';
-      case 4:
-        return 'Thu';
-      case 5:
-        return 'Fri';
-      case 6:
-        return 'Sat';
-      case 7:
-        return 'Sun';
-      default:
-        return '';
-    }
-  }
 
 
 
@@ -632,125 +566,349 @@ class _SubsScreenState extends State<SubsScreen> {
         final isPostpaidEnabled = sessionState.profile?.isPostpaidEnabled ?? false;
         final creditLimit = sessionState.profile?.postpaidCreditLimit ?? 0.0;
 
-        return Container(
-          margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: kPrimary.withValues(alpha: 0.08),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              )
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF123E24), Color(0xFF1F8A4D), Color(0xFF38A169)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 360;
+
+            return Container(
+              margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: kPrimary.withValues(alpha: 0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  )
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF123E24), Color(0xFF1F8A4D), Color(0xFF38A169)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
                       ),
                     ),
+                    Positioned(
+                      right: -15,
+                      top: -15,
+                      child: Container(
+                        width: 70,
+                        height: 70,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withValues(alpha: 0.04),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isCompact ? 12 : 18,
+                        vertical: isCompact ? 14 : 16,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(isCompact ? 6 : 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              isPostpaidEnabled ? Icons.credit_card_rounded : Icons.credit_card_off_rounded,
+                              color: kAccent,
+                              size: isCompact ? 18 : 22,
+                            ),
+                          ),
+                          SizedBox(width: isCompact ? 8 : 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  isPostpaidEnabled ? 'POSTPAID CREDIT LIMIT' : 'POSTPAID STATUS',
+                                  style: TextStyle(
+                                    fontSize: isCompact ? 8.5 : 9.5,
+                                    color: Colors.white.withValues(alpha: 0.6),
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: isCompact ? 0.4 : 1.0,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    isPostpaidEnabled
+                                        ? '₹${creditLimit.toStringAsFixed(2)}'
+                                        : 'Not Enabled',
+                                    style: TextStyle(
+                                      fontSize: isCompact ? 17 : 20,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: -0.2,
+                                    ),
+                                    maxLines: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            fit: FlexFit.loose,
+                            child: GestureDetector(
+                              onTap: () => _showContactSupportOptions(context),
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isCompact ? 8 : 12,
+                                  vertical: isCompact ? 5 : 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.25),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      isPostpaidEnabled ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                                      color: isPostpaidEnabled ? kAccent : Colors.orangeAccent,
+                                      size: isCompact ? 12 : 14,
+                                    ),
+                                    SizedBox(width: isCompact ? 4 : 6),
+                                    Flexible(
+                                      child: Text(
+                                        isPostpaidEnabled ? 'Postpaid Active' : 'Contact Support',
+                                        style: TextStyle(
+                                          fontSize: isCompact ? 10 : 11,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showContactSupportOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                Positioned(
-                  right: -15,
-                  top: -15,
-                  child: Container(
-                    width: 70,
-                    height: 70,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.04),
+              ),
+              const Row(
+                children: [
+                  Icon(Icons.headset_mic_rounded, color: kPrimary, size: 24),
+                  SizedBox(width: 10),
+                  Text(
+                    'Contact Customer Support',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF10291F),
                     ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Choose how you would like to connect with F2H support:',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              ),
+              const SizedBox(height: 20),
+              // Option 1: WhatsApp
+              InkWell(
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  const msg = 'Hello F2H Support, I would like to request enabling Postpaid status for my account.';
+                  final encoded = Uri.encodeComponent(msg);
+                  final waUri = Uri.parse('https://wa.me/?text=$encoded');
+                  try {
+                    if (await canLaunchUrl(waUri)) {
+                      await launchUrl(waUri, mode: LaunchMode.externalApplication);
+                    } else {
+                      final webUri = Uri.parse('https://api.whatsapp.com/send?text=$encoded');
+                      if (await canLaunchUrl(webUri)) {
+                        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+                      } else {
+                        if (context.mounted) {
+                          F2HToast.error(context, 'Could not open WhatsApp support');
+                        }
+                      }
+                    }
+                  } catch (_) {
+                    if (context.mounted) {
+                      F2HToast.error(context, 'Could not open WhatsApp support');
+                    }
+                  }
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFDCFCE7), width: 1.5),
+                  ),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.1),
+                        width: 44,
+                        height: 44,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF25D366),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(
-                          isPostpaidEnabled ? Icons.credit_card_rounded : Icons.credit_card_off_rounded,
-                          color: kAccent,
-                          size: 22,
-                        ),
+                        child: const Icon(Icons.chat_rounded, color: Colors.white, size: 22),
                       ),
                       const SizedBox(width: 14),
-                      Expanded(
+                      const Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              isPostpaidEnabled ? 'POSTPAID CREDIT LIMIT' : 'POSTPAID STATUS',
+                              'Chat on WhatsApp',
                               style: TextStyle(
-                                fontSize: 9.5,
-                                color: Colors.white.withValues(alpha: 0.6),
+                                fontSize: 15,
                                 fontWeight: FontWeight.w900,
-                                letterSpacing: 1.0,
+                                color: Color(0xFF10291F),
                               ),
                             ),
-                            const SizedBox(height: 3),
+                            SizedBox(height: 2),
                             Text(
-                              isPostpaidEnabled
-                                  ? '₹${creditLimit.toStringAsFixed(2)}'
-                                  : 'Not Enabled',
-                              style: const TextStyle(
-                                fontSize: 20,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: -0.2,
-                              ),
+                              'Instant support chat on WhatsApp',
+                              style: TextStyle(fontSize: 12, color: Color(0xFF16653A), fontWeight: FontWeight.w600),
                             ),
                           ],
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.25),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              isPostpaidEnabled ? Icons.check_circle_rounded : Icons.info_outline_rounded,
-                              color: isPostpaidEnabled ? kAccent : Colors.orangeAccent,
-                              size: 14,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              isPostpaidEnabled ? 'Postpaid Active' : 'Contact Support',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      const Icon(Icons.chevron_right_rounded, color: Color(0xFF16653A)),
                     ],
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 12),
+              // Option 2: Direct Call
+              InkWell(
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final callUri = Uri.parse('tel:+919876543210');
+                  try {
+                    if (await canLaunchUrl(callUri)) {
+                      await launchUrl(callUri);
+                    } else {
+                      if (context.mounted) {
+                        F2HToast.error(context, 'Could not initiate phone call');
+                      }
+                    }
+                  } catch (_) {
+                    if (context.mounted) {
+                      F2HToast.error(context, 'Could not initiate phone call');
+                    }
+                  }
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAF8),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: const BoxDecoration(
+                          color: kPrimary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.phone_in_talk_rounded, color: Colors.white, size: 22),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Call Support',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF10291F),
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Speak directly with our support team',
+                              style: TextStyle(fontSize: 12, color: kTextSub, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded, color: kTextSub),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },

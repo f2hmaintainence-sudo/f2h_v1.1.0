@@ -97,7 +97,6 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
     }
 
     // 2. Days of current month
-    final todayNormalized = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
     final firstAvailableNormalized = DateTime(widget.firstDate.year, widget.firstDate.month, widget.firstDate.day);
     final lastAvailableNormalized = DateTime(widget.lastDate.year, widget.lastDate.month, widget.lastDate.day);
 
@@ -524,12 +523,12 @@ class _CustomDateRangePickerDialogState extends State<CustomDateRangePickerDialo
           Center(
             child: Text(
               _startDate == null
-                  ? 'Tap a date to select start'
+                  ? 'Tap a date to select start date'
                   : _endDate == null
-                      ? 'Select end date'
+                      ? 'Selected: ${_startDate!.day}/${_startDate!.month} (Tap Done or tap end date)'
                       : 'Range: ${_startDate!.day}/${_startDate!.month} to ${_endDate!.day}/${_endDate!.month}',
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w800,
                 color: _startDate == null ? kTextSub : kPrimary,
               ),
@@ -688,9 +687,11 @@ class _CustomDateRangePickerDialogState extends State<CustomDateRangePickerDialo
                 width: 120,
                 height: 44,
                 child: ElevatedButton(
-                  onPressed: _startDate != null && _endDate != null
+                  onPressed: _startDate != null
                       ? () {
-                          Navigator.pop(context, DateTimeRange(start: _startDate!, end: _endDate!));
+                          final start = _startDate!;
+                          final end = _endDate ?? _startDate!;
+                          Navigator.pop(context, DateTimeRange(start: start, end: end));
                         }
                       : null,
                   style: ElevatedButton.styleFrom(

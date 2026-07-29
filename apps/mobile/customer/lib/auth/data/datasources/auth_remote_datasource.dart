@@ -62,9 +62,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Future<UserModel> login(String identifier, String password, {String? fcmToken}) async {
-    // Ensure we have a CSRF token before login
-    await dioClient.fetchCsrfToken();
-
     try {
       final response = await dioClient.dio.post(
         ApiEndpoints.login,
@@ -103,8 +100,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     String? referralCode,
     String? fcmToken,
   }) async {
-    await dioClient.fetchCsrfToken();
-
     try {
       final body = <String, dynamic>{
           'user_name': userName,
@@ -141,8 +136,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Future<void> sendRegistrationOtp(String email, {String? userName}) async {
-    await dioClient.fetchCsrfToken();
-
     try {
       await dioClient.dio.post(
         ApiEndpoints.sendOtp,
@@ -163,8 +156,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String otp,
     required String purpose,
   }) async {
-    await dioClient.fetchCsrfToken();
-
     try {
       final response = await dioClient.dio.post(
         ApiEndpoints.verifyOtp,
@@ -187,8 +178,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Future<void> requestPasswordResetOtp(String email) async {
-    await dioClient.fetchCsrfToken();
-
     try {
       await dioClient.dio.post(
         ApiEndpoints.forgotPassword,
@@ -205,8 +194,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String token,
     required String newPassword,
   }) async {
-    await dioClient.fetchCsrfToken();
-
     try {
       await dioClient.dio.post(
         ApiEndpoints.resetPassword,
@@ -223,7 +210,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Future<UserModel> signInWithGoogle(String serverAuthCode, {String? fcmToken}) async {
-    await dioClient.fetchCsrfToken();
     try {
       final response = await dioClient.dio.get(
         '${ApiEndpoints.googleAuth}/callback',

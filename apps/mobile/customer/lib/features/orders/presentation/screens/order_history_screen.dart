@@ -9,6 +9,7 @@ import 'package:f2h_customer/features/orders/presentation/bloc/order_history_eve
 import 'package:f2h_customer/features/orders/presentation/bloc/order_history_state.dart';
 import 'package:f2h_customer/features/orders/presentation/widgets/order_tile.dart';
 import 'package:f2h_customer/features/orders/presentation/screens/order_details_screen.dart';
+import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
 // import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
 // import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
 // import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
@@ -294,23 +295,25 @@ class _OrderHistoryViewState extends State<OrderHistoryView>
     final isCancelled = plan.status.toLowerCase() == 'cancelled';
 
     final statusColor = isActive
-        ? kPrimary
+        ? const Color(0xFF047857)
         : isPaused
-            ? kAccent
+            ? const Color(0xFFD97706)
             : isExpired
-                ? kAccent
+                ? const Color(0xFFDC2626)
                 : isCompleted
-                    ? kPrimary
+                    ? const Color(0xFF2563EB)
                     : kTextSub;
+
     final statusBg = isActive
-        ? kPrimaryPl
+        ? const Color(0xFFECFDF5)
         : isPaused
-            ? kAccentLt.withValues(alpha: 0.4)
+            ? const Color(0xFFFEF3C7)
             : isExpired
-                ? kAccentLt.withValues(alpha: 0.4)
+                ? const Color(0xFFFEE2E2)
                 : isCompleted
-                    ? kPrimaryPl
+                    ? const Color(0xFFEFF6FF)
                     : kBgDeep;
+
     final statusLabel = isActive
         ? 'Active'
         : isPaused
@@ -325,36 +328,51 @@ class _OrderHistoryViewState extends State<OrderHistoryView>
                             ? 'Unknown'
                             : plan.status[0].toUpperCase() + plan.status.substring(1));
 
+    final firstItem = plan.items.isNotEmpty ? plan.items.first : null;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: kSurface,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isActive ? kPrimary.withValues(alpha: 0.2) : kBorder,
+          color: isActive ? kPrimary.withValues(alpha: 0.25) : kBorder.withValues(alpha: 0.8),
           width: 1.5,
         ),
-        boxShadow: isActive
-            ? [BoxShadow(color: kPrimary.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 4))]
-            : [],
+        boxShadow: [
+          BoxShadow(
+            color: isActive ? kPrimary.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Header ──────────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          // ── Header Card Section ──────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+            decoration: BoxDecoration(
+              color: isActive ? kPrimaryPl.withValues(alpha: 0.3) : kSurface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+            ),
             child: Row(
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
+                // Product Real Image / Avatar
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    width: 50,
+                    height: 50,
                     color: statusBg,
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: Center(
-                    child: Text(plan.primaryEmoji, style: const TextStyle(fontSize: 24)),
+                    child: buildProductImage(
+                      plan.displayName,
+                      imageAsset: firstItem?.imageUrl,
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -365,36 +383,70 @@ class _OrderHistoryViewState extends State<OrderHistoryView>
                       Text(
                         plan.displayName,
                         style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w800, color: kText),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          color: kText,
+                          letterSpacing: -0.2,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        plan.subscriptionNumber,
-                        style: const TextStyle(fontSize: 11, color: kTextSub),
+                      const SizedBox(height: 3),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: kBgDeep,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          plan.subscriptionNumber,
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: kTextSub,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
-                // Status chip
+                // Status Chip with status dot
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: statusBg,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: statusColor.withValues(alpha: 0.3)),
                   ),
-                  child: Text(
-                    statusLabel,
-                    style: TextStyle(
-                      fontSize: 11, fontWeight: FontWeight.w800, color: statusColor),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        statusLabel,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
 
-          // ── Items list ───────────────────────────────────────────────────
+          // ── Items List Section with Real Product Images ───────────────
           if (plan.items.isNotEmpty) ...[
             const Divider(height: 1, color: kBorder),
             ListView.builder(
@@ -406,11 +458,27 @@ class _OrderHistoryViewState extends State<OrderHistoryView>
                 final hasM = item.defaultMQty > 0;
                 final hasE = item.defaultEQty > 0;
                 return Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text(item.emoji, style: const TextStyle(fontSize: 18)),
-                      const SizedBox(width: 10),
+                      // Real product variant thumbnail
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          width: 42,
+                          height: 42,
+                          color: kBgDeep,
+                          child: buildProductImage(
+                            item.productName,
+                            imageAsset: item.imageUrl,
+                            width: 42,
+                            height: 42,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -418,27 +486,54 @@ class _OrderHistoryViewState extends State<OrderHistoryView>
                             Text(
                               item.productName,
                               style: const TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w700, color: kText),
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                                color: kText,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             if (item.variantName.isNotEmpty &&
-                                item.variantName.toLowerCase() != 'standard')
-                              Text(item.variantName,
-                                  style: const TextStyle(fontSize: 11, color: kTextSub)),
-                            const SizedBox(height: 4),
+                                item.variantName.toLowerCase() != 'standard') ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                item.variantName,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: kTextSub,
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 6),
                             Row(
                               children: [
-                                if (hasM) _qtyChip('🌅 ×${item.defaultMQty.toStringAsFixed(0)}', Colors.orange.shade50, Colors.orange.shade700),
+                                if (hasM)
+                                  _qtyChip(
+                                    '🌅 Morning ×${item.defaultMQty.toStringAsFixed(0)}',
+                                    const Color(0xFFFFF7ED),
+                                    const Color(0xFFC2410C),
+                                  ),
                                 if (hasM && hasE) const SizedBox(width: 6),
-                                if (hasE) _qtyChip('🌙 ×${item.defaultEQty.toStringAsFixed(0)}', Colors.indigo.shade50, Colors.indigo.shade700),
+                                if (hasE)
+                                  _qtyChip(
+                                    '🌙 Evening ×${item.defaultEQty.toStringAsFixed(0)}',
+                                    const Color(0xFFEEF2FF),
+                                    const Color(0xFF3730A3),
+                                  ),
                               ],
                             ),
                           ],
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Text(
                         '₹${item.finalPrice.toStringAsFixed(0)}/u',
                         style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w700, color: kText),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: kPrimary,
+                        ),
                       ),
                     ],
                   ),
@@ -447,34 +542,54 @@ class _OrderHistoryViewState extends State<OrderHistoryView>
             ),
           ],
 
-          // ── Footer: schedule + billing ────────────────────────────────────
+          // ── Footer Section: Schedule & Billing ─────────────────────────────
           Container(
-            margin: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            margin: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
             decoration: BoxDecoration(
-              color: kBgDeep,
-              borderRadius: BorderRadius.circular(10),
+              color: kBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: kBorder.withValues(alpha: 0.6)),
             ),
             child: Row(
               children: [
-                const Icon(Icons.calendar_month_outlined, size: 14, color: kTextSub),
+                const Icon(Icons.calendar_today_rounded, size: 13, color: kTextSub),
                 const SizedBox(width: 6),
                 Text(
                   plan.scheduleType.isEmpty ? 'Flexible' : plan.scheduleType,
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kTextMid),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: kTextMid,
+                  ),
                 ),
                 const Spacer(),
-                const Icon(Icons.repeat, size: 14, color: kTextSub),
-                const SizedBox(width: 6),
+                const Icon(Icons.sync_rounded, size: 14, color: kTextSub),
+                const SizedBox(width: 5),
                 Text(
                   plan.billingCycle,
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kTextMid),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: kTextMid,
+                  ),
                 ),
                 if (plan.dailyMorningCost > 0 || plan.dailyEveningCost > 0) ...[
                   const SizedBox(width: 12),
-                  Text(
-                    '₹${(plan.dailyMorningCost + plan.dailyEveningCost).toStringAsFixed(0)}/day',
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: kPrimary),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: kPrimaryPl,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '₹${(plan.dailyMorningCost + plan.dailyEveningCost).toStringAsFixed(0)}/day',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        color: kPrimary,
+                      ),
+                    ),
                   ),
                 ],
               ],
