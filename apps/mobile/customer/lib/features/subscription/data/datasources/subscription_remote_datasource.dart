@@ -41,9 +41,16 @@ class SubscriptionRemoteDataSourceImpl implements SubscriptionRemoteDataSource {
 
   @override
   Future<Map<String, dynamic>> checkoutSubscription(Map<String, dynamic> data) async {
+    print('[SubscriptionDS] checkoutSubscription payload: $data');
     await dioClient.fetchCsrfToken();
-    final response = await dioClient.dio.post(ApiEndpoints.subscriptionCheckout, data: data);
-    return response.data as Map<String, dynamic>;
+    try {
+      final response = await dioClient.dio.post(ApiEndpoints.subscriptionCheckout, data: data);
+      print('[SubscriptionDS] checkoutSubscription response: ${response.statusCode} ${response.data}');
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      print('[SubscriptionDS] checkoutSubscription ERROR: $e');
+      rethrow;
+    }
   }
 
   @override

@@ -290,7 +290,7 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
         }
       } else if (scheduleType == 'daily') {
         // Daily: same quantity for all 7 days
-        schedules = List.generate(7, (i) => {
+        schedules = List.generate(7, (i) => <String, dynamic>{
           'day': i,
           'day_of_week': i,
           'm_quantity': morningQty,
@@ -311,7 +311,7 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
         'customer_id': customerId,
         'branch_id': branchId,
         if (addressId != null && addressId.isNotEmpty) 'address_id': addressId,
-        'schedule_type': scheduleType == 'custom' ? 'custom_days' : 'weekly',
+        'schedule_type': (scheduleType == 'daily' || scheduleType == 'weekly') ? 'weekly' : 'custom_dates',
         'payment_type': paymentType,
         'payment_method': paymentMethod,
         'auto_renew': autoRenew,
