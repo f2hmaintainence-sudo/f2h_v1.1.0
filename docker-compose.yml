@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile
       target: development
     container_name: f2hapi-dev-2
+    command: node dist/main.js
     ports:
       - "5001:5001"
     volumes:

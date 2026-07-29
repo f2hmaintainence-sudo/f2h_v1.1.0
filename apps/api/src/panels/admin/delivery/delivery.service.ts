@@ -533,8 +533,9 @@ export class DeliveryManagementService {
 
   async updateDeliveryStatus(orderId: string, status: string, notes?: string) {
     try {
-      const validStatuses = ['confirmed', 'packed', 'out_for_delivery', 'delivered', 'failed'];
-      if (!validStatuses.includes(status)) {
+      const normStatus = String(status || '').toLowerCase().replace(/[\s_-]+/g, '_');
+      const validStatuses = ['pending', 'confirmed', 'packed', 'out_for_delivery', 'delivered', 'cancelled', 'failed'];
+      if (!validStatuses.includes(normStatus)) {
         return { status: false, message: `Invalid status. Valid: ${validStatuses.join(', ')}` };
       }
 
@@ -542,16 +543,16 @@ export class DeliveryManagementService {
         `status = $2`,
         `updated_at = NOW()`,
       ];
-      const params: any[] = [orderId, status];
+      const params: any[] = [orderId, normStatus];
 
-      if (status === 'delivered') {
+      if (normStatus === 'delivered') {
         updateFields.push(`delivered_at = NOW()`);
       }
 
       const sql = `
         UPDATE orders
         SET ${updateFields.join(', ')}
-        WHERE order_id = $1
+        WHERE order_id = $1 OR id::text = $1
         RETURNING order_id, customer_id, status
       `;
 

@@ -244,7 +244,7 @@ async function bootstrap() {
     maxAge: 86400, // 24-hour preflight cache
   });
 
-  const port = env.Backend_Port || 4000;
+  const port = env.PORT || env.Backend_Port || 5001;
   await app.listen(port, '0.0.0.0');
   console.log(`Server running on http://0.0.0.0:${port}`);
 }
