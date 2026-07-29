@@ -1478,15 +1478,37 @@ export class DeliveryOrderController implements OnModuleInit {
 
       // 6. Handle empty bottles container balance
       if (['delivered', 'partial'].includes(newStatus)) {
-        await this.handleBottleReturn(client, {
-          customerId: stopAddress.customer_id,
-          referenceOrderId: orderIds[0],
-          returned: norm.returnedContainers,
-          damaged: norm.damagedContainers,
-          lost: norm.lostContainers,
-          remarks: norm.notes || 'Collected by delivery boy during run stop',
-          createdBy: String(boy.user_id),
-        });
+        const containerReturns = (body as any).container_returns || (body as any).containerReturns || [];
+        if (Array.isArray(containerReturns) && containerReturns.length > 0) {
+          for (const item of containerReturns) {
+            const containerId = item.container_id || (item as any).containerId;
+            const returned = Number(item.returned || 0);
+            const damaged = Number(item.damaged || 0);
+            const lost = Number(item.lost || 0);
+            if (returned + damaged + lost > 0) {
+              await this.handleContainerReturn(client, {
+                customerId: stopAddress.customer_id,
+                referenceOrderId: orderIds[0],
+                containerId,
+                returned,
+                damaged,
+                lost,
+                remarks: norm.notes || 'Collected by delivery boy during run stop',
+                createdBy: String(boy.user_id),
+              });
+            }
+          }
+        } else {
+          await this.handleBottleReturn(client, {
+            customerId: stopAddress.customer_id,
+            referenceOrderId: orderIds[0],
+            returned: norm.returnedContainers,
+            damaged: norm.damagedContainers,
+            lost: norm.lostContainers,
+            remarks: norm.notes || 'Collected by delivery boy during run stop',
+            createdBy: String(boy.user_id),
+          });
+        }
 
         // Record bottle issue transactions for delivered returnable items
         for (const item of items) {
