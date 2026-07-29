@@ -1693,11 +1693,13 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _referralBanner() {
+    final session = context.watch<CustomerSessionCubit>().state;
+    final profile = session.profile;
+    final isLoggedIn = profile != null;
+
     return GestureDetector(
       onTap: () {
-        final session = context.read<CustomerSessionCubit>().state;
-        final profile = session.profile;
-        if (profile != null) {
+        if (isLoggedIn) {
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -1714,66 +1716,90 @@ class _HomeScreenState extends State<HomeScreen>
         }
       },
       child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        padding: const EdgeInsets.all(18),
+        margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF16653A),
-          borderRadius: BorderRadius.circular(20),
+          color: const Color(0xFF104A2A),
+          borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF16653A).withValues(alpha: 0.15),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
+              color: const Color(0xFF104A2A).withValues(alpha: 0.15),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Row(
           children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF1C5),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              child: const Icon(
+                Icons.card_giftcard_rounded,
+                color: Color(0xFFC57A00),
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
-                    '🎁 Refer & Earn',
+                    'Invite Friends & Earn ₹50!',
                     style: TextStyle(
-                      fontSize: 17,
+                      fontSize: 13.5,
                       fontWeight: FontWeight.w900,
                       color: Colors.white,
+                      letterSpacing: -0.2,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Invite friends & earn ₹50 F2H Cash for every referral!',
+                  const SizedBox(height: 2),
+                  Text(
+                    'You & your friend both get ₹50 on first order.',
                     style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white70,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white.withValues(alpha: 0.85),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      'Invite Now',
-                      style: TextStyle(
-                        color: Color(0xFF16653A),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 10),
-            const Icon(
-              Icons.card_giftcard_rounded,
-              color: Colors.white,
-              size: 64,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isLoggedIn ? Icons.arrow_forward_rounded : Icons.login_rounded,
+                    color: const Color(0xFF104A2A),
+                    size: 14,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    isLoggedIn ? 'Invite' : 'Login',
+                    style: const TextStyle(
+                      color: Color(0xFF104A2A),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
