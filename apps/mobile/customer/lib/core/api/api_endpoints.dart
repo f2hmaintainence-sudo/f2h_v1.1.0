@@ -25,7 +25,7 @@ class ApiEndpoints {
     if (kReleaseMode && _envBaseUrl.isEmpty) {
       return 'https://f2hfresh.com';
     }
-    return 'http://192.168.1.6:5001';
+    return 'http://localhost:5001';
   }
 
   /// Root host (scheme + host + port), no trailing slash.
