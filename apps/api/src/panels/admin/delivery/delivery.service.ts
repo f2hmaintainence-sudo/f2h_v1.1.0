@@ -102,6 +102,7 @@ export class DeliveryManagementService {
           b.branch_name,
           db.is_active,
           db.is_available,
+          CASE WHEN (to_jsonb(db)->>'is_online') IS NOT NULL THEN ((to_jsonb(db)->>'is_online')::boolean) ELSE db.is_available END AS is_online,
           db.daily_salary,
           db.max_daily_orders,
           db.current_lat,
