@@ -245,14 +245,16 @@ export class DeliveryOrderController {
   }
 
   private normalizeDeliveryBody(body: any) {
+    const damagedQty = Number(body.damaged_containers ?? body.damagedContainers ?? 0);
+    const lostQty = Number(body.lost_containers ?? body.lostContainers ?? 0);
     return {
       paymentMode: (body.payment_mode || body.paymentMode || null) as string | null,
       paymentStatus: (body.payment_status || body.paymentStatus || null) as string | null,
       deliveryImage: this.cleanDeliveryImagePath(body.delivery_image || body.deliveryImage),
       bottles: (body.empty_bottles_collected ?? body.emptyBottlesCollected ?? 0) as number,
       returnedContainers: (body.returned_containers ?? body.returnedContainers ?? 0) as number,
-      damagedContainers: (body.damaged_containers ?? body.damagedContainers ?? 0) as number,
-      lostContainers: (body.lost_containers ?? body.lostContainers ?? 0) as number,
+      damagedContainers: (damagedQty + lostQty) as number,
+      lostContainers: 0 as number,
       notes: (body.remarks || body.notes || null) as string | null,
       latitude: body.latitude ? Number(body.latitude) : null,
       longitude: body.longitude ? Number(body.longitude) : null,
@@ -394,6 +396,21 @@ export class DeliveryOrderController {
       );
     }
 
+    const balRes = await executor.query(
+      `SELECT COALESCE(issued_quantity - returned_quantity - damaged_quantity - lost_quantity, 0) AS balance
+       FROM customer_container_balances
+       WHERE customer_id = $1 AND packaging_type_id = $2`,
+      [params.customerId, pkgId],
+    );
+    const balRows = Array.isArray(balRes) ? balRes : (balRes?.rows || []);
+    const currentBalance = balRows.length ? Number(balRows[0].balance) : 0;
+
+    if (total > currentBalance) {
+      throw new BadRequestException(
+        `Cannot collect/return more than the customer's current container balance. (Current balance: ${currentBalance}, Requested: ${total})`,
+      );
+    }
+
     if (params.returned > 0) {
       await executor.query(
         `INSERT INTO container_transactions (
@@ -462,6 +479,21 @@ export class DeliveryOrderController {
       await executor.query(`SELECT container_id FROM customer_container_balances LIMIT 1`);
       colName = 'container_id';
     } catch (_) {}
+
+    const balRes = await executor.query(
+      `SELECT COALESCE(issued_quantity - returned_quantity - damaged_quantity - lost_quantity, 0) AS balance
+       FROM customer_container_balances
+       WHERE customer_id = $1 AND ${colName} = $2`,
+      [params.customerId, params.containerId],
+    );
+    const balRows = Array.isArray(balRes) ? balRes : (balRes?.rows || []);
+    const currentBalance = balRows.length ? Number(balRows[0].balance) : 0;
+
+    if (total > currentBalance) {
+      throw new BadRequestException(
+        `Cannot collect/return more than the customer's current container balance. (Current balance: ${currentBalance}, Requested: ${total})`,
+      );
+    }
 
     if (params.returned > 0) {
       await executor.query(
@@ -810,6 +842,41 @@ export class DeliveryOrderController {
           );
         }
       }
+
+      // Handle empty bottles/container collection inside the transaction
+      if (newStatus === 'delivered') {
+        const containerReturns = (body as any).container_returns || (body as any).containerReturns || [];
+        if (Array.isArray(containerReturns) && containerReturns.length > 0) {
+          for (const item of containerReturns) {
+            const containerId = item.container_id || (item as any).containerId;
+            const returned = Number(item.returned || 0);
+            const damaged = Number(item.damaged || 0);
+            const lost = Number(item.lost || 0);
+            if (returned + damaged + lost > 0) {
+              await this.handleContainerReturn(client, {
+                customerId: order.customer_id,
+                referenceOrderId: orderId,
+                containerId,
+                returned,
+                damaged,
+                lost,
+                remarks: norm.notes || 'Collected by delivery boy during stop',
+                createdBy: String(boy.user_id),
+              });
+            }
+          }
+        } else {
+          await this.handleBottleReturn(client, {
+            customerId: order.customer_id,
+            referenceOrderId: orderId,
+            returned: norm.returnedContainers,
+            damaged: norm.damagedContainers,
+            lost: norm.lostContainers,
+            remarks: norm.notes || 'Collected by delivery boy during stop',
+            createdBy: String(boy.user_id),
+          });
+        }
+      }
     });
 
     // Send push notification to customer if delivered & process referral reward
@@ -833,19 +900,6 @@ export class DeliveryOrderController {
       } catch (err) {
         console.error('Failed to send delivery confirmation notification:', err);
       }
-    }
-
-    // Handle empty bottles collection
-    if (newStatus === 'delivered') {
-      await this.handleBottleReturn(this.db, {
-        customerId: order.customer_id,
-        referenceOrderId: orderId,
-        returned: norm.returnedContainers,
-        damaged: norm.damagedContainers,
-        lost: norm.lostContainers,
-        remarks: norm.notes,
-        createdBy: String(boy.id),
-      });
     }
 
     return {

@@ -113,6 +113,24 @@ export class AuthService {
       }
     }
 
+    // 3b. Search by phone last 10 digits fallback
+    if (!user) {
+      const cleanPhoneInput = rawIdentifier.replace(/\D/g, '');
+      if (cleanPhoneInput.length >= 10) {
+        const last10 = cleanPhoneInput.slice(-10);
+        const phoneMatchRes = await this.DataBase.query(
+          `SELECT user_id, email, password, locked_at, max_logins, user_name, phone, must_change_password, role_id
+           FROM users
+           WHERE REGEXP_REPLACE(phone, '\\D', '', 'g') LIKE $1
+           LIMIT 1`,
+          [`%${last10}`]
+        );
+        if (phoneMatchRes?.length) {
+          user = phoneMatchRes[0];
+        }
+      }
+    }
+
     if (!user) {
       this.developer.debug('[Auth:validateUser] Login failed - user not found', {
         identifier: formattedIdentifier,
