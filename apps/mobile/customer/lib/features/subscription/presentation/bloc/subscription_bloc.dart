@@ -150,14 +150,18 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
           autoRenew: event.autoRenew,
         ));
 
-        final results = await Future.wait([
-          subscriptionRepository.getSubscriptions(),
-          subscriptionRepository.getOrders(),
-        ]);
-        emit(SubscriptionLoaded(
-          subscriptions: results[0] as List<Subscription>,
-          orders: results[1] as List<Order>,
-        ));
+        try {
+          final results = await Future.wait([
+            subscriptionRepository.getSubscriptions(),
+            subscriptionRepository.getOrders(),
+          ]);
+          emit(SubscriptionLoaded(
+            subscriptions: results[0] as List<Subscription>,
+            orders: results[1] as List<Order>,
+          ));
+        } catch (_) {
+          // Keep SubscriptionActionSuccess state active if post-checkout refresh encounters a network delay
+        }
       } else {
         final errMsg = result['message']?.toString()
             ?? result['error']?.toString()

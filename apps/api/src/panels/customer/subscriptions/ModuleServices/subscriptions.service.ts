@@ -8,6 +8,10 @@ import {
   SubscriptionItemDto,
 } from '../dto/subscription.dto';
 
+import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
+import { NotificationService } from 'src/notifications/notification.service';
+import { MailService } from 'src/mail/mail.service';
+
 const DEFAULT_BRANCH_ID = 'ALL';
 const DEFAULT_ADDRESS_ID = 'ADDR_DEFAULT';
 
@@ -17,12 +21,30 @@ export class SubscriptionsService {
     private readonly db: DatabaseService,
     private readonly data: DataService,
     private readonly developer: DeveloperService,
+    private readonly pushNotificationService: PushNotificationService,
+    private readonly notificationService: NotificationService,
+    private readonly mailService: MailService,
   ) { }
 
   async checkout(body: CreateSubscriptionDto, req?: any) {
     this.developer.debug('SubscriptionsService.checkout called', { body });
 
-    const customerId = body.customer_id?.trim();
+    let customerId = body.customer_id?.trim() || (req?.headers?.['x-user-id'] as string)?.trim() || (req?.user as any)?.user_id;
+    if (!customerId && req?.headers?.['authorization']) {
+      try {
+        const token = (req.headers['authorization'] as string).replace(/^Bearer\s+/i, '');
+        const jwt = require('jsonwebtoken');
+        const decoded: any = jwt.decode(token);
+        if (decoded?.user_id || decoded?.sub) {
+          customerId = decoded.user_id || decoded.sub;
+        }
+      } catch (_) {}
+    }
+
+    if (customerId) {
+      body.customer_id = customerId;
+    }
+
     const estimatedTotal = Number(body.estimated_total || 0);
 
     if (!customerId) {
@@ -30,11 +52,11 @@ export class SubscriptionsService {
       throw new BadRequestException('customer_id is required');
     }
 
-    
+
 
     const email = (req as any)?.user?.email;
     let customerResult = await this.data.query('customers', {
-      select: ['customer_id', 'wallet_balance', 'is_postpaid_enabled', 'postpaid_credit_limit', 'email', 'branch_id'],
+      select: ['customer_id', 'first_name', 'last_name', 'phone', 'email', 'wallet_balance', 'is_postpaid_enabled', 'postpaid_credit_limit', 'branch_id'],
       where: [{ column: 'customer_id', operator: '=', value: customerId }],
       limit: 1,
     });
@@ -76,7 +98,7 @@ export class SubscriptionsService {
           };
           await this.data.insert('customers', customer);
         }
-      } catch (_) {}
+      } catch (_) { }
     }
     if (!customer) {
       this.developer.error('SubscriptionsService.checkout customer profile not found', { customerId });
@@ -126,66 +148,61 @@ export class SubscriptionsService {
           });
           return {
             status: false,
-            error_code: 'insufficient wallet',
+            error_code: 'insufficient_wallet',
             message: 'Insufficient wallet balance',
             wallet_balance: walletBalance,
             required: estimatedTotal,
           };
         }
 
-      }else{
+      } else {
         // TODO: Implement other payment methods
       }
     }
 
     // 3. POSTPAID validation
     if (paymentType === 'postpaid') {
-      const isPostpaidEnabled = Boolean(customer.is_postpaid_enabled === 't' ||customer.is_postpaid_enabled === true || customer.is_postpaid_enabled === 'true');
+      const isPostpaidEnabled = Boolean(customer.is_postpaid_enabled === 't' || customer.is_postpaid_enabled === true || customer.is_postpaid_enabled === 'true');
       const creditLimit = Number(customer.postpaid_credit_limit || 0);
 
       if (!isPostpaidEnabled) {
         return {
           status: false,
-          error_code: 'postpaid not enabled',
+          error_code: 'postpaid_not_enabled',
           message: 'Postpaid facility is not enabled on your account. Please select Prepaid option.',
         };
       }
-
-      // Calculate monthly estimations of existing active/paused postpaid subscriptions
+      // Calculate monthly estimations of existing active/paused postpaid subscriptions directly from monthly_estimate column
       const existingSubsRes = await this.db.query(
         `SELECT
-          si.unit_price,
-          COALESCE(SUM(sws.m_quantity + sws.e_quantity), 0) AS weekly_qty
-        FROM subscriptions s
-        JOIN subscription_items si
-            ON si.subscription_id = s.subscription_id
-        LEFT JOIN subscription_weekly_schedule sws
-            ON sws.subscription_item_id = si.subscription_item_id
-        WHERE s.customer_id = $1
-          AND s.payment_type = 'postpaid'
-          AND LOWER(s.status) IN ('active', 'paused')
-        GROUP BY si.subscription_item_id, si.unit_price;`,
+          COALESCE(SUM(monthly_estimate::numeric), 0) AS total_committed
+        FROM subscriptions
+        WHERE customer_id = $1
+          AND payment_type = 'postpaid'
+          AND LOWER(status) IN ('active', 'paused');`,
         [customerId],
       );
 
-      let existingCommitted = 0;
-      if (Array.isArray(existingSubsRes)) {
-        for (const row of existingSubsRes) {
-          const unitPrice = Number(row.unit_price || 0);
-          const weeklyQty = Number(row.weekly_qty || 0);
-          existingCommitted += (unitPrice * (weeklyQty / 7)) * 30; // Monthly estimation
-        }
-      }
+      const existingCommitted = Number(existingSubsRes?.[0]?.total_committed || 0);
+      const newMonthlyEstimate = Number(body.monthly_estimate || estimatedTotal);
 
-      const combinedTotal = existingCommitted + estimatedTotal;
+      this.developer.debug('SubscriptionsService.checkout postpaid credit check', {
+        existingCommitted,
+        newMonthlyEstimate,
+        combinedTotal: existingCommitted + newMonthlyEstimate,
+        creditLimit,
+        willBlock: creditLimit > 0 && (existingCommitted + newMonthlyEstimate) > creditLimit,
+      });
+
+      const combinedTotal = existingCommitted + newMonthlyEstimate;
       if (creditLimit > 0 && combinedTotal > creditLimit) {
         return {
           status: false,
-          error_code: 'credit limit exceeded',
+          error_code: 'credit_limit_exceeded',
           message: 'Postpaid credit limit exceeded. Please re-select Prepaid option.',
           credit_limit: creditLimit,
           existing_committed: existingCommitted,
-          requested: estimatedTotal,
+          requested: newMonthlyEstimate,
         };
       }
     }
@@ -201,40 +218,40 @@ export class SubscriptionsService {
         customerId,
       });
 
-        // Deduct from wallet atomically
-        const updateRes = await this.db.query(
-          `UPDATE customers SET wallet_balance = COALESCE(wallet_balance, 0) - $1, updated_at = NOW() WHERE customer_id = $2 RETURNING wallet_balance`,
-          [estimatedTotal, customerId],
-        );
-        const newBalance = Number(updateRes?.[0]?.wallet_balance ?? (walletBalance - estimatedTotal));
+      // Deduct from wallet atomically
+      const updateRes = await this.db.query(
+        `UPDATE customers SET wallet_balance = COALESCE(wallet_balance, 0) - $1, updated_at = NOW() WHERE customer_id = $2 RETURNING wallet_balance`,
+        [estimatedTotal, customerId],
+      );
+      const newBalance = Number(updateRes?.[0]?.wallet_balance ?? (walletBalance - estimatedTotal));
 
-        this.developer.debug('SubscriptionsService.checkout deducting wallet balance', {
-          customerId,
-          walletBalance,
-          estimatedTotal,
-          newBalance,
-        });
+      this.developer.debug('SubscriptionsService.checkout deducting wallet balance', {
+        customerId,
+        walletBalance,
+        estimatedTotal,
+        newBalance,
+      });
 
-        // Record wallet transaction ledger entry
-        const ts = Math.floor(Date.now() / 1000).toString(36);
-        const rnd = Math.floor(Math.random() * 9000 + 1000);
-        const txId = `WT${ts}${rnd}`;
+      // Record wallet transaction ledger entry
+      const ts = Math.floor(Date.now() / 1000).toString(36);
+      const rnd = Math.floor(Math.random() * 9000 + 1000);
+      const txId = `WT${ts}${rnd}`;
 
-        await this.data.insert(
-          'customer_wallet_transactions',
-          {
-            transaction_id: txId,
-            customer_id: customerId,
-            transaction_type: 'debit',
-            amount: estimatedTotal,
-            balance_after: newBalance,
-            remarks: 'Subscription prepaid wallet payment',
-            reference_type: 'subscription',
-            reference_id: createResult.subscription_id,
-            created_by: customerId,
-            created_at: new Date(),
-          },
-        );
+      await this.data.insert(
+        'customer_wallet_transactions',
+        {
+          transaction_id: txId,
+          customer_id: customerId,
+          transaction_type: 'debit',
+          amount: estimatedTotal,
+          balance_after: newBalance,
+          remarks: 'Subscription prepaid wallet payment',
+          reference_type: 'subscription',
+          reference_id: createResult.subscription_id,
+          created_by: customerId,
+          created_at: new Date(),
+        },
+      );
 
       const billId = `BILL_${Date.now().toString(36).toUpperCase()}`;
       const startDateStr = body.start_date;
@@ -266,12 +283,73 @@ export class SubscriptionsService {
     const response = {
       status: true,
       success: true,
-      id: `#SUB-${createResult.subscription_id}`,
+      id: `#${createResult.subscription_id}`,
       subscription_id: createResult.subscription_id,
       subscription_number: createResult.subscription_number,
       message: 'Subscription created successfully',
       items: createResult.items,
     };
+
+    // Send Push, In-App, and Email Notifications
+    const subNumber = createResult.subscription_number || createResult.subscription_id;
+    const notifTitle = 'Subscription Confirmed! 🎉';
+    const notifBody = `Your subscription (#${subNumber}) has been created successfully.`;
+
+    // 1. Push Notification via FCM
+    try {
+      await this.pushNotificationService.sendNotificationToUsers(
+        [customerId],
+        {
+          title: notifTitle,
+          body: notifBody,
+        },
+      );
+    } catch (pushErr) {
+      this.developer.error('SubscriptionsService.checkout push notification failed', { customerId, error: pushErr });
+    }
+
+    // 2. In-App Notification (Database & WebSocket)
+    try {
+      await this.notificationService.sendNotification({
+        title: notifTitle,
+        message: notifBody,
+        type: 'success',
+        priority: 'high',
+        recipientIds: [customerId],
+        senderId: customerId,
+      });
+    } catch (inAppErr) {
+      this.developer.error('SubscriptionsService.checkout in-app notification failed', { customerId, error: inAppErr });
+    }
+
+    // 3. Email Notification
+    const customerEmail = customer?.email || email;
+    if (customerEmail) {
+      const customerName = [customer?.first_name, customer?.last_name].filter(Boolean).join(' ') || 'Customer';
+      try {
+        await this.mailService.sendMail({
+          to: customerEmail,
+          subject: 'Subscription Confirmed - F2H Fresh 🎉',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+              <h2 style="color: #1b5e20;">Subscription Confirmed! 🎉</h2>
+              <p>Hello <strong>${customerName}</strong>,</p>
+              <p>Thank you for subscribing with F2H Fresh! Your subscription details are as follows:</p>
+              <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+                <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Subscription No:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">#${subNumber}</td></tr>
+                <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Schedule Type:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">${body.schedule_type || 'weekly'}</td></tr>
+                <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Payment Type:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">${body.payment_type || 'prepaid'}</td></tr>
+                <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Start Date:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">${body.start_date}</td></tr>
+              </table>
+              <p style="margin-top: 20px;">If you have any questions or need to pause/modify your subscription, open the F2H Fresh app anytime.</p>
+              <p style="color: #888; font-size: 12px; margin-top: 30px;">F2H Fresh - Farm 2 Home</p>
+            </div>
+          `,
+        });
+      } catch (mailErr) {
+        this.developer.error('SubscriptionsService.checkout email notification failed', { email: customerEmail, error: mailErr });
+      }
+    }
 
     this.developer.debug('SubscriptionsService.checkout completed successfully', { response });
     return response;
@@ -297,6 +375,11 @@ export class SubscriptionsService {
 
     const customerIdStr = (body.customer_id || '').trim();
 
+    const rawScheduleType = (body.schedule_type || 'weekly').toLowerCase();
+    const dbScheduleType = (rawScheduleType === 'custom' || rawScheduleType === 'custom_days' || rawScheduleType === 'custom_dates')
+      ? 'custom_dates'
+      : 'weekly';
+
     if (!customerIdStr) {
       throw new BadRequestException('customer_id is required');
     }
@@ -305,20 +388,26 @@ export class SubscriptionsService {
       throw new BadRequestException('start_date is required');
     }
 
-    if (body.schedule_type === 'weekly' && validItems.length === 0) {
-
-      throw new BadRequestException('Add at least one weekly quantity');
+    if (dbScheduleType === 'weekly' && validItems.length === 0) {
+      throw new BadRequestException('Add at least one quantity');
     }
 
-    if (body.schedule_type === 'custom_dates' && (body.custom_dates || []).length === 0) {
-
+    if (dbScheduleType === 'custom_dates' && (body.custom_dates || []).length === 0) {
       throw new BadRequestException('Add at least one custom date');
     }
 
     const branchId = body.branch_id || DEFAULT_BRANCH_ID;
-    const addressId = body.address_id || DEFAULT_ADDRESS_ID;
 
     return this.db.transaction(async (client) => {
+      let addressId = body.address_id?.trim();
+      if (!addressId || addressId === DEFAULT_ADDRESS_ID) {
+        const addrRes = await client.query(
+          `SELECT address_id FROM customer_addresses WHERE customer_id = $1 ORDER BY is_default DESC, id ASC LIMIT 1`,
+          [customerIdStr],
+        );
+        addressId = addrRes?.rows?.[0]?.address_id || 'ADDR_DEFAULT';
+      }
+
       // 1. Fetch or generate subscription_number from customers table
       const custRes = await client.query(
         `SELECT subscription_number FROM customers WHERE customer_id = $1 LIMIT 1`,
@@ -354,19 +443,6 @@ export class SubscriptionsService {
         validItemsCount: validItems.length,
       });
 
-      // 2. Remove existing subscription records for this customer (customer_id is UNIQUE in subscriptions table)
-      // const existingSub = await client.query(
-      //   `SELECT subscription_id FROM subscriptions WHERE customer_id = $1 LIMIT 1`,
-      //   [customerIdStr],
-      // );
-      // if (existingSub?.rows?.length > 0) {
-      //   const oldSubId = existingSub.rows[0].subscription_id;
-      //   this.developer.debug('SubscriptionsService.create replacing existing subscription', { oldSubId, customerIdStr });
-      //   await client.query(`DELETE FROM subscription_weekly_schedule WHERE subscription_id = $1`, [oldSubId]);
-      //   await client.query(`DELETE FROM subscription_items WHERE subscription_id = $1`, [oldSubId]);
-      //   await client.query(`DELETE FROM subscriptions WHERE customer_id = $1`, [customerIdStr]);
-      // }
-
       // 3. Insert new subscription row using varchar subscription_id
       await client.query(
         `
@@ -386,10 +462,11 @@ export class SubscriptionsService {
           status,
           notes,
           metadata,
+          monthly_estimate,
           created_by,
           updated_by
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'active', $13, $14, $15, $15)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'active', $13, $14, $15, $16, $16)
         `,
         [
           subscriptionId,
@@ -397,9 +474,9 @@ export class SubscriptionsService {
           customerIdStr,
           branchId,
           addressId,
-          body.schedule_type,
+          dbScheduleType,
           body.payment_type,
-          body.schedule_type === 'custom_dates' ? 'custom' : 'monthly',
+          dbScheduleType === 'custom_dates' ? 'custom' : 'monthly',
           body.start_date,
           body.end_date || null,
           body.auto_renew,
@@ -410,6 +487,7 @@ export class SubscriptionsService {
             branch_id: branchId,
             custom_dates: body.custom_dates || [],
           }),
+          body.monthly_estimate ?? body.estimated_total ?? 0,
           customerIdStr,
         ],
       );
@@ -594,6 +672,7 @@ export class SubscriptionsService {
         'subscriptions.status',
         'subscriptions.pause_from_date',
         'subscriptions.pause_to_date',
+        'subscriptions.monthly_estimate',
         'subscriptions.created_at',
         'subscriptions.updated_at',
         'COALESCE(subscription_items.subscription_item_id, subscription_items.id::text) AS subscription_item_id',
@@ -729,8 +808,8 @@ export class SubscriptionsService {
       ],
       where: [
         isItemId
-            ? { column: 'subscription_items.id', operator: '=', value: subscriptionId }
-            : { column: 'subscriptions.subscription_id', operator: '=', value: subscriptionId }
+          ? { column: 'subscription_items.id', operator: '=', value: subscriptionId }
+          : { column: 'subscriptions.subscription_id', operator: '=', value: subscriptionId }
       ],
     });
 
@@ -753,7 +832,7 @@ export class SubscriptionsService {
 
     const itemIds = items.map(item => item.subscription_item_id).filter(Boolean);
     let schedules: any[] = [];
-    
+
     try {
       const scheduleResult = await this.db.query(
         `SELECT * FROM subscription_weekly_schedule WHERE subscription_id = $1 OR subscription_item_id = ANY($2::text[])`,
@@ -1153,7 +1232,7 @@ export class SubscriptionsService {
         const schedRes = await this.db.query(
           `SELECT sws.m_quantity, sws.e_quantity, si.unit_price
            FROM subscription_weekly_schedule sws
-           JOIN subscription_items si ON si.id = sws.subscription_item_id
+           JOIN subscription_items si ON si.subscription_item_id = sws.subscription_item_id
            WHERE sws.subscription_id = $1`,
           [subscriptionId],
         );

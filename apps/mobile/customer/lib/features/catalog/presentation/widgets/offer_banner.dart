@@ -13,6 +13,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
@@ -304,29 +305,26 @@ class _OfferBannerState extends State<OfferBanner> {
                                 ),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(14),
-                                  child: Image.network(
-                                    imageUrl,
+                                  child: CachedNetworkImage(
+                                    imageUrl: imageUrl,
                                     fit: BoxFit.contain,
-                                    errorBuilder: (context, error, stackTrace) {
+                                    errorWidget: (context, url, error) {
                                       return const Icon(
                                         Icons.local_offer_rounded,
                                         color: Colors.white,
                                         size: 28,
                                       );
                                     },
-                                    loadingBuilder: (context, child, loadingProgress) {
-                                      if (loadingProgress == null) return child;
-                                      return const Center(
-                                        child: SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(
-                                            color: Colors.white,
-                                            strokeWidth: 2,
-                                          ),
+                                    placeholder: (context, url) => const Center(
+                                      child: SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
                                         ),
-                                      );
-                                    },
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),

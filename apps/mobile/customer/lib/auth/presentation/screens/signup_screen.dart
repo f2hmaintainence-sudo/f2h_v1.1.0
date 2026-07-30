@@ -13,6 +13,7 @@ import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
 import 'package:f2h_customer/auth/presentation/screens/otp_screen.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/privacy_screen.dart';
+import 'package:f2h_customer/core/services/app_asset_service.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
@@ -398,8 +399,8 @@ class _SignupScreenState extends State<SignupScreen> {
                                           ],
                                         ),
                                         child: Center(
-                                          child: Image.asset(
-                                            'assets/icon/app_icon.png',
+                                          child: AppAssetImage(
+                                            assetKey: 'assets/icon/app_icon.png',
                                             width: 32,
                                             height: 32,
                                             errorBuilder:
@@ -1242,8 +1243,8 @@ class _OAuthButton extends StatelessWidget {
           border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
         ),
         child: Center(
-          child: Image.asset(
-            icon,
+          child: AppAssetImage(
+            assetKey: icon,
             width: 24,
             height: 24,
             errorBuilder: (context, error, stackTrace) =>
