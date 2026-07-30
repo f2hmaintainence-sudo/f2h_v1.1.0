@@ -5,6 +5,7 @@ import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/orders/presentation/bloc/handover_bloc.dart';
+import 'package:f2h_delivery/features/orders/domain/repositories/orders_repository.dart';
 
 class WarehouseHandoverScreen extends StatefulWidget {
   const WarehouseHandoverScreen({super.key});
@@ -59,7 +60,10 @@ class _WarehouseHandoverScreenState extends State<WarehouseHandoverScreen> {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => sl<HandoverBloc>(),
+      create: (context) => HandoverBloc(
+        ordersRepository: sl<OrdersRepository>(),
+        deliverySessionBloc: context.read<DeliverySessionBloc>(),
+      ),
       child: BlocConsumer<HandoverBloc, HandoverState>(
         listener: (context, state) {
           if (state is HandoverSuccess) {

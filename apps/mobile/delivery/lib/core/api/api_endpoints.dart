@@ -14,15 +14,21 @@ import 'package:flutter/foundation.dart';
 class ApiEndpoints {
   ApiEndpoints._();
 
+  
+  // ---------------------------------------------------------------------------
+  // Base URL — reads compile-time env var, falls back to local dev address.
+  // Override at build time:
+  //   flutter run --dart-define=F2H_API_BASE_URL=https://api.f2hfresh.com
+  // ---------------------------------------------------------------------------
   static const String _envBaseUrl = String.fromEnvironment('F2H_API_BASE_URL');
-  static const String _devBaseUrl = 'http://192.168.1.39:5001';
-
-  static String get host {
-    if (_envBaseUrl.isNotEmpty) return _envBaseUrl;
-    if (kReleaseMode) return 'https://api.f2hfresh.com';
-    if (kIsWeb) return 'http://localhost:5001';
-    return _devBaseUrl;
+  static String get _devBaseUrl {
+    if (kReleaseMode && _envBaseUrl.isEmpty) {
+      return 'https://f2hfresh.com';
+    }
+    return 'http://192.168.1.16:5001';
   }
+
+  static String get host => _envBaseUrl.isNotEmpty ? _envBaseUrl : _devBaseUrl;
 
   static String get apiBaseUrl => '$host/api/v1';
   static String get baseUrl => apiBaseUrl;
@@ -42,6 +48,8 @@ class ApiEndpoints {
   static const String googleAuth       = '$_auth/google';
   static const String sendEmailOtp     = '$_auth/send-email-otp';
   static const String verifyEmailOtp   = '$_auth/verify-email-otp';
+  static const String forgotPassword   = '$_auth/forgot-password';
+  static const String resetPassword    = '$_auth/reset-password';
 
   // ---------------------------------------------------------------------------
   // Delivery Partner Location & SOS

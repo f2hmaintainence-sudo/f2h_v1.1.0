@@ -96,6 +96,16 @@ export class CustomersController {
     return this.customersService.logContainerTransaction(id, body, adminId);
   }
 
+  @Post(':id/settle-postpaid-bill')
+  async settlePostpaidBill(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Req() req: any,
+  ) {
+    const adminId = req.user?.user_id ?? 'system';
+    return this.customersService.settlePostpaidBill(id, body, adminId);
+  }
+
   @Get(':id/view')
   async getCustomerView(@Param('id') id: string) {
     return this.customersService.getCustomerView(id);

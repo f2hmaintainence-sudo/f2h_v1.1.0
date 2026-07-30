@@ -52,7 +52,45 @@ export class ProfileService {
       if (!result?.length) {
         throw new NotFoundException('Delivery partner profile not found');
       }
-      return result[0];
+
+      const profile = result[0];
+      const partnerUserId = profile.user_id || deliveryPartnerId;
+
+      // Query referral earnings & count for delivery partner (75 rupees per referral)
+      let referralEarnings = 0;
+      let referralCount = 0;
+      try {
+        const refRes = await this.db.query(
+          `SELECT 
+             COALESCE(SUM(CASE WHEN referrer_reward_amount > 0 THEN referrer_reward_amount ELSE 75.00 END), 0)::numeric AS referral_earnings,
+             COUNT(*)::int AS referral_count
+           FROM referrals
+           WHERE (referrer_id = $1 OR referrer_customer_id = $1 OR referrer_id = $2 OR referrer_customer_id = $2)
+             AND LOWER(status) IN ('rewarded', 'completed', 'active', 'success', 'credited')`,
+          [deliveryPartnerId, partnerUserId],
+        );
+        referralEarnings = parseFloat(refRes?.[0]?.referral_earnings || '0');
+        referralCount = parseInt(refRes?.[0]?.referral_count || '0', 10);
+      } catch (err) {
+        this.developerService.error('[Profile] Failed to query referral stats', { error: err });
+      }
+
+      let referralCode = profile.referral_code;
+      if (!referralCode || !referralCode.trim()) {
+        const cleanName = (profile.full_name || 'RIDER').replace(/[^a-zA-Z]/g, '').toUpperCase();
+        const prefix = cleanName.length >= 3 ? cleanName.slice(0, 3) : 'DP';
+        const cleanPhone = (profile.phone || '').replace(/\D/g, '');
+        const phoneSuffix = cleanPhone.length >= 4 ? cleanPhone.slice(-4) : '7500';
+        referralCode = `F2HDR-${prefix}${phoneSuffix}`;
+      }
+
+      return {
+        ...profile,
+        referral_code: referralCode,
+        referral_earnings: referralEarnings,
+        referral_count: referralCount,
+        reward_per_referral: 75.00,
+      };
     } catch (error) {
       this.developerService.error(`[Profile] Error fetching personal info for deliveryPartnerId: ${deliveryPartnerId}`, { error });
       throw error;

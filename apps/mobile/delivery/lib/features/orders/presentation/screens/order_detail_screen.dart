@@ -8,6 +8,8 @@ import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/delivery_confirmation_sheet.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/report_issue_screen.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class OrderDetailScreen extends StatefulWidget {
@@ -20,7 +22,6 @@ class OrderDetailScreen extends StatefulWidget {
 }
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
-  final MockDataService _dataService = MockDataService();
   final LocationService _locationService = LocationService();
   late GroupedStop _currentStop;
   String _calculatedDistanceText = 'Calculating distance...';
@@ -30,13 +31,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   void initState() {
     super.initState();
     _currentStop = widget.stop;
-    _dataService.addListener(_onDataServiceChanged);
     _calculateDynamicEta();
   }
 
   @override
   void dispose() {
-    _dataService.removeListener(_onDataServiceChanged);
     super.dispose();
   }
 
@@ -76,17 +75,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
-  void _onDataServiceChanged() {
-    final updated = _dataService.getGroupedStops().firstWhere(
-      (s) => s.customerId == _currentStop.customerId,
-      orElse: () => _currentStop,
-    );
-    if (mounted) {
-      setState(() {
-        _currentStop = updated;
-      });
-    }
-  }
 
   void _callPhone(String phone) async {
     final url = Uri.parse('tel:$phone');
@@ -140,10 +128,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => DeliveryConfirmationSheet(
         stop: _currentStop,
-        onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage) {
-          _dataService.updateOrderStatus(
-            _currentStop.orders.first.orderId,
-            status,
+        onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns) {
+          if (_currentStop.orders.isEmpty) return;
+          final orderId = _currentStop.orders.first.orderId;
+
+          context.read<DeliverySessionBloc>().add(UpdateStopStatusEvent(
+            orderId: orderId,
+            newStatus: status,
             emptyBottles: emptyBottles,
             returnedContainers: returnedContainers,
             damagedContainers: damagedContainers,
@@ -152,11 +143,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             paymentMode: paymentMode,
             paymentStatus: paymentStatus,
             deliveryImage: deliveryImage,
-          );
-          final messenger = ScaffoldMessenger.of(context);
-          Navigator.pop(context); // Pop bottom sheet
-          Navigator.pop(context); // Pop order detail screen
-          messenger.showSnackBar(
+            containerReturns: containerReturns,
+          ));
+          if (mounted && Navigator.canPop(context)) {
+            Navigator.pop(context); // Pop order detail screen if still open
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Stop #${_currentStop.stop} marked as $status!'),
               backgroundColor: status == 'delivered' ? kSuccess : kDanger,
@@ -165,7 +158,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
           );
           if (status == 'delivered') {
-            _dataService.tabNavigationNotifier.value = 2; // Switch to Map tab
+            MockDataService().tabNavigationNotifier.value = 2; // Switch to Map tab
           }
         },
       ),
@@ -174,6 +167,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final sessionState = context.watch<DeliverySessionBloc>().state;
+    if (sessionState is DeliverySessionLoaded) {
+      final updated = sessionState.groupedStops.firstWhere(
+        (s) => s.customerId == _currentStop.customerId,
+        orElse: () => _currentStop,
+      );
+      _currentStop = updated;
+    }
     final statusLower = _currentStop.status.toLowerCase();
     final isDone = statusLower == 'delivered' || 
                    statusLower == 'failed' || 
@@ -181,7 +182,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                    statusLower == 'cancelled';
     final hasSubscription = _currentStop.orders.any((o) => o.orderType == 'subscription');
     final hasOneTime = _currentStop.orders.any((o) => o.orderType == 'one-time' || o.orderType == 'single');
-
     return Scaffold(
       backgroundColor: kBg,
       appBar: AppBar(
@@ -244,7 +244,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             // Bottle Returns Ledger Card
             _buildBottleLedgerCard(),
             const SizedBox(height: 16),
-
             // Map Route Preview
             if (!isDone) ...[
               _buildMapRoutePreviewCard(),

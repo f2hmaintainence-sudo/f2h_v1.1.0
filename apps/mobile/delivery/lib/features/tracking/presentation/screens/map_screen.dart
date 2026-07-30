@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
-import 'package:f2h_delivery/services/mock_data_service.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/delivery_confirmation_sheet.dart';
-import 'package:f2h_delivery/features/orders/presentation/screens/report_issue_screen.dart';
-import 'package:f2h_delivery/features/orders/presentation/screens/order_detail_screen.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/features/tracking/presentation/widgets/map_delivery_sheet.dart';
 
 class MapScreen extends StatefulWidget {
@@ -20,7 +18,6 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
-  final MockDataService _dataService = MockDataService();
   
   bool _voiceNavEnabled = true;
   bool _showTraffic = true;
@@ -70,9 +67,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   
 
 
-  List<Marker> _buildMarkers() {
+  List<Marker> _buildMarkers(List<GroupedStop> groupedStops) {
     final List<Marker> markers = [];
-    final groupedStops = _dataService.getGroupedStops();
     
     // Add client stop markers
     for (int i = 0; i < groupedStops.length; i++) {
@@ -206,7 +202,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _dataService.addListener(_onDataServiceChanged);
     
     _pulsateController = AnimationController(
       vsync: this,
@@ -229,7 +224,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     _refreshController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
-    _dataService.removeListener(_onDataServiceChanged);
     super.dispose();
   }
 
@@ -238,42 +232,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     setState(() => _isRefreshing = true);
     _refreshController.repeat();
     try {
-      // Re-notify listeners to re-fetch & refit bounds
-      _onDataServiceChanged();
-      // Also refresh current location
+      context.read<DeliverySessionBloc>().add(ReloadSessionEvent());
       await _goToCurrentLocation();
       await Future.delayed(const Duration(milliseconds: 600));
     } finally {
       _refreshController.stop();
       _refreshController.reset();
       if (mounted) setState(() => _isRefreshing = false);
-    }
-  }
-
-  void _onDataServiceChanged() {
-    if (mounted) {
-      setState(() {});
-      final groupedStops = _dataService.getGroupedStops();
-      if (groupedStops.isNotEmpty) {
-        final points = groupedStops
-            .where((s) => s.addressLat.isFinite && !s.addressLat.isNaN && s.addressLng.isFinite && !s.addressLng.isNaN)
-            .map((s) => LatLng(s.addressLat, s.addressLng))
-            .toList();
-        if (points.isNotEmpty) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            try {
-              _mapController.fitCamera(
-                CameraFit.bounds(
-                  bounds: LatLngBounds.fromPoints(points),
-                  padding: const EdgeInsets.all(50.0),
-                ),
-              );
-            } catch (e) {
-              print('Error fitting camera bounds: $e');
-            }
-          });
-        }
-      }
     }
   }
 
@@ -289,6 +254,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         stop.addressLat,
         stop.addressLng,
       );
+      print('[DEBUG] Rider is $dist km away from stop.');
+      // Bypassed 300 meters check to allow testing locally
+      /*
       if (dist > 0.3) { // 300 meters threshold
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -302,6 +270,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         }
         return;
       }
+      */
     }
 
     if (!mounted) return;
@@ -311,10 +280,24 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       backgroundColor: Colors.transparent,
       builder: (_) => DeliveryConfirmationSheet(
         stop: stop,
-        onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage) {
-          _dataService.updateOrderStatus(
-            stop.orders.first.orderId,
-            status,
+        onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns) {
+          if (stop.orders.isEmpty) return;
+          final orderId = stop.orders.first.orderId;
+
+          // Show loading dialog
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
+              ),
+            ),
+          );
+
+          context.read<DeliverySessionBloc>().add(UpdateStopStatusEvent(
+            orderId: orderId,
+            newStatus: status,
             emptyBottles: emptyBottles,
             returnedContainers: returnedContainers,
             damagedContainers: damagedContainers,
@@ -323,16 +306,34 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             paymentMode: paymentMode,
             paymentStatus: paymentStatus,
             deliveryImage: deliveryImage,
-          );
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Stop #${stop.stop} marked as $status!'),
-              backgroundColor: status == 'delivered' ? kSuccess : kDanger,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          );
+            containerReturns: containerReturns,
+            onSuccess: () {
+              if (mounted) {
+                Navigator.pop(context); // pop loading dialog
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Stop #${stop.stop} marked as $status!'),
+                    backgroundColor: status == 'delivered' ? kSuccess : kDanger,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                );
+              }
+            },
+            onError: (errorMsg) {
+              if (mounted) {
+                Navigator.pop(context); // pop loading dialog
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(errorMsg),
+                    backgroundColor: kDanger,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                );
+              }
+            },
+          ));
         },
       ),
     );
@@ -341,241 +342,189 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final pendingCount = _dataService.pendingGroupedStopsCount;
-    final distanceRemaining = (pendingCount * 0.7).toStringAsFixed(1);
-    
-    // Estimate finish time based on local time + pending stops (e.g. 6 mins per stop)
-    final now = DateTime.now();
-    final finishTime = now.add(Duration(minutes: pendingCount * 6));
-    final finishStr = "${finishTime.hour.toString().padLeft(2, '0')}:${finishTime.minute.toString().padLeft(2, '0')} ${finishTime.hour >= 12 ? 'PM' : 'AM'}";
-
-    final List<LatLng> routePoints = [];
-    final groupedStops = _dataService.getGroupedStops();
-    if (groupedStops.isNotEmpty) {
-      for (var stop in groupedStops) {
-        if (stop.addressLat.isFinite && !stop.addressLat.isNaN && stop.addressLng.isFinite && !stop.addressLng.isNaN) {
-          routePoints.add(LatLng(stop.addressLat, stop.addressLng));
+    return BlocListener<DeliverySessionBloc, DeliverySessionState>(
+      listenWhen: (previous, current) {
+        if (current is! DeliverySessionLoaded) return false;
+        if (previous is! DeliverySessionLoaded) return true;
+        if (previous.orders.length != current.orders.length) return true;
+        for (int i = 0; i < previous.orders.length; i++) {
+          if (previous.orders[i].status != current.orders[i].status) {
+            return true;
+          }
         }
-      }
-    }
-    if (routePoints.isEmpty) {
-      routePoints.addAll([
-        const LatLng(12.9085, 77.6390),
-        const LatLng(12.9105, 77.6420),
-        const LatLng(12.9135, 77.6465),
-        const LatLng(12.9158, 77.6398),
-        const LatLng(12.9180, 77.6432),
-        const LatLng(12.9120, 77.6495),
-        const LatLng(12.9145, 77.6415),
-        const LatLng(12.9160, 77.6480),
-      ]);
-    }
-
-    LatLng mapCenter = const LatLng(12.9125, 77.6430);
-    final validStops = groupedStops.where((s) => s.addressLat.isFinite && !s.addressLat.isNaN && s.addressLng.isFinite && !s.addressLng.isNaN).toList();
-    if (validStops.isNotEmpty) {
-      double totalLat = 0;
-      double totalLng = 0;
-      for (var stop in validStops) {
-        totalLat += stop.addressLat;
-        totalLng += stop.addressLng;
-      }
-      mapCenter = LatLng(totalLat / validStops.length, totalLng / validStops.length);
-    }
-
-    return Scaffold(
-      body: Stack(
-        children: [
-          // 1. Full-screen Vector Route Painter Map
-          Positioned.fill(
-            child: FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: mapCenter,
-                initialCameraFit: CameraFit.bounds(
-                  bounds: LatLngBounds.fromPoints(routePoints),
-                  padding: const EdgeInsets.all(50.0),
-                ),
-                maxZoom: 18.0,
-                minZoom: 4.0,
+        return false;
+      },
+      listener: (context, state) {
+        if (state is DeliverySessionLoaded) {
+          final groupedStops = state.groupedStops;
+          if (groupedStops.isNotEmpty) {
+            final points = groupedStops
+                .where((s) => s.addressLat.isFinite && !s.addressLat.isNaN && s.addressLng.isFinite && !s.addressLng.isNaN)
+                .map((s) => LatLng(s.addressLat, s.addressLng))
+                .toList();
+            if (points.isNotEmpty) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                try {
+                  _mapController.fitCamera(
+                    CameraFit.bounds(
+                      bounds: LatLngBounds.fromPoints(points),
+                      padding: const EdgeInsets.all(50.0),
+                    ),
+                  );
+                } catch (e) {
+                  print('Error fitting camera bounds: $e');
+                }
+              });
+            }
+          }
+        }
+      },
+      child: BlocBuilder<DeliverySessionBloc, DeliverySessionState>(
+        builder: (context, state) {
+          if (state is! DeliverySessionLoaded) {
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
               ),
+            );
+          }
+
+          final groupedStops = state.groupedStops;
+          final pendingCount = state.pendingGroupedStopsCount;
+          final distanceRemaining = (pendingCount * 0.7).toStringAsFixed(1);
+          
+          final now = DateTime.now();
+          final finishTime = now.add(Duration(minutes: pendingCount * 6));
+          final finishStr = "${finishTime.hour.toString().padLeft(2, '0')}:${finishTime.minute.toString().padLeft(2, '0')} ${finishTime.hour >= 12 ? 'PM' : 'AM'}";
+
+          final List<LatLng> routePoints = [];
+          if (groupedStops.isNotEmpty) {
+            for (var stop in groupedStops) {
+              if (stop.addressLat.isFinite && !stop.addressLat.isNaN && stop.addressLng.isFinite && !stop.addressLng.isNaN) {
+                routePoints.add(LatLng(stop.addressLat, stop.addressLng));
+              }
+            }
+          }
+          if (routePoints.isEmpty) {
+            routePoints.addAll([
+              const LatLng(12.9085, 77.6390),
+              const LatLng(12.9105, 77.6420),
+              const LatLng(12.9135, 77.6465),
+              const LatLng(12.9158, 77.6398),
+              const LatLng(12.9180, 77.6432),
+              const LatLng(12.9120, 77.6495),
+              const LatLng(12.9145, 77.6415),
+              const LatLng(12.9160, 77.6480),
+            ]);
+          }
+
+          LatLng mapCenter = const LatLng(12.9125, 77.6430);
+          final validStops = groupedStops.where((s) => s.addressLat.isFinite && !s.addressLat.isNaN && s.addressLng.isFinite && !s.addressLng.isNaN).toList();
+          if (validStops.isNotEmpty) {
+            double totalLat = 0;
+            double totalLng = 0;
+            for (var stop in validStops) {
+              totalLat += stop.addressLat;
+              totalLng += stop.addressLng;
+            }
+            mapCenter = LatLng(totalLat / validStops.length, totalLng / validStops.length);
+          }
+
+          return Scaffold(
+            body: Stack(
               children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.f2h.delivery',
+                // 1. Full-screen Vector Route Painter Map
+                Positioned.fill(
+                  child: FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(
+                      initialCenter: mapCenter,
+                      initialCameraFit: CameraFit.bounds(
+                        bounds: LatLngBounds.fromPoints(routePoints),
+                        padding: const EdgeInsets.all(50.0),
+                      ),
+                      maxZoom: 18.0,
+                      minZoom: 4.0,
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.f2h.delivery',
+                      ),
+                      MarkerLayer(
+                        markers: _buildMarkers(groupedStops),
+                      ),
+                    ],
+                  ),
                 ),
-                MarkerLayer(
-                  markers: _buildMarkers(),
+
+                // 2. Floating Search Bar
+                Positioned(
+                  top: MediaQuery.of(context).padding.top + 12,
+                  left: 16,
+                  right: 72,
+                  child: _buildSearchBar(groupedStops),
                 ),
+
+                // 3. Floating Side Map Options
+                Positioned(
+                  right: 16,
+                  top: MediaQuery.of(context).padding.top + 12,
+                  child: Column(
+                    children: [
+                      _buildMapOptionCircle(
+                        icon: _showSearch ? Icons.search_off_rounded : Icons.search_rounded,
+                        color: _showSearch ? kPrimary : kTextSub,
+                        onTap: () {
+                          setState(() {
+                            _showSearch = !_showSearch;
+                            if (!_showSearch) {
+                              _searchController.clear();
+                              _searchQuery = '';
+                              _searchResults = [];
+                              _searchFocusNode.unfocus();
+                            } else {
+                              Future.delayed(const Duration(milliseconds: 100), () {
+                                _searchFocusNode.requestFocus();
+                              });
+                            }
+                          });
+                        },
+                        tooltip: _showSearch ? 'Close Search' : 'Search Stops',
+                      ),
+                      const SizedBox(height: 10),
+                      _buildMapOptionCircle(
+                        icon: _showTraffic ? Icons.traffic_rounded : Icons.traffic_outlined,
+                        color: _showTraffic ? kPrimary : kTextSub,
+                        onTap: () => setState(() => _showTraffic = !_showTraffic),
+                        tooltip: 'Traffic Density',
+                      ),
+                      const SizedBox(height: 10),
+                       _buildMapOptionCircle(
+                        icon: _voiceNavEnabled ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+                        color: _voiceNavEnabled ? kPrimary : kTextSub,
+                        onTap: () => setState(() => _voiceNavEnabled = !_voiceNavEnabled),
+                        tooltip: 'Voice Navigation',
+                      ),
+                      const SizedBox(height: 10),
+                      _buildMapOptionCircle(
+                        icon: Icons.my_location_rounded,
+                        color: kPrimary,
+                        onTap: _goToCurrentLocation,
+                        tooltip: 'Get Current Location',
+                      ),
+                      const SizedBox(height: 10),
+                      _buildRefreshCircle(),
+                    ],
+                  ),
+                ),
+
+                // 4. Bottom Active Delivery Details HUD (if any pending)
+                _buildBottomHUD(state),
               ],
             ),
-          ),
-
-          // 2. Floating Top HUD Card
-          // Positioned(
-          //   top: MediaQuery.of(context).padding.top + 12,
-          //   left: 16,
-          //   right: 16,
-          //   child: Container(
-          //     decoration: BoxDecoration(
-          //       color: kSurface,
-          //       borderRadius: BorderRadius.circular(20),
-          //       border: Border.all(color: kBorder),
-          //       boxShadow: [
-          //         BoxShadow(
-          //           color: Colors.black.withOpacity(0.08),
-          //           blurRadius: 16,
-          //           offset: const Offset(0, 6),
-          //         )
-          //       ],
-          //     ),
-          //     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-          //     child: Row(
-          //       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          //       children: [
-          //         Column(
-          //           crossAxisAlignment: CrossAxisAlignment.start,
-          //           mainAxisSize: MainAxisSize.min,
-          //           children: [
-          //             const Text(
-          //               'OPTIMIZED ROUTE',
-          //               style: TextStyle(
-          //                 color: kPrimary,
-          //                 fontSize: 10,
-          //                 fontWeight: FontWeight.w900,
-          //                 letterSpacing: 0.8,
-          //               ),
-          //             ),
-          //             const SizedBox(height: 6),
-          //             Text(
-          //               '$pendingCount Deliveries Left',
-          //               style: const TextStyle(
-          //                 color: kText,
-          //                 fontSize: 16,
-          //                 fontWeight: FontWeight.w900,
-          //               ),
-          //             ),
-          //           ],
-          //         ),
-          //         Container(height: 28, width: 1, color: kBorder),
-          //         Column(
-          //           crossAxisAlignment: CrossAxisAlignment.start,
-          //           mainAxisSize: MainAxisSize.min,
-          //           children: [
-          //             const Text(
-          //               'DISTANCE',
-          //               style: TextStyle(
-          //                 color: kTextSub,
-          //                 fontSize: 10,
-          //                 fontWeight: FontWeight.w800,
-          //                 letterSpacing: 0.8,
-          //               ),
-          //             ),
-          //             const SizedBox(height: 6),
-          //             Text(
-          //               '$distanceRemaining KM Left',
-          //               style: const TextStyle(
-          //                 color: kText,
-          //                 fontSize: 15,
-          //                 fontWeight: FontWeight.w900,
-          //               ),
-          //             ),
-          //           ],
-          //         ),
-          //         Container(height: 28, width: 1, color: kBorder),
-          //         Column(
-          //           crossAxisAlignment: CrossAxisAlignment.end,
-          //           mainAxisSize: MainAxisSize.min,
-          //           children: [
-          //             const Text(
-          //               'EST. FINISH',
-          //               style: TextStyle(
-          //                 color: kTextSub,
-          //                 fontSize: 10,
-          //                 fontWeight: FontWeight.w800,
-          //                 letterSpacing: 0.8,
-          //               ),
-          //             ),
-          //             const SizedBox(height: 6),
-          //             Text(
-          //               finishStr,
-          //               style: const TextStyle(
-          //                 color: kText,
-          //                 fontSize: 15,
-          //                 fontWeight: FontWeight.w900,
-          //               ),
-          //             ),
-          //           ],
-          //         ),
-          //       ],
-          //     ),
-          //   ),
-          // ),
-
-          // 2. Floating Search Bar
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 12,
-            left: 16,
-            right: 72,
-            child: _buildSearchBar(),
-          ),
-
-          // 3. Floating Side Map Options
-          Positioned(
-            right: 16,
-            top: MediaQuery.of(context).padding.top + 12,
-            child: Column(
-              children: [
-                _buildMapOptionCircle(
-                  icon: _showSearch ? Icons.search_off_rounded : Icons.search_rounded,
-                  color: _showSearch ? kPrimary : kTextSub,
-                  onTap: () {
-                    setState(() {
-                      _showSearch = !_showSearch;
-                      if (!_showSearch) {
-                        _searchController.clear();
-                        _searchQuery = '';
-                        _searchResults = [];
-                        _searchFocusNode.unfocus();
-                      } else {
-                        Future.delayed(const Duration(milliseconds: 100), () {
-                          _searchFocusNode.requestFocus();
-                        });
-                      }
-                    });
-                  },
-                  tooltip: _showSearch ? 'Close Search' : 'Search Stops',
-                ),
-                const SizedBox(height: 10),
-                _buildMapOptionCircle(
-                  icon: _showTraffic ? Icons.traffic_rounded : Icons.traffic_outlined,
-                  color: _showTraffic ? kPrimary : kTextSub,
-                  onTap: () => setState(() => _showTraffic = !_showTraffic),
-                  tooltip: 'Traffic Density',
-                ),
-                const SizedBox(height: 10),
-                 _buildMapOptionCircle(
-                  icon: _voiceNavEnabled ? Icons.volume_up_rounded : Icons.volume_off_rounded,
-                  color: _voiceNavEnabled ? kPrimary : kTextSub,
-                  onTap: () => setState(() => _voiceNavEnabled = !_voiceNavEnabled),
-                  tooltip: 'Voice Navigation',
-                ),
-                const SizedBox(height: 10),
-                _buildMapOptionCircle(
-                  icon: Icons.my_location_rounded,
-                  color: kPrimary,
-                  onTap: _goToCurrentLocation,
-                  tooltip: 'Get Current Location',
-                ),
-                const SizedBox(height: 10),
-                _buildRefreshCircle(),
-              ],
-            ),
-          ),
-
-          // 4. Bottom Active Delivery Details HUD (if any pending)
-          _buildBottomHUD(),
-        ],
+          );
+        },
       ),
     );
   }
@@ -642,7 +591,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildSearchBar() {
+  Widget _buildSearchBar(List<GroupedStop> groupedStops) {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 250),
       transitionBuilder: (child, animation) => FadeTransition(
@@ -684,8 +633,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                         if (query.isEmpty) {
                           _searchResults = [];
                         } else {
-                          _searchResults = _dataService
-                              .getGroupedStops()
+                          _searchResults = groupedStops
                               .where((s) {
                                 return s.customerName.toLowerCase().contains(query) ||
                                     s.address.toLowerCase().contains(query) ||
@@ -882,9 +830,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildBottomHUD() {
-    final groupedStops = _dataService.getGroupedStops();
-    final nextStop = _selectedStop ?? _dataService.nextGroupedDelivery;
+  Widget _buildBottomHUD(DeliverySessionLoaded state) {
+    final groupedStops = state.groupedStops;
+    final nextStop = _selectedStop ?? state.nextGroupedDelivery;
     if (nextStop == null) {
       if (_hideAllClearedCard) {
         return const Positioned(

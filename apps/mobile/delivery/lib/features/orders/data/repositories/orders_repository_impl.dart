@@ -7,7 +7,6 @@ import 'package:f2h_delivery/features/orders/domain/repositories/orders_reposito
 import 'package:f2h_delivery/features/orders/data/datasources/orders_remote_datasource.dart';
 import 'package:f2h_delivery/features/orders/data/models/pickup_item_model.dart';
 import 'package:f2h_delivery/features/orders/data/models/handover_model.dart';
-
 class OrdersRepositoryImpl implements OrdersRepository {
   final DioClient _dioClient;
   final OrdersRemoteDataSource _remoteDataSource;
@@ -44,6 +43,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
     String? paymentMode,
     String? paymentStatus,
     String? deliveryImage,
+    List<Map<String, dynamic>>? containerReturns,
   }) async {
     try {
       String? resolvedImageUrl = deliveryImage;
@@ -79,21 +79,22 @@ class OrdersRepositoryImpl implements OrdersRepository {
         '${ApiEndpoints.updateOrderStatus}/$orderId/status',
         data: {
           'status': status,
-          'notes': ?notes,
-          'empty_bottles_collected': ?emptyBottlesCollected,
-          'returned_containers': ?returnedContainers,
-          'damaged_containers': ?damagedContainers,
-          'lost_containers': ?lostContainers,
-          'payment_mode': ?paymentMode,
-          'payment_status': ?paymentStatus,
-          'delivery_image': ?resolvedImageUrl,
+          if (notes != null) 'notes': notes,
+          if (emptyBottlesCollected != null) 'empty_bottles_collected': emptyBottlesCollected,
+          if (returnedContainers != null) 'returned_containers': returnedContainers,
+          if (damagedContainers != null) 'damaged_containers': damagedContainers,
+          if (lostContainers != null) 'lost_containers': lostContainers,
+          if (paymentMode != null) 'payment_mode': paymentMode,
+          if (paymentStatus != null) 'payment_status': paymentStatus,
+          if (resolvedImageUrl != null) 'delivery_image': resolvedImageUrl,
+          if (containerReturns != null) 'container_returns': containerReturns,
         },
       );
       final data = response.data;
       return data != null && data['status'] == true;
     } catch (e) {
       print('Error updating order status: $e');
-      return false;
+      throw _handleDioError(e, 'Failed to update order status');
     }
   }
 
@@ -143,6 +144,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
     String? deliveryImage,
     double? latitude,
     double? longitude,
+    List<Map<String, dynamic>>? containerReturns,
   }) async {
     try {
       String? resolvedImageUrl = deliveryImage;
@@ -178,23 +180,25 @@ class OrdersRepositoryImpl implements OrdersRepository {
         ApiEndpoints.markStopDelivered(runId, addressId),
         data: {
           'status': status,
-          'remarks': ?remarks,
-          'empty_bottles_collected': ?emptyBottlesCollected,
-          'returned_containers': ?returnedContainers,
-          'damaged_containers': ?damagedContainers,
-          'lost_containers': ?lostContainers,
-          'payment_mode': ?paymentMode,
-          'payment_status': ?paymentStatus,
-          'delivery_image': ?resolvedImageUrl,
-          'latitude': ?latitude,
-          'longitude': ?longitude,
+          if (orderId != null) 'order_id': orderId,
+          if (remarks != null) 'remarks': remarks,
+          if (emptyBottlesCollected != null) 'empty_bottles_collected': emptyBottlesCollected,
+          if (returnedContainers != null) 'returned_containers': returnedContainers,
+          if (damagedContainers != null) 'damaged_containers': damagedContainers,
+          if (lostContainers != null) 'lost_containers': lostContainers,
+          if (paymentMode != null) 'payment_mode': paymentMode,
+          if (paymentStatus != null) 'payment_status': paymentStatus,
+          if (resolvedImageUrl != null) 'delivery_image': resolvedImageUrl,
+          if (latitude != null) 'latitude': latitude,
+          if (longitude != null) 'longitude': longitude,
+          if (containerReturns != null) 'container_returns': containerReturns,
         },
       );
       final data = response.data;
       return data != null && data['status'] == true;
     } catch (e) {
       print('Error marking stop as delivered: $e');
-      return false;
+      throw _handleDioError(e, 'Failed to mark stop as delivered');
     }
   }
 

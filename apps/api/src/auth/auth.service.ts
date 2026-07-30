@@ -113,6 +113,24 @@ export class AuthService {
       }
     }
 
+    // 3b. Search by phone last 10 digits fallback
+    if (!user) {
+      const cleanPhoneInput = rawIdentifier.replace(/\D/g, '');
+      if (cleanPhoneInput.length >= 10) {
+        const last10 = cleanPhoneInput.slice(-10);
+        const phoneMatchRes = await this.DataBase.query(
+          `SELECT user_id, email, password, locked_at, max_logins, user_name, phone, must_change_password, role_id
+           FROM users
+           WHERE REGEXP_REPLACE(phone, '\\D', '', 'g') LIKE $1
+           LIMIT 1`,
+          [`%${last10}`]
+        );
+        if (phoneMatchRes?.length) {
+          user = phoneMatchRes[0];
+        }
+      }
+    }
+
     if (!user) {
       this.developer.debug('[Auth:validateUser] Login failed - user not found', {
         identifier: formattedIdentifier,
@@ -745,11 +763,9 @@ export class AuthService {
     this.developer.debug(`[AuthService] Generated OTP for ${identifier}: ${otp}`);
 
     if (email) {
-      try {
-        await this.mailService.sendRegistrationOtp(email, otp);
-      } catch (err) {
+      this.mailService.sendRegistrationOtp(email, otp).catch((err) => {
         this.developer.error(`Failed to send registration OTP email to ${email}`, { err });
-      }
+      });
       return {
         message: 'OTP sent to your email',
         ttl: CACHE_TTL.FIFTEEN_MINUTES,
@@ -1280,11 +1296,9 @@ export class AuthService {
     this.developer.debug(`[AuthService:forgotPassword] Generated OTP for ${targetKey}: ${otp}`);
 
     if (user.email) {
-      try {
-        await this.mailService.sendForgotPasswordOtp(user.email, otp);
-      } catch (err) {
+      this.mailService.sendForgotPasswordOtp(user.email, otp).catch((err) => {
         this.developer.error(`Failed to send forgot password OTP email to ${user.email}`, { err });
-      }
+      });
     }
 
     return {
@@ -1384,11 +1398,9 @@ export class AuthService {
     );
 
     if (user.email) {
-      try {
-        await this.mailService.sendPasswordChangedAlert(user.email);
-      } catch (err) {
+      this.mailService.sendPasswordChangedAlert(user.email).catch((err) => {
         this.developer.error(`Failed to send password changed alert to ${user.email}`, { err });
-      }
+      });
     }
 
     return { message: 'Password reset successful' };

@@ -202,27 +202,18 @@ export class LocationController {
     };
     await this.redisService.put(redisKey, locationData, 3600);
 
-    // Broadcast location update to all connected Socket.io clients
-    if (this.notificationGateway && this.notificationGateway.server) {
-      try {
-        const fs = require('fs');
-        fs.appendFileSync('location_debug.log', `[${new Date().toISOString()}] Broadcasting location update to WS for userId: ${userId}\n`);
-      } catch (e) {}
-
-      this.notificationGateway.server.emit('delivery_location_update', {
-        userId,
-        latitude: Number(body.latitude),
-        longitude: Number(body.longitude),
-        battery: body.battery !== undefined ? Number(body.battery) : 100,
-        speed: body.speed !== undefined ? Number(body.speed) : 0,
-        status,
+    // Broadcast GPS position to admin tracking room via targeted room emit
+    try {
+      this.notificationGateway.emitPartnerLocation({
+        partnerId: userId,
+        lat: Number(body.latitude),
+        lng: Number(body.longitude),
+        battery: body.battery !== undefined ? Number(body.battery) : undefined,
+        speed: body.speed !== undefined ? Number(body.speed) : undefined,
         timestamp: new Date().toISOString(),
       });
-    } else {
-      try {
-        const fs = require('fs');
-        fs.appendFileSync('location_debug.log', `[${new Date().toISOString()}] WS Broadcast Failed: Gateway or Server undefined\n`);
-      } catch (e) {}
+    } catch (e) {
+      // Gateway not ready — ignore silently
     }
 
     return {

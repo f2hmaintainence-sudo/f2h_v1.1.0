@@ -6,6 +6,7 @@ import { PushNotificationService } from 'src/shared/pushNotifications/pushNotifi
 
 import { FirstOrderDetectorService } from '../../customer/referral/services/first-order-detector.service';
 import { ReferralRewardEngineService } from '../../customer/referral/services/referral-reward-engine.service';
+import { RedisService } from 'src/shared/redis/redis.service';
 
 function todayIST(): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -27,6 +28,7 @@ export class DeliveryManagementService {
     private readonly pushNotificationService: PushNotificationService,
     private readonly firstOrderDetector: FirstOrderDetectorService,
     private readonly referralRewardEngine: ReferralRewardEngineService,
+    private readonly redisService: RedisService,
   ) { }
 
   private async notifyPartner(partnerId: string, title: string, messageBody: string): Promise<void> {
@@ -471,6 +473,8 @@ export class DeliveryManagementService {
           b.branch_name,
           db.full_name AS partner_name,
           db.phone AS partner_phone,
+          ca.latitude  AS lat,
+          ca.longitude AS lng,
           COALESCE(
             (
               SELECT json_agg(
@@ -492,6 +496,7 @@ export class DeliveryManagementService {
         FROM orders o
         LEFT JOIN delivery_partners db ON db.delivery_partner_id = o.delivery_partner_id
         LEFT JOIN branches b ON b.branch_id = o.branch_id
+        LEFT JOIN customer_addresses ca ON ca.address_id::text = o.address_id::text
         WHERE ${where.join(' AND ')}
         ORDER BY
           CASE o.status
@@ -551,6 +556,70 @@ export class DeliveryManagementService {
     } catch (error) {
       this.developer.error('getTrackingSummary error', { error });
       throw new InternalServerErrorException('Failed to retrieve tracking summary');
+    }
+  }
+
+  /**
+   * Returns the last-known GPS position for all delivery partners that have
+   * ever sent a location update. Used by the admin tracking page on initial
+   * load so every partner marker appears on the map before WebSocket takes over.
+   */
+  async getLivePartnerPositions(branchId?: string) {
+    try {
+      const params: any[] = [];
+      const where: string[] = [
+        'dp.current_lat IS NOT NULL',
+        'dp.current_lng IS NOT NULL',
+      ];
+
+      if (branchId) {
+        params.push(branchId);
+        where.push(`dp.branch_id = $${params.length}`);
+      }
+
+      const sql = `
+        SELECT
+          dp.delivery_partner_id,
+          dp.full_name,
+          dp.branch_id,
+          b.branch_name,
+          dp.current_lat,
+          dp.current_lng,
+          dp.last_location_at,
+          dp.is_online,
+          dp.is_available,
+          dp.is_active
+        FROM delivery_partners dp
+        LEFT JOIN branches b ON b.branch_id = dp.branch_id
+        WHERE ${where.join(' AND ')}
+        ORDER BY dp.last_location_at DESC NULLS LAST
+      `;
+
+      const rows = await this.db.query(sql, params);
+
+      // Enrich with latest live location data from Redis cache (0 DB/external API cost)
+      for (const row of rows) {
+        try {
+          const key = `delivery_partner_location:${row.delivery_partner_id}`;
+          const redisLoc: any = await this.redisService.fetch(key);
+          if (redisLoc) {
+            if (redisLoc.latitude) row.current_lat = redisLoc.latitude;
+            if (redisLoc.longitude) row.current_lng = redisLoc.longitude;
+            if (redisLoc.battery != null) row.battery = redisLoc.battery;
+            if (redisLoc.speed != null) row.speed = redisLoc.speed;
+            if (redisLoc.updatedAt) row.last_location_at = redisLoc.updatedAt;
+          }
+        } catch (_) {}
+      }
+
+      return {
+        status: true,
+        data: rows,
+        message: 'Live partner positions fetched',
+      };
+    } catch (error) {
+      this.developer.error('getLivePartnerPositions error', { error });
+      throw new InternalServerErrorException('Failed to retrieve live partner positions');
     }
   }
 

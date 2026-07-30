@@ -77,7 +77,7 @@ Future<void> init() async {
     profileRepo: sl(),
   ));
   sl.registerFactory(() => PickupBloc(ordersRepository: sl()));
-  sl.registerFactory(() => HandoverBloc(ordersRepository: sl()));
+  sl.registerFactory(() => HandoverBloc(ordersRepository: sl(), deliverySessionBloc: sl()));
 
   // Services
   sl.registerLazySingleton(() => LocationService());
