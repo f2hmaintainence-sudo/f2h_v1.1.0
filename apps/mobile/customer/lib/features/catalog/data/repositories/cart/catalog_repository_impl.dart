@@ -1,8 +1,6 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
-import 'package:f2h_customer/core/utils/extensions.dart';
 import 'package:f2h_customer/features/catalog/domain/repositories/catalog_repository.dart';
 import 'package:f2h_customer/features/catalog/data/datasources/catalog_remote_datasource.dart';
 import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
@@ -105,6 +103,21 @@ class CatalogRepositoryImpl implements CatalogRepository {
         final isCurdOrNonSub = pNameLower.contains('curd') || vNameLower.contains('curd') || pNameLower.contains('paneer') || vNameLower.contains('paneer');
         final subscriptionPrice = isCurdOrNonSub ? null : double.tryParse(item['subscription_price']?.toString() ?? '');
 
+<<<<<<< HEAD
+=======
+        final availQty = item['available_quantity'] != null ? double.tryParse(item['available_quantity'].toString()) : null;
+        final lowThreshold = item['low_stock_threshold'] != null ? double.tryParse(item['low_stock_threshold'].toString()) : 10.0;
+
+        final isVariantOutOfStock = _readBool(item['is_out_of_stock'], fallback: false);
+        bool isVariantLowStock = false;
+        if (!isVariantOutOfStock) {
+          if (_readBool(item['is_low_stock'], fallback: false) ||
+              (availQty != null && lowThreshold != null && availQty < lowThreshold && availQty > 0)) {
+            isVariantLowStock = true;
+          }
+        }
+
+>>>>>>> d4fb2b59b4da470914731ab0239e4a2417b85ecf
         vars.add(ProductVariant(
           id: variantId,
           label: variantName.trim().isNotEmpty ? variantName.trim() : 'Standard',
@@ -113,6 +126,9 @@ class CatalogRepositoryImpl implements CatalogRepository {
           price: price,
           originalPrice: origPrice,
           subscriptionPrice: subscriptionPrice,
+          availableQuantity: availQty,
+          lowStockThreshold: lowThreshold,
+          isLowStock: isVariantLowStock,
         ));
       }
       productVariantsMap[pid] = vars;
@@ -209,7 +225,7 @@ class CatalogRepositoryImpl implements CatalogRepository {
 
     // 1. Try to load from cache
     try {
-      final cachedData = prefs.getString('cached_categories');
+      final cachedData = prefs.getString('cached_categories_v2');
       if (cachedData != null) {
         final List<dynamic> decoded = jsonDecode(cachedData);
         final cachedCategories = decoded
@@ -222,7 +238,6 @@ class CatalogRepositoryImpl implements CatalogRepository {
           return cachedCategories;
         }
       }
-      ;
     } catch (e) {
       print('Error parsing local cached categories: $e');
     }
@@ -247,7 +262,7 @@ class CatalogRepositoryImpl implements CatalogRepository {
           .toList();
 
       if (categories.isNotEmpty) {
-        await prefs.setString('cached_categories', jsonEncode(categories));
+        await prefs.setString('cached_categories_v2', jsonEncode(categories));
       }
 
       return categories;

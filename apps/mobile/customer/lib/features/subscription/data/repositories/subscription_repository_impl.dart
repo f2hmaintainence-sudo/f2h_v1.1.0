@@ -171,6 +171,7 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
             slot: deliverySlot,
             qty: qty,
             imageUrl: normalizedItems.isNotEmpty ? normalizedItems.first.imageUrl : null,
+            monthlyEstimate: _parseDouble(subRow['monthly_estimate'] ?? subRow['monthlyEstimate']),
           ),
         );
       }
@@ -316,6 +317,8 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
         'payment_method': paymentMethod,
         'auto_renew': autoRenew,
         'estimated_total': estimatedTotal,
+        'monthly_estimate': estimatedTotal,
+
         'custom_dates': scheduleType == 'custom' ? customDays : <String>[],
         'items': [
           {

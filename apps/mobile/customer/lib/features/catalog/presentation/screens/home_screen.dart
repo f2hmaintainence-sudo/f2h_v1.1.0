@@ -18,6 +18,7 @@ import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:f2h_customer/core/services/app_asset_service.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../profile/presentation/screens/referral_screen.dart';
 import '../../../notifications/presentation/screens/notifications_screen.dart';
@@ -2022,8 +2023,8 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
           // 1. Farm Background Image (fades out as header collapses)
           Opacity(
             opacity: (1.0 - shrinkFactor).clamp(0.0, 1.0),
-            child: Image.asset(
-              'assets/icon/home_bg.jpg',
+            child: AppAssetImage(
+              assetKey: 'assets/bg/home_bg.jpg',
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
               errorBuilder: (context, error, stackTrace) {
@@ -2070,8 +2071,8 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.asset(
-                      'assets/icon/app_icon.png',
+                    child: AppAssetImage(
+                      assetKey: 'assets/icon/app_icon.png',
                       width: 32,
                       height: 32,
                       fit: BoxFit.cover,

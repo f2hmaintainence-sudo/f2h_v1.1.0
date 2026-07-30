@@ -24,12 +24,13 @@ export class CategoriesProductsService {
     try {
       const rows = await this.db.query(
         `SELECT
-           reference_id AS product_id,
-           COALESCE(AVG(rating), 0) AS avg_rating,
+           COALESCE(pv.product_id, cf.reference_id) AS product_id,
+           COALESCE(AVG(cf.rating), 0) AS avg_rating,
            COUNT(*) AS review_count
-         FROM customer_feedback
-         WHERE reference_type = 'product' AND rating IS NOT NULL
-         GROUP BY reference_id`,
+         FROM customer_feedback cf
+         LEFT JOIN product_variants pv ON pv.variant_id = cf.reference_id
+         WHERE cf.reference_type = 'product' AND cf.rating IS NOT NULL
+         GROUP BY COALESCE(pv.product_id, cf.reference_id)`,
       );
       for (const r of rows || []) {
         map.set(r.product_id, {
@@ -48,38 +49,46 @@ export class CategoriesProductsService {
   // Categories images → categories.image_path (categories/ folder)
   // ─────────────────────────────────────────────────────────────────────────
   async getCategories(backendUrl?: string) {
-    const response = await this.Data.query('categories', {
-      select: [
-        'category_id',
-        'name',
-        'slug',
-        'description',
-        'image_path',
-      ],
-      where: [
-        {
-          column: 'is_active',
-          value: true,
-        },
-      ],
-    });
-
-    if (!response.status) {
-      console.error('DATABASE ERROR IN getCategories:', response);
-    }
-
     const baseUrl =
       process.env.MOBILE_BACKEND_URL ||
       process.env.BACKEND_URL ||
       'http://localhost:5001';
 
-    const mappedData = (response.data || []).map((cat: any) => ({
-      ...cat,
-      // Category images live in categories/ folder, read from categories.image_path
-      image_path: resolveImageUrl(cat.image_path, baseUrl),
-    }));
+    try {
+      const query = `
+        SELECT DISTINCT
+          c.category_id,
+          c.name,
+          c.slug,
+          c.description,
+          c.image_path
+        FROM categories c
+        JOIN products p ON (
+          p.category_id = c.category_id 
+          OR p.category_id = c.name 
+          OR LOWER(p.category_id) = LOWER(c.name) 
+          OR p.category_id = c.slug 
+          OR LOWER(p.category_id) = LOWER(c.slug)
+        )
+        JOIN product_variants pv ON pv.product_id = p.product_id
+        WHERE c.is_active = true
+          AND (p.is_active = true OR p.is_active IS NULL)
+          AND p.deleted_at IS NULL
+          AND (pv.status = 'active' OR pv.status IS NULL)
+        ORDER BY c.name ASC
+      `;
+      const rows = await this.db.query(query);
 
-    return { data: mappedData };
+      const mappedData = (rows || []).map((cat: any) => ({
+        ...cat,
+        image_path: resolveImageUrl(cat.image_path, baseUrl),
+      }));
+
+      return { data: mappedData };
+    } catch (e) {
+      console.error('Error in getCategories service:', e);
+      return { data: [] };
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -256,9 +265,21 @@ export class CategoriesProductsService {
 
   // ─────────────────────────────────────────────────────────────────────────
   // GET PRODUCT REVIEWS
+  // Accepts either product_id OR variant_id and resolves product_id
   // ─────────────────────────────────────────────────────────────────────────
-  async getProductReviews(productId: string) {
+  async getProductReviews(productIdOrVariantId: string) {
     try {
+      let targetProductId = productIdOrVariantId;
+
+      // If passed parameter is a variant_id, resolve its parent product_id
+      const variantRows = await this.db.query(
+        `SELECT product_id FROM product_variants WHERE variant_id = $1 LIMIT 1`,
+        [productIdOrVariantId],
+      );
+      if (variantRows && variantRows.length > 0 && variantRows[0].product_id) {
+        targetProductId = variantRows[0].product_id;
+      }
+
       const rows = await this.db.query(
         `SELECT
            cf.rating,
@@ -267,9 +288,9 @@ export class CategoriesProductsService {
            TRIM(CONCAT(COALESCE(c.first_name, ''), ' ', COALESCE(c.last_name, ''))) AS customer_name
          FROM customer_feedback cf
          LEFT JOIN customers c ON c.customer_id = cf.customer_id
-         WHERE cf.reference_id = $1 AND cf.reference_type = 'product'
+         WHERE (cf.reference_id = $1 OR cf.reference_id = $2) AND cf.reference_type = 'product'
          ORDER BY cf.created_at DESC`,
-        [productId],
+        [targetProductId, productIdOrVariantId],
       );
       return { status: true, data: rows || [] };
     } catch (e) {

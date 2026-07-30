@@ -110,6 +110,12 @@ export class CreateSubscriptionDto {
   estimated_total?: number;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  monthly_estimate?: number;
+
+
+  @IsOptional()
   @IsString()
   start_date?: string;
 

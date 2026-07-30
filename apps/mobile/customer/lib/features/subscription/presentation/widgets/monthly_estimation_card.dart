@@ -29,6 +29,8 @@ class MonthlyEstimationCard extends StatelessWidget {
   final double estimatedTotal;      // subscriptionPrice × total qty
   final double savings;             // normalPrice total − subscriptionPrice total
   final double savingsPercent;
+  /// When true, the Est. Quantity subtitle shows 'per week' instead of 'per day'
+  final bool isWeekly;
 
   const MonthlyEstimationCard({
     super.key,
@@ -45,6 +47,7 @@ class MonthlyEstimationCard extends StatelessWidget {
     required this.estimatedTotal,
     required this.savings,
     required this.savingsPercent,
+    this.isWeekly = false,
   });
 
   @override
@@ -132,14 +135,19 @@ class MonthlyEstimationCard extends StatelessWidget {
                   icon: Icons.calendar_today_rounded,
                 ),
                 const SizedBox(height: 8),
-                _Row(
+_Row(
                   label: 'Est. Quantity',
                   value: '$estimatedQty units',
-                  sub: morningQty > 0 && eveningQty > 0
-                      ? '(Morning: $morningQty · Evening: $eveningQty per day)'
-                      : morningQty > 0
-                          ? '(Morning: $morningQty per day)'
-                          : '(Evening: $eveningQty per day)',
+                  sub: () {
+                    final period = isWeekly ? 'per week' : 'per day';
+                    if (morningQty > 0 && eveningQty > 0) {
+                      return '(Morning: $morningQty · Evening: $eveningQty $period)';
+                    } else if (morningQty > 0) {
+                      return '(Morning: $morningQty $period)';
+                    } else {
+                      return '(Evening: $eveningQty $period)';
+                    }
+                  }(),
                   icon: Icons.local_shipping_outlined,
                 ),
                 const SizedBox(height: 8),

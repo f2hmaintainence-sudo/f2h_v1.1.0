@@ -72,17 +72,28 @@ class NotificationService {
       final fcm = _fcm;
       if (fcm == null) return;
 
-      // 2. Request permission with timeout
-      await fcm.requestPermission(alert: true, badge: true, sound: true).timeout(const Duration(seconds: 3));
+      // 2. Request permission (without strict timeout so user dialog interaction completes)
+      try {
+        await fcm.requestPermission(alert: true, badge: true, sound: true);
+      } catch (e) {
+        debugPrint('[NotificationService] Permission request notice: $e');
+      }
 
       // Retrieve and log FCM device token
       try {
-        final token = await fcm.getToken().timeout(const Duration(seconds: 2));
-        _cachedFcmToken = token;
-        debugPrint('🔥 [FCM] Firebase Connected Successfully! Token: $token');
+        final token = await fcm.getToken();
+        if (token != null && token.isNotEmpty) {
+          _cachedFcmToken = token;
+          debugPrint('🔥 [FCM] Firebase Connected Successfully! Token: $token');
+        }
       } catch (e) {
         debugPrint('🔥 [FCM] Token retrieval log notice: $e');
       }
+
+      fcm.onTokenRefresh.listen((token) {
+        _cachedFcmToken = token;
+        debugPrint('🔥 [FCM] Token Refreshed: $token');
+      });
 
       // 3. Foreground message listener -> triggers heads-up banner notification
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
@@ -159,7 +170,7 @@ class NotificationService {
       final fcm = _fcm;
       if (fcm == null) return null;
 
-      final token = await fcm.getToken().timeout(const Duration(milliseconds: 300));
+      final token = await fcm.getToken().timeout(const Duration(seconds: 5));
       _cachedFcmToken = token;
       return token;
     } catch (e) {

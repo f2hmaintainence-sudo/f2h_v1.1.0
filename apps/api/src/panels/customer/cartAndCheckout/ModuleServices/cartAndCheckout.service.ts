@@ -494,13 +494,13 @@ export class CartService {
       );
     } catch (_) {}
 
-    // D. Insert wallet ledger entries
-    if (paymentMethod === 'wallet') {
+    // D. Insert wallet ledger entries (ONLY for prepaid wallet orders)
+    if (paymentMethod === 'wallet' && !isCod && paymentType === 'prepaid') {
       await this.insertWalletTransactions(customerId, walletBalance, walletTransactionsToInsert);
     }
 
-    // E. Insert customer_bills and customer_bill_items for prepaid orders
-    if (paymentType === 'prepaid') {
+    // E. Insert customer_bills and customer_bill_items ONLY for prepaid orders (never for COD or postpaid)
+    if (paymentType === 'prepaid' && !isCod && paymentMethod !== 'cod') {
       await this.insertPrepaidBillingRecords(customerId, onetimeGroups, walletTransactionsToInsert, referenceId, paymentMethod);
     }
 
@@ -536,8 +536,8 @@ export class CartService {
       this.developer.error('Failed to save checkout notification to DB', { customerId, error: notifError });
     }
 
-    const isPending = paymentMethod === 'cod' || paymentType === 'postpaid';
-    const finalStatus = isPending ? 'pending' : 'success';
+    // Order creation status is 'success' if order created without error; payment_status in DB handles payment state
+    const finalStatus = referenceId ? 'success' : 'failed';
     const displayId = `#F2H-${referenceId}`;
 
     return {

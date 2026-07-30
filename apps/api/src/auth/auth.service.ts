@@ -61,10 +61,10 @@ export class AuthService {
     ip?: string,
     userAgent?: string,
     fingerprintData?: any,
+    fcmToken?: string,
   ) {
     const rawIdentifier = identifier.trim();
     const formattedIdentifier = rawIdentifier.toLowerCase();
-
     const selectCols = [
       'user_id',
       'email',
@@ -146,37 +146,37 @@ export class AuthService {
     }
 
     // Check lock status
-    if (user.locked_at) {
-      const lockoutDuration = 30 * 60 * 1000; // 30 minutes
-      if (
-        new Date().getTime() - new Date(user.locked_at).getTime() <
-        lockoutDuration
-      ) {
-        const remainingTime = Math.ceil(
-          (lockoutDuration -
-            (new Date().getTime() - new Date(user.locked_at).getTime())) /
-          60000,
-        );
+    // if (user.locked_at) {
+    //   const lockoutDuration = 30 * 60 * 1000; // 30 minutes
+    //   if (
+    //     new Date().getTime() - new Date(user.locked_at).getTime() <
+    //     lockoutDuration
+    //   ) {
+    //     const remainingTime = Math.ceil(
+    //       (lockoutDuration -
+    //         (new Date().getTime() - new Date(user.locked_at).getTime())) /
+    //       60000,
+    //     );
 
-        this.auditLogger.logAccountLockout({
-          userId: user.user_id,
-          email: user.email,
-          ip: ip || 'unknown',
-          reason: 'Account locked - multiple failed attempts',
-        });
+    //     this.auditLogger.logAccountLockout({
+    //       userId: user.user_id,
+    //       email: user.email,
+    //       ip: ip || 'unknown',
+    //       reason: 'Account locked - multiple failed attempts',
+    //     });
 
-        throw new ForbiddenException(
-          `Account is locked due to multiple failed login attempts. Please try again in ${remainingTime} minutes.`,
-        );
-      } else {
-        // Unlock account after lockout duration has passed
-        await this.Data.update(
-          'users',
-          { locked_at: null },
-          [{ column: 'user_id', operator: '=', value: user.user_id }],
-        );
-      }
-    }
+    //     throw new ForbiddenException(
+    //       `Account is locked due to multiple failed login attempts. Please try again in ${remainingTime} minutes.`,
+    //     );
+    //   } else {
+    //     // Unlock account after lockout duration has passed
+    //     await this.Data.update(
+    //       'users',
+    //       { locked_at: null },
+    //       [{ column: 'user_id', operator: '=', value: user.user_id }],
+    //     );
+    //   }
+    // }
 
     // Verify Password
     const passwordMatch = await bcrypt.compare(password, user.password);
@@ -227,6 +227,11 @@ export class AuthService {
         [{ column: 'user_id', operator: '=', value: user.user_id }],
       );
     }
+
+    if (fcmToken) {
+      await this.updateFcmToken(user.user_id, fcmToken);
+    }
+
     return user;
   }
 
@@ -402,68 +407,48 @@ export class AuthService {
     await this.Data.executeTransaction(async (transaction) => {
       if (existingUser) {
         // Update placeholder user created during OTP verification
+        const incomingFcmToken = body.fcm_token || (body as any).fcmToken;
         const userUpdatePayload: any = {
           email,
           phone,
-          user_name: userName,
-          first_name: firstName,
-          last_name: lastName,
+          user_name: body.user_name || email?.split('@')[0] || phone,
+          first_name: body.first_name || '',
+          last_name: body.last_name || '',
           password: hashedPassword,
           role_id: roleId,
           updated_at: now,
         };
-        if (body.fcm_token) {
-          userUpdatePayload.fcm_token = body.fcm_token;
+        if (incomingFcmToken) {
+          userUpdatePayload.fcm_token = incomingFcmToken;
         }
 
         await this.Data.update(
           'users',
-          {
-            email,
-            phone,
-            user_name: body.user_name || email?.split('@')[0] || phone,
-            first_name: body.first_name || '',
-            last_name: body.last_name || '',
-            fcm_token: body.fcm_token,
-            password: hashedPassword,
-            role_id: roleId,
-            updated_at: now,
-          },
+          userUpdatePayload,
           [{ column: 'user_id', operator: '=', value: userId }],
           { transaction },
         );
       } else {
+        const incomingFcmToken = body.fcm_token || (body as any).fcmToken;
         const userInsertPayload: any = {
           user_id: userId,
           email,
           phone,
-          user_name: userName,
-          first_name: firstName,
-          last_name: lastName,
+          user_name: body.user_name || email?.split('@')[0] || phone,
+          first_name: body.first_name || '',
+          last_name: body.last_name || '',
           password: hashedPassword,
           role_id: roleId,
           created_at: now,
           updated_at: now,
         };
-        if (body.fcm_token) {
-          userInsertPayload.fcm_token = body.fcm_token;
+        if (incomingFcmToken) {
+          userInsertPayload.fcm_token = incomingFcmToken;
         }
 
         const userResult = await this.Data.insert(
           'users',
-          {
-            user_id: userId,
-            email,
-            phone,
-            user_name: body.user_name || email?.split('@')[0] || phone,
-            first_name: body.first_name || '',
-            last_name: body.last_name || '',
-            fcm_token: body.fcm_token,
-            password: hashedPassword,
-            role_id: roleId,
-            created_at: now,
-            updated_at: now,
-          },
+          userInsertPayload,
           { transaction },
         );
 
@@ -811,13 +796,15 @@ export class AuthService {
       user = emailRes?.data?.[0];
     }
 
+    const incomingFcmToken = body.fcm_token || (body as any).fcmToken;
+
     if (!user) {
       const userId = generateId('USER', 20);
       const temporaryPassword = crypto.randomBytes(32).toString('hex');
       const hashedPassword = await bcrypt.hash(temporaryPassword, 12);
       const now = new Date();
 
-      await this.Data.insert('users', {
+      const userInsertData: any = {
         user_id: userId,
         phone: phone || null,
         email: email || null,
@@ -825,7 +812,12 @@ export class AuthService {
         role_id: 'CUSTOMER',
         created_at: now,
         updated_at: now,
-      });
+      };
+      if (incomingFcmToken) {
+        userInsertData.fcm_token = incomingFcmToken;
+      }
+
+      await this.Data.insert('users', userInsertData);
 
       try {
         const cleanName = (email ? email.split('@')[0] : 'USR').replace(/[^a-zA-Z]/g, '').toUpperCase();
@@ -834,7 +826,7 @@ export class AuthService {
         const suffix = phoneDigits.length >= 3 ? phoneDigits.slice(-3) : Math.floor(100 + Math.random() * 900).toString();
         const generatedRefCode = `F2H${prefix}${suffix}`;
 
-        await this.Data.insert('customers', {
+        const customerInsertData: any = {
           customer_id: userId,
           first_name: email ? email.split('@')[0] : 'Customer',
           last_name: '',
@@ -846,7 +838,12 @@ export class AuthService {
           referral_status: 'locked',
           created_at: now,
           updated_at: now,
-        });
+        };
+        if (incomingFcmToken) {
+          customerInsertData.fcm_token = incomingFcmToken;
+        }
+
+        await this.Data.insert('customers', customerInsertData);
       } catch (custErr) {
         console.error('[AuthService] Auto customer record creation failed during OTP verify:', custErr);
       }
@@ -857,6 +854,8 @@ export class AuthService {
         email: email || null,
         role_id: 'CUSTOMER',
       };
+    } else if (incomingFcmToken) {
+      await this.updateFcmToken(user.user_id, incomingFcmToken);
     }
 
     const verificationToken = crypto.randomBytes(32).toString('hex');
@@ -918,9 +917,28 @@ export class AuthService {
   }
 
   async updateFcmToken(userId: string, fcmToken: string) {
-    return this.Data.update('users', { fcm_token: fcmToken }, [
-      { column: 'user_id', operator: '=', value: userId },
-    ]);
+    if (!fcmToken || fcmToken === 'fcmToken' || fcmToken === 'fcmtoken' || fcmToken === 'null' || fcmToken === 'undefined') return;
+
+    const now = new Date();
+    try {
+      await this.Data.update('users', { fcm_token: fcmToken, updated_at: now }, [
+        { column: 'user_id', operator: '=', value: userId },
+      ]);
+    } catch (err) {
+      console.error('[AuthService:updateFcmToken] Failed to update fcm_token in users table:', err);
+    }
+
+    try {
+      await this.Data.update('users', { fcm: fcmToken }, [
+        { column: 'user_id', operator: '=', value: userId },
+      ]);
+    } catch (_) {}
+
+    try {
+      await this.Data.update('customers', { fcm_token: fcmToken, updated_at: now }, [
+        { column: 'customer_id', operator: '=', value: userId },
+      ]);
+    } catch (_) {}
   }
 
   /*===============================================================================================

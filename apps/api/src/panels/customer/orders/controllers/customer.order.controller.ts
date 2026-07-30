@@ -61,7 +61,9 @@ export class CustomerOrderController {
         const placeholders = orderIds.map((_: any, i: number) => `$${i + 1}`).join(',');
 
         const [rawItems]: any = await conn.query(
-          `SELECT
+          `SELECT DISTINCT ON (oi.id, oi.order_id, oi.variant_id)
+             COALESCE(oi.id::text, oi.order_id || '_' || oi.variant_id) AS item_key,
+             oi.id,
              oi.order_id,
              oi.variant_id,
              oi.quantity,
@@ -74,15 +76,16 @@ export class CustomerOrderController {
              p.product_id,
              COALESCE(pi.url, p.image_path) AS image_path
            FROM order_items oi
-           LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
-           LEFT JOIN products p          ON p.product_id = pv.product_id
+           LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id AND (pv.deleted_at IS NULL)
+           LEFT JOIN products p          ON p.product_id = pv.product_id AND (p.deleted_at IS NULL)
            LEFT JOIN LATERAL (
              SELECT url FROM product_images pi2
              WHERE pi2.variant_id = oi.variant_id OR (pi2.variant_id IS NULL AND pi2.product_id = p.product_id)
              ORDER BY pi2.is_primary DESC NULLS LAST, pi2.id ASC
              LIMIT 1
            ) pi ON true
-           WHERE oi.order_id IN (${placeholders})`,
+           WHERE oi.order_id IN (${placeholders})
+           ORDER BY oi.id, oi.order_id, oi.variant_id`,
           orderIds,
         );
         enrichedItems = rawItems || [];
@@ -122,7 +125,10 @@ export class CustomerOrderController {
           rating_feedback: itemFeedback?.feedback ?? null,
         };
         const list = itemsByOrder.get(mappedItem.order_id) ?? [];
-        list.push(mappedItem);
+        const itemUniqueKey = mappedItem.item_key || `${mappedItem.order_id}_${mappedItem.variant_id}_${mappedItem.id}`;
+        if (!list.some((existing: any) => (existing.item_key || `${existing.order_id}_${existing.variant_id}_${existing.id}`) === itemUniqueKey)) {
+          list.push(mappedItem);
+        }
         itemsByOrder.set(mappedItem.order_id, list);
       }
 
@@ -413,7 +419,9 @@ export class CustomerOrderController {
     try {
       // Fetch order items with variant, product, and image joins
       const [rawItems]: any = await conn.query(
-        `SELECT
+        `SELECT DISTINCT ON (oi.id, oi.order_id, oi.variant_id)
+           COALESCE(oi.id::text, oi.order_id || '_' || oi.variant_id) AS item_key,
+           oi.id,
            oi.order_id,
            oi.variant_id,
            oi.quantity,
@@ -426,15 +434,16 @@ export class CustomerOrderController {
            p.product_id,
            COALESCE(pi.url, p.image_path) AS image_path
          FROM order_items oi
-         LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
-         LEFT JOIN products p          ON p.product_id = pv.product_id
+         LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id AND (pv.deleted_at IS NULL)
+         LEFT JOIN products p          ON p.product_id = pv.product_id AND (p.deleted_at IS NULL)
          LEFT JOIN LATERAL (
             SELECT url FROM product_images pi2
             WHERE pi2.variant_id = oi.variant_id OR (pi2.variant_id IS NULL AND pi2.product_id = p.product_id)
             ORDER BY pi2.is_primary DESC NULLS LAST, pi2.id ASC
             LIMIT 1
           ) pi ON true
-         WHERE oi.order_id = $1`,
+         WHERE oi.order_id = $1
+         ORDER BY oi.id, oi.order_id, oi.variant_id`,
         [orderId],
       );
       
@@ -475,15 +484,21 @@ export class CustomerOrderController {
         (feedbackRows || []).map((f: any) => [f.reference_id, f]),
       );
 
-      const enrichedItems = (rawItems || []).map((item: any) => {
+      const enrichedItems: any[] = [];
+      const seenItemKeys = new Set<string>();
+      for (const item of (rawItems || [])) {
+        const itemKey = item.item_key || `${item.order_id}_${item.variant_id}_${item.id}`;
+        if (seenItemKeys.has(itemKey)) continue;
+        seenItemKeys.add(itemKey);
+
         const itemFeedback = item.product_id ? feedbackMap.get(item.product_id) : null;
-        return {
+        enrichedItems.push({
           ...item,
           image_path: mapImagePath(item.image_path),
           rating: itemFeedback ? Number(itemFeedback.rating) : null,
           rating_feedback: itemFeedback?.feedback ?? null,
-        };
-      });
+        });
+      }
 
       const firstItemWithRating = enrichedItems.find((i: any) => i.rating !== null);
 
@@ -739,7 +754,15 @@ export class CustomerOrderController {
     const customerId = customer ? customer.customer_id : userId;
 
     let productId = body.product_id;
-    if (!productId) {
+    if (productId) {
+      const vRes = await this.db.query(
+        `SELECT product_id FROM product_variants WHERE variant_id = $1 LIMIT 1`,
+        [productId],
+      );
+      if (vRes && vRes.length > 0 && vRes[0].product_id) {
+        productId = vRes[0].product_id;
+      }
+    } else {
       const conn = await this.data.getSharedConnection();
       try {
         const [rows]: any = await conn.query(
