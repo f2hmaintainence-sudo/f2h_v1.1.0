@@ -20,13 +20,19 @@ import 'package:f2h_customer/core/widgets/network_overlay.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/catalog_bloc.dart';
 import 'package:f2h_customer/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:f2h_customer/features/subscription/presentation/bloc/subscription_bloc.dart';
+import 'package:f2h_customer/features/subscription/presentation/bloc/subscription_state.dart';
+import 'package:f2h_customer/features/subscription/presentation/bloc/subscription_event.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_bloc.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_state.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_event.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/checkout/checkout_bloc.dart';
 import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_bloc.dart';
 import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_event.dart';
+import 'package:f2h_customer/features/orders/presentation/bloc/order_history_bloc.dart';
+import 'package:f2h_customer/features/orders/presentation/bloc/order_history_state.dart';
+import 'package:f2h_customer/features/orders/presentation/bloc/order_history_event.dart';
 import 'package:f2h_customer/core/app_bootstrap.dart';
+import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
 
 
 class F2HApp extends StatelessWidget {
@@ -45,6 +51,7 @@ class F2HApp extends StatelessWidget {
       BlocProvider<CartBloc>(create: (_) => sl<CartBloc>()),
       BlocProvider<CheckoutBloc>(create: (_) => sl<CheckoutBloc>()),
       BlocProvider<NotificationsBloc>(create: (_) => sl<NotificationsBloc>()),
+      BlocProvider<OrderHistoryBloc>(create: (_) => sl<OrderHistoryBloc>()),
     ],
     child: MaterialApp(
       title: 'F2H Fresh',
@@ -64,10 +71,8 @@ class F2HApp extends StatelessWidget {
             builder: (context, state) {
               if (state is Authenticated) {
                 return const CustomerSessionGate();
-              } else if (state is Unauthenticated || state is AuthFailure) {
-                return const AppShell(); // Land directly on home screen
               }
-              return const InitialLoadingScreen();
+              return const LoginScreen();
             },
           ),
         ),
@@ -111,6 +116,8 @@ class _CustomerSessionGateState extends State<CustomerSessionGate> {
           if (customerId != null) {
             context.read<CartBloc>().add(LoadCartEvent(customerId));
             context.read<NotificationsBloc>().add(LoadNotifications());
+            context.read<SubscriptionBloc>().add(LoadSubscriptions());
+            context.read<OrderHistoryBloc>().add(LoadOrderHistory());
           }
         }
       },
@@ -136,8 +143,8 @@ class _CustomerSessionGateState extends State<CustomerSessionGate> {
                       Container(
                         width: 72,
                         height: 72,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEE2E2),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFEE2E2),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
@@ -181,7 +188,10 @@ class _CustomerSessionGateState extends State<CustomerSessionGate> {
                           ),
                           child: const Text(
                             'Retry Connection',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
@@ -441,11 +451,57 @@ class AppShellState extends State<AppShell> {
                                           );
                                         },
                                       )
-                                    : Icon(
-                                        on ? tab.$2 : tab.$1,
-                                        color: on ? Colors.white : kTextSub,
-                                        size: 20,
-                                      ),
+                                    : (i == 3
+                                        ? BlocBuilder<SubscriptionBloc, SubscriptionState>(
+                                            builder: (context, subState) {
+                                              int subCount = 0;
+                                              if (subState is SubscriptionLoaded) {
+                                                subCount = subState.subscriptions
+                                                    .where((s) => s.status.toLowerCase() == 'active' || s.status.toLowerCase() == 'paused')
+                                                    .length;
+                                              } else {
+                                                final orderState = context.read<OrderHistoryBloc>().state;
+                                                if (orderState is OrderHistoryLoaded) {
+                                                  subCount = orderState.subscriptionPlans.where((p) => p.isActive).length;
+                                                }
+                                              }
+                                              return Stack(
+                                                clipBehavior: Clip.none,
+                                                children: [
+                                                  Icon(
+                                                    on ? tab.$2 : tab.$1,
+                                                    color: on ? Colors.white : kTextSub,
+                                                    size: 20,
+                                                  ),
+                                                  if (subCount > 0)
+                                                    Positioned(
+                                                      top: -4,
+                                                      right: -4,
+                                                      child: Container(
+                                                        padding: const EdgeInsets.all(3),
+                                                        decoration: const BoxDecoration(
+                                                          color: Colors.red,
+                                                          shape: BoxShape.circle,
+                                                        ),
+                                                        child: Text(
+                                                          subCount > 99 ? '99+' : '$subCount',
+                                                          style: const TextStyle(
+                                                            color: Colors.white,
+                                                            fontSize: 7,
+                                                            fontWeight: FontWeight.w900,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                ],
+                                              );
+                                            },
+                                          )
+                                        : Icon(
+                                            on ? tab.$2 : tab.$1,
+                                            color: on ? Colors.white : kTextSub,
+                                            size: 20,
+                                          )),
                               ),
                             ),
                             const SizedBox(height: 3),

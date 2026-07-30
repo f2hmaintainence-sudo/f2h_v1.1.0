@@ -101,7 +101,15 @@ class Order {
 
   factory Order.fromJson(Map<String, dynamic> json) {
     final rawItems = json['items'] as List<dynamic>? ?? [];
-    final items = rawItems.map((item) => OrderItem.fromJson(item as Map<String, dynamic>)).toList();
+    final items = <OrderItem>[];
+    final seenKeys = <String>{};
+    for (final item in rawItems) {
+      final parsed = OrderItem.fromJson(item as Map<String, dynamic>);
+      final key = '${parsed.variantId}_${parsed.productName}_${parsed.quantity}_${parsed.unitPrice}';
+      if (seenKeys.contains(key)) continue;
+      seenKeys.add(key);
+      items.add(parsed);
+    }
 
     // Derive productName
     String pName = 'Order';

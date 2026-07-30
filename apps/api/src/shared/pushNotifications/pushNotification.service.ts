@@ -81,10 +81,10 @@ export class PushNotificationService {
                             token: tokens[idx],
                         });
                         console.error(`[PushNotificationService] FCM Error (${errCode}) for token ${tokens[idx]?.substring(0, 20)}...: ${errMsg}`);
-                        
+
                         if (errCode === 'messaging/registration-token-not-registered' || errCode === 'messaging/invalid-argument') {
                             console.warn(`[PushNotificationService] Deleting stale/unregistered token from database: ${tokens[idx]?.substring(0, 20)}...`);
-                            this.dataService.update('users', { fcm_token: null }, [{ column: 'fcm_token', operator: '=', value: tokens[idx] }]).catch(() => {});
+                            this.dataService.update('users', { fcm_token: null }, [{ column: 'fcm_token', operator: '=', value: tokens[idx] }]).catch(() => { });
                         }
                     }
                 });

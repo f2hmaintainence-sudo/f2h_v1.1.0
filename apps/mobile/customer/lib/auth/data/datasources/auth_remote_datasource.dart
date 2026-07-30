@@ -4,7 +4,11 @@ import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/auth/data/models/user_model.dart';
 
 abstract class AuthRemoteDataSource {
-  Future<UserModel> login(String identifier, String password, {String? fcmToken});
+  Future<UserModel> login(
+    String identifier,
+    String password, {
+    String? fcmToken,
+  });
   Future<UserModel> register(
     String userName,
     String email,
@@ -61,7 +65,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   @override
-  Future<UserModel> login(String identifier, String password, {String? fcmToken}) async {
+  Future<UserModel> login(
+    String identifier,
+    String password, {
+    String? fcmToken,
+  }) async {
     try {
       final response = await dioClient.dio.post(
         ApiEndpoints.login,
@@ -74,7 +82,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         // Merge top-level response (contains accessToken) with the nested user map
-        final userMap = Map<String, dynamic>.from(response.data['user'] as Map? ?? {});
+        final userMap = Map<String, dynamic>.from(
+          response.data['user'] as Map? ?? {},
+        );
         userMap['accessToken'] = response.data['accessToken'];
         dioClient.setAuthToken(response.data['accessToken']?.toString());
         return UserModel.fromJson(userMap);
@@ -102,13 +112,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }) async {
     try {
       final body = <String, dynamic>{
-          'user_name': userName,
-          'email': email,
-          'phone': phone,
-          'password': password,
-          'verification_token': verificationToken,
-          'fcm_token': fcmToken,
-        };
+        'user_name': userName,
+        'email': email,
+        'phone': phone,
+        'password': password,
+        'verification_token': verificationToken,
+        'fcm_token': fcmToken,
+      };
       if (referralCode != null && referralCode.isNotEmpty) {
         body['referral_code'] = referralCode;
       }
@@ -118,7 +128,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final userMap = Map<String, dynamic>.from(response.data['user'] as Map? ?? {});
+        final userMap = Map<String, dynamic>.from(
+          response.data['user'] as Map? ?? {},
+        );
         userMap['accessToken'] = response.data['accessToken'];
         dioClient.setAuthToken(response.data['accessToken']?.toString());
         return UserModel.fromJson(userMap);
@@ -159,11 +171,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       final response = await dioClient.dio.post(
         ApiEndpoints.verifyOtp,
-        data: {
-          'email': email,
-          'otp': otp,
-          'purpose': purpose,
-        },
+        data: {'email': email, 'otp': otp, 'purpose': purpose},
       );
       final data = Map<String, dynamic>.from(response.data as Map? ?? {});
       final token = data['verification_token']?.toString() ?? '';
@@ -197,11 +205,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       await dioClient.dio.post(
         ApiEndpoints.resetPassword,
-        data: {
-          'email': email,
-          'token': token,
-          'newPassword': newPassword,
-        },
+        data: {'email': email, 'token': token, 'newPassword': newPassword},
       );
     } on DioException catch (e) {
       throw _extractError(e, 'Unable to reset password');
@@ -209,18 +213,20 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   @override
-  Future<UserModel> signInWithGoogle(String serverAuthCode, {String? fcmToken}) async {
+  Future<UserModel> signInWithGoogle(
+    String serverAuthCode, {
+    String? fcmToken,
+  }) async {
     try {
       final response = await dioClient.dio.get(
         '${ApiEndpoints.googleAuth}/callback',
-        queryParameters: {
-          'code': serverAuthCode,
-          'fcm_token': fcmToken,
-        },
+        queryParameters: {'code': serverAuthCode, 'fcm_token': fcmToken},
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final userMap = Map<String, dynamic>.from(response.data['user'] as Map? ?? {});
+        final userMap = Map<String, dynamic>.from(
+          response.data['user'] as Map? ?? {},
+        );
         userMap['accessToken'] = response.data['accessToken'];
         dioClient.setAuthToken(response.data['accessToken']?.toString());
         return UserModel.fromJson(userMap);

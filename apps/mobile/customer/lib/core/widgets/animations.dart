@@ -17,6 +17,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
+import 'package:f2h_customer/core/services/app_asset_service.dart';
 // NOTE: Removed circular self-import that was here previously
 
 
@@ -1178,8 +1179,8 @@ class InitialLoadingScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(15),
                   child: Padding(
                     padding: const EdgeInsets.all(12.0),
-                    child: Image.asset(
-                      'assets/icon/app_icon.png',
+                    child: AppAssetImage(
+                      assetKey: 'assets/icon/app_icon.png',
                       fit: BoxFit.contain,
                       errorBuilder: (_, _, _) => const Icon(Icons.spa, color: kPrimary, size: 36),
                     ),

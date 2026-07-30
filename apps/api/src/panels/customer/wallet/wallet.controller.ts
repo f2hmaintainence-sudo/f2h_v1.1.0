@@ -10,11 +10,15 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
 import { DataService } from 'src/shared/database/Data.service';
+import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
+import { DeveloperService } from 'src/shared/logger/Developer.service';
 
 @Controller({ path: '/customer/wallet', version: '1' })
 export class WalletController {
   constructor(
     private readonly Data: DataService,
+    private readonly pushNotificationService: PushNotificationService,
+    private readonly developer: DeveloperService,
   ) {}
 
   @Post('topup')
@@ -111,6 +115,21 @@ export class WalletController {
       });
     } catch (notifErr) {
       // Notification failure must not block wallet credit
+    }
+
+    try {
+      await this.pushNotificationService.sendNotificationToUsers(
+        [customer.customer_id],
+        {
+          title: 'Wallet Credited! 💳',
+          body: `Your wallet has been recharged with ₹${amount.toFixed(0)}. New balance: ₹${newBalance.toFixed(0)}.`,
+        },
+      );
+    } catch (error) {
+      this.developer.error('Wallet topup push notification failed', {
+        customerId: customer.customer_id,
+        error,
+      });
     }
 
     return {

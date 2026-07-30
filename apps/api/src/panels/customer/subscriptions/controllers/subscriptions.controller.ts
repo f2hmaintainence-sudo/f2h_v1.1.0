@@ -29,7 +29,6 @@ export class SubscriptionsController {
   @Public()
   @Post('checkout')
   checkout(@Req() req: Request, @Body() body: CreateSubscriptionDto) {
-    console.log("i am from subscription checkout", body);
     const user = req?.user as any;
     if (!body.customer_id && user?.user_id) {
       body.customer_id = user.user_id;

@@ -27,7 +27,10 @@ class AuthRepositoryImpl implements AuthRepository {
   // Google Sign-In — reads serverClientId dynamically from AppConfig / API
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     clientId: kIsWeb ? AppConfig.googleServerClientId : null,
-    scopes: <String>['email', 'https://www.googleapis.com/auth/userinfo.profile'],
+    scopes: <String>[
+      'email',
+      'https://www.googleapis.com/auth/userinfo.profile',
+    ],
     serverClientId: kIsWeb ? null : AppConfig.googleServerClientId,
   );
 
@@ -38,13 +41,21 @@ class AuthRepositoryImpl implements AuthRepository {
   });
 
   @override
-  Future<User> login(String identifier, String password, {String? fcmToken}) async {
-    final userModel = await remoteDataSource.login(identifier, password, fcmToken: fcmToken);
-    final access  = userModel.token;
+  Future<User> login(
+    String identifier,
+    String password, {
+    String? fcmToken,
+  }) async {
+    final userModel = await remoteDataSource.login(
+      identifier,
+      password,
+      fcmToken: fcmToken,
+    );
+    final access = userModel.token;
     final refresh = userModel.refreshToken;
     if (access != null && access.isNotEmpty) {
       await TokenStorage.saveTokens(
-        accessToken:  access,
+        accessToken: access,
         refreshToken: refresh ?? '',
         userId: userModel.userId.toString(),
         role: 'C',
@@ -65,17 +76,19 @@ class AuthRepositoryImpl implements AuthRepository {
     String? fcmToken,
   }) async {
     final userModel = await remoteDataSource.register(
-      userName, email, password,
+      userName,
+      email,
+      password,
       phone: phone,
       verificationToken: verificationToken,
       referralCode: referralCode,
       fcmToken: fcmToken,
     );
-    final access  = userModel.token;
+    final access = userModel.token;
     final refresh = userModel.refreshToken;
     if (access != null && access.isNotEmpty) {
       await TokenStorage.saveTokens(
-        accessToken:  access,
+        accessToken: access,
         refreshToken: refresh ?? '',
         userId: userModel.userId.toString(),
         role: 'C',
@@ -96,11 +109,7 @@ class AuthRepositoryImpl implements AuthRepository {
     required String otp,
     required String purpose,
   }) {
-    return remoteDataSource.verifyOtp(
-      email: email,
-      otp: otp,
-      purpose: purpose,
-    );
+    return remoteDataSource.verifyOtp(email: email, otp: otp, purpose: purpose);
   }
 
   @override
@@ -132,12 +141,15 @@ class AuthRepositoryImpl implements AuthRepository {
         throw 'Failed to retrieve authorization code from Google';
       }
 
-      final userModel = await remoteDataSource.signInWithGoogle(code, fcmToken: fcmToken);
-      final access  = userModel.token;
+      final userModel = await remoteDataSource.signInWithGoogle(
+        code,
+        fcmToken: fcmToken,
+      );
+      final access = userModel.token;
       final refresh = userModel.refreshToken;
       if (access != null && access.isNotEmpty) {
         await TokenStorage.saveTokens(
-          accessToken:  access,
+          accessToken: access,
           refreshToken: refresh ?? '',
           userId: userModel.userId.toString(),
           role: 'C',
@@ -157,8 +169,8 @@ class AuthRepositoryImpl implements AuthRepository {
       remoteDataSource.logout().catchError((_) => null);
       await Future.wait([
         localDataSource.clearCache(),
-        TokenStorage.clear(),          // wipes access + refresh + userId + role
-        dioClient.clearSession(),      // wipes cookie jar
+        TokenStorage.clear(), // wipes access + refresh + userId + role
+        dioClient.clearSession(), // wipes cookie jar
       ]);
     } catch (_) {
       // Ensure local state is always cleared even if remote call fails

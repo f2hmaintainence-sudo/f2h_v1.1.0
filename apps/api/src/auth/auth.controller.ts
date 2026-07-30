@@ -55,6 +55,8 @@ export class AuthController {
       `[AuthController:login] Attempting login with identifier: ${body.identifier}, clientRole: ${clientRole}`,
     );
 
+    const fcmToken = body.fcm_token || (body as any).fcmToken;
+
     // 2. Validate user credentials
     const user = await this.authService.validateUser(
       body.identifier,
@@ -63,6 +65,7 @@ export class AuthController {
       ip,
       userAgent,
       body.fingerprintData,
+      fcmToken,
     );
 
     const userRole = (user.role_id || '').toUpperCase().trim();
@@ -97,8 +100,9 @@ export class AuthController {
       `[AuthController:login] Client Role: ${clientRole}, Resolved User Role: ${userRole}, Result: SUCCESS`,
     );
 
-    if (body.fcm_token) {
-      await this.authService.updateFcmToken(user.user_id, body.fcm_token);
+    const incomingFcmToken = body.fcm_token || (body as any).fcmToken;
+    if (incomingFcmToken) {
+      await this.authService.updateFcmToken(user.user_id, incomingFcmToken);
     }
 
     let deviceId: string | null = null;
@@ -292,6 +296,38 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async getSessionInfo(@Req() req: Request) {
     return { message: 'Session is active' };
+  }
+
+  @Post('fcm-token')
+  @HttpCode(HttpStatus.OK)
+  async saveFcmToken(@Req() req: Request, @Body() body: { fcm_token?: string; fcmToken?: string }) {
+    const token = body.fcm_token || body.fcmToken;
+    if (!token) {
+      return { success: false, message: 'No FCM token provided' };
+    }
+    const authHeader = req.headers['authorization'];
+    const bearerToken = typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+      ? authHeader.substring(7)
+      : undefined;
+    const accessToken = req.cookies?.access_token || bearerToken;
+    let userId: string | null = null;
+    if (accessToken) {
+      try {
+        const decoded = this.jwtService.decode(accessToken) as any;
+        userId = decoded?.sub || decoded?.user_id;
+      } catch (_) {}
+    }
+    if (userId) {
+      await this.authService.updateFcmToken(userId, token);
+      return { success: true, message: 'FCM token updated successfully' };
+    }
+    return { success: false, message: 'User not authenticated' };
+  }
+
+  @Post('update-fcm-token')
+  @HttpCode(HttpStatus.OK)
+  async updateFcmTokenEndpoint(@Req() req: Request, @Body() body: { fcm_token?: string; fcmToken?: string }) {
+    return this.saveFcmToken(req, body);
   }
 
   @Get('get-users-by-role')

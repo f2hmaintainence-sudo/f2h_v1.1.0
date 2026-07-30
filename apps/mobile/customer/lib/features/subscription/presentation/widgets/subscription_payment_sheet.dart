@@ -6,7 +6,8 @@ import '../../../wallet/presentation/screens/wallet_screen.dart';
 
 class SubscriptionPaymentSheet extends StatelessWidget {
   final String paymentType; // 'prepaid' | 'postpaid'
-  final double estimatedTotal;
+  final double estimatedTotal;               // Actual charge this month (partial)
+  final double monthlyEstimateForCreditCheck; // Full-month estimate used for postpaid limit check
   final ProfileModel? profile;
   final double existingPostpaidCommitted;
   final Function({required String paymentType, required String paymentMethod}) onConfirm;
@@ -16,6 +17,7 @@ class SubscriptionPaymentSheet extends StatelessWidget {
     super.key,
     required this.paymentType,
     required this.estimatedTotal,
+    required this.monthlyEstimateForCreditCheck,
     required this.profile,
     required this.existingPostpaidCommitted,
     required this.onConfirm,
@@ -26,6 +28,7 @@ class SubscriptionPaymentSheet extends StatelessWidget {
     required BuildContext context,
     required String paymentType,
     required double estimatedTotal,
+    required double monthlyEstimateForCreditCheck,
     required ProfileModel? profile,
     required double existingPostpaidCommitted,
     required Function({required String paymentType, required String paymentMethod}) onConfirm,
@@ -38,6 +41,7 @@ class SubscriptionPaymentSheet extends StatelessWidget {
       builder: (ctx) => SubscriptionPaymentSheet(
         paymentType: paymentType,
         estimatedTotal: estimatedTotal,
+        monthlyEstimateForCreditCheck: monthlyEstimateForCreditCheck,
         profile: profile,
         existingPostpaidCommitted: existingPostpaidCommitted,
         onConfirm: onConfirm,
@@ -53,7 +57,8 @@ class SubscriptionPaymentSheet extends StatelessWidget {
 
     final creditLimit = profile?.postpaidCreditLimit ?? 0.0;
     final isPostpaidEnabled = profile?.isPostpaidEnabled ?? false;
-    final combinedPostpaidTotal = existingPostpaidCommitted + estimatedTotal;
+    // Use full-month estimate for credit limit check, not the partial-month charge
+    final combinedPostpaidTotal = existingPostpaidCommitted + monthlyEstimateForCreditCheck;
     final isPostpaidOverLimit = !isPostpaidEnabled || (creditLimit > 0 && combinedPostpaidTotal > creditLimit);
 
     return Container(
@@ -115,7 +120,9 @@ class SubscriptionPaymentSheet extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Estimation: ₹${estimatedTotal.toStringAsFixed(0)}',
+                      paymentType == 'postpaid'
+                          ? 'Monthly Est: ₹${monthlyEstimateForCreditCheck.toStringAsFixed(0)}/mo'
+                          : 'Estimation: ₹${estimatedTotal.toStringAsFixed(0)}',
                       style: const TextStyle(fontSize: 12, color: kTextSub, fontWeight: FontWeight.w600),
                     ),
                   ],
@@ -403,7 +410,7 @@ class SubscriptionPaymentSheet extends StatelessWidget {
                     const SizedBox(height: 12),
                     _CreditRow(label: 'Postpaid Credit Limit:', value: '₹${creditLimit.toStringAsFixed(0)}'),
                     _CreditRow(label: 'Existing Postpaid Subs:', value: '₹${existingPostpaidCommitted.toStringAsFixed(0)}/mo'),
-                    _CreditRow(label: 'New Subscription Est:', value: '₹${estimatedTotal.toStringAsFixed(0)}/mo'),
+                    _CreditRow(label: 'New Subscription Est:', value: '₹${monthlyEstimateForCreditCheck.toStringAsFixed(0)}/mo'),
                     const SizedBox(height: 8),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(4),
