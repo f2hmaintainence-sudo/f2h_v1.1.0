@@ -900,7 +900,7 @@ export default function DeliveryTrackingPage() {
           ) : (
             filteredPartners.map(p => {
               const isSelected = p.delivery_partner_id === selectedPartner?.delivery_partner_id;
-              const pOrds = orders.filter(o => o.delivery_partner_id === p.delivery_partner_id);
+              const pOrds = isSelected ? partnerOrders : orders.filter(o => o.delivery_partner_id === p.delivery_partner_id);
               const delCnt = pOrds.filter(o => o.status === "delivered").length;
               const onDuty = isPartnerOnDuty(p);
 

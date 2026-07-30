@@ -21,7 +21,8 @@ import {
   Calendar,
   Box,
   Truck,
-  CheckCircle2
+  CheckCircle2,
+  Bell
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
