@@ -86,6 +86,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           response.data['user'] as Map? ?? {},
         );
         userMap['accessToken'] = response.data['accessToken'];
+        userMap['refreshToken'] = response.data['refreshToken'];
         dioClient.setAuthToken(response.data['accessToken']?.toString());
         return UserModel.fromJson(userMap);
       } else {
@@ -132,6 +133,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           response.data['user'] as Map? ?? {},
         );
         userMap['accessToken'] = response.data['accessToken'];
+        userMap['refreshToken'] = response.data['refreshToken'];
         dioClient.setAuthToken(response.data['accessToken']?.toString());
         return UserModel.fromJson(userMap);
       } else {
@@ -228,6 +230,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           response.data['user'] as Map? ?? {},
         );
         userMap['accessToken'] = response.data['accessToken'];
+        userMap['refreshToken'] = response.data['refreshToken'];
         dioClient.setAuthToken(response.data['accessToken']?.toString());
         return UserModel.fromJson(userMap);
       } else {
