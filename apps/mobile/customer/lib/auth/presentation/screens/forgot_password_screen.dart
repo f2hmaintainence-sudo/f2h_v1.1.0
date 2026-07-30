@@ -6,6 +6,7 @@ import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/auth/domain/repositories/auth_repository.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
+import 'package:f2h_customer/core/services/app_asset_service.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -278,8 +279,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                       ],
                                     ),
                                     child: Center(
-                                      child: Image.asset(
-                                        'assets/icon/app_icon.png',
+                                      child: AppAssetImage(
+                                        assetKey: 'assets/icon/app_icon.png',
                                         width: 32,
                                         height: 32,
                                         errorBuilder: (context, error, stackTrace) => const Icon(

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:f2h_customer/core/widgets/scrolling_items_loader.dart';
+import 'package:f2h_customer/core/services/app_asset_service.dart';
 
 class DynamicSplashScreen extends StatefulWidget {
   final Widget child;
@@ -21,6 +22,7 @@ class _DynamicSplashScreenState extends State<DynamicSplashScreen> with SingleTi
   @override
   void initState() {
     super.initState();
+    AppAssetService().init();
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -96,8 +98,8 @@ class _DynamicSplashScreenState extends State<DynamicSplashScreen> with SingleTi
                         child: ScrollingItemsLoader(),
                       ),
                     )
-                  : Image.asset(
-                      _splashImage!,
+                  : AppAssetImage(
+                      assetKey: _splashImage!,
                       fit: BoxFit.cover,
                     ),
             ),

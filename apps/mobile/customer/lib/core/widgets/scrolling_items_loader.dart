@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:f2h_customer/core/services/app_asset_service.dart';
 
 class ScrollingItemsLoader extends StatefulWidget {
   final String text;
@@ -126,8 +127,8 @@ class _ScrollingItemsLoaderState extends State<ScrollingItemsLoader>
                           scale: anim,
                           child: FadeTransition(opacity: anim, child: child),
                         ),
-                        child: Image.asset(
-                          _images[activeIndex],
+                        child: AppAssetImage(
+                          assetKey: _images[activeIndex],
                           key: ValueKey<int>(activeIndex),
                           height: 52,
                           width: 52,

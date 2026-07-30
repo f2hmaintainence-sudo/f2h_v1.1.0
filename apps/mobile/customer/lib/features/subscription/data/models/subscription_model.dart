@@ -10,7 +10,7 @@ int _asInt(dynamic value) {
   if (value == null) return 0;
   if (value is int) return value;
   if (value is double) return value.toInt();
-  return int.tryParse(value.toString()) ?? 0;
+  return int.tryParse(value.toString()) ?? (double.tryParse(value.toString())?.toInt() ?? 0);
 }
 
 double _asDouble(dynamic value) {
@@ -464,6 +464,7 @@ class Subscription {
   final int qty;
 
   final String? imageUrl;
+  final double? monthlyEstimate;
 
   const Subscription({
     required this.id,
@@ -497,6 +498,7 @@ class Subscription {
     required this.slot,
     required this.qty,
     this.imageUrl,
+    this.monthlyEstimate,
   });
 
   bool get isPaused =>
@@ -525,6 +527,24 @@ class Subscription {
     );
     if (calculated > 0) return calculated;
     return pricePerDay > 0 ? pricePerDay * (qty > 0 ? qty : 1) : 0.0;
+  }
+
+  double get totalMonthlyCost {
+    if (monthlyEstimate != null && monthlyEstimate! > 0) {
+      return monthlyEstimate!;
+    }
+    final isWeekly = scheduleType == 'weekly' || frequency.toLowerCase().contains('week');
+    if (isWeekly) {
+      final dayQtys = getSelectedDayQuantities();
+      final totalWeeklyQty = dayQtys.fold<int>(0, (sum, dq) => sum + dq.quantity);
+      if (totalWeeklyQty > 0) {
+        final unitPrice = (items.isNotEmpty && items.first.unitPrice > 0)
+            ? items.first.unitPrice
+            : (pricePerDay > 0 ? pricePerDay : 0.0);
+        return (unitPrice * (totalWeeklyQty / 7)) * 30;
+      }
+    }
+    return totalDailyCost * 30;
   }
 
   List<SubscriptionCustomDateModel> get allCustomDates {

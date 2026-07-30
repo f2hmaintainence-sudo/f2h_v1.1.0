@@ -98,8 +98,9 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
 
     _startDate = DateTime.now().add(const Duration(days: 1));
 
-    // Init weekly schedule defaults: 1 morning, 0 evening per day
-    _weeklySchedule = {for (final d in _kDays) d: {'morning': 1, 'evening': 0}};
+    // Init weekly schedule defaults: 0 morning, 0 evening per day
+    // User must explicitly set quantities for each day they want delivery
+    _weeklySchedule = {for (final d in _kDays) d: {'morning': 0, 'evening': 0}};
 
     // Load default address from session
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -111,6 +112,13 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
             orElse: () => session.addresses.first,
           );
         });
+      }
+
+      // Ensure subscriptions are loaded so existing postpaid committed
+      // is calculated correctly in _calculateExistingPostpaidCommitted()
+      final subState = context.read<SubscriptionBloc>().state;
+      if (subState is! SubscriptionLoaded) {
+        context.read<SubscriptionBloc>().add(LoadSubscriptions());
       }
     });
   }
@@ -297,6 +305,8 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       context: context,
       paymentType: _paymentType,
       estimatedTotal: estimate.total,
+      // Use full-month estimate for postpaid credit limit check (not partial-month)
+      monthlyEstimateForCreditCheck: _fullMonthEstimate.total,
       profile: context.read<CustomerSessionCubit>().state.profile,
       existingPostpaidCommitted: _calculateExistingPostpaidCommitted(),
       onConfirm: ({required String paymentType, required String paymentMethod}) {
@@ -335,6 +345,15 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
             ? 'Morning'
             : 'Evening';
 
+    // For weekly mode: only pass days that actually have qty > 0
+    final activeDays = _frequency == 'weekly'
+        ? _kDays.where((d) {
+            final m = _weeklySchedule[d]?['morning'] ?? 0;
+            final e = _weeklySchedule[d]?['evening'] ?? 0;
+            return m > 0 || e > 0;
+          }).toList()
+        : _kDays;
+
     context.read<SubscriptionBloc>().add(
           SubscriptionCheckoutRequested(
             customerId: customerId,
@@ -345,17 +364,21 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
             deliverySlot: deliverySlot,
             startDate: _startDate.toString().split(' ')[0],
             unitPrice: _subscriptionUnitPrice,
-            customDays: _kDays,
+            customDays: activeDays,
             morningQty: morningQty,
             eveningQty: eveningQty,
             weeklySchedule: _frequency == 'weekly' ? Map.from(_weeklySchedule) : {},
             paymentType: paymentType,
             paymentMethod: paymentMethod,
             autoRenew: _autoRenew,
-            estimatedTotal: _currentMonthEstimate.total,
+            // For postpaid: send full-month estimate so backend credit limit
+            // check uses monthly commitment, not the partial-month charge.
+            // For prepaid: send partial-month amount for correct wallet deduction.
+            estimatedTotal: paymentType == 'postpaid'
+                ? _fullMonthEstimate.total
+                : _currentMonthEstimate.total,
           ),
         );
-
   }
 
   // ══════════════════════════════════════════════════════
@@ -1160,6 +1183,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                           estimatedQty: estimate.qty,
                           morningQty: _frequency == 'daily' ? _morningQty : _totalMorningQty,
                           eveningQty: _frequency == 'daily' ? _eveningQty : _totalEveningQty,
+                          isWeekly: _frequency == 'weekly',
                           normalPrice: _normalUnitPrice,
                           subscriptionPrice: _subscriptionUnitPrice,
                           estimatedTotal: estimate.total,
@@ -1178,6 +1202,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                           estimatedQty: fullEst.qty,
                           morningQty: _frequency == 'daily' ? _morningQty : _totalMorningQty,
                           eveningQty: _frequency == 'daily' ? _eveningQty : _totalEveningQty,
+                          isWeekly: _frequency == 'weekly',
                           normalPrice: _normalUnitPrice,
                           subscriptionPrice: _subscriptionUnitPrice,
                           estimatedTotal: fullEst.total,

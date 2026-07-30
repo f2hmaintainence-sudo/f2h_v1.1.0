@@ -185,6 +185,14 @@ export class VerifyOtpDto {
   @IsString()
   @MinLength(6, { message: 'OTP must be 6 characters' })
   otp: string;
+
+  @IsOptional()
+  @IsString()
+  fcm_token?: string;
+
+  @IsOptional()
+  @IsString()
+  fcmToken?: string;
 }
 
 export class DeviceFingerprintDto {

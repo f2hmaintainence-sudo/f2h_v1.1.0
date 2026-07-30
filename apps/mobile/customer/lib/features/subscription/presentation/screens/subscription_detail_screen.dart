@@ -499,16 +499,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     final isExpired = s.status == 'expaired' || s.status == 'expired';
     final isCompleted = s.status == 'completed';
     final isTerminal = isCancelled || isExpired || isCompleted;
-    final firstItem = s.items.isNotEmpty ? s.items.first : null;
-    final itemPrice = (firstItem != null && firstItem.finalPrice > 0)
-        ? firstItem.finalPrice
-        : ((firstItem != null && firstItem.unitPrice > 0)
-            ? firstItem.unitPrice
-            : s.pricePerDay);
-    final dailyCost = s.totalDailyCost > 0
-        ? s.totalDailyCost
-        : ((s.pricePerDay > 0 ? s.pricePerDay : itemPrice) * (s.qty > 0 ? s.qty : 1));
-    final monthlyPrice = dailyCost * 30;
+    final monthlyPrice = s.totalMonthlyCost;
 
     final Color statusColor = isActive
         ? kPrimary

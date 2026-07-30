@@ -8,6 +8,7 @@ import 'package:f2h_customer/auth/presentation/bloc/auth_event.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/auth/presentation/screens/forgot_password_screen.dart';
 import 'package:f2h_customer/auth/presentation/screens/signup_screen.dart';
+import 'package:f2h_customer/core/services/app_asset_service.dart';
 
 class LoginScreen extends StatefulWidget {
   final bool popOnSuccess;
@@ -219,8 +220,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                       ],
                                     ),
                                     child: Center(
-                                      child: Image.asset(
-                                        'assets/icon/app_icon.png',
+                                      child: AppAssetImage(
+                                        assetKey: 'assets/icon/app_icon.png',
                                         width: 32,
                                         height: 32,
                                         errorBuilder: (context, error, stackTrace) => const Icon(
@@ -637,8 +638,8 @@ class _OAuthButton extends StatelessWidget {
           border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
         ),
         child: Center(
-          child: Image.asset(
-            icon,
+          child: AppAssetImage(
+            assetKey: icon,
             width: 24,
             height: 24,
             errorBuilder: (context, error, stackTrace) => Icon(
