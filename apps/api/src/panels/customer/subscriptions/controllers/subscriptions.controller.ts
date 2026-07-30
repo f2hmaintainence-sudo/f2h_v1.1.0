@@ -28,7 +28,6 @@ export class SubscriptionsController {
 
   @Public()
   @Post('checkout')
-<<<<<<< HEAD
   async checkout(@Req() req: Request, @Body() body: CreateSubscriptionDto) {
     try {
       console.log("i am from subscription checkout", JSON.stringify(body));
@@ -58,12 +57,6 @@ export class SubscriptionsController {
         message: err?.message || 'Subscription checkout failed',
         debug: String(err),
       };
-=======
-  checkout(@Req() req: Request, @Body() body: CreateSubscriptionDto) {
-    const user = req?.user as any;
-    if (!body.customer_id && user?.user_id) {
-      body.customer_id = user.user_id;
->>>>>>> d4fb2b59b4da470914731ab0239e4a2417b85ecf
     }
   }
 

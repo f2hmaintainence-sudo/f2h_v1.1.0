@@ -103,8 +103,6 @@ class CatalogRepositoryImpl implements CatalogRepository {
         final isCurdOrNonSub = pNameLower.contains('curd') || vNameLower.contains('curd') || pNameLower.contains('paneer') || vNameLower.contains('paneer');
         final subscriptionPrice = isCurdOrNonSub ? null : double.tryParse(item['subscription_price']?.toString() ?? '');
 
-<<<<<<< HEAD
-=======
         final availQty = item['available_quantity'] != null ? double.tryParse(item['available_quantity'].toString()) : null;
         final lowThreshold = item['low_stock_threshold'] != null ? double.tryParse(item['low_stock_threshold'].toString()) : 10.0;
 
@@ -116,8 +114,6 @@ class CatalogRepositoryImpl implements CatalogRepository {
             isVariantLowStock = true;
           }
         }
-
->>>>>>> d4fb2b59b4da470914731ab0239e4a2417b85ecf
         vars.add(ProductVariant(
           id: variantId,
           label: variantName.trim().isNotEmpty ? variantName.trim() : 'Standard',
