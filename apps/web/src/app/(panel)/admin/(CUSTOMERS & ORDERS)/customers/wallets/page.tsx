@@ -10,7 +10,7 @@
 
 "use client";
 
-import WalletReportPage from "../../(FINANCE & GROWTH)/finance/wallet/page";
+import WalletReportPage from "../../../(FINANCE & GROWTH)/finance/wallet/page";
 
 export default function CustomerWalletsPage() {
   return <WalletReportPage />;

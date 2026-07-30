@@ -649,9 +649,10 @@ export class DeliveryRunService {
           dl.*,
           o.total_amount, o.status AS order_status, o.delivery_slot, o.customer_name,o.address_line,o.run_sequence
         FROM delivery_logs dl
+        JOIN delivery_runs dr ON dr.run_id = dl.run_id
         LEFT JOIN orders o ON o.order_id = dl.order_id
-        WHERE dl.run_id = $1
-        ORDER BY dl.sequence_no ASC
+        WHERE dr.id::varchar = $1 OR dr.run_id = $1
+        ORDER BY o.run_sequence ASC, dl.created_at ASC
       `;
       const rows = await this.db.query(sql, [runId]);
 

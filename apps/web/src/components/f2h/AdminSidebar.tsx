@@ -39,7 +39,6 @@ const adminNav = [
         name: "Delivery Operations",
         icon: Truck,
         subItems: [
-          { name: "Dispatch", href: "/admin/delivery/dispatch", icon: Box },
           { name: "Delivery Runs", href: "/admin/delivery/assign", icon: Zap },
           { name: "Delivery Partners", href: "/admin/delivery/partners", icon: UserCog },
           { name: "Delivery Logs", href: "/admin/delivery/logs", icon: PieChart },

@@ -73,31 +73,47 @@ const VerifyActionButtons = ({ status, onVerify }: { status?: string; onVerify: 
 );
 
 // --- Memoized Partner Card ---
-const PartnerCard = React.memo(({ partner: p, onOpenEditModal, onOpenDocsModal }: { partner: any; onOpenEditModal: (p: any) => void; onOpenDocsModal: (p: any) => void }) => (
-  <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between group/card">
-    <div>
-      <div className="flex items-start justify-between gap-2.5">
-        <Link href={`/admin/delivery/partners/${p.delivery_partner_id || p.id}`} className="flex items-center gap-3 min-w-0 group/link cursor-pointer">
-          <div className={`w-10 h-10 shrink-0 rounded-xl font-extrabold flex items-center justify-center text-xs text-white shadow-2xs ${p.is_active ? "bg-gradient-to-br from-emerald-600 to-teal-700" : "bg-slate-400"}`}>
-            {(p.full_name || "D")[0].toUpperCase()}
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-extrabold text-slate-900 truncate group-hover/link:text-emerald-700 transition-colors">{p.full_name || "Delivery Partner"}</p>
-            <p className="text-[11px] text-slate-500 font-semibold flex items-center gap-1 truncate mt-0.5"><MapPin size={11} className="shrink-0 text-slate-400" /><span className="truncate">{p.branch_name || p.branch_id || "Main Hub"}</span></p>
-          </div>
-        </Link>
-        <button type="button" onClick={() => onOpenEditModal(p)} className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-600 hover:text-white font-bold text-[11px] transition-colors shadow-2xs" title="Edit Partner Profile">
-          <Edit2 size={11} /><span>Edit</span>
-        </button>
-      </div>
+const PartnerCard = React.memo(({ partner: p, leaveInfo, onOpenEditModal, onOpenDocsModal }: { partner: any; leaveInfo: any; onOpenEditModal: (p: any) => void; onOpenDocsModal: (p: any) => void }) => {
+  const isHalfDay = leaveInfo?.leave_type === 'half_day';
+  const shift = leaveInfo?.half_day_shift;
+  const shiftLabel = shift ? (shift.charAt(0).toUpperCase() + shift.slice(1)) : '';
+  const pillLabel = isHalfDay ? `Leave (${shiftLabel || 'Shift'})` : 'On Leave';
 
-      <div className="bg-slate-50/80 rounded-xl p-3 my-3 border border-slate-100 space-y-2">
-        <div className="flex items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-1.5 font-semibold text-slate-700 min-w-0 truncate"><Phone size={12} className="text-slate-400 shrink-0" /><span className="truncate">{p.phone || "N/A"}</span></div>
-          <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${p.is_active ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-slate-200/80 text-slate-600 border border-slate-300"}`}>
-            {p.is_active && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}<span>{p.is_active ? "Active" : "Inactive"}</span>
-          </span>
+  return (
+    <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between group/card">
+      <div>
+        <div className="flex items-start justify-between gap-2.5">
+          <Link href={`/admin/delivery/partners/${p.delivery_partner_id || p.id}`} className="flex items-center gap-3 min-w-0 group/link cursor-pointer">
+            <div className={`w-10 h-10 shrink-0 rounded-xl font-extrabold flex items-center justify-center text-xs text-white shadow-2xs ${p.is_active ? "bg-gradient-to-br from-emerald-600 to-teal-700" : "bg-slate-400"}`}>
+              {(p.full_name || "D")[0].toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-extrabold text-slate-900 truncate group-hover/link:text-emerald-700 transition-colors">{p.full_name || "Delivery Partner"}</p>
+              <p className="text-[11px] text-slate-500 font-semibold flex items-center gap-1 truncate mt-0.5"><MapPin size={11} className="shrink-0 text-slate-400" /><span className="truncate">{p.branch_name || p.branch_id || "Main Hub"}</span></p>
+            </div>
+          </Link>
+          <button type="button" onClick={() => onOpenEditModal(p)} className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-600 hover:text-white font-bold text-[11px] transition-colors shadow-2xs" title="Edit Partner Profile">
+            <Edit2 size={11} /><span>Edit</span>
+          </button>
         </div>
+
+        <div className="bg-slate-50/80 rounded-xl p-3 my-3 border border-slate-100 space-y-2">
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-1.5 font-semibold text-slate-700 min-w-0 truncate"><Phone size={12} className="text-slate-400 shrink-0" /><span className="truncate">{p.phone || "N/A"}</span></div>
+            <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${leaveInfo ? "bg-amber-50 text-amber-800 border border-amber-200" : p.is_active ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-slate-200/80 text-slate-600 border border-slate-300"}`}>
+              {leaveInfo ? (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  <span>{pillLabel}</span>
+                </>
+              ) : (
+                <>
+                  {p.is_active && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                  <span>{p.is_active ? "Active" : "Inactive"}</span>
+                </>
+              )}
+            </span>
+          </div>
         <div>
           <button type="button" onClick={() => onOpenDocsModal(p)} className={`w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-[11px] font-bold transition-all border ${p.is_verified ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100 shadow-2xs" : "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100 shadow-2xs animate-pulse"}`}>
             {p.is_verified ? <ShieldCheck size={13} className="text-emerald-600 shrink-0" /> : <ShieldAlert size={13} className="text-amber-600 shrink-0" />}
@@ -111,7 +127,8 @@ const PartnerCard = React.memo(({ partner: p, onOpenEditModal, onOpenDocsModal }
       <div className="flex flex-col items-center justify-center py-2 px-2 rounded-xl bg-emerald-50/70 border border-emerald-200/50"><span className="text-sm font-extrabold text-emerald-700">{p.today_delivered ?? 0}</span><span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider mt-0.5">Delivered</span></div>
     </div>
   </div>
-));
+)
+});
 PartnerCard.displayName = "PartnerCard";
 
 // --- Memoized KYC Sub-Cards ---
@@ -191,7 +208,7 @@ export default function DeliveryPartnersPage() {
   const [partners, setPartners] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
+  const [filter, setFilter] = useState<"all" | "active" | "inactive" | "on_leave">("all");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [searchQuery, setSearchQuery] = useState("");
   const [verificationFilter, setVerificationFilter] = useState<"all" | "verified" | "pending">("all");
@@ -207,14 +224,59 @@ export default function DeliveryPartnersPage() {
   const [verifying, setVerifying] = useState(false);
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
 
+  const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
+
   const fetchPartners = useCallback(async () => {
     setLoading(true);
     try {
-      const params = filter !== "all" ? `?status=${filter}` : "";
-      const res = await api.get<any>(`/admin/delivery/partners${params}`);
-      if (res.data?.data) { setPartners(res.data.data); setTotal(res.data.total ?? res.data.data.length); }
+      const apiStatus = (filter !== "all" && filter !== "on_leave") ? filter : "";
+      const params = apiStatus ? `?status=${apiStatus}` : "";
+      const [partnersRes, leavesRes] = await Promise.all([
+        api.get<any>(`/admin/delivery/partners${params}`),
+        api.get<any>("/admin/delivery/leave-requests")
+      ]);
+      if (partnersRes.data?.data) { 
+        setPartners(partnersRes.data.data); 
+        setTotal(partnersRes.data.total ?? partnersRes.data.data.length); 
+      }
+      if (leavesRes.data?.data) {
+        setLeaveRequests(leavesRes.data.data);
+      } else if (Array.isArray(leavesRes.data)) {
+        setLeaveRequests(leavesRes.data);
+      }
     } catch { } finally { setLoading(false); }
   }, [filter]);
+
+  const getPartnerLeaveInfo = useCallback((partner: any) => {
+    if (!partner) return null;
+    
+    // Offset local timezone to get the correct local YYYY-MM-DD
+    const d = new Date();
+    const offset = d.getTimezoneOffset();
+    const localDate = new Date(d.getTime() - (offset * 60 * 1000));
+    const todayStr = localDate.toISOString().split('T')[0];
+
+    return leaveRequests.find((lr) => {
+      const lrPartnerId = String(lr.delivery_partner_id || lr.partner_id || '').toLowerCase();
+      const pId = String(partner.delivery_partner_id || partner.id || '').toLowerCase();
+      const pUserId = String(partner.user_id || '').toLowerCase();
+
+      // Check ID match or Fallback to phone matching
+      const idMatch = lrPartnerId && (lrPartnerId === pId || lrPartnerId === pUserId);
+      const phoneMatch = partner.phone && lr.partner_phone && String(partner.phone).trim() === String(lr.partner_phone).trim();
+      
+      if (!idMatch && !phoneMatch) return false;
+      
+      const status = String(lr.status || '').toUpperCase();
+      if (!status.includes('APPROV')) return false;
+      
+      const startStr = lr.leave_date ? lr.leave_date.split('T')[0] : '';
+      const endStr = lr.end_date ? lr.end_date.split('T')[0] : startStr;
+      
+      if (!startStr) return false;
+      return todayStr >= startStr && todayStr <= endStr;
+    }) || null;
+  }, [leaveRequests]);
 
   useEffect(() => {
     fetchPartners();
@@ -249,7 +311,13 @@ export default function DeliveryPartnersPage() {
   // Filtered partners
   const filteredPartners = useMemo(() => {
     return partners.filter((p) => {
-      // 1. Search Query
+      // 1. On Leave local filter
+      if (filter === "on_leave") {
+        const leave = getPartnerLeaveInfo(p);
+        if (!leave) return false;
+      }
+
+      // 2. Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const name = String(p.full_name || "").toLowerCase();
@@ -258,13 +326,13 @@ export default function DeliveryPartnersPage() {
         if (!name.includes(q) && !phone.includes(q) && !branch.includes(q)) return false;
       }
 
-      // 2. Verification Filter
+      // 3. Verification Filter
       if (verificationFilter === "verified" && !p.is_verified) return false;
       if (verificationFilter === "pending" && p.is_verified) return false;
 
       return true;
     });
-  }, [partners, searchQuery, verificationFilter]);
+  }, [partners, searchQuery, verificationFilter, filter, getPartnerLeaveInfo]);
 
   const handleOpenDocsModal = useCallback(async (partner: any) => {
     setSelectedPartnerForDocs(partner);
@@ -464,7 +532,7 @@ export default function DeliveryPartnersPage() {
 
           {/* Status Tabs */}
           <div className="inline-flex h-9 rounded-xl bg-gray-100/90 p-1 border border-gray-200/80 items-center">
-            {(["all", "active", "inactive"] as const).map((f) => (
+            {(["all", "active", "inactive", "on_leave"] as const).map((f) => (
               <button
                 key={f}
                 type="button"
@@ -475,7 +543,7 @@ export default function DeliveryPartnersPage() {
                     : "text-gray-600 hover:text-gray-900"
                 }`}
               >
-                {f}
+                {f === "on_leave" ? "On Leave" : f}
               </button>
             ))}
           </div>
@@ -582,12 +650,30 @@ export default function DeliveryPartnersPage() {
                       </td>
 
                       <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold ${
-                          p.is_active ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-slate-100 text-slate-600 border border-slate-200"
-                        }`}>
-                          {p.is_active && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
-                          {p.is_active ? "Active" : "Inactive"}
-                        </span>
+                        {(() => {
+                          const leave = getPartnerLeaveInfo(p);
+                          if (leave) {
+                            const isHalfDay = leave.leave_type === 'half_day';
+                            const shift = leave.half_day_shift;
+                            const shiftLabel = shift ? (shift.charAt(0).toUpperCase() + shift.slice(1)) : '';
+                            const pillLabel = isHalfDay ? `Leave (${shiftLabel || 'Shift'})` : 'On Leave';
+
+                            return (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 animate-pulse animate-duration-1000">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                {pillLabel}
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold ${
+                              p.is_active ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-slate-100 text-slate-600 border border-slate-200"
+                            }`}>
+                              {p.is_active && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                              {p.is_active ? "Active" : "Inactive"}
+                            </span>
+                          );
+                        })()}
                       </td>
 
                       <td className="px-4 py-3 text-center">
@@ -636,7 +722,7 @@ export default function DeliveryPartnersPage() {
         /* Executive Cards Grid View */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredPartners.map((p) => (
-            <PartnerCard key={p.delivery_partner_id || p.id} partner={p} onOpenEditModal={handleOpenEditModal} onOpenDocsModal={handleOpenDocsModal} />
+            <PartnerCard key={p.delivery_partner_id || p.id} partner={p} leaveInfo={getPartnerLeaveInfo(p)} onOpenEditModal={handleOpenEditModal} onOpenDocsModal={handleOpenDocsModal} />
           ))}
         </div>
       )}
