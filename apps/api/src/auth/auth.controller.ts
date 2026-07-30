@@ -335,7 +335,7 @@ export class AuthController {
       try {
         const decoded = this.jwtService.decode(accessToken) as any;
         userId = decoded?.sub || decoded?.user_id;
-      } catch (_) {}
+      } catch (_) { }
     }
     if (userId) {
       await this.authService.updateFcmToken(userId, token);

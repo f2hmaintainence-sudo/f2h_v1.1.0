@@ -763,11 +763,9 @@ export class AuthService {
     this.developer.debug(`[AuthService] Generated OTP for ${identifier}: ${otp}`);
 
     if (email) {
-      try {
-        await this.mailService.sendRegistrationOtp(email, otp);
-      } catch (err) {
+      this.mailService.sendRegistrationOtp(email, otp).catch((err) => {
         this.developer.error(`Failed to send registration OTP email to ${email}`, { err });
-      }
+      });
       return {
         message: 'OTP sent to your email',
         ttl: CACHE_TTL.FIFTEEN_MINUTES,
@@ -1298,11 +1296,9 @@ export class AuthService {
     this.developer.debug(`[AuthService:forgotPassword] Generated OTP for ${targetKey}: ${otp}`);
 
     if (user.email) {
-      try {
-        await this.mailService.sendForgotPasswordOtp(user.email, otp);
-      } catch (err) {
+      this.mailService.sendForgotPasswordOtp(user.email, otp).catch((err) => {
         this.developer.error(`Failed to send forgot password OTP email to ${user.email}`, { err });
-      }
+      });
     }
 
     return {
@@ -1402,11 +1398,9 @@ export class AuthService {
     );
 
     if (user.email) {
-      try {
-        await this.mailService.sendPasswordChangedAlert(user.email);
-      } catch (err) {
+      this.mailService.sendPasswordChangedAlert(user.email).catch((err) => {
         this.developer.error(`Failed to send password changed alert to ${user.email}`, { err });
-      }
+      });
     }
 
     return { message: 'Password reset successful' };

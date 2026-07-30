@@ -25,8 +25,10 @@ class ApiEndpoints {
     if (kReleaseMode && _envBaseUrl.isEmpty) {
       return 'https://f2hfresh.com';
     }
-    return 'http://192.168.1.6:5001';
+    return 'http://192.168.1.16:5001';
   }
+
+  static String get host => _envBaseUrl.isNotEmpty ? _envBaseUrl : _devBaseUrl;
 
   static String get apiBaseUrl => '$host/api/v1';
   static String get baseUrl => apiBaseUrl;
