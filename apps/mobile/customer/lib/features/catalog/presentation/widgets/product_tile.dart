@@ -649,7 +649,7 @@ class ProductCardV extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorIndex = (p.id.hashCode ?? p.name.hashCode).abs() % 5;
+    final colorIndex = p.id.hashCode.abs() % 5;
     final borderColor = [
       const Color(0xFFC8E6C9), // soft green
       const Color(0xFFC8E6C9), // soft blue
@@ -670,6 +670,7 @@ class ProductCardV extends StatelessWidget {
       ),
       child: Container(
         clipBehavior: Clip.antiAlias,
+        constraints: isBrowse ? const BoxConstraints(minHeight: 128) : null,
         decoration: BoxDecoration(
           color: kSurface,
           borderRadius: BorderRadius.circular(20),
@@ -689,7 +690,7 @@ class ProductCardV extends StatelessWidget {
                   children: [
                     // 1. Image on the left
                     SizedBox(
-                      width: MediaQuery.of(context).size.width < 350 ? 90 : 104,
+                      width: MediaQuery.of(context).size.width < 350 ? 98 : 112,
                       child: Hero(
                         tag: 'product-v-${p.id}',
                         child: Stack(
@@ -766,45 +767,61 @@ class ProductCardV extends StatelessWidget {
                     // 2. Info on the right
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              p.name,
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w800,
-                                color: kText,
-                                letterSpacing: -0.2,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            if (p.isSubscribable)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2),
-                                child: SubscriptionButton(
-                                  product: p,
-                                  isCompact: true,
-                                ),
-                              ),
-                            if (p.unit.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2),
-                                child: Text(
-                                  p.unit,
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  p.name,
                                   style: const TextStyle(
-                                    fontSize: 10,
-                                    color: kTextSub,
-                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    color: kText,
+                                    letterSpacing: -0.2,
                                   ),
-                                  maxLines: 1,
+                                  maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
-                            const SizedBox(height: 6),
+                                if ((p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit).isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: UnconstrainedBox(
+                                      alignment: Alignment.centerLeft,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF3F4F6),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
+                                        ),
+                                        child: Text(
+                                          p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit,
+                                          style: const TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF6B7280),
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                if (p.isSubscribable)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4, bottom: 2),
+                                    child: SubscriptionButton(
+                                      product: p,
+                                      isCompact: true,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               crossAxisAlignment: CrossAxisAlignment.end,
@@ -818,15 +835,11 @@ class ProductCardV extends StatelessWidget {
                                       Text(
                                         '₹${p.price.toStringAsFixed(0)}',
                                         style: const TextStyle(
-                                          fontSize: 13.5,
+                                          fontSize: 14,
                                           fontWeight: FontWeight.w900,
                                           color: kText,
                                         ),
                                       ),
-                                      if (p.isSubscribable && p.subscriptionPrice != null && p.subscriptionPrice! > 0)
-                                        SubscriptionPriceBadge.compact(
-                                          subscriptionPrice: p.subscriptionPrice!,
-                                        ),
                                       if (p.originalPrice > p.price)
                                         Text(
                                           '₹${p.originalPrice.toStringAsFixed(0)}',
@@ -937,11 +950,32 @@ class ProductCardV extends StatelessWidget {
                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kText, letterSpacing: -0.2),
                               maxLines: 2, overflow: TextOverflow.ellipsis),
                           const SizedBox(height: 2),
-                          if (p.unit.isNotEmpty)
-                             Text(p.unit, style: const TextStyle(fontSize: 10, color: kTextSub, fontWeight: FontWeight.w600))
-                           else
+                           if ((p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit).isNotEmpty) ...[
+                             const SizedBox(height: 3),
+                             UnconstrainedBox(
+                               alignment: Alignment.centerLeft,
+                               child: Container(
+                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                 decoration: BoxDecoration(
+                                   color: const Color(0xFFF3F4F6),
+                                   borderRadius: BorderRadius.circular(6),
+                                   border: Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
+                                 ),
+                                 child: Text(
+                                   p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit,
+                                   style: const TextStyle(
+                                     fontSize: 10,
+                                     fontWeight: FontWeight.w700,
+                                     color: Color(0xFF6B7280),
+                                   ),
+                                   maxLines: 1,
+                                   overflow: TextOverflow.ellipsis,
+                                 ),
+                               ),
+                             ),
+                           ] else
                              const SizedBox(height: 12),
-                           const Spacer(),
+                          const Spacer(),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -950,27 +984,15 @@ class ProductCardV extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Row(
-                                      children: [
-                                        Text(
-                                          '₹${p.price.toStringAsFixed(0)}',
-                                          style: const TextStyle(
-                                            fontSize: 13.5,
-                                            fontWeight: FontWeight.w900,
-                                            color: kText,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
-                                        // Displays the compact subscription price badge in grid list
-                                        if (p.subscriptionPrice != null && p.subscriptionPrice! > 0) ...[
-                                          const SizedBox(width: 4),
-                                          SubscriptionPriceBadge.compact(
-                                            subscriptionPrice: p.subscriptionPrice!,
-                                          ),
-                                        ],
-                                      ],
+                                    Text(
+                                      '₹${p.price.toStringAsFixed(0)}',
+                                      style: const TextStyle(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w900,
+                                        color: kText,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                     if (p.originalPrice > p.price) ...[
                                       const SizedBox(height: 1),

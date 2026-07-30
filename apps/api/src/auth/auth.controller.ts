@@ -38,6 +38,10 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
     @Req() req: Request,
   ) {
+
+    console.log(
+      `Body===========================>`,body
+    );
     const ip = req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
     const userAgent = req.headers['user-agent'] || 'unknown';
     // 1. Extract x-role strictly from header (ignore any role sent in request body)
@@ -95,10 +99,6 @@ export class AuthController {
       );
       throw new UnauthorizedException(`Unauthorized role for ${clientRole} application`);
     }
-
-    console.log(
-      `[AuthController:login] Client Role: ${clientRole}, Resolved User Role: ${userRole}, Result: SUCCESS`,
-    );
 
     const incomingFcmToken = body.fcm_token || (body as any).fcmToken;
     if (incomingFcmToken) {
@@ -315,7 +315,7 @@ export class AuthController {
       try {
         const decoded = this.jwtService.decode(accessToken) as any;
         userId = decoded?.sub || decoded?.user_id;
-      } catch (_) {}
+      } catch (_) { }
     }
     if (userId) {
       await this.authService.updateFcmToken(userId, token);

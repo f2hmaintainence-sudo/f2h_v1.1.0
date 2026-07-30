@@ -578,13 +578,13 @@ class Subscription {
             : items.expand((i) => i.weeklySchedules).toList());
 
     const fullDayNames = [
-      'Sunday',
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
+      'Sun',
+      'Mon',
+      'Tues',
+      'Wed',
+      'Thurs',
+      'Fri',
+      'Sat',
     ];
 
     if (schedules.isNotEmpty) {

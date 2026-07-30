@@ -31,14 +31,12 @@ import 'package:f2h_customer/features/notifications/presentation/bloc/notificati
 import 'package:f2h_customer/features/orders/presentation/bloc/order_history_bloc.dart';
 import 'package:f2h_customer/features/orders/presentation/bloc/order_history_state.dart';
 import 'package:f2h_customer/features/orders/presentation/bloc/order_history_event.dart';
-import 'package:f2h_customer/core/app_bootstrap.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
 
 
 class F2HApp extends StatelessWidget {
-  final AuthBootResult? bootResult;
+  const F2HApp({super.key});
 
-  const F2HApp({super.key, this.bootResult});
   @override
   Widget build(BuildContext context) => MultiBlocProvider(
     providers: [
@@ -69,6 +67,18 @@ class F2HApp extends StatelessWidget {
           },
           child: BlocBuilder<AuthBloc, AuthState>(
             builder: (context, state) {
+              // Still checking auth status — show nothing (splash is still visible)
+              if (state is AuthInitial || state is AuthLoading) {
+                return const Scaffold(
+                  backgroundColor: Colors.white,
+                  body: Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF0C831F),
+                      strokeWidth: 2.5,
+                    ),
+                  ),
+                );
+              }
               if (state is Authenticated) {
                 return const CustomerSessionGate();
               }

@@ -7,16 +7,16 @@
 // Description : Auth repository implementation for customer app
 //
 // ============================================================================
-
-import 'package:flutter/foundation.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:f2h_customer/core/api/dio_client.dart';
-import 'package:f2h_customer/core/auth/token_storage.dart';
-import 'package:f2h_customer/auth/domain/entities/user_entity.dart';
-import 'package:f2h_customer/auth/domain/repositories/auth_repository.dart';
 import 'package:f2h_customer/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:f2h_customer/auth/data/datasources/auth_local_datasource.dart';
-
+import 'package:f2h_customer/auth/domain/entities/user_entity.dart';
+import 'package:f2h_customer/auth/domain/repositories/auth_repository.dart';
+import 'package:f2h_customer/core/api/api_endpoints.dart';
+import 'package:f2h_customer/core/api/dio_client.dart';
+import 'package:f2h_customer/core/auth/token_storage.dart';
 import 'package:f2h_customer/core/config/app_config.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
@@ -180,10 +180,19 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<bool> checkAuthStatus() async {
-    // Delegate to TokenStorage — the DioClient AuthInterceptor handles
-    // silent token refresh on 401 automatically. AppBootstrap.checkAuth()
-    // performs the deep cold-boot validation on first launch.
-    return TokenStorage.hasSession();
+    // Call /customer/bootstrap — if it returns 200 the user is authenticated.
+    // 401 means the session/token is invalid → show Login screen.
+    try {
+      await dioClient.dio.get(ApiEndpoints.customerBootstrap);
+      return true;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) return false;
+      // Network error / server down — treat as authenticated (offline mode)
+      // so the user is not logged out just because of a connectivity issue.
+      return await TokenStorage.hasSession();
+    } catch (_) {
+      return await TokenStorage.hasSession();
+    }
   }
 
   @override

@@ -884,24 +884,27 @@ class _HomeScreenState extends State<HomeScreen>
                           letterSpacing: -0.2,
                         ),
                       ),
-                      if (p.formattedUnit.isNotEmpty && p.formattedUnit.toLowerCase() != p.name.toLowerCase()) ...[
-                        const SizedBox(height: 3),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
-                          ),
-                          child: Text(
-                            p.formattedUnit,
-                            style: const TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF475569),
+                      if ((p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit).isNotEmpty && (p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit).toLowerCase() != p.name.toLowerCase()) ...[
+                        const SizedBox(height: 4),
+                        UnconstrainedBox(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF3F4F6),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            child: Text(
+                              p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit,
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF6B7280),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
                       ],
@@ -1107,24 +1110,27 @@ class _HomeScreenState extends State<HomeScreen>
                           letterSpacing: -0.2,
                         ),
                       ),
-                      if (p.formattedUnit.isNotEmpty && p.formattedUnit.toLowerCase() != p.name.toLowerCase()) ...[
-                        const SizedBox(height: 3),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
-                          ),
-                          child: Text(
-                            p.formattedUnit,
-                            style: const TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF475569),
+                      if ((p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit).isNotEmpty && (p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit).toLowerCase() != p.name.toLowerCase()) ...[
+                        const SizedBox(height: 4),
+                        UnconstrainedBox(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF3F4F6),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            child: Text(
+                              p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit,
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF6B7280),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
                       ],
