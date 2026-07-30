@@ -301,7 +301,13 @@ export default function CustomerDetailsPage() {
               onRefresh={fetchPortfolio} 
             />
           )}
-          {activeTab === 'Postpaid Ledger' && <PostpaidTab ledger={data.postpaid_ledger} />}
+          {activeTab === 'Postpaid Ledger' && (
+            <PostpaidTab 
+              ledger={data.postpaid_ledger} 
+              customerId={customer.customer_id || id} 
+              onRefresh={fetchPortfolio} 
+            />
+          )}
           {activeTab === 'Wallet Analytics' && <WalletTab ledger={data.wallet_ledger} />}
           {activeTab === 'Subscription' && <SubscriptionTab subscriptions={data.subscriptions} />}
           {activeTab === 'Revenue Trends' && <RevenueTrendsTab revenueAnalytics={data.revenue_analytics} />}
@@ -887,7 +893,13 @@ function ContainersTab({ containerData, customerId, onRefresh }: { containerData
   );
 }
 
-function PostpaidTab({ ledger }: { ledger: any }) {
+function PostpaidTab({ ledger, customerId, onRefresh }: { ledger: any; customerId?: string; onRefresh?: () => void }) {
+  const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
+  const [settleAmountInput, setSettleAmountInput] = useState('');
+  const [settleMode, setSettleMode] = useState('CASH');
+  const [settleNotes, setSettleNotes] = useState('');
+  const [submittingSettle, setSubmittingSettle] = useState(false);
+
   if (!ledger) return <div className="text-sm text-gray-500 py-8 text-center bg-gray-50 rounded-xl">No Postpaid Ledger Data Available</div>;
   const { summary = {}, bills = [], subscription_orders = [] } = ledger;
 
@@ -912,6 +924,45 @@ function PostpaidTab({ ledger }: { ledger: any }) {
     .filter((o: any) => String(o.payment_status).toLowerCase() === 'paid' && String(o.status).toLowerCase() !== 'cancelled')
     .reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
 
+  const totalDueAmount = thisMonthDue > 0 ? thisMonthDue : Number(summary?.current_due || 0);
+
+  // Automated month-end reminder dates (7 days, 3 days, 1 day before month end)
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const lastDayOfMonth = new Date(year, month + 1, 0);
+
+  const day7Before = new Date(year, month + 1, 0 - 6).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  const day3Before = new Date(year, month + 1, 0 - 2).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  const day1Before = new Date(year, month + 1, 0).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  const dueDateStr = lastDayOfMonth.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  const handleSettlePostpaid = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = Number(settleAmountInput || totalDueAmount);
+    if (!amt || amt <= 0) return alert('Please enter a valid amount');
+    try {
+      setSubmittingSettle(true);
+      const res = await fetch(`/api/admin/customer/${customerId}/settle-postpaid-bill`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: amt, payment_mode: settleMode, notes: settleNotes }),
+      });
+      const data = await res.json();
+      if (data.status) {
+        alert(data.message || 'Postpaid bill settled successfully!');
+        setIsSettleModalOpen(false);
+        if (onRefresh) onRefresh();
+      } else {
+        alert(data.message || 'Failed to settle postpaid bill');
+      }
+    } catch (err: any) {
+      alert('Error settling bill: ' + err.message);
+    } finally {
+      setSubmittingSettle(false);
+    }
+  };
+
   return (
     <div className="space-y-6 font-sans">
       {/* Current Month Bill Statement Card (Light Theme) */}
@@ -921,28 +972,42 @@ function PostpaidTab({ ledger }: { ledger: any }) {
             <Sparkles size={14} className="text-emerald-600" /> Current Month Statement ({currentMonthYear})
           </div>
           <h2 className="text-3xl font-black tracking-tight text-slate-900">
-            ₹{(thisMonthDue > 0 ? thisMonthDue : Number(summary?.current_due || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            ₹{totalDueAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
           </h2>
           <p className="text-xs text-slate-600 font-medium mt-1">
-            {(thisMonthDue > 0 || Number(summary?.current_due || 0) > 0)
-              ? `Current amount customer needs to pay for ${currentMonthYear} subscription orders`
+            {totalDueAmount > 0
+              ? `Outstanding postpaid balance for ${currentMonthYear} subscription orders`
               : `All subscription charges for ${currentMonthYear} have been fully paid.`}
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-4 text-xs font-medium bg-white/90 p-3.5 rounded-xl border border-emerald-100 shadow-2xs">
-          <div>
-            <span className="block text-[10px] text-slate-500 uppercase font-extrabold">Month Billed</span>
-            <span className="font-bold text-slate-900 text-sm">₹{thisMonthBilled.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+        <div className="flex flex-col sm:flex-row items-end gap-3">
+          <div className="flex flex-wrap gap-4 text-xs font-medium bg-white/90 p-3.5 rounded-xl border border-emerald-100 shadow-2xs">
+            <div>
+              <span className="block text-[10px] text-slate-500 uppercase font-extrabold">Month Billed</span>
+              <span className="font-bold text-slate-900 text-sm">₹{thisMonthBilled.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="border-l border-slate-200 pl-4">
+              <span className="block text-[10px] text-slate-500 uppercase font-extrabold">Month Paid</span>
+              <span className="font-bold text-emerald-700 text-sm">₹{thisMonthPaid.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="border-l border-slate-200 pl-4">
+              <span className="block text-[10px] text-slate-500 uppercase font-extrabold">Amount To Pay</span>
+              <span className="font-bold text-rose-600 text-sm">₹{totalDueAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+            </div>
           </div>
-          <div className="border-l border-slate-200 pl-4">
-            <span className="block text-[10px] text-slate-500 uppercase font-extrabold">Month Paid</span>
-            <span className="font-bold text-emerald-700 text-sm">₹{thisMonthPaid.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-          </div>
-          <div className="border-l border-slate-200 pl-4">
-            <span className="block text-[10px] text-slate-500 uppercase font-extrabold">Amount To Pay</span>
-            <span className="font-bold text-rose-600 text-sm">₹{thisMonthDue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-          </div>
+
+          {totalDueAmount > 0 && customerId && (
+            <button
+              onClick={() => {
+                setSettleAmountInput(String(totalDueAmount));
+                setIsSettleModalOpen(true);
+              }}
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 shrink-0"
+            >
+              <CreditCard size={15} /> Settle / Pay Bill
+            </button>
+          )}
         </div>
       </div>
 
@@ -954,32 +1019,69 @@ function PostpaidTab({ ledger }: { ledger: any }) {
         </div>
         <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Outstanding Due</p>
-          <p className="text-xl font-black text-rose-600">₹{Number(summary?.current_due || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+          <p className="text-xl font-black text-rose-600">₹{totalDueAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
         </div>
         <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Subscription Billed Total</p>
-          <p className="text-xl font-black text-blue-600">₹{Number(summary?.total_credit_given || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+          <p className="text-xl font-black text-blue-600">₹{Number(summary?.total_credit_given || thisMonthBilled || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
         </div>
         <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Subscription Paid Total</p>
-          <p className="text-xl font-black text-emerald-600">₹{Number(summary?.total_paid || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+          <p className="text-xl font-black text-emerald-600">₹{Number(summary?.total_paid || thisMonthPaid || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
         </div>
       </div>
 
-      {/* Utilization Bar */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs">
-        <div className="flex justify-between items-center mb-2 text-xs font-bold text-gray-700">
-          <span>Credit Utilization ({Number(summary?.credit_utilization_pct || 0).toFixed(1)}%)</span>
-          <span>₹{Number(summary?.current_due || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / ₹{Number(summary?.credit_limit || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+      {/* Automated Billing Cycle & Gentle Reminders Flow Card */}
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-indigo-50 text-indigo-700 rounded-xl">
+              <Bell size={18} />
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">Automated Month-End Reminders Schedule</h4>
+              <p className="text-[11px] font-medium text-slate-500">Billing Due Date: <strong className="text-slate-900">{dueDateStr}</strong> (Month-End)</p>
+            </div>
+          </div>
+
+          <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full border border-indigo-100">
+            🔔 7-Day, 3-Day & 1-Day Auto-Reminders Active
+          </span>
         </div>
-        <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-          <div 
-            className={`h-full rounded-full transition-all ${
-              Number(summary?.credit_utilization_pct || 0) > 80 ? 'bg-rose-500' : 
-              Number(summary?.credit_utilization_pct || 0) > 50 ? 'bg-amber-500' : 'bg-blue-600'
-            }`}
-            style={{ width: `${Math.min(100, Math.max(0, Number(summary?.credit_utilization_pct || 0)))}%` }}
-          ></div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-800 text-xs font-black flex items-center justify-center shrink-0">
+              7D
+            </div>
+            <div>
+              <p className="text-[10px] font-extrabold text-slate-400 uppercase">7 Days Before ({day7Before})</p>
+              <p className="text-xs font-bold text-slate-800">Initial Bill Statement & SMS</p>
+              <span className="text-[9px] font-bold text-emerald-600">✓ Auto Scheduled</span>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 text-xs font-black flex items-center justify-center shrink-0">
+              3D
+            </div>
+            <div>
+              <p className="text-[10px] font-extrabold text-slate-400 uppercase">3 Days Before ({day3Before})</p>
+              <p className="text-xs font-bold text-slate-800">Gentle Follow-Up Alert</p>
+              <span className="text-[9px] font-bold text-emerald-600">✓ Auto Scheduled</span>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-800 text-xs font-black flex items-center justify-center shrink-0">
+              1D
+            </div>
+            <div>
+              <p className="text-[10px] font-extrabold text-slate-400 uppercase">1 Day Before ({day1Before})</p>
+              <p className="text-xs font-bold text-slate-800">Final Due Date Urgency Alert</p>
+              <span className="text-[9px] font-bold text-amber-600">⏳ Triggers at Month-End</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1013,8 +1115,11 @@ function PostpaidTab({ ledger }: { ledger: any }) {
                       ? order.items.map((it: any) => `${it.product_name || it.variant_name} (${it.quantity || 1})`).join(', ')
                       : 'Subscription Delivery Item';
                     
-                    const isPaid = String(order.payment_status).toLowerCase() === 'paid';
                     const isCancelled = String(order.status).toLowerCase() === 'cancelled';
+                    const isPostpaid = String(order.payment_mode || '').toUpperCase() === 'POSTPAID';
+                    
+                    // Postpaid orders remain DUE until explicitly settled/paid!
+                    const isPaid = String(order.payment_status).toLowerCase() === 'paid' && (!isPostpaid || Boolean(order.paid_at || order.bill_settled));
 
                     return (
                       <tr key={i} className="hover:bg-slate-50 transition-colors">
@@ -1044,7 +1149,7 @@ function PostpaidTab({ ledger }: { ledger: any }) {
                         <td className="px-4 py-3 text-center">
                           <span className={`inline-block text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase border ${
                             isCancelled ? 'bg-slate-100 text-slate-600 border-slate-200' :
-                            isPaid ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-rose-100 text-rose-800 border-rose-200'
+                            isPaid ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-amber-100 text-amber-800 border-amber-300'
                           }`}>
                             {isCancelled ? 'Cancelled' : isPaid ? 'Paid' : 'Postpaid Due'}
                           </span>
@@ -1058,6 +1163,97 @@ function PostpaidTab({ ledger }: { ledger: any }) {
           </div>
         )}
       </div>
+
+      {/* Settle Postpaid Bill Modal */}
+      {isSettleModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                  <CreditCard size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">Settle / Pay Postpaid Bill</h3>
+                  <p className="text-xs text-slate-500 font-medium">Customer: #{customerId}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsSettleModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSettlePostpaid} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Settlement Amount (₹)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">₹</span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    value={settleAmountInput}
+                    onChange={(e) => setSettleAmountInput(e.target.value)}
+                    className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-bold focus:bg-white focus:border-emerald-600 focus:outline-none transition-all"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Payment Mode
+                </label>
+                <select
+                  value={settleMode}
+                  onChange={(e) => setSettleMode(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold focus:bg-white focus:border-emerald-600 focus:outline-none"
+                >
+                  <option value="CASH">Cash Payment</option>
+                  <option value="UPI">UPI / Online Transfer</option>
+                  <option value="NETBANKING">Netbanking</option>
+                  <option value="CHEQUE">Cheque</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Payment Notes / Reference ID
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Paid cash at store / UPI Txn #987213"
+                  value={settleNotes}
+                  onChange={(e) => setSettleNotes(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-emerald-600 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsSettleModalOpen(false)}
+                  className="px-4 py-2 text-slate-600 text-xs font-bold hover:bg-slate-100 rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingSettle}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all disabled:opacity-50"
+                >
+                  {submittingSettle ? 'Processing...' : 'Settle Bill & Mark Paid'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
