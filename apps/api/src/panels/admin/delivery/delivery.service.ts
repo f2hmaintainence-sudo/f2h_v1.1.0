@@ -102,6 +102,7 @@ export class DeliveryManagementService {
           b.branch_name,
           db.is_active,
           db.is_available,
+          CASE WHEN (to_jsonb(db)->>'is_online') IS NOT NULL THEN ((to_jsonb(db)->>'is_online')::boolean) ELSE db.is_available END AS is_online,
           db.daily_salary,
           db.max_daily_orders,
           db.current_lat,
@@ -464,11 +465,33 @@ export class DeliveryManagementService {
           o.delivery_partner_id,
           o.assignment_method,
           o.assigned_at,
-          o.delivered_at,
+          o.scheduled_date,
+          o.created_at,
+          o.branch_id,
+          b.branch_name,
           db.full_name AS partner_name,
-          db.phone AS partner_phone
+          db.phone AS partner_phone,
+          COALESCE(
+            (
+              SELECT json_agg(
+                json_build_object(
+                  'id', oi.id,
+                  'product_name', COALESCE(p.name, 'Fresh Item'),
+                  'variant_name', pv.name,
+                  'quantity', oi.quantity,
+                  'unit_price', oi.unit_price,
+                  'final_price', COALESCE(oi.final_price, oi.unit_price * oi.quantity)
+                )
+              )
+              FROM order_items oi
+              LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
+              LEFT JOIN products p ON p.product_id = pv.product_id
+              WHERE oi.order_id = o.order_id
+            ), '[]'::json
+          ) AS items
         FROM orders o
         LEFT JOIN delivery_partners db ON db.delivery_partner_id = o.delivery_partner_id
+        LEFT JOIN branches b ON b.branch_id = o.branch_id
         WHERE ${where.join(' AND ')}
         ORDER BY
           CASE o.status
@@ -545,9 +568,7 @@ export class DeliveryManagementService {
       ];
       const params: any[] = [orderId, normStatus];
 
-      if (normStatus === 'delivered') {
-        updateFields.push(`delivered_at = NOW()`);
-      }
+      // Note: delivered_at column does not exist on orders table; status update only.
 
       const sql = `
         UPDATE orders
@@ -577,6 +598,29 @@ export class DeliveryManagementService {
     } catch (error) {
       this.developer.error('updateDeliveryStatus error', { error });
       throw new InternalServerErrorException('Failed to update delivery status');
+    }
+  }
+
+  async assignPartnerToOrder(orderId: string, partnerId: string) {
+    try {
+      const sql = `
+        UPDATE orders
+        SET delivery_partner_id = $1,
+            assignment_method   = 'manual',
+            assigned_at         = NOW(),
+            updated_at          = NOW()
+        WHERE order_id = $2
+        RETURNING order_id, delivery_partner_id, assigned_at
+      `;
+      const rows = await this.db.query(sql, [partnerId, orderId]);
+      return {
+        status: true,
+        data: rows?.[0] ?? null,
+        message: `Delivery partner assigned to order ${orderId}`,
+      };
+    } catch (error) {
+      this.developer.error('assignPartnerToOrder error', { error });
+      throw new InternalServerErrorException('Failed to assign partner to order');
     }
   }
 

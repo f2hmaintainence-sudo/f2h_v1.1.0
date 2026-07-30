@@ -134,10 +134,10 @@ export class DeliveryDispatchService {
           results.push(insertResult.rows[0]);
         }
 
-        // 4. Update run status to 'dispatched'
+        // 4. Update run status to 'in_progress' (dispatched corresponds to 'in_progress' in constraint)
         await client.query(
           `UPDATE delivery_runs
-           SET status = 'dispatched', updated_at = NOW()
+           SET status = 'in_progress', updated_at = NOW()
            WHERE id = $1 AND status IN ('pending', 'assigned')`,
           [runId],
         );

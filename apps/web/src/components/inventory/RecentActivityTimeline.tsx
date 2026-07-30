@@ -21,12 +21,19 @@ interface RecentActivityTimelineProps {
 
 function formatTime(isoString: string): string {
   try {
-    return new Date(isoString).toLocaleTimeString("en-IN", {
+    const d = new Date(isoString);
+    const dateStr = d.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      timeZone: "Asia/Kolkata",
+    });
+    const timeStr = d.toLocaleTimeString("en-IN", {
       hour: "2-digit",
       minute: "2-digit",
       hour12: true,
       timeZone: "Asia/Kolkata",
     });
+    return `${dateStr}, ${timeStr}`;
   } catch {
     return "";
   }

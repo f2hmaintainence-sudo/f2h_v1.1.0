@@ -15,7 +15,7 @@ import { api } from '@/services/api.client';
 import WarehouseSelector from '@/components/inventory/WarehouseSelector';
 import InventorySummaryCards from '@/components/inventory/InventorySummaryCards';
 import InventoryStatusBanner from '@/components/inventory/InventoryStatusBanner';
-import InventoryHealthChart from '@/components/inventory/InventoryHealthChart';
+import StockInOutSummary from '@/components/inventory/StockInOutSummary';
 import StockMovementChart from '@/components/inventory/StockMovementChart';
 import RecentActivityTimeline from '@/components/inventory/RecentActivityTimeline';
 import LowStockCards from '@/components/inventory/LowStockCards';
@@ -109,6 +109,9 @@ export default function InventoryOverviewPage() {
   } | null>(null);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
 
+  const [inventoryItems, setInventoryItems] = useState<any[]>([]);
+  const [loadingInventory, setLoadingInventory] = useState(true);
+
   const [tableKey, setTableKey] = useState(0);
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [selectedWarehouse, setSelectedWarehouse] = useState('');
@@ -147,6 +150,26 @@ export default function InventoryOverviewPage() {
     }
   }, [selectedWarehouse]);
 
+  // ── Fetch current inventory list ────────────────────────
+  const fetchInventory = useCallback(async () => {
+    setLoadingInventory(true);
+    try {
+      const endpoint = `/admin/inventory/table?limit=100${selectedWarehouse ? `&warehouse_id=${selectedWarehouse}` : ''}`;
+      const res = await api.get<any>(endpoint);
+      if (res.data?.data) {
+        setInventoryItems(res.data.data);
+      } else if (res.data?.rows) {
+        setInventoryItems(res.data.rows);
+      } else if (Array.isArray(res.data)) {
+        setInventoryItems(res.data);
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setLoadingInventory(false);
+    }
+  }, [selectedWarehouse]);
+
   // ── Load warehouse list once ─────────────────────────────
   useEffect(() => {
     api
@@ -157,10 +180,11 @@ export default function InventoryOverviewPage() {
       .catch(() => {});
   }, []);
 
-  // ── Re-fetch stats when warehouse changes ────────────────
+  // ── Re-fetch stats & inventory when warehouse changes ────
   useEffect(() => {
     fetchStats();
-  }, [fetchStats]);
+    fetchInventory();
+  }, [fetchStats, fetchInventory]);
 
   // ── Initial dashboard fetch + polling ───────────────────
   useEffect(() => {
@@ -176,7 +200,8 @@ export default function InventoryOverviewPage() {
     setTableKey((p) => p + 1);
     fetchStats();
     fetchDashboard();
-  }, [fetchStats, fetchDashboard]);
+    fetchInventory();
+  }, [fetchStats, fetchDashboard, fetchInventory]);
 
   const chartData = buildChartData(dashboardData?.recent_movements ?? []);
   const lowStockItems = mapLowStockItems(dashboardData?.low_stock_alerts ?? []);
@@ -239,10 +264,9 @@ export default function InventoryOverviewPage() {
 
       {/* 6. Charts Row — Inventory Health + Stock Movement */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <InventoryHealthChart
-          inStock={stats?.in_stock ?? 0}
-          lowStock={stats?.low_stock ?? 0}
-          outOfStock={stats?.out_of_stock ?? 0}
+        <StockInOutSummary
+          items={inventoryItems}
+          isLoading={loadingInventory}
         />
         <StockMovementChart data={chartData} isLoading={loadingDashboard} />
       </div>
