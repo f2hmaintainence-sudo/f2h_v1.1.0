@@ -134,9 +134,6 @@ class _PickupSelectionScreenState extends State<PickupSelectionScreen> {
         sl<PickupBloc>().add(LoadPickupItems());
       } catch (_) {}
 
-      // Refresh mock data service cache
-      await MockDataService().loadBackendData();
-
       if (mounted) {
         setState(() => _isConfirming = false);
         Navigator.pop(context, true); // Pop back to dashboard with success status
@@ -162,6 +159,14 @@ class _PickupSelectionScreenState extends State<PickupSelectionScreen> {
           return sum + (_pickedQuantities[item.productVariantId] ?? 0.0);
         }
         return sum;
+      },
+    );
+
+    final isEverythingCollected = widget.response.pickupConfirmed || widget.response.items.every(
+      (item) {
+        final isSelected = _selectedVariantIds.contains(item.productVariantId);
+        final pickedQty = _pickedQuantities[item.productVariantId] ?? 0.0;
+        return isSelected && (pickedQty == item.quantity);
       },
     );
 
@@ -278,75 +283,78 @@ class _PickupSelectionScreenState extends State<PickupSelectionScreen> {
                               Text(
                                 item.productName,
                                 style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 14,
-                                  color: isSelected ? kText : kTextSub,
-                                  decoration: isSelected ? null : TextDecoration.lineThrough,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 15,
+                                  color: kText,
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              Row(
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
-                                  Text(
-                                    'Expected: ${item.quantity.toInt()} ${item.unit}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: kTextSub,
-                                      fontWeight: FontWeight.bold,
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: kBgDeep,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      'Expected: ${item.quantity.toInt()} ${item.unit}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: kTextSub,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
-                                  if (isSelected && currentQty != item.quantity) ...[
-                                    const SizedBox(width: 8),
+                                  if (item.isReturnable)
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: kAccentLt,
-                                        borderRadius: BorderRadius.circular(4),
+                                        color: kPrimary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: const Text(
-                                        'Modified',
+                                        'Returnable',
                                         style: TextStyle(
-                                          fontSize: 10,
-                                          color: kAccent,
-                                          fontWeight: FontWeight.w900,
+                                          fontSize: 11,
+                                          color: kPrimary,
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                     ),
-                                  ],
                                 ],
                               ),
                             ],
                           ),
                         ),
                         
-                        // Counter
+                        
                         Row(
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.remove_circle_outline_rounded),
-                              color: currentQty > 0.0 ? kRed : kMuted,
-                              onPressed: currentQty > 0.0
+                              onPressed: isSelected && currentQty > 0
                                   ? () => _adjustQuantity(item.productVariantId, item.quantity, -1.0)
                                   : null,
+                              icon: const Icon(Icons.remove_circle_outline_rounded, size: 24),
+                              color: kMuted,
                             ),
-                            Container(
-                              constraints: const BoxConstraints(minWidth: 24),
-                              alignment: Alignment.center,
-                              child: Text(
-                                currentQty.toInt().toString(),
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  color: isSelected ? kPrimaryMid : kTextSub,
-                                ),
+                            Text(
+                              currentQty.toInt().toString(),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: isSelected ? kPrimary : kMuted,
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.add_circle_outline_rounded),
-                              color: currentQty < item.quantity ? kPrimary : kMuted,
-                              onPressed: currentQty < item.quantity
+                              onPressed: isSelected && currentQty < item.quantity
                                   ? () => _adjustQuantity(item.productVariantId, item.quantity, 1.0)
                                   : null,
+                              icon: const Icon(Icons.add_circle_outline_rounded, size: 24),
+                              color: kPrimary,
                             ),
                           ],
                         ),
@@ -359,14 +367,13 @@ class _PickupSelectionScreenState extends State<PickupSelectionScreen> {
           ),
         ],
       ),
-      bottomSheet: Container(
+      bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: kSurface,
-          border: const Border(top: BorderSide(color: kBorder)),
           boxShadow: [
             BoxShadow(
-              color: kText.withOpacity(0.05),
+              color: Colors.black.withOpacity(0.04),
               blurRadius: 10,
               offset: const Offset(0, -4),
             ),
@@ -378,14 +385,25 @@ class _PickupSelectionScreenState extends State<PickupSelectionScreen> {
             height: 52,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: kPrimary,
+                backgroundColor: isEverythingCollected ? kPrimary : Colors.grey.shade400,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
                 elevation: 0,
               ),
-              onPressed: _isConfirming ? null : _onConfirmPickup,
+              onPressed: _isConfirming
+                  ? null
+                  : () {
+                      if (!isEverythingCollected) {
+                        AppSnackBar.error(
+                          context,
+                          'Please select all items and match the expected quantities to confirm pickup.',
+                        );
+                        return;
+                      }
+                      _onConfirmPickup();
+                    },
               child: _isConfirming
                   ? const SizedBox(
                       height: 24,

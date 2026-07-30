@@ -29,6 +29,10 @@ class UpdateStopStatusEvent extends DeliverySessionEvent {
   final String? paymentStatus;
   final String? deliveryImage;
   final List<Map<String, dynamic>>? containerReturns;
+  /// Called on successful backend confirmation (after fresh state is emitted).
+  final void Function()? onSuccess;
+  /// Called with the error message when the backend call fails.
+  final void Function(String error)? onError;
 
   UpdateStopStatusEvent({
     required this.orderId,
@@ -42,6 +46,8 @@ class UpdateStopStatusEvent extends DeliverySessionEvent {
     this.paymentStatus,
     this.deliveryImage,
     this.containerReturns,
+    this.onSuccess,
+    this.onError,
   });
 }
 
@@ -59,3 +65,11 @@ class ClearSosEvent extends DeliverySessionEvent {}
 
 /// Clear the active run after a warehouse handover.
 class ClearActiveRunEvent extends DeliverySessionEvent {}
+
+/// Hand over a completed run to the warehouse.
+class HandoverRunEvent extends DeliverySessionEvent {
+  final String runId;
+  final void Function(HandoverResult result)? onSuccess;
+  final void Function(String error)? onError;
+  HandoverRunEvent(this.runId, {this.onSuccess, this.onError});
+}

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:dio/dio.dart';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/core/api/dio_client.dart';

@@ -10,6 +10,7 @@ class ContainerReturnInput {
   final String containerId;
   final String name;
   final int balance;
+  final int expected;
   bool isChecked;
   int returned;
   int damaged;
@@ -19,6 +20,7 @@ class ContainerReturnInput {
     required this.containerId,
     required this.name,
     required this.balance,
+    this.expected = 0,
     this.isChecked = false,
     this.returned = 0,
     this.damaged = 0,
@@ -91,6 +93,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         containerId: bal.containerId,
         name: bal.name,
         balance: bal.balance,
+        expected: isGlass ? expected : 0,
         isChecked: (isGlass && expected > 0),
         returned: (isGlass && expected > 0) ? expected : 0,
       );
@@ -104,6 +107,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         containerId: 'PKG_GLASS_BOTTLE',
         name: 'Glass Bottle',
         balance: outstanding,
+        expected: expected,
         isChecked: expected > 0,
         returned: expected > 0 ? expected : 0,
       );
@@ -194,14 +198,6 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                 onTap: () {
                   Navigator.pop(ctx);
                   _takePhoto(ImageSource.camera);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_rounded, color: Colors.blue),
-                title: const Text('Choose from Gallery'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _takePhoto(ImageSource.gallery);
                 },
               ),
             ],
@@ -729,6 +725,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                 // One row per container type
                 ..._containerInputs.values.map((input) {
                   final outstanding = input.balance;
+                  final maxAllowed = outstanding > input.expected ? outstanding : input.expected;
                   final projected = outstanding - input.returned - input.damaged - input.lost;
 
                   return Column(
@@ -752,7 +749,9 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                                       setState(() {
                                         input.isChecked = val ?? false;
                                         if (input.isChecked) {
-                                          input.returned = outstanding > 0 ? outstanding : 0;
+                                          input.returned = input.expected > 0
+                                              ? input.expected
+                                              : (outstanding > 0 ? outstanding : 0);
                                           input.damaged = 0;
                                           input.lost = 0;
                                         } else {
@@ -812,7 +811,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                                       onDec: input.returned > 0
                                           ? () => setState(() { input.returned--; _syncLegacyCounts(); })
                                           : null,
-                                      onInc: (input.returned + input.lost) < outstanding
+                                      onInc: (input.returned + input.lost) < maxAllowed
                                           ? () => setState(() { input.returned++; _syncLegacyCounts(); })
                                           : null,
                                     ),
@@ -827,7 +826,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                                       onDec: input.lost > 0
                                           ? () => setState(() { input.lost--; _syncLegacyCounts(); })
                                           : null,
-                                      onInc: (input.returned + input.lost) < outstanding
+                                      onInc: (input.returned + input.lost) < maxAllowed
                                           ? () => setState(() { input.lost++; _syncLegacyCounts(); })
                                           : null,
                                     ),

@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
-import 'package:f2h_delivery/services/mock_data_service.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/delivery_confirmation_sheet.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -286,6 +284,17 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           if (stop.orders.isEmpty) return;
           final orderId = stop.orders.first.orderId;
 
+          // Show loading dialog
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
+              ),
+            ),
+          );
+
           context.read<DeliverySessionBloc>().add(UpdateStopStatusEvent(
             orderId: orderId,
             newStatus: status,
@@ -298,29 +307,33 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             paymentStatus: paymentStatus,
             deliveryImage: deliveryImage,
             containerReturns: containerReturns,
+            onSuccess: () {
+              if (mounted) {
+                Navigator.pop(context); // pop loading dialog
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Stop #${stop.stop} marked as $status!'),
+                    backgroundColor: status == 'delivered' ? kSuccess : kDanger,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                );
+              }
+            },
+            onError: (errorMsg) {
+              if (mounted) {
+                Navigator.pop(context); // pop loading dialog
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(errorMsg),
+                    backgroundColor: kDanger,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                );
+              }
+            },
           ));
-
-          MockDataService().updateOrderStatus(
-            orderId,
-            status,
-            emptyBottles: emptyBottles,
-            returnedContainers: returnedContainers,
-            damagedContainers: damagedContainers,
-            lostContainers: lostContainers,
-            notes: notes,
-            paymentMode: paymentMode,
-            paymentStatus: paymentStatus,
-            deliveryImage: deliveryImage,
-          );
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Stop #${stop.stop} marked as $status!'),
-              backgroundColor: status == 'delivered' ? kSuccess : kDanger,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          );
         },
       ),
     );

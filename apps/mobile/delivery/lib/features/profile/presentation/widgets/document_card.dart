@@ -58,7 +58,6 @@ class DocumentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final typeLabel = document.documentType.toUpperCase().replaceAll('_', ' ');
-    final isPending = document.verificationStatus.toLowerCase() == 'pending';
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(

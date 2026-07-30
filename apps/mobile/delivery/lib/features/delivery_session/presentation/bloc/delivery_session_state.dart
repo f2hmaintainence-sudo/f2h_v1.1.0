@@ -15,7 +15,6 @@ class DeliverySessionError extends DeliverySessionState {
 class DeliverySessionLoaded extends DeliverySessionState {
   // ── Profile ─────────────────────────────────────────────────────────────────
   final String driverName;
-  final double todayBasePay;
   final bool isOnline;
   final bool isVerified;
   final String accountStatus;
@@ -27,7 +26,6 @@ class DeliverySessionLoaded extends DeliverySessionState {
 
   DeliverySessionLoaded({
     required this.driverName,
-    required this.todayBasePay,
     required this.isOnline,
     required this.isVerified,
     required this.accountStatus,
@@ -93,19 +91,7 @@ class DeliverySessionLoaded extends DeliverySessionState {
     return (deliveredOrdersCount / totalOrdersCount) * 100.0;
   }
 
-  // Earnings
-  static const double _performanceBonus = 150.0;
-  static const double _subscriptionBonus = 200.0;
-  static const double _distanceBonus = 150.0;
 
-  double get performanceBonus => _performanceBonus;
-  double get subscriptionBonus => _subscriptionBonus;
-  double get distanceBonus => _distanceBonus;
-
-  double get todayEarnings =>
-      todayBasePay + _performanceBonus + _subscriptionBonus + _distanceBonus + (deliveredOrdersCount * 15.0);
-  double get weekEarnings => 5450.0 + (deliveredOrdersCount * 15.0);
-  double get monthEarnings => 21850.0 + (deliveredOrdersCount * 15.0);
 
   // Bottle stats
   int get expectedBottlesCount =>
@@ -113,13 +99,14 @@ class DeliverySessionLoaded extends DeliverySessionState {
   int get collectedBottlesCount =>
       orders.fold(0, (sum, o) => sum + (o.emptyBottlesCollected ?? 0));
   int get bottlesStillOutstanding {
-    final sum = orders
+    // Sum the outstanding bottle balance across non-delivered stops.
+    // bottlesWithCustomer is a positive count, so the result must also be positive.
+    return orders
         .where((o) => o.status != 'delivered')
         .fold(0, (currentSum, o) {
       final val = o.bottlesWithCustomer ?? 0;
       return currentSum + (val > 0 ? val : 0);
     });
-    return -sum;
   }
 
   // Item lists for handover
@@ -156,7 +143,6 @@ class DeliverySessionLoaded extends DeliverySessionState {
 
   DeliverySessionLoaded copyWith({
     String? driverName,
-    double? todayBasePay,
     bool? isOnline,
     bool? isVerified,
     String? accountStatus,
@@ -167,7 +153,6 @@ class DeliverySessionLoaded extends DeliverySessionState {
   }) {
     return DeliverySessionLoaded(
       driverName: driverName ?? this.driverName,
-      todayBasePay: todayBasePay ?? this.todayBasePay,
       isOnline: isOnline ?? this.isOnline,
       isVerified: isVerified ?? this.isVerified,
       accountStatus: accountStatus ?? this.accountStatus,

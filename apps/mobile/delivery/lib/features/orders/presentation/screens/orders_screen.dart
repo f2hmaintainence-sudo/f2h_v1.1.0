@@ -109,6 +109,17 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
           if (stop.orders.isEmpty) return;
           final orderId = stop.orders.first.orderId;
 
+          // Show loading dialog
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
+              ),
+            ),
+          );
+
           context.read<DeliverySessionBloc>().add(UpdateStopStatusEvent(
             orderId: orderId,
             newStatus: status,
@@ -121,32 +132,36 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
             paymentStatus: paymentStatus,
             deliveryImage: deliveryImage,
             containerReturns: containerReturns,
+            onSuccess: () {
+              if (mounted) {
+                Navigator.pop(context); // pop loading dialog
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Stop #${stop.stop} marked as $status!'),
+                    backgroundColor: status == 'delivered' ? kSuccess : kDanger,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                );
+                if (status == 'delivered') {
+                  MockDataService().tabNavigationNotifier.value = 2;
+                }
+              }
+            },
+            onError: (errorMsg) {
+              if (mounted) {
+                Navigator.pop(context); // pop loading dialog
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(errorMsg),
+                    backgroundColor: kDanger,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                );
+              }
+            },
           ));
-
-          MockDataService().updateOrderStatus(
-            orderId,
-            status,
-            emptyBottles: emptyBottles,
-            returnedContainers: returnedContainers,
-            damagedContainers: damagedContainers,
-            lostContainers: lostContainers,
-            notes: notes,
-            paymentMode: paymentMode,
-            paymentStatus: paymentStatus,
-            deliveryImage: deliveryImage,
-          );
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Stop #${stop.stop} marked as $status!'),
-              backgroundColor: status == 'delivered' ? kSuccess : kDanger,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          );
-          if (status == 'delivered') {
-            MockDataService().tabNavigationNotifier.value = 2;
-          }
         },
       ),
     );

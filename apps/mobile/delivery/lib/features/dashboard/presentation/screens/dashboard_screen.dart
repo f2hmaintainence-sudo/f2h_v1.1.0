@@ -18,7 +18,6 @@ import 'package:f2h_delivery/features/dashboard/presentation/widgets/next_delive
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/queue_item_tile.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/verification_pending_view.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/handover_status_card.dart';
-import 'package:f2h_delivery/features/dashboard/presentation/widgets/bottle_tracker_card.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/collect_queue_item.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/pickup_selection_screen.dart';
 
@@ -207,6 +206,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (stop.orders.isEmpty) return;
           final orderId = stop.orders.first.orderId;
 
+          // Show a loading dialog during status update
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
+              ),
+            ),
+          );
+
           context.read<DeliverySessionBloc>().add(UpdateStopStatusEvent(
             orderId: orderId,
             newStatus: status,
@@ -219,29 +229,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
             paymentStatus: paymentStatus,
             deliveryImage: deliveryImage,
             containerReturns: containerReturns,
+            onSuccess: () {
+              if (mounted) {
+                Navigator.pop(context); // pop loading dialog
+                AppSnackBar.show(
+                  context,
+                  'Stop #${stop.stop} marked as $status!',
+                  backgroundColor: status == 'delivered' ? kSuccess : kDanger,
+                );
+                if (status == 'delivered') {
+                  MockDataService().tabNavigationNotifier.value = 2;
+                }
+              }
+            },
+            onError: (errorMsg) {
+              if (mounted) {
+                Navigator.pop(context); // pop loading dialog
+                AppSnackBar.error(context, errorMsg);
+              }
+            },
           ));
-
-          MockDataService().updateOrderStatus(
-            orderId,
-            status,
-            emptyBottles: emptyBottles,
-            returnedContainers: returnedContainers,
-            damagedContainers: damagedContainers,
-            lostContainers: lostContainers,
-            notes: notes,
-            paymentMode: paymentMode,
-            paymentStatus: paymentStatus,
-            deliveryImage: deliveryImage,
-          );
-
-          AppSnackBar.show(
-            context,
-            'Stop #${stop.stop} marked as $status!',
-            backgroundColor: status == 'delivered' ? kSuccess : kDanger,
-          );
-          if (status == 'delivered') {
-            MockDataService().tabNavigationNotifier.value = 2;
-          }
         },
       ),
     );
@@ -601,12 +608,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ] else ...[
                   HandoverStatusCard(currentRun: session.currentRun),
-                  BottleTrackerCard(
-                    expected: session.expectedBottlesCount,
-                    collected: session.collectedBottlesCount,
-                    outstanding: session.bottlesStillOutstanding,
-                    toReturn: session.collectedBottlesCount,
-                  ),
                   const SizedBox(height: 12),
                   // Tab Selector
                   Container(

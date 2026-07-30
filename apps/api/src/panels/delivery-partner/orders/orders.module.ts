@@ -5,12 +5,13 @@ import { DataService } from 'src/shared/database/Data.service';
 import { DeveloperService } from 'src/shared/logger/Developer.service';
 import { HelpersModule } from 'src/helpers/Helpers.module';
 import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
+import { DeliveryOrderService } from './services/delivery.order.service';
 
 import { ReferralModule } from '../../customer/referral/referral.module';
 
 @Module({
   imports: [HelpersModule, ReferralModule],
   controllers: [DeliveryOrderController],
-  providers: [DeveloperService, PushNotificationService, DataService],
+  providers: [DeveloperService, PushNotificationService, DataService, DeliveryOrderService],
 })
 export class DeliveryOrdersModule {}

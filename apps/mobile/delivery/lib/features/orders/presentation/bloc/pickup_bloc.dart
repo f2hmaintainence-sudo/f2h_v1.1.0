@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:f2h_delivery/services/mock_data_service.dart';
+import 'package:f2h_delivery/core/di/injection.dart';
+import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/features/orders/data/models/pickup_item_model.dart';
 import 'package:f2h_delivery/features/orders/domain/repositories/orders_repository.dart';
 
@@ -48,7 +49,9 @@ class PickupBloc extends Bloc<PickupEvent, PickupState> {
         );
         
         if (success) {
-          await MockDataService().loadBackendData();
+          try {
+            sl<DeliverySessionBloc>().add(ReloadSessionEvent());
+          } catch (_) {}
           emit(PickupConfirmed(response: currentState.response));
         } else {
           emit(PickupError(message: 'Failed to confirm pickup'));

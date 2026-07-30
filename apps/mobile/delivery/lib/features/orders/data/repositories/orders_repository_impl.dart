@@ -7,7 +7,6 @@ import 'package:f2h_delivery/features/orders/domain/repositories/orders_reposito
 import 'package:f2h_delivery/features/orders/data/datasources/orders_remote_datasource.dart';
 import 'package:f2h_delivery/features/orders/data/models/pickup_item_model.dart';
 import 'package:f2h_delivery/features/orders/data/models/handover_model.dart';
-
 class OrdersRepositoryImpl implements OrdersRepository {
   final DioClient _dioClient;
   final OrdersRemoteDataSource _remoteDataSource;
@@ -95,7 +94,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
       return data != null && data['status'] == true;
     } catch (e) {
       print('Error updating order status: $e');
-      return false;
+      throw _handleDioError(e, 'Failed to update order status');
     }
   }
 
@@ -199,7 +198,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
       return data != null && data['status'] == true;
     } catch (e) {
       print('Error marking stop as delivered: $e');
-      return false;
+      throw _handleDioError(e, 'Failed to mark stop as delivered');
     }
   }
 
