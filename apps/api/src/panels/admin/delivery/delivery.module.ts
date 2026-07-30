@@ -10,6 +10,7 @@ import { NotificationModule } from 'src/notifications/notification.module';
 import { AdminAuthModule } from 'src/panels/admin/auth/auth.module';
 import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
 import { DataService } from 'src/shared/database/Data.service';
+import { RedisService } from 'src/shared/redis/redis.service';
 
 import { DeliveryShowAddService } from './services/showAdd.service';
 import { DeliverySaveAddService } from './services/saveAdd.service';
@@ -31,6 +32,7 @@ import { ReferralModule } from '../../customer/referral/referral.module';
     DeveloperService,
     PushNotificationService,
     DataService,
+    RedisService,
     DeliveryShowAddService,
     DeliverySaveAddService,
     DeliveryShowEditService,

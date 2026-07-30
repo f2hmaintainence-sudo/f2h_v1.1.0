@@ -96,6 +96,7 @@ const adminNav = [
           { name: "SMS", href: "/admin/developer/api-integrations/sms", icon: FileText },
           { name: "Firebase", href: "/admin/developer/api-integrations/firebase", icon: Layers },
           { name: "Payment Gateway", href: "/admin/developer/api-integrations/payment-gateway", icon: CreditCard },
+          { name: "Maps", href: "/admin/developer/api-integrations/maps", icon: MapPin },
         ]
       }
     ],

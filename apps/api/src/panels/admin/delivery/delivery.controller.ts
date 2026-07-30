@@ -96,6 +96,11 @@ export class DeliveryManagementController {
     return this.saveEditService.savePartner(id, body, adminId);
   }
 
+  @Get('partners/live-positions')
+  async getLivePartnerPositions(@Query('branch_id') branchId?: string) {
+    return this.deliveryService.getLivePartnerPositions(branchId);
+  }
+
   @Get('partners/:id')
   async getPartnerDetails(@Param('id') id: string) {
     return this.deliveryService.getPartnerDetails(id);
