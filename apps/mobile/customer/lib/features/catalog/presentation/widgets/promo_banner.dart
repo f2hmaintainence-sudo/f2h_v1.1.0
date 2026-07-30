@@ -4,18 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/app.dart';
-import 'package:f2h_customer/features/profile/presentation/screens/referral_screen.dart';
+import 'package:f2h_customer/features/wallet/presentation/screens/wallet_screen.dart';
 
-/// Fetches banners from the API and displays them as a tappable carousel.
-/// Tapping navigates to the route specified by each banner (e.g. Subscribe tab).
-class ImageBanner extends StatefulWidget {
-  const ImageBanner({super.key});
+/// Displays top promo banners (subscription_banner.png & wallet_banner.png) as a sliding carousel.
+class PromoBanner extends StatefulWidget {
+  const PromoBanner({super.key});
 
   @override
-  State<ImageBanner> createState() => _ImageBannerState();
+  State<PromoBanner> createState() => _PromoBannerState();
 }
 
-class _ImageBannerState extends State<ImageBanner> {
+class _PromoBannerState extends State<PromoBanner> {
   List<Map<String, dynamic>> _banners = [];
   bool _loading = true;
   static const int _initialPage = 3000;
@@ -38,7 +37,7 @@ class _ImageBannerState extends State<ImageBanner> {
   void _startAutoScroll() {
     _autoScrollTimer?.cancel();
     if (_banners.length <= 1) return;
-    _autoScrollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+    _autoScrollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!mounted || !_pageController.hasClients) return;
       _pageController.nextPage(
         duration: const Duration(milliseconds: 650),
@@ -50,7 +49,7 @@ class _ImageBannerState extends State<ImageBanner> {
   Future<void> _fetchBanners() async {
     try {
       final dioClient = DioClient();
-      final resp = await dioClient.dio.get(ApiEndpoints.banners);
+      final resp = await dioClient.dio.get(ApiEndpoints.promoBanners);
       dynamic data = resp.data;
       if (data is String) {
         data = jsonDecode(data);
@@ -69,66 +68,55 @@ class _ImageBannerState extends State<ImageBanner> {
           return;
         }
       }
-      _useDefaultBanner();
+      _useDefaultBanners();
     } catch (_) {
-      _useDefaultBanner();
+      _useDefaultBanners();
     }
   }
 
-  void _useDefaultBanner() {
+  void _useDefaultBanners() {
     if (!mounted) return;
     setState(() {
       _banners = [
         {
-          'id': 'sub-banner-1',
-          'imageUrl': '${ApiEndpoints.host}/uploads/banners/sub_banner_1.png',
-          'title': 'VIP Member',
-          'subtitle': 'Exclusive benefits & premium experience.',
+          'id': 'promo-1',
+          'imageUrl': '${ApiEndpoints.host}/uploads/banners/subscription_banner.png',
+          'title': 'Subscription Savings',
+          'subtitle': 'Subscribe to fresh milk, curd, paneer & more for hassle-free morning deliveries.',
           'cta': 'Subscribe Now',
           'route': 'subscribe',
           'isActive': true,
         },
         {
-          'id': 'sub-banner-2',
-          'imageUrl': '${ApiEndpoints.host}/uploads/banners/sub_banner_2.png',
-          'title': 'Refer & Earn',
-          'subtitle': 'Invite friends and earn rewards on every referral.',
-          'cta': 'Refer Now',
-          'route': 'refer',
-          'isActive': true,
-        },
-        {
-          'id': 'sub-banner-3',
-          'imageUrl': '${ApiEndpoints.host}/uploads/banners/sub_banner_3.png',
-          'title': 'Farm Fresh Essentials',
-          'subtitle': 'Pure, fresh and natural milk, curd, paneer & ghee.',
-          'cta': 'Shop Now',
-          'route': 'menu',
+          'id': 'promo-2',
+          'imageUrl': '${ApiEndpoints.host}/uploads/banners/wallet_banner.png',
+          'title': 'F2H Wallet',
+          'subtitle': 'Add cash to your wallet & get instant cashback on orders.',
+          'cta': 'Add Money',
+          'route': 'wallet',
           'isActive': true,
         },
       ];
       _loading = false;
     });
+    _startAutoScroll();
   }
 
   void _onBannerTap(Map<String, dynamic> banner) {
     final route = banner['route']?.toString().toLowerCase() ?? '';
     final imageUrl = banner['imageUrl']?.toString().toLowerCase() ?? '';
-    final id = banner['id']?.toString().toLowerCase() ?? '';
 
-    if (route == 'subscribe' || imageUrl.contains('sub_banner_1') || id.contains('sub-banner-1')) {
-      final shellState = context.findAncestorStateOfType<AppShellState>();
-      shellState?.setTab(3); // Redirect to Subscription tab
-    } else if (route == 'refer' || imageUrl.contains('sub_banner_2') || id.contains('sub-banner-2')) {
+    if (route == 'wallet' || imageUrl.contains('wallet_banner')) {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => const ReferralScreen(),
+          builder: (_) => const WalletScreen(),
         ),
       );
     } else {
+      // Default to subscribe tab (tab 3 in AppShell)
       final shellState = context.findAncestorStateOfType<AppShellState>();
-      shellState?.setTab(1); // Redirect to Menu tab (BrowseScreen)
+      shellState?.setTab(3);
     }
   }
 
@@ -153,7 +141,7 @@ class _ImageBannerState extends State<ImageBanner> {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: AspectRatio(
-            aspectRatio: 3.14,
+            aspectRatio: 3.10,
             child: Container(
               color: Colors.grey.shade200,
               child: const Center(
@@ -187,7 +175,7 @@ class _ImageBannerState extends State<ImageBanner> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Container(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(32),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.08),
@@ -197,7 +185,7 @@ class _ImageBannerState extends State<ImageBanner> {
                   ],
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(32),
                   child: GestureDetector(
                     onTap: () => _onBannerTap(banner),
                     child: Image.network(
@@ -221,17 +209,14 @@ class _ImageBannerState extends State<ImageBanner> {
                         );
                       },
                       errorBuilder: (context, error, stackTrace) {
-                        final isRefer = banner['route'] == 'refer' || imageUrl.contains('sub_banner_2');
-                        final isMenu = banner['route'] == 'menu' || imageUrl.contains('sub_banner_3');
+                        final isWallet = banner['route'] == 'wallet' || imageUrl.contains('wallet');
                         return Container(
-                          padding: const EdgeInsets.all(20),
+                          padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
-                              colors: isRefer
-                                  ? [const Color(0xFFD97706), const Color(0xFFF59E0B)]
-                                  : isMenu
-                                      ? [const Color(0xFF0284C7), const Color(0xFF38BDF8)]
-                                      : [const Color(0xFF15803D), const Color(0xFF22C55E)],
+                              colors: isWallet
+                                  ? [const Color(0xFF1D4ED8), const Color(0xFF3B82F6)]
+                                  : [const Color(0xFF15803D), const Color(0xFF22C55E)],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
@@ -244,34 +229,9 @@ class _ImageBannerState extends State<ImageBanner> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white24,
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        isRefer
-                                            ? 'REFER & EARN'
-                                            : isMenu
-                                                ? 'FARM FRESH'
-                                                : 'DAILY SUBSCRIPTION',
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                          letterSpacing: 0.8,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
                                     Text(
                                       banner['title']?.toString() ??
-                                          (isRefer
-                                              ? 'Refer & Earn'
-                                              : isMenu
-                                                  ? 'Farm Fresh Essentials'
-                                                  : 'VIP Member'),
+                                          (isWallet ? 'F2H Wallet' : 'Save Up To 5%'),
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.bold,
@@ -281,11 +241,9 @@ class _ImageBannerState extends State<ImageBanner> {
                                     const SizedBox(height: 4),
                                     Text(
                                       banner['subtitle']?.toString() ??
-                                          (isRefer
-                                              ? 'Invite friends and earn rewards on every referral.'
-                                              : isMenu
-                                                  ? 'Pure, fresh and natural milk, curd, paneer & ghee.'
-                                                  : 'Exclusive benefits & premium experience.'),
+                                          (isWallet
+                                              ? 'Add cash & get instant cashback on orders.'
+                                              : 'Subscription to fresh milk, curd, paneer & more.'),
                                       style: const TextStyle(color: Colors.white70, fontSize: 11),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
@@ -293,22 +251,20 @@ class _ImageBannerState extends State<ImageBanner> {
                                   ],
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 8),
                               Container(
-                                width: 48,
-                                height: 48,
-                                decoration: const BoxDecoration(
-                                  color: Colors.white24,
-                                  shape: BoxShape.circle,
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
                                 ),
-                                child: Icon(
-                                  isRefer
-                                      ? Icons.card_giftcard_rounded
-                                      : isMenu
-                                          ? Icons.shopping_bag_rounded
-                                          : Icons.calendar_month_rounded,
-                                  color: Colors.amber,
-                                  size: 26,
+                                child: Text(
+                                  banner['cta']?.toString() ?? (isWallet ? 'Add Money' : 'Order Now'),
+                                  style: TextStyle(
+                                    color: isWallet ? const Color(0xFF1D4ED8) : const Color(0xFF15803D),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
                                 ),
                               ),
                             ],

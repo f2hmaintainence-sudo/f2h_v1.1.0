@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../bloc/catalog_bloc.dart';
@@ -29,6 +30,7 @@ import '../widgets/product_tile.dart';
 import '../widgets/cart_widgets.dart';
 import '../widgets/offer_banner.dart';
 import '../widgets/image_banner.dart';
+import '../widgets/promo_banner.dart';
 import 'cart_screen.dart';
 import 'product_detail_view_screen.dart';
 import 'product_detail_screen.dart';
@@ -154,8 +156,8 @@ class _HomeScreenState extends State<HomeScreen>
                 // 2. Category Shortcuts Row
                 SliverToBoxAdapter(child: _categoryShortcuts()),
 
-                // 3. Static Image Banner - MOVED DOWN! (Removed by request)
-                SliverToBoxAdapter(child: const ImageBanner()),
+                // 3. Top Banner (above Subscription Products)
+                const SliverToBoxAdapter(child: PromoBanner()),
 
                 // 4. Subscription Products (Marketplace Catalog) - MOVED TO TOP!
                 SliverToBoxAdapter(
@@ -271,6 +273,14 @@ class _HomeScreenState extends State<HomeScreen>
                             .toList(),
                       );
                     },
+                  ),
+                ),
+
+                // 5. Image Banner (Below Subscription Products)
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: ImageBanner(),
                   ),
                 ),
 
@@ -1242,130 +1252,67 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _subscriptionBanner() {
+    final imageUrl = '${ApiEndpoints.host}/uploads/banners/subscription_banner.png';
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 18, 16, 8),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF114227), Color(0xFF1D5C39)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF114227).withValues(alpha: 0.15),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -20,
-            bottom: -20,
-            child: Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: AspectRatio(
+          aspectRatio: 2.75,
+          child: GestureDetector(
+            onTap: () => AppShell.of(context)?.setTab(1),
+            child: Image.network(
+              imageUrl,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              errorBuilder: (context, error, stackTrace) => Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF16A34A),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
                   children: [
-                    const Text(
-                      'Flat 50% OFF',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: -0.5,
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Save Up To 5%',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Subscription to fresh milk, curd, paneer & more for hassle-free morning deliveries.',
+                            style: TextStyle(color: Colors.white70, fontSize: 11),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
                     ),
-                    const Text(
-                      'on your very first order!',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white70,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE5A93B).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: const Color(0xFFE5A93B).withValues(alpha: 0.4),
-                        ),
+                        color: Colors.amber,
+                        borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Text(
-                        'Use code: F2HFIRST50',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFFE5A93B),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    GestureDetector(
-                      onTap: () {
-                        AppShell.of(context)?.setTab(1); // Switch to Menu Tab
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
-                              blurRadius: 6,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: const Text(
-                          'Order Now',
-                          style: TextStyle(
-                            color: Color(0xFF114227),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
+                        'Order Now >',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 12),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Icon(
-                    Icons.calendar_today_rounded,
-                    color: Color(0xFFE5A93B),
-                    size: 34,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
