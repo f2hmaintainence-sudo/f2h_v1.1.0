@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
@@ -12,7 +12,11 @@ class VersionChecker {
     try {
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
-      final platform = Platform.isAndroid ? 'android_delivery' : 'ios_delivery';
+      final platform = kIsWeb
+          ? 'web_delivery'
+          : defaultTargetPlatform == TargetPlatform.iOS
+              ? 'ios_delivery'
+              : 'android_delivery';
 
       final checkUrl = '${ApiEndpoints.baseUrl}/app/check-version';
       final response = await http.get(
