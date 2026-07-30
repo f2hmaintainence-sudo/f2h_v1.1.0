@@ -84,3 +84,8 @@
 .f2h-media-reset img {
   max-width: none !important;
 }
+
+/* Smooth gliding movement for live GPS vehicle pucks */
+.custom-leaflet-partner-uber {
+  transition: transform 1.2s cubic-bezier(0.25, 1, 0.5, 1) !important;
+}

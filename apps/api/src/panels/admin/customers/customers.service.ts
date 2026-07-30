@@ -1678,4 +1678,64 @@ export class CustomersService {
       throw new InternalServerErrorException('Failed to log container transaction');
     }
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // SETTLE POSTPAID BILL
+  // ═══════════════════════════════════════════════════════════════
+
+  async settlePostpaidBill(id: string, body: any, adminId: string = 'system') {
+    try {
+      const custRes = await this.databaseService.query(
+        `SELECT customer_id, first_name, last_name, phone FROM customers WHERE customer_id = ? OR id::text = ?`,
+        [id, id]
+      );
+      if (!custRes || custRes.length === 0) {
+        throw new BadRequestException('Customer not found');
+      }
+      const customer = custRes[0];
+      const customerId = customer.customer_id;
+      const { amount, payment_mode = 'CASH', notes = '' } = body;
+
+      const numAmount = Number(amount || 0);
+      if (numAmount <= 0) {
+        throw new BadRequestException('Settle amount must be greater than 0');
+      }
+
+      // Update all pending/unpaid postpaid orders for this customer to PAID
+      await this.databaseService.query(
+        `UPDATE orders
+         SET payment_status = 'paid', updated_at = NOW()
+         WHERE customer_id = ?
+           AND payment_mode = 'POSTPAID'
+           AND payment_status != 'paid'`,
+        [customerId]
+      );
+
+      // Record in customer_bills if table exists
+      await this.databaseService.query(
+        `UPDATE customer_bills
+         SET status = 'paid', paid_amount = total_amount, due_amount = 0, updated_at = NOW()
+         WHERE customer_id = ? AND status != 'paid'`,
+        [customerId]
+      ).catch(() => []);
+
+      // Log admin audit
+      await this.dataService.insert('admin_audit_logs', {
+        admin_id: adminId,
+        action: 'settle_postpaid_bill',
+        target_type: 'customers',
+        target_id: customerId,
+        details: JSON.stringify({ amount: numAmount, payment_mode, notes }),
+      }).catch(() => []);
+
+      return {
+        status: true,
+        message: `Postpaid bill of ₹${numAmount.toLocaleString('en-IN')} for ${customer.first_name || 'Customer'} successfully settled!`,
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      this.developer.error('settlePostpaidBill error', { error, id });
+      throw new InternalServerErrorException('Failed to settle postpaid bill');
+    }
+  }
 }

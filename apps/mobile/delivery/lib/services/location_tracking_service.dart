@@ -40,8 +40,8 @@ class LocationTrackingService {
     // Send initial location immediately
     await _sendLocationUpdate();
 
-    // Start periodic updates every 3 minute
-    _locationTimer = Timer.periodic(const Duration(minutes: 3), (_) async {
+    // Start periodic updates every 30 seconds
+    _locationTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
       if (_isTracking) {
         await _sendLocationUpdate();
       }
