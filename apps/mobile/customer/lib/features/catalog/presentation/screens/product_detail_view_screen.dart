@@ -628,13 +628,15 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                           ),
 
                           // Expanded content
-                          AnimatedCrossFade(
-                            firstChild: const SizedBox.shrink(),
-                            secondChild: Padding(
-                              padding: const EdgeInsets.only(top: 12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
+ 
+                            AnimatedCrossFade(
+                              duration: const Duration(milliseconds: 300),
+                              firstChild: const SizedBox.shrink(),
+                              secondChild: Padding(
+                                padding: const EdgeInsets.only(top: 12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
                                   const Text(
                                     'About this product',
                                     style: TextStyle(
@@ -730,6 +732,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                 : CrossFadeState.showFirst,
                           ),
 
+
                           const SizedBox(height: 12),
                           const Divider(height: 1, color: Color(0xFFF0F0F0)),
                           const SizedBox(height: 16),
@@ -784,7 +787,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                           ),
                           const SizedBox(height: 24),
 
-                          // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
+
                           // Customer Reviews Feed Section
                           const Divider(height: 1, color: Color(0xFFF0F0F0)),
                           const SizedBox(height: 16),

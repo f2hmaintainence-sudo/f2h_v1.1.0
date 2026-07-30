@@ -18,6 +18,7 @@ import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:f2h_customer/core/services/app_asset_service.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../profile/presentation/screens/referral_screen.dart';
 import '../../../notifications/presentation/screens/notifications_screen.dart';
@@ -275,11 +276,6 @@ class _HomeScreenState extends State<HomeScreen>
 
 
 
-                // 5.5. Referral Banner (Invite Friends, Earn Rewards!)
-                const SliverToBoxAdapter(
-                  child: _HomeReferralBanner(),
-                ),
-
                 // 6. One time Product
                 SliverToBoxAdapter(
                   child: Padding(
@@ -379,25 +375,15 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 ),
 
-                // 6. Quick Features Strip - MOVED DOWN!
-                SliverToBoxAdapter(child: _quickFeatures()),
+                // 6. Referral Banner (Invite Friends, Earn Rewards!)
+                const SliverToBoxAdapter(
+                  child: _HomeReferralBanner(),
+                ),
 
-                // 7. Subscription Promotion Banner - MOVED DOWN!
-                //  SliverToBoxAdapter(child: _subscriptionBanner()),
-
-                // 8. Today's Fresh Batch
-                SliverToBoxAdapter(child: _freshBatchStepper()),
-
-                // 9. The F2H Promise
+                // 7. The F2H Promise
                 SliverToBoxAdapter(child: _promiseStrip()),
 
-                // 10. Customer Reviews
-                // SliverToBoxAdapter(child: _reviewsCard()),
-
-                // 11. Referral Program (Removed by request)
-                // SliverToBoxAdapter(child: _referralBanner()),
-
-                const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                const SliverToBoxAdapter(child: SizedBox(height: 20)),
               ],
             ),
           ),
@@ -532,33 +518,48 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _profileBtn() {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const ProfileScreen()),
+    return BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
+      builder: (context, state) {
+        final isVip = state.profile?.isMember == true;
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+            );
+          },
+          child: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              gradient: isVip
+                  ? const LinearGradient(
+                      colors: [Color(0xFFB8860B), Color(0xFFFFD700)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+              color: isVip ? null : Colors.white,
+              shape: BoxShape.circle,
+              border: isVip ? Border.all(color: Colors.white, width: 1.5) : null,
+              boxShadow: [
+                BoxShadow(
+                  color: isVip
+                      ? const Color(0xFFFFD700).withValues(alpha: 0.4)
+                      : Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Icon(
+              Icons.person_outline_rounded,
+              color: isVip ? Colors.white : const Color(0xFF16653A),
+              size: 20,
+            ),
+          ),
         );
       },
-      child: Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: const Icon(
-          Icons.person_outline_rounded,
-          color: Color(0xFF16653A),
-          size: 20,
-        ),
-      ),
     );
   }
 
@@ -1690,76 +1691,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _referralBanner() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 18, 16, 20),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFF16653A),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF16653A).withValues(alpha: 0.15),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Refer & Earn',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Invite friends & earn ₹100 F2H Cash',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white70,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                GestureDetector(
-                  onTap: () {
-                    // Invite
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      'Invite Now',
-                      style: TextStyle(
-                        color: Color(0xFF16653A),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          const Icon(
-            Icons.card_giftcard_rounded,
-            color: Colors.white,
-            size: 64,
-          ),
-        ],
-      ),
-    );
+    return const _HomeReferralBanner();
   }
 
   Widget _buildFloatingCartBadge() {
@@ -2091,8 +2023,8 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
           // 1. Farm Background Image (fades out as header collapses)
           Opacity(
             opacity: (1.0 - shrinkFactor).clamp(0.0, 1.0),
-            child: Image.asset(
-              'assets/icon/home_bg.jpg',
+            child: AppAssetImage(
+              assetKey: 'assets/bg/home_bg.jpg',
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
               errorBuilder: (context, error, stackTrace) {
@@ -2139,8 +2071,8 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.asset(
-                      'assets/icon/app_icon.png',
+                    child: AppAssetImage(
+                      assetKey: 'assets/icon/app_icon.png',
                       width: 32,
                       height: 32,
                       fit: BoxFit.cover,
@@ -2177,51 +2109,60 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
             left: 16,
             right: 16,
             top: topPadding + 170 - (shrinkFactor * 162), // Interpolates from topPadding+170 to topPadding+8
-            child: GestureDetector(
-              onTap: onSearchTap,
-              child: Container(
-                height: 46,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: const Color(0xFF16653A).withValues(alpha: 0.12),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF16653A).withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.search_rounded,
-                      color: Color(0xFF16653A),
-                      size: 20,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        searchHint,
-                        style: const TextStyle(
-                          color: kTextSub,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
+            child: BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
+              builder: (context, sessionState) {
+                final isVip = sessionState.profile?.isMember == true;
+
+                return GestureDetector(
+                  onTap: onSearchTap,
+                  child: Container(
+                    height: 46,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(
+                        color: isVip ? const Color(0xFFFFD700) : const Color(0xFF16653A).withValues(alpha: 0.12),
+                        width: isVip ? 1.5 : 1.0,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: isVip
+                              ? const Color(0xFFFFD700).withValues(alpha: 0.3)
+                              : const Color(0xFF16653A).withValues(alpha: 0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    const Icon(
-                      Icons.tune_rounded,
-                      color: Color(0xFF16653A),
-                      size: 20,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.search_rounded,
+                          color: isVip ? const Color(0xFFB8860B) : const Color(0xFF16653A),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            searchHint,
+                            style: const TextStyle(
+                              color: kTextSub,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.tune_rounded,
+                          color: isVip ? const Color(0xFFB8860B) : const Color(0xFF16653A),
+                          size: 20,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -2287,13 +2228,13 @@ class _HomeReferralBanner extends StatelessWidget {
             }
           },
           child: Container(
-            margin: EdgeInsets.fromLTRB(sw < 340 ? 10 : 16, 10, sw < 340 ? 10 : 16, 8),
-            padding: EdgeInsets.all(12 * scale),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 12 * scale),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [
-                  Color(0xFF0D5432),
-                  Color(0xFF16653A),
+                  Color(0xFF0B4628),
+                  Color(0xFF145C34),
                   Color(0xFF043927),
                 ],
                 begin: Alignment.topLeft,
@@ -2306,9 +2247,9 @@ class _HomeReferralBanner extends StatelessWidget {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF064E3B).withOpacity(0.2),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
+                  color: const Color(0xFF064E3B).withOpacity(0.25),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
@@ -2316,8 +2257,8 @@ class _HomeReferralBanner extends StatelessWidget {
               children: [
                 // Icon badge — fixed size, scales with screen
                 Container(
-                  width: 34 * scale,
-                  height: 34 * scale,
+                  width: 40 * scale,
+                  height: 40 * scale,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [Color(0xFFFEF3C7), Color(0xFFFDE68A)],
@@ -2338,21 +2279,22 @@ class _HomeReferralBanner extends StatelessWidget {
                     child: Icon(
                       isLocked ? Icons.lock_outline_rounded : Icons.card_giftcard_rounded,
                       color: const Color(0xFFB45309),
-                      size: 17 * scale,
+                      size: 20 * scale,
                     ),
                   ),
                 ),
-                SizedBox(width: 8 * scale),
+                SizedBox(width: 10 * scale),
                 // Text content — expands to fill
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         'Invite Friends & Earn ₹50!',
                         style: TextStyle(
-                          fontSize: 12 * scale,
+                          fontSize: 13.5 * scale,
                           fontWeight: FontWeight.w900,
                           color: Colors.white,
                           height: 1.2,
@@ -2361,13 +2303,13 @@ class _HomeReferralBanner extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      SizedBox(height: 2 * scale),
+                      SizedBox(height: 3 * scale),
                       Text(
                         isLocked
                             ? 'Make your 1st order to unlock referral code.'
                             : 'You & your friend both get ₹50 on first order.',
                         style: TextStyle(
-                          fontSize: 9.5 * scale,
+                          fontSize: 10.5 * scale,
                           fontWeight: FontWeight.w500,
                           color: const Color(0xFFA7F3D0),
                           height: 1.2,
@@ -2378,8 +2320,8 @@ class _HomeReferralBanner extends StatelessWidget {
                     ],
                   ),
                 ),
-                SizedBox(width: 6 * scale),
-                // CTA button — wraps to fit
+                SizedBox(width: 8 * scale),
+                // CTA button — stacked vertically to preserve width
                 _buildCta(context, isLoggedIn, isLocked, code, scale),
               ],
             ),
@@ -2392,14 +2334,14 @@ class _HomeReferralBanner extends StatelessWidget {
   Widget _buildCta(BuildContext ctx, bool isLoggedIn, bool isLocked, String? code, double scale) {
     if (!isLoggedIn) {
       return Container(
-        padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 6 * scale),
+        padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 8 * scale),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.10),
-              blurRadius: 4,
+              color: Colors.black.withOpacity(0.12),
+              blurRadius: 5,
               offset: const Offset(0, 2),
             ),
           ],
@@ -2407,12 +2349,12 @@ class _HomeReferralBanner extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.login_rounded, color: const Color(0xFF064E3B), size: 12 * scale),
-            SizedBox(width: 4 * scale),
+            Icon(Icons.login_rounded, color: const Color(0xFF064E3B), size: 14 * scale),
+            SizedBox(width: 5 * scale),
             Text(
               'Login',
               style: TextStyle(
-                fontSize: 10 * scale,
+                fontSize: 12 * scale,
                 fontWeight: FontWeight.w900,
                 color: const Color(0xFF064E3B),
               ),
@@ -2424,25 +2366,25 @@ class _HomeReferralBanner extends StatelessWidget {
 
     if (isLocked) {
       return Container(
-        padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 5 * scale),
+        padding: EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 7 * scale),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFFFEF3C7), Color(0xFFFDE68A)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.white, width: 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.lock_rounded, color: const Color(0xFFB45309), size: 11 * scale),
-            SizedBox(width: 3 * scale),
+            Icon(Icons.lock_rounded, color: const Color(0xFFB45309), size: 13 * scale),
+            SizedBox(width: 4 * scale),
             Text(
               'Unlock',
               style: TextStyle(
-                fontSize: 10 * scale,
+                fontSize: 11.5 * scale,
                 fontWeight: FontWeight.w900,
                 color: const Color(0xFFB45309),
               ),
@@ -2453,66 +2395,63 @@ class _HomeReferralBanner extends StatelessWidget {
     }
 
     if (code != null) {
-      return Flexible(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 7 * scale, vertical: 4 * scale),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white.withOpacity(0.4), width: 1),
-                ),
-                child: Text(
-                  code,
-                  style: TextStyle(
-                    fontSize: 10 * scale,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: 0.3,
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 3 * scale),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white.withOpacity(0.45), width: 1),
+            ),
+            child: Text(
+              code,
+              style: TextStyle(
+                fontSize: 10 * scale,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                letterSpacing: 0.3,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          SizedBox(height: 4 * scale),
+          GestureDetector(
+            onTap: () => _shareCode(ctx, code),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 4 * scale),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.share_rounded, color: const Color(0xFF064E3B), size: 11 * scale),
+                  SizedBox(width: 3 * scale),
+                  Text(
+                    'Share',
+                    style: TextStyle(
+                      fontSize: 10 * scale,
+                      fontWeight: FontWeight.w900,
+                      color: const Color(0xFF064E3B),
+                    ),
+                  ),
+                ],
               ),
             ),
-            SizedBox(width: 5 * scale),
-            GestureDetector(
-              onTap: () => _shareCode(ctx, code),
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 4 * scale),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
-                      blurRadius: 3,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.share_rounded, color: const Color(0xFF064E3B), size: 11 * scale),
-                    SizedBox(width: 3 * scale),
-                    Text(
-                      'Share',
-                      style: TextStyle(
-                        fontSize: 9.5 * scale,
-                        fontWeight: FontWeight.w900,
-                        color: const Color(0xFF064E3B),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 

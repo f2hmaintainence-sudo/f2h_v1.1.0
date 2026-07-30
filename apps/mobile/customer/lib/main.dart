@@ -58,7 +58,9 @@ void main() async {
           await Firebase.initializeApp();
         }
       }
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      FirebaseMessaging.onBackgroundMessage(
+        _firebaseMessagingBackgroundHandler,
+      );
       sl<NotificationService>().initialize();
     } catch (e) {
       debugPrint('[main] Firebase init failed: $e');
@@ -68,10 +70,12 @@ void main() async {
   // 3. Cold-boot auth check — determines initial screen without a loading flash
   final bootResult = await AppBootstrap.checkAuth();
 
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.dark,
-  ));
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+    ),
+  );
 
   // 4. Launch app with pre-resolved auth state
   runApp(F2HApp(bootResult: bootResult));

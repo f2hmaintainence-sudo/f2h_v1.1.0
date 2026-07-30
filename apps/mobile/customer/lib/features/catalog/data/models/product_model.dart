@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
+import 'package:f2h_customer/core/services/app_asset_service.dart';
 
 // ══════════════════════════════════════════════════════════
 //  PRODUCT VARIANT — size/weight options per product
@@ -309,12 +310,13 @@ Widget buildProductImage(
 
   if (asset != null && asset.isNotEmpty) {
     if (asset.startsWith('assets/')) {
-      return Image.asset(
-        asset,
+      final imageUrl = AppAssetService.getAssetUrl(asset);
+      return CachedNetworkImage(
+        imageUrl: imageUrl,
         width: width,
         height: height,
         fit: fit,
-        errorBuilder: (context, error, stackTrace) {
+        errorWidget: (context, url, error) {
           return _fallbackIconWidget(name, width, height, fallbackColor);
         },
       );

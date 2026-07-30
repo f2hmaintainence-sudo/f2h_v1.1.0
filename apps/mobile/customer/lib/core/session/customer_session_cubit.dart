@@ -5,6 +5,7 @@ import 'package:f2h_customer/core/auth/token_storage.dart';
 import 'package:f2h_customer/core/session/customer_bootstrap_api.dart';
 import 'package:f2h_customer/core/session/customer_session_cache.dart';
 import 'package:f2h_customer/core/session/customer_session_state.dart';
+export 'package:f2h_customer/core/session/customer_session_state.dart';
 
 class CustomerSessionCubit extends Cubit<CustomerSessionState> {
   final CustomerBootstrapApi bootstrapApi;

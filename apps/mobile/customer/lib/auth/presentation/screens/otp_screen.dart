@@ -10,6 +10,7 @@ import 'package:f2h_customer/auth/presentation/bloc/auth_event.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
+import 'package:f2h_customer/core/services/app_asset_service.dart';
 
 class OtpScreen extends StatefulWidget {
   final String userName;
@@ -177,8 +178,8 @@ class _OtpScreenState extends State<OtpScreen> {
                               shape: BoxShape.circle,
                             ),
                             child: Center(
-                              child: Image.asset(
-                                'assets/icon/app_icon.png',
+                              child: AppAssetImage(
+                                assetKey: 'assets/icon/app_icon.png',
                                 width: 38,
                                 height: 38,
                                 errorBuilder: (context, error, stackTrace) => const Icon(
