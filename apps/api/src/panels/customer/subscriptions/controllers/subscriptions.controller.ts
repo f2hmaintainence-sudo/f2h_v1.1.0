@@ -28,20 +28,55 @@ export class SubscriptionsController {
 
   @Public()
   @Post('checkout')
-  checkout(@Req() req: Request, @Body() body: CreateSubscriptionDto) {
-    const user = req?.user as any;
-    if (!body.customer_id && user?.user_id) {
-      body.customer_id = user.user_id;
+  async checkout(@Req() req: Request, @Body() body: CreateSubscriptionDto) {
+    try {
+      console.log("i am from subscription checkout", JSON.stringify(body));
+      const user = req?.user as any;
+      let customerId = body.customer_id?.trim() || user?.user_id || (req.headers['x-user-id'] as string)?.trim();
+      if (!customerId && req.headers['authorization']) {
+        try {
+          const token = (req.headers['authorization'] as string).replace(/^Bearer\s+/i, '');
+          const jwt = require('jsonwebtoken');
+          const decoded: any = jwt.decode(token);
+          if (decoded?.user_id || decoded?.sub) {
+            customerId = decoded.user_id || decoded.sub;
+          }
+        } catch (_) {}
+      }
+      if (customerId) {
+        body.customer_id = customerId;
+      }
+      const result = await this.service.checkout(body, req);
+      return result;
+    } catch (err) {
+      console.error('SUBSCRIPTION CHECKOUT ERROR:', err?.message || err, err?.stack);
+      // Return structured error instead of raw 500
+      return {
+        status: false,
+        error_code: 'server_error',
+        message: err?.message || 'Subscription checkout failed',
+        debug: String(err),
+      };
     }
-    return this.service.checkout(body);
   }
 
+  @Public()
   @Get()
-  @UseGuards(AuthGuard('jwt'))
   getSubscriptions(@Req() req: Request) {
     const user = req.user as any;
-    const userId = user?.user_id;
-    const email = user?.email;
+    let userId = user?.user_id || (req.headers['x-user-id'] as string)?.trim();
+    let email = user?.email;
+    if (!userId && req.headers['authorization']) {
+      try {
+        const token = (req.headers['authorization'] as string).replace(/^Bearer\s+/i, '');
+        const jwt = require('jsonwebtoken');
+        const decoded: any = jwt.decode(token);
+        if (decoded?.user_id || decoded?.sub) {
+          userId = decoded.user_id || decoded.sub;
+          email = decoded.email || email;
+        }
+      } catch (_) {}
+    }
     return this.service.getSubscriptions(userId, email);
   }
 

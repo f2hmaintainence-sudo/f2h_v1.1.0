@@ -29,6 +29,8 @@ interface NotificationPayload {
     origin: [
       'http://localhost:3000',
       'http://127.0.0.1:3000',
+      'http://localhost:8085',
+      'http://127.0.0.1:8085',
       'https://f2hfresh.com',
       'https://www.f2hfresh.com',
     ],
@@ -87,6 +89,23 @@ export class NotificationGateway
   broadcastExcept(excludeUserId: string, payload: NotificationPayload): void {
     const recipients = this.getOnlineUsersExcept(excludeUserId);
     this.sendToUsers(recipients, payload);
+  }
+
+  /**
+   * Broadcast real-time GPS position of a delivery partner to all admin
+   * clients that have joined the 'admin_tracking' room.
+   * Called from LocationController after every location update.
+   */
+  emitPartnerLocation(payload: {
+    partnerId: string;
+    partnerName?: string;
+    lat: number;
+    lng: number;
+    battery?: number;
+    speed?: number;
+    timestamp: string;
+  }): void {
+    this.server.to('admin_tracking').emit('partner_location_update', payload);
   }
 
   disconnectUserSockets(userId: string): number {
@@ -295,6 +314,12 @@ export class NotificationGateway
     }
     this.userSockets.get(userId)!.add(client.id);
     client.join(this.getUserRoom(userId));
+
+    // Allow admin clients to self-join the GPS tracking room
+    client.on('join_admin_tracking', () => {
+      client.join('admin_tracking');
+      this.logger.log(`[GPS] Admin ${userId} (${client.id}) joined admin_tracking room`);
+    });
 
     const socketCount = this.userSockets.get(userId)!.size;
     this.logger.log(

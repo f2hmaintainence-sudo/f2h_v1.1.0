@@ -114,7 +114,6 @@ class CatalogRepositoryImpl implements CatalogRepository {
             isVariantLowStock = true;
           }
         }
-
         vars.add(ProductVariant(
           id: variantId,
           label: variantName.trim().isNotEmpty ? variantName.trim() : 'Standard',

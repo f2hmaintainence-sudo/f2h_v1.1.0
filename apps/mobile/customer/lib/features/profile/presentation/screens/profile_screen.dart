@@ -873,7 +873,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ? profile.email
                 : 'Complete your email for faster support';
 
-            customerInfo = profile.isMember ? 'F2H MEMBER' : 'NORMAL';
+            customerInfo = profile.isMember ? 'VIP MEMBER' : 'NORMAL';
           }
 
           return Scaffold(
@@ -917,24 +917,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 SliverToBoxAdapter(
                   child: Column(
                     children: [
-                      // Profile header card with gradient
+                      // Profile header card with modern glassmorphic layout
                       Container(
                         margin: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                        padding: const EdgeInsets.all(24),
+                        clipBehavior: Clip.antiAlias,
                         decoration: BoxDecoration(
                           gradient: profile?.isMember == true
                               ? const LinearGradient(
                                   colors: [
-                                    Color(0xFF8A6E2D), // Rich dark gold
-                                    Color(0xFFC5A04D), // Medium warm gold
-                                    Color(0xFFE3C47B), // Light gold
+                                    Color(0xFF0F2015), // Luxury Deep Emerald/Obsidian
+                                    Color(0xFF1B3D2A), // Forest Emerald
+                                    Color(0xFF133220), // Rich Dark Green
                                   ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 )
                               : const LinearGradient(
                                   colors: [
-                                    Color(0xFF123E24),
+                                    Color(0xFF0D331E),
                                     kPrimary,
                                     kPrimaryMid,
                                   ],
@@ -942,231 +942,256 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   end: Alignment.bottomRight,
                                 ),
                           borderRadius: BorderRadius.circular(28),
+                          border: Border.all(
+                            color: profile?.isMember == true
+                                ? const Color(0xFFFFD700).withValues(alpha: 0.35)
+                                : Colors.white.withValues(alpha: 0.2),
+                            width: 1.5,
+                          ),
                           boxShadow: [
                             BoxShadow(
                               color: profile?.isMember == true
-                                  ? const Color(0xFFC5A04D).withValues(alpha: 0.2)
-                                  : kPrimary.withValues(alpha: 0.12),
+                                  ? const Color(0xFF16A34A).withValues(alpha: 0.2)
+                                  : kPrimary.withValues(alpha: 0.15),
                               blurRadius: 24,
-                              offset: const Offset(0, 12),
+                              offset: const Offset(0, 10),
                             )
                           ],
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Stack(
                           children: [
-                            Row(
-                              children: [
-                                // Avatar Ring
-                                Container(
-                                  width: 72,
-                                  height: 72,
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [Colors.white.withValues(alpha: 0.4), Colors.white.withValues(alpha: 0.05)],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.white.withValues(alpha: 0.4),
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                  padding: const EdgeInsets.all(3),
-                                  child: Container(
-                                    decoration: const BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        customerName.isNotEmpty ? customerName[0].toUpperCase() : 'G',
-                                        style: TextStyle(
-                                          fontSize: 28,
-                                          fontWeight: FontWeight.w900,
-                                          color: profile?.isMember == true ? const Color(0xFF8A6E2D) : kPrimary,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 18),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                            // Background Watermark Decor
+                            Positioned(
+                              right: -15,
+                              bottom: -20,
+                              child: Icon(
+                                profile?.isMember == true
+                                    ? Icons.workspace_premium_rounded
+                                    : Icons.eco_rounded,
+                                size: 140,
+                                color: profile?.isMember == true
+                                    ? const Color(0xFFFFD700).withValues(alpha: 0.07)
+                                    : Colors.white.withValues(alpha: 0.05),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(22),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.center,
                                     children: [
-                                      Text(
-                                        customerName,
-                                        style: const TextStyle(
-                                          fontSize: 22,
-                                          fontWeight: FontWeight.w900,
-                                          color: Colors.white,
-                                          letterSpacing: -0.5,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 6),
-                                      // Verified badge pill
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                        decoration: BoxDecoration(
-                                          gradient: profile?.isMember == true
-                                              ? const LinearGradient(
-                                                  colors: [Colors.white, Colors.white],
-                                                  begin: Alignment.topLeft,
-                                                  end: Alignment.bottomRight,
+                                      // Avatar Ring
+                                      Stack(
+                                        children: [
+                                          Container(
+                                            width: 70,
+                                            height: 70,
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                colors: profile?.isMember == true
+                                                    ? [const Color(0xFFFFD700), const Color(0xFFB8860B)]
+                                                    : [Colors.white, Colors.white.withValues(alpha: 0.4)],
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                              ),
+                                              shape: BoxShape.circle,
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: profile?.isMember == true
+                                                      ? const Color(0xFFFFD700).withValues(alpha: 0.35)
+                                                      : Colors.black.withValues(alpha: 0.1),
+                                                  blurRadius: 10,
+                                                  offset: const Offset(0, 4),
                                                 )
-                                              : const LinearGradient(
-                                                  colors: [Color(0xFFFFD56B), _marketGold],
-                                                  begin: Alignment.topLeft,
-                                                  end: Alignment.bottomRight,
-                                                ),
-                                          borderRadius: BorderRadius.circular(30),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withValues(alpha: 0.06),
-                                              blurRadius: 4,
-                                              offset: const Offset(0, 2),
-                                            )
-                                          ],
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              Icons.verified_rounded,
-                                              size: 13,
-                                              color: profile?.isMember == true ? const Color(0xFF8A6E2D) : const Color(0xFF332000),
+                                              ],
                                             ),
-                                            const SizedBox(width: 5),
-                                            Flexible(
-                                              child: Text(
-                                                customerInfo,
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w900,
-                                                  color: profile?.isMember == true ? const Color(0xFF8A6E2D) : const Color(0xFF332000),
-                                                  letterSpacing: 0.5,
+                                            padding: const EdgeInsets.all(2.5),
+                                            child: Container(
+                                              decoration: const BoxDecoration(
+                                                color: Colors.white,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Center(
+                                                child: Text(
+                                                  customerName.isNotEmpty ? customerName[0].toUpperCase() : 'G',
+                                                  style: TextStyle(
+                                                    fontSize: 28,
+                                                    fontWeight: FontWeight.w900,
+                                                    color: profile?.isMember == true
+                                                        ? const Color(0xFF133220)
+                                                        : kPrimary,
+                                                  ),
                                                 ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ),
+                                          if (profile?.isMember == true)
+                                            Positioned(
+                                              top: 0,
+                                              right: 0,
+                                              child: Container(
+                                                padding: const EdgeInsets.all(3),
+                                                decoration: const BoxDecoration(
+                                                  color: Color(0xFFFFD700),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(
+                                                  Icons.star_rounded,
+                                                  size: 11,
+                                                  color: Color(0xFF0F2015),
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              customerName,
+                                              style: const TextStyle(
+                                                fontSize: 21,
+                                                fontWeight: FontWeight.w900,
+                                                color: Colors.white,
+                                                letterSpacing: -0.4,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            if (customerMobile.isNotEmpty) ...[
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                customerMobile,
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.white.withValues(alpha: 0.8),
+                                                ),
+                                              ),
+                                            ],
+                                            const SizedBox(height: 6),
+                                            // Verified badge pill
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                gradient: profile?.isMember == true
+                                                    ? const LinearGradient(
+                                                        colors: [Color(0xFF052E16), Color(0xFF14532D)],
+                                                        begin: Alignment.topLeft,
+                                                        end: Alignment.bottomRight,
+                                                      )
+                                                    : const LinearGradient(
+                                                        colors: [Color(0xFFFFD56B), _marketGold],
+                                                        begin: Alignment.topLeft,
+                                                        end: Alignment.bottomRight,
+                                                      ),
+                                                borderRadius: BorderRadius.circular(30),
+                                                border: profile?.isMember == true
+                                                    ? Border.all(color: const Color(0xFFFFD700), width: 1.2)
+                                                    : null,
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: profile?.isMember == true
+                                                        ? Colors.black.withValues(alpha: 0.3)
+                                                        : Colors.black.withValues(alpha: 0.06),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 2),
+                                                  )
+                                                ],
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    profile?.isMember == true
+                                                        ? Icons.workspace_premium_rounded
+                                                        : Icons.verified_rounded,
+                                                    size: 13,
+                                                    color: profile?.isMember == true ? const Color(0xFFFFD700) : const Color(0xFF332000),
+                                                  ),
+                                                  const SizedBox(width: 5),
+                                                  Flexible(
+                                                    child: Text(
+                                                      customerInfo,
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        fontWeight: FontWeight.w900,
+                                                        color: profile?.isMember == true ? const Color(0xFFFFD700) : const Color(0xFF332000),
+                                                        letterSpacing: 0.8,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
+                                      // Action button (Edit details / Settings)
+                                      IconButton(
+                                        onPressed: () {
+                                          if (isLoggedIn) {
+                                            _showPersonalDetails(context, profile);
+                                          } else {
+                                            _showLoginDrawer(context);
+                                          }
+                                        },
+                                        icon: const Icon(Icons.chevron_right_rounded, size: 22),
+                                        color: Colors.white,
+                                        style: IconButton.styleFrom(
+                                          backgroundColor: Colors.white.withValues(alpha: 0.15),
+                                          padding: const EdgeInsets.all(8),
+                                        ),
+                                      ),
                                     ],
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 22),
-                            // Glassmorphic Contact Card
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.07),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.12),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Column(
-                                children: [
-                                  if (isLoggedIn) ...[
-                                    Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(6),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: const Icon(
-                                            Icons.phone_iphone_rounded,
-                                            color: Colors.white,
-                                            size: 16,
-                                          ),
+                                  if (!isLoggedIn) ...[
+                                    const SizedBox(height: 18),
+                                    // Login button for Guest Users
+                                    Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.07),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
+                                          color: Colors.white.withValues(alpha: 0.12),
+                                          width: 1,
                                         ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Text(
-                                            customerMobile,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const Padding(
-                                      padding: EdgeInsets.symmetric(vertical: 10),
-                                      child: Divider(color: Colors.white10, height: 1),
-                                    ),
-                                    Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(6),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: const Icon(
-                                            Icons.mail_outline_rounded,
-                                            color: Colors.white,
-                                            size: 16,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Text(
-                                            customerEmail,
+                                      ),
+                                      child: SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton.icon(
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) => const LoginScreen(popOnSuccess: true),
+                                              ),
+                                            );
+                                          },
+                                          icon: const Icon(Icons.login_rounded, size: 18, color: kPrimary),
+                                          label: const Text(
+                                            'Login / Sign Up',
                                             style: TextStyle(
-                                              color: Colors.white.withValues(alpha: 0.85),
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w900,
+                                              color: kPrimary,
                                             ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  ] else ...[
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: ElevatedButton.icon(
-                                        onPressed: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) => const LoginScreen(popOnSuccess: true),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.white,
+                                            foregroundColor: kPrimary,
+                                            padding: const EdgeInsets.symmetric(vertical: 12),
+                                            elevation: 2,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(14),
                                             ),
-                                          );
-                                        },
-                                        icon: const Icon(Icons.login_rounded, size: 18, color: kPrimary),
-                                        label: const Text(
-                                          'Login / Sign Up',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w900,
-                                            color: kPrimary,
-                                          ),
-                                        ),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.white,
-                                          foregroundColor: kPrimary,
-                                          padding: const EdgeInsets.symmetric(vertical: 12),
-                                          elevation: 2,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(14),
                                           ),
                                         ),
                                       ),
@@ -1213,13 +1238,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Row(
                           children: [
                             _quickAction(
-                              Icons.location_on_outlined,
-                              'Addresses',
+                              Icons.person_outline_rounded,
+                              'Details',
                               const Color(0xFFE8F5E9),
                               const Color(0xFF2E7D32),
                               () {
                                 if (isLoggedIn) {
-                                  AddressSelectorDrawer.show(context);
+                                  _showPersonalDetails(context, profile);
+                                } else {
+                                  _showLoginDrawer(context);
+                                }
+                              },
+                            ),
+                            _quickAction(
+                              Icons.location_on_outlined,
+                              'Address',
+                              const Color(0xFFF3E5F5),
+                              const Color(0xFF7B1FA2),
+                              () async {
+                                if (isLoggedIn) {
+                                  final selected = await AddressSelectorDrawer.show(context);
+                                  if (selected != null && selected.addressId != null && context.mounted) {
+                                    await context.read<CustomerSessionCubit>().updateDefaultAddress(selected.addressId!);
+                                    if (context.mounted) {
+                                      F2HToast.success(context, 'Default address updated');
+                                    }
+                                  }
                                 } else {
                                   _showLoginDrawer(context);
                                 }
@@ -1324,20 +1368,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             _divider(),
                             _menuItem(
-                              Icons.person_outline_rounded,
-                              'Personal Details',
-                              const Color(0xFFFFF3E0),
-                              const Color(0xFFEF6C00),
-                              onTap: () {
-                                if (isLoggedIn) {
-                                  _showPersonalDetails(context, profile);
-                                } else {
-                                  _showLoginDrawer(context);
-                                }
-                              },
-                            ),
-                            _divider(),
-                            _menuItem(
                               Icons.notifications_none_outlined,
                               'My Notifications',
                               const Color(0xFFE8F5E9),
@@ -1350,14 +1380,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ),
                                 );
                               },
-                            ),
-                            _divider(),
-                            _menuItem(
-                              Icons.settings_outlined,
-                              'Notification Preferences',
-                              const Color(0xFFE8EAF6),
-                              const Color(0xFF3F51B5),
-                              onTap: () => _showNotificationPrefs(context),
                             ),
                             _divider(),
                             // _menuItem(
@@ -1472,14 +1494,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         child: Column(
                           children: [
-                            _menuItem(
-                              Icons.help_outline_rounded,
-                              'Help Center',
-                              const Color(0xFFF3E5F5),
-                              const Color(0xFF7B1FA2),
-                              onTap: () => _showHelpCenter(context),
-                            ),
-                            _divider(),
                             _menuItem(
                               Icons.phone_outlined,
                               'Call Us - +91 91487 73591',

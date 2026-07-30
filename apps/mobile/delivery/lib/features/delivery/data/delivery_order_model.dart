@@ -55,6 +55,7 @@ class DeliveryOrderModel {
   final List<DeliveryOrderItem> products;
   final String? runId;
   final int? addressRowId;
+  final List<CustomerContainerBalance> containerBalances;
 
   const DeliveryOrderModel({
     required this.orderId,
@@ -99,11 +100,15 @@ class DeliveryOrderModel {
     required this.products,
     this.runId,
     this.addressRowId,
+    this.containerBalances = const [],
   });
 
   factory DeliveryOrderModel.fromJson(Map<String, dynamic> json) {
     final items = (json['products'] as List<dynamic>? ?? [])
         .map((e) => DeliveryOrderItem.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+    final containerBalancesList = (json['container_balances'] as List<dynamic>? ?? [])
+        .map((e) => CustomerContainerBalance.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
     return DeliveryOrderModel(
       orderId: json['order_id']?.toString() ?? '',
@@ -148,6 +153,7 @@ class DeliveryOrderModel {
       products: items,
       runId: json['run_id']?.toString(),
       addressRowId: _toInt(json['address_row_id']),
+      containerBalances: containerBalancesList,
     );
   }
 
@@ -159,6 +165,7 @@ class DeliveryOrderModel {
     String? deliveryImage,
     String? deliveryNotes,
     int? bottlesWithCustomer,
+    List<CustomerContainerBalance>? containerBalances,
   }) {
     return DeliveryOrderModel(
       orderId: orderId,
@@ -203,6 +210,7 @@ class DeliveryOrderModel {
       products: products,
       runId: runId,
       addressRowId: addressRowId,
+      containerBalances: containerBalances ?? this.containerBalances,
     );
   }
 
@@ -274,6 +282,8 @@ class GroupedStop {
   int get emptyBottlesCollected => orders.fold(0, (sum, o) => sum + (o.emptyBottlesCollected ?? 0));
 
   int get bottlesWithCustomer => orders.isEmpty ? 0 : (orders.first.bottlesWithCustomer ?? 0);
+
+  List<CustomerContainerBalance> get containerBalances => orders.isEmpty ? const [] : orders.first.containerBalances;
 
   List<DeliveryOrderItem> get products {
     final List<DeliveryOrderItem> items = [];
@@ -357,6 +367,26 @@ class DeliveryRun {
       slot: json['slot']?.toString() ?? '',
       runDate: json['date']?.toString() ?? '',
       orders: ordersList,
+    );
+  }
+}
+
+class CustomerContainerBalance {
+  final String containerId;
+  final String name;
+  final int balance;
+
+  const CustomerContainerBalance({
+    required this.containerId,
+    required this.name,
+    required this.balance,
+  });
+
+  factory CustomerContainerBalance.fromJson(Map<String, dynamic> json) {
+    return CustomerContainerBalance(
+      containerId: json['container_id']?.toString() ?? json['packaging_type_id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      balance: _toInt(json['balance']),
     );
   }
 }

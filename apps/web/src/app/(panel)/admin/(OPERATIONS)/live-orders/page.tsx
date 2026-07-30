@@ -664,29 +664,52 @@ export default function LiveOrdersPage() {
                 </div>
               </div>
 
-              {/* Partner Select */}
+              {/* Partner Select (Filtered strictly by order's branch) */}
               <div>
-                <label className="text-[10px] font-black text-slate-700 uppercase tracking-wide block mb-1.5">
-                  Select Delivery Boy
-                </label>
-                {partners.length > 0 ? (
-                  <select
-                    value={selectedPartner}
-                    onChange={e => setSelectedPartner(e.target.value)}
-                    className="w-full border border-slate-200 bg-white rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-                  >
-                    <option value="">— Select a delivery partner —</option>
-                    {partners.map(p => (
-                      <option key={p.delivery_partner_id} value={p.delivery_partner_id}>
-                        {p.full_name}{p.phone ? ` · ${p.phone}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <p className="text-xs text-slate-500 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
-                    No delivery partners found. Please add partners first.
-                  </p>
-                )}
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-[10px] font-black text-slate-700 uppercase tracking-wide">
+                    Select Delivery Boy
+                  </label>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    Branch: {assignOrder.branch_name || "Main Hub"}
+                  </span>
+                </div>
+                {(() => {
+                  const branchPartners = partners.filter(p => {
+                    if (!p.branch_id && !p.branch_name) return true;
+                    if (assignOrder.branch_id && p.branch_id) {
+                      return String(p.branch_id) === String(assignOrder.branch_id);
+                    }
+                    if (assignOrder.branch_name && p.branch_name) {
+                      return p.branch_name.toLowerCase().trim() === assignOrder.branch_name.toLowerCase().trim();
+                    }
+                    return true;
+                  });
+
+                  if (branchPartners.length > 0) {
+                    return (
+                      <select
+                        value={selectedPartner}
+                        onChange={e => setSelectedPartner(e.target.value)}
+                        className="w-full border border-slate-200 bg-white rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                      >
+                        <option value="">— Select a delivery partner ({branchPartners.length} in branch) —</option>
+                        {branchPartners.map(p => (
+                          <option key={p.delivery_partner_id} value={p.delivery_partner_id}>
+                            {p.full_name}{p.phone ? ` · ${p.phone}` : ""} ({p.branch_name || "Branch"})
+                          </option>
+                        ))}
+                      </select>
+                    );
+                  }
+
+                  return (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 space-y-1">
+                      <p className="font-bold">No delivery boys found for branch &quot;{assignOrder.branch_name || "Main"}&quot;.</p>
+                      <p className="text-[11px] text-amber-700">Please assign a delivery partner to this branch under Delivery Management.</p>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

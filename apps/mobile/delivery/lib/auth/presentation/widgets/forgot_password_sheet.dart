@@ -25,6 +25,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
   bool _obscurePass = true;
   bool _obscureConfirm = true;
   bool _isLoading = false;
+  String? _verificationToken;
 
   int _countdown = 60;
   bool _canResend = false;
@@ -81,22 +82,33 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
     setState(() => _isLoading = true);
     try {
       final dioClient = sl<DioClient>();
-      await dioClient.fetchCsrfToken();
-      
-      await dioClient.dio.post(
+      await dioClient.fetchCsrfToken().timeout(const Duration(seconds: 3), onTimeout: () {});
+
+      final response = await dioClient.dio.post(
         ApiEndpoints.sendEmailOtp,
-        data: {'email': email},
+        data: {'email': email, 'purpose': 'forgot_password'},
       );
 
+      final resData = Map<String, dynamic>.from(response.data as Map? ?? {});
+      final debugOtp = resData['otp']?.toString();
+
+      if (!mounted) return;
       setState(() {
-        _isLoading = false;
         _step = 1;
       });
       _startCountdown();
-      _showSnack('OTP sent to $email ✅');
+      if (debugOtp != null && debugOtp.isNotEmpty) {
+        _showSnack('OTP sent to $email (OTP: $debugOtp) ✅');
+      } else {
+        _showSnack('OTP sent to $email ✅');
+      }
     } on DioException catch (e) {
-      setState(() => _isLoading = false);
-      _showSnack(e.response?.data?['message'] ?? 'Failed to send OTP', isError: true);
+      final msg = e.response?.data is Map ? e.response?.data['message'] : null;
+      _showSnack(msg?.toString() ?? e.message ?? 'Failed to send OTP', isError: true);
+    } catch (e) {
+      _showSnack('Failed to send OTP: $e', isError: true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -110,21 +122,32 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
     setState(() => _isLoading = true);
     try {
       final dioClient = sl<DioClient>();
-      await dioClient.fetchCsrfToken();
+      await dioClient.fetchCsrfToken().timeout(const Duration(seconds: 3), onTimeout: () {});
 
-      await dioClient.dio.post(
+      final response = await dioClient.dio.post(
         ApiEndpoints.verifyEmailOtp,
-        data: {'email': _emailCtrl.text.trim(), 'otp': otp},
+        data: {
+          'email': _emailCtrl.text.trim(),
+          'otp': otp,
+          'purpose': 'forgot_password',
+        },
       );
 
+      final resData = Map<String, dynamic>.from(response.data as Map? ?? {});
+      _verificationToken = resData['verification_token']?.toString();
+
+      if (!mounted) return;
       setState(() {
-        _isLoading = false;
         _step = 2;
       });
       _showSnack('OTP Verified successfully! ✅');
     } on DioException catch (e) {
-      setState(() => _isLoading = false);
-      _showSnack(e.response?.data?['message'] ?? 'Invalid OTP', isError: true);
+      final msg = e.response?.data is Map ? e.response?.data['message'] : null;
+      _showSnack(msg?.toString() ?? e.message ?? 'Invalid OTP', isError: true);
+    } catch (e) {
+      _showSnack('Failed to verify OTP: $e', isError: true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -149,23 +172,27 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
     setState(() => _isLoading = true);
     try {
       final dioClient = sl<DioClient>();
-      await dioClient.fetchCsrfToken();
+      await dioClient.fetchCsrfToken().timeout(const Duration(seconds: 3), onTimeout: () {});
 
       await dioClient.dio.post(
-        '/DeliveryPartner/auth/reset-password',
+        ApiEndpoints.resetPassword,
         data: {
           'email': _emailCtrl.text.trim(),
-          'token': otp,
+          'token': _verificationToken ?? otp,
+          'otp': otp,
           'newPassword': pass,
         },
       );
 
-      setState(() => _isLoading = false);
       _showSnack('Password reset successful! Please login with your new password.');
       if (mounted) Navigator.pop(context);
     } on DioException catch (e) {
-      setState(() => _isLoading = false);
-      _showSnack(e.response?.data?['message'] ?? 'Failed to reset password', isError: true);
+      final msg = e.response?.data is Map ? e.response?.data['message'] : null;
+      _showSnack(msg?.toString() ?? e.message ?? 'Failed to reset password', isError: true);
+    } catch (e) {
+      _showSnack('Failed to reset password: $e', isError: true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

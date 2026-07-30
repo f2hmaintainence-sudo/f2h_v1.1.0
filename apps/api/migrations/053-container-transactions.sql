@@ -3,8 +3,7 @@ CREATE TABLE container_transactions (
 
     customer_id VARCHAR(30) NOT NULL,
 
-    packaging_type_id VARCHAR(30) NOT NULL
-    REFERENCES packaging_types(id),
+    container_id VARCHAR(30) NOT NULL,
 
     reference_type VARCHAR(20) NOT NULL,
     -- subscription / order / trial / manual

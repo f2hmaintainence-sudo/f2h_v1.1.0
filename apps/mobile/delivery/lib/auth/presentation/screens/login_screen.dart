@@ -234,11 +234,11 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                       ),
                                       decoration: InputDecoration(
                                         prefixIcon: Icon(
-                                          Icons.alternate_email_rounded,
+                                          Icons.mail_outline_rounded,
                                           color: _identifierFocused ? kPrimaryMid : kMuted,
                                           size: 20,
                                         ),
-                                        hintText: 'Email or Username',
+                                        hintText: 'Email or Phone',
                                         hintStyle: GoogleFonts.poppins(
                                           color: kMuted,
                                           fontSize: 14,

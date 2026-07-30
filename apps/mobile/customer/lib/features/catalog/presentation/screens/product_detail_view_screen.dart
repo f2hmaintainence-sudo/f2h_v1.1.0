@@ -732,6 +732,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                 : CrossFadeState.showFirst,
                           ),
 
+
                           const SizedBox(height: 12),
                           const Divider(height: 1, color: Color(0xFFF0F0F0)),
                           const SizedBox(height: 16),

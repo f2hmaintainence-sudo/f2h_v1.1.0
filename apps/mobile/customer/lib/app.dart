@@ -5,7 +5,7 @@ import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/theme/app_theme.dart';
 import 'package:f2h_customer/core/widgets/animations.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
-import 'package:f2h_customer/core/session/customer_session_state.dart';
+
 import 'package:f2h_customer/features/catalog/presentation/screens/home_screen.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_screen.dart'; // Contains BrowseScreen
 import 'package:f2h_customer/features/catalog/presentation/screens/cart_screen.dart';
@@ -29,7 +29,7 @@ import 'package:f2h_customer/features/catalog/presentation/bloc/checkout/checkou
 import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_bloc.dart';
 import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_event.dart';
 import 'package:f2h_customer/features/orders/presentation/bloc/order_history_bloc.dart';
-import 'package:f2h_customer/features/orders/presentation/bloc/order_history_state.dart';
+
 import 'package:f2h_customer/features/orders/presentation/bloc/order_history_event.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
 
@@ -350,400 +350,205 @@ class AppShellState extends State<AppShell> {
           offset: _showNav ? Offset.zero : const Offset(0, 1),
           duration: const Duration(milliseconds: 280),
           curve: Curves.easeOutCubic,
-          child: Container(
-            decoration: BoxDecoration(
-              color: kSurface,
-              border: const Border(top: BorderSide(color: kBorderLt)),
-              boxShadow: [
-                BoxShadow(
-                  color: kPrimary.withValues(alpha: 0.04),
-                  blurRadius: 20,
-                  offset: const Offset(0, -4),
-                )
-              ],
-            ),
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: List.generate(_tabs.length, (i) {
-                    final on = i == _i;
-                    final tab = _tabs[i];
-                    return Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          if (_i == i) return;
-                          AppShell.activeTab = i;
-                          setState(() {
-                            _showNav = true;
-                            _i = i;
-                            _isTransitioning = true;
-                          });
-                          _pageController.jumpToPage(i);
-                          Future.delayed(const Duration(milliseconds: 300), () {
-                            if (mounted) {
+          child: BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
+            builder: (context, sessionState) {
+              final isVip = sessionState.profile?.isMember == true;
+              final activeColor = isVip ? const Color(0xFFB8860B) : kPrimary;
+              final shadowColor = isVip ? const Color(0xFFFFD700) : kPrimary;
+
+              return Container(
+                decoration: BoxDecoration(
+                  color: kSurface,
+                  border: Border(
+                    top: BorderSide(
+                      color: isVip ? const Color(0xFFFFD700) : kBorderLt,
+                      width: isVip ? 1.5 : 1.0,
+                    ),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: shadowColor.withValues(alpha: isVip ? 0.12 : 0.04),
+                      blurRadius: 20,
+                      offset: const Offset(0, -4),
+                    )
+                  ],
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      children: List.generate(_tabs.length, (i) {
+                        final on = i == _i;
+                        final tab = _tabs[i];
+                        return Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              if (_i == i) return;
+                              AppShell.activeTab = i;
                               setState(() {
-                                _isTransitioning = false;
+                                _showNav = true;
+                                _i = i;
+                                _isTransitioning = true;
                               });
-                            }
-                          });
-                        },
-                        behavior: HitTestBehavior.opaque,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          color: Colors.transparent,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                            AnimatedScale(
-                              scale: on ? 1.15 : 1.0,
-                              duration: const Duration(milliseconds: 200),
-                              curve: Curves.easeOutBack,
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: on ? kPrimary : Colors.transparent,
-                                  shape: BoxShape.circle,
-                                  boxShadow: on
-                                      ? [
-                                          BoxShadow(
-                                            color: kPrimary.withValues(alpha: 0.3),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 3),
-                                          )
-                                        ]
-                                      : [],
-                                ),
-                                child: i == 2
-                                    ? BlocBuilder<CartBloc, CartState>(
-                                        builder: (context, state) {
-                                          final items = context.read<CartBloc>().currentItems;
-                                           int count = 0;
-                                           for (final item in items) {
-                                             if (item.purchaseType == 'subscription') {
-                                               final schedSum = item.schedules?.fold(0, (s, sched) => s + sched.mQuantity + sched.eQuantity) ?? 0;
-                                               count += (schedSum > 0 ? schedSum : 1);
-                                             } else {
-                                               count += item.quantity ?? 1;
-                                             }
-                                           }
-                                          return Stack(
-                                            clipBehavior: Clip.none,
-                                            children: [
-                                              Icon(
+                              _pageController.jumpToPage(i);
+                              Future.delayed(const Duration(milliseconds: 300), () {
+                                if (mounted) {
+                                  setState(() {
+                                    _isTransitioning = false;
+                                  });
+                                }
+                              });
+                            },
+                            behavior: HitTestBehavior.opaque,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              color: Colors.transparent,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  AnimatedScale(
+                                    scale: on ? 1.15 : 1.0,
+                                    duration: const Duration(milliseconds: 200),
+                                    curve: Curves.easeOutBack,
+                                    child: AnimatedContainer(
+                                      duration: const Duration(milliseconds: 200),
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: on ? activeColor : Colors.transparent,
+                                        shape: BoxShape.circle,
+                                        boxShadow: on
+                                            ? [
+                                                BoxShadow(
+                                                  color: shadowColor.withValues(alpha: 0.35),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 3),
+                                                )
+                                              ]
+                                            : [],
+                                      ),
+                                      child: i == 2
+                                          ? BlocBuilder<CartBloc, CartState>(
+                                              builder: (context, state) {
+                                                final items = context.read<CartBloc>().currentItems;
+                                                int count = 0;
+                                                for (final item in items) {
+                                                  if (item.purchaseType == 'subscription') {
+                                                    final schedSum = item.schedules?.fold(0, (s, sched) => s + sched.mQuantity + sched.eQuantity) ?? 0;
+                                                    count += (schedSum > 0 ? schedSum : 1);
+                                                  } else {
+                                                    count += item.quantity ?? 1;
+                                                  }
+                                                }
+                                                return Stack(
+                                                  clipBehavior: Clip.none,
+                                                  children: [
+                                                    Icon(
+                                                      on ? tab.$2 : tab.$1,
+                                                      color: on ? Colors.white : kTextSub,
+                                                      size: 20,
+                                                    ),
+                                                    if (count > 0)
+                                                      Positioned(
+                                                        top: -4,
+                                                        right: -4,
+                                                        child: Container(
+                                                          padding: const EdgeInsets.all(3),
+                                                          decoration: const BoxDecoration(
+                                                            color: Colors.red,
+                                                            shape: BoxShape.circle,
+                                                          ),
+                                                          child: Text(
+                                                            count > 99 ? '99+' : '$count',
+                                                            style: const TextStyle(
+                                                              color: Colors.white,
+                                                              fontSize: 7,
+                                                              fontWeight: FontWeight.w900,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                  ],
+                                                );
+                                              },
+                                            )
+                                          : i == 3
+                                            ? BlocBuilder<SubscriptionBloc, SubscriptionState>(
+                                                builder: (context, subState) {
+                                                  int subCount = 0;
+                                                  if (subState is SubscriptionLoaded) {
+                                                    subCount = subState.subscriptions
+                                                        .where((s) => s.status.toLowerCase() == 'active' || s.status.toLowerCase() == 'paused')
+                                                        .length;
+                                                  }
+                                                  return Stack(
+                                                    clipBehavior: Clip.none,
+                                                    children: [
+                                                      Icon(
+                                                        on ? tab.$2 : tab.$1,
+                                                        color: on ? Colors.white : kTextSub,
+                                                        size: 20,
+                                                      ),
+                                                      if (subCount > 0)
+                                                        Positioned(
+                                                          top: -4,
+                                                          right: -4,
+                                                          child: Container(
+                                                            padding: const EdgeInsets.all(3),
+                                                            decoration: const BoxDecoration(
+                                                              color: Colors.red,
+                                                              shape: BoxShape.circle,
+                                                            ),
+                                                            child: Text(
+                                                              subCount > 99 ? '99+' : '$subCount',
+                                                              style: const TextStyle(
+                                                                color: Colors.white,
+                                                                fontSize: 7,
+                                                                fontWeight: FontWeight.w900,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  );
+                                                },
+                                              )
+                                            : Icon(
                                                 on ? tab.$2 : tab.$1,
                                                 color: on ? Colors.white : kTextSub,
                                                 size: 20,
                                               ),
-                                              if (count > 0)
-                                                Positioned(
-                                                  top: -4,
-                                                  right: -4,
-                                                  child: Container(
-                                                    padding: const EdgeInsets.all(3),
-                                                    decoration: const BoxDecoration(
-                                                      color: Colors.red,
-                                                      shape: BoxShape.circle,
-                                                    ),
-                                                    child: Text(
-                                                      count > 99 ? '99+' : '$count',
-                                                      style: const TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 7,
-                                                        fontWeight: FontWeight.w900,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                            ],
-                                          );
-                                        },
-                                      )
-                                    : (i == 3
-                                        ? BlocBuilder<SubscriptionBloc, SubscriptionState>(
-                                            builder: (context, subState) {
-                                              int subCount = 0;
-                                              if (subState is SubscriptionLoaded) {
-                                                subCount = subState.subscriptions
-                                                    .where((s) => s.status.toLowerCase() == 'active' || s.status.toLowerCase() == 'paused')
-                                                    .length;
-                                              } else {
-                                                final orderState = context.read<OrderHistoryBloc>().state;
-                                                if (orderState is OrderHistoryLoaded) {
-                                                  subCount = orderState.subscriptionPlans.where((p) => p.isActive).length;
-                                                }
-                                              }
-                                              return Stack(
-                                                clipBehavior: Clip.none,
-                                                children: [
-                                                  Icon(
-                                                    on ? tab.$2 : tab.$1,
-                                                    color: on ? Colors.white : kTextSub,
-                                                    size: 20,
-                                                  ),
-                                                  if (subCount > 0)
-                                                    Positioned(
-                                                      top: -4,
-                                                      right: -4,
-                                                      child: Container(
-                                                        padding: const EdgeInsets.all(3),
-                                                        decoration: const BoxDecoration(
-                                                          color: Colors.red,
-                                                          shape: BoxShape.circle,
-                                                        ),
-                                                        child: Text(
-                                                          subCount > 99 ? '99+' : '$subCount',
-                                                          style: const TextStyle(
-                                                            color: Colors.white,
-                                                            fontSize: 7,
-                                                            fontWeight: FontWeight.w900,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                ],
-                                              );
-                                            },
-                                          )
-                                        : Icon(
-                                            on ? tab.$2 : tab.$1,
-                                            color: on ? Colors.white : kTextSub,
-                                            size: 20,
-                                          )),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  AnimatedDefaultTextStyle(
+                                    duration: const Duration(milliseconds: 200),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: on ? FontWeight.w800 : FontWeight.w500,
+                                      color: on ? activeColor : kTextSub,
+                                      letterSpacing: 0.1,
+                                    ),
+                                    child: Text(
+                                      tab.$3,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.visible,
+                                      softWrap: false,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 3),
-                            AnimatedDefaultTextStyle(
-                              duration: const Duration(milliseconds: 200),
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: on ? FontWeight.w800 : FontWeight.w500,
-                                color: on ? kPrimary : kTextSub,
-                                letterSpacing: 0.1,
-                              ),
-                              child: Text(
-                                tab.$3,
-                                maxLines: 1,
-                                overflow: TextOverflow.visible,
-                                softWrap: false,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                          ),
+                        );
+                      }),
                     ),
-                  );
-                  }),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       );
-}
+  }
 
-// class F2HDialogs {
-//   static void showEmptyCartDialog(BuildContext context) {
-//     showDialog(
-//       context: context,
-//       builder: (context) => AlertDialog(
-//         shape: RoundedRectangleBorder(
-//           borderRadius: BorderRadius.circular(20),
-//         ),
-//         backgroundColor: Colors.white,
-//         content: Padding(
-//           padding: const EdgeInsets.symmetric(vertical: 10),
-//           child: Column(
-//             mainAxisSize: MainAxisSize.min,
-//             children: [
-//               Container(
-//                 width: 90,
-//                 height: 90,
-//                 decoration: BoxDecoration(
-//                   shape: BoxShape.circle,
-//                   color: const Color(0xFFE8F5E9),
-//                   border: Border.all(
-//                     color: const Color(0xFFC8E6C9),
-//                     width: 4,
-//                   ),
-//                   boxShadow: [
-//                     BoxShadow(
-//                       color: const Color(0xFF0C831F).withValues(alpha: 0.1),
-//                       blurRadius: 16,
-//                       spreadRadius: 4,
-//                     ),
-//                   ],
-//                 ),
-//                 child: Center(
-//                   child: Container(
-//                     width: 66,
-//                     height: 66,
-//                     decoration: const BoxDecoration(
-//                       shape: BoxShape.circle,
-//                       gradient: LinearGradient(
-//                         colors: [Color(0xFF81C784), Color(0xFF388E3C)],
-//                         begin: Alignment.topLeft,
-//                         end: Alignment.bottomRight,
-//                       ),
-//                     ),
-//                     child: const Icon(
-//                       Icons.shopping_cart_checkout_rounded,
-//                       color: Colors.white,
-//                       size: 32,
-//                     ),
-//                   ),
-//                 ),
-//               ),
-//               const SizedBox(height: 20),
-//               const Text(
-//                 'Your Cart is Empty',
-//                 style: TextStyle(
-//                   fontSize: 18,
-//                   fontWeight: FontWeight.w900,
-//                   color: Color(0xFF1D252C),
-//                 ),
-//               ),
-//               const SizedBox(height: 10),
-//               const Text(
-//                 'Please add items to your cart before proceeding.',
-//                 textAlign: TextAlign.center,
-//                 style: TextStyle(
-//                   fontSize: 13,
-//                   fontWeight: FontWeight.w600,
-//                   color: Color(0xFF8D989F),
-//                   height: 1.4,
-//                 ),
-//               ),
-//               const SizedBox(height: 24),
-//               SizedBox(
-//                 width: double.infinity,
-//                 child: ElevatedButton(
-//                   onPressed: () => Navigator.pop(context),
-//                   style: ElevatedButton.styleFrom(
-//                     backgroundColor: const Color(0xFF0C831F),
-//                     foregroundColor: Colors.white,
-//                     padding: const EdgeInsets.symmetric(vertical: 14),
-//                     shape: RoundedRectangleBorder(
-//                       borderRadius: BorderRadius.circular(12),
-//                     ),
-//                     elevation: 0,
-//                   ),
-//                   child: const Text(
-//                     'Okay',
-//                     style: TextStyle(
-//                       fontSize: 14,
-//                       fontWeight: FontWeight.w900,
-//                     ),
-//                   ),
-//                 ),
-//               ),
-//             ],
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-
-//   static void showEmptySubscriptionsDialog(BuildContext context) {
-//     showDialog(
-//       context: context,
-//       builder: (context) => AlertDialog(
-//         shape: RoundedRectangleBorder(
-//           borderRadius: BorderRadius.circular(20),
-//         ),
-//         backgroundColor: Colors.white,
-//         content: Padding(
-//           padding: const EdgeInsets.symmetric(vertical: 10),
-//           child: Column(
-//             mainAxisSize: MainAxisSize.min,
-//             children: [
-//               Container(
-//                 width: 90,
-//                 height: 90,
-//                 decoration: BoxDecoration(
-//                   shape: BoxShape.circle,
-//                   color: const Color(0xFFFFF8E1),
-//                   border: Border.all(
-//                     color: const Color(0xFFFFE082),
-//                     width: 4,
-//                   ),
-//                   boxShadow: [
-//                     BoxShadow(
-//                       color: const Color(0xFFFFB300).withValues(alpha: 0.1),
-//                       blurRadius: 16,
-//                       spreadRadius: 4,
-//                     ),
-//                   ],
-//                 ),
-//                 child: Center(
-//                   child: Container(
-//                     width: 66,
-//                     height: 66,
-//                     decoration: const BoxDecoration(
-//                       shape: BoxShape.circle,
-//                       gradient: LinearGradient(
-//                         colors: [Color(0xFFFFD54F), Color(0xFFFF8F00)],
-//                         begin: Alignment.topLeft,
-//                         end: Alignment.bottomRight,
-//                       ),
-//                     ),
-//                     child: const Icon(
-//                       Icons.calendar_today_rounded,
-//                       color: Colors.white,
-//                       size: 30,
-//                     ),
-//                   ),
-//                 ),
-//               ),
-//               const SizedBox(height: 20),
-//               const Text(
-//                 'No Active Subscriptions',
-//                 style: TextStyle(
-//                   fontSize: 18,
-//                   fontWeight: FontWeight.w900,
-//                   color: Color(0xFF1D252C),
-//                 ),
-//               ),
-//               const SizedBox(height: 10),
-//               const Text(
-//                 'You do not have any active subscriptions yet. Subscribe to products to manage them here.',
-//                 textAlign: TextAlign.center,
-//                 style: TextStyle(
-//                   fontSize: 13,
-//                   fontWeight: FontWeight.w600,
-//                   color: Color(0xFF8D989F),
-//                   height: 1.4,
-//                 ),
-//               ),
-//               const SizedBox(height: 24),
-//               SizedBox(
-//                 width: double.infinity,
-//                 child: ElevatedButton(
-//                   onPressed: () => Navigator.pop(context),
-//                   style: ElevatedButton.styleFrom(
-//                     backgroundColor: const Color(0xFF0C831F),
-//                     foregroundColor: Colors.white,
-//                     padding: const EdgeInsets.symmetric(vertical: 14),
-//                     shape: RoundedRectangleBorder(
-//                       borderRadius: BorderRadius.circular(12),
-//                     ),
-//                     elevation: 0,
-//                   ),
-//                   child: const Text(
-//                     'Okay',
-//                     style: TextStyle(
-//                       fontSize: 14,
-//                       fontWeight: FontWeight.w900,
-//                     ),
-//                   ),
-//                 ),
-//               ),
-//             ],
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-// }
