@@ -10,7 +10,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthRepository authRepository;
   final NotificationService notificationService;
 
-  AuthBloc({required this.authRepository, required this.notificationService}) : super(AuthInitial()) {
+  AuthBloc({required this.authRepository, required this.notificationService})
+    : super(AuthInitial()) {
     on<LoginRequested>(_onLoginRequested);
     on<SignupRequested>(_onSignupRequested);
     on<GoogleSignInRequested>(_onGoogleSignInRequested);
@@ -18,18 +19,35 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthCheckRequested>(_onAuthCheckRequested);
   }
 
-  Future<void> _onLoginRequested(LoginRequested event, Emitter<AuthState> emit) async {
+  Future<void> _onLoginRequested(
+    LoginRequested event,
+    Emitter<AuthState> emit,
+  ) async {
     emit(AuthLoading());
     try {
       final String? fcmToken = await notificationService.getToken();
-      final user = await authRepository.login(event.identifier, event.password, fcmToken: fcmToken);
+      final user = await authRepository.login(
+        event.identifier,
+        event.password,
+        fcmToken: fcmToken,
+      );
       emit(Authenticated(user: user));
     } catch (e) {
-      emit(AuthFailure(error: extractErrorMessage(e, fallback: 'Login failed. Please try again.')));
+      emit(
+        AuthFailure(
+          error: extractErrorMessage(
+            e,
+            fallback: 'Login failed. Please try again.',
+          ),
+        ),
+      );
     }
   }
 
-  Future<void> _onSignupRequested(SignupRequested event, Emitter<AuthState> emit) async {
+  Future<void> _onSignupRequested(
+    SignupRequested event,
+    Emitter<AuthState> emit,
+  ) async {
     emit(AuthLoading());
     try {
       final String? fcmToken = await notificationService.getToken();
@@ -44,36 +62,71 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       );
       emit(Authenticated(user: user));
     } catch (e) {
-      emit(AuthFailure(error: extractErrorMessage(e, fallback: 'Signup failed. Please try again.')));
+      emit(
+        AuthFailure(
+          error: extractErrorMessage(
+            e,
+            fallback: 'Signup failed. Please try again.',
+          ),
+        ),
+      );
     }
   }
 
-  Future<void> _onGoogleSignInRequested(GoogleSignInRequested event, Emitter<AuthState> emit) async {
+  Future<void> _onGoogleSignInRequested(
+    GoogleSignInRequested event,
+    Emitter<AuthState> emit,
+  ) async {
     emit(AuthLoading());
     try {
       final String? fcmToken = await notificationService.getToken();
       final user = await authRepository.signInWithGoogle(fcmToken: fcmToken);
       emit(Authenticated(user: user));
     } catch (e) {
-      emit(AuthFailure(error: extractErrorMessage(e, fallback: 'Google sign-in failed. Please try again.')));
+      emit(
+        AuthFailure(
+          error: extractErrorMessage(
+            e,
+            fallback: 'Google sign-in failed. Please try again.',
+          ),
+        ),
+      );
     }
   }
 
-  Future<void> _onLogoutRequested(LogoutRequested event, Emitter<AuthState> emit) async {
+  Future<void> _onLogoutRequested(
+    LogoutRequested event,
+    Emitter<AuthState> emit,
+  ) async {
     emit(AuthLoading());
     try {
       await authRepository.logout();
       emit(const Unauthenticated());
     } catch (e) {
-      emit(AuthFailure(error: extractErrorMessage(e, fallback: 'Logout failed. Please try again.')));
+      emit(
+        AuthFailure(
+          error: extractErrorMessage(
+            e,
+            fallback: 'Logout failed. Please try again.',
+          ),
+        ),
+      );
     }
   }
 
-  Future<void> _onAuthCheckRequested(AuthCheckRequested event, Emitter<AuthState> emit) async {
+  Future<void> _onAuthCheckRequested(
+    AuthCheckRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(AuthLoading());
     final isAuthenticated = await authRepository.checkAuthStatus();
     if (isAuthenticated) {
       final user = await authRepository.getCachedUser();
-      emit(Authenticated(user: user ?? User(userId: 'session', email: '')));
+      emit(
+        Authenticated(
+          user: user ?? User(userId: 'session', email: ''),
+        ),
+      );
     } else {
       emit(const Unauthenticated());
     }

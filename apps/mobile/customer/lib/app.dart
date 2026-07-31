@@ -5,7 +5,7 @@ import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/theme/app_theme.dart';
 import 'package:f2h_customer/core/widgets/animations.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
-import 'package:f2h_customer/core/session/customer_session_state.dart';
+
 import 'package:f2h_customer/features/catalog/presentation/screens/home_screen.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_screen.dart'; // Contains BrowseScreen
 import 'package:f2h_customer/features/catalog/presentation/screens/cart_screen.dart';
@@ -29,16 +29,14 @@ import 'package:f2h_customer/features/catalog/presentation/bloc/checkout/checkou
 import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_bloc.dart';
 import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_event.dart';
 import 'package:f2h_customer/features/orders/presentation/bloc/order_history_bloc.dart';
-import 'package:f2h_customer/features/orders/presentation/bloc/order_history_state.dart';
+
 import 'package:f2h_customer/features/orders/presentation/bloc/order_history_event.dart';
-import 'package:f2h_customer/core/app_bootstrap.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
 
 
 class F2HApp extends StatelessWidget {
-  final AuthBootResult? bootResult;
+  const F2HApp({super.key});
 
-  const F2HApp({super.key, this.bootResult});
   @override
   Widget build(BuildContext context) => MultiBlocProvider(
     providers: [
@@ -69,6 +67,18 @@ class F2HApp extends StatelessWidget {
           },
           child: BlocBuilder<AuthBloc, AuthState>(
             builder: (context, state) {
+              // Still checking auth status — show nothing (splash is still visible)
+              if (state is AuthInitial || state is AuthLoading) {
+                return const Scaffold(
+                  backgroundColor: Colors.white,
+                  body: Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF0C831F),
+                      strokeWidth: 2.5,
+                    ),
+                  ),
+                );
+              }
               if (state is Authenticated) {
                 return const CustomerSessionGate();
               }
@@ -462,11 +472,52 @@ class AppShellState extends State<AppShell> {
                                                 );
                                               },
                                             )
-                                          : Icon(
-                                              on ? tab.$2 : tab.$1,
-                                              color: on ? Colors.white : kTextSub,
-                                              size: 20,
-                                            ),
+                                          : i == 3
+                                            ? BlocBuilder<SubscriptionBloc, SubscriptionState>(
+                                                builder: (context, subState) {
+                                                  int subCount = 0;
+                                                  if (subState is SubscriptionLoaded) {
+                                                    subCount = subState.subscriptions
+                                                        .where((s) => s.status.toLowerCase() == 'active' || s.status.toLowerCase() == 'paused')
+                                                        .length;
+                                                  }
+                                                  return Stack(
+                                                    clipBehavior: Clip.none,
+                                                    children: [
+                                                      Icon(
+                                                        on ? tab.$2 : tab.$1,
+                                                        color: on ? Colors.white : kTextSub,
+                                                        size: 20,
+                                                      ),
+                                                      if (subCount > 0)
+                                                        Positioned(
+                                                          top: -4,
+                                                          right: -4,
+                                                          child: Container(
+                                                            padding: const EdgeInsets.all(3),
+                                                            decoration: const BoxDecoration(
+                                                              color: Colors.red,
+                                                              shape: BoxShape.circle,
+                                                            ),
+                                                            child: Text(
+                                                              subCount > 99 ? '99+' : '$subCount',
+                                                              style: const TextStyle(
+                                                                color: Colors.white,
+                                                                fontSize: 7,
+                                                                fontWeight: FontWeight.w900,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  );
+                                                },
+                                              )
+                                            : Icon(
+                                                on ? tab.$2 : tab.$1,
+                                                color: on ? Colors.white : kTextSub,
+                                                size: 20,
+                                              ),
                                     ),
                                   ),
                                   const SizedBox(height: 3),
@@ -501,206 +552,3 @@ class AppShellState extends State<AppShell> {
       );
   }
 
-// class F2HDialogs {
-//   static void showEmptyCartDialog(BuildContext context) {
-//     showDialog(
-//       context: context,
-//       builder: (context) => AlertDialog(
-//         shape: RoundedRectangleBorder(
-//           borderRadius: BorderRadius.circular(20),
-//         ),
-//         backgroundColor: Colors.white,
-//         content: Padding(
-//           padding: const EdgeInsets.symmetric(vertical: 10),
-//           child: Column(
-//             mainAxisSize: MainAxisSize.min,
-//             children: [
-//               Container(
-//                 width: 90,
-//                 height: 90,
-//                 decoration: BoxDecoration(
-//                   shape: BoxShape.circle,
-//                   color: const Color(0xFFE8F5E9),
-//                   border: Border.all(
-//                     color: const Color(0xFFC8E6C9),
-//                     width: 4,
-//                   ),
-//                   boxShadow: [
-//                     BoxShadow(
-//                       color: const Color(0xFF0C831F).withValues(alpha: 0.1),
-//                       blurRadius: 16,
-//                       spreadRadius: 4,
-//                     ),
-//                   ],
-//                 ),
-//                 child: Center(
-//                   child: Container(
-//                     width: 66,
-//                     height: 66,
-//                     decoration: const BoxDecoration(
-//                       shape: BoxShape.circle,
-//                       gradient: LinearGradient(
-//                         colors: [Color(0xFF81C784), Color(0xFF388E3C)],
-//                         begin: Alignment.topLeft,
-//                         end: Alignment.bottomRight,
-//                       ),
-//                     ),
-//                     child: const Icon(
-//                       Icons.shopping_cart_checkout_rounded,
-//                       color: Colors.white,
-//                       size: 32,
-//                     ),
-//                   ),
-//                 ),
-//               ),
-//               const SizedBox(height: 20),
-//               const Text(
-//                 'Your Cart is Empty',
-//                 style: TextStyle(
-//                   fontSize: 18,
-//                   fontWeight: FontWeight.w900,
-//                   color: Color(0xFF1D252C),
-//                 ),
-//               ),
-//               const SizedBox(height: 10),
-//               const Text(
-//                 'Please add items to your cart before proceeding.',
-//                 textAlign: TextAlign.center,
-//                 style: TextStyle(
-//                   fontSize: 13,
-//                   fontWeight: FontWeight.w600,
-//                   color: Color(0xFF8D989F),
-//                   height: 1.4,
-//                 ),
-//               ),
-//               const SizedBox(height: 24),
-//               SizedBox(
-//                 width: double.infinity,
-//                 child: ElevatedButton(
-//                   onPressed: () => Navigator.pop(context),
-//                   style: ElevatedButton.styleFrom(
-//                     backgroundColor: const Color(0xFF0C831F),
-//                     foregroundColor: Colors.white,
-//                     padding: const EdgeInsets.symmetric(vertical: 14),
-//                     shape: RoundedRectangleBorder(
-//                       borderRadius: BorderRadius.circular(12),
-//                     ),
-//                     elevation: 0,
-//                   ),
-//                   child: const Text(
-//                     'Okay',
-//                     style: TextStyle(
-//                       fontSize: 14,
-//                       fontWeight: FontWeight.w900,
-//                     ),
-//                   ),
-//                 ),
-//               ),
-//             ],
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-
-//   static void showEmptySubscriptionsDialog(BuildContext context) {
-//     showDialog(
-//       context: context,
-//       builder: (context) => AlertDialog(
-//         shape: RoundedRectangleBorder(
-//           borderRadius: BorderRadius.circular(20),
-//         ),
-//         backgroundColor: Colors.white,
-//         content: Padding(
-//           padding: const EdgeInsets.symmetric(vertical: 10),
-//           child: Column(
-//             mainAxisSize: MainAxisSize.min,
-//             children: [
-//               Container(
-//                 width: 90,
-//                 height: 90,
-//                 decoration: BoxDecoration(
-//                   shape: BoxShape.circle,
-//                   color: const Color(0xFFFFF8E1),
-//                   border: Border.all(
-//                     color: const Color(0xFFFFE082),
-//                     width: 4,
-//                   ),
-//                   boxShadow: [
-//                     BoxShadow(
-//                       color: const Color(0xFFFFB300).withValues(alpha: 0.1),
-//                       blurRadius: 16,
-//                       spreadRadius: 4,
-//                     ),
-//                   ],
-//                 ),
-//                 child: Center(
-//                   child: Container(
-//                     width: 66,
-//                     height: 66,
-//                     decoration: const BoxDecoration(
-//                       shape: BoxShape.circle,
-//                       gradient: LinearGradient(
-//                         colors: [Color(0xFFFFD54F), Color(0xFFFF8F00)],
-//                         begin: Alignment.topLeft,
-//                         end: Alignment.bottomRight,
-//                       ),
-//                     ),
-//                     child: const Icon(
-//                       Icons.calendar_today_rounded,
-//                       color: Colors.white,
-//                       size: 30,
-//                     ),
-//                   ),
-//                 ),
-//               ),
-//               const SizedBox(height: 20),
-//               const Text(
-//                 'No Active Subscriptions',
-//                 style: TextStyle(
-//                   fontSize: 18,
-//                   fontWeight: FontWeight.w900,
-//                   color: Color(0xFF1D252C),
-//                 ),
-//               ),
-//               const SizedBox(height: 10),
-//               const Text(
-//                 'You do not have any active subscriptions yet. Subscribe to products to manage them here.',
-//                 textAlign: TextAlign.center,
-//                 style: TextStyle(
-//                   fontSize: 13,
-//                   fontWeight: FontWeight.w600,
-//                   color: Color(0xFF8D989F),
-//                   height: 1.4,
-//                 ),
-//               ),
-//               const SizedBox(height: 24),
-//               SizedBox(
-//                 width: double.infinity,
-//                 child: ElevatedButton(
-//                   onPressed: () => Navigator.pop(context),
-//                   style: ElevatedButton.styleFrom(
-//                     backgroundColor: const Color(0xFF0C831F),
-//                     foregroundColor: Colors.white,
-//                     padding: const EdgeInsets.symmetric(vertical: 14),
-//                     shape: RoundedRectangleBorder(
-//                       borderRadius: BorderRadius.circular(12),
-//                     ),
-//                     elevation: 0,
-//                   ),
-//                   child: const Text(
-//                     'Okay',
-//                     style: TextStyle(
-//                       fontSize: 14,
-//                       fontWeight: FontWeight.w900,
-//                     ),
-//                   ),
-//                 ),
-//               ),
-//             ],
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-// }

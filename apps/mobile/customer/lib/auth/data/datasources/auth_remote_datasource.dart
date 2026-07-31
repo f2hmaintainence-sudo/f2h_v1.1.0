@@ -76,7 +76,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         data: {
           'identifier': identifier,
           'password': password,
-          'fcm_token': fcmToken,
+          if (fcmToken != null && fcmToken.isNotEmpty) 'fcm_token': fcmToken,
         },
       );
 
@@ -86,6 +86,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           response.data['user'] as Map? ?? {},
         );
         userMap['accessToken'] = response.data['accessToken'];
+        userMap['refreshToken'] = response.data['refreshToken'];
         dioClient.setAuthToken(response.data['accessToken']?.toString());
         return UserModel.fromJson(userMap);
       } else {
@@ -117,7 +118,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         'phone': phone,
         'password': password,
         'verification_token': verificationToken,
-        'fcm_token': fcmToken,
+        if (fcmToken != null && fcmToken.isNotEmpty) 'fcm_token': fcmToken,
       };
       if (referralCode != null && referralCode.isNotEmpty) {
         body['referral_code'] = referralCode;
@@ -132,6 +133,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           response.data['user'] as Map? ?? {},
         );
         userMap['accessToken'] = response.data['accessToken'];
+        userMap['refreshToken'] = response.data['refreshToken'];
         dioClient.setAuthToken(response.data['accessToken']?.toString());
         return UserModel.fromJson(userMap);
       } else {
@@ -218,9 +220,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     String? fcmToken,
   }) async {
     try {
-      final response = await dioClient.dio.get(
-        '${ApiEndpoints.googleAuth}/callback',
-        queryParameters: {'code': serverAuthCode, 'fcm_token': fcmToken},
+      final response = await dioClient.dio.post(
+        ApiEndpoints.googleAuth,
+        data: {
+          'id_token': serverAuthCode,
+          if (fcmToken != null && fcmToken.isNotEmpty) 'fcm_token': fcmToken,
+        },
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -228,6 +233,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           response.data['user'] as Map? ?? {},
         );
         userMap['accessToken'] = response.data['accessToken'];
+        userMap['refreshToken'] = response.data['refreshToken'];
         dioClient.setAuthToken(response.data['accessToken']?.toString());
         return UserModel.fromJson(userMap);
       } else {

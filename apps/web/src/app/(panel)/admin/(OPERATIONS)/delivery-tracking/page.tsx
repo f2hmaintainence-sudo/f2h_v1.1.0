@@ -80,6 +80,17 @@ function isPartnerOnDuty(p: DeliveryPartner): boolean {
   return Boolean(p.is_online ?? p.is_available);
 }
 
+const statusBadgeConfig: Record<string, { bg: string; text: string; border: string; label: string }> = {
+  placed:           { bg: "bg-sky-100",     text: "text-sky-800",     border: "border-sky-300",     label: "Placed" },
+  confirmed:        { bg: "bg-teal-100",    text: "text-teal-800",    border: "border-teal-300",    label: "Confirmed" },
+  assigned:         { bg: "bg-indigo-100",  text: "text-indigo-800",  border: "border-indigo-300",  label: "Assigned" },
+  packed:           { bg: "bg-purple-100",  text: "text-purple-800",  border: "border-purple-300",  label: "Packed" },
+  out_for_delivery: { bg: "bg-blue-100",    text: "text-blue-800",    border: "border-blue-300",    label: "Out for Delivery 🚚" },
+  delivered:        { bg: "bg-emerald-100", text: "text-emerald-800", border: "border-emerald-300", label: "Delivered ✓" },
+  failed:           { bg: "bg-rose-100",    text: "text-rose-800",    border: "border-rose-300",    label: "Failed ❌" },
+  cancelled:        { bg: "bg-slate-100",   text: "text-slate-700",   border: "border-slate-300",   label: "Cancelled" },
+};
+
 // Kuppam Hub & Sector Coordinates (Light Map GPS Locations)
 const KUPPAM_HUB = { lat: 12.7483, lng: 78.3644, name: "Kuppam Main Hub" };
 
@@ -376,63 +387,7 @@ export default function DeliveryTrackingPage() {
       });
     }
 
-    // Fallback demo order flow if no orders currently assigned in DB (numbered strictly 1, 2, 3)
-    return [
-      {
-        order_id: "ORD-98214-01",
-        customer_name: "Ashok Nanda",
-        contact_number: "9876543210",
-        address_line: "14/3, Kuppam Main Rd, Hub Area",
-        delivery_slot: "morning",
-        status: "delivered",
-        total_amount: 350.00,
-        scheduled_date: todayIST(),
-        stop_number: 1,
-        distance_km: 1.2,
-        estimated_time: "Delivered 08:45 AM",
-        branch_id: selectedPartner?.branch_id,
-        branch_name: selectedPartner?.branch_name || "Main Branch",
-        lat: hubLat + 0.006,
-        lng: hubLng + 0.005,
-        items: [{ product_name: "Fresh Milk 500ml", quantity: 2, unit_price: 35, final_price: 70 }, { product_name: "Farm Curd 1kg", quantity: 1, unit_price: 90, final_price: 90 }],
-      },
-      {
-        order_id: "ORD-98214-02",
-        customer_name: "Pooja Reddy",
-        contact_number: "9988776655",
-        address_line: "Flat 402, Green Meadows Apt, Sector 3",
-        delivery_slot: "morning",
-        status: "out_for_delivery",
-        total_amount: 520.00,
-        scheduled_date: todayIST(),
-        stop_number: 2,
-        distance_km: 2.8,
-        estimated_time: "In Transit (ETA 6 mins)",
-        branch_id: selectedPartner?.branch_id,
-        branch_name: selectedPartner?.branch_name || "Main Branch",
-        lat: hubLat + 0.012,
-        lng: hubLng + 0.010,
-        items: [{ product_name: "Organic Paneer 200g", quantity: 2, unit_price: 110, final_price: 220 }, { product_name: "Butter 500g", quantity: 1, unit_price: 300, final_price: 300 }],
-      },
-      {
-        order_id: "ORD-98214-03",
-        customer_name: "Suhail Khan",
-        contact_number: "9638527418",
-        address_line: "Door 88, Kottapeta Main Rd, Kuppam",
-        delivery_slot: "morning",
-        status: "confirmed",
-        total_amount: 140.00,
-        scheduled_date: todayIST(),
-        stop_number: 3,
-        distance_km: 4.5,
-        estimated_time: "Scheduled 11:15 AM",
-        branch_id: selectedPartner?.branch_id,
-        branch_name: selectedPartner?.branch_name || "Main Branch",
-        lat: hubLat + 0.018,
-        lng: hubLng + 0.014,
-        items: [{ product_name: "Fresh Cow Milk 1L", quantity: 2, unit_price: 70, final_price: 140 }],
-      }
-    ];
+    return [];
   }, [orders, selectedPartner, activeBranch]);
 
   const partnerStats = useMemo(() => {
@@ -1220,17 +1175,21 @@ export default function DeliveryTrackingPage() {
                     }`}>
                       <div className="flex items-center justify-between mb-1 gap-1">
                         <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                          Stop {idx + 1} • #{o.order_id.slice(0, 14)}
+                          Stop {idx + 1} • #{o.order_id}
                         </span>
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${
-                          isDelivered
-                            ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                            : isInTransit
-                            ? "bg-blue-100 text-blue-800 border-blue-300 animate-pulse"
-                            : "bg-slate-100 text-slate-600 border-slate-200"
-                        }`}>
-                          {isDelivered ? "Delivered ✓" : isInTransit ? "In Transit 🚚" : "Scheduled"}
-                        </span>
+                        {(() => {
+                          const stConfig = statusBadgeConfig[o.status] || {
+                            bg: "bg-slate-100",
+                            text: "text-slate-700",
+                            border: "border-slate-300",
+                            label: (o.status || "Unknown").replace(/_/g, " "),
+                          };
+                          return (
+                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${stConfig.bg} ${stConfig.text} ${stConfig.border}`}>
+                              {stConfig.label}
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       <div className="flex items-center justify-between mt-1">

@@ -21,7 +21,7 @@ export class ContainersService {
 
       if (search) {
         params.push(`%${search}%`, `%${search}%`);
-        whereClause += ` AND (c.name ILIKE ? OR c.container_id ILIKE ?)`;
+        whereClause += ` AND (c.name ILIKE $1 OR c.container_id ILIKE $2)`;
       }
 
       const listSql = `
@@ -29,7 +29,7 @@ export class ContainersService {
         FROM containers c
         ${whereClause}
         ORDER BY c.created_at DESC
-        LIMIT ? OFFSET ?
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}
       `;
 
       const countSql = `
@@ -74,7 +74,7 @@ export class ContainersService {
       const generatedId = container_id || `CONT-${Math.floor(1000 + Math.random() * 9000)}`;
 
       const checkExisting = await this.db.query(
-        `SELECT id FROM containers WHERE container_id = ? AND deleted_at IS NULL`,
+        `SELECT id FROM containers WHERE container_id = $1 AND deleted_at IS NULL`,
         [generatedId]
       );
       if (checkExisting?.length > 0) {
@@ -83,7 +83,7 @@ export class ContainersService {
 
       const insertRes = await this.db.query(
         `INSERT INTO containers (container_id, name, quantity, is_returnable, status)
-         VALUES (?, ?, ?, ?, ?)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
         [generatedId, name, Math.abs(Number(quantity || 0)), Boolean(is_returnable), status]
       );
@@ -105,7 +105,7 @@ export class ContainersService {
       const { name, quantity, is_returnable, status } = body;
 
       const checkRes = await this.db.query(
-        `SELECT * FROM containers WHERE (container_id = ? OR id::text = ?) AND deleted_at IS NULL`,
+        `SELECT * FROM containers WHERE (container_id = $1 OR id::text = $2) AND deleted_at IS NULL`,
         [id, id]
       );
       if (!checkRes?.length) {
@@ -121,8 +121,8 @@ export class ContainersService {
 
       const updateRes = await this.db.query(
         `UPDATE containers 
-         SET name = ?, quantity = ?, is_returnable = ?, status = ?, updated_at = NOW()
-         WHERE id = ?
+         SET name = $1, quantity = $2, is_returnable = $3, status = $4, updated_at = NOW()
+         WHERE id = $5
          RETURNING *`,
         [updatedName, updatedQty, updatedReturnable, updatedStatus, target.id]
       );

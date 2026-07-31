@@ -269,7 +269,13 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
 
   Future<void> _changeAddress() async {
     final picked = await AddressSelectorDrawer.show(context);
-    if (picked != null) setState(() => _selectedAddress = picked);
+    if (picked != null && mounted) {
+      setState(() => _selectedAddress = picked);
+      // Sync with session so the address widget always reflects the new default
+      if (picked.addressId != null) {
+        await context.read<CustomerSessionCubit>().updateDefaultAddress(picked.addressId!);
+      }
+    }
   }
 
   double _calculateExistingPostpaidCommitted() {
