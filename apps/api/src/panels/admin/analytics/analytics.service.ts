@@ -129,17 +129,30 @@ export class AnalyticsService {
     try {
       const days = parseInt(query.days || '30', 10);
       const sql = `
-        SELECT status, refund_type AS refund_method,
-          COUNT(*)::int AS count,
-          COALESCE(SUM(refund_amount), 0)::numeric AS total_amount
-        FROM refunds WHERE created_at >= CURRENT_DATE - ($1 || ' days')::interval
-        GROUP BY status, refund_type ORDER BY count DESC
+        SELECT status, refund_method, SUM(count)::int AS count, SUM(total_amount)::numeric AS total_amount
+        FROM (
+          SELECT status, refund_type AS refund_method,
+            COUNT(*)::int AS count,
+            COALESCE(SUM(refund_amount), 0)::numeric AS total_amount
+          FROM refunds WHERE created_at >= CURRENT_DATE - ($1 || ' days')::interval
+          GROUP BY status, refund_type
+
+          UNION ALL
+
+          SELECT 'processed' AS status, 'wallet_deposit' AS refund_method,
+            COUNT(*)::int AS count,
+            COALESCE(SUM(refund_amount), 0)::numeric AS total_amount
+          FROM subscription_refunds WHERE created_at >= CURRENT_DATE - ($1 || ' days')::interval
+          GROUP BY status
+        ) combined
+        GROUP BY status, refund_method
+        ORDER BY count DESC
       `;
       const rows = await this.db.query(sql, [days]);
-      return { status: true, data: rows.map((r: any) => ({ ...r, total_amount: Number(r.total_amount) })), message: 'Refund report fetched' };
+      return { status: true, data: (rows || []).map((r: any) => ({ ...r, total_amount: Number(r.total_amount) })), message: 'Refund report fetched' };
     } catch (error) {
       this.developer.error('getRefundReport error', { error });
-      throw new InternalServerErrorException('Failed');
+      throw new InternalServerErrorException('Failed to fetch refund report');
     }
   }
 
@@ -147,16 +160,43 @@ export class AnalyticsService {
     try {
       const days = parseInt(query.days || '30', 10);
       const sql = `
-        SELECT *
+        SELECT 
+          id::text AS id,
+          COALESCE(refund_number, id::text) AS refund_number,
+          customer_id,
+          order_id,
+          refund_amount,
+          refund_type,
+          status,
+          reason,
+          created_at,
+          'order_refund' AS category
         FROM refunds 
         WHERE created_at >= CURRENT_DATE - ($1 || ' days')::interval
+
+        UNION ALL
+
+        SELECT 
+          sr.id::text AS id,
+          sr.id::text AS refund_number,
+          sr.customer_id,
+          sr.subscription_id AS order_id,
+          sr.refund_amount,
+          'wallet_deposit' AS refund_type,
+          'processed' AS status,
+          ('Subscription pause refund for ' || sr.total_paused_days || ' days (' || sr.refund_month || ')') AS reason,
+          sr.created_at,
+          'subscription_pause_refund' AS category
+        FROM subscription_refunds sr
+        WHERE sr.created_at >= CURRENT_DATE - ($1 || ' days')::interval
+
         ORDER BY created_at DESC
       `;
       const rows = await this.db.query(sql, [days]);
-      return { status: true, data: rows, message: 'Refunds list fetched' };
+      return { status: true, data: rows || [], message: 'Refunds list fetched' };
     } catch (error) {
       this.developer.error('getRefundsList error', { error });
-      throw new InternalServerErrorException('Failed');
+      throw new InternalServerErrorException('Failed to fetch refunds list');
     }
   }
 

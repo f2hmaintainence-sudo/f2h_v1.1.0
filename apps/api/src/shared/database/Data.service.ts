@@ -58,6 +58,7 @@ export const AVOID_DELETED_AT = [
   'subscription_custom_schedule',
   'subscription_overrides',
   'subscription_pauses',
+  'subscription_refunds',
   'subscription_daily_snapshots',
   'subscription_billing_lines',
   'subscription_logs',
