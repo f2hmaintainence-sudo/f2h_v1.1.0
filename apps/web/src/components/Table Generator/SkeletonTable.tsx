@@ -381,8 +381,20 @@ export default function SkeletonTable({
         const separator = apiEndpoint.includes('?') ? '&' : '?';
         const url = `${apiUrl}${apiEndpoint}${params.toString() ? separator + params.toString() : ''}`;
 
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'x-role': 'A',
+        };
+        if (typeof window !== 'undefined') {
+          const authToken = localStorage.getItem('access_token') || localStorage.getItem('token');
+          if (authToken) {
+            headers['Authorization'] = `Bearer ${authToken}`;
+          }
+        }
+
         const response = await fetch(url, {
           method: 'GET',
+          headers,
           credentials: 'include',
           signal: controller.signal,
         });

@@ -113,12 +113,6 @@ export class CatalogTableService {
         });
       }
 
-      // Always exclude soft-deleted products
-      conditions.push({
-        column: 'products.deleted_at',
-        operator: 'IS',
-        value: null,
-      });
 
       const reqSet: ReqSet = {
         key: 'products',
@@ -149,7 +143,7 @@ export class CatalogTableService {
           name: ['products.name AS name', false],
           batch_product: ['products.batch_product', false],
           gst: ['products.gst_percentage', true],
-          packaging_type: ['packaging_types.name AS packaging_type', true],
+          packaging_type: ['COALESCE(products.packaging_type_id::text, \'Standard\') AS packaging_type', true],
           subscribable: ['products.is_subscribable AS subscribable', true],
           one_time: ['products.is_one_time AS one_time', true],
           returnable: ['products.is_returnable AS returnable', true],
@@ -168,11 +162,6 @@ export class CatalogTableService {
             type: 'left',
             table: 'categories',
             on: [['products.category_id', 'categories.category_id']],
-          },
-          {
-            type: 'left',
-            table: 'packaging_types',
-            on: [['products.packaging_type_id', 'packaging_types.id']],
           }
         ],
         conditions,
@@ -256,17 +245,6 @@ export class CatalogTableService {
         });
       }
 
-      // Always exclude soft-deleted variants
-      conditions.push({
-        column: 'product_variants.deleted_at',
-        operator: 'IS',
-        value: null,
-      });
-      conditions.push({
-        column: 'products.deleted_at',
-        operator: 'IS',
-        value: null,
-      });
 
       const reqSet: ReqSet = {
         key: 'product_variants',
