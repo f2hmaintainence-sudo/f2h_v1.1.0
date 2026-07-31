@@ -5,6 +5,7 @@ import { api } from "@/services/api.client";
 import {
   ArrowRightLeft,
   ChevronRight,
+  ChevronLeft,
   Home,
   RefreshCw,
   Search,
@@ -15,9 +16,9 @@ import {
   Clock,
   XCircle,
   Package,
-  Layers,
   Filter,
-  DollarSign
+  DollarSign,
+  RotateCcw
 } from "lucide-react";
 import Link from "next/link";
 
@@ -36,6 +37,10 @@ export default function RefundsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<"all" | "subscription_pause_refund" | "order_refund">("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const fetchRefunds = useCallback(async () => {
     setLoading(true);
@@ -56,6 +61,11 @@ export default function RefundsPage() {
   useEffect(() => {
     fetchRefunds();
   }, [fetchRefunds]);
+
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedCategory, selectedStatus, days, pageSize]);
 
   // Derived metrics
   const totalAmount = useMemo(() => {
@@ -98,16 +108,33 @@ export default function RefundsPage() {
         const custId = String(item.customer_id || "").toLowerCase();
         const orderId = String(item.order_id || "").toLowerCase();
         const reason = String(item.reason || "").toLowerCase();
+        const method = String(item.refund_type || "").toLowerCase();
         return (
           refNo.includes(query) ||
           custId.includes(query) ||
           orderId.includes(query) ||
-          reason.includes(query)
+          reason.includes(query) ||
+          method.includes(query)
         );
       }
       return true;
     });
   }, [refundsList, selectedCategory, selectedStatus, searchTerm]);
+
+  // Paginated Sliced Data
+  const totalPages = Math.ceil(filteredRefunds.length / pageSize) || 1;
+  const paginatedRefunds = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredRefunds.slice(start, start + pageSize);
+  }, [filteredRefunds, currentPage, pageSize]);
+
+  const isFiltered = searchTerm || selectedCategory !== "all" || selectedStatus !== "all";
+
+  const handleResetFilters = () => {
+    setSearchTerm("");
+    setSelectedCategory("all");
+    setSelectedStatus("all");
+  };
 
   // Export CSV helper
   const handleExportCSV = () => {
@@ -177,7 +204,7 @@ export default function RefundsPage() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Days selector */}
+          {/* Time Filter Buttons */}
           <div className="flex bg-white rounded-xl border border-slate-200 p-1 shadow-sm">
             {[7, 14, 30, 90, 365].map((d) => (
               <button
@@ -272,7 +299,7 @@ export default function RefundsPage() {
       </div>
 
       {/* Main Table Container */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden space-y-4">
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden space-y-0">
         {/* Table Filter & Search Toolbar */}
         <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
           {/* Category Tabs */}
@@ -334,6 +361,16 @@ export default function RefundsPage() {
               <option value="pending">Pending</option>
               <option value="rejected">Rejected</option>
             </select>
+
+            {isFiltered && (
+              <button
+                onClick={handleResetFilters}
+                className="p-2 text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                title="Reset Filters"
+              >
+                <RotateCcw size={15} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -345,32 +382,32 @@ export default function RefundsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
+            <table className="w-full text-sm text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-100 text-[11px] font-black uppercase text-slate-400 tracking-wider">
-                  <th className="px-5 py-3.5">Refund ID / Reference</th>
-                  <th className="px-5 py-3.5">Customer</th>
-                  <th className="px-5 py-3.5">Order / Sub ID</th>
-                  <th className="px-5 py-3.5">Category</th>
-                  <th className="px-5 py-3.5 text-right">Amount</th>
-                  <th className="px-5 py-3.5">Method</th>
-                  <th className="px-5 py-3.5">Status</th>
-                  <th className="px-5 py-3.5">Reason / Breakdown</th>
-                  <th className="px-5 py-3.5 text-right">Date & Time</th>
+                  <th className="px-5 py-3.5 whitespace-nowrap">Refund ID / Reference</th>
+                  <th className="px-5 py-3.5 whitespace-nowrap">Customer</th>
+                  <th className="px-5 py-3.5 whitespace-nowrap">Order / Sub ID</th>
+                  <th className="px-5 py-3.5 whitespace-nowrap">Category</th>
+                  <th className="px-5 py-3.5 text-right whitespace-nowrap">Amount</th>
+                  <th className="px-5 py-3.5 whitespace-nowrap">Method</th>
+                  <th className="px-5 py-3.5 whitespace-nowrap">Status</th>
+                  <th className="px-5 py-3.5 whitespace-nowrap">Reason / Breakdown</th>
+                  <th className="px-5 py-3.5 text-right whitespace-nowrap">Date & Time</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredRefunds.map((r, i) => {
+                {paginatedRefunds.map((r, i) => {
                   const isSubRefund = r.category === "subscription_pause_refund";
                   return (
                     <tr key={r.id || i} className="hover:bg-slate-50/80 transition-colors">
                       {/* Refund ID */}
-                      <td className="px-5 py-4 font-mono text-xs font-bold text-slate-800">
+                      <td className="px-5 py-4 font-mono text-xs font-bold text-slate-800 whitespace-nowrap">
                         {r.refund_number}
                       </td>
 
                       {/* Customer ID */}
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-4 whitespace-nowrap">
                         <Link
                           href={`/admin/customers/${r.customer_id}`}
                           className="font-mono text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline"
@@ -380,42 +417,42 @@ export default function RefundsPage() {
                       </td>
 
                       {/* Order or Sub ID */}
-                      <td className="px-5 py-4 font-mono text-xs text-slate-600">
+                      <td className="px-5 py-4 font-mono text-xs text-slate-600 whitespace-nowrap">
                         {r.order_id || "—"}
                       </td>
 
-                      {/* Category Badge */}
-                      <td className="px-5 py-4">
+                      {/* Category Pill (Fixed Non-Wrapping Badge) */}
+                      <td className="px-5 py-4 whitespace-nowrap">
                         {isSubRefund ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200/60">
-                            <Calendar size={12} />
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/60 whitespace-nowrap shrink-0 shadow-2xs">
+                            <Calendar size={13} className="shrink-0 text-blue-500" />
                             Sub Pause Refund
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-purple-50 text-purple-700 border border-purple-200/60">
-                            <Package size={12} />
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200/60 whitespace-nowrap shrink-0 shadow-2xs">
+                            <Package size={13} className="shrink-0 text-purple-500" />
                             Order Refund
                           </span>
                         )}
                       </td>
 
                       {/* Amount */}
-                      <td className="px-5 py-4 text-right font-black text-rose-600 text-sm">
+                      <td className="px-5 py-4 text-right font-black text-rose-600 text-sm whitespace-nowrap">
                         {formatMoney(Number(r.refund_amount))}
                       </td>
 
                       {/* Method */}
-                      <td className="px-5 py-4">
-                        <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 capitalize">
-                          <Wallet size={13} className="text-slate-400" />
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 capitalize whitespace-nowrap">
+                          <Wallet size={13} className="text-slate-400 shrink-0" />
                           {r.refund_type === "wallet_deposit" ? "Wallet Deposit" : r.refund_type || "Wallet"}
                         </span>
                       </td>
 
                       {/* Status */}
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-4 whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide whitespace-nowrap shrink-0 ${
                             r.status === "processed" || r.status === "completed"
                               ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
                               : r.status === "pending"
@@ -424,11 +461,11 @@ export default function RefundsPage() {
                           }`}
                         >
                           {r.status === "processed" || r.status === "completed" ? (
-                            <CheckCircle2 size={11} />
+                            <CheckCircle2 size={12} className="shrink-0" />
                           ) : r.status === "pending" ? (
-                            <Clock size={11} />
+                            <Clock size={12} className="shrink-0" />
                           ) : (
-                            <XCircle size={11} />
+                            <XCircle size={12} className="shrink-0" />
                           )}
                           {r.status || "processed"}
                         </span>
@@ -471,12 +508,100 @@ export default function RefundsPage() {
                         <p className="text-xs text-slate-400">
                           Try adjusting your search criteria or selecting a different time range.
                         </p>
+                        {isFiltered && (
+                          <button
+                            onClick={handleResetFilters}
+                            className="mt-2 text-xs font-bold text-emerald-600 hover:text-emerald-700 underline"
+                          >
+                            Reset All Filters
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination Controls Footer */}
+        {!loading && filteredRefunds.length > 0 && (
+          <div className="px-5 py-4 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            {/* Entry Summary */}
+            <div className="text-xs font-medium text-slate-500">
+              Showing <span className="font-bold text-slate-800">{(currentPage - 1) * pageSize + 1}</span> to{" "}
+              <span className="font-bold text-slate-800">
+                {Math.min(currentPage * pageSize, filteredRefunds.length)}
+              </span>{" "}
+              of <span className="font-bold text-slate-800">{filteredRefunds.length}</span> entries
+            </div>
+
+            {/* Pagination Actions */}
+            <div className="flex items-center gap-3">
+              {/* Page size selector */}
+              <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                <span>Per page:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  className="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded-lg font-bold text-slate-800 focus:outline-none"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+
+              {/* Page Number Buttons */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="p-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white text-slate-600 transition-all"
+                  title="Previous Page"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+
+                {Array.from({ length: totalPages }, (_, idx) => idx + 1)
+                  .filter((page) => {
+                    return (
+                      page === 1 ||
+                      page === totalPages ||
+                      Math.abs(page - currentPage) <= 1
+                    );
+                  })
+                  .map((page, index, array) => {
+                    const showEllipsis = index > 0 && page - array[index - 1] > 1;
+                    return (
+                      <div key={page} className="flex items-center">
+                        {showEllipsis && <span className="px-1 text-xs text-slate-400">...</span>}
+                        <button
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                            currentPage === page
+                              ? "bg-slate-900 text-white shadow-sm"
+                              : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      </div>
+                    );
+                  })}
+
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="p-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white text-slate-600 transition-all"
+                  title="Next Page"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
