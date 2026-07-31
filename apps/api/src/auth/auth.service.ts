@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
@@ -755,9 +756,35 @@ export class AuthService {
    ================================================================================================*/
 
   async requestMobileOtp(body: SendOtpDto) {
-    const { phone, email } = body;
+    const { phone, email, purpose } = body;
     if (!phone && !email) {
       throw new BadRequestException('Phone number or email is required');
+    }
+
+    if (purpose === 'registration' || !purpose) {
+      if (email) {
+        const normalizedEmail = email.toLowerCase().trim();
+        const existingEmailUser = await this.Data.query('users', {
+          select: ['user_id', 'email'],
+          where: [{ column: 'email', operator: '=', value: normalizedEmail }],
+          limit: 1,
+        });
+        if (existingEmailUser?.data?.length > 0) {
+          throw new ConflictException('Email address is already registered.');
+        }
+      }
+
+      if (phone) {
+        const trimmedPhone = phone.trim();
+        const existingPhoneUser = await this.Data.query('users', {
+          select: ['user_id', 'phone'],
+          where: [{ column: 'phone', operator: '=', value: trimmedPhone }],
+          limit: 1,
+        });
+        if (existingPhoneUser?.data?.length > 0) {
+          throw new ConflictException('Phone number is already registered.');
+        }
+      }
     }
 
     const identifier = phone || email!;
