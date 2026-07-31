@@ -134,15 +134,15 @@ export class AnalyticsService {
           SELECT status::text AS status, refund_type::text AS refund_method,
             COUNT(*)::int AS count,
             COALESCE(SUM(refund_amount), 0)::numeric AS total_amount
-          FROM refunds WHERE created_at >= CURRENT_DATE - ($1 || ' days')::interval
+          FROM refunds WHERE created_at >= CURRENT_DATE - ($1::text || ' days')::interval
           GROUP BY status, refund_type
 
           UNION ALL
 
-          SELECT 'processed' AS status, 'wallet_deposit' AS refund_method,
+          SELECT COALESCE(status, 'pending')::text AS status, 'wallet_deposit' AS refund_method,
             COUNT(*)::int AS count,
             COALESCE(SUM(refund_amount), 0)::numeric AS total_amount
-          FROM subscription_refunds WHERE created_at >= CURRENT_DATE - ($1 || ' days')::interval
+          FROM subscription_refunds WHERE created_at >= CURRENT_DATE - ($1::text || ' days')::interval
           GROUP BY status
         ) combined
         GROUP BY status, refund_method
@@ -172,7 +172,7 @@ export class AnalyticsService {
           created_at,
           'order_refund' AS category
         FROM refunds 
-        WHERE created_at >= CURRENT_DATE - ($1 || ' days')::interval
+        WHERE created_at >= CURRENT_DATE - ($1::text || ' days')::interval
 
         UNION ALL
 
@@ -183,12 +183,12 @@ export class AnalyticsService {
           sr.subscription_id AS order_id,
           sr.refund_amount,
           'wallet_deposit' AS refund_type,
-          COALESCE(sr.status, 'processed')::text AS status,
+          COALESCE(sr.status, 'pending')::text AS status,
           ('Subscription pause refund for ' || sr.total_paused_days || ' days (' || sr.refund_month || ')') AS reason,
           sr.created_at,
           'subscription_pause_refund' AS category
         FROM subscription_refunds sr
-        WHERE sr.created_at >= CURRENT_DATE - ($1 || ' days')::interval
+        WHERE sr.created_at >= CURRENT_DATE - ($1::text || ' days')::interval
 
         ORDER BY created_at DESC
       `;
