@@ -1108,10 +1108,21 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
 
   Widget _buildHandoverStatusCard(BuildContext context) {
     final sessionState = context.read<DeliverySessionBloc>().state;
-    final currentRun = sessionState is DeliverySessionLoaded ? sessionState.currentRun : null;
-    if (currentRun == null) return const SizedBox.shrink();
+    final session = sessionState is DeliverySessionLoaded ? sessionState : null;
+    final currentRun = session?.currentRun;
+    if (session == null || currentRun == null) return const SizedBox.shrink();
 
-    if (currentRun.status == 'completed') {
+    final allOrdersDone = session.orders.isNotEmpty &&
+        session.orders.every((o) =>
+            o.status == 'delivered' ||
+            o.status == 'failed' ||
+            o.status == 'completed' ||
+            o.status == 'cancelled');
+
+    final isCompleted = currentRun.status == 'completed' ||
+        (allOrdersDone && currentRun.status != 'handed_over');
+
+    if (isCompleted) {
       return Container(
         margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
         padding: const EdgeInsets.all(16),

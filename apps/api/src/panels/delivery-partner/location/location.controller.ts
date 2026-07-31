@@ -134,11 +134,10 @@ export class LocationController {
                 FROM orders o
                 JOIN customers c ON c.customer_id = o.customer_id
                 LEFT JOIN customer_addresses ca ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
-                LEFT JOIN delivery_route_customers drc ON drc.customer_id = c.id
                 WHERE o.delivery_partner_id = $1
                   AND o.scheduled_date = CURRENT_DATE
                   AND o.status IN ('pending', 'out_for_delivery')
-                ORDER BY drc.sequence_number ASC NULLS LAST, o.created_at ASC
+                ORDER BY o.run_sequence ASC NULLS LAST, o.created_at ASC
                 LIMIT 1
               `, [deliveryPartnerId]);
 
@@ -357,12 +356,11 @@ export class LocationController {
              o.order_id, 
              o.status, 
              o.delivery_slot, 
-             c.route_id, 
-             r.route_name,
+             o.delivery_run_id::text AS route_id, 
+             COALESCE(o.delivery_run_id::text, 'Run') AS route_name,
              COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '') AS customer_name
            FROM orders o
            JOIN customers c ON c.customer_id = o.customer_id
-           LEFT JOIN delivery_routes r ON r.id::text = c.route_id::text
            WHERE o.delivery_partner_id = $1 AND o.scheduled_date = CURRENT_DATE`,
           [driver.id]
         );

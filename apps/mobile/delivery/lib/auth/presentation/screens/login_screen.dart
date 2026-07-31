@@ -134,25 +134,30 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                           child: Column(
                             children: [
                               Container(
-                                width: 72,
-                                height: 72,
+                                width: 78,
+                                height: 78,
                                 decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: const LinearGradient(
-                                    colors: [kPrimaryMid, kPrimary],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
+                                  borderRadius: BorderRadius.circular(22),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: kPrimary.withValues(alpha: 0.25),
-                                      blurRadius: 24,
-                                      spreadRadius: 2,
+                                      color: kPrimary.withValues(alpha: 0.2),
+                                      blurRadius: 20,
+                                      spreadRadius: 1,
                                       offset: const Offset(0, 6),
                                     ),
                                   ],
                                 ),
-                                child: const Icon(Icons.eco_rounded, color: Colors.white, size: 36),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(22),
+                                  child: Image.asset(
+                                    'assets/icon/delivery_logo.png',
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      color: kPrimary,
+                                      child: const Icon(Icons.eco_rounded, color: Colors.white, size: 36),
+                                    ),
+                                  ),
+                                ),
                               ),
                               const SizedBox(height: 16),
                               Text(

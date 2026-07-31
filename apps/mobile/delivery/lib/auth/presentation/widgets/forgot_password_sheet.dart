@@ -26,6 +26,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
   bool _obscureConfirm = true;
   bool _isLoading = false;
   String? _verificationToken;
+  String? _errorMessage;
 
   int _countdown = 60;
   bool _canResend = false;
@@ -75,6 +76,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
   Future<void> _sendOtp() async {
     final identifier = _emailCtrl.text.trim();
     if (identifier.isEmpty) {
+      setState(() => _errorMessage = 'Please enter your email address or phone number');
       _showSnack('Please enter your email address or phone number', isError: true);
       return;
     }
@@ -83,11 +85,15 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
     final isPhone = RegExp(r'^\+?[0-9]{7,15}$').hasMatch(identifier.replaceAll(RegExp(r'[\s\-\(\)]'), ''));
 
     if (!isEmail && !isPhone) {
+      setState(() => _errorMessage = 'Please enter a valid email address or phone number');
       _showSnack('Please enter a valid email address or phone number', isError: true);
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     try {
       final dioClient = sl<DioClient>();
       await dioClient.fetchCsrfToken().timeout(const Duration(seconds: 3), onTimeout: () {});
@@ -98,23 +104,23 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
       );
 
       final resData = Map<String, dynamic>.from(response.data as Map? ?? {});
-      final debugOtp = resData['otp']?.toString();
 
       if (!mounted) return;
       setState(() {
         _step = 1;
+        _errorMessage = null;
       });
       _startCountdown();
-      if (debugOtp != null && debugOtp.isNotEmpty) {
-        _showSnack('OTP sent to $identifier (OTP: $debugOtp) ✅');
-      } else {
-        _showSnack('OTP sent to $identifier ✅');
-      }
+      _showSnack('OTP sent to $identifier ✅');
     } on DioException catch (e) {
       final msg = e.response?.data is Map ? e.response?.data['message'] : null;
-      _showSnack(msg?.toString() ?? e.message ?? 'User does not exist or failed to send OTP', isError: true);
+      final errorStr = msg?.toString() ?? 'User does not exist';
+      if (mounted) setState(() => _errorMessage = errorStr);
+      _showSnack(errorStr, isError: true);
     } catch (e) {
-      _showSnack('Failed to send OTP: $e', isError: true);
+      const errorStr = 'User does not exist';
+      if (mounted) setState(() => _errorMessage = errorStr);
+      _showSnack(errorStr, isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -271,10 +277,13 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
           decoration: BoxDecoration(
             color: kBgDeep,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: kBorder),
+            border: Border.all(color: _errorMessage != null ? kRed : kBorder, width: _errorMessage != null ? 1.5 : 1.0),
           ),
           child: TextField(
             controller: _emailCtrl,
+            onChanged: (_) {
+              if (_errorMessage != null) setState(() => _errorMessage = null);
+            },
             keyboardType: TextInputType.emailAddress,
             style: GoogleFonts.poppins(color: kText, fontSize: 15, fontWeight: FontWeight.w500),
             decoration: InputDecoration(
@@ -286,6 +295,29 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
             ),
           ),
         ),
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: kRed.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kRed.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, color: kRed, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _errorMessage!,
+                    style: GoogleFonts.poppins(color: kRed, fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 24),
         SizedBox(
           height: 54,

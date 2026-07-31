@@ -343,7 +343,7 @@ export class AuthService {
       };
       try {
         await this.Data.insert('customers', custData);
-      } catch (_) {}
+      } catch (_) { }
       return custData;
     }
 
@@ -859,10 +859,6 @@ export class AuthService {
           created_at: now,
           updated_at: now,
         };
-        if (incomingFcmToken) {
-          customerInsertData.fcm_token = incomingFcmToken;
-        }
-
         await this.Data.insert('customers', customerInsertData);
       } catch (custErr) {
         console.error('[AuthService] Auto customer record creation failed during OTP verify:', custErr);
@@ -952,13 +948,7 @@ export class AuthService {
       await this.Data.update('users', { fcm: fcmToken }, [
         { column: 'user_id', operator: '=', value: userId },
       ]);
-    } catch (_) {}
-
-    try {
-      await this.Data.update('customers', { fcm_token: fcmToken, updated_at: now }, [
-        { column: 'customer_id', operator: '=', value: userId },
-      ]);
-    } catch (_) {}
+    } catch (_) { }
   }
 
   /*===============================================================================================
@@ -1258,7 +1248,7 @@ export class AuthService {
     }
 
     if (!user) {
-      throw new NotFoundException('User does not exist. Please check your email or phone number.');
+      throw new NotFoundException('User does not exist');
     }
 
     // Role validation if clientRole is supplied
@@ -1282,10 +1272,7 @@ export class AuthService {
       }
 
       if (!isAllowed) {
-        if (cRole === 'DELIVERY_BOY' || cRole === 'DELIVERY_PARTNER') {
-          throw new NotFoundException('No delivery partner account found with this email/phone.');
-        }
-        throw new ForbiddenException(`Account is not authorized for ${cRole} application`);
+        throw new NotFoundException('User does not exist');
       }
     }
 

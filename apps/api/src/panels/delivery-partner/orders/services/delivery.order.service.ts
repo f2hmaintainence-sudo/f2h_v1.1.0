@@ -7,15 +7,14 @@ import {
 import { DatabaseService } from '../../../../shared/database/Database.service';
 import { PushNotificationService } from '../../../../shared/pushNotifications/pushNotification.service';
 import { DeveloperService } from '../../../../shared/logger/Developer.service';
-import * as path from 'path';
-import * as fs from 'fs';
+
 @Injectable()
 export class DeliveryOrderService {
   constructor(
     private readonly db: DatabaseService,
     private readonly pushNotificationService: PushNotificationService,
     private readonly developer: DeveloperService,
-  ) {}
+  ) { }
 
   cleanDeliveryImagePath(imageUrl: string | null | undefined): string | null {
     if (!imageUrl) return null;
@@ -82,78 +81,150 @@ export class DeliveryOrderService {
       }
     }
 
-    const collectedRes = await this.db.query(
-      `SELECT reference_id AS order_id, COALESCE(SUM(quantity), 0) AS collected
+    // 1. Fetch expected containers by order
+    const expectedContainersRes = await this.db.query(
+      `SELECT oi.order_id, pv.container_id, c.name AS container_name, SUM(oi.quantity)::int AS expected
+       FROM order_items oi
+       JOIN product_variants pv ON pv.variant_id = oi.variant_id
+       JOIN products p ON p.product_id = pv.product_id
+       JOIN containers c ON c.container_id = pv.container_id
+       WHERE oi.order_id = ANY($1) AND COALESCE(c.is_returnable, p.is_returnable, false) = true
+       GROUP BY oi.order_id, pv.container_id, c.name`,
+      [orderIds],
+    );
+
+    const expectedContainersMap: Record<string, Record<string, { name: string; expected: number }>> = {};
+    for (const row of expectedContainersRes || []) {
+      const oid = String(row.order_id);
+      const cid = String(row.container_id);
+      if (!expectedContainersMap[oid]) expectedContainersMap[oid] = {};
+      expectedContainersMap[oid][cid] = { name: row.container_name, expected: row.expected };
+    }
+
+    // 2. Fetch customer container balances
+    const customerIds = [...new Set(orders.map((o: any) => o.customer_id))];
+    const balancesMap: Record<string, Record<string, { name: string; balance: number }>> = {};
+    const bottlesWithCustomerByCustomer: Record<string, number> = {};
+
+    if (customerIds.length > 0) {
+      const balanceRes = await this.db.query(
+        `SELECT cb.customer_id, cb.container_id, c.name AS container_name,
+                COALESCE(SUM(cb.issued_quantity - cb.returned_quantity - cb.damaged_quantity - cb.lost_quantity), 0)::int AS balance
+         FROM customer_container_balances cb
+         JOIN containers c ON c.container_id = cb.container_id
+         WHERE cb.customer_id = ANY($1)
+         GROUP BY cb.customer_id, cb.container_id, c.name`,
+        [customerIds],
+      );
+
+      for (const row of balanceRes || []) {
+        const custId = String(row.customer_id);
+        const cid = String(row.container_id);
+        if (!balancesMap[custId]) balancesMap[custId] = {};
+        balancesMap[custId][cid] = { name: row.container_name, balance: row.balance };
+
+        // For legacy single field support
+        if (cid === 'CONT-001') {
+          bottlesWithCustomerByCustomer[custId] = row.balance;
+        }
+      }
+    }
+
+    // 3. Fetch actual returned counts in this order
+    const collectedContainersRes = await this.db.query(
+      `SELECT reference_id AS order_id, container_id, COALESCE(SUM(quantity), 0)::int AS collected
        FROM container_transactions
        WHERE reference_type = 'order'
          AND reference_id = ANY($1)
          AND transaction_type = 'return'
-       GROUP BY reference_id`,
+       GROUP BY reference_id, container_id`,
       [orderIds],
     );
 
+    const collectedContainersMap: Record<string, Record<string, number>> = {};
     const collectedBottlesByOrder: Record<string, number> = {};
-    for (const row of collectedRes || []) {
-      collectedBottlesByOrder[String(row.order_id)] = Number(row.collected);
-    }
+    for (const row of collectedContainersRes || []) {
+      const oid = String(row.order_id);
+      const cid = String(row.container_id);
+      if (!collectedContainersMap[oid]) collectedContainersMap[oid] = {};
+      collectedContainersMap[oid][cid] = row.collected;
 
-    const customerIds = [...new Set(orders.map((o: any) => o.customer_id))];
-    const bottlesWithCustomerByCustomer: Record<string, number> = {};
-    if (customerIds.length > 0) {
-      const balanceRes = await this.db.query(
-        `SELECT customer_id, 
-                COALESCE(SUM(issued_quantity - returned_quantity - damaged_quantity - lost_quantity), 0) AS balance
-         FROM customer_container_balances
-         WHERE customer_id = ANY($1)
-         GROUP BY customer_id`,
-        [customerIds],
-      );
-      for (const row of balanceRes || []) {
-        bottlesWithCustomerByCustomer[String(row.customer_id)] = Number(row.balance);
+      if (cid === 'CONT-001') {
+        collectedBottlesByOrder[oid] = row.collected;
       }
     }
 
-    return orders.map((o: any, idx: number) => ({
-      stop: o.sequence_number ?? o.sequence_no ?? idx + 1,
-      order_id: o.order_id,
-      subscription_id: o.subscription_id,
-      order_type: o.order_type,
-      customer_id: o.customer_id,
-      customer_name: o.customer_name,
-      customer_phone: o.customer_phone,
-      address_id: o.address_id,
-      address: o.customer_address,
-      address_lat: Number(o.address_lat),
-      address_lng: Number(o.address_lng),
-      zone_id: o.zone_id,
-      route_id: o.route_id,
-      route_name: o.route_name,
-      branch_id: o.branch_id,
-      delivery_slot: o.delivery_slot,
-      scheduled_date: o.scheduled_date,
-      status: o.status,
-      subtotal: Number(o.subtotal),
-      discount_amount: Number(o.discount_amount),
-      gst_amount: Number(o.gst_amount),
-      payment_mode: o.payment_mode,
-      payment_status: o.payment_status,
-      is_cod: o.payment_mode === 'cod',
-      cod_amount: o.payment_mode === 'cod' ? Number(o.total_amount) : null,
-      total_amount: Number(o.total_amount),
-      delivery_partner_id: o.delivery_partner_id,
-      delivery_session_id: o.delivery_session_id ?? o.run_id ?? null,
-      run_id: o.run_id ?? null,
-      special_instructions: o.special_instructions,
-      invoice_image: o.invoice_image,
-      delivery_image: this.mapDeliveryImage(o.delivery_image),
-      payment_screenshot: o.payment_screenshot,
-      created_at: o.created_at,
-      updated_at: o.updated_at,
-      empty_bottles_expected: expectedBottlesByOrder[String(o.order_id)] || 0,
-      empty_bottles_collected: collectedBottlesByOrder[String(o.order_id)] || 0,
-      bottles_with_customer: bottlesWithCustomerByCustomer[String(o.customer_id)] || 0,
-      products: itemsByOrder[String(o.order_id)] || [],
-    }));
+    return orders.map((o: any, idx: number) => {
+      const ordId = String(o.order_id);
+      const custId = String(o.customer_id);
+
+      // Aggregate all container lists for this specific order/customer
+      const containersToCollect: any[] = [];
+      const allCids = new Set([
+        ...Object.keys(expectedContainersMap[ordId] || {}),
+        ...Object.keys(balancesMap[custId] || {}),
+      ]);
+
+      for (const cid of allCids) {
+        const name = expectedContainersMap[ordId]?.[cid]?.name || balancesMap[custId]?.[cid]?.name || 'Container';
+        const expected = expectedContainersMap[ordId]?.[cid]?.expected || 0;
+        const balance = balancesMap[custId]?.[cid]?.balance || 0;
+        const collected = collectedContainersMap[ordId]?.[cid] || 0;
+
+        containersToCollect.push({
+          container_id: cid,
+          name,
+          expected_delivery: expected,
+          customer_balance: balance,
+          max_collectable: expected + balance,
+          collected,
+        });
+      }
+
+      return {
+        stop: o.sequence_number ?? o.sequence_no ?? idx + 1,
+        order_id: o.order_id,
+        subscription_id: o.subscription_id,
+        order_type: o.order_type,
+        customer_id: o.customer_id,
+        customer_name: o.customer_name,
+        customer_phone: o.customer_phone,
+        address_id: o.address_id,
+        address: (o.customer_address || '').trim(),
+        landmark: (o.customer_landmark || '').trim() || null,
+        address_lat: Number(o.address_lat),
+        address_lng: Number(o.address_lng),
+        zone_id: o.zone_id,
+        route_id: o.route_id,
+        route_name: o.route_name,
+        branch_id: o.branch_id,
+        delivery_slot: o.delivery_slot,
+        scheduled_date: o.scheduled_date,
+        status: o.status,
+        subtotal: Number(o.subtotal),
+        discount_amount: Number(o.discount_amount),
+        gst_amount: Number(o.gst_amount),
+        payment_mode: o.payment_mode,
+        payment_status: o.payment_status,
+        is_cod: o.payment_mode === 'cod',
+        cod_amount: o.payment_mode === 'cod' ? Number(o.total_amount) : null,
+        total_amount: Number(o.total_amount),
+        delivery_partner_id: o.delivery_partner_id,
+        delivery_session_id: o.delivery_session_id ?? o.run_id ?? null,
+        run_id: o.run_id ?? null,
+        special_instructions: o.special_instructions,
+        invoice_image: o.invoice_image,
+        delivery_image: this.mapDeliveryImage(o.delivery_image),
+        payment_screenshot: o.payment_screenshot,
+        created_at: o.created_at,
+        updated_at: o.updated_at,
+        empty_bottles_expected: expectedBottlesByOrder[ordId] || 0,
+        empty_bottles_collected: collectedBottlesByOrder[ordId] || 0,
+        bottles_with_customer: bottlesWithCustomerByCustomer[custId] || 0,
+        containers_to_collect: containersToCollect,
+        products: itemsByOrder[ordId] || [],
+      };
+    });
   }
 
   getRunIdentifiers(run: any): string[] {
@@ -164,20 +235,6 @@ export class DeliveryOrderService {
     return ids;
   }
 
-  async resolveRunByIdentifier(identifier: string | number | null | undefined) {
-    if (!identifier) return null;
-    const idStr = String(identifier);
-    const runRes = await this.db.query(
-      `SELECT id, run_id, status, delivery_slot AS slot, run_date, branch_id
-       FROM delivery_runs
-       WHERE id::text = $1 OR run_id::text = $1
-       LIMIT 1`,
-      [idStr],
-    );
-    if (!runRes?.length) return null;
-    const run = runRes[0];
-    return { run, ids: this.getRunIdentifiers(run) };
-  }
 
   async findDeliveryRunByIdAndBoy(runId: string, boy: any) {
     const runRes = await this.db.query(
@@ -255,85 +312,16 @@ export class DeliveryOrderService {
     return cash;
   }
 
-  buildItemsJson(items: any[], defaultSlot?: string): any[] {
-    return items.map((item) => {
-      const slot = item.delivery_slot || defaultSlot;
-      const isMorning = slot === 'morning'
-        || slot?.toString().toLowerCase().startsWith('m')
-        || slot?.startsWith('AM');
-      return {
-        product_variant_id: item.variant_id,
-        product_name: item.product_name || 'Product',
-        m_qty: isMorning ? Number(item.quantity) : 0,
-        e_qty: !isMorning ? Number(item.quantity) : 0,
-      };
-    });
-  }
 
   async isRunHandedOver(runId: string): Promise<boolean> {
     const res = await this.db.query(
-      `SELECT 1 FROM delivery_logs
-       WHERE run_id = $1
-         AND (remarks = 'Warehouse handover completed' OR remarks = 'Warehouse handover confirmed')
+      `SELECT 1 FROM delivery_runs
+       WHERE (run_id = $1 OR id::text = $1)
+         AND status = 'completed'
        LIMIT 1`,
       [runId],
     );
     return !!(res?.length);
-  }
-
-  async upsertDeliveryLog(
-    client: any,
-    params: {
-      orderId: string;
-      runIdentifier: string;
-      customerId: string;
-      addressId: string;
-      deliveryPartnerId: string;
-      deliveryDate: string;
-      slot: string;
-      itemsJson: any[];
-      status: string;
-      norm: {
-        bottles: number; returnedContainers: number; damagedContainers: number;
-        lostContainers: number; deliveryImage: string | null;
-        notes: string | null; latitude: number | null; longitude: number | null;
-      };
-      cashCollected: number;
-    },
-  ): Promise<void> {
-    const { orderId, norm, status, cashCollected } = params;
-    const updateRes = await client.query(
-      `UPDATE delivery_logs
-       SET bottles_collected = $1, cash_collected = $2,
-           latitude = $3, longitude = $4, status = $5,
-           delivered_at = NOW(), returned_containers = $6,
-           damaged_containers = $7, lost_containers = $8,
-           proof_photo_url = $9, delivery_time = NOW()
-       WHERE order_id = $10`,
-      [
-        norm.bottles, cashCollected, norm.latitude, norm.longitude,
-        status, norm.returnedContainers, norm.damagedContainers,
-        norm.lostContainers, norm.deliveryImage, orderId,
-      ],
-    );
-    if (updateRes.rowCount === 0) {
-      await client.query(
-        `INSERT INTO delivery_logs (
-          order_id, run_id, customer_id, address_id, delivery_partner_id,
-          delivery_date, delivery_slot, items_json, status,
-          bottles_collected, cash_collected, latitude, longitude,
-          proof_photo_url, delivery_time, returned_containers,
-          damaged_containers, lost_containers, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), $15, $16, $17, NOW(), NOW())`,
-        [
-          orderId, params.runIdentifier, params.customerId, params.addressId,
-          params.deliveryPartnerId, params.deliveryDate, params.slot,
-          JSON.stringify(params.itemsJson), status, norm.bottles, cashCollected,
-          norm.latitude, norm.longitude, norm.deliveryImage, norm.returnedContainers,
-          norm.damagedContainers, norm.lostContainers,
-        ],
-      );
-    }
   }
 
   async handleContainerReturn(
@@ -352,6 +340,34 @@ export class DeliveryOrderService {
     const total = Number(params.returned || 0) + Number(params.damaged || 0) + Number(params.lost || 0);
     if (total <= 0) return;
 
+    // Get current customer balance
+    const balanceRes = await executor.query(
+      `SELECT COALESCE(SUM(issued_quantity - returned_quantity - damaged_quantity - lost_quantity), 0)::int AS balance
+       FROM customer_container_balances
+       WHERE customer_id = $1 AND container_id = $2`,
+      [params.customerId, params.containerId],
+    );
+    const currentBalance = Number(balanceRes.rows?.[0]?.balance ?? 0);
+
+    // Get expected/delivered in the current order
+    const orderExpectedRes = await executor.query(
+      `SELECT COALESCE(SUM(oi.quantity), 0)::int AS expected
+       FROM order_items oi
+       JOIN product_variants pv ON pv.variant_id = oi.variant_id
+       JOIN products p ON p.product_id = pv.product_id
+       LEFT JOIN containers c ON c.container_id = pv.container_id
+       WHERE oi.order_id = $1 AND pv.container_id = $2 AND COALESCE(c.is_returnable, p.is_returnable, false) = true`,
+      [params.referenceOrderId, params.containerId],
+    );
+    const orderExpected = Number(orderExpectedRes.rows?.[0]?.expected ?? 0);
+
+    const maxAllowed = currentBalance + orderExpected;
+    if (total > maxAllowed) {
+      throw new BadRequestException(
+        `Cannot collect ${total} containers. Customer only has ${currentBalance} outstanding containers (plus ${orderExpected} delivered in this order).`
+      );
+    }
+
     if (params.returned > 0) {
       await executor.query(
         `INSERT INTO container_transactions (
@@ -359,7 +375,7 @@ export class DeliveryOrderService {
            transaction_type, quantity, remarks, transaction_date, created_by
          ) VALUES ($1, $2, 'order', $3, 'return', $4, $5, CURRENT_DATE, $6)`,
         [params.customerId, params.containerId, params.referenceOrderId, params.returned,
-         params.remarks || 'Collected by delivery boy', params.createdBy],
+        params.remarks || 'Collected by delivery boy', params.createdBy],
       );
     }
 
@@ -455,24 +471,6 @@ export class DeliveryOrderService {
     );
   }
 
-  async handleBottleIssue(
-    executor: { query: (sql: string, params?: any[]) => Promise<any> },
-    params: {
-      customerId: string;
-      referenceOrderId: string;
-      packagingTypeId: string;
-      quantity: number;
-      createdBy: string;
-    },
-  ): Promise<void> {
-    return this.handleContainerIssue(executor, {
-      customerId: params.customerId,
-      referenceOrderId: params.referenceOrderId,
-      containerId: params.packagingTypeId,
-      quantity: params.quantity,
-      createdBy: params.createdBy,
-    });
-  }
 
   async getTodayRun(userId: string, dateParam?: string, status?: string) {
     const boy = await this.resolveDeliveryPartner(userId);
@@ -491,11 +489,13 @@ export class DeliveryOrderService {
 
     let activeRunId: string | null = null;
     let activeRunStatus: string | null = null;
+    let runIds: string[] = [String(boy.user_id)];
 
     if (runs?.length) {
       const activeRun = runs[0];
       activeRunId = activeRun.run_id || String(activeRun.id);
       activeRunStatus = activeRun.status;
+      runIds = runs.map((r: any) => String(r.run_id || r.id));
 
       if (activeRunStatus === 'completed') {
         if (await this.isRunHandedOver(activeRunId!)) {
@@ -517,8 +517,8 @@ export class DeliveryOrderService {
           o.status,
           o.address_id,
           NULL AS zone_id,
-          drc.route_id::text AS route_id,
-          COALESCE(r.route_name, o.delivery_run_id::text) AS route_name,
+          o.delivery_run_id::text AS route_id,
+          COALESCE(o.delivery_run_id::text, 'Run') AS route_name,
           o.branch_id,
           o.delivery_slot,
           o.scheduled_date,
@@ -542,6 +542,7 @@ export class DeliveryOrderService {
           COALESCE(ca.building_name, '') || ' ' ||
           COALESCE(ca.street, '') || ' ' ||
           COALESCE(ca.area, '') AS customer_address,
+          COALESCE(ca.landmark, '') AS customer_landmark,
           COALESCE(ca.latitude, 0.0) AS address_lat,
           COALESCE(ca.longitude, 0.0) AS address_lng,
           o.run_sequence AS sequence_number
@@ -549,17 +550,13 @@ export class DeliveryOrderService {
        JOIN customers c ON c.customer_id = o.customer_id
        LEFT JOIN customer_addresses ca
          ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
-       LEFT JOIN delivery_route_customers drc
-         ON drc.customer_id = c.id
-       LEFT JOIN delivery_routes r
-         ON r.id = drc.route_id
-        WHERE o.delivery_partner_id = $1
+        WHERE (o.delivery_partner_id = $1 OR o.delivery_run_id = ANY($5))
           AND o.status = ANY($3)
-          AND DATE(o.scheduled_date AT TIME ZONE 'Asia/Kolkata') = $2::date
+          AND o.scheduled_date = $2::date
           AND o.delivery_slot = $4
         ORDER BY o.run_sequence ASC NULLS LAST,
                  o.created_at ASC`,
-      [String(boy.user_id), targetDate, orderStatuses, targetSlot],
+      [String(boy.user_id), targetDate, orderStatuses, targetSlot, runIds],
     );
 
     if (!activeRunId && orders?.length) {
@@ -570,13 +567,30 @@ export class DeliveryOrderService {
       }
     }
 
-    if (activeRunId && activeRunStatus === 'in_progress') {
+    if (activeRunId) {
+      const uncompletedOrdersRes = await this.db.query(
+        `SELECT COUNT(*)::int AS count FROM orders
+         WHERE (delivery_run_id = $1 OR delivery_run_id::text = $1)
+           AND status NOT IN ('delivered', 'failed', 'completed', 'cancelled')`,
+        [activeRunId],
+      );
+      const uncompletedCount = Number(uncompletedOrdersRes[0]?.count || 0);
       const dbRun = await this.db.query(
         `SELECT status FROM delivery_runs WHERE run_id = $1 OR id::text = $1 LIMIT 1`,
         [activeRunId],
       );
-      if (dbRun?.length && dbRun[0].status === 'completed') {
+      const currentDbStatus = dbRun?.length ? dbRun[0].status : 'in_progress';
+
+      if (uncompletedCount === 0 && orders?.length > 0 && currentDbStatus !== 'handed_over') {
+        await this.db.query(
+          `UPDATE delivery_runs SET status = 'completed', actual_end_time = COALESCE(actual_end_time, NOW()), updated_at = NOW() WHERE run_id = $1 OR id::text = $1`,
+          [activeRunId],
+        );
         activeRunStatus = (await this.isRunHandedOver(activeRunId!)) ? 'handed_over' : 'completed';
+      } else if (currentDbStatus === 'completed') {
+        activeRunStatus = (await this.isRunHandedOver(activeRunId!)) ? 'handed_over' : 'completed';
+      } else if (currentDbStatus === 'handed_over') {
+        activeRunStatus = 'handed_over';
       }
     }
 
@@ -673,6 +687,30 @@ export class DeliveryOrderService {
       for (const order of stopsRes) {
         if (['delivered', 'failed'].includes(order.status)) continue;
 
+        // Issue containers FIRST (so the balance exists before we try to collect empties)
+        if (status === 'delivered') {
+          const returnableItems = await client.query(
+            `SELECT oi.quantity, pv.container_id
+             FROM order_items oi
+             JOIN product_variants pv ON pv.variant_id = oi.variant_id
+             JOIN products p ON p.product_id = pv.product_id
+             LEFT JOIN containers c ON c.container_id = pv.container_id
+             WHERE oi.order_id = $1
+               AND pv.container_id IS NOT NULL
+               AND COALESCE(c.is_returnable, p.is_returnable, false) = true`,
+            [order.order_id],
+          );
+          for (const item of returnableItems.rows || []) {
+            await this.handleContainerIssue(client, {
+              customerId: order.customer_id,
+              referenceOrderId: order.order_id,
+              containerId: item.container_id,
+              quantity: Number(item.quantity),
+              createdBy: boy.full_name,
+            });
+          }
+        }
+
         // Perform bottle/container collection ONLY ONCE for the stop to prevent duplication
         if (norm.bottles > 0 && isFirstOrder) {
           await this.handleBottleReturn(client, {
@@ -706,36 +744,23 @@ export class DeliveryOrderService {
           [order.order_id, status, norm.notes || `Stop marked as ${status} by driver`, boy.full_name],
         );
 
-        const itemsRes = await client.query(
-          `SELECT variant_id, quantity FROM order_items WHERE order_id = $1`,
-          [order.order_id],
-        );
-        const itemsJson = this.buildItemsJson(itemsRes.rows || [], run.slot);
-
-        // Zero out counts for subsequent orders of the same stop in log entries to prevent duplicate sums
-        const orderNorm = {
-          ...norm,
-          bottles: isFirstOrder ? norm.bottles : 0,
-          returnedContainers: isFirstOrder ? norm.returnedContainers : 0,
-          damagedContainers: isFirstOrder ? norm.damagedContainers : 0,
-          lostContainers: isFirstOrder ? norm.lostContainers : 0,
-        };
-
-        await this.upsertDeliveryLog(client, {
-          orderId: order.order_id,
-          runIdentifier,
-          customerId: order.customer_id,
-          addressId,
-          deliveryPartnerId: boy.user_id,
-          deliveryDate: new Date().toISOString().split('T')[0],
-          slot: run.slot || 'morning',
-          itemsJson,
-          status,
-          norm: orderNorm,
-          cashCollected,
-        });
-
         isFirstOrder = false;
+      }
+
+      // Auto-complete the run if all orders are delivered or failed
+      const pendingRes = await client.query(
+        `SELECT COUNT(*)::int AS count FROM orders
+         WHERE delivery_run_id = ANY($1)
+           AND status NOT IN ('delivered', 'failed', 'completed', 'cancelled')`,
+        [runIds],
+      );
+      if (Number(pendingRes.rows?.[0]?.count || 0) === 0) {
+        await client.query(
+          `UPDATE delivery_runs
+           SET status = 'completed', actual_end_time = COALESCE(actual_end_time, NOW()), updated_at = NOW()
+           WHERE (id::text = ANY($1) OR run_id = ANY($1)) AND status != 'handed_over'`,
+          [runIds],
+        );
       }
     });
 
@@ -759,9 +784,10 @@ export class DeliveryOrderService {
     }
 
     const bottlesRes = await this.db.query(
-      `SELECT COALESCE(SUM(bottles_collected), 0) AS total_bottles
-       FROM delivery_logs
-       WHERE run_id = ANY($1) AND status != 'pickup_confirmed' AND status != 'handed_over'`,
+      `SELECT COALESCE(SUM(ct.quantity), 0) AS total_bottles
+       FROM container_transactions ct
+       JOIN orders o ON o.order_id = ct.reference_id
+       WHERE o.delivery_run_id = ANY($1) AND ct.transaction_type = 'return'`,
       [runIds],
     );
     const totalBottles = Number(bottlesRes[0]?.total_bottles || 0);
@@ -793,20 +819,6 @@ export class DeliveryOrderService {
       await client.query(
         `UPDATE delivery_runs SET status = 'completed', actual_end_time = COALESCE(actual_end_time, NOW()), updated_at = NOW() WHERE id = $1`,
         [run.id],
-      );
-
-      await client.query(
-        `UPDATE delivery_logs
-           SET delivery_date = CURRENT_DATE,
-               photo_id = NULL,
-               bottles_collected = COALESCE(bottles_collected, 0),
-               cash_collected = COALESCE(cash_collected, 0),
-               remarks = 'Warehouse handover completed',
-               status = 'completed',
-               delivered_at = NOW(),
-               created_at = NOW()
-           WHERE run_id = ANY($1)`,
-        [runIds],
       );
     });
 
@@ -890,6 +902,31 @@ export class DeliveryOrderService {
     const status = body.status || 'delivered';
 
     await this.db.transaction(async (client) => {
+      // Issue containers FIRST so the balance exists before collection check
+      if (status === 'delivered') {
+        const returnableItems = await client.query(
+          `SELECT oi.quantity, pv.container_id
+           FROM order_items oi
+           JOIN product_variants pv ON pv.variant_id = oi.variant_id
+           JOIN products p ON p.product_id = pv.product_id
+           LEFT JOIN containers c ON c.container_id = pv.container_id
+           WHERE oi.order_id = $1
+             AND pv.container_id IS NOT NULL
+             AND COALESCE(c.is_returnable, p.is_returnable, false) = true`,
+          [order.order_id],
+        );
+        for (const item of returnableItems.rows || []) {
+          await this.handleContainerIssue(client, {
+            customerId: order.customer_id,
+            referenceOrderId: order.order_id,
+            containerId: item.container_id,
+            quantity: Number(item.quantity),
+            createdBy: boy.full_name,
+          });
+        }
+      }
+
+      // Now collect returned containers (balance already updated above)
       if (norm.bottles > 0) {
         await this.handleBottleReturn(client, {
           customerId: order.customer_id,
@@ -920,25 +957,23 @@ export class DeliveryOrderService {
         [order.order_id, status, norm.notes || `Order marked as ${status} by driver`, boy.full_name],
       );
 
-      const itemsRes = await client.query(
-        `SELECT variant_id, quantity FROM order_items WHERE order_id = $1`,
-        [order.order_id],
-      );
-      const itemsJson = this.buildItemsJson(itemsRes.rows || [], order.delivery_slot);
-
-      await this.upsertDeliveryLog(client, {
-        orderId: order.order_id,
-        runIdentifier: order.delivery_session_id || 'legacy',
-        customerId: order.customer_id,
-        addressId: order.address_id,
-        deliveryPartnerId: boy.user_id,
-        deliveryDate: new Date().toISOString().split('T')[0],
-        slot: order.delivery_slot || 'morning',
-        itemsJson,
-        status,
-        norm,
-        cashCollected,
-      });
+      // Auto-complete the run if all orders are delivered or failed
+      if (order.delivery_run_id) {
+        const pendingRes = await client.query(
+          `SELECT COUNT(*)::int AS count FROM orders
+           WHERE delivery_run_id = $1
+             AND status NOT IN ('delivered', 'failed', 'completed', 'cancelled')`,
+          [order.delivery_run_id],
+        );
+        if (Number(pendingRes.rows?.[0]?.count || 0) === 0) {
+          await client.query(
+            `UPDATE delivery_runs
+             SET status = 'completed', actual_end_time = COALESCE(actual_end_time, NOW()), updated_at = NOW()
+             WHERE (id::text = $1 OR run_id = $1) AND status != 'handed_over'`,
+            [order.delivery_run_id],
+          );
+        }
+      }
     });
 
     return { success: true, message: `Order status updated to ${status} successfully` };
@@ -984,7 +1019,8 @@ export class DeliveryOrderService {
              o.order_id,
              o.customer_id,
              COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '') AS customer_name,
-             COALESCE(ca.flat_no, '') || ' ' || COALESCE(ca.building_name, '') || ' ' || COALESCE(ca.street, '') || ' ' || COALESCE(ca.area, '') AS customer_address
+             COALESCE(ca.flat_no, '') || ' ' || COALESCE(ca.building_name, '') || ' ' || COALESCE(ca.street, '') || ' ' || COALESCE(ca.area, '') AS customer_address,
+             COALESCE(ca.landmark, '') AS customer_landmark
            FROM orders o
            JOIN customers c ON c.customer_id = o.customer_id
            LEFT JOIN customer_addresses ca ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
@@ -1009,7 +1045,8 @@ export class DeliveryOrderService {
            o.order_id,
            o.customer_id,
            COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '') AS customer_name,
-           COALESCE(ca.flat_no, '') || ' ' || COALESCE(ca.building_name, '') || ' ' || COALESCE(ca.street, '') || ' ' || COALESCE(ca.area, '') AS customer_address
+           COALESCE(ca.flat_no, '') || ' ' || COALESCE(ca.building_name, '') || ' ' || COALESCE(ca.street, '') || ' ' || COALESCE(ca.area, '') AS customer_address,
+           COALESCE(ca.landmark, '') AS customer_landmark
          FROM orders o
          JOIN customers c ON c.customer_id = o.customer_id
          LEFT JOIN customer_addresses ca ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
@@ -1200,21 +1237,7 @@ export class DeliveryOrderService {
         );
       }
 
-      await client.query(
-        `UPDATE delivery_logs
-           SET status = 'pickup_confirmed',
-               latitude = COALESCE($2, latitude),
-               longitude = COALESCE($3, longitude),
-               delivery_time = NOW(),
-               remarks = 'Warehouse pickup confirmed'
-           WHERE run_id = ANY($1)
-             AND status = 'pending'`,
-        [
-          runIds,
-          body.latitude ? Number(body.latitude) : null,
-          body.longitude ? Number(body.longitude) : null,
-        ],
-      );
+
     });
 
     return {
@@ -1225,80 +1248,5 @@ export class DeliveryOrderService {
     };
   }
 
-  async updateOrderContainers(
-    userId: string,
-    id: string,
-    body: {
-      container_updates: Array<{
-        container_id: string;
-        expected_quantity?: number;
-        returned_quantity?: number;
-        status?: string;
-        notes?: string;
-      }>;
-    },
-  ) {
-    const boy = await this.resolveDeliveryPartner(userId);
 
-    const orderRes = await this.db.query(
-      `SELECT order_id, customer_id FROM orders
-       WHERE (order_id = $1 OR id::text = $1)
-         AND delivery_partner_id::text = $2
-       LIMIT 1`,
-      [id, String(boy.user_id)],
-    );
-    if (!orderRes?.length) {
-      throw new NotFoundException('Order not found or not assigned to you');
-    }
-
-    const order = orderRes[0];
-    const { container_updates } = body;
-
-    if (!Array.isArray(container_updates) || container_updates.length === 0) {
-      throw new BadRequestException('container_updates must be a non-empty array');
-    }
-
-    for (const item of container_updates) {
-      const { container_id, expected_quantity = 1, returned_quantity = 0, status = 'returned', notes } = item;
-      if (!container_id) continue;
-
-      await this.db.query(
-        `INSERT INTO order_containers 
-         (order_id, customer_id, container_id, expected_quantity, returned_quantity, status, notes, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
-        [order.order_id, order.customer_id, container_id, expected_quantity, returned_quantity, status, notes || null],
-      );
-
-      const txnType = status === 'returned' ? 'return' : status === 'broken' ? 'damaged' : status === 'lost' ? 'lost' : 'issue';
-      const qty = Math.max(1, Number(returned_quantity || expected_quantity || 1));
-
-      await this.db.query(
-        `INSERT INTO container_transactions 
-         (customer_id, container_id, reference_type, reference_id, transaction_type, quantity, remarks, transaction_date, created_by)
-         VALUES ($1, $2, 'order', $3, $4, $5, $6, CURRENT_DATE, $7)`,
-        [order.customer_id, container_id, order.order_id, txnType, qty, notes || `Order ${order.order_id} container check (${status})`, boy.full_name || String(boy.user_id)],
-      ).catch(() => null);
-
-      const returnAdd = txnType === 'return' ? qty : 0;
-      const damagedAdd = txnType === 'damaged' ? qty : 0;
-      const lostAdd = txnType === 'lost' ? qty : 0;
-
-      await this.db.query(
-        `INSERT INTO customer_container_balances 
-         (customer_id, container_id, issued_quantity, returned_quantity, damaged_quantity, lost_quantity, updated_at)
-         VALUES ($1, $2, 0, $3, $4, $5, NOW())
-         ON CONFLICT (customer_id, container_id) DO UPDATE SET
-           returned_quantity = customer_container_balances.returned_quantity + EXCLUDED.returned_quantity,
-           damaged_quantity = customer_container_balances.damaged_quantity + EXCLUDED.damaged_quantity,
-           lost_quantity = customer_container_balances.lost_quantity + EXCLUDED.lost_quantity,
-           updated_at = NOW()`,
-        [order.customer_id, container_id, returnAdd, damagedAdd, lostAdd],
-      ).catch(() => null);
-    }
-
-    return {
-      success: true,
-      message: 'Container checklist & statuses updated successfully',
-    };
-  }
 }

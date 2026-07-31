@@ -27,7 +27,7 @@ class ApiEndpoints {
     if (defaultTargetPlatform == TargetPlatform.android) {
       return 'http://10.0.2.2:5001';
     }
-    return 'http://localhost:5001';
+    return 'http://192.168.1.16:5001';
   }
 
   /// Root host (scheme + host + port), no trailing slash.

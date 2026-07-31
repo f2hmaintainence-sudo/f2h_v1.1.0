@@ -99,11 +99,8 @@ class DeliverySessionLoaded extends DeliverySessionState {
   int get collectedBottlesCount =>
       orders.fold(0, (sum, o) => sum + (o.emptyBottlesCollected ?? 0));
   int get bottlesStillOutstanding {
-    // Sum the outstanding bottle balance across non-delivered stops.
-    // bottlesWithCustomer is a positive count, so the result must also be positive.
-    return orders
-        .where((o) => o.status != 'delivered')
-        .fold(0, (currentSum, o) {
+    // Sum the outstanding bottle balance at customer homes across all stops in the session.
+    return orders.fold(0, (currentSum, o) {
       final val = o.bottlesWithCustomer ?? 0;
       return currentSum + (val > 0 ? val : 0);
     });

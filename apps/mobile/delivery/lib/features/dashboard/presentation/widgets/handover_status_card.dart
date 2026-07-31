@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
+import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/warehouse_handover_screen.dart';
 
 /// Displays a contextual status banner when the delivery run is [completed]
@@ -18,7 +20,24 @@ class HandoverStatusCard extends StatelessWidget {
     final run = currentRun;
     if (run == null) return const SizedBox.shrink();
 
-    if (run.status == 'completed') {
+    // Check if session has all orders completed as a fallback
+    bool allOrdersDone = false;
+    try {
+      final sessionState = context.read<DeliverySessionBloc>().state;
+      if (sessionState is DeliverySessionLoaded) {
+        allOrdersDone = sessionState.orders.isNotEmpty &&
+            sessionState.orders.every((o) =>
+                o.status == 'delivered' ||
+                o.status == 'failed' ||
+                o.status == 'completed' ||
+                o.status == 'cancelled');
+      }
+    } catch (_) {}
+
+    final isCompleted = run.status == 'completed' ||
+        (allOrdersDone && run.status != 'handed_over');
+
+    if (isCompleted) {
       return Container(
         margin: const EdgeInsets.only(top: 16, bottom: 16),
         padding: const EdgeInsets.all(16),
