@@ -113,15 +113,30 @@ export class DeliveryManagementService {
           (
             SELECT COUNT(*)::int FROM orders o
             WHERE o.delivery_partner_id = db.delivery_partner_id
-              AND o.scheduled_date = CURRENT_DATE
+              AND (o.scheduled_date = CURRENT_DATE OR o.created_at::date = CURRENT_DATE)
               AND o.status NOT IN ('cancelled', 'failed')
           ) AS today_assigned,
           (
             SELECT COUNT(*)::int FROM orders o
             WHERE o.delivery_partner_id = db.delivery_partner_id
-              AND o.scheduled_date = CURRENT_DATE
+              AND (o.scheduled_date = CURRENT_DATE OR o.created_at::date = CURRENT_DATE)
               AND o.status = 'delivered'
           ) AS today_delivered,
+          COALESCE(
+            (
+              SELECT json_agg(
+                json_build_object(
+                  'order_id', o.order_id,
+                  'status', o.status,
+                  'total_amount', o.total_amount,
+                  'delivery_slot', o.delivery_slot
+                )
+              )
+              FROM orders o
+              WHERE o.delivery_partner_id = db.delivery_partner_id
+                AND (o.scheduled_date = CURRENT_DATE OR o.created_at::date = CURRENT_DATE)
+            ), '[]'::json
+          ) AS assigned_orders,
           db.created_at
         FROM delivery_partners db
         LEFT JOIN branches b ON b.branch_id = db.branch_id
@@ -438,7 +453,7 @@ export class DeliveryManagementService {
       const { branch_id, status, partner_id, page = 1, limit = 50 } = query;
       const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
       const params: any[] = [date];
-      const where: string[] = ['o.scheduled_date = $1'];
+      const where: string[] = ['(o.scheduled_date = $1 OR o.created_at::date = $1)'];
 
       if (branch_id) {
         params.push(branch_id);
@@ -500,16 +515,17 @@ export class DeliveryManagementService {
         WHERE ${where.join(' AND ')}
         ORDER BY
           CASE o.status
-            WHEN 'pending' THEN 1
-            WHEN 'placed' THEN 2
-            WHEN 'confirmed' THEN 3
+            WHEN 'placed' THEN 1
+            WHEN 'confirmed' THEN 2
+            WHEN 'assigned' THEN 3
             WHEN 'packed' THEN 4
             WHEN 'out_for_delivery' THEN 5
             WHEN 'delivered' THEN 6
             WHEN 'cancelled' THEN 7
             WHEN 'failed' THEN 8
+            ELSE 9
           END ASC,
-          o.created_at ASC
+          o.created_at DESC
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
       `;
       params.push(parseInt(limit, 10), offset);
@@ -543,7 +559,7 @@ export class DeliveryManagementService {
           COUNT(*) FILTER (WHERE status = 'cancelled')::int          AS cancelled,
           COUNT(DISTINCT delivery_partner_id)::int                   AS active_partners
         FROM orders
-        WHERE scheduled_date = $1
+        WHERE (scheduled_date = $1 OR created_at::date = $1)
       `;
       const rows = await this.db.query(sql, [targetDate]);
 

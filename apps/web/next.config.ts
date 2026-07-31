@@ -31,7 +31,7 @@ const nextConfig: NextConfig = {
     ],
   },
   turbopack: {
-    root: path.resolve(__dirname, "../../"),
+    root: path.resolve(__dirname),
   },
   experimental: {
     optimizePackageImports: ["react-icons", "lucide-react"],

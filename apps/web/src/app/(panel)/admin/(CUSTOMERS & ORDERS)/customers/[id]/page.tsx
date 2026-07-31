@@ -50,7 +50,9 @@ export default function CustomerDetailsPage() {
   const [savingPostpaid, setSavingPostpaid] = useState(false);
 
   useEffect(() => {
-    if (id) fetchPortfolio();
+    if (id && !['allcustomers', 'add', 'postpaidcustomers', 'groups', 'wallets', 'branch-customers'].includes(id)) {
+      fetchPortfolio();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 

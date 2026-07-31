@@ -18,6 +18,15 @@ export class CustomerBillingRepository {
     return await this.databaseService.query(sql);
   }
 
+  async findPendingPostpaidBills(): Promise<any[]> {
+    const sql = `
+      SELECT bill_id as bill_number, customer_id, due_date, status, total_amount, due_amount
+      FROM public.customer_bills
+      WHERE status != 'paid' AND status != 'cancelled'
+    `;
+    return await this.databaseService.query(sql).catch(() => []);
+  }
+
   async checkCustomerPostpaidEnabled(customerId: string): Promise<any> {
     const sql = `
       SELECT customer_id, first_name, phone, is_postpaid_enabled

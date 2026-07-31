@@ -1,13 +1,3 @@
-// ============================================================================
-// ChronoSparkSolutions — A Software Company
-// © 2026 ChronoSparkSolutions. All rights reserved.
-//
-// Project     : F2H Fresh
-// File        : page.tsx
-// Description : Branch customers management page for admin panel
-//
-// ============================================================================
-
 'use client';
 
 import { getApiBaseUrl } from '@/lib/api-config';
@@ -16,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { HardHat, Users, Filter } from 'lucide-react';
 import SkeletonTable from '@/components/Table Generator/SkeletonTable';
 
-export default function CustomersPage() {
+export default function BranchCustomersPage() {
   const [branches, setBranches] = useState<any[]>([]);
   const [zones, setZones] = useState<any[]>([]);
 
@@ -84,7 +74,7 @@ export default function CustomersPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-800 tracking-tight flex items-center gap-3">
           <Users className="w-8 h-8 text-fresh-green" />
-          Customer Management
+          Branch Customer Management
         </h1>
         <p className="text-gray-500 mt-2 text-sm">
           Select a branch and a zone to view associated customers.
@@ -99,18 +89,14 @@ export default function CustomersPage() {
             Select Branch
           </label>
           <select
-            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-fresh-green/50 transition-all cursor-pointer text-gray-700"
             value={selectedBranch}
-            onChange={(e) => {
-              setSelectedBranch(e.target.value);
-              setSelectedZone(''); // reset zone when branch changes
-              setTableKey(prev => prev + 1); // trigger table re-render
-            }}
+            onChange={(e) => setSelectedBranch(e.target.value)}
+            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-fresh-green/20 focus:border-fresh-green transition-all"
           >
             <option value="">All Branches</option>
-            {branches.map(branch => (
-              <option key={branch.branch_id} value={branch.branch_id}>
-                {branch.branch_name} ({branch.city})
+            {branches.map((b) => (
+              <option key={b.branch_id} value={b.branch_id}>
+                {b.branch_name}
               </option>
             ))}
           </select>
@@ -122,31 +108,19 @@ export default function CustomersPage() {
             Select Zone
           </label>
           <select
-            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-fresh-green/50 transition-all cursor-pointer text-gray-700"
             value={selectedZone}
-            onChange={(e) => {
-              setSelectedZone(e.target.value);
-              setTableKey(prev => prev + 1); // trigger table re-render
-            }}
-            disabled={!selectedBranch || zones.length === 0}
+            onChange={(e) => setSelectedZone(e.target.value)}
+            disabled={!selectedBranch}
+            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-fresh-green/20 focus:border-fresh-green transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <option value="">All Zones</option>
-            {zones.map(zone => (
-              <option key={zone.id} value={zone.id}>
-                {zone.name}
+            {zones.map((z) => (
+              <option key={z.zone_id} value={z.zone_id}>
+                {z.zone_name}
               </option>
             ))}
           </select>
         </div>
-      </div>
-
-      {/* Table Section */}
-      <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 p-6 overflow-hidden">
-        <SkeletonTable
-          key={tableKey}
-          apiEndpoint={apiEndpoint}
-          onAction={handleAction}
-        />
       </div>
     </div>
   );

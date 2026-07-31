@@ -50,16 +50,17 @@ interface DeliveryPartner {
 }
 
 const statusConfig: Record<string, { icon: any; color: string; bgColor: string; borderColor: string; label: string }> = {
-  pending:          { icon: Clock,        color: "text-amber-700",   bgColor: "bg-amber-50",   borderColor: "border-amber-300",   label: "Pending" },
   placed:           { icon: ShoppingCart, color: "text-sky-700",     bgColor: "bg-sky-50",     borderColor: "border-sky-300",     label: "Placed" },
   confirmed:        { icon: CheckCircle2, color: "text-teal-700",    bgColor: "bg-teal-50",    borderColor: "border-teal-300",    label: "Confirmed" },
+  assigned:         { icon: UserCheck,    color: "text-indigo-700",  bgColor: "bg-indigo-50",  borderColor: "border-indigo-300",  label: "Assigned" },
+  packed:           { icon: Package,      color: "text-purple-700",  bgColor: "bg-purple-50",  borderColor: "border-purple-300",  label: "Packed" },
   out_for_delivery: { icon: Truck,        color: "text-blue-700",    bgColor: "bg-blue-50",    borderColor: "border-blue-300",    label: "Out for Delivery" },
   delivered:        { icon: CheckCircle2, color: "text-emerald-700", bgColor: "bg-emerald-50", borderColor: "border-emerald-300", label: "Delivered" },
   failed:           { icon: AlertCircle,  color: "text-rose-700",    bgColor: "bg-rose-50",    borderColor: "border-rose-300",    label: "Failed" },
   cancelled:        { icon: XCircle,      color: "text-slate-600",   bgColor: "bg-slate-100",  borderColor: "border-slate-300",   label: "Cancelled" },
 };
 
-const statusFlow = ["pending", "placed", "confirmed", "out_for_delivery", "delivered"];
+const statusFlow = ["placed", "confirmed", "assigned", "packed", "out_for_delivery", "delivered"];
 
 function todayIST(): string {
   const now = new Date();
@@ -211,9 +212,10 @@ export default function LiveOrdersPage() {
 
   const tabs = [
     { id: "", label: "All Orders", count: allOrders.length },
-    { id: "pending", label: "Pending", count: allOrders.filter(o => o.status === "pending").length },
     { id: "placed", label: "Placed", count: allOrders.filter(o => o.status === "placed").length },
     { id: "confirmed", label: "Confirmed", count: allOrders.filter(o => o.status === "confirmed").length },
+    { id: "assigned", label: "Assigned", count: allOrders.filter(o => o.status === "assigned").length },
+    { id: "packed", label: "Packed", count: allOrders.filter(o => o.status === "packed").length },
     { id: "out_for_delivery", label: "Out for Delivery", count: allOrders.filter(o => o.status === "out_for_delivery").length },
     { id: "delivered", label: "Delivered", count: allOrders.filter(o => o.status === "delivered").length },
     { id: "failed", label: "Failed", count: allOrders.filter(o => o.status === "failed").length },
