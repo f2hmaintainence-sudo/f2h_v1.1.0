@@ -437,16 +437,16 @@ export default function RefundsPage() {
             <table className="w-full text-sm text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-100 text-[11px] font-black uppercase text-slate-400 tracking-wider">
-                  <th className="px-5 py-3.5 whitespace-nowrap">Refund ID / Reference</th>
-                  <th className="px-5 py-3.5 whitespace-nowrap">Customer</th>
-                  <th className="px-5 py-3.5 whitespace-nowrap">Order / Sub ID</th>
-                  <th className="px-5 py-3.5 whitespace-nowrap">Category</th>
-                  <th className="px-5 py-3.5 text-right whitespace-nowrap">Amount</th>
-                  <th className="px-5 py-3.5 whitespace-nowrap">Method</th>
-                  <th className="px-5 py-3.5 whitespace-nowrap">Status</th>
-                  <th className="px-5 py-3.5 whitespace-nowrap">Reason / Breakdown</th>
-                  <th className="px-5 py-3.5 text-right whitespace-nowrap">Date & Time</th>
-                  <th className="px-5 py-3.5 text-center whitespace-nowrap">Action</th>
+                  <th className="px-4 py-3.5 whitespace-nowrap">Refund ID / Reference</th>
+                  <th className="px-4 py-3.5 whitespace-nowrap">Customer</th>
+                  <th className="px-4 py-3.5 whitespace-nowrap">Order / Sub ID</th>
+                  <th className="px-4 py-3.5 whitespace-nowrap">Category</th>
+                  <th className="px-4 py-3.5 text-right whitespace-nowrap">Amount</th>
+                  <th className="px-4 py-3.5 whitespace-nowrap">Status</th>
+                  <th className="px-4 py-3.5 text-center whitespace-nowrap bg-amber-50/50 text-amber-900 font-extrabold border-x border-amber-200/60">Action</th>
+                  <th className="px-4 py-3.5 whitespace-nowrap">Method</th>
+                  <th className="px-4 py-3.5 whitespace-nowrap">Reason / Breakdown</th>
+                  <th className="px-4 py-3.5 text-right whitespace-nowrap">Date & Time</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -458,12 +458,12 @@ export default function RefundsPage() {
                   return (
                     <tr key={r.id || i} className="hover:bg-slate-50/80 transition-colors">
                       {/* Refund ID */}
-                      <td className="px-5 py-4 font-mono text-xs font-bold text-slate-800 whitespace-nowrap">
+                      <td className="px-4 py-3.5 font-mono text-xs font-bold text-slate-800 whitespace-nowrap">
                         {r.refund_number}
                       </td>
 
                       {/* Customer ID */}
-                      <td className="px-5 py-4 whitespace-nowrap">
+                      <td className="px-4 py-3.5 whitespace-nowrap">
                         <Link
                           href={`/admin/customers/${r.customer_id}`}
                           className="font-mono text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline"
@@ -473,19 +473,19 @@ export default function RefundsPage() {
                       </td>
 
                       {/* Order or Sub ID */}
-                      <td className="px-5 py-4 font-mono text-xs text-slate-600 whitespace-nowrap">
+                      <td className="px-4 py-3.5 font-mono text-xs text-slate-600 whitespace-nowrap">
                         {r.order_id || "—"}
                       </td>
 
-                      {/* Category Pill (Non-Wrapping Badge) */}
-                      <td className="px-5 py-4 whitespace-nowrap">
+                      {/* Category Pill */}
+                      <td className="px-4 py-3.5 whitespace-nowrap">
                         {isSubRefund ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/60 whitespace-nowrap shrink-0 shadow-2xs">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/60 whitespace-nowrap shrink-0 shadow-2xs">
                             <Calendar size={13} className="shrink-0 text-blue-500" />
                             Sub Pause Refund
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200/60 whitespace-nowrap shrink-0 shadow-2xs">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200/60 whitespace-nowrap shrink-0 shadow-2xs">
                             <Package size={13} className="shrink-0 text-purple-500" />
                             Order Refund
                           </span>
@@ -493,20 +493,12 @@ export default function RefundsPage() {
                       </td>
 
                       {/* Amount */}
-                      <td className="px-5 py-4 text-right font-black text-rose-600 text-sm whitespace-nowrap">
+                      <td className="px-4 py-3.5 text-right font-black text-rose-600 text-sm whitespace-nowrap">
                         {formatMoney(Number(r.refund_amount))}
                       </td>
 
-                      {/* Method */}
-                      <td className="px-5 py-4 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 capitalize whitespace-nowrap">
-                          <Wallet size={13} className="text-slate-400 shrink-0" />
-                          {r.refund_type === "wallet_deposit" ? "Wallet Deposit" : r.refund_type || "Wallet"}
-                        </span>
-                      </td>
-
                       {/* Status */}
-                      <td className="px-5 py-4 whitespace-nowrap">
+                      <td className="px-4 py-3.5 whitespace-nowrap">
                         <span
                           className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide whitespace-nowrap shrink-0 ${
                             r.status === "processed" || r.status === "completed"
@@ -527,16 +519,49 @@ export default function RefundsPage() {
                         </span>
                       </td>
 
+                      {/* Prominent Action Column (Placed right next to Status) */}
+                      <td className="px-4 py-3.5 text-center whitespace-nowrap bg-amber-50/30 border-x border-amber-100">
+                        {isPending ? (
+                          <button
+                            onClick={() => handleProcessRefund(r.id)}
+                            disabled={isProcessingThis}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer"
+                          >
+                            {isProcessingThis ? (
+                              <>
+                                <Loader2 size={13} className="animate-spin" /> Processing...
+                              </>
+                            ) : (
+                              <>
+                                <Play size={13} fill="currentColor" /> Process Refund
+                              </>
+                            )}
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                            <CheckCircle2 size={12} /> Done
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Method */}
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 capitalize whitespace-nowrap">
+                          <Wallet size={13} className="text-slate-400 shrink-0" />
+                          {r.refund_type === "wallet_deposit" ? "Wallet Deposit" : r.refund_type || "Wallet"}
+                        </span>
+                      </td>
+
                       {/* Reason */}
                       <td
-                        className="px-5 py-4 text-xs text-slate-600 max-w-[240px] truncate"
+                        className="px-4 py-3.5 text-xs text-slate-600 max-w-[200px] truncate"
                         title={r.reason}
                       >
                         {r.reason || "Subscription paused item refund"}
                       </td>
 
                       {/* Date & Time */}
-                      <td className="px-5 py-4 text-right font-medium text-slate-500 text-xs whitespace-nowrap">
+                      <td className="px-4 py-3.5 text-right font-medium text-slate-500 text-xs whitespace-nowrap">
                         {new Date(r.created_at).toLocaleDateString("en-IN", {
                           day: "2-digit",
                           month: "short",
@@ -548,31 +573,6 @@ export default function RefundsPage() {
                             minute: "2-digit"
                           })}
                         </span>
-                      </td>
-
-                      {/* Action Column */}
-                      <td className="px-5 py-4 text-center whitespace-nowrap">
-                        {isPending ? (
-                          <button
-                            onClick={() => handleProcessRefund(r.id)}
-                            disabled={isProcessingThis}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-sm transition-all"
-                          >
-                            {isProcessingThis ? (
-                              <>
-                                <Loader2 size={12} className="animate-spin" /> Processing...
-                              </>
-                            ) : (
-                              <>
-                                <Play size={12} /> Process Refund
-                              </>
-                            )}
-                          </button>
-                        ) : (
-                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                            Done
-                          </span>
-                        )}
                       </td>
                     </tr>
                   );
