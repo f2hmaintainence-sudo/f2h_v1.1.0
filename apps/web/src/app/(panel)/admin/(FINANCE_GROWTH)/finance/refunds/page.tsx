@@ -18,7 +18,9 @@ import {
   Package,
   Filter,
   DollarSign,
-  RotateCcw
+  RotateCcw,
+  Play,
+  Loader2
 } from "lucide-react";
 import Link from "next/link";
 
@@ -34,6 +36,9 @@ export default function RefundsPage() {
   const [refundsList, setRefundsList] = useState<any[]>([]);
   const [days, setDays] = useState(30);
   const [loading, setLoading] = useState(true);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<"all" | "subscription_pause_refund" | "order_refund">("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
@@ -61,6 +66,31 @@ export default function RefundsPage() {
   useEffect(() => {
     fetchRefunds();
   }, [fetchRefunds]);
+
+  // Handle Admin Process Refund Action
+  const handleProcessRefund = async (refundId: string) => {
+    setProcessingId(refundId);
+    setActionMessage(null);
+    try {
+      const res = await api.post<any>(`/admin/analytics/refunds/${refundId}/process`);
+      if (res.data?.status) {
+        setActionMessage({
+          type: "success",
+          text: res.data.message || "Refund processed and credited to customer wallet successfully!"
+        });
+        await fetchRefunds();
+      } else {
+        setActionMessage({ type: "error", text: res.data?.message || "Failed to process refund." });
+      }
+    } catch (err: any) {
+      setActionMessage({
+        type: "error",
+        text: err?.response?.data?.message || "Error processing refund."
+      });
+    } finally {
+      setProcessingId(null);
+    }
+  };
 
   // Reset page to 1 when filters change
   useEffect(() => {
@@ -239,6 +269,28 @@ export default function RefundsPage() {
         </div>
       </div>
 
+      {/* Action Notification Toast */}
+      {actionMessage && (
+        <div
+          className={`p-4 rounded-xl text-xs font-bold flex items-center justify-between shadow-sm transition-all ${
+            actionMessage.type === "success"
+              ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+              : "bg-rose-50 text-rose-800 border border-rose-200"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {actionMessage.type === "success" ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
+            <span>{actionMessage.text}</span>
+          </div>
+          <button
+            onClick={() => setActionMessage(null)}
+            className="text-xs underline font-semibold ml-4 hover:opacity-75"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Total Refunded */}
@@ -394,11 +446,15 @@ export default function RefundsPage() {
                   <th className="px-5 py-3.5 whitespace-nowrap">Status</th>
                   <th className="px-5 py-3.5 whitespace-nowrap">Reason / Breakdown</th>
                   <th className="px-5 py-3.5 text-right whitespace-nowrap">Date & Time</th>
+                  <th className="px-5 py-3.5 text-center whitespace-nowrap">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {paginatedRefunds.map((r, i) => {
                   const isSubRefund = r.category === "subscription_pause_refund";
+                  const isPending = r.status === "pending";
+                  const isProcessingThis = processingId === r.id;
+
                   return (
                     <tr key={r.id || i} className="hover:bg-slate-50/80 transition-colors">
                       {/* Refund ID */}
@@ -421,7 +477,7 @@ export default function RefundsPage() {
                         {r.order_id || "—"}
                       </td>
 
-                      {/* Category Pill (Fixed Non-Wrapping Badge) */}
+                      {/* Category Pill (Non-Wrapping Badge) */}
                       <td className="px-5 py-4 whitespace-nowrap">
                         {isSubRefund ? (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/60 whitespace-nowrap shrink-0 shadow-2xs">
@@ -493,13 +549,38 @@ export default function RefundsPage() {
                           })}
                         </span>
                       </td>
+
+                      {/* Action Column */}
+                      <td className="px-5 py-4 text-center whitespace-nowrap">
+                        {isPending ? (
+                          <button
+                            onClick={() => handleProcessRefund(r.id)}
+                            disabled={isProcessingThis}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-sm transition-all"
+                          >
+                            {isProcessingThis ? (
+                              <>
+                                <Loader2 size={12} className="animate-spin" /> Processing...
+                              </>
+                            ) : (
+                              <>
+                                <Play size={12} /> Process Refund
+                              </>
+                            )}
+                          </button>
+                        ) : (
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                            Done
+                          </span>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
 
                 {filteredRefunds.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="text-center py-16">
+                    <td colSpan={10} className="text-center py-16">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <div className="p-4 bg-slate-100 text-slate-400 rounded-full">
                           <Filter size={24} />
