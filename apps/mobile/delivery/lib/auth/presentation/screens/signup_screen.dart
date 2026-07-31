@@ -242,7 +242,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
           });
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (_) => const WelcomeIntroScreen(afterSignup: true)),
+            MaterialPageRoute(builder: (_) => const AppShell(initialIndex: 3)),
             (route) => false,
           );
         } else if (state is AuthFailure) {

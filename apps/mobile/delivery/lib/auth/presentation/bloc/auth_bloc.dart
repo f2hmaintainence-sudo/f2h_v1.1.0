@@ -27,7 +27,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   Future<void> _onSignupRequested(SignupRequested event, Emitter<AuthState> emit) async {
     emit(AuthLoading());
     try {
-      await authRepository.register(
+      final user = await authRepository.register(
         event.name,
         event.email,
         event.password,
@@ -38,8 +38,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         verificationToken: event.verificationToken,
         referralCode: event.referralCode,
       );
-      final loggedInUser = await authRepository.login(event.email, event.password);
-      emit(Authenticated(user: loggedInUser));
+      if (user.token != null && user.token!.isNotEmpty) {
+        emit(Authenticated(user: user));
+      } else {
+        final loggedInUser = await authRepository.login(event.email, event.password);
+        emit(Authenticated(user: loggedInUser));
+      }
     } catch (e) {
       emit(AuthFailure(error: e.toString()));
     }

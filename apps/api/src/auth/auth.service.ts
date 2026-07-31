@@ -380,19 +380,11 @@ export class AuthService {
     }
     const userName = body.user_name || rawName || email?.split('@')[0] || phone;
 
-    // Verify OTP for registrations first
-    if (roleId === 'CUSTOMER' || roleId === 'DELIVERY_PARTNER' || roleId === 'DELIVERY_BOY') {
-      if (!body.verification_token) {
-        throw new BadRequestException('Verification token is required');
-      }
-      await this.consumeVerifiedOtp(body.verification_token, email || phone!, 'registration');
-    }
-
     // Check existing users via indexed SQL query
     let existingUser: any = null;
     if (email) {
       const emailRes = await this.Data.query('users', {
-        select: ['user_id', 'email', 'phone'],
+        select: ['user_id', 'email', 'phone', 'password', 'role_id'],
         where: [{ column: 'email', operator: '=', value: email.toLowerCase().trim() }],
         limit: 1,
       });
@@ -400,21 +392,33 @@ export class AuthService {
     }
     if (!existingUser && phone) {
       const phoneRes = await this.Data.query('users', {
-        select: ['user_id', 'email', 'phone'],
+        select: ['user_id', 'email', 'phone', 'password', 'role_id'],
         where: [{ column: 'phone', operator: '=', value: phone.trim() }],
         limit: 1,
       });
       existingUser = phoneRes?.data?.[0];
     }
 
-    // If user exists and no verification token was supplied, reject duplicate registration
-    if (existingUser && !body.verification_token) {
-      if (email && existingUser.email?.toLowerCase().trim() === email) {
-        throw new BadRequestException('Email already registered');
+    // If user is already fully registered with a password and matching role, return success directly (prevents double submit token errors)
+    if (
+      existingUser &&
+      existingUser.password &&
+      !existingUser.password.startsWith('temp_') &&
+      existingUser.role_id === roleId
+    ) {
+      this.developer.debug(`[AuthService:register] User ${existingUser.user_id} already registered. Skipping duplicate OTP consumption.`);
+      return {
+        message: 'Registration successful',
+        userId: existingUser.user_id,
+      };
+    }
+
+    // Verify OTP for registrations
+    if (roleId === 'CUSTOMER' || roleId === 'DELIVERY_PARTNER' || roleId === 'DELIVERY_BOY') {
+      if (!body.verification_token) {
+        throw new BadRequestException('Verification token is required');
       }
-      if (phone && existingUser.phone?.trim() === phone) {
-        throw new BadRequestException('Phone already registered');
-      }
+      await this.consumeVerifiedOtp(body.verification_token, email || phone!, 'registration');
     }
 
     const userId = existingUser ? existingUser.user_id : generateId('USER', 10);
@@ -1254,7 +1258,7 @@ export class AuthService {
     }
 
     if (!user) {
-      throw new NotFoundException('User with provided email or phone not found');
+      throw new NotFoundException('User does not exist. Please check your email or phone number.');
     }
 
     // Role validation if clientRole is supplied
@@ -1278,6 +1282,9 @@ export class AuthService {
       }
 
       if (!isAllowed) {
+        if (cRole === 'DELIVERY_BOY' || cRole === 'DELIVERY_PARTNER') {
+          throw new NotFoundException('No delivery partner account found with this email/phone.');
+        }
         throw new ForbiddenException(`Account is not authorized for ${cRole} application`);
       }
     }

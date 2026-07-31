@@ -73,9 +73,17 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
   }
 
   Future<void> _sendOtp() async {
-    final email = _emailCtrl.text.trim();
-    if (email.isEmpty || !RegExp(r'^[\w.-]+@[\w-]+\.\w+$').hasMatch(email)) {
-      _showSnack('Please enter a valid email address', isError: true);
+    final identifier = _emailCtrl.text.trim();
+    if (identifier.isEmpty) {
+      _showSnack('Please enter your email address or phone number', isError: true);
+      return;
+    }
+
+    final isEmail = RegExp(r'^[\w.-]+@[\w-]+\.\w+$').hasMatch(identifier);
+    final isPhone = RegExp(r'^\+?[0-9]{7,15}$').hasMatch(identifier.replaceAll(RegExp(r'[\s\-\(\)]'), ''));
+
+    if (!isEmail && !isPhone) {
+      _showSnack('Please enter a valid email address or phone number', isError: true);
       return;
     }
 
@@ -85,8 +93,8 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
       await dioClient.fetchCsrfToken().timeout(const Duration(seconds: 3), onTimeout: () {});
 
       final response = await dioClient.dio.post(
-        ApiEndpoints.sendEmailOtp,
-        data: {'email': email, 'purpose': 'forgot_password'},
+        ApiEndpoints.forgotPassword,
+        data: isEmail ? {'email': identifier} : {'phone': identifier},
       );
 
       final resData = Map<String, dynamic>.from(response.data as Map? ?? {});
@@ -98,13 +106,13 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
       });
       _startCountdown();
       if (debugOtp != null && debugOtp.isNotEmpty) {
-        _showSnack('OTP sent to $email (OTP: $debugOtp) ✅');
+        _showSnack('OTP sent to $identifier (OTP: $debugOtp) ✅');
       } else {
-        _showSnack('OTP sent to $email ✅');
+        _showSnack('OTP sent to $identifier ✅');
       }
     } on DioException catch (e) {
       final msg = e.response?.data is Map ? e.response?.data['message'] : null;
-      _showSnack(msg?.toString() ?? e.message ?? 'Failed to send OTP', isError: true);
+      _showSnack(msg?.toString() ?? e.message ?? 'User does not exist or failed to send OTP', isError: true);
     } catch (e) {
       _showSnack('Failed to send OTP: $e', isError: true);
     } finally {
@@ -124,10 +132,13 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
       final dioClient = sl<DioClient>();
       await dioClient.fetchCsrfToken().timeout(const Duration(seconds: 3), onTimeout: () {});
 
+      final identifier = _emailCtrl.text.trim();
+      final isEmail = RegExp(r'^[\w.-]+@[\w-]+\.\w+$').hasMatch(identifier);
+
       final response = await dioClient.dio.post(
         ApiEndpoints.verifyEmailOtp,
         data: {
-          'email': _emailCtrl.text.trim(),
+          if (isEmail) 'email': identifier else 'phone': identifier,
           'otp': otp,
           'purpose': 'forgot_password',
         },
@@ -155,6 +166,8 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
     final pass = _passwordCtrl.text;
     final confirm = _confirmPasswordCtrl.text;
     final otp = _otpCtrl.map((c) => c.text).join();
+    final identifier = _emailCtrl.text.trim();
+    final isEmail = RegExp(r'^[\w.-]+@[\w-]+\.\w+$').hasMatch(identifier);
 
     if (pass.isEmpty || confirm.isEmpty) {
       _showSnack('Please enter and confirm your password', isError: true);
@@ -177,7 +190,8 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
       await dioClient.dio.post(
         ApiEndpoints.resetPassword,
         data: {
-          'email': _emailCtrl.text.trim(),
+          if (isEmail) 'email': identifier else 'phone': identifier,
+          'identifier': identifier,
           'token': _verificationToken ?? otp,
           'otp': otp,
           'newPassword': pass,
@@ -233,7 +247,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
           const SizedBox(height: 8),
           Text(
             _step == 0
-                ? 'Enter your registered email address to receive an OTP.'
+                ? 'Enter your registered email address or phone number to receive an OTP.'
                 : _step == 1
                     ? 'Enter the 6-digit OTP sent to ${_emailCtrl.text}'
                     : 'Set a secure new password for your account.',
@@ -265,7 +279,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
             style: GoogleFonts.poppins(color: kText, fontSize: 15, fontWeight: FontWeight.w500),
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.alternate_email_rounded, color: kMuted, size: 20),
-              hintText: 'Enter email address',
+              hintText: 'Enter email or phone number',
               hintStyle: GoogleFonts.poppins(color: kMuted, fontSize: 14),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),

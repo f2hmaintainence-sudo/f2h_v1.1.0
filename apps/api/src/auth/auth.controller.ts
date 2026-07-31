@@ -241,17 +241,28 @@ export class AuthController {
   @Public()
   @Post('send-otp')
   @HttpCode(HttpStatus.OK)
-  async sendOtp(@Body() body: SendOtpDto) {
+  async sendOtp(@Body() body: SendOtpDto & { purpose?: string }, @Req() req: Request) {
+    if (body.purpose === 'forgot_password') {
+      const rawClientRole = req.headers['x-role'];
+      const clientRole = typeof rawClientRole === 'string' ? rawClientRole.trim().toUpperCase() : undefined;
+      const identifier = body.phone || body.email || '';
+      return this.authService.forgotPassword(identifier, clientRole);
+    }
     return this.authService.requestMobileOtp(body);
   }
 
   @Public()
   @Post('send-email-otp')
   @HttpCode(HttpStatus.OK)
-  async sendEmailOtp(@Body() body: { email?: string; phone?: string; purpose?: string }) {
+  async sendEmailOtp(
+    @Body() body: { email?: string; phone?: string; purpose?: string },
+    @Req() req: Request,
+  ) {
     if (body.purpose === 'forgot_password') {
+      const rawClientRole = req.headers['x-role'];
+      const clientRole = typeof rawClientRole === 'string' ? rawClientRole.trim().toUpperCase() : undefined;
       const identifier = body.email || body.phone || '';
-      return this.authService.forgotPassword(identifier);
+      return this.authService.forgotPassword(identifier, clientRole);
     }
     return this.authService.requestMobileOtp({ email: body.email, phone: body.phone });
   }
