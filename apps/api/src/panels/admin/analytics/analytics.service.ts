@@ -131,7 +131,7 @@ export class AnalyticsService {
       const sql = `
         SELECT status, refund_method, SUM(count)::int AS count, SUM(total_amount)::numeric AS total_amount
         FROM (
-          SELECT status, refund_type AS refund_method,
+          SELECT status::text AS status, refund_type::text AS refund_method,
             COUNT(*)::int AS count,
             COALESCE(SUM(refund_amount), 0)::numeric AS total_amount
           FROM refunds WHERE created_at >= CURRENT_DATE - ($1 || ' days')::interval
@@ -166,8 +166,8 @@ export class AnalyticsService {
           customer_id,
           order_id,
           refund_amount,
-          refund_type,
-          status,
+          refund_type::text AS refund_type,
+          status::text AS status,
           reason,
           created_at,
           'order_refund' AS category
