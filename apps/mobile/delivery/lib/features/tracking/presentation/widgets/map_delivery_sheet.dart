@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/core/utils/stop_status_helper.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';

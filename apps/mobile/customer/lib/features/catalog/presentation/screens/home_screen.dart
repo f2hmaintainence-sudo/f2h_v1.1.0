@@ -529,8 +529,16 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _profileBtn() {
     return BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
-      builder: (context, state) {
-        final isVip = state.profile?.isMember == true;
+      builder: (context, sessionState) {
+        final profile = sessionState.profile;
+        final isVip = profile?.isMember == true;
+        final isAuthenticated = profile != null;
+
+        // First letter of name (or '?' as fallback)
+        final initial = (isAuthenticated && profile!.name.isNotEmpty)
+            ? profile.name[0].toUpperCase()
+            : '?';
+
         return GestureDetector(
           onTap: () {
             Navigator.push(
@@ -538,35 +546,79 @@ class _HomeScreenState extends State<HomeScreen>
               MaterialPageRoute(builder: (_) => const ProfileScreen()),
             );
           },
-          child: Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              gradient: isVip
-                  ? const LinearGradient(
-                      colors: [Color(0xFFB8860B), Color(0xFFFFD700)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    )
-                  : null,
-              color: isVip ? null : Colors.white,
-              shape: BoxShape.circle,
-              border: isVip ? Border.all(color: Colors.white, width: 1.5) : null,
-              boxShadow: [
-                BoxShadow(
-                  color: isVip
-                      ? const Color(0xFFFFD700).withValues(alpha: 0.4)
-                      : Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // ── Outer ring (VIP: gold gradient, normal: none) ──────────
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  gradient: isVip
+                      ? const LinearGradient(
+                          colors: [Color(0xFFFFD700), Color(0xFFB8860B)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : null,
+                  color: isVip ? null : (isAuthenticated ? const Color(0xFF16653A) : Colors.white),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: isVip
+                          ? const Color(0xFFFFD700).withValues(alpha: 0.45)
+                          : Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: Icon(
-              Icons.person_outline_rounded,
-              color: isVip ? Colors.white : const Color(0xFF16653A),
-              size: 20,
-            ),
+                // ── Inner circle (VIP: white, normal: transparent) ──────
+                padding: isVip ? const EdgeInsets.all(2.5) : EdgeInsets.zero,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isVip ? Colors.white : Colors.transparent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: isAuthenticated
+                        ? Text(
+                            initial,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: isVip ? const Color(0xFF133220) : Colors.white,
+                              height: 1.0,
+                            ),
+                          )
+                        : Icon(
+                            Icons.person_outline_rounded,
+                            color: const Color(0xFF16653A),
+                            size: 20,
+                          ),
+                  ),
+                ),
+              ),
+
+              // ── Gold star badge (VIP only) ──────────────────────────
+              if (isVip)
+                Positioned(
+                  top: -2,
+                  right: -2,
+                  child: Container(
+                    padding: const EdgeInsets.all(2.5),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFFD700),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.star_rounded,
+                      size: 9,
+                      color: Color(0xFF0F2015),
+                    ),
+                  ),
+                ),
+            ],
           ),
         );
       },
@@ -894,24 +946,27 @@ class _HomeScreenState extends State<HomeScreen>
                           letterSpacing: -0.2,
                         ),
                       ),
-                      if (p.formattedUnit.isNotEmpty && p.formattedUnit.toLowerCase() != p.name.toLowerCase()) ...[
-                        const SizedBox(height: 3),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
-                          ),
-                          child: Text(
-                            p.formattedUnit,
-                            style: const TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF475569),
+                      if ((p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit).isNotEmpty && (p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit).toLowerCase() != p.name.toLowerCase()) ...[
+                        const SizedBox(height: 4),
+                        UnconstrainedBox(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF3F4F6),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            child: Text(
+                              p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit,
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF6B7280),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
                       ],
@@ -1117,24 +1172,27 @@ class _HomeScreenState extends State<HomeScreen>
                           letterSpacing: -0.2,
                         ),
                       ),
-                      if (p.formattedUnit.isNotEmpty && p.formattedUnit.toLowerCase() != p.name.toLowerCase()) ...[
-                        const SizedBox(height: 3),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
-                          ),
-                          child: Text(
-                            p.formattedUnit,
-                            style: const TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF475569),
+                      if ((p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit).isNotEmpty && (p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit).toLowerCase() != p.name.toLowerCase()) ...[
+                        const SizedBox(height: 4),
+                        UnconstrainedBox(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF3F4F6),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            child: Text(
+                              p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit,
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF6B7280),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
                       ],

@@ -1255,9 +1255,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               'Address',
                               const Color(0xFFF3E5F5),
                               const Color(0xFF7B1FA2),
-                              () {
+                              () async {
                                 if (isLoggedIn) {
-                                  AddressSelectorDrawer.show(context);
+                                  final selected = await AddressSelectorDrawer.show(context);
+                                  if (selected != null && selected.addressId != null && context.mounted) {
+                                    await context.read<CustomerSessionCubit>().updateDefaultAddress(selected.addressId!);
+                                    if (context.mounted) {
+                                      F2HToast.success(context, 'Default address updated');
+                                    }
+                                  }
                                 } else {
                                   _showLoginDrawer(context);
                                 }

@@ -6,6 +6,7 @@ import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/orders/domain/repositories/orders_repository.dart';
 import 'package:f2h_delivery/features/profile/data/profile_model.dart';
 import 'package:f2h_delivery/features/profile/data/profile_repository.dart';
+import 'package:f2h_delivery/features/orders/data/models/handover_model.dart';
 import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/services/location_tracking_service.dart';
 
@@ -38,6 +39,7 @@ class DeliverySessionBloc
     on<TriggerSosEvent>(_onTriggerSos);
     on<ClearSosEvent>(_onClearSos);
     on<ClearActiveRunEvent>(_onClearActiveRun);
+    on<HandoverRunEvent>(_onHandoverRun);
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -47,7 +49,6 @@ class DeliverySessionBloc
     if (s is DeliverySessionLoaded) return s;
     return DeliverySessionLoaded(
       driverName: 'User',
-      todayBasePay: 300.0,
       isOnline: false,
       isVerified: true,
       accountStatus: 'active',
@@ -61,13 +62,15 @@ class DeliverySessionBloc
     final current = _currentLoaded();
 
     String driverName = current.driverName;
-    double todayBasePay = current.todayBasePay;
     bool isOnline = current.isOnline;
     bool isVerified = current.isVerified;
     String accountStatus = current.accountStatus;
     DeliveryRun? currentRun;
     List<DeliveryOrderModel> orders = [];
 
+    // Fetch profile and today's run in parallel.
+    // fetchTodayOrders is only called as a fallback if fetchTodayRun returns null,
+    // since GET /today internally delegates to GET /run/today — avoid the duplicate call.
     final futures = await Future.wait([
       _profileRepo.fetchProfile().then<dynamic>((val) => val).catchError((err) {
         print('[DeliverySessionBloc] profile fetch failed: $err');
@@ -77,21 +80,15 @@ class DeliverySessionBloc
         print('[DeliverySessionBloc] fetchTodayRun failed: $err');
         return err;
       }),
-      _ordersRepo.fetchTodayOrders().then<dynamic>((val) => val).catchError((err) {
-        print('[DeliverySessionBloc] fetchTodayOrders failed: $err');
-        return err;
-      }),
     ]);
 
     final profileRes = futures[0];
     final runRes = futures[1];
-    final ordersRes = futures[2];
 
     bool profileFailed = false;
     dynamic profileError;
     if (profileRes is ProfileModel) {
       driverName = profileRes.fullName;
-      todayBasePay = profileRes.dailySalary ?? 300.0;
       isOnline = profileRes.isActive;
       isVerified = profileRes.isVerified;
       accountStatus = profileRes.accountStatus ?? 'active';
@@ -116,11 +113,14 @@ class DeliverySessionBloc
       currentRun = runRes;
       orders = runRes.orders;
     } else if (runRes == null) {
-      if (ordersRes is List<DeliveryOrderModel>) {
-        orders = ordersRes;
-      } else {
+      // No run found — try the fallback orders endpoint.
+      try {
+        final fallbackOrders = await _ordersRepo.fetchTodayOrders();
+        orders = fallbackOrders;
+      } catch (err) {
+        print('[DeliverySessionBloc] fetchTodayOrders failed: $err');
         ordersFailed = true;
-        ordersError = ordersRes;
+        ordersError = err;
         currentRun = current.currentRun;
         orders = current.orders;
       }
@@ -143,7 +143,6 @@ class DeliverySessionBloc
 
     return current.copyWith(
       driverName: driverName,
-      todayBasePay: todayBasePay,
       isOnline: isOnline,
       isVerified: isVerified,
       accountStatus: accountStatus,
@@ -181,11 +180,12 @@ class DeliverySessionBloc
   Future<void> _onToggleOnline(
       ToggleOnlineEvent event, Emitter<DeliverySessionState> emit) async {
     final current = _currentLoaded();
-    // Optimistic update
-    emit(current.copyWith(isOnline: event.val));
     try {
       final dioClient = sl<DioClient>();
-      await dioClient.dio.post('/DeliveryPartner/auth/shift-toggle');
+      await dioClient.dio.post(
+        '/DeliveryPartner/auth/shift-toggle',
+        data: {'is_active': event.val},
+      );
 
       final trackingService = sl<LocationTrackingService>();
       if (event.val) {
@@ -193,9 +193,24 @@ class DeliverySessionBloc
       } else {
         await trackingService.stopTracking();
       }
-    } catch (_) {
-      // Roll back on failure
-      emit(current.copyWith(isOnline: !event.val));
+
+      emit(current.copyWith(isOnline: event.val));
+
+      add(ReloadSessionEvent());
+      if (event.callback != null) {
+        event.callback!(null);
+      }
+    } catch (e) {
+      if (event.callback != null) {
+        String msg = 'Failed to update shift status.';
+        try {
+          final resData = (e as dynamic).response?.data;
+          if (resData is Map && resData.containsKey('message')) {
+            msg = resData['message'].toString();
+          }
+        } catch (_) {}
+        event.callback!(msg);
+      }
     }
   }
 
@@ -259,6 +274,7 @@ class DeliverySessionBloc
           deliveryImage: event.deliveryImage,
           latitude: lat,
           longitude: lng,
+          containerReturns: event.containerReturns,
         );
       } else {
         success = await _ordersRepo.updateOrderStatus(
@@ -272,16 +288,20 @@ class DeliverySessionBloc
           paymentMode: event.paymentMode,
           paymentStatus: event.paymentStatus,
           deliveryImage: event.deliveryImage,
+          containerReturns: event.containerReturns,
         );
       }
 
       if (success) {
         // Fetch fresh data after a successful backend update
-        emit(await _fetchFresh());
+        final freshState = await _fetchFresh();
+        emit(freshState);
+        event.onSuccess?.call();
       }
-    } catch (_) {
-      // Roll back to original state on error
+    } catch (e) {
+      // Roll back to original state on error and surface the message to the caller
       emit(current);
+      event.onError?.call(e.toString());
     }
   }
 
@@ -345,5 +365,24 @@ class DeliverySessionBloc
   void _onClearActiveRun(
       ClearActiveRunEvent event, Emitter<DeliverySessionState> emit) {
     emit(_currentLoaded().copyWith(clearRun: true, orders: []));
+  }
+
+  Future<void> _onHandoverRun(
+      HandoverRunEvent event, Emitter<DeliverySessionState> emit) async {
+    final current = _currentLoaded();
+    try {
+      final result = await _ordersRepo.handoverRun(event.runId);
+      if (result.success) {
+        // Handover completed successfully, refresh the state to clear or update run
+        emit(await _fetchFresh());
+        event.onSuccess?.call(result);
+      } else {
+        event.onError?.call(result.message.isNotEmpty
+            ? result.message
+            : 'Warehouse handover failed.');
+      }
+    } catch (e) {
+      event.onError?.call(e.toString());
+    }
   }
 }

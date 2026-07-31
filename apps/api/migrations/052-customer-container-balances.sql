@@ -3,8 +3,7 @@ CREATE TABLE customer_container_balances (
 
     customer_id VARCHAR(30) NOT NULL,
 
-    packaging_type_id VARCHAR(30) NOT NULL
-    REFERENCES packaging_types(id),
+    container_id VARCHAR(30) NOT NULL,
 
     issued_quantity INTEGER DEFAULT 0,
 

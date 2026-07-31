@@ -1,14 +1,17 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_event.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
+import 'package:f2h_delivery/features/profile/data/profile_model.dart';
 import 'package:f2h_delivery/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:f2h_delivery/features/profile/presentation/bloc/profile_event.dart';
 import 'package:f2h_delivery/features/profile/presentation/bloc/profile_state.dart';
@@ -18,8 +21,6 @@ import 'package:f2h_delivery/features/profile/presentation/screens/personal_info
 import 'package:f2h_delivery/features/profile/presentation/screens/documents_screen.dart';
 import 'package:f2h_delivery/features/profile/presentation/screens/vehicle_info_screen.dart';
 import 'package:f2h_delivery/features/profile/presentation/screens/bank_details_screen.dart';
-import 'package:f2h_delivery/features/profile/presentation/screens/notifications_preferences_screen.dart';
-import 'package:f2h_delivery/features/profile/presentation/screens/activity_screen.dart';
 import 'package:f2h_delivery/features/profile/presentation/screens/support_screen.dart';
 import 'package:f2h_delivery/features/profile/presentation/screens/security_screen.dart';
 import 'package:f2h_delivery/features/profile/presentation/screens/performance_screen.dart';
@@ -269,31 +270,7 @@ class ProfileScreen extends StatelessWidget {
                     SliverToBoxAdapter(
                       child: _buildHeader(context, state, partnerName, partnerId),
                     ),
-                    if (state.isOffline)
-                      SliverToBoxAdapter(
-                        child: Container(
-                          color: Colors.amber.shade800,
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 16),
-                              const SizedBox(width: 8),
-                              Text(
-                                profile.deliveryPartnerId.isEmpty
-                                    ? 'Offline Mode · No cached profile data'
-                                    : 'Offline Mode · Showing cached profile data',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
@@ -423,65 +400,26 @@ class ProfileScreen extends StatelessWidget {
                                     ),
                                   ),
                                 ),
+                                InfoTile(
+                                  label: 'Security Settings',
+                                  value: 'Password and session management',
+                                  leadingIcon: Icons.shield_rounded,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => BlocProvider.value(
+                                        value: context.read<ProfileBloc>(),
+                                        child: const SecurityScreen(),
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
                             const SizedBox(height: 16),
 
-                            // ── SYSTEM PREFERENCES ─────────────────────────────────────
-                            _buildSectionHeader(
-                              'System Preferences',
-                              'Configure app and system settings',
-                            ),
-                            _buildPremiumWideCard(
-                              'Notifications & Preferences',
-                              'Config alerts and app language',
-                              Icons.notifications_rounded,
-                              const Color(0xFF09AD42),
-                              () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => BlocProvider.value(
-                                    value: context.read<ProfileBloc>(),
-                                    child: const NotificationsPreferencesScreen(),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            _buildPremiumWideCard(
-                              'Activity Logs',
-                              'Device info and app version',
-                              Icons.assessment_rounded,
-                              const Color(0xFF09AD42),
-                              () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => BlocProvider.value(
-                                    value: context.read<ProfileBloc>(),
-                                    child: const ActivityScreen(),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            _buildPremiumWideCard(
-                              'Security Settings',
-                              'Password and session management',
-                              Icons.shield_rounded,
-                              const Color(0xFF09AD42),
-                              () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => BlocProvider.value(
-                                    value: context.read<ProfileBloc>(),
-                                    child: const SecurityScreen(),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-
-                            // ── LOG OUT SESSION ─────────────────────────────────────
                             _buildLogoutCard(() {
-                              context.read<AuthBloc>().add(LogoutRequested());
+                              _showLogoutConfirmationDialog(context);
                             }),
                             const SizedBox(height: 32),
 
@@ -997,6 +935,80 @@ class ProfileScreen extends StatelessWidget {
       Icons.logout_rounded,
       const Color(0xFFEF4444),
       onTap,
+    );
+  }
+
+  void _showLogoutConfirmationDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          backgroundColor: Colors.white,
+          title: Row(
+            children: const [
+              Icon(
+                Icons.warning_amber_rounded,
+                color: Color(0xFFEF4444),
+                size: 28,
+              ),
+              SizedBox(width: 10),
+              Text(
+                'Confirm Log Out',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 18,
+                  color: kText,
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Are you sure you want to log out of your session? You will need your credentials to log back in.',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: kTextSub,
+              height: 1.4,
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: kTextSub,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                context.read<AuthBloc>().add(LogoutRequested());
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text(
+                'Log Out',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

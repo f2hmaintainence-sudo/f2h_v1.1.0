@@ -35,15 +35,15 @@ export class PackageController {
     const txResult = await this.Data.query('customer_container_balances', {
       select: [
         'customer_container_balances.*',
-        'packaging_types.name AS package_name',
-        'packaging_types.capacity AS package_capacity',
-        'packaging_types.unit AS package_unit',
+        ' containers.name AS package_name',
+        ' containers.capacity AS package_capacity',
+        ' containers.unit AS package_unit',
       ],
       joins: [
         {
           type: 'left',
-          table: 'packaging_types',
-          on: [['customer_container_balances.packaging_type_id', 'packaging_types.id']],
+          table: 'containers',
+          on: [['customer_container_balances.container_id', ' containers.container_id']],
         },
       ],
       where: [{ column: 'customer_container_balances.customer_id', operator: '=', value: customer.customer_id }],

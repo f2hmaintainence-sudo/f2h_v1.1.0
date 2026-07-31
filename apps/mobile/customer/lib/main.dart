@@ -5,9 +5,8 @@
 // Project     : F2H Fresh
 // File        : main.dart
 // Description : Entry point for the F2H Customer mobile application.
-//               Runs AppBootstrap.checkAuth() before runApp() to silently
-//               validate any stored JWT session — enforcing "never logout"
-//               unless the user explicitly signs out or refresh token expires.
+//               Auth check is done inside AuthBloc via /customer/bootstrap.
+//               401 → Login screen, 200 → Home screen.
 //
 // ============================================================================
 
@@ -18,7 +17,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:f2h_customer/app.dart';
 import 'package:f2h_customer/firebase_options.dart';
-import 'package:f2h_customer/core/app_bootstrap.dart';
 import 'package:f2h_customer/core/services/notification_service.dart';
 import 'package:f2h_customer/core/di/injection.dart' as di;
 import 'package:f2h_customer/core/di/injection.dart';
@@ -28,13 +26,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   if (!kIsWeb) {
     try {
       if (Firebase.apps.isEmpty) {
-        if (defaultTargetPlatform == TargetPlatform.iOS) {
-          await Firebase.initializeApp(
-            options: DefaultFirebaseOptions.currentPlatform,
-          );
-        } else {
-          await Firebase.initializeApp();
-        }
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
       }
     } catch (_) {}
   }
@@ -43,32 +37,26 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 1. Boot DI container (DioClient.init() is called inside di.init())
+  // 1. Boot DI container
   await di.init();
 
-  // 2. Firebase — non-blocking; app works without it if unavailable
+  // 2. Firebase init — must complete before runApp so FCM token is ready
   if (!kIsWeb) {
     try {
       if (Firebase.apps.isEmpty) {
-        if (defaultTargetPlatform == TargetPlatform.iOS) {
-          await Firebase.initializeApp(
-            options: DefaultFirebaseOptions.currentPlatform,
-          );
-        } else {
-          await Firebase.initializeApp();
-        }
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
       }
       FirebaseMessaging.onBackgroundMessage(
         _firebaseMessagingBackgroundHandler,
       );
-      sl<NotificationService>().initialize();
+      // Await so FCM token is cached before user can log in
+      await sl<NotificationService>().initialize();
     } catch (e) {
       debugPrint('[main] Firebase init failed: $e');
     }
   }
-
-  // 3. Cold-boot auth check — determines initial screen without a loading flash
-  final bootResult = await AppBootstrap.checkAuth();
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -77,6 +65,6 @@ void main() async {
     ),
   );
 
-  // 4. Launch app with pre-resolved auth state
-  runApp(F2HApp(bootResult: bootResult));
+  // 3. Launch — AuthBloc will call /customer/bootstrap to decide home vs login
+  runApp(const F2HApp());
 }

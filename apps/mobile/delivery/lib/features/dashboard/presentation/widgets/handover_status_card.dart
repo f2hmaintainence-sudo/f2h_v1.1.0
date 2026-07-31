@@ -20,7 +20,7 @@ class HandoverStatusCard extends StatelessWidget {
 
     if (run.status == 'completed') {
       return Container(
-        margin: const EdgeInsets.only(bottom: 16),
+        margin: const EdgeInsets.only(top: 16, bottom: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: kDanger.withValues(alpha: 0.08),
@@ -111,7 +111,7 @@ class HandoverStatusCard extends StatelessWidget {
 
     if (run.status == 'handed_over') {
       return Container(
-        margin: const EdgeInsets.only(bottom: 16),
+        margin: const EdgeInsets.only(top: 16, bottom: 16),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: kSuccess.withValues(alpha: 0.08),

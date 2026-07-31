@@ -16,7 +16,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 class NotificationService {
   final _messageController = StreamController<Map<String, dynamic>>.broadcast();
-  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
 
   Stream<Map<String, dynamic>> get onNotification => _messageController.stream;
 
@@ -25,7 +26,9 @@ class NotificationService {
     try {
       return FirebaseMessaging.instance;
     } catch (e) {
-      debugPrint('[NotificationService] FirebaseMessaging instance unavailable: $e');
+      debugPrint(
+        '[NotificationService] FirebaseMessaging instance unavailable: $e',
+      );
       return null;
     }
   }
@@ -43,7 +46,9 @@ class NotificationService {
         importance: Importance.high,
       );
 
-      const initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const initializationSettingsAndroid = AndroidInitializationSettings(
+        '@mipmap/ic_launcher',
+      );
       const initializationSettingsDarwin = DarwinInitializationSettings();
       const initializationSettings = InitializationSettings(
         android: initializationSettingsAndroid,
@@ -62,8 +67,10 @@ class NotificationService {
         },
       );
 
-      final androidPlugin = _localNotifications.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
+      final androidPlugin = _localNotifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
       if (androidPlugin != null) {
         await androidPlugin.createNotificationChannel(androidChannel);
         await androidPlugin.requestNotificationsPermission();
@@ -97,15 +104,17 @@ class NotificationService {
 
       // 3. Foreground message listener -> triggers heads-up banner notification
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        final title = message.notification?.title ?? message.data['title'] ?? 'Farm to Home';
-        final body = message.notification?.body ?? message.data['body'] ?? 'New notification received';
+        final title =
+            message.notification?.title ??
+            message.data['title'] ??
+            'Farm to Home';
+        final body =
+            message.notification?.body ??
+            message.data['body'] ??
+            'New notification received';
         final url = message.data['url'];
 
-        showLocalNotification(
-          title: title,
-          body: body,
-          payload: url,
-        );
+        showLocalNotification(title: title, body: body, payload: url);
 
         final Map<String, dynamic> payload = {
           'title': title,
@@ -116,7 +125,9 @@ class NotificationService {
       });
 
       // 4. Handle notification taps when app is in background but opened
-      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) async {
+      FirebaseMessaging.onMessageOpenedApp.listen((
+        RemoteMessage message,
+      ) async {
         final url = message.data['url'];
         if (url != null) {
           await launchUrl(Uri.parse(url));
@@ -165,16 +176,26 @@ class NotificationService {
 
   Future<String?> getToken() async {
     if (kIsWeb) return null;
-    if (_cachedFcmToken != null) return _cachedFcmToken;
+    if (_cachedFcmToken != null && _cachedFcmToken!.isNotEmpty) {
+      debugPrint('🔥 [FCM] Using cached token: $_cachedFcmToken');
+      return _cachedFcmToken;
+    }
     try {
       final fcm = _fcm;
-      if (fcm == null) return null;
-
-      final token = await fcm.getToken().timeout(const Duration(seconds: 5));
-      _cachedFcmToken = token;
-      return token;
+      if (fcm == null) {
+        debugPrint('🔥 [FCM] ERROR: FirebaseMessaging.instance is null — Firebase not initialized!');
+        return null;
+      }
+      final token = await fcm.getToken().timeout(const Duration(seconds: 8));
+      if (token != null && token.isNotEmpty) {
+        _cachedFcmToken = token;
+        debugPrint('🔥 [FCM] Token fetched fresh: $token');
+      } else {
+        debugPrint('🔥 [FCM] WARNING: getToken() returned null/empty — check SHA-1 & google-services.json');
+      }
+      return _cachedFcmToken;
     } catch (e) {
-      debugPrint('[NotificationService] FCM token retrieval skipped: $e');
+      debugPrint('🔥 [FCM] getToken() error: $e');
       return _cachedFcmToken;
     }
   }
