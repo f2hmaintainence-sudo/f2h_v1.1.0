@@ -1,5 +1,17 @@
 import type { NextConfig } from "next";
 import path from "path";
+import fs from "fs";
+
+function getTurbopackRoot(): string {
+  if (process.env.TURBOPACK_ROOT) {
+    return process.env.TURBOPACK_ROOT;
+  }
+  const monorepoRoot = path.resolve(__dirname, "../../");
+  if (fs.existsSync(path.join(monorepoRoot, "apps")) || fs.existsSync(path.join(monorepoRoot, "package.json"))) {
+    return monorepoRoot;
+  }
+  return path.resolve(__dirname);
+}
 
 /**
  * Production config for Contabo VPS with Node.js (next start).
@@ -31,7 +43,7 @@ const nextConfig: NextConfig = {
     ],
   },
   turbopack: {
-    root: path.resolve(__dirname),
+    root: getTurbopackRoot(),
   },
   experimental: {
     optimizePackageImports: ["react-icons", "lucide-react"],
