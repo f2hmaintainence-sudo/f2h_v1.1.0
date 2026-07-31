@@ -15,6 +15,7 @@ class ProfileModel {
   final String? joinedDate;
   final int? sectorIndex;
   final String? branchName;
+  final String? branchId;
   final double? dailySalary;
 
   // New fields
@@ -47,6 +48,7 @@ class ProfileModel {
     this.joinedDate,
     this.sectorIndex,
     this.branchName,
+    this.branchId,
     this.dailySalary,
     this.dateOfBirth,
     this.gender,
@@ -92,6 +94,7 @@ class ProfileModel {
       joinedDate: json['joined_date']?.toString(),
       sectorIndex: json['sector_index'] != null ? int.tryParse(json['sector_index'].toString()) : null,
       branchName: json['branch_name']?.toString(),
+      branchId: json['branch_id']?.toString(),
       dailySalary: json['daily_salary'] != null ? double.tryParse(json['daily_salary'].toString()) : null,
       dateOfBirth: json['date_of_birth']?.toString(),
       gender: json['gender']?.toString(),

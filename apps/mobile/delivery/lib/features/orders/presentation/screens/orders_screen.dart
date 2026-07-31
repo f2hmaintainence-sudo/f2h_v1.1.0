@@ -9,6 +9,8 @@ import 'package:f2h_delivery/features/orders/presentation/screens/delivery_confi
 import 'package:f2h_delivery/features/orders/presentation/screens/warehouse_handover_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_delivery/services/location_service.dart';
+import 'package:f2h_delivery/auth/presentation/bloc/auth_bloc.dart';
+import 'package:f2h_delivery/auth/presentation/bloc/auth_event.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -174,6 +176,44 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
     }
   }
 
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.logout_rounded, color: kDanger),
+            SizedBox(width: 10),
+            Text('Logout', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to log out of your account?',
+          style: TextStyle(fontSize: 13, color: kTextSub),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: kTextSub, fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<AuthBloc>().add(LogoutRequested());
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kDanger,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Logout', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _openNav(double lat, double lng) async {
     final url = Uri.parse('google.navigation:q=$lat,$lng');
     if (await launchUrl(url)) {
@@ -203,6 +243,14 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
           'Stops Ledger',
           style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: kText),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, color: kDanger, size: 20),
+            tooltip: 'Logout',
+            onPressed: () => _showLogoutDialog(context),
+          ),
+          const SizedBox(width: 4),
+        ],
         bottom: TabBar(
           controller: _tabController,
           labelColor: kPrimary,

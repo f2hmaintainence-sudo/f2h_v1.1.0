@@ -84,8 +84,22 @@ export class ProfileService {
         referralCode = `F2HDR-${prefix}${phoneSuffix}`;
       }
 
+      let branchName = profile.branch_name;
+      if (!branchName && profile.branch_id) {
+        try {
+          const [branchMatch] = await this.db.query(
+            `SELECT branch_name FROM branches WHERE branch_id = $1 OR id::text = $1 LIMIT 1`,
+            [profile.branch_id],
+          );
+          if (branchMatch?.branch_name) {
+            branchName = branchMatch.branch_name;
+          }
+        } catch (_) {}
+      }
+
       return {
         ...profile,
+        branch_name: branchName || profile.branch_name || null,
         referral_code: referralCode,
         referral_earnings: referralEarnings,
         referral_count: referralCount,

@@ -156,9 +156,15 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         ALTER TABLE product_banner ADD COLUMN IF NOT EXISTS background_color VARCHAR(50);
         ALTER TABLE product_banner ALTER COLUMN created_by TYPE VARCHAR(50) USING created_by::text;
         ALTER TABLE product_banner ALTER COLUMN updated_by TYPE VARCHAR(50) USING updated_by::text;
+        
+        ALTER TABLE delivery_partners ADD COLUMN IF NOT EXISTS emergency_contact VARCHAR(150);
+        ALTER TABLE delivery_partners ADD COLUMN IF NOT EXISTS emergency_contact_number VARCHAR(20);
+        ALTER TABLE delivery_partners ADD COLUMN IF NOT EXISTS date_of_birth DATE;
+        ALTER TABLE delivery_partners ADD COLUMN IF NOT EXISTS gender VARCHAR(20);
+        ALTER TABLE delivery_partners ADD COLUMN IF NOT EXISTS residential_address TEXT;
       `);
 
-      this.logger.log('dispatch_requirements and dispatch_balances tables verified.');
+      this.logger.log('dispatch_requirements, dispatch_balances, and delivery_partners profile columns verified.');
     } catch (err) {
       this.logger.error('Failed to create required tables dispatch_requirements or dispatch_balances', err);
     }

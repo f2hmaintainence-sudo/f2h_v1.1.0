@@ -514,8 +514,8 @@ export class AuthService {
             customer_id: userId,
             first_name: custFirstName,
             last_name: lastName,
-            mobile: phone || ('NO_PHONE_' + userId),
-            phone: phone || ('NO_PHONE_' + userId),
+            mobile: (phone || ('NO_PHONE_' + userId)).slice(0, 20),
+            phone: (phone || ('NO_PHONE_' + userId)).slice(0, 20),
             email: email || null,
             referral_code: generatedRefCode,
             referral_status: 'locked',
@@ -572,11 +572,12 @@ export class AuthService {
       // Delivery Partner specific initialization
       if (roleId === 'DELIVERY_PARTNER' || roleId === 'DELIVERY_BOY') {
         let selectedBranchId = body.branch_id;
+        const branchesRes = await this.Data.query('branches', {
+          where: [{ column: 'is_active', operator: '=', value: true }],
+        });
+        const branches = branchesRes?.data ?? [];
+
         if (!selectedBranchId && body.latitude !== undefined && body.longitude !== undefined) {
-          const branchesRes = await this.Data.query('branches', {
-            where: [{ column: 'is_active', operator: '=', value: true }],
-          });
-          const branches = branchesRes?.data ?? [];
           const lat = parseFloat(String(body.latitude));
           const lng = parseFloat(String(body.longitude));
 
@@ -594,6 +595,10 @@ export class AuthService {
               }
             }
           }
+        }
+
+        if (!selectedBranchId && branches.length > 0) {
+          selectedBranchId = branches[0].branch_id;
         }
 
         const existingDp = await this.Data.query('delivery_partners', {
@@ -629,8 +634,8 @@ export class AuthService {
               full_name: partnerFullName,
               phone: phone || null,
               email: email || null,
-              branch_id: selectedBranchId || 'BRANCHd8c0WDGS76ii',
-              is_active: 1,
+              branch_id: selectedBranchId || null,
+              is_active: 0,
               is_verified: 0,
               vehicle_type: 'BIKE',
               vehicle_number: 'N/A',
