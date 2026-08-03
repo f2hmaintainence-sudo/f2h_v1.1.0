@@ -100,6 +100,10 @@ export class NotificationService {
     this.logger.log('Gateway reference set');
   }
 
+  getGateway(): any {
+    return this.gateway;
+  }
+
   /**
    * Industry-standard notification send
    * Saves to DB first, then sends via WebSocket if user is online

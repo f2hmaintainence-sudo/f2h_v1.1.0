@@ -108,6 +108,33 @@ export class NotificationGateway
     this.server.to('admin_tracking').emit('partner_location_update', payload);
   }
 
+  /**
+   * Broadcast newly created order to all admin clients listening in admin_live_orders room
+   */
+  emitOrderCreated(orderPayload: any): void {
+    if (!this.server) return;
+    this.server.to('admin_live_orders').emit('order_created', orderPayload);
+    this.logger.log(`[LiveOrders] Broadcasted order_created for order ${orderPayload?.order_id}`);
+  }
+
+  /**
+   * Broadcast order status change or delivery assignment to admin_live_orders room
+   */
+  emitOrderStatusChanged(payload: {
+    order_id: string;
+    status?: string;
+    delivery_partner_id?: string;
+    partner_name?: string;
+    partner_phone?: string;
+    assignment_method?: string;
+    assigned_at?: string;
+    updated_at?: string;
+  }): void {
+    if (!this.server) return;
+    this.server.to('admin_live_orders').emit('order_status_changed', payload);
+    this.logger.log(`[LiveOrders] Broadcasted order_status_changed for order ${payload?.order_id}`);
+  }
+
   disconnectUserSockets(userId: string): number {
     const socketIds = this.userSockets.get(userId);
     if (!socketIds || socketIds.size === 0) {
@@ -319,6 +346,12 @@ export class NotificationGateway
     client.on('join_admin_tracking', () => {
       client.join('admin_tracking');
       this.logger.log(`[GPS] Admin ${userId} (${client.id}) joined admin_tracking room`);
+    });
+
+    // Allow admin clients to self-join the live orders room
+    client.on('join_admin_live_orders', () => {
+      client.join('admin_live_orders');
+      this.logger.log(`[LiveOrders] Admin ${userId} (${client.id}) joined admin_live_orders room`);
     });
 
     const socketCount = this.userSockets.get(userId)!.size;

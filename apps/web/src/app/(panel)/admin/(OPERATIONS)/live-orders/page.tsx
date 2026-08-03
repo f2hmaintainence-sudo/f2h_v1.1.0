@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { io, Socket } from "socket.io-client";
 import { api } from "@/services/api.client";
 import {
   ShoppingCart, Package, Truck, CheckCircle2, Clock, AlertTriangle,
@@ -129,10 +130,67 @@ export default function LiveOrdersPage() {
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
+  // WebSockets: Real-time order updates (Replaces 30-second polling)
   useEffect(() => {
-    const id = setInterval(() => fetchOrders(true), 30000);
-    return () => clearInterval(id);
-  }, [fetchOrders]);
+    const baseUrl = process.env.NEXT_PUBLIC_SOCKET_URL || (typeof window !== "undefined" ? window.location.origin : "");
+    if (!baseUrl) return;
+
+    const socket: Socket = io(baseUrl, {
+      path: "/socket.io",
+      transports: ["websocket"],
+      withCredentials: true,
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+    });
+
+    socket.on("connect", () => {
+      socket.emit("join_admin_live_orders");
+    });
+
+    socket.on("order_created", (newOrder: Order) => {
+      if (!newOrder || !newOrder.order_id) return;
+      setAllOrders(prev => {
+        const exists = prev.some(o => o.order_id === newOrder.order_id);
+        if (exists) return prev;
+        return [newOrder, ...prev];
+      });
+      showSuccessToast(`New live order arrived: #${newOrder.order_id}`);
+    });
+
+    socket.on("order_status_changed", (updatedOrder: Partial<Order>) => {
+      if (!updatedOrder || !updatedOrder.order_id) return;
+
+      setAllOrders(prev => {
+        const exists = prev.some(o => o.order_id === updatedOrder.order_id);
+        if (!exists) {
+          return [updatedOrder as Order, ...prev];
+        }
+        return prev.map(o => {
+          if (o.order_id !== updatedOrder.order_id) return o;
+          return {
+            ...o,
+            ...updatedOrder,
+          };
+        });
+      });
+
+      // Automatically update Order Details modal if currently open for this order
+      setDetailOrder(prev => {
+        if (prev && prev.order_id === updatedOrder.order_id) {
+          return { ...prev, ...updatedOrder };
+        }
+        return prev;
+      });
+    });
+
+    return () => {
+      socket.off("connect");
+      socket.off("order_created");
+      socket.off("order_status_changed");
+      socket.disconnect();
+    };
+  }, []);
 
   // Fetch partners once
   useEffect(() => {
@@ -257,7 +315,7 @@ export default function LiveOrdersPage() {
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 font-medium truncate">
-                {allOrders.length} orders loaded · auto-refresh 30s
+                {allOrders.length} orders loaded · <span className="text-emerald-600 font-bold">Live WebSockets</span>
               </p>
             </div>
           </div>

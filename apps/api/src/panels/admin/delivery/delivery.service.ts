@@ -453,7 +453,7 @@ export class DeliveryManagementService {
       const { branch_id, status, partner_id, page = 1, limit = 50 } = query;
       const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
       const params: any[] = [date];
-      const where: string[] = ['(o.scheduled_date = $1 OR o.created_at::date = $1)'];
+      const where: string[] = ['o.scheduled_date = $1'];
 
       if (branch_id) {
         params.push(branch_id);
@@ -486,8 +486,8 @@ export class DeliveryManagementService {
           o.created_at,
           o.branch_id,
           b.branch_name,
-          db.full_name AS partner_name,
-          db.phone AS partner_phone,
+          COALESCE(NULLIF(TRIM(db.full_name), ''), NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), u.user_name) AS partner_name,
+          COALESCE(NULLIF(TRIM(db.phone), ''), NULLIF(TRIM(u.phone), ''), NULLIF(TRIM(db.email), ''), NULLIF(TRIM(u.email), ''), '—') AS partner_phone,
           ca.latitude  AS lat,
           ca.longitude AS lng,
           COALESCE(
@@ -509,7 +509,8 @@ export class DeliveryManagementService {
             ), '[]'::json
           ) AS items
         FROM orders o
-        LEFT JOIN delivery_partners db ON db.delivery_partner_id = o.delivery_partner_id
+        LEFT JOIN delivery_partners db ON (db.delivery_partner_id = o.delivery_partner_id OR db.user_id = o.delivery_partner_id)
+        LEFT JOIN users u ON u.user_id = o.delivery_partner_id
         LEFT JOIN branches b ON b.branch_id = o.branch_id
         LEFT JOIN customer_addresses ca ON ca.address_id::text = o.address_id::text
         WHERE ${where.join(' AND ')}
@@ -559,7 +560,7 @@ export class DeliveryManagementService {
           COUNT(*) FILTER (WHERE status = 'cancelled')::int          AS cancelled,
           COUNT(DISTINCT delivery_partner_id)::int                   AS active_partners
         FROM orders
-        WHERE (scheduled_date = $1 OR created_at::date = $1)
+        WHERE scheduled_date = $1
       `;
       const rows = await this.db.query(sql, [targetDate]);
 
@@ -675,6 +676,8 @@ export class DeliveryManagementService {
         }
       }
 
+      await this.broadcastOrderUpdate(updatedOrder?.order_id || orderId);
+
       return {
         status: true,
         data: updatedOrder ?? null,
@@ -683,6 +686,48 @@ export class DeliveryManagementService {
     } catch (error) {
       this.developer.error('updateDeliveryStatus error', { error });
       throw new InternalServerErrorException('Failed to update delivery status');
+    }
+  }
+
+  async broadcastOrderUpdate(orderId: string) {
+    try {
+      const sql = `
+        SELECT
+          o.order_id,
+          o.customer_id,
+          o.customer_name,
+          o.status,
+          o.order_source,
+          o.delivery_slot,
+          o.address_line,
+          o.contact_number,
+          o.total_amount,
+          o.delivery_partner_id,
+          o.assignment_method,
+          o.assigned_at,
+          o.scheduled_date,
+          o.created_at,
+          o.branch_id,
+          b.branch_name,
+          COALESCE(NULLIF(TRIM(db.full_name), ''), NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), u.user_name) AS partner_name,
+          COALESCE(NULLIF(TRIM(db.phone), ''), NULLIF(TRIM(u.phone), '')) AS partner_phone
+        FROM orders o
+        LEFT JOIN delivery_partners db ON (db.delivery_partner_id = o.delivery_partner_id OR db.user_id = o.delivery_partner_id)
+        LEFT JOIN users u ON u.user_id = o.delivery_partner_id
+        LEFT JOIN branches b ON b.branch_id = o.branch_id
+        WHERE o.order_id = $1 OR o.id::text = $1
+        LIMIT 1
+      `;
+      const rows = await this.db.query(sql, [orderId]);
+      if (rows && rows.length > 0) {
+        const orderData = rows[0];
+        const gateway = this.notificationService.getGateway();
+        if (gateway && typeof gateway.emitOrderStatusChanged === 'function') {
+          gateway.emitOrderStatusChanged(orderData);
+        }
+      }
+    } catch (err) {
+      this.developer.error('broadcastOrderUpdate error', { err });
     }
   }
 
@@ -695,9 +740,11 @@ export class DeliveryManagementService {
             assigned_at         = NOW(),
             updated_at          = NOW()
         WHERE order_id = $2
-        RETURNING order_id, delivery_partner_id, assigned_at
+        RETURNING order_id, status, delivery_partner_id, assigned_at
       `;
       const rows = await this.db.query(sql, [partnerId, orderId]);
+      await this.broadcastOrderUpdate(orderId);
+
       return {
         status: true,
         data: rows?.[0] ?? null,

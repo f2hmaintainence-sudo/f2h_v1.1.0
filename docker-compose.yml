@@ -1,4 +1,4 @@
-name: f2hprod
+name: f2hfresh
 
 services:
   api:
@@ -37,6 +37,7 @@ services:
     restart: unless-stopped
 
   web:
+    container_name: web_app_service
     build:
       context: ./apps/web
       dockerfile: Dockerfile

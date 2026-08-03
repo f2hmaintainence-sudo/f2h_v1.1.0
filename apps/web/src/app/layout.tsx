@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Poppins, Inter, IBM_Plex_Mono, Fraunces } from "next/font/google";
+import { AlertProvider } from "@/context/AlertContext";
+import { ToastContainer } from "@/components/Toast";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -79,9 +81,6 @@ export const metadata: Metadata = {
     apple: "/assets/log1.webp",
   },
 };
-
-import { AlertProvider } from "@/context/AlertContext";
-import { ToastContainer } from "@/components/Toast";
 
 export default function RootLayout({
   children,

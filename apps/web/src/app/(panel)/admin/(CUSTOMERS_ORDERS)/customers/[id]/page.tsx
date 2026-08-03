@@ -146,7 +146,7 @@ export default function CustomerDetailsPage() {
             </div>
             
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-600 mb-3">
-              <div className="flex items-center gap-1.5"><Phone size={14} className="text-fresh-green" /> {customer.phone || 'N/A'}</div>
+              <div className="flex items-center gap-1.5"><Phone size={14} className="text-fresh-green" /> {(!customer.phone || customer.phone.startsWith('NO_PHONE_')) ? 'N/A' : customer.phone}</div>
               <div className="flex items-center gap-1.5"><Mail size={14} className="text-fresh-green" /> {customer.email || 'N/A'}</div>
               {primaryAddress && (
                 <div className="flex items-center gap-1.5"><MapPin size={14} className="text-fresh-green" /> {primaryAddress.address_line_1 || primaryAddress.city || 'N/A'}</div>
