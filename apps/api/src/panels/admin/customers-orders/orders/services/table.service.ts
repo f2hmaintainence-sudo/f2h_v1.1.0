@@ -106,12 +106,34 @@ export class OrdersTableService {
         normalizeStatus(query.status) ||
         simpleFilters.find((filter) => statusValues.includes(filter));
 
-      if (scope === 'today' || query.today === '1' || query.today === 'true') {
+      if (query.fromDate) {
         conditions.push({
           column: 'orders.scheduled_date',
-          operator: '=',
-          value: query.date || todayInIndia(),
+          operator: '>=',
+          value: query.fromDate,
         });
+      }
+      if (query.toDate) {
+        conditions.push({
+          column: 'orders.scheduled_date',
+          operator: '<=',
+          value: query.toDate,
+        });
+      }
+      if (!query.fromDate && !query.toDate) {
+        if (query.date) {
+          conditions.push({
+            column: 'orders.scheduled_date',
+            operator: '=',
+            value: query.date,
+          });
+        } else if (scope === 'today' || query.today === '1' || query.today === 'true') {
+          conditions.push({
+            column: 'orders.scheduled_date',
+            operator: '=',
+            value: todayInIndia(),
+          });
+        }
       }
 
       if (orderType) {

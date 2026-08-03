@@ -21,7 +21,9 @@ import {
   Sun,
   Moon,
   AlertTriangle,
+  AlertTriangle,
   X,
+  Calendar,
 } from 'lucide-react';
 
 export type ViewMode = 'grid' | 'table';
@@ -40,6 +42,13 @@ interface OrderFilterBarProps {
   onSlotFilterChange: (slot: DeliverySlotFilter) => void;
   urgentOnly: boolean;
   onUrgentToggle: () => void;
+  selectedDate?: string;
+  onSelectedDateChange?: (date: string) => void;
+  fromDate?: string;
+  onFromDateChange?: (date: string) => void;
+  toDate?: string;
+  onToDateChange?: (date: string) => void;
+  onClearDates?: () => void;
 }
 
 export default function OrderFilterBar({
@@ -54,6 +63,13 @@ export default function OrderFilterBar({
   onSlotFilterChange,
   urgentOnly,
   onUrgentToggle,
+  selectedDate = '',
+  onSelectedDateChange,
+  fromDate = '',
+  onFromDateChange,
+  toDate = '',
+  onToDateChange,
+  onClearDates,
 }: OrderFilterBarProps) {
   return (
     <div className="bg-white rounded-2xl p-3 border border-gray-200/90 shadow-2xs">
@@ -194,6 +210,54 @@ export default function OrderFilterBar({
             <AlertTriangle size={14} className={urgentOnly ? 'text-rose-600 animate-pulse' : 'text-gray-400'} />
             <span>Urgent</span>
           </button>
+
+          {/* Date Wise Filters — Particular Date & Date Range (From - To) */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Particular Date */}
+            <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200/90 rounded-xl px-2.5 h-9">
+              <Calendar size={13} className="text-emerald-600 shrink-0" />
+              <span className="text-[10px] font-bold text-gray-500 uppercase shrink-0">Date:</span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => onSelectedDateChange?.(e.target.value)}
+                className="bg-transparent text-xs font-semibold text-gray-800 outline-none cursor-pointer"
+                title="Filter by Particular Date"
+              />
+            </div>
+
+            {/* Range: From Date - To Date */}
+            <div className="flex items-center gap-1 bg-gray-50 border border-gray-200/90 rounded-xl px-2.5 h-9">
+              <span className="text-[10px] font-bold text-gray-500 uppercase shrink-0">From:</span>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => onFromDateChange?.(e.target.value)}
+                className="bg-transparent text-xs font-semibold text-gray-800 outline-none cursor-pointer"
+                title="From Date"
+              />
+              <span className="text-[10px] font-bold text-gray-500 uppercase shrink-0 ml-1">To:</span>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => onToDateChange?.(e.target.value)}
+                className="bg-transparent text-xs font-semibold text-gray-800 outline-none cursor-pointer"
+                title="To Date"
+              />
+            </div>
+
+            {(selectedDate || fromDate || toDate) && (
+              <button
+                type="button"
+                onClick={onClearDates}
+                className="h-9 px-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1"
+                title="Clear Date Filters"
+              >
+                <X size={13} />
+                <span>Reset</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

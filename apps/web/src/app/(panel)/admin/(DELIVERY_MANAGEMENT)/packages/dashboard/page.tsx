@@ -22,6 +22,8 @@ import {
   X,
   Container,
   Skull,
+  Truck,
+  Eye,
 } from 'lucide-react';
 import Link from 'next/link';
 import { api } from '@/services/api.client';
@@ -40,6 +42,10 @@ type PendingRow = {
   lost_quantity: number;
   pending_count: number;
   updated_at: string;
+  latest_order_id?: string;
+  delivery_partner_name?: string;
+  delivery_partner_phone?: string;
+  latest_delivery_date?: string;
 };
 
 type AdjustState = {
@@ -56,12 +62,25 @@ export default function ContainersPage() {
   const [search, setSearch] = useState('');
   const [selectedType, setSelectedType] = useState('All');
   const [page, setPage] = useState(1);
+  const [selectedDetailRow, setSelectedDetailRow] = useState<PendingRow | null>(null);
   const [adjusting, setAdjusting] = useState<AdjustState | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [containersMaster, setContainersMaster] = useState<any[]>([]);
+  const [dashboardSummary, setDashboardSummary] = useState<any>(null);
   const limit = 20;
   const searchRef = useRef<NodeJS.Timeout | null>(null);
+
+  const fetchDashboardSummary = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/package/dashboard');
+      if (res.data?.data?.summary) {
+        setDashboardSummary(res.data.data.summary);
+      }
+    } catch (err) {
+      console.error('Failed to fetch package dashboard summary:', err);
+    }
+  }, []);
 
   const fetchMasterContainers = useCallback(async () => {
     try {
@@ -77,7 +96,8 @@ export default function ContainersPage() {
 
   useEffect(() => {
     fetchMasterContainers();
-  }, [fetchMasterContainers]);
+    fetchDashboardSummary();
+  }, [fetchDashboardSummary, fetchMasterContainers]);
 
   const totalWarehouseStock = containersMaster.reduce((acc, c) => acc + Number(c.quantity || 0), 0);
 
@@ -127,6 +147,7 @@ export default function ContainersPage() {
       setAdjusting(null);
       load();
       fetchMasterContainers();
+      fetchDashboardSummary();
     } catch (e: any) {
       showToast(e.response?.data?.message || e.message || 'Failed to adjust', false);
     } finally {
@@ -137,11 +158,11 @@ export default function ContainersPage() {
   const totalPages = Math.ceil(total / limit);
 
   const renderKpiCards = () => {
-    const totalIssued = rows.reduce((acc, r) => acc + Number(r.issued_quantity || 0), 0);
-    const totalReturned = rows.reduce((acc, r) => acc + Number(r.returned_quantity || 0), 0);
-    const totalPending = rows.reduce((acc, r) => acc + Number(r.pending_count || 0), 0);
-    const totalDamaged = rows.reduce((acc, r) => acc + Number(r.damaged_quantity || 0), 0);
-    const totalLost = rows.reduce((acc, r) => acc + Number(r.lost_quantity || 0), 0);
+    const totalIssued = dashboardSummary?.issued_quantity ?? rows.reduce((acc, r) => acc + Number(r.issued_quantity || 0), 0);
+    const totalReturned = dashboardSummary?.returned_quantity ?? rows.reduce((acc, r) => acc + Number(r.returned_quantity || 0), 0);
+    const totalPending = dashboardSummary?.balance_quantity ?? rows.reduce((acc, r) => acc + Number(r.pending_count || 0), 0);
+    const totalDamaged = dashboardSummary?.damaged_quantity ?? rows.reduce((acc, r) => acc + Number(r.damaged_quantity || 0), 0);
+    const totalLost = dashboardSummary?.lost_quantity ?? rows.reduce((acc, r) => acc + Number(r.lost_quantity || 0), 0);
     const returnRate = totalIssued > 0 ? ((totalReturned / totalIssued) * 100).toFixed(1) : '100.0';
 
     return (
@@ -312,33 +333,31 @@ export default function ContainersPage() {
                 })
                 .map((row) => (
                 <tr key={`${row.customer_id}_${row.container_type_id}`} className="hover:bg-amber-50/40 transition-colors">
-                  <td className="px-4 py-3">
-                    <div className="font-semibold text-gray-800">{row.customer_name || row.customer_id}</div>
-                    <div className="text-xs text-gray-400">{row.phone} · {row.customer_id}</div>
+                  <td className="px-4 py-3 align-middle">
+                    <div className="font-bold text-slate-900">{row.customer_name || `Customer #${row.customer_id}`}</div>
+                    <div className="text-xs text-slate-400 font-medium">{row.phone} · <span className="font-mono text-[10px] text-slate-400">{row.customer_id}</span></div>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-gray-700">{row.container_name}</div>
+                  <td className="px-4 py-3 align-middle">
+                    <div className="font-bold text-slate-800">{row.container_name}</div>
                     {row.capacity && (
-                      <div className="text-xs text-gray-400">{row.capacity} {row.unit}</div>
+                      <div className="text-xs text-slate-400 font-medium">{row.capacity} {row.unit}</div>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-center text-gray-600">{row.issued_quantity}</td>
-                  <td className="px-4 py-3 text-center text-emerald-600 font-semibold">{row.returned_quantity}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-amber-100 text-amber-700 font-black text-base">
+                  <td className="px-4 py-3 text-center text-slate-600 font-bold align-middle">{row.issued_quantity}</td>
+                  <td className="px-4 py-3 text-center text-emerald-600 font-bold align-middle">{row.returned_quantity}</td>
+                  <td className="px-4 py-3 text-center align-middle">
+                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-amber-100 text-amber-800 font-black text-base">
                       {row.pending_count}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => setAdjusting({ row, action: 'returned', quantity: row.pending_count, notes: '' })}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
-                        title="Mark as returned"
-                      >
-                        <Undo2 size={12} />Adjust
-                      </button>
-                    </div>
+                  <td className="px-4 py-3 text-right align-middle">
+                    <button
+                      onClick={() => setSelectedDetailRow(row)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg transition-colors cursor-pointer"
+                      title="View order & container details"
+                    >
+                      <Eye size={14} className="text-slate-600" /> Details
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -355,24 +374,132 @@ export default function ContainersPage() {
           </table>
         </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
-            <p className="text-xs text-gray-500">{total} total records</p>
-            <div className="flex items-center gap-2">
-              <button disabled={page <= 1} onClick={() => { setPage(p => p - 1); load(search, page - 1); }}
-                className="px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">
-                ← Prev
+        {/* Pagination Bar */}
+        <div className="px-4 py-3 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-gray-50/50">
+          <p className="text-xs text-slate-500 font-medium">
+            Showing <strong className="text-slate-800">{total > 0 ? (page - 1) * limit + 1 : 0}</strong> to <strong className="text-slate-800">{Math.min(page * limit, total)}</strong> of <strong className="text-slate-800">{total}</strong> container balances
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              disabled={page <= 1 || loading}
+              onClick={() => { const p = page - 1; setPage(p); load(search, p); }}
+              className="px-3.5 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs transition-all cursor-pointer"
+            >
+              ← Previous
+            </button>
+            <span className="text-xs font-bold text-slate-600 px-2 py-1 bg-white border border-slate-200 rounded-lg shadow-2xs">
+              Page {page} of {Math.max(1, totalPages)}
+            </span>
+            <button
+              disabled={page >= totalPages || loading}
+              onClick={() => { const p = page + 1; setPage(p); load(search, p); }}
+              className="px-3.5 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs transition-all cursor-pointer"
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Details Modal */}
+      {selectedDetailRow && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 animate-in fade-in zoom-in-95 duration-200 space-y-5">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
+                  <Container size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base">Container & Order Details</h3>
+                  <p className="text-xs text-slate-500 font-medium">Customer Container Balance Record</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedDetailRow(null)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X size={18} />
               </button>
-              <span className="text-xs text-gray-500">Page {page} of {totalPages}</span>
-              <button disabled={page >= totalPages} onClick={() => { setPage(p => p + 1); load(search, page + 1); }}
-                className="px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">
-                Next →
+            </div>
+
+            {/* Customer Info Card */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-1">
+              <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Customer Profile</p>
+              <p className="text-sm font-extrabold text-slate-900">{selectedDetailRow.customer_name}</p>
+              <p className="text-xs text-slate-500 font-medium">
+                Phone: <span className="font-bold text-slate-700">{selectedDetailRow.phone}</span> • ID: <span className="font-mono text-slate-600">{selectedDetailRow.customer_id}</span>
+              </p>
+            </div>
+
+            {/* Container Details Grid */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Container Name</p>
+                <p className="text-sm font-bold text-slate-900">{selectedDetailRow.container_name}</p>
+                <p className="text-[11px] text-slate-500 font-medium">{selectedDetailRow.container_type_id}</p>
+              </div>
+              <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Current Balance Status</p>
+                <p className="text-sm font-black text-amber-700">{selectedDetailRow.pending_count} Pending Return</p>
+                <p className="text-[11px] text-slate-500 font-medium">{selectedDetailRow.issued_quantity} Issued • {selectedDetailRow.returned_quantity} Returned</p>
+              </div>
+            </div>
+
+            {/* Issued Order & Delivery Agent Details */}
+            <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200/80 space-y-2.5">
+              <p className="text-[10px] font-extrabold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Truck size={14} className="text-emerald-600" /> Issued Order & Delivery Partner
+              </p>
+
+              {selectedDetailRow.latest_order_id ? (
+                <div className="space-y-2 text-xs text-slate-700">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-500">Issued Order ID:</span>
+                    <span className="bg-white text-emerald-900 border border-emerald-300 font-extrabold px-2 py-0.5 rounded text-xs shadow-2xs">
+                      #{selectedDetailRow.latest_order_id}
+                    </span>
+                  </div>
+                  {selectedDetailRow.delivery_partner_name ? (
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-500">Delivered By Agent:</span>
+                      <span className="font-bold text-emerald-800">
+                        {selectedDetailRow.delivery_partner_name}
+                        {selectedDetailRow.delivery_partner_phone && (
+                          <span className="text-slate-500 font-normal ml-1">({selectedDetailRow.delivery_partner_phone})</span>
+                        )}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-slate-500 italic">No delivery partner assigned</div>
+                  )}
+                  {selectedDetailRow.latest_delivery_date && (
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-500">Delivery Timestamp:</span>
+                      <span className="font-medium text-slate-800">
+                        {new Date(selectedDetailRow.latest_delivery_date).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500 italic">No order details linked to this container</p>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end pt-1">
+              <button
+                onClick={() => setSelectedDetailRow(null)}
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-2xs transition-all cursor-pointer"
+              >
+                Close
               </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Adjust Modal */}
       {adjusting && (

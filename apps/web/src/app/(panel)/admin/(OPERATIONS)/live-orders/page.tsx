@@ -336,12 +336,6 @@ export default function LiveOrdersPage() {
               <RefreshCw size={12} className={refreshing ? "animate-spin text-emerald-600" : "text-slate-400"} />
               Refresh
             </button>
-            <Link
-              href="/admin/delivery/assign"
-              className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-[11px] font-bold hover:bg-emerald-700 transition-all shadow whitespace-nowrap"
-            >
-              <Zap size={12} /> Create Runs &amp; Assign
-            </Link>
           </div>
         </div>
       </div>
@@ -571,19 +565,9 @@ export default function LiveOrdersPage() {
                             )}
                           </div>
                         ) : (
-                          <div>
-                            <div className="flex items-center gap-1">
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-extrabold whitespace-nowrap">
-                                <AlertTriangle size={9} className="text-amber-600 shrink-0" /> Unassigned
-                              </span>
-                            </div>
-                            <button
-                              onClick={() => { setAssignOrder(o); setSelectedPartner(""); }}
-                              className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md text-[10px] font-bold transition-all"
-                            >
-                              <UserPlus size={9} /> Assign
-                            </button>
-                          </div>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-bold whitespace-nowrap">
+                            Not Assigned
+                          </span>
                         )}
                       </td>
 
