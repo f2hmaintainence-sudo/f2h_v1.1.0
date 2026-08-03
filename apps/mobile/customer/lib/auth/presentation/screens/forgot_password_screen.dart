@@ -1,10 +1,16 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:f2h_customer/app.dart';
 import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/auth/domain/repositories/auth_repository.dart';
+import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
+import 'package:f2h_customer/auth/presentation/bloc/auth_event.dart';
+import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
+
 import 'package:f2h_customer/core/errors/error_handler.dart';
 import 'package:f2h_customer/core/services/app_asset_service.dart';
 
@@ -118,13 +124,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password reset successfully')),
+        const SnackBar(content: Text('Password reset successfully. Logging in...')),
       );
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-        (route) => false,
-      );
+
+      context.read<AuthBloc>().add(
+            LoginRequested(
+              identifier: _email,
+              password: password,
+            ),
+          );
     } catch (e) {
       if (!mounted) return;
       _showError(extractErrorMessage(e));
@@ -146,7 +154,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     final size = MediaQuery.of(context).size;
     final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
 
-    return Scaffold(
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state is Authenticated) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const CustomerSessionGate()),
+            (route) => false,
+          );
+        } else if (state is AuthFailure) {
+          _showError(state.error);
+        }
+      },
+      child: Scaffold(
+
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -404,9 +425,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ),
       ],
     ),
-  ),
-);
+      ),
+    ),
+  );
 }
+
 
   String get _title {
     switch (_step) {

@@ -187,7 +187,7 @@ class _ImageBannerState extends State<ImageBanner> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Container(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.08),
@@ -197,7 +197,7 @@ class _ImageBannerState extends State<ImageBanner> {
                   ],
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(14),
                   child: GestureDetector(
                     onTap: () => _onBannerTap(banner),
                     child: Image.network(
@@ -235,7 +235,7 @@ class _ImageBannerState extends State<ImageBanner> {
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
-                            borderRadius: BorderRadius.circular(24),
+                            borderRadius: BorderRadius.circular(14),
                           ),
                           child: Row(
                             children: [

@@ -192,7 +192,7 @@ class _OfferBannerState extends State<OfferBanner> {
                 return Container(
                   margin: const EdgeInsets.symmetric(horizontal: 2),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(14),
                     gradient: LinearGradient(
                       colors: bgColors,
                       begin: Alignment.topLeft,
@@ -207,7 +207,8 @@ class _OfferBannerState extends State<OfferBanner> {
                     ],
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(14),
+
                     child: Stack(
                       children: [
                         // Decorative Background Circles

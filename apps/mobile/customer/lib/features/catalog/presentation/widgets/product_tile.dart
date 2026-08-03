@@ -10,7 +10,7 @@ import '../bloc/cart/cart_state.dart';
 import '../../domain/entities/cart/cart_item_entity.dart';
 import '../../../../core/guards/auth_guard.dart';
 import '../../../subscription/presentation/widgets/subscription_button.dart';
-import 'cart_widgets.dart';
+
 // ── Product image widget ─────────────────────────────────
 Widget _productImage(Product p, {BoxFit fit = BoxFit.cover, double padding = 0.0}) {
   return Padding(
@@ -1242,3 +1242,7 @@ class ZeptoAddButtonState extends State<ZeptoAddButton>
     );
   }
 }
+
+
+
+

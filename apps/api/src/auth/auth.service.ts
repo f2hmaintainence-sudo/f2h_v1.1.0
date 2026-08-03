@@ -356,7 +356,8 @@ export class AuthService {
     const email = body.email ? body.email.toLowerCase().trim() : null;
     const phone = body.phone ? body.phone.trim() : null;
     const roleId = (body.role || 'CUSTOMER').toUpperCase();
-    console.log("data ", body);
+
+   this.developer.debug('register', body);
     if (!email && !phone) {
       throw new BadRequestException('Email and phone is required');
     }
@@ -431,6 +432,7 @@ export class AuthService {
       if (existingUser) {
         // Update placeholder user created during OTP verification
         const incomingFcmToken = body.fcm_token || (body as any).fcmToken;
+        this.developer.debug('userUpdatePayload', body);
         const userUpdatePayload: any = {
           email,
           phone,
@@ -497,7 +499,7 @@ export class AuthService {
           const custPayload: any = {
             first_name: body.first_name || body.user_name || 'Customer',
             last_name: body.last_name || '',
-            mobile: phone || '',
+            mobile: phone || null,
             email: email || null,
             updated_at: now,
           };
@@ -515,8 +517,8 @@ export class AuthService {
             customer_id: userId,
             first_name: custFirstName,
             last_name: lastName,
-            mobile: (phone || ('NO_PHONE_' + userId)).slice(0, 20),
-            phone: (phone || ('NO_PHONE_' + userId)).slice(0, 20),
+            mobile: phone || null,
+            phone: phone || null,
             email: email || null,
             referral_code: generatedRefCode,
             referral_status: 'locked',
@@ -883,8 +885,8 @@ export class AuthService {
           customer_id: userId,
           first_name: email ? email.split('@')[0] : 'Customer',
           last_name: '',
-          mobile: phone || ('NO_PHONE_' + userId),
-          phone: phone || ('NO_PHONE_' + userId),
+          mobile: phone || null,
+          phone: phone || null,
           email: email || null,
           branch_id: 'BRANCH_DEFAULT',
           referral_code: generatedRefCode,
@@ -981,11 +983,7 @@ export class AuthService {
       await this.Data.update('users', { fcm: fcmToken }, [
         { column: 'user_id', operator: '=', value: userId },
       ]);
-<<<<<<< HEAD
     } catch (_) {}
-=======
-    } catch (_) { }
->>>>>>> main
   }
 
   /*===============================================================================================
@@ -1467,8 +1465,8 @@ export class AuthService {
             customer_id: userId,
             first_name: body.name || email.split('@')[0],
             last_name: '',
-            mobile: 'NO_PHONE_' + userId,
-            phone: 'NO_PHONE_' + userId,
+            mobile: null,
+            phone: null,
             email: email.toLowerCase().trim(),
             branch_id: 'BRANCH_DEFAULT',
             created_at: now,

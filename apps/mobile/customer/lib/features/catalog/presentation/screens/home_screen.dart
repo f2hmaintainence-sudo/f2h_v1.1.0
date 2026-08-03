@@ -401,7 +401,8 @@ class _HomeScreenState extends State<HomeScreen>
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 4,
                                 ),
-                                child: _oneTimeProductCard(context, p),
+                                child: oneTimeProductCard(context, p),
+
                               ),
                             )
                             .toList(),
@@ -1206,272 +1207,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
-  Widget _oneTimeProductCard(BuildContext context, Product p) {
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (_, a, __) => ProductDetailViewScreen(product: p),
-          transitionsBuilder: (_, a, __, child) =>
-              FadeTransition(opacity: a, child: child),
-          transitionDuration: const Duration(milliseconds: 220),
-        ),
-      ),
-      child: Container(
-        width: 162,
-        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: kBorderLt, width: 1.0),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  height: 120,
-                  width: double.infinity,
-                  decoration: const BoxDecoration(
-                    color: Colors.transparent,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.zero,
-                    child: buildProductImage(
-                      p.name,
-                      imageAsset: p.imageAsset,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        p.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: kText,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                      if ((p.formattedUnit.isNotEmpty
-                                  ? p.formattedUnit
-                                  : p.unit)
-                              .isNotEmpty &&
-                          (p.formattedUnit.isNotEmpty
-                                      ? p.formattedUnit
-                                      : p.unit)
-                                  .toLowerCase() !=
-                              p.name.toLowerCase()) ...[
-                        const SizedBox(height: 4),
-                        UnconstrainedBox(
-                          alignment: Alignment.centerLeft,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF3F4F6),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: const Color(0xFFE5E7EB),
-                                width: 1.0,
-                              ),
-                            ),
-                            child: Text(
-                              p.formattedUnit.isNotEmpty
-                                  ? p.formattedUnit
-                                  : p.unit,
-                              style: const TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF6B7280),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                '₹${p.price.toStringAsFixed(0)}',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w900,
-                                  color: kText,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (p.originalPrice > p.price) ...[
-                              const SizedBox(width: 3),
-                              Flexible(
-                                child: Text(
-                                  '₹${p.originalPrice.toStringAsFixed(0)}',
-                                  style: const TextStyle(
-                                    fontSize: 9.5,
-                                    color: kMuted,
-                                    decoration: TextDecoration.lineThrough,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      ZeptoAddButton(p: p, isSmall: true),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            if (p.reviews > 0)
-              Positioned(
-                top: 8,
-                left: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 5,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: const Color(0xFFFFE0B2),
-                      width: 0.8,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.star_rounded,
-                        size: 10,
-                        color: Colors.amber,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        '${p.rating.toStringAsFixed(1)} (${p.reviews})',
-                        style: const TextStyle(
-                          fontSize: 7.5,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFFE65100),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            if (p.isLowStock || p.isOutOfStock)
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFEBEE),
-                    borderRadius: BorderRadius.circular(100),
-                    border: Border.all(
-                      color: const Color(0xFFEF5350),
-                      width: 0.8,
-                    ),
-                  ),
-                  child: Text(
-                    p.isOutOfStock ? 'OUT OF STOCK' : 'LOW STOCK',
-                    style: const TextStyle(
-                      fontSize: 6.5,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFFD32F2F),
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ),
-              )
-            else if (p.isOrganic)
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF7E6),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: const Color(0xFFFFD54F),
-                      width: 0.8,
-                    ),
-                  ),
-                  child: const Text(
-                    'Best Seller',
-                    style: TextStyle(
-                      fontSize: 6.5,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFFB45309),
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   Widget _subscriptionBanner() {
     final imageUrl =
@@ -2432,7 +2168,8 @@ class _HomeReferralBanner extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(14),
+
               border: Border.all(
                 color: const Color(0xFF34D399).withOpacity(0.35),
                 width: 1.2,
@@ -2714,3 +2451,275 @@ class _HomeReferralBanner extends StatelessWidget {
     }
   }
 }
+
+// ══════════════════════════════════════════════════════════
+//  REUSABLE HOME SCREEN ONE-TIME PRODUCT CARD
+// ══════════════════════════════════════════════════════════
+
+Widget oneTimeProductCard(BuildContext context, Product p) {
+  return GestureDetector(
+    onTap: () => Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, a, _) => ProductDetailViewScreen(product: p),
+        transitionsBuilder: (_, a, _, child) =>
+            FadeTransition(opacity: a, child: child),
+        transitionDuration: const Duration(milliseconds: 220),
+      ),
+    ),
+    child: Container(
+      width: 162,
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: kBorderLt, width: 1.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 120,
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.zero,
+                  child: buildProductImage(
+                    p.name,
+                    imageAsset: p.imageAsset,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      p.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: kText,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    if ((p.formattedUnit.isNotEmpty
+                                ? p.formattedUnit
+                                : p.unit)
+                            .isNotEmpty &&
+                        (p.formattedUnit.isNotEmpty
+                                    ? p.formattedUnit
+                                    : p.unit)
+                                .toLowerCase() !=
+                            p.name.toLowerCase()) ...[
+                      const SizedBox(height: 4),
+                      UnconstrainedBox(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF3F4F6),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: const Color(0xFFE5E7EB),
+                              width: 1.0,
+                            ),
+                          ),
+                          child: Text(
+                            p.formattedUnit.isNotEmpty
+                                ? p.formattedUnit
+                                : p.unit,
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF6B7280),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              '₹${p.price.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                                color: kText,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (p.originalPrice > p.price) ...[
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                '₹${p.originalPrice.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  fontSize: 9.5,
+                                  color: kMuted,
+                                  decoration: TextDecoration.lineThrough,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    ZeptoAddButton(p: p, isSmall: true),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (p.reviews > 0)
+            Positioned(
+              top: 8,
+              left: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 5,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: const Color(0xFFFFE0B2),
+                    width: 0.8,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.star_rounded,
+                      size: 10,
+                      color: Colors.amber,
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      '${p.rating.toStringAsFixed(1)} (${p.reviews})',
+                      style: const TextStyle(
+                        fontSize: 7.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFE65100),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (p.isLowStock || p.isOutOfStock)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFEBEE),
+                  borderRadius: BorderRadius.circular(100),
+                  border: Border.all(
+                    color: const Color(0xFFEF5350),
+                    width: 0.8,
+                  ),
+                ),
+                child: Text(
+                  p.isOutOfStock ? 'OUT OF STOCK' : 'LOW STOCK',
+                  style: const TextStyle(
+                    fontSize: 6.5,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFFD32F2F),
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+            )
+          else if (p.isOrganic)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF7E6),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: const Color(0xFFFFD54F),
+                    width: 0.8,
+                  ),
+                ),
+                child: const Text(
+                  'Best Seller',
+                  style: TextStyle(
+                    fontSize: 6.5,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFFB45309),
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+}
+
+

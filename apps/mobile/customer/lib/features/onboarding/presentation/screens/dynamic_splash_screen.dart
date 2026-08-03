@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:f2h_customer/core/widgets/scrolling_items_loader.dart';
@@ -13,8 +12,10 @@ class DynamicSplashScreen extends StatefulWidget {
   State<DynamicSplashScreen> createState() => _DynamicSplashScreenState();
 }
 
-class _DynamicSplashScreenState extends State<DynamicSplashScreen> with SingleTickerProviderStateMixin {
+class _DynamicSplashScreenState extends State<DynamicSplashScreen>
+    with SingleTickerProviderStateMixin {
   bool _showSplash = true;
+  bool _showBanner = false;
   String? _splashImage;
   late final AnimationController _animationController;
   late final Animation<double> _fadeAnimation;
@@ -30,7 +31,7 @@ class _DynamicSplashScreenState extends State<DynamicSplashScreen> with SingleTi
     _fadeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
-    _loadSplashImage();
+    _startSplashSequence();
   }
 
   @override
@@ -39,31 +40,35 @@ class _DynamicSplashScreenState extends State<DynamicSplashScreen> with SingleTi
     super.dispose();
   }
 
-  Future<void> _loadSplashImage() async {
+  Future<void> _startSplashSequence() async {
+    // Prepare image key
     try {
       final prefs = await SharedPreferences.getInstance();
       int count = prefs.getInt('app_open_count') ?? 0;
-      
-      // List of available splash images
       final images = [
         'assets/splash/splash.png',
       ];
-      
+
       if (images.isNotEmpty) {
-        setState(() {
-          _splashImage = images[count % images.length];
-        });
+        _splashImage = images[count % images.length];
       }
-      
-      // Increment and save count for the next run
+
       await prefs.setInt('app_open_count', count + 1);
     } catch (e) {
-      debugPrint('Error loading splash image: $e');
+      debugPrint('Error preparing splash image: $e');
     }
 
-    // Wait for 800 milliseconds before starting the fade-out transition
-    await Future.delayed(const Duration(milliseconds: 800));
-    _fadeOutAndDismiss();
+    // Step 1: First show loading animation for 1.5 seconds on app launch
+    await Future.delayed(const Duration(milliseconds: 1500));
+    if (!mounted || !_showSplash) return;
+
+    // Step 2: Then switch to showing the splash banner image
+    if (_splashImage != null) {
+      setState(() {
+        _showBanner = true;
+      });
+    }
+    // Step 3: Banner stays on screen until user taps Skip button (no auto-dismiss timer)
   }
 
   void _fadeOutAndDismiss() {
@@ -89,74 +94,77 @@ class _DynamicSplashScreenState extends State<DynamicSplashScreen> with SingleTi
         opacity: _fadeAnimation,
         child: Stack(
           children: [
-            // Full Screen Image
+            // Smooth CrossFade: First show Loading Animation, then switch to Splash Banner
             Positioned.fill(
-              child: _splashImage == null
-                  ? Container(
-                      color: Colors.white,
-                      child: const Center(
-                        child: ScrollingItemsLoader(),
-                      ),
-                    )
-                  : AppAssetImage(
-                      assetKey: _splashImage!,
-                      fit: BoxFit.cover,
-                    ),
-            ),
-            // ponytail: removed bottom rolling loader overlay
-            // const Positioned(
-            //   bottom: 80,
-            //   left: 0,
-            //   right: 0,
-            //   child: Center(
-            //     child: ScrollingItemsLoader(),
-            //   ),
-            // ),
-            // Glassmorphic / Semi-transparent Skip Button
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 16,
-              right: 16,
-              child: SafeArea(
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: _fadeOutAndDismiss,
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.4),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          width: 1,
+              child: AnimatedCrossFade(
+                duration: const Duration(milliseconds: 500),
+                crossFadeState: _showBanner && _splashImage != null
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
+                firstChild: Container(
+                  color: Colors.white,
+                  child: const Center(
+                    child: ScrollingItemsLoader(),
+                  ),
+                ),
+                secondChild: _splashImage != null
+                    ? SizedBox.expand(
+                        child: AppAssetImage(
+                          assetKey: _splashImage!,
+                          fit: BoxFit.cover,
                         ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Text(
-                            'Skip',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
+                      )
+                    : Container(color: Colors.white),
+              ),
+            ),
+
+            // Glassmorphic Skip Button during Banner Phase (Stays until user taps Skip)
+            if (_showBanner)
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 16,
+                right: 16,
+                child: SafeArea(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _fadeOutAndDismiss,
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            width: 1,
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Skip',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
+                              ),
                             ),
-                          ),
-                          SizedBox(width: 4),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                        ],
+                            SizedBox(width: 4),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
           ],
         ),
       ),

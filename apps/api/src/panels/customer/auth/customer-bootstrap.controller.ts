@@ -112,8 +112,8 @@ export class CustomerBootstrapController {
             customer_id: userId,
             first_name: userObj.first_name || userObj.user_name || (userObj.email ? userObj.email.split('@')[0] : 'Customer'),
             last_name: userObj.last_name || '',
-            mobile: (userObj.phone || ('NO_PHONE_' + userId)).slice(0, 20),
-            phone: (userObj.phone || ('NO_PHONE_' + userId)).slice(0, 20),
+            mobile: (userObj.phone || null),
+            phone: (userObj.phone || null),
             email: userObj.email || email || null,
             branch_id: activeBranchId,
             created_at: now,
@@ -656,7 +656,8 @@ export class CustomerBootstrapController {
   async updateProfile(@Req() req: Request, @Body() body: any) {
     const user = req.user as any;
     const userId = user?.user_id;
-
+    console.log('[CustomerBootstrapController] updateProfile', body);
+    this.Developer.log('[CustomerBootstrapController] updateProfile', body);
     if (!userId) {
       throw new BadRequestException('Invalid customer session');
     }
@@ -665,13 +666,13 @@ export class CustomerBootstrapController {
       first_name: String(body?.first_name ?? '').trim(),
       last_name: String(body?.last_name ?? '').trim(),
       email: String(body?.email ?? '').trim(),
-      phone: String(body?.mobile ?? '').trim(),
+      mobile: String(body?.mobile ?? '').trim(),
       dob: this.formatDateForPostgres(body?.dob),
       gender: String(body?.gender ?? '').trim(),
       updated_at: new Date(),
     };
-    if (!updateData.first_name || !updateData.phone || !updateData.email) {
-      throw new BadRequestException('First name and phone number are required');
+    if (!updateData.first_name || !updateData.mobile || !updateData.email) {
+      throw new BadRequestException('First name and mobile number are required');
     }
     const existingProfile = await this.resolveCustomer(userId, user?.email);
     if (!existingProfile) {
@@ -694,7 +695,7 @@ export class CustomerBootstrapController {
       first_name: updateData.first_name,
       last_name: updateData.last_name,
       user_name: `${updateData.first_name} ${updateData.last_name}`.trim(),
-      phone: updateData.phone,
+      phone: updateData.mobile,
       email: updateData.email,
       updated_at: new Date(),
     };
