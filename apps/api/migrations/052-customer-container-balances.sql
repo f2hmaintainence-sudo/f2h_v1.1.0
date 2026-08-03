@@ -22,5 +22,5 @@ CREATE TABLE customer_container_balances (
 
     updated_at TIMESTAMPTZ DEFAULT now(),
 
-    UNIQUE(customer_id, packaging_type_id)
+    UNIQUE(customer_id, container_id)
 );

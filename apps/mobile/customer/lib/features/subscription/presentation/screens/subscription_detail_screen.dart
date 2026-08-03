@@ -138,12 +138,188 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     }
   }
 
-  void _handleResume() {
-    context.read<SubscriptionBloc>().add(
-      ResumeSubscriptionRequested(subscriptionId: widget.subscription.id),
-    );
-    widget.onPauseResume();
-    Navigator.pop(context);
+  void _showResumeDialog() {
+    final s = widget.subscription;
+    final pauseFromDate = s.pauseFromDate;
+    final pauseToDate   = s.pauseToDate;
+
+    if (pauseFromDate == null || pauseToDate == null) return;
+
+    final today    = DateTime.now();
+    final todayStr = '${today.year}-${today.month.toString().padLeft(2,'0')}-${today.day.toString().padLeft(2,'0')}';
+
+    if (todayStr.compareTo(pauseFromDate) < 0) {
+      // ── SCENARIO 1: Pause hasn't started yet — simple confirm ──
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Cancel Upcoming Pause?',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: kText)),
+          content: Text(
+            'Your pause is scheduled to start on $pauseFromDate. '
+            'Cancelling it will restore normal deliveries immediately.',
+            style: const TextStyle(fontSize: 13, color: kTextSub, fontWeight: FontWeight.w500, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Keep Pause', style: TextStyle(color: kTextSub, fontWeight: FontWeight.w700)),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                context.read<SubscriptionBloc>().add(
+                  ResumeSubscriptionRequested(subscriptionId: s.id),
+                );
+                widget.onPauseResume();
+                if (mounted) Navigator.pop(context);
+              },
+              child: const Text('Resume Now',
+                  style: TextStyle(color: Color(0xFF15803D), fontWeight: FontWeight.w800)),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // ── SCENARIO 2 / 3: Pause is active — date picker ──
+      final tomorrow    = today.add(const Duration(days: 1));
+      final pauseEndDay = DateTime.tryParse(pauseToDate) ?? today.add(const Duration(days: 30));
+
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) {
+          DateTime? selectedDate;
+          return StatefulBuilder(builder: (ctx, setS) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.play_circle_outline_rounded,
+                        size: 20, color: Color(0xFF15803D)),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text('Resume Subscription',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: kText)),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Resume Date',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kTextSub)),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: ctx,
+                        initialDate: tomorrow,
+                        firstDate: tomorrow,
+                        lastDate: pauseEndDay,
+                        helpText: 'Select resume date',
+                      );
+                      if (picked != null) {
+                        setS(() => selectedDate = picked);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF9FAFB),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: selectedDate != null ? const Color(0xFF15803D) : kBorderLt),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today_rounded,
+                            size: 16,
+                            color: selectedDate != null ? const Color(0xFF15803D) : kMuted,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            selectedDate != null
+                                ? '${selectedDate!.day} ${_getMonthName(selectedDate!.month)} ${selectedDate!.year}'
+                                : 'Tap to select date',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: selectedDate != null ? kText : kMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Deliveries will resume from the selected date.\n'
+                    'Allowed: Tomorrow → ${_formatDate(pauseToDate)}',
+                    style: const TextStyle(fontSize: 11, color: kMuted, height: 1.4),
+                  ),
+                ],
+              ),
+              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              actions: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: const BorderSide(color: kBorderLt),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Cancel',
+                            style: TextStyle(color: kTextSub, fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: selectedDate == null
+                            ? null
+                            : () {
+                                final resumeStr =
+                                    '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2,'0')}-${selectedDate!.day.toString().padLeft(2,'0')}';
+                                Navigator.pop(ctx);
+                                context.read<SubscriptionBloc>().add(
+                                  ResumeSubscriptionRequested(
+                                    subscriptionId: s.id,
+                                    resumeDate: resumeStr,
+                                  ),
+                                );
+                                widget.onPauseResume();
+                                if (mounted) Navigator.pop(context);
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF15803D),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          disabledBackgroundColor: kBorderLt,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Resume', style: TextStyle(fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          });
+        },
+      );
+    }
   }
 
   void _handleRenew() {
@@ -264,6 +440,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
         pauses: _pauseHistory,
         isLoading: _loadingPauseHistory,
         formatDate: _formatDate,
+        onResume: _showResumeDialog,
       ),
     );
   }
@@ -894,10 +1071,11 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     required bool isCancelled,
     required bool isTerminal,
   }) {
+    final s = widget.subscription;
     final isExpired =
-        widget.subscription.status == 'expaired' ||
-        widget.subscription.status == 'expired';
-    final isCompleted = widget.subscription.status == 'completed';
+        s.status == 'expaired' ||
+        s.status == 'expired';
+    final isCompleted = s.status == 'completed';
 
     if (isCompleted) {
       return Container(
@@ -980,8 +1158,14 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
       );
     }
 
+    // Determine if pause is current/future (disable Pause, show Resume)
+    final today    = DateTime.now();
+    final todayStr = '${today.year}-${today.month.toString().padLeft(2,'0')}-${today.day.toString().padLeft(2,'0')}';
+    final pTo      = s.pauseToDate;
+    final isCurrentlyPaused = pTo != null && pTo.compareTo(todayStr) >= 0;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       decoration: BoxDecoration(
         color: kSurface,
         border: const Border(top: BorderSide(color: kBorderLt)),
@@ -995,83 +1179,176 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
       ),
       child: SafeArea(
         top: false,
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              flex: 3,
-              child: SizedBox(
-                height: 46,
-                child: ElevatedButton.icon(
-                  onPressed: isTerminal
-                      ? null
-                      : isPaused
-                      ? _handleResume
-                      : _handlePause,
-                  icon: Icon(
-                    isPaused
-                        ? Icons.play_circle_outline_rounded
-                        : Icons.pause_circle_outline_rounded,
-                    size: 17,
-                    color: Colors.white,
-                  ),
-                  label: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      isTerminal
-                          ? (isCompleted
-                                ? 'Completed'
-                                : isExpired
-                                ? 'Expired'
-                                : 'Ended')
-                          : isPaused
-                          ? 'Resume Subscription'
-                          : 'Pause Subscription',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
-                      maxLines: 1,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isTerminal
-                        ? kMuted
-                        : isPaused
-                        ? const Color(0xFF15803D)
-                        : kPrimary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    disabledBackgroundColor: kBorderLt,
-                    disabledForegroundColor: kMuted,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-            ),
+            // ── Auto Renew toggle row ───────────────────────────
             if (!isTerminal) ...[
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 2,
-                child: SizedBox(
-                  height: 46,
-                  child: OutlinedButton(
-                    onPressed: _handleCancel,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      side: BorderSide(color: kRed.withValues(alpha: 0.5), width: 1.2),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      backgroundColor: kRed.withValues(alpha: 0.04),
-                    ),
-                    child: const FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        'Cancel',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: kRed),
-                        maxLines: 1,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: BoxDecoration(
+                  color: kBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: kBorderLt),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: s.autoRenew ? const Color(0xFFDCFCE7) : kBorderLt,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.autorenew_rounded,
+                        size: 15,
+                        color: s.autoRenew ? const Color(0xFF15803D) : kMuted,
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Auto Renew',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: kText),
+                          ),
+                          Text(
+                            s.autoRenew
+                                ? 'Subscription renews automatically'
+                                : 'Ends on current end date',
+                            style: const TextStyle(fontSize: 10.5, color: kTextSub, fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch.adaptive(
+                      value: s.autoRenew,
+                      onChanged: (val) {
+                        context.read<SubscriptionBloc>().add(
+                          UpdateAutoRenewRequested(subscriptionId: s.id, autoRenew: val),
+                        );
+                      },
+                      activeColor: const Color(0xFF15803D),
+                    ),
+                  ],
                 ),
               ),
             ],
+            // ── Pause disabled / Resume / Cancel row ───────────
+            Row(
+              children: [
+                // Pause button — disabled when currently paused
+                Expanded(
+                  flex: 3,
+                  child: SizedBox(
+                    height: 46,
+                    child: isCurrentlyPaused
+                        ? Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                height: 46,
+                                child: ElevatedButton.icon(
+                                  onPressed: null,
+                                  icon: const Icon(Icons.pause_circle_outline_rounded, size: 17),
+                                  label: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      'Paused until ${_formatDate(pTo!)}',
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+                                      maxLines: 1,
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    disabledBackgroundColor: kBorderLt,
+                                    disabledForegroundColor: kMuted,
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : ElevatedButton.icon(
+                            onPressed: isTerminal ? null : _handlePause,
+                            icon: const Icon(Icons.pause_circle_outline_rounded, size: 17, color: Colors.white),
+                            label: const FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'Pause Subscription',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+                                maxLines: 1,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isTerminal ? kMuted : kPrimary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              disabledBackgroundColor: kBorderLt,
+                              disabledForegroundColor: kMuted,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                  ),
+                ),
+                if (!isTerminal) ...[
+                  const SizedBox(width: 8),
+                  // Resume button — only when paused
+                  if (isCurrentlyPaused)
+                    Expanded(
+                      flex: 2,
+                      child: SizedBox(
+                        height: 46,
+                        child: ElevatedButton.icon(
+                          onPressed: _showResumeDialog,
+                          icon: const Icon(Icons.play_circle_outline_rounded, size: 17, color: Colors.white),
+                          label: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('Resume',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900), maxLines: 1),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF15803D),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                    ),
+                  // Cancel button
+                  Expanded(
+                    flex: 2,
+                    child: SizedBox(
+                      height: 46,
+                      child: OutlinedButton(
+                        onPressed: _handleCancel,
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          side: BorderSide(color: kRed.withValues(alpha: 0.5), width: 1.2),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          backgroundColor: kRed.withValues(alpha: 0.04),
+                        ),
+                        child: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: kRed),
+                            maxLines: 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ],
         ),
       ),
@@ -1490,22 +1767,39 @@ class _PauseHistorySheet extends StatelessWidget {
   final List<SubscriptionPauseModel> pauses;
   final bool isLoading;
   final String Function(String?) formatDate;
+  final VoidCallback onResume;
 
   const _PauseHistorySheet({
     required this.pauses,
     required this.isLoading,
     required this.formatDate,
+    required this.onResume,
   });
 
   @override
   Widget build(BuildContext context) {
+    final today = DateTime.now();
+    final todayStr = '${today.year}-${today.month.toString().padLeft(2,'0')}-${today.day.toString().padLeft(2,'0')}';
+
+    // Find the one latest active pause (status=paused AND endDate not passed)
+    final latestActivePauseId = pauses.isNotEmpty
+        ? pauses.firstWhere(
+            (p) =>
+                (p.status == 'paused' || p.status == null) &&
+                (p.endDate == null ||
+                    p.endDate == '2099-12-31' ||
+                    (p.endDate?.compareTo(todayStr) ?? -1) >= 0),
+            orElse: () => const SubscriptionPauseModel(id: '__none__', subscriptionId: ''),
+          ).id
+        : '__none__';
+
     return Container(
       decoration: const BoxDecoration(
         color: kSurface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.65),
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.72),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1566,56 +1860,99 @@ class _PauseHistorySheet extends StatelessWidget {
                 itemCount: pauses.length,
                 itemBuilder: (_, i) {
                   final pause = pauses[i];
-                  final isActive = pause.endDate == '2099-12-31';
+                  final isLatestActive = pause.id == latestActivePauseId && pause.id != '__none__';
+                  final isResumed = pause.status == 'resumed';
+                  final statusColor = isResumed
+                      ? const Color(0xFF15803D)
+                      : isLatestActive
+                      ? kAccent
+                      : kMuted;
+                  final statusBg = isResumed
+                      ? const Color(0xFFDCFCE7)
+                      : isLatestActive
+                      ? kAccentLt.withValues(alpha: 0.4)
+                      : const Color(0xFFF0F0F0);
+                  final statusLabel = isResumed ? 'Resumed' : isLatestActive ? 'Active' : 'Ended';
+                  final iconData = isResumed
+                      ? Icons.play_circle_outline_rounded
+                      : Icons.pause_circle_outline_rounded;
+
                   return Container(
                     margin: const EdgeInsets.only(bottom: 10),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isActive ? kAccentLt.withValues(alpha: 0.2) : kBg,
+                      color: isLatestActive ? kAccentLt.withValues(alpha: 0.15) : kBg,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: isActive ? kAccentLt.withValues(alpha: 0.5) : kBorderLt,
+                        color: isLatestActive ? kAccentLt.withValues(alpha: 0.5) : kBorderLt,
                       ),
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(7),
-                          decoration: BoxDecoration(
-                            color: kAccentLt.withValues(alpha: 0.4),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.pause_rounded, size: 13, color: kAccent),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${formatDate(pause.startDate)} → ${isActive ? 'Ongoing' : formatDate(pause.endDate)}',
-                                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: kText),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(7),
+                              decoration: BoxDecoration(
+                                color: statusBg,
+                                shape: BoxShape.circle,
                               ),
-                              if (pause.reason != null && pause.reason!.isNotEmpty) ...[
-                                const SizedBox(height: 2),
-                                Text(pause.reason!,
-                                    style: const TextStyle(fontSize: 11, color: kTextSub, fontWeight: FontWeight.w500)),
-                              ],
-                            ],
-                          ),
+                              child: Icon(iconData, size: 13, color: statusColor),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${formatDate(pause.startDate)} → ${formatDate(pause.endDate)}',
+                                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: kText),
+                                  ),
+                                  if (pause.reason != null && pause.reason!.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text(pause.reason!,
+                                        style: const TextStyle(fontSize: 11, color: kTextSub, fontWeight: FontWeight.w500)),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: statusBg,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                statusLabel,
+                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: statusColor),
+                              ),
+                            ),
+                          ],
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: isActive ? kAccentLt.withValues(alpha: 0.5) : const Color(0xFFF0F0F0),
-                            borderRadius: BorderRadius.circular(6),
+                        // Resume button — only on latest active pause record
+                        if (isLatestActive) ...[
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                onResume();
+                              },
+                              icon: const Icon(Icons.play_circle_outline_rounded, size: 15, color: Colors.white),
+                              label: const Text('Resume Subscription',
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF15803D),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
                           ),
-                          child: Text(
-                            isActive ? 'Active' : 'Ended',
-                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800,
-                                color: isActive ? kAccent : kTextSub),
-                          ),
-                        ),
+                        ],
                       ],
                     ),
                   );

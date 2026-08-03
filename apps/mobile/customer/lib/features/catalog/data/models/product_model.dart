@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/core/services/app_asset_service.dart';
 
@@ -19,6 +18,8 @@ class ProductVariant {
   final double? availableQuantity;
   final double? lowStockThreshold;
   final bool isLowStock;
+  final String? imagePath;
+  final List<String> images;
 
   const ProductVariant({
     required this.id,
@@ -31,6 +32,8 @@ class ProductVariant {
     this.availableQuantity,
     this.lowStockThreshold,
     this.isLowStock = false,
+    this.imagePath,
+    this.images = const [],
   });
 
   String get formattedUnit {
@@ -61,10 +64,22 @@ class ProductVariant {
       'availableQuantity': availableQuantity,
       'lowStockThreshold': lowStockThreshold,
       'isLowStock': isLowStock,
+      'imagePath': imagePath,
+      'images': images,
     };
   }
 
   factory ProductVariant.fromJson(Map<String, dynamic> json) {
+    final rawImages = json['images'] ?? json['variant_images'];
+    List<String> parsedImages = [];
+    if (rawImages is List) {
+      parsedImages = rawImages.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+    }
+    final imgPath = json['image_path']?.toString() ?? json['imagePath']?.toString() ?? json['image']?.toString();
+    if (parsedImages.isEmpty && imgPath != null && imgPath.isNotEmpty) {
+      parsedImages = [imgPath];
+    }
+
     return ProductVariant(
       id: json['id'],
       label: json['label'],
@@ -77,6 +92,8 @@ class ProductVariant {
       availableQuantity: json['availableQuantity']?.toDouble(),
       lowStockThreshold: json['lowStockThreshold']?.toDouble(),
       isLowStock: json['isLowStock'] ?? false,
+      imagePath: imgPath,
+      images: parsedImages,
     );
   }
 }
@@ -248,52 +265,74 @@ class Product {
 
 IconData getProductFallbackIcon(String name) {
   final n = name.toLowerCase();
-  if (n.contains('milk')) return Icons.water_drop_rounded;
-  if (n.contains('curd') || n.contains('yogurt'))
+  if (n.contains('milk')) {
+    return Icons.water_drop_rounded;
+  }
+  if (n.contains('curd') || n.contains('yogurt')) {
     return Icons.soup_kitchen_rounded;
+  }
   if (n.contains('kova') ||
       n.contains('sweets') ||
       n.contains('peda') ||
-      n.contains('sweet'))
+      n.contains('sweet')) {
     return Icons.cake_rounded;
+  }
   if (n.contains('almond') ||
       n.contains('badam') ||
       n.contains('nut') ||
-      n.contains('dry fruit'))
+      n.contains('dry fruit')) {
     return Icons.grain_rounded;
-  if (n.contains('ghee')) return Icons.opacity_rounded;
-  if (n.contains('butter') && !n.contains('milk'))
+  }
+  if (n.contains('ghee')) {
+    return Icons.opacity_rounded;
+  }
+  if (n.contains('butter') && !n.contains('milk')) {
     return Icons.breakfast_dining_rounded;
-  if (n.contains('paneer') || n.contains('cheese'))
+  }
+  if (n.contains('paneer') || n.contains('cheese')) {
     return Icons.grid_view_rounded;
-  if (n.contains('chaas') || n.contains('buttermilk') || n.contains('drink'))
+  }
+  if (n.contains('chaas') || n.contains('buttermilk') || n.contains('drink')) {
     return Icons.local_cafe_rounded;
-  if (n.contains('oil')) return Icons.water_drop_outlined;
-  if (n.contains('honey')) return Icons.hive_rounded;
+  }
+  if (n.contains('oil')) {
+    return Icons.water_drop_outlined;
+  }
+  if (n.contains('honey')) {
+    return Icons.hive_rounded;
+  }
   return Icons.shopping_bag_outlined;
 }
 
 (Color, Color) getFallbackColors(String name) {
   final n = name.toLowerCase();
-  if (n.contains('milk'))
+  if (n.contains('milk')) {
     return (const Color(0xFFE8F5E9), const Color(0xFF1B5E20));
-  if (n.contains('curd') || n.contains('yogurt'))
+  }
+  if (n.contains('curd') || n.contains('yogurt')) {
     return (const Color(0xFFE3F2FD), const Color(0xFF0D47A1));
+  }
   if (n.contains('kova') ||
       n.contains('sweets') ||
       n.contains('peda') ||
-      n.contains('sweet'))
+      n.contains('sweet')) {
     return (const Color(0xFFF3E5F5), const Color(0xFF4A148C));
-  if (n.contains('almond') || n.contains('badam') || n.contains('nut'))
+  }
+  if (n.contains('almond') || n.contains('badam') || n.contains('nut')) {
     return (const Color(0xFFFFF3E0), const Color(0xFFE65100));
-  if (n.contains('ghee'))
+  }
+  if (n.contains('ghee')) {
     return (const Color(0xFFFFFDE7), const Color(0xFFF57F17));
-  if (n.contains('butter'))
+  }
+  if (n.contains('butter')) {
     return (const Color(0xFFFFF8E1), const Color(0xFFFF6F00));
-  if (n.contains('paneer') || n.contains('cheese'))
+  }
+  if (n.contains('paneer') || n.contains('cheese')) {
     return (const Color(0xFFE0F2F1), const Color(0xFF004D40));
-  if (n.contains('chaas') || n.contains('buttermilk'))
+  }
+  if (n.contains('chaas') || n.contains('buttermilk')) {
     return (const Color(0xFFF1F8E9), const Color(0xFF33691E));
+  }
   return (const Color(0xFFF5F5F5), const Color(0xFF16653A));
 }
 
@@ -383,6 +422,7 @@ Widget buildProductImage(
           placeholder: (context, url) =>
               _fallbackIconWidget(name, width, height, fallbackColor),
           errorWidget: (context, url, err) {
+            debugPrint('[buildProductImage] FAILED url=$url err=$err');
             return _fallbackIconWidget(name, width, height, fallbackColor);
           },
         );
@@ -390,6 +430,7 @@ Widget buildProductImage(
     }
   }
 
+  debugPrint('[buildProductImage] NO_URL asset=$imageAsset');
   return _fallbackIconWidget(name, width, height, fallbackColor);
 }
 

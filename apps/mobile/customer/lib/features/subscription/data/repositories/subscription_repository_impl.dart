@@ -388,12 +388,23 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
   }
 
   @override
-  Future<bool> resumeSubscription(String subscriptionId) async {
+  Future<bool> resumeSubscription(String subscriptionId, {String? resumeDate}) async {
     try {
-      final res = await remoteDataSource.resumeSubscription(subscriptionId);
+      final res = await remoteDataSource.resumeSubscription(subscriptionId, resumeDate: resumeDate);
       return res['status'] == true;
     } catch (e) {
       print('Error resuming subscription: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> updateAutoRenew(String subscriptionId, bool autoRenew) async {
+    try {
+      final res = await remoteDataSource.updateAutoRenew(subscriptionId, autoRenew);
+      return res['status'] == true;
+    } catch (e) {
+      print('Error updating auto renew: $e');
       return false;
     }
   }

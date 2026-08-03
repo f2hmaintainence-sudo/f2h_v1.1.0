@@ -981,7 +981,11 @@ export class AuthService {
       await this.Data.update('users', { fcm: fcmToken }, [
         { column: 'user_id', operator: '=', value: userId },
       ]);
+<<<<<<< HEAD
+    } catch (_) {}
+=======
     } catch (_) { }
+>>>>>>> main
   }
 
   /*===============================================================================================

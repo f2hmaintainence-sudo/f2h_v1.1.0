@@ -60,7 +60,8 @@ abstract class SubscriptionRepository {
 
   Future<List<Order>> getOrders();
   Future<bool> pauseSubscription(String subscriptionId, {String? startDate, String? endDate});
-  Future<bool> resumeSubscription(String subscriptionId);
+  Future<bool> resumeSubscription(String subscriptionId, {String? resumeDate});
+  Future<bool> updateAutoRenew(String subscriptionId, bool autoRenew);
   Future<List<dynamic>> getSubscriptionCalendar(String subscriptionId);
   Future<bool> cancelSubscriptionItem(String subscriptionItemId);
   Future<bool> cancelSubscription(String subscriptionId, {String? cancelReason, String? endDate});

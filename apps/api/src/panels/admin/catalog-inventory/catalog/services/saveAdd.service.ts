@@ -136,7 +136,6 @@ export class CatalogSaveAddService {
         await this.dataService.insert('product_images', {
           product_id: productId,
           variant_id: variantId,
-          url: fileUrl,
           storage_key: `variants/${fileUrl.split('/').pop()}`,
           alt_text: String(variantName || 'Variant image').slice(0, 255),
           width: 800,

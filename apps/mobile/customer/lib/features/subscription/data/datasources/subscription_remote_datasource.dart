@@ -10,7 +10,8 @@ abstract class SubscriptionRemoteDataSource {
   Future<Map<String, dynamic>> placeOrder(Map<String, dynamic> data);
   Future<List<Order>> getOrders();
   Future<Map<String, dynamic>> pauseSubscription(String subscriptionId, {String? startDate, String? endDate});
-  Future<Map<String, dynamic>> resumeSubscription(String subscriptionId);
+  Future<Map<String, dynamic>> resumeSubscription(String subscriptionId, {String? resumeDate});
+  Future<Map<String, dynamic>> updateAutoRenew(String subscriptionId, bool autoRenew);
   Future<List<dynamic>> getSubscriptionCalendar(String subscriptionId);
   Future<Map<String, dynamic>> cancelSubscriptionItem(String subscriptionItemId);
   Future<Map<String, dynamic>> cancelSubscription(String subscriptionId, {String? cancelReason, String? endDate});
@@ -98,10 +99,21 @@ class SubscriptionRemoteDataSourceImpl implements SubscriptionRemoteDataSource {
   }
 
   @override
-  Future<Map<String, dynamic>> resumeSubscription(String subscriptionId) async {
+  Future<Map<String, dynamic>> resumeSubscription(String subscriptionId, {String? resumeDate}) async {
     await dioClient.fetchCsrfToken();
     final response = await dioClient.dio.post(
       '${ApiEndpoints.subscriptions}/$subscriptionId/resume',
+      data: resumeDate != null ? {'resume_date': resumeDate} : {},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> updateAutoRenew(String subscriptionId, bool autoRenew) async {
+    await dioClient.fetchCsrfToken();
+    final response = await dioClient.dio.patch(
+      '${ApiEndpoints.subscriptions}/$subscriptionId/auto-renew',
+      data: {'auto_renew': autoRenew},
     );
     return response.data as Map<String, dynamic>;
   }

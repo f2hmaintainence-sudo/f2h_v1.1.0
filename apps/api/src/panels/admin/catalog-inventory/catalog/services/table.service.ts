@@ -272,7 +272,7 @@ export class CatalogTableService {
           variant_id: ['product_variants.variant_id', true],
           product_name: ['products.name AS product_name', true],
           variant_name: ['product_variants.name', true],
-          image: ['(SELECT url FROM product_images WHERE product_images.variant_id = product_variants.variant_id ORDER BY is_primary DESC, id ASC LIMIT 1) AS image', true],
+          image: ['(SELECT storage_key FROM product_images WHERE product_images.variant_id = product_variants.variant_id AND storage_key IS NOT NULL AND storage_key <> \'\' AND (is_primary = true OR sort_order = 0) ORDER BY is_primary DESC, sort_order ASC, id ASC LIMIT 1) AS image', true],
           unit_value: ['product_variants.unit_value', true],
           unit_type: ['product_variants.unit_type', true],
           price: ['product_variants.price', true],

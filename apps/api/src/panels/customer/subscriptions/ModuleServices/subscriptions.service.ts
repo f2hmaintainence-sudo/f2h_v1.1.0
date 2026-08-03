@@ -656,77 +656,74 @@ export class SubscriptionsService {
       return { status: true, data: [] };
     }
 
-    const subsDetails = await this.data.query('subscriptions', {
-      select: [
-        'subscriptions.subscription_id',
-        'subscriptions.subscription_number',
-        'subscriptions.customer_id',
-        'subscriptions.schedule_type',
-        'subscriptions.branch_id',
-        'subscriptions.address_id',
-        'subscriptions.payment_type',
-        'subscriptions.billing_cycle',
-        'subscriptions.start_date',
-        'subscriptions.end_date',
-        'subscriptions.auto_renew',
-        'subscriptions.status',
-        'subscriptions.pause_from_date',
-        'subscriptions.pause_to_date',
-        'subscriptions.monthly_estimate',
-        'subscriptions.created_at',
-        'subscriptions.updated_at',
-        'COALESCE(subscription_items.subscription_item_id, subscription_items.id::text) AS subscription_item_id',
-        'subscription_items.product_variant_id',
-        'subscription_items.unit_price',
-        'subscription_items.discount_id',
-        'subscription_items.coupon_id',
-        'subscription_items.discount_amount',
-        'subscription_items.coupon_amount',
-        'subscription_items.final_price',
-        'subscription_items.is_free',
-        'subscription_items.status AS item_status',
-        'product_variants.product_id',
-        'product_variants.name',
-        'product_variants.sku',
-        'product_variants.price',
-        'product_variants.subscription_price',
-        'product_variants.unit_value',
-        'product_variants.unit_type',
-        'product_variants.fulfillment_mode',
-        'product_variants.manageable_qty',
-        'product_variants.sort_order',
-        'product_variants.variant_id',
-        'product_images.url'
-      ],
-      joins: [
-        {
-          type: 'left',
-          table: 'subscription_items',
-          on: [
-            ['subscriptions.subscription_id', 'subscription_items.subscription_id']
-          ]
-        },
-        {
-          type: 'left',
-          table: 'product_variants',
-          on: [
-            ['subscription_items.product_variant_id', 'product_variants.variant_id']
-          ]
-        },
-        {
-          type: 'left',
-          table: 'product_images',
-          on: [
-            ['product_variants.variant_id', 'product_images.variant_id']
-          ]
-        }
-      ],
-      where: [{ column: 'subscriptions.customer_id', operator: '=', value: customer.customer_id }],
-      orderBy: [{ column: 'created_at', direction: 'DESC' }],
-    });
+    const baseUrl = process.env.MOBILE_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:5001';
+    const mapImagePath = (imagePath: string | null) => {
+      if (!imagePath) return null;
+      if (imagePath.startsWith('http')) return imagePath;
+      let cleanedPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
+      if (cleanedPath.startsWith('uploads/')) return `${baseUrl}/${cleanedPath}`;
+      return `${baseUrl}/uploads/${cleanedPath}`;
+    };
 
-    const items = subsDetails.data || [];
-    const baseUrl = process.env.BACKEND_URL || 'http://localhost:5001';
+    const subsDetails = await this.db.query(`
+      SELECT
+        s.subscription_id,
+        s.subscription_number,
+        s.customer_id,
+        s.schedule_type,
+        s.branch_id,
+        s.address_id,
+        s.payment_type,
+        s.billing_cycle,
+        s.start_date,
+        s.end_date,
+        s.auto_renew,
+        s.status,
+        s.pause_from_date,
+        s.pause_to_date,
+        s.monthly_estimate,
+        s.created_at,
+        s.updated_at,
+        COALESCE(si.subscription_item_id, si.id::text) AS subscription_item_id,
+        si.product_variant_id,
+        si.unit_price,
+        si.discount_id,
+        si.coupon_id,
+        si.discount_amount,
+        si.coupon_amount,
+        si.final_price,
+        si.is_free,
+        si.status AS item_status,
+        pv.product_id,
+        pv.name,
+        pv.sku,
+        pv.price,
+        pv.subscription_price,
+        pv.unit_value,
+        pv.unit_type,
+        pv.fulfillment_mode,
+        pv.manageable_qty,
+        pv.sort_order,
+        pv.variant_id,
+        pi.storage_key
+      FROM subscriptions s
+      LEFT JOIN subscription_items si ON si.subscription_id = s.subscription_id
+      LEFT JOIN product_variants pv ON pv.variant_id = si.product_variant_id
+      LEFT JOIN LATERAL (
+        SELECT storage_key FROM product_images pi2
+        WHERE pi2.variant_id = pv.variant_id
+          AND pi2.storage_key IS NOT NULL AND pi2.storage_key <> ''
+          AND (pi2.is_primary = true OR pi2.sort_order = 0)
+          AND pi2.deleted_at IS NULL
+        ORDER BY pi2.is_primary DESC NULLS LAST, pi2.sort_order ASC NULLS LAST
+        LIMIT 1
+      ) pi ON true
+      WHERE s.customer_id = $1
+      ORDER BY s.created_at DESC
+    `, [customer.customer_id]);
+
+    const items = subsDetails || [];
+
     if (items.length === 0) {
       this.developer.debug('SubscriptionsService.getSubscriptions no subscriptions found for customer', { customer_id: customer.customer_id });
       return { status: true, data: [] };
@@ -753,18 +750,9 @@ export class SubscriptionsService {
       customDates = customDateRes.data || [];
     }
 
-    const mapImagePath = (imagePath: string | null) => {
-      if (!imagePath) return null;
-      if (imagePath.startsWith('http')) return imagePath;
-      let cleanedPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
-      if (cleanedPath.startsWith('uploads/')) {
-        return `${baseUrl}/${cleanedPath}`;
-      }
-      return `${baseUrl}/uploads/${cleanedPath}`;
-    };
 
     for (const item of items) {
-      item.url = mapImagePath(item.url);
+      item.url = mapImagePath(item.storage_key);
       const subId = item.subscription_id;
       const itemId = item.subscription_item_id || item.id;
       item.weekly_schedules = weeklySchedules.filter(s => s.subscription_id === subId || s.subscription_item_id === itemId);
@@ -891,7 +879,7 @@ export class SubscriptionsService {
 
     return calendar;
   }
-
+  // Subscription Pause
   async pauseSubscription(subscriptionId: string, startDate?: string, endDate?: string) {
     this.developer.debug('SubscriptionsService.pauseSubscription called', { subscriptionId, startDate, endDate });
     try {
@@ -905,7 +893,6 @@ export class SubscriptionsService {
       }
 
       const updateData: any = {
-        status: 'paused',
         updated_at: new Date().toISOString(),
       };
       if (startDate) updateData.pause_from_date = startDate;
@@ -945,6 +932,7 @@ export class SubscriptionsService {
               subscription_item_id: item.id,
               start_date: startStr,
               end_date: endStr,
+              status:'paused',
               reason: 'Paused by customer',
             }, { includeDeleted: true });
           }
@@ -969,78 +957,153 @@ export class SubscriptionsService {
       throw new BadRequestException('Failed to pause subscription');
     }
   }
-
-  async resumeSubscription(subscriptionId: string) {
-    this.developer.debug('SubscriptionsService.resumeSubscription called', { subscriptionId });
+  // Subscription Resume — 3-Scenario Logic
+  async resumeSubscription(subscriptionId: string, resumeDate?: string) {
+    this.developer.debug('SubscriptionsService.resumeSubscription called', { subscriptionId, resumeDate });
     try {
-      const subResult = await this.data.query('subscriptions', {
-        where: [{ column: 'subscription_id', operator: '=', value: subscriptionId }],
-        limit: 1,
-      }, true);
-      if (!subResult?.data?.length) {
-        this.developer.error('SubscriptionsService.resumeSubscription subscription not found', { subscriptionId });
-        throw new BadRequestException('Subscription not found');
-      }
+      return await this.db.transaction(async (client) => {
+        // 1. Fetch subscription
+        const subRes = await client.query<any>(
+          `SELECT subscription_id, status, pause_from_date, pause_to_date FROM subscriptions WHERE subscription_id = $1 LIMIT 1`,
+          [subscriptionId],
+        );
+        const sub = subRes.rows[0];
+        if (!sub) throw new BadRequestException('Subscription not found');
+        if (sub.status !== 'active') throw new BadRequestException('Only active subscriptions can be resumed');
 
-      await this.data.query('subscriptions', {
-        update: {
-          status: 'active',
-          pause_from_date: null,
-          pause_to_date: null,
-          updated_at: new Date().toISOString()
-        },
-        where: [{ column: 'subscription_id', operator: '=', value: subscriptionId }],
-      }, true);
+        const pFrom = sub.pause_from_date ? String(sub.pause_from_date).slice(0, 10) : null;
+        const pTo   = sub.pause_to_date   ? String(sub.pause_to_date).slice(0, 10)   : null;
+        if (!pFrom || !pTo) throw new BadRequestException('Subscription is not currently paused');
 
-      await this.data.query('subscription_items', {
-        update: { status: 'active', updated_at: new Date().toISOString() },
-        where: [{ column: 'subscription_id', operator: '=', value: subscriptionId }],
-      }, true);
+        const today = new Date();
+        const todayStr    = today.toISOString().slice(0, 10);
+        const tomorrow    = new Date(today); tomorrow.setDate(today.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().slice(0, 10);
 
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().slice(0, 10);
+        // Find the latest active pause record
+        const pauseRes = await client.query<any>(
+          `SELECT id, start_date, end_date, status
+           FROM subscription_pauses
+           WHERE subscription_id = $1 AND status = 'paused'
+           ORDER BY created_at DESC NULLS LAST, id DESC
+           LIMIT 1`,
+          [subscriptionId],
+        );
+        const activePause = pauseRes.rows[0];
+        if (!activePause) throw new BadRequestException('No active pause record found to resume');
 
-      const activePausesRes = await this.data.query('subscription_pauses', {
-        where: [
-          { column: 'subscription_id', operator: '=', value: subscriptionId },
-          { column: 'end_date', operator: '=', value: '2099-12-31' }
-        ]
-      }, true);
-      const activePauses = activePausesRes.data || [];
-
-      for (const p of activePauses) {
-        const pStartDate = p.start_date instanceof Date ? p.start_date.toISOString().slice(0, 10) : String(p.start_date).slice(0, 10);
-        if (pStartDate === todayStr) {
-          await this.data.query('subscription_pauses', {
-            delete: true,
-            where: [{ column: 'id', operator: '=', value: p.id }]
-          }, true);
+        if (!resumeDate) {
+          // ── SCENARIO 1: Resume before pause starts ──
+          if (todayStr >= pFrom) {
+            throw new BadRequestException(
+              'Pause has already started. Please provide a resume_date (tomorrow or later).',
+            );
+          }
+          await client.query(
+            `UPDATE subscriptions SET pause_from_date = NULL, pause_to_date = NULL, updated_at = now() WHERE subscription_id = $1`,
+            [subscriptionId],
+          );
+          await client.query(
+            `UPDATE subscription_pauses SET status = 'resumed', updated_at = now() WHERE id = $1`,
+            [activePause.id],
+          );
         } else {
-          await this.data.query('subscription_pauses', {
-            update: { end_date: yesterdayStr },
-            where: [{ column: 'id', operator: '=', value: p.id }]
-          }, true);
+          // ── SCENARIO 2 / 3: Resume during pause ──
+          if (resumeDate < tomorrowStr) throw new BadRequestException('Resume date must be tomorrow or later');
+          if (resumeDate > pTo) throw new BadRequestException(`Resume date cannot be after pause end date (${pTo})`);
+
+          const resumeDay    = new Date(resumeDate + 'T00:00:00Z');
+          const dayBefore    = new Date(resumeDay); dayBefore.setUTCDate(resumeDay.getUTCDate() - 1);
+          const dayBeforeStr = dayBefore.toISOString().slice(0, 10);
+          const originalPauseTo = String(activePause.end_date).slice(0, 10);
+
+          await client.query(
+            `UPDATE subscriptions SET pause_to_date = $1, updated_at = now() WHERE subscription_id = $2`,
+            [dayBeforeStr, subscriptionId],
+          );
+          await client.query(
+            `UPDATE subscription_pauses SET end_date = $1, updated_at = now() WHERE id = $2`,
+            [dayBeforeStr, activePause.id],
+          );
+          await client.query(
+            `INSERT INTO subscription_pauses (subscription_id, start_date, end_date, status, reason, created_at, updated_at)
+             VALUES ($1, $2, $3, 'resumed', 'Resumed by customer', now(), now())`,
+            [subscriptionId, resumeDate, originalPauseTo],
+          );
         }
-      }
 
-      await this.data.insert('subscription_logs', {
-        subscription_id: subscriptionId,
-        action: 'resume',
-        new_data: JSON.stringify({ resumed_at: todayStr }),
-        created_by: 'customer',
-      }, { includeDeleted: true });
+        // Reactivate subscription items
+        await client.query(
+          `UPDATE subscription_items SET status = 'active', updated_at = now() WHERE subscription_id = $1`,
+          [subscriptionId],
+        );
 
-      this.developer.debug('SubscriptionsService.resumeSubscription success', { subscriptionId });
-      return {
-        status: true,
-        message: 'Subscription resumed successfully',
-      };
+        // Audit log
+        await client.query(
+          `INSERT INTO subscription_logs (subscription_id, action, new_data, created_by, created_at)
+           VALUES ($1, 'resume', $2, 'customer', now())`,
+          [subscriptionId, JSON.stringify({ resumed_at: todayStr, resume_date: resumeDate || null })],
+        );
+
+        this.developer.debug('SubscriptionsService.resumeSubscription success', { subscriptionId, resumeDate });
+        return { status: true, message: 'Subscription resumed successfully' };
+      });
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
       this.developer.error('resumeSubscription error', { error, subscriptionId });
       throw new BadRequestException('Failed to resume subscription');
+    }
+  }
+
+  // Pause History
+  async getPauseHistory(subscriptionId: string) {
+    this.developer.debug('SubscriptionsService.getPauseHistory called', { subscriptionId });
+    try {
+      const rows = await this.db.query(
+        `SELECT id, subscription_id, subscription_item_id,
+                start_date, end_date, status, reason,
+                created_at, updated_at
+         FROM subscription_pauses
+         WHERE subscription_id = $1
+         ORDER BY created_at DESC NULLS LAST, id DESC`,
+        [subscriptionId],
+      );
+      return {
+        status: true,
+        data: Array.isArray(rows) ? rows : [],
+      };
+    } catch (error) {
+      this.developer.error('getPauseHistory error', { error, subscriptionId });
+      return { status: false, data: [] };
+    }
+  }
+
+  // Auto Renew Toggle
+  async updateAutoRenew(subscriptionId: string, autoRenew: boolean) {
+    this.developer.debug('SubscriptionsService.updateAutoRenew called', { subscriptionId, autoRenew });
+    try {
+      const rows = await this.db.query(
+        `UPDATE subscriptions
+         SET auto_renew = $1, updated_at = now()
+         WHERE subscription_id = $2
+         RETURNING subscription_id, auto_renew, updated_at`,
+        [autoRenew, subscriptionId],
+      );
+      const updated = Array.isArray(rows) ? rows[0] : null;
+      if (!updated) throw new BadRequestException('Subscription not found');
+
+      await this.data.insert('subscription_logs', {
+        subscription_id: subscriptionId,
+        action: 'update_auto_renew',
+        new_data: JSON.stringify({ auto_renew: autoRenew }),
+        created_by: 'customer',
+      }, { includeDeleted: true });
+
+      return { status: true, data: updated };
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      this.developer.error('updateAutoRenew error', { error, subscriptionId });
+      throw new BadRequestException('Failed to update auto renew setting');
     }
   }
 
@@ -1095,22 +1158,22 @@ export class SubscriptionsService {
     }
   }
 
-  async getPauseHistory(subscriptionId: string) {
-    this.developer.debug('SubscriptionsService.getPauseHistory called', { subscriptionId });
-    try {
-      const pauseRes = await this.data.query('subscription_pauses', {
-        where: [{ column: 'subscription_id', operator: '=', value: subscriptionId }],
-        orderBy: [{ column: 'start_date', direction: 'DESC' }],
-      }, true);
-      return {
-        status: true,
-        data: pauseRes.data || [],
-      };
-    } catch (error) {
-      this.developer.error('getPauseHistory error', { error, subscriptionId });
-      throw new BadRequestException('Failed to get pause history');
-    }
-  }
+  // async getPauseHistory(subscriptionId: string) {
+  //   this.developer.debug('SubscriptionsService.getPauseHistory called', { subscriptionId });
+  //   try {
+  //     const pauseRes = await this.data.query('subscription_pauses', {
+  //       where: [{ column: 'subscription_id', operator: '=', value: subscriptionId }],
+  //       orderBy: [{ column: 'start_date', direction: 'DESC' }],
+  //     }, true);
+  //     return {
+  //       status: true,
+  //       data: pauseRes.data || [],
+  //     };
+  //   } catch (error) {
+  //     this.developer.error('getPauseHistory error', { error, subscriptionId });
+  //     throw new BadRequestException('Failed to get pause history');
+  //   }
+  // }
 
   async cancelSubscriptionItem(subscriptionItemId: string) {
     this.developer.debug('SubscriptionsService.cancelSubscriptionItem called', { subscriptionItemId });

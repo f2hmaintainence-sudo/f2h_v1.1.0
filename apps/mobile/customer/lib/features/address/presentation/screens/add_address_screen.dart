@@ -14,8 +14,8 @@ import 'package:f2h_customer/core/widgets/hot_toast.dart';
 import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
-import 'package:f2h_customer/core/errors/error_handler.dart';
 import 'package:f2h_customer/features/address/data/models/profile_address.dart';
+import 'package:f2h_customer/core/config/app_config.dart';
 
 class AddAddressScreen extends StatefulWidget {
   final AddressModel? existing;
@@ -46,7 +46,6 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   late String addressType;
   late bool isDefault;
   bool isSaving = false;
-  bool _isDeleting = false;
   bool isLoadingLocation = false;
   bool isReverseGeocoding = false;
   bool _isMapExpanded = false;
@@ -61,7 +60,6 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
   Timer? _searchDebounce;
   List<dynamic> _searchResults = [];
-  bool _isUpdatingFromMap = false;
 
   List<dynamic> activeBranches = [];
   bool isLoadingBranches = true;
@@ -300,8 +298,69 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     });
   }
 
+  void _parseGoogleAddressComponents(List? components) {
+    if (components == null) return;
+    String streetNum = '';
+    String route = '';
+    String area = '';
+    String city = '';
+    String state = '';
+    String pincode = '';
+
+    for (final comp in components) {
+      final types = (comp['types'] as List?)?.map((e) => e.toString()).toList() ?? [];
+      final name = comp['long_name']?.toString() ?? '';
+
+      if (types.contains('street_number')) {
+        streetNum = name;
+      } else if (types.contains('route')) {
+        route = name;
+      } else if (types.contains('sublocality_level_1') || types.contains('sublocality') || types.contains('neighborhood')) {
+        if (area.isEmpty) area = name;
+      } else if (types.contains('locality')) {
+        city = name;
+      } else if (types.contains('administrative_area_level_2') && city.isEmpty) {
+        city = name;
+      } else if (types.contains('administrative_area_level_1')) {
+        state = name;
+      } else if (types.contains('postal_code')) {
+        pincode = name;
+      }
+    }
+
+    String streetValue = [streetNum, route].where((s) => s.isNotEmpty).join(' ');
+
+    setState(() {
+      if (streetValue.isNotEmpty) streetController.text = streetValue;
+      if (area.isNotEmpty) areaController.text = area;
+      if (city.isNotEmpty) cityController.text = city;
+      if (state.isNotEmpty) stateController.text = state;
+      if (pincode.isNotEmpty) pincodeController.text = pincode;
+    });
+  }
+
   Future<void> _performSearch(String query) async {
     try {
+      final apiKey = AppConfig.googleMapsApiKey;
+      if (apiKey.isNotEmpty) {
+        final url = Uri.parse(
+          'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${Uri.encodeComponent(query)}&key=$apiKey',
+        );
+        final response = await http.get(url);
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data['status'] == 'OK' && data['predictions'] != null && mounted) {
+            setState(() {
+              _searchResults = (data['predictions'] as List).map((p) => {
+                'description': p['description'] ?? '',
+                'place_id': p['place_id'] ?? '',
+              }).toList();
+            });
+            return;
+          }
+        }
+      }
+
       final url = Uri.parse(
         'https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&limit=5&addressdetails=1',
       );
@@ -324,7 +383,42 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     }
   }
 
-  void _selectSearchResult(dynamic result) {
+  Future<void> _selectSearchResult(dynamic result) async {
+    final apiKey = AppConfig.googleMapsApiKey;
+    final placeId = result['place_id']?.toString() ?? '';
+
+    if (apiKey.isNotEmpty && placeId.isNotEmpty) {
+      try {
+        final detailsUrl = Uri.parse(
+          'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&fields=geometry,address_components,formatted_address&key=$apiKey',
+        );
+        final res = await http.get(detailsUrl);
+        if (res.statusCode == 200) {
+          final data = json.decode(res.body);
+          if (data['status'] == 'OK' && data['result'] != null) {
+            final resObj = data['result'];
+            final location = resObj['geometry']?['location'];
+            final lat = (location?['lat'] as num?)?.toDouble() ?? 0.0;
+            final lng = (location?['lng'] as num?)?.toDouble() ?? 0.0;
+
+            if (lat != 0.0 && lng != 0.0) {
+              setState(() {
+                selectedLat = lat;
+                selectedLng = lng;
+                _searchResults.clear();
+                _searchController.clear();
+              });
+              _mapController.move(LatLng(lat, lng), 16.0);
+              _parseGoogleAddressComponents(resObj['address_components'] as List?);
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error fetching Google Place details: $e');
+      }
+    }
+
     final lat = double.tryParse(result['lat']?.toString() ?? '') ?? 0.0;
     final lon = double.tryParse(result['lon']?.toString() ?? '') ?? 0.0;
     if (lat != 0.0 && lon != 0.0) {
@@ -358,16 +452,11 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
             : (cityDistrict.isNotEmpty ? cityDistrict : (suburb.isNotEmpty ? suburb : city));
 
         setState(() {
-          _isUpdatingFromMap = true;
           streetController.text = streetValue;
           areaController.text = areaValue;
           cityController.text = city;
           stateController.text = state;
           pincodeController.text = postcode;
-        });
-
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _isUpdatingFromMap = false;
         });
       } else {
         _reverseGeocodeLocation(lat, lon);
@@ -446,6 +535,23 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     });
 
     try {
+      final apiKey = AppConfig.googleMapsApiKey;
+      if (apiKey.isNotEmpty) {
+        final url = Uri.parse(
+          'https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&key=$apiKey',
+        );
+        final response = await http.get(url);
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data['status'] == 'OK' && data['results'] != null && (data['results'] as List).isNotEmpty && mounted) {
+            final firstResult = data['results'][0];
+            final components = firstResult['address_components'] as List?;
+            _parseGoogleAddressComponents(components);
+            return;
+          }
+        }
+      }
+
       final url = Uri.parse(
         'https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lng&zoom=18&addressdetails=1',
       );
@@ -481,16 +587,11 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
               : (cityDistrict.isNotEmpty ? cityDistrict : (suburb.isNotEmpty ? suburb : city));
 
           setState(() {
-            _isUpdatingFromMap = true;
             streetController.text = streetValue;
             areaController.text = areaValue;
             cityController.text = city;
             stateController.text = state;
             pincodeController.text = postcode;
-          });
-
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _isUpdatingFromMap = false;
           });
         }
       }
@@ -546,7 +647,6 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       };
 
       setState(() {
-        _isDeleting = false;
         isSaving = true;
       });
 
@@ -616,7 +716,6 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                 );
                 if (confirm == true && localContext.mounted) {
                   setState(() {
-                    _isDeleting = true;
                     isSaving = true;
                   });
                   try {
@@ -631,7 +730,6 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                     if (localContext.mounted) {
                       setState(() {
                         isSaving = false;
-                        _isDeleting = false;
                       });
                       F2HToast.error(localContext, extractErrorMessage(e));
                     }
@@ -1012,7 +1110,9 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                urlTemplate: AppConfig.googleMapsApiKey.isNotEmpty
+                    ? 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&key=${AppConfig.googleMapsApiKey}'
+                    : 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
                 userAgentPackageName: 'com.form2home.app',
               ),
               CircleLayer(
@@ -1182,7 +1282,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                       final result = _searchResults[index];
                       return ListTile(
                         title: Text(
-                          result['display_name'] ?? '',
+                          result['display_name'] ?? result['description'] ?? '',
                           style: const TextStyle(fontSize: 12, color: kText),
                         ),
                         onTap: () => _selectSearchResult(result),
