@@ -1,11 +1,9 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_bloc.dart';
@@ -654,12 +652,14 @@ class ProfileScreen extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const SizedBox(width: 4),
-                              const Icon(
-                                Icons.verified_rounded,
-                                color: Color(0xFF09AD42),
-                                size: 16,
-                              ),
+                              if (profile.isVerified) ...[
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Icons.verified_rounded,
+                                  color: Color(0xFF09AD42),
+                                  size: 16,
+                                ),
+                              ],
                             ],
                           ),
                           Text(
@@ -686,7 +686,7 @@ class ProfileScreen extends StatelessWidget {
                                     const Icon(Icons.home_work_rounded, color: Color(0xFF09AD42), size: 10),
                                     const SizedBox(width: 4),
                                     Text(
-                                      'Hub: ${profile.branchName ?? "Kuppam"}',
+                                      'Hub: ${(profile.branchName != null && profile.branchName!.trim().isNotEmpty) ? profile.branchName! : ((profile.branchId != null && profile.branchId!.trim().isNotEmpty) ? profile.branchId! : "Unassigned")}',
                                       style: GoogleFonts.poppins(
                                         fontSize: 9,
                                         color: const Color(0xFF09AD42),
@@ -700,19 +700,25 @@ class ProfileScreen extends StatelessWidget {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFE8F8EE),
+                                  color: profile.isVerified ? const Color(0xFFE8F8EE) : const Color(0xFFFEF3C7),
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: const Color(0xFFDCFCE7)),
+                                  border: Border.all(
+                                    color: profile.isVerified ? const Color(0xFFDCFCE7) : const Color(0xFFFDE68A),
+                                  ),
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.shield_rounded, color: Color(0xFF09AD42), size: 10),
+                                    Icon(
+                                      profile.isVerified ? Icons.shield_rounded : Icons.pending_actions_rounded,
+                                      color: profile.isVerified ? const Color(0xFF09AD42) : const Color(0xFFD97706),
+                                      size: 10,
+                                    ),
                                     const SizedBox(width: 4),
                                     Text(
-                                      'VERIFIED',
+                                      profile.isVerified ? 'VERIFIED' : 'UNVERIFIED',
                                       style: GoogleFonts.poppins(
                                         fontSize: 9,
-                                        color: const Color(0xFF09AD42),
+                                        color: profile.isVerified ? const Color(0xFF09AD42) : const Color(0xFFD97706),
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),

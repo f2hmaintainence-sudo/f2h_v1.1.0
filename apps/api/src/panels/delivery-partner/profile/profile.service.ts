@@ -84,8 +84,22 @@ export class ProfileService {
         referralCode = `F2HDR-${prefix}${phoneSuffix}`;
       }
 
+      let branchName = profile.branch_name;
+      if (!branchName && profile.branch_id) {
+        try {
+          const [branchMatch] = await this.db.query(
+            `SELECT branch_name FROM branches WHERE branch_id = $1 OR id::text = $1 LIMIT 1`,
+            [profile.branch_id],
+          );
+          if (branchMatch?.branch_name) {
+            branchName = branchMatch.branch_name;
+          }
+        } catch (_) {}
+      }
+
       return {
         ...profile,
+        branch_name: branchName || profile.branch_name || null,
         referral_code: referralCode,
         referral_earnings: referralEarnings,
         referral_count: referralCount,
@@ -863,12 +877,16 @@ export class ProfileService {
            COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '') AS customer_name,
            c.phone AS customer_phone,
            COALESCE(ca.flat_no, '') || ' ' || COALESCE(ca.building_name, '') || ' ' || COALESCE(ca.street, '') || ' ' || COALESCE(ca.area, '') AS customer_address,
-           dl.status AS log_status,
-           COALESCE(dl.bottles_collected, 0) as bottles_collected,
-           COALESCE(dl.cash_collected, 0) as cash_collected,
-           COALESCE(dl.remarks, '') as remarks,
-           dl.proof_photo_url,
-           dl.delivery_time,
+           o.status AS log_status,
+           COALESCE((
+             SELECT SUM(quantity)
+             FROM container_transactions
+             WHERE reference_id = o.order_id AND transaction_type = 'return'
+           ), 0) AS bottles_collected,
+           CASE WHEN o.payment_mode = 'cod' AND o.payment_status = 'paid' THEN o.total_amount ELSE 0 END AS cash_collected,
+           COALESCE(o.special_instructions, '') AS remarks,
+           o.delivery_image AS proof_photo_url,
+           CASE WHEN o.status = 'delivered' THEN o.updated_at ELSE NULL END AS delivery_time,
            (
              SELECT json_agg(json_build_object(
                'product_name', pv.name,
@@ -884,7 +902,6 @@ export class ProfileService {
          FROM orders o
          JOIN customers c ON c.customer_id = o.customer_id
          LEFT JOIN customer_addresses ca ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
-         LEFT JOIN delivery_logs dl ON dl.order_id = o.order_id
          WHERE o.delivery_partner_id = $1
            AND DATE(o.scheduled_date AT TIME ZONE 'Asia/Kolkata') = $2::date
          ORDER BY o.run_sequence ASC NULLS LAST, o.created_at ASC`,

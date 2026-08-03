@@ -99,7 +99,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
       return;
     }
     if (!RegExp(r'^\d{10,15}$').hasMatch(phone)) {
-      _showSnack('Please enter a valid 10-15 digit phone number (digits only)', isError: true);
+      _showSnack('Please enter a valid 10 digit phone number (digits only)', isError: true);
       return;
     }
     setState(() => _isLoading = true);
@@ -117,8 +117,55 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
       _showSnack('OTP sent to $email ✅');
     } on DioException catch (e) {
       setState(() => _isLoading = false);
-      _showSnack(e.response?.data?['message'] ?? 'Failed to send OTP', isError: true);
+      final msg = (e.response?.data?['message'] ?? 'Failed to send OTP').toString();
+      _showSnack(msg, isError: true);
+      if (e.response?.statusCode == 409 || msg.toLowerCase().contains('already exist') || msg.toLowerCase().contains('registered')) {
+        _showAlreadyExistsDialog(msg);
+      }
     }
+  }
+
+  void _showAlreadyExistsDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.account_circle_rounded, color: kPrimary, size: 24),
+            SizedBox(width: 10),
+            Text('Account Exists', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          message.toLowerCase().contains('login') || message.toLowerCase().contains('log in')
+              ? message
+              : '$message\n\nPlease log in to continue.',
+          style: const TextStyle(fontSize: 13, color: kTextSub, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: kTextSub, fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kPrimary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Login Now', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _startCountdown() {
@@ -242,7 +289,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
           });
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (_) => const WelcomeIntroScreen(afterSignup: true)),
+            MaterialPageRoute(builder: (_) => const AppShell(initialIndex: 3)),
             (route) => false,
           );
         } else if (state is AuthFailure) {

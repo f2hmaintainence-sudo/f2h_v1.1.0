@@ -20,6 +20,9 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:f2h_delivery/core/api/api_endpoints.dart';
 import 'package:f2h_delivery/core/auth/token_storage.dart';
+import 'package:f2h_delivery/core/di/injection.dart';
+import 'package:f2h_delivery/auth/presentation/bloc/auth_bloc.dart';
+import 'package:f2h_delivery/auth/presentation/bloc/auth_event.dart';
 
 class DioClient {
   DioClient._internal();
@@ -138,6 +141,11 @@ class DioClient {
   Future<void> _handleSessionExpired() async {
     await TokenStorage.clear();
     await _cookieJar.deleteAll();
+    try {
+      if (sl.isRegistered<AuthBloc>()) {
+        sl<AuthBloc>().add(LogoutRequested());
+      }
+    } catch (_) {}
   }
 
   Future<void> fetchCsrfToken() async {

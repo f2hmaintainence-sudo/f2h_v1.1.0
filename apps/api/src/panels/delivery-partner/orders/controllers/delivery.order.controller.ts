@@ -172,14 +172,5 @@ export class DeliveryOrderController {
     return this.service.confirmPickup(userId, body);
   }
 
-  @Post(':id/update-containers')
-  @HttpCode(HttpStatus.OK)
-  async updateOrderContainers(
-    @Request() req: any,
-    @Param('id') id: string,
-    @Body() body: any,
-  ) {
-    const userId = req.user?.user_id;
-    return this.service.updateOrderContainers(userId, id, body);
-  }
+
 }

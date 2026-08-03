@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../../../shared/database/Database.service';
 import { DeveloperService } from '../../../shared/logger/Developer.service';
 import { PdfService } from '../../../common/pdf/pdf.service';
@@ -129,17 +129,30 @@ export class AnalyticsService {
     try {
       const days = parseInt(query.days || '30', 10);
       const sql = `
-        SELECT status, refund_type AS refund_method,
-          COUNT(*)::int AS count,
-          COALESCE(SUM(refund_amount), 0)::numeric AS total_amount
-        FROM refunds WHERE created_at >= CURRENT_DATE - ($1 || ' days')::interval
-        GROUP BY status, refund_type ORDER BY count DESC
+        SELECT status, refund_method, SUM(count)::int AS count, SUM(total_amount)::numeric AS total_amount
+        FROM (
+          SELECT status::text AS status, refund_type::text AS refund_method,
+            COUNT(*)::int AS count,
+            COALESCE(SUM(refund_amount), 0)::numeric AS total_amount
+          FROM refunds WHERE created_at >= CURRENT_DATE - ($1::text || ' days')::interval
+          GROUP BY status, refund_type
+
+          UNION ALL
+
+          SELECT COALESCE(status, 'pending')::text AS status, 'wallet_deposit' AS refund_method,
+            COUNT(*)::int AS count,
+            COALESCE(SUM(refund_amount), 0)::numeric AS total_amount
+          FROM subscription_refunds WHERE created_at >= CURRENT_DATE - ($1::text || ' days')::interval
+          GROUP BY status
+        ) combined
+        GROUP BY status, refund_method
+        ORDER BY count DESC
       `;
       const rows = await this.db.query(sql, [days]);
-      return { status: true, data: rows.map((r: any) => ({ ...r, total_amount: Number(r.total_amount) })), message: 'Refund report fetched' };
+      return { status: true, data: (rows || []).map((r: any) => ({ ...r, total_amount: Number(r.total_amount) })), message: 'Refund report fetched' };
     } catch (error) {
       this.developer.error('getRefundReport error', { error });
-      throw new InternalServerErrorException('Failed');
+      throw new InternalServerErrorException('Failed to fetch refund report');
     }
   }
 
@@ -147,16 +160,152 @@ export class AnalyticsService {
     try {
       const days = parseInt(query.days || '30', 10);
       const sql = `
-        SELECT *
+        SELECT 
+          id::text AS id,
+          COALESCE(refund_number, id::text) AS refund_number,
+          customer_id,
+          order_id,
+          refund_amount,
+          refund_type::text AS refund_type,
+          status::text AS status,
+          reason,
+          created_at,
+          'order_refund' AS category
         FROM refunds 
-        WHERE created_at >= CURRENT_DATE - ($1 || ' days')::interval
+        WHERE created_at >= CURRENT_DATE - ($1::text || ' days')::interval
+
+        UNION ALL
+
+        SELECT 
+          sr.id::text AS id,
+          sr.id::text AS refund_number,
+          sr.customer_id,
+          sr.subscription_id AS order_id,
+          sr.refund_amount,
+          'wallet_deposit' AS refund_type,
+          COALESCE(sr.status, 'pending')::text AS status,
+          ('Subscription pause refund for ' || sr.total_paused_days || ' days (' || sr.refund_month || ')') AS reason,
+          sr.created_at,
+          'subscription_pause_refund' AS category
+        FROM subscription_refunds sr
+        WHERE sr.created_at >= CURRENT_DATE - ($1::text || ' days')::interval
+
         ORDER BY created_at DESC
       `;
       const rows = await this.db.query(sql, [days]);
-      return { status: true, data: rows, message: 'Refunds list fetched' };
+      return { status: true, data: rows || [], message: 'Refunds list fetched' };
     } catch (error) {
       this.developer.error('getRefundsList error', { error });
-      throw new InternalServerErrorException('Failed');
+      throw new InternalServerErrorException('Failed to fetch refunds list');
+    }
+  }
+
+  async processRefund(refundId: string) {
+    try {
+      // 1. Check if in subscription_refunds
+      const subRefundRes = await this.db.query(
+        `SELECT * FROM subscription_refunds WHERE id = $1 LIMIT 1`,
+        [refundId]
+      );
+
+      if (subRefundRes && subRefundRes.length > 0) {
+        const sr = subRefundRes[0];
+        if (sr.status === 'processed') {
+          return { status: true, message: 'Refund is already processed' };
+        }
+
+        const refundAmount = Number(sr.refund_amount || 0);
+
+        // Fetch customer balance
+        const custRes = await this.db.query(
+          `SELECT wallet_balance FROM customers WHERE customer_id = $1 LIMIT 1`,
+          [sr.customer_id]
+        );
+        const currentBalance = Number(custRes?.[0]?.wallet_balance || 0);
+        const newBalance = currentBalance + refundAmount;
+
+        // Credit customer wallet balance
+        await this.db.query(
+          `UPDATE customers SET wallet_balance = $1, updated_at = NOW() WHERE customer_id = $2`,
+          [newBalance, sr.customer_id]
+        );
+
+        // Insert wallet transaction
+        const walletTxRes = await this.db.query(
+          `INSERT INTO customer_wallet_transactions (customer_id, transaction_type, amount, balance_after, reference_type, reference_id, remarks, created_at)
+           VALUES ($1, 'credit', $2, $3, 'subscription_pause_refund', $4, $5, NOW()) RETURNING id`,
+          [sr.customer_id, refundAmount, newBalance, sr.subscription_id, `Refund for ${sr.total_paused_days} paused days in ${sr.refund_month}`]
+        );
+
+        const walletTxId = String(walletTxRes?.[0]?.id || '');
+
+        // Update subscription_refunds record status to processed
+        await this.db.query(
+          `UPDATE subscription_refunds SET status = 'processed', wallet_transaction_id = $1 WHERE id = $2`,
+          [walletTxId, refundId]
+        );
+
+        // Mark subscription_pauses as is_refunded = true
+        await this.db.query(
+          `UPDATE subscription_pauses SET is_refunded = true WHERE subscription_id = $1 AND is_refunded = false`,
+          [sr.subscription_id]
+        );
+
+        return {
+          status: true,
+          message: `Refund ₹${refundAmount} processed and credited to customer wallet successfully.`,
+          new_balance: newBalance
+        };
+      }
+
+      // 2. Check if in refunds table
+      const refundRes = await this.db.query(
+        `SELECT * FROM refunds WHERE id::text = $1 OR refund_number = $1 LIMIT 1`,
+        [refundId]
+      );
+
+      if (refundRes && refundRes.length > 0) {
+        const r = refundRes[0];
+        const refundAmount = Number(r.refund_amount || 0);
+
+        // Fetch customer balance
+        const custRes = await this.db.query(
+          `SELECT wallet_balance FROM customers WHERE customer_id = $1 LIMIT 1`,
+          [r.customer_id]
+        );
+        const currentBalance = Number(custRes?.[0]?.wallet_balance || 0);
+        const newBalance = currentBalance + refundAmount;
+
+        // Credit customer wallet balance
+        await this.db.query(
+          `UPDATE customers SET wallet_balance = $1, updated_at = NOW() WHERE customer_id = $2`,
+          [newBalance, r.customer_id]
+        );
+
+        // Insert wallet transaction
+        await this.db.query(
+          `INSERT INTO customer_wallet_transactions (customer_id, transaction_type, amount, balance_after, reference_type, reference_id, remarks, created_at)
+           VALUES ($1, 'credit', $2, $3, 'order_refund', $4, $5, NOW())`,
+          [r.customer_id, refundAmount, newBalance, r.order_id || r.id, `Order refund ${r.refund_number || r.id}`]
+        );
+
+        // Update refunds table status
+        await this.db.query(
+          `UPDATE refunds SET status = 'processed' WHERE id = $1`,
+          [r.id]
+        );
+
+        return {
+          status: true,
+          message: `Order refund ₹${refundAmount} processed and credited to customer wallet successfully.`,
+          new_balance: newBalance
+        };
+      }
+
+      throw new BadRequestException('Refund record not found');
+    } catch (error) {
+      this.developer.error('processRefund error', { error });
+      throw new InternalServerErrorException('Failed to process refund');
     }
   }
 

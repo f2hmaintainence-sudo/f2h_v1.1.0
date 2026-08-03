@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Res } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { AnalyticsService } from './analytics.service';
 
@@ -37,6 +37,11 @@ export class AnalyticsController {
   @Get('refunds/list')
   async getRefundsList(@Query() query: any) {
     return this.analyticsService.getRefundsList(query);
+  }
+
+  @Post('refunds/:id/process')
+  async processRefund(@Param('id') id: string) {
+    return this.analyticsService.processRefund(id);
   }
 
   // ── Growth Reports ──

@@ -47,6 +47,21 @@ class _WelcomeIntroScreenState extends State<WelcomeIntroScreen>
       ..repeat();
     _floatCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200))
       ..repeat(reverse: true);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (widget.afterSignup) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const AppShell(initialIndex: 3)),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          _slideRoute(const ServiceAreaCheckScreen()),
+        );
+      }
+    });
   }
 
   @override

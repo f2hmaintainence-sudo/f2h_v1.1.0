@@ -22,10 +22,12 @@ class ApiEndpoints {
   // ---------------------------------------------------------------------------
   static const String _envBaseUrl = String.fromEnvironment('F2H_API_BASE_URL');
   static String get _devBaseUrl {
-    if (kReleaseMode && _envBaseUrl.isEmpty) {
-      return 'https://f2hfresh.com';
+    if (_envBaseUrl.isNotEmpty) return _envBaseUrl;
+    if (kIsWeb) return 'http://localhost:5001';
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:5001';
     }
-    return 'http://192.168.1.6:5001';
+    return 'http://192.168.1.16:5001';
   }
 
   /// Root host (scheme + host + port), no trailing slash.

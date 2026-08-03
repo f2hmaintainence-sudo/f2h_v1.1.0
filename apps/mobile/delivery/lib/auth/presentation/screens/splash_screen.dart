@@ -155,28 +155,33 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                     children: [
                       // Logo circle
                       Container(
-                        width: 100,
-                        height: 100,
+                        width: 104,
+                        height: 104,
                         decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [kPrimaryMid, kPrimary],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                          borderRadius: BorderRadius.circular(28),
                           boxShadow: [
                             BoxShadow(
                               color: kPrimary.withValues(alpha: 0.25),
                               blurRadius: 32,
-                              spreadRadius: 4,
+                              spreadRadius: 2,
                               offset: const Offset(0, 8),
                             ),
                           ],
                         ),
-                        child: const Icon(
-                          Icons.eco_rounded,
-                          size: 48,
-                          color: Colors.white,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(28),
+                          child: Image.asset(
+                            'assets/icon/delivery_logo.png',
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: kPrimary,
+                              child: const Icon(
+                                Icons.eco_rounded,
+                                size: 48,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 28),

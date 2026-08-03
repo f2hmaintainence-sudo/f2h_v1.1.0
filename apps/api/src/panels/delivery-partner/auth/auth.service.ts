@@ -1,14 +1,16 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { AuthService as SharedAuthService } from 'src/auth/auth.service';
+import { DatabaseService } from '../../../shared/database/Database.service';
 
 @Injectable()
-export class AuthService extends SharedAuthService {
+export class AuthService {
+  constructor(private readonly db: DatabaseService) {}
+
   async toggleShiftStatus(userId: string, requestedActiveState?: boolean) {
     if (!userId) {
       throw new BadRequestException('User ID is required');
     }
 
-    const boyRes = await (this as any).DataBase.query(
+    const boyRes = await this.db.query(
       `SELECT id, is_active, delivery_partner_id, user_id FROM delivery_partners WHERE user_id = $1 OR delivery_partner_id = $1 LIMIT 1`,
       [userId],
     );
@@ -22,11 +24,11 @@ export class AuthService extends SharedAuthService {
 
     if (newStatus === false) {
       const { targetDate, targetSlot } = this.getKolkataDateAndSlot();
-      const pendingRes = await (this as any).DataBase.query(
-        `SELECT COUNT(*)::int AS pending_count 
-         FROM orders 
-         WHERE (delivery_partner_id::text = $1::text OR delivery_partner_id::text = $2::text)
-           AND DATE(scheduled_date AT TIME ZONE 'Asia/Kolkata') = $3::date
+      const pendingRes = await this.db.query(
+        `SELECT COUNT(*)::int AS pending_count
+         FROM orders
+         WHERE (delivery_partner_id = $1 OR delivery_partner_id = $2)
+           AND scheduled_date = $3::date
            AND delivery_slot = $4
            AND status NOT IN ('delivered', 'failed', 'cancelled')`,
         [boyRes[0].delivery_partner_id, boyRes[0].user_id, targetDate, targetSlot],
@@ -37,7 +39,7 @@ export class AuthService extends SharedAuthService {
       }
     }
 
-    await (this as any).DataBase.execute(
+    await this.db.execute(
       `UPDATE delivery_partners SET is_active = $1, is_online = $1, updated_at = NOW() WHERE id = $2`,
       [newStatus, boyRes[0].id],
     );
@@ -71,4 +73,3 @@ export class AuthService extends SharedAuthService {
     return { targetDate: kolkataDateStr, targetSlot };
   }
 }
-

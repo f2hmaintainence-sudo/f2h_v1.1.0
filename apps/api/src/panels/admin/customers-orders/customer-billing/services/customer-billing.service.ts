@@ -40,6 +40,62 @@ export class CustomerBillingService {
   }
 
   /**
+   * Daily automated cron job at 9:00 AM (@Cron('0 9 * * *'))
+   * Sends 7-day, 3-day, and 1-day gentle postpaid due push notifications to customer app via Firebase
+   */
+  @Cron('0 9 * * *')
+  async handlePostpaidRemindersCron() {
+    this.logger.log('Executing daily 9 AM cron for Postpaid Bill Push Notification Reminders (7D, 3D, 1D)...');
+    try {
+      const pendingBills = await this.repository.findPendingPostpaidBills();
+      if (!pendingBills || pendingBills.length === 0) return;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      for (const bill of pendingBills) {
+        if (!bill.due_date || !bill.customer_id) continue;
+        const due = new Date(bill.due_date);
+        due.setHours(0, 0, 0, 0);
+
+        const diffDays = Math.round((due.getTime() - today.getTime()) / (1000 * 3600 * 24));
+        const amountStr = `₹${Number(bill.due_amount || bill.total_amount || 0).toFixed(2)}`;
+
+        if (diffDays === 7) {
+          await this.pushNotificationService.sendNotificationToUsers(
+            [bill.customer_id],
+            {
+              title: '🔔 F2H Postpaid Bill Due in 7 Days',
+              body: `Gentle Reminder: Your postpaid bill #${bill.bill_number} of ${amountStr} is due on ${due.toLocaleDateString('en-IN')}. Pay via F2H App for uninterrupted service.`,
+            },
+          ).catch(() => {});
+          this.logger.log(`Sent 7-day postpaid reminder FCM push to customer ${bill.customer_id}`);
+        } else if (diffDays === 3) {
+          await this.pushNotificationService.sendNotificationToUsers(
+            [bill.customer_id],
+            {
+              title: '⏰ F2H Postpaid Bill Due in 3 Days',
+              body: `Reminder: Your bill #${bill.bill_number} of ${amountStr} is due in 3 days. Pay now via F2H App.`,
+            },
+          ).catch(() => {});
+          this.logger.log(`Sent 3-day postpaid reminder FCM push to customer ${bill.customer_id}`);
+        } else if (diffDays === 1) {
+          await this.pushNotificationService.sendNotificationToUsers(
+            [bill.customer_id],
+            {
+              title: '🚨 Final Alert: Postpaid Bill Due Tomorrow',
+              body: `Urgent: Postpaid bill #${bill.bill_number} of ${amountStr} is due tomorrow! Settle now to maintain active subscription deliveries.`,
+            },
+          ).catch(() => {});
+          this.logger.log(`Sent 1-day postpaid reminder FCM push to customer ${bill.customer_id}`);
+        }
+      }
+    } catch (err: any) {
+      this.logger.error(`Error sending postpaid push notification reminders: ${err.message}`, err.stack);
+    }
+  }
+
+  /**
    * Main feature: Generate Postpaid Bill for single or all eligible customers
    */
   async generateBill(dto: GenerateCustomerBillDto): Promise<any> {

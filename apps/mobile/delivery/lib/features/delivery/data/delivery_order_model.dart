@@ -22,6 +22,7 @@ class DeliveryOrderModel {
   final String customerPhone;
   final String addressId;
   final String address;
+  final String? landmark;
   final double addressLat;
   final double addressLng;
   final String? zoneId;
@@ -67,6 +68,7 @@ class DeliveryOrderModel {
     required this.customerPhone,
     required this.addressId,
     required this.address,
+    this.landmark,
     required this.addressLat,
     required this.addressLng,
     this.zoneId,
@@ -120,6 +122,7 @@ class DeliveryOrderModel {
       customerPhone: json['customer_phone']?.toString() ?? '',
       addressId: json['address_id']?.toString() ?? '',
       address: json['address']?.toString() ?? '',
+      landmark: json['landmark']?.toString(),
       addressLat: _toDouble(json['address_lat']),
       addressLng: _toDouble(json['address_lng']),
       zoneId: json['zone_id']?.toString(),
@@ -177,6 +180,7 @@ class DeliveryOrderModel {
       customerPhone: customerPhone,
       addressId: addressId,
       address: address,
+      landmark: landmark,
       addressLat: addressLat,
       addressLng: addressLng,
       zoneId: zoneId,
@@ -280,6 +284,8 @@ class GroupedStop {
   int get emptyBottlesExpected => orders.fold(0, (sum, o) => sum + (o.emptyBottlesExpected ?? 0));
 
   int get emptyBottlesCollected => orders.fold(0, (sum, o) => sum + (o.emptyBottlesCollected ?? 0));
+
+  String? get landmark => orders.isEmpty ? null : orders.first.landmark;
 
   int get bottlesWithCustomer => orders.isEmpty ? 0 : (orders.first.bottlesWithCustomer ?? 0);
 

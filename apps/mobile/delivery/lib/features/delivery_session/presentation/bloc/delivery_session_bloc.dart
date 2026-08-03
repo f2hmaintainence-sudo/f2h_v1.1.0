@@ -50,7 +50,7 @@ class DeliverySessionBloc
     return DeliverySessionLoaded(
       driverName: 'User',
       isOnline: false,
-      isVerified: true,
+      isVerified: false,
       accountStatus: 'active',
       isSosActive: false,
       currentRun: null,

@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
@@ -343,7 +344,7 @@ export class AuthService {
       };
       try {
         await this.Data.insert('customers', custData);
-      } catch (_) {}
+      } catch (_) { }
       return custData;
     }
 
@@ -380,19 +381,11 @@ export class AuthService {
     }
     const userName = body.user_name || rawName || email?.split('@')[0] || phone;
 
-    // Verify OTP for registrations first
-    if (roleId === 'CUSTOMER' || roleId === 'DELIVERY_PARTNER' || roleId === 'DELIVERY_BOY') {
-      if (!body.verification_token) {
-        throw new BadRequestException('Verification token is required');
-      }
-      await this.consumeVerifiedOtp(body.verification_token, email || phone!, 'registration');
-    }
-
     // Check existing users via indexed SQL query
     let existingUser: any = null;
     if (email) {
       const emailRes = await this.Data.query('users', {
-        select: ['user_id', 'email', 'phone'],
+        select: ['user_id', 'email', 'phone', 'password', 'role_id'],
         where: [{ column: 'email', operator: '=', value: email.toLowerCase().trim() }],
         limit: 1,
       });
@@ -400,21 +393,33 @@ export class AuthService {
     }
     if (!existingUser && phone) {
       const phoneRes = await this.Data.query('users', {
-        select: ['user_id', 'email', 'phone'],
+        select: ['user_id', 'email', 'phone', 'password', 'role_id'],
         where: [{ column: 'phone', operator: '=', value: phone.trim() }],
         limit: 1,
       });
       existingUser = phoneRes?.data?.[0];
     }
 
-    // If user exists and no verification token was supplied, reject duplicate registration
-    if (existingUser && !body.verification_token) {
-      if (email && existingUser.email?.toLowerCase().trim() === email) {
-        throw new BadRequestException('Email already registered');
+    // If user is already fully registered with a password and matching role, return success directly (prevents double submit token errors)
+    if (
+      existingUser &&
+      existingUser.password &&
+      !existingUser.password.startsWith('temp_') &&
+      existingUser.role_id === roleId
+    ) {
+      this.developer.debug(`[AuthService:register] User ${existingUser.user_id} already registered. Skipping duplicate OTP consumption.`);
+      return {
+        message: 'Registration successful',
+        userId: existingUser.user_id,
+      };
+    }
+
+    // Verify OTP for registrations
+    if (roleId === 'CUSTOMER' || roleId === 'DELIVERY_PARTNER' || roleId === 'DELIVERY_BOY') {
+      if (!body.verification_token) {
+        throw new BadRequestException('Verification token is required');
       }
-      if (phone && existingUser.phone?.trim() === phone) {
-        throw new BadRequestException('Phone already registered');
-      }
+      await this.consumeVerifiedOtp(body.verification_token, email || phone!, 'registration');
     }
 
     const userId = existingUser ? existingUser.user_id : generateId('USER', 10);
@@ -510,8 +515,8 @@ export class AuthService {
             customer_id: userId,
             first_name: custFirstName,
             last_name: lastName,
-            mobile: phone || ('NO_PHONE_' + userId),
-            phone: phone || ('NO_PHONE_' + userId),
+            mobile: (phone || ('NO_PHONE_' + userId)).slice(0, 20),
+            phone: (phone || ('NO_PHONE_' + userId)).slice(0, 20),
             email: email || null,
             referral_code: generatedRefCode,
             referral_status: 'locked',
@@ -568,11 +573,12 @@ export class AuthService {
       // Delivery Partner specific initialization
       if (roleId === 'DELIVERY_PARTNER' || roleId === 'DELIVERY_BOY') {
         let selectedBranchId = body.branch_id;
+        const branchesRes = await this.Data.query('branches', {
+          where: [{ column: 'is_active', operator: '=', value: true }],
+        });
+        const branches = branchesRes?.data ?? [];
+
         if (!selectedBranchId && body.latitude !== undefined && body.longitude !== undefined) {
-          const branchesRes = await this.Data.query('branches', {
-            where: [{ column: 'is_active', operator: '=', value: true }],
-          });
-          const branches = branchesRes?.data ?? [];
           const lat = parseFloat(String(body.latitude));
           const lng = parseFloat(String(body.longitude));
 
@@ -590,6 +596,10 @@ export class AuthService {
               }
             }
           }
+        }
+
+        if (!selectedBranchId && branches.length > 0) {
+          selectedBranchId = branches[0].branch_id;
         }
 
         const existingDp = await this.Data.query('delivery_partners', {
@@ -625,8 +635,8 @@ export class AuthService {
               full_name: partnerFullName,
               phone: phone || null,
               email: email || null,
-              branch_id: selectedBranchId || 'BRANCHd8c0WDGS76ii',
-              is_active: 1,
+              branch_id: selectedBranchId || null,
+              is_active: 0,
               is_verified: 0,
               vehicle_type: 'BIKE',
               vehicle_number: 'N/A',
@@ -746,9 +756,35 @@ export class AuthService {
    ================================================================================================*/
 
   async requestMobileOtp(body: SendOtpDto) {
-    const { phone, email } = body;
+    const { phone, email, purpose } = body;
     if (!phone && !email) {
       throw new BadRequestException('Phone number or email is required');
+    }
+
+    if (purpose === 'registration' || !purpose) {
+      if (email) {
+        const normalizedEmail = email.toLowerCase().trim();
+        const existingEmailUser = await this.Data.query('users', {
+          select: ['user_id', 'email'],
+          where: [{ column: 'email', operator: '=', value: normalizedEmail }],
+          limit: 1,
+        });
+        if (existingEmailUser?.data?.length > 0) {
+          throw new ConflictException('Email address is already registered.');
+        }
+      }
+
+      if (phone) {
+        const trimmedPhone = phone.trim();
+        const existingPhoneUser = await this.Data.query('users', {
+          select: ['user_id', 'phone'],
+          where: [{ column: 'phone', operator: '=', value: trimmedPhone }],
+          limit: 1,
+        });
+        if (existingPhoneUser?.data?.length > 0) {
+          throw new ConflictException('Phone number is already registered.');
+        }
+      }
     }
 
     const identifier = phone || email!;
@@ -856,10 +892,6 @@ export class AuthService {
           created_at: now,
           updated_at: now,
         };
-        if (incomingFcmToken) {
-          customerInsertData.fcm_token = incomingFcmToken;
-        }
-
         await this.Data.insert('customers', customerInsertData);
       } catch (custErr) {
         console.error('[AuthService] Auto customer record creation failed during OTP verify:', custErr);
@@ -949,7 +981,11 @@ export class AuthService {
       await this.Data.update('users', { fcm: fcmToken }, [
         { column: 'user_id', operator: '=', value: userId },
       ]);
+<<<<<<< HEAD
     } catch (_) {}
+=======
+    } catch (_) { }
+>>>>>>> main
   }
 
   /*===============================================================================================
@@ -1249,7 +1285,7 @@ export class AuthService {
     }
 
     if (!user) {
-      throw new NotFoundException('User with provided email or phone not found');
+      throw new NotFoundException('User does not exist');
     }
 
     // Role validation if clientRole is supplied
@@ -1273,7 +1309,7 @@ export class AuthService {
       }
 
       if (!isAllowed) {
-        throw new ForbiddenException(`Account is not authorized for ${cRole} application`);
+        throw new NotFoundException('User does not exist');
       }
     }
 

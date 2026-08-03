@@ -122,8 +122,8 @@ export class NotificationService {
         priority: normalizedPriority,
         sender_id: dto.senderId || null,
         status: true,
-        created_by: dto.senderId || null,
-        updated_by: dto.senderId || null,
+        created_by: dto.senderId || 'SYSTEM',
+        updated_by: dto.senderId || 'SYSTEM',
         created_at: now,
         updated_at: now,
       };
@@ -148,8 +148,8 @@ export class NotificationService {
           status: isOnline ? 'read' : 'unread',
           notified_at: now,
           read_at: isOnline ? now : null,
-          created_by: dto.senderId || null,
-          updated_by: dto.senderId || null,
+          created_by: dto.senderId || 'SYSTEM',
+          updated_by: dto.senderId || 'SYSTEM',
           created_at: now,
           updated_at: now,
         };

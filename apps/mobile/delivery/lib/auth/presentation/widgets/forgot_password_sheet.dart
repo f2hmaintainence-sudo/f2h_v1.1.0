@@ -26,6 +26,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
   bool _obscureConfirm = true;
   bool _isLoading = false;
   String? _verificationToken;
+  String? _errorMessage;
 
   int _countdown = 60;
   bool _canResend = false;
@@ -73,40 +74,53 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
   }
 
   Future<void> _sendOtp() async {
-    final email = _emailCtrl.text.trim();
-    if (email.isEmpty || !RegExp(r'^[\w.-]+@[\w-]+\.\w+$').hasMatch(email)) {
-      _showSnack('Please enter a valid email address', isError: true);
+    final identifier = _emailCtrl.text.trim();
+    if (identifier.isEmpty) {
+      setState(() => _errorMessage = 'Please enter your email address or phone number');
+      _showSnack('Please enter your email address or phone number', isError: true);
       return;
     }
 
-    setState(() => _isLoading = true);
+    final isEmail = RegExp(r'^[\w.-]+@[\w-]+\.\w+$').hasMatch(identifier);
+    final isPhone = RegExp(r'^\+?[0-9]{7,15}$').hasMatch(identifier.replaceAll(RegExp(r'[\s\-\(\)]'), ''));
+
+    if (!isEmail && !isPhone) {
+      setState(() => _errorMessage = 'Please enter a valid email address or phone number');
+      _showSnack('Please enter a valid email address or phone number', isError: true);
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     try {
       final dioClient = sl<DioClient>();
       await dioClient.fetchCsrfToken().timeout(const Duration(seconds: 3), onTimeout: () {});
 
       final response = await dioClient.dio.post(
-        ApiEndpoints.sendEmailOtp,
-        data: {'email': email, 'purpose': 'forgot_password'},
+        ApiEndpoints.forgotPassword,
+        data: isEmail ? {'email': identifier} : {'phone': identifier},
       );
 
       final resData = Map<String, dynamic>.from(response.data as Map? ?? {});
-      final debugOtp = resData['otp']?.toString();
 
       if (!mounted) return;
       setState(() {
         _step = 1;
+        _errorMessage = null;
       });
       _startCountdown();
-      if (debugOtp != null && debugOtp.isNotEmpty) {
-        _showSnack('OTP sent to $email (OTP: $debugOtp) ✅');
-      } else {
-        _showSnack('OTP sent to $email ✅');
-      }
+      _showSnack('OTP sent to $identifier ✅');
     } on DioException catch (e) {
       final msg = e.response?.data is Map ? e.response?.data['message'] : null;
-      _showSnack(msg?.toString() ?? e.message ?? 'Failed to send OTP', isError: true);
+      final errorStr = msg?.toString() ?? 'User does not exist';
+      if (mounted) setState(() => _errorMessage = errorStr);
+      _showSnack(errorStr, isError: true);
     } catch (e) {
-      _showSnack('Failed to send OTP: $e', isError: true);
+      const errorStr = 'User does not exist';
+      if (mounted) setState(() => _errorMessage = errorStr);
+      _showSnack(errorStr, isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -124,10 +138,13 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
       final dioClient = sl<DioClient>();
       await dioClient.fetchCsrfToken().timeout(const Duration(seconds: 3), onTimeout: () {});
 
+      final identifier = _emailCtrl.text.trim();
+      final isEmail = RegExp(r'^[\w.-]+@[\w-]+\.\w+$').hasMatch(identifier);
+
       final response = await dioClient.dio.post(
         ApiEndpoints.verifyEmailOtp,
         data: {
-          'email': _emailCtrl.text.trim(),
+          if (isEmail) 'email': identifier else 'phone': identifier,
           'otp': otp,
           'purpose': 'forgot_password',
         },
@@ -155,6 +172,8 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
     final pass = _passwordCtrl.text;
     final confirm = _confirmPasswordCtrl.text;
     final otp = _otpCtrl.map((c) => c.text).join();
+    final identifier = _emailCtrl.text.trim();
+    final isEmail = RegExp(r'^[\w.-]+@[\w-]+\.\w+$').hasMatch(identifier);
 
     if (pass.isEmpty || confirm.isEmpty) {
       _showSnack('Please enter and confirm your password', isError: true);
@@ -177,7 +196,8 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
       await dioClient.dio.post(
         ApiEndpoints.resetPassword,
         data: {
-          'email': _emailCtrl.text.trim(),
+          if (isEmail) 'email': identifier else 'phone': identifier,
+          'identifier': identifier,
           'token': _verificationToken ?? otp,
           'otp': otp,
           'newPassword': pass,
@@ -233,7 +253,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
           const SizedBox(height: 8),
           Text(
             _step == 0
-                ? 'Enter your registered email address to receive an OTP.'
+                ? 'Enter your registered email address or phone number to receive an OTP.'
                 : _step == 1
                     ? 'Enter the 6-digit OTP sent to ${_emailCtrl.text}'
                     : 'Set a secure new password for your account.',
@@ -257,21 +277,47 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
           decoration: BoxDecoration(
             color: kBgDeep,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: kBorder),
+            border: Border.all(color: _errorMessage != null ? kRed : kBorder, width: _errorMessage != null ? 1.5 : 1.0),
           ),
           child: TextField(
             controller: _emailCtrl,
+            onChanged: (_) {
+              if (_errorMessage != null) setState(() => _errorMessage = null);
+            },
             keyboardType: TextInputType.emailAddress,
             style: GoogleFonts.poppins(color: kText, fontSize: 15, fontWeight: FontWeight.w500),
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.alternate_email_rounded, color: kMuted, size: 20),
-              hintText: 'Enter email address',
+              hintText: 'Enter email or phone number',
               hintStyle: GoogleFonts.poppins(color: kMuted, fontSize: 14),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             ),
           ),
         ),
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: kRed.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kRed.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, color: kRed, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _errorMessage!,
+                    style: GoogleFonts.poppins(color: kRed, fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 24),
         SizedBox(
           height: 54,

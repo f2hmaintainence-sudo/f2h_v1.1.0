@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
+import 'package:f2h_delivery/core/api/api_endpoints.dart';
 import 'package:f2h_delivery/services/mock_data_service.dart';
 import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
@@ -539,37 +540,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       const SizedBox(height: 8),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: firstOrder.deliveryImage!.startsWith('http')
-                            ? Image.network(
-                                firstOrder.deliveryImage!,
-                                height: 100,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    height: 100,
-                                    color: kBgDeep,
-                                    child: const Center(
-                                      child: Icon(Icons.broken_image_rounded, color: kTextSub, size: 20),
-                                    ),
-                                  );
-                                },
-                              )
-                            : Image.file(
-                                File(firstOrder.deliveryImage!),
-                                height: 100,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    height: 100,
-                                    color: kBgDeep,
-                                    child: const Center(
-                                      child: Icon(Icons.broken_image_rounded, color: kTextSub, size: 20),
-                                    ),
-                                  );
-                                },
+                        child: Image.network(
+                          firstOrder.deliveryImage!.startsWith('http')
+                              ? firstOrder.deliveryImage!
+                              : '${ApiEndpoints.host}${firstOrder.deliveryImage!.startsWith('/') ? '' : '/'}${firstOrder.deliveryImage!}',
+                          height: 100,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              height: 100,
+                              color: kBgDeep,
+                              child: const Center(
+                                child: Icon(Icons.broken_image_rounded, color: kTextSub, size: 20),
                               ),
+                            );
+                          },
+                        ),
                       ),
                     ],
                   ],
@@ -700,7 +687,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                     _currentStop.address,
+                     _currentStop.landmark != null && _currentStop.landmark!.isNotEmpty
+                          ? _currentStop.landmark!
+                          : _currentStop.address,
                       style: const TextStyle(fontSize: 12.5, color: kTextSub),
                     ),
                   ],
@@ -714,22 +703,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildBottleLedgerCard() {
-    final outstanding = _currentStop.bottlesWithCustomer;
-    final displayedOutstanding = outstanding > 0 ? -outstanding : 0;
-    int deliveredToday = 0;
-    for (var p in _currentStop.products) {
-      if (p.productName.toLowerCase().contains('bottle') || p.productName.toLowerCase().contains('milk')) {
-        deliveredToday += p.quantity;
-      }
-    }
+    // outstanding = bottles already at customer's home (min 0, negatives mean over-collected earlier)
+    final outstanding = (_currentStop.bottlesWithCustomer).clamp(0, 9999);
+    // deliveredToday = containers being delivered in this order (from backend)
+    final deliveredToday = _currentStop.emptyBottlesExpected;
     final statusLower = _currentStop.status.toLowerCase();
-    final isDone = statusLower == 'delivered' || 
-                   statusLower == 'failed' || 
-                   statusLower == 'completed' || 
+    final isDone = statusLower == 'delivered' ||
+                   statusLower == 'failed' ||
+                   statusLower == 'completed' ||
                    statusLower == 'cancelled';
     final collected = isDone ? _currentStop.emptyBottlesCollected : 0;
+    // Projected = outstanding + delivered today - collected today
     final projectedBalance = outstanding + deliveredToday - collected;
-    final displayedProjected = projectedBalance > 0 ? -projectedBalance : 0;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -757,7 +742,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               Expanded(
                 child: _buildBottleIndicator(
                   'Outstanding at Home',
-                  '$displayedOutstanding',
+                  '$outstanding',
                   Colors.teal,
                 ),
               ),
@@ -773,7 +758,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               Expanded(
                 child: _buildBottleIndicator(
                   isDone ? 'Collected Today' : 'Expected Today',
-                  isDone ? '-$collected' : '${_currentStop.emptyBottlesExpected}',
+                  isDone ? '$collected' : '$deliveredToday',
                   isDone ? kSuccess : kAccent,
                 ),
               ),
@@ -790,12 +775,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.teal.shade50,
+                  color: projectedBalance > 0 ? Colors.teal.shade50 : Colors.orange.shade50,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  '$displayedProjected bottles',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Colors.teal.shade800),
+                  '$projectedBalance bottle${projectedBalance == 1 ? '' : 's'}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    color: projectedBalance > 0 ? Colors.teal.shade800 : Colors.orange.shade800,
+                  ),
                 ),
               ),
             ],

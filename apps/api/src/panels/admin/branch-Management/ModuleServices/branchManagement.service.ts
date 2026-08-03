@@ -951,6 +951,8 @@ export class BranchManagementService {
         type,
         message,
         status: 'pending',
+        created_by: 'system',
+        updated_by: 'system',
       });
 
       return { status: true, message: 'Notification queued successfully' };
