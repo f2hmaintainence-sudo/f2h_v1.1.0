@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
+import 'package:f2h_customer/features/catalog/presentation/helpers/cart_helpers.dart';
 
 class CustomDatePickerDialog extends StatefulWidget {
   final DateTime initialDate;
@@ -7,6 +8,8 @@ class CustomDatePickerDialog extends StatefulWidget {
   final DateTime lastDate;
   final String title;
   final bool highlightMonthEnd;
+  final bool showSlots;
+  final String? initialSlot;
 
   const CustomDatePickerDialog({
     super.key,
@@ -15,6 +18,8 @@ class CustomDatePickerDialog extends StatefulWidget {
     required this.lastDate,
     required this.title,
     this.highlightMonthEnd = false,
+    this.showSlots = false,
+    this.initialSlot,
   });
 
   @override
@@ -24,6 +29,7 @@ class CustomDatePickerDialog extends StatefulWidget {
 class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
   late DateTime _selectedDate;
   late DateTime _currentMonth;
+  late String _selectedSlot;
 
   final List<String> _weekdays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -38,6 +44,13 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
     // Normalize date to remove time component
     _selectedDate = DateTime(widget.initialDate.year, widget.initialDate.month, widget.initialDate.day);
     _currentMonth = DateTime(_selectedDate.year, _selectedDate.month);
+    _selectedSlot = widget.initialSlot ?? 'Morning';
+    if (widget.showSlots) {
+      final available = getAvailableSlots(_selectedDate, DateTime.now());
+      if (!available.contains(_selectedSlot)) {
+        _selectedSlot = getDefaultSlot(_selectedDate, DateTime.now());
+      }
+    }
   }
 
   void _nextMonth() {
@@ -66,6 +79,55 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
 
   int _daysInMonth(DateTime date) {
     return DateTime(date.year, date.month + 1, 0).day;
+  }
+
+  Widget _buildSlotButton({
+    required String title,
+    required IconData icon,
+    required Color iconColorInactive,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFFFC107) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? const Color(0xFFFFB300) : kBorderLt,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? Colors.white : iconColorInactive,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: isSelected ? Colors.white : kText,
+              ),
+            ),
+            if (isSelected) ...[
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.check_circle,
+                size: 14,
+                color: Colors.white,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -249,6 +311,12 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
                 onTap: () {
                   setState(() {
                     _selectedDate = date;
+                    if (widget.showSlots) {
+                      final available = getAvailableSlots(date, DateTime.now());
+                      if (!available.contains(_selectedSlot)) {
+                        _selectedSlot = getDefaultSlot(date, DateTime.now());
+                      }
+                    }
                   });
                 },
                 child: AnimatedContainer(
@@ -290,6 +358,51 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
               );
             },
           ),
+          if (widget.showSlots) ...[
+            const SizedBox(height: 16),
+            const Text(
+              'DELIVERY SLOT',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                color: kTextSub,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Builder(
+              builder: (context) {
+                final now = DateTime.now();
+                final availableSlots = getAvailableSlots(_selectedDate, now);
+                return Row(
+                  children: [
+                    if (availableSlots.contains('Morning')) ...[
+                      Expanded(
+                        child: _buildSlotButton(
+                          title: 'Morning',
+                          icon: Icons.wb_sunny_rounded,
+                          iconColorInactive: Colors.orange.shade300,
+                          isSelected: _selectedSlot == 'Morning',
+                          onTap: () => setState(() => _selectedSlot = 'Morning'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
+                    if (availableSlots.contains('Evening'))
+                      Expanded(
+                        child: _buildSlotButton(
+                          title: 'Evening',
+                          icon: Icons.nightlight_round,
+                          iconColorInactive: Colors.blueGrey.shade100,
+                          isSelected: _selectedSlot == 'Evening',
+                          onTap: () => setState(() => _selectedSlot = 'Evening'),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ],
           const SizedBox(height: 24),
 
           // Done Button
@@ -299,7 +412,14 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
               height: 44,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(context, _selectedDate);
+                  if (widget.showSlots) {
+                    Navigator.pop(
+                      context,
+                      DateSlotResult(date: _selectedDate, slot: _selectedSlot),
+                    );
+                  } else {
+                    Navigator.pop(context, _selectedDate);
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kPrimary,
@@ -357,6 +477,47 @@ Future<DateTime?> showCustomDatePicker({
     },
   );
 }
+
+class DateSlotResult {
+  final DateTime date;
+  final String slot;
+
+  DateSlotResult({required this.date, required this.slot});
+}
+
+Future<DateSlotResult?> showCustomDateAndSlotPicker({
+  required BuildContext context,
+  required DateTime initialDate,
+  required String initialSlot,
+  required DateTime firstDate,
+  required DateTime lastDate,
+  String title = 'Select Delivery Date',
+}) {
+  return showDialog<DateSlotResult>(
+    context: context,
+    barrierDismissible: true,
+    builder: (context) {
+      return Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        elevation: 12,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        child: CustomDatePickerDialog(
+          initialDate: initialDate,
+          firstDate: firstDate,
+          lastDate: lastDate,
+          title: title,
+          showSlots: true,
+          initialSlot: initialSlot,
+        ),
+      );
+    },
+  );
+}
+
 
 class CustomDateRangePickerDialog extends StatefulWidget {
   final DateTime firstDate;

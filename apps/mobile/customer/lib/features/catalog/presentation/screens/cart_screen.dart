@@ -27,8 +27,12 @@ import '../../../../core/widgets/scrolling_items_loader.dart';
 import 'product_detail_view_screen.dart';
 import '../bloc/catalog_bloc.dart';
 import '../bloc/catalog_state.dart';
+import '../bloc/catalog_event.dart';
 import '../helpers/cart_helpers.dart';
 import '../widgets/cart_widgets.dart';
+import 'home_screen.dart';
+
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  CART SCREEN WIDGET
@@ -48,9 +52,6 @@ class _CartScreenState extends State<CartScreen> {
   /// Key format: "{variantId}_once"
   final Map<String, bool> _selectedItems = {};
 
-  // ignore: unused_field
-  bool _isAddressLoading = false;
-
   /// Global delivery date for all one-time items.
   DateTime? _globalOnetimeDate;
 
@@ -67,6 +68,10 @@ class _CartScreenState extends State<CartScreen> {
       final customerId = sessionState.profile?.customerId;
       if (bloc.state is CartInitialState && customerId != null) {
         bloc.add(LoadCartEvent(customerId));
+      }
+      final catBloc = context.read<CatalogBloc>();
+      if (catBloc.state is! CatalogLoaded) {
+        catBloc.add(LoadCatalog());
       }
     });
   }
@@ -315,33 +320,29 @@ class _CartScreenState extends State<CartScreen> {
                                       ),
                                       const SizedBox(height: 16),
 
-                                      // ===== One-Time Configuration =====
-                                      if (filteredItems.any(
-                                        (item) => item.purchaseType == 'onetime',
-                                      )) ...[
-                                        _buildGlobalOneTimeConfiguration(
-                                          context,
-                                          filteredItems,
-                                        ),
-                                        const SizedBox(height: 16),
-                                      ],
+                                      // ===== Related Products Carousel =====
+                                      _buildRelatedProducts(filteredItems),
+                                      const SizedBox(height: 16),
 
                                       // ===== Bill Summary =====
                                       _buildBillSummary(filteredItems),
                                       const SizedBox(height: 24),
+
                                     ],
                                   ),
                                 ),
                               ),
                             ),
 
-                            // ===== Checkout =====
+                            // ===== Checkout & Delivery Date Bottom Bar =====
                             _buildBottomAction(
                               context,
                               finalGrandTotal,
                               displayItemKeys,
+                              filteredItems,
                             ),
                           ],
+
                         ),
                         // Loading overlay
                         if (state is CartLoadingState)
@@ -507,7 +508,7 @@ class _CartScreenState extends State<CartScreen> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: itemKeys.length,
-              separatorBuilder: (_, __) =>
+              separatorBuilder: (_, _) =>
                   const Divider(color: kBorderLt, height: 1),
               itemBuilder: (context, i) {
                 final key = itemKeys[i];
@@ -674,7 +675,16 @@ class _CartScreenState extends State<CartScreen> {
     BuildContext context,
     double total,
     List<String> itemKeys,
+    List<CartItemEntity> filteredItems,
   ) {
+    final now = DateTime.now();
+    final date = _globalOnetimeDate ?? getDefaultDeliveryDate(now);
+    final slot = _globalOnetimeSlot;
+    final dateFormatted = '${date.day}/${date.month}/${date.year}';
+    final slotInitial = slot.isNotEmpty ? ' (${slot[0]})' : '';
+    final hasOnetimeItems =
+        filteredItems.any((item) => item.purchaseType == 'onetime');
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
@@ -682,200 +692,130 @@ class _CartScreenState extends State<CartScreen> {
         border: const Border(top: BorderSide(color: kBorderLt)),
         boxShadow: [
           BoxShadow(
-            color: kPrimary.withOpacity(0.04),
+            color: kPrimary.withValues(alpha: 0.04),
             blurRadius: 16,
             offset: const Offset(0, -4),
           ),
         ],
       ),
       child: SafeArea(
-        child: ElevatedButton(
-          onPressed: () {
-            final selectedKeys = itemKeys
-                .where((k) => _selectedItems[k] ?? true)
-                .toList();
-
-            if (selectedKeys.isEmpty) {
-              F2HToast.error(
-                context,
-                'Please select at least one item to proceed.',
-              );
-              return;
-            }
-
-            // Navigate to Checkout Screen
-            context.runWithAuth(() {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CheckoutScreen(selectedItemIds: selectedKeys),
-                ),
-              );
-            });
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: kPrimary,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 50),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            elevation: 0,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '₹${total.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 16,
-                ),
-              ),
-              const Row(
-                children: [
-                  Text(
-                    'PROCEED TO CHECKOUT',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 13,
-                      letterSpacing: 0.5,
+        child: Row(
+          children: [
+            // Button 1 (Left): Delivery Date Button (if one-time items exist)
+            if (hasOnetimeItems) ...[
+              Expanded(
+                flex: 5,
+                child: GestureDetector(
+                  onTap: () => _selectGlobalDate(context, filteredItems),
+                  child: Container(
+                    height: 50,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: kPrimary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: kPrimary.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.local_shipping_rounded,
+                          size: 15,
+                          color: kPrimary,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            '$dateFormatted$slotInitial',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              color: kPrimary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.edit_rounded,
+                          size: 13,
+                          color: kPrimary,
+                        ),
+                      ],
                     ),
                   ),
-                  SizedBox(width: 6),
-                  Icon(Icons.arrow_forward_rounded, size: 16),
-                ],
+                ),
               ),
+              const SizedBox(width: 10),
             ],
-          ),
+
+            // Button 2 (Right): Proceed to Checkout Button (without price)
+            Expanded(
+              flex: 6,
+              child: SizedBox(
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () {
+                    final selectedKeys = itemKeys
+                        .where((k) => _selectedItems[k] ?? true)
+                        .toList();
+
+                    if (selectedKeys.isEmpty) {
+                      F2HToast.error(
+                        context,
+                        'Please select at least one item to proceed.',
+                      );
+                      return;
+                    }
+
+                    // Navigate to Checkout Screen
+                    context.runWithAuth(() {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              CheckoutScreen(selectedItemIds: selectedKeys),
+                        ),
+                      );
+                    });
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'CHECKOUT',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 12,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      SizedBox(width: 6),
+                      Icon(Icons.arrow_forward_rounded, size: 16),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  // ===== One-Time Configuration =====
 
-  /// Global date and slot selector for all one-time items.
-  Widget _buildGlobalOneTimeConfiguration(
-    BuildContext context,
-    List<CartItemEntity> items,
-  ) {
-    return SectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.local_shipping_rounded, size: 16, color: kPrimary),
-              SizedBox(width: 8),
-              Text(
-                'One-Time Delivery Schedule',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: kText,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'DELIVERY DATE',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
-              color: kTextSub,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 10),
-          GestureDetector(
-            onTap: () => _selectGlobalDate(context, items),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: kBorder),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.calendar_today_rounded,
-                    size: 16,
-                    color: kPrimary,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      _globalOnetimeDate != null
-                          ? 'Delivery Date: ${_globalOnetimeDate!.day}/${_globalOnetimeDate!.month}/${_globalOnetimeDate!.year}'
-                          : 'Select Delivery Date',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: kText,
-                      ),
-                    ),
-                  ),
-                  const Icon(
-                    Icons.keyboard_arrow_right_rounded,
-                    size: 18,
-                    color: kTextSub,
-                  ),
-                ],
-              ),
-            ),
-          ),
 
-          const SizedBox(height: 20),
-          const Text(
-            'DELIVERY SLOT',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
-              color: kTextSub,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 10),
-          // ===== Slot visibility based on selected date =====
-          // Today → Evening only; Tomorrow+ → both Morning and Evening
-          Builder(
-            builder: (context) {
-              final now = DateTime.now();
-              final slots = getAvailableSlots(_globalOnetimeDate ?? now, now);
-              return Row(
-                children: [
-                  if (slots.contains('Morning')) ...[
-                    Expanded(
-                      child: _buildGlobalSlotOption(
-                        'Morning',
-                        Icons.wb_sunny_rounded,
-                        Colors.white,
-                        Colors.orange.shade300,
-                        items,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                  ],
-                  Expanded(
-                    child: _buildGlobalSlotOption(
-                      'Evening',
-                      Icons.nightlight_round,
-                      kTextMid,
-                      Colors.blueGrey.shade100,
-                      items,
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
 
   Future<void> _selectGlobalDate(
     BuildContext context,
@@ -884,23 +824,19 @@ class _CartScreenState extends State<CartScreen> {
     final now = DateTime.now();
     final firstDate = getFirstAllowedDate(now);
 
-    final DateTime? picked = await showCustomDatePicker(
+    final DateSlotResult? result = await showCustomDateAndSlotPicker(
       context: context,
       initialDate: _globalOnetimeDate ?? firstDate,
+      initialSlot: _globalOnetimeSlot,
       firstDate: firstDate,
       lastDate: now.add(const Duration(days: 30)),
       title: 'Select Delivery Date',
     );
 
-    if (picked != null) {
+    if (result != null) {
       setState(() {
-        _globalOnetimeDate = picked;
-        // Auto-update slot based on new date:
-        // Today → Evening only, Tomorrow+ → keep current or default to Morning
-        final availableSlots = getAvailableSlots(picked, now);
-        if (!availableSlots.contains(_globalOnetimeSlot)) {
-          _globalOnetimeSlot = getDefaultSlot(picked, now);
-        }
+        _globalOnetimeDate = result.date;
+        _globalOnetimeSlot = result.slot;
       });
       _syncGlobalOnetimeToBloc(items);
     }
@@ -926,61 +862,72 @@ class _CartScreenState extends State<CartScreen> {
     context.read<CartBloc>().add(SyncCartEvent(updatedItems));
   }
 
-  Widget _buildGlobalSlotOption(
-    String title,
-    IconData icon,
-    Color iconColorInactive,
-    Color iconColorActive,
-    List<CartItemEntity> items,
-  ) {
-    final isSel = _globalOnetimeSlot == title;
-    return GestureDetector(
-      onTap: () {
-        setState(() => _globalOnetimeSlot = title);
-        _syncGlobalOnetimeToBloc(items);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isSel ? const Color(0xFFFFC107) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSel ? const Color(0xFFFFB300) : kBorderLt,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+  /// Renders non-subscription related product cards with auto-scroll animation like home screen.
+  Widget _buildRelatedProducts(List<CartItemEntity> filteredItems) {
+    return BlocBuilder<CatalogBloc, CatalogState>(
+      builder: (context, state) {
+        if (state is! CatalogLoaded || state.products.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        // Filter out subscription products AND products already in cart
+        final cartVariantIds = filteredItems.map((i) => i.variantId).toSet();
+        final relatedProducts = state.products
+            .where((p) => !p.isSubscribable && !cartVariantIds.contains(p.id))
+            .toList();
+
+        if (relatedProducts.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              icon,
-              size: 18,
-              color: isSel ? Colors.white : iconColorInactive,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: isSel ? Colors.white : kText,
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: Row(
+                children: [
+                  Icon(Icons.auto_awesome_rounded, size: 16, color: kPrimary),
+                  SizedBox(width: 6),
+                  Text(
+                    'You Might Also Like',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      color: kText,
+                    ),
+                  ),
+                ],
               ),
             ),
-            if (isSel) ...[
-              const SizedBox(width: 4),
-              const Icon(
-                Icons.check_circle_rounded,
-                size: 14,
-                color: Colors.white,
-              ),
-            ],
+            const SizedBox(height: 10),
+            InfiniteAutoScrollList(
+              height: 245,
+              itemWidth: 170,
+              autoScrollInterval: const Duration(milliseconds: 10000),
+              scrollDuration: const Duration(milliseconds: 1000),
+              animateClockwise: false,
+              items: relatedProducts
+                  .map(
+                    (p) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: oneTimeProductCard(context, p),
+                    ),
+                  )
+                  .toList(),
+
+
+            ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 }
 
+
 // ═══════════════════════════════════════════════════════════════════════════
+
 //  CART ITEM TILE
 //
 //  Renders a single one-time order item in the cart list.
