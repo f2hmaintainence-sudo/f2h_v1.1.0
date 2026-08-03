@@ -21,7 +21,6 @@ import {
   Sun,
   Moon,
   AlertTriangle,
-  AlertTriangle,
   X,
   Calendar,
 } from 'lucide-react';
