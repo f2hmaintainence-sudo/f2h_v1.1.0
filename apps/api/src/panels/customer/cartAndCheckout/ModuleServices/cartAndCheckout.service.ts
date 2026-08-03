@@ -469,6 +469,8 @@ export class CartService {
         }
       }
 
+      await this.broadcastNewOrderToLiveOrders(orderId);
+
       walletTransactionsToInsert.push({
         amount: totalAmount,
         reference_type: 'order',
@@ -646,6 +648,66 @@ export class CartService {
           );
         } catch (_) {}
       }
+    }
+  }
+
+  private async broadcastNewOrderToLiveOrders(orderId: string) {
+    try {
+      const sql = `
+        SELECT
+          o.order_id,
+          o.customer_id,
+          o.customer_name,
+          o.status,
+          o.order_source,
+          o.delivery_slot,
+          o.address_line,
+          o.contact_number,
+          o.total_amount,
+          o.delivery_partner_id,
+          o.assignment_method,
+          o.assigned_at,
+          o.scheduled_date,
+          o.created_at,
+          o.branch_id,
+          b.branch_name,
+          COALESCE(NULLIF(TRIM(db.full_name), ''), NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), u.user_name) AS partner_name,
+          COALESCE(NULLIF(TRIM(db.phone), ''), NULLIF(TRIM(u.phone), ''), NULLIF(TRIM(db.email), ''), NULLIF(TRIM(u.email), ''), '—') AS partner_phone,
+          COALESCE(
+            (
+              SELECT json_agg(
+                json_build_object(
+                  'id', oi.id,
+                  'product_name', COALESCE(p.name, oi.product_name, 'Fresh Item'),
+                  'variant_name', pv.name,
+                  'quantity', oi.quantity,
+                  'unit_price', oi.unit_price,
+                  'final_price', COALESCE(oi.final_price, oi.total_price, oi.unit_price * oi.quantity)
+                )
+              )
+              FROM order_items oi
+              LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
+              LEFT JOIN products p ON p.product_id = pv.product_id
+              WHERE oi.order_id = o.order_id
+            ), '[]'::json
+          ) AS items
+        FROM orders o
+        LEFT JOIN delivery_partners db ON (db.delivery_partner_id = o.delivery_partner_id OR db.user_id = o.delivery_partner_id)
+        LEFT JOIN users u ON u.user_id = o.delivery_partner_id
+        LEFT JOIN branches b ON b.branch_id = o.branch_id
+        WHERE o.order_id = $1 OR o.id::text = $1
+        LIMIT 1
+      `;
+      const rows = await this.db.query(sql, [orderId]);
+      if (rows && rows.length > 0) {
+        const orderData = rows[0];
+        const gateway = this.notificationService.getGateway();
+        if (gateway && typeof gateway.emitOrderCreated === 'function') {
+          gateway.emitOrderCreated(orderData);
+        }
+      }
+    } catch (err) {
+      this.developer.error('broadcastNewOrderToLiveOrders error', { err });
     }
   }
 }

@@ -127,7 +127,18 @@ export class OrdersService {
       const params: any[] = [];
       const where: string[] = [];
 
-      if (query.date) {
+      if (query.fromDate && query.toDate) {
+        params.push(query.fromDate);
+        where.push(`scheduled_date >= $${params.length}`);
+        params.push(query.toDate);
+        where.push(`scheduled_date <= $${params.length}`);
+      } else if (query.fromDate) {
+        params.push(query.fromDate);
+        where.push(`scheduled_date >= $${params.length}`);
+      } else if (query.toDate) {
+        params.push(query.toDate);
+        where.push(`scheduled_date <= $${params.length}`);
+      } else if (query.date) {
         params.push(query.date);
         where.push(`scheduled_date = $${params.length}`);
       }

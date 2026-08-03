@@ -271,7 +271,7 @@ export default function AllCustomersPage() {
               <div className="space-y-2 mb-4">
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Phone size={14} className="text-fresh-green" />
-                  {c.phone || 'No Phone Registered'}
+                  {(!c.phone || c.phone.startsWith('NO_PHONE_')) ? 'No Phone Registered' : c.phone}
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Mail size={14} className="text-fresh-green shrink-0" />

@@ -83,6 +83,11 @@ export default function TodayOrdersClient({
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [activeStatusFilter, setActiveStatusFilter] = useState<string | null>(null);
 
+  // Date wise filter states
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
+
   // Data states
   const [ordersList, setOrdersList] = useState<Record<string, any>[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
@@ -113,7 +118,13 @@ export default function TodayOrdersClient({
     setSummaryLoading(true);
     try {
       const summaryPath = scope === 'today' ? 'today/summary' : 'summary';
-      const res = await fetch(`${API_URL}/admin/orders/${summaryPath}`, {
+      const queryParams = new URLSearchParams();
+      if (selectedDate) queryParams.set('date', selectedDate);
+      if (fromDate) queryParams.set('fromDate', fromDate);
+      if (toDate) queryParams.set('toDate', toDate);
+
+      const qs = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      const res = await fetch(`${API_URL}/admin/orders/${summaryPath}${qs}`, {
         credentials: 'include',
       });
       const result = await res.json();
@@ -125,7 +136,7 @@ export default function TodayOrdersClient({
     } finally {
       setSummaryLoading(false);
     }
-  }, [scope, showDashboard]);
+  }, [fromDate, scope, selectedDate, showDashboard, toDate]);
 
   useEffect(() => {
     fetchSummary();
@@ -136,6 +147,9 @@ export default function TodayOrdersClient({
     const appendFilters = (path: string) => {
       const url = new URL(path, 'http://local');
       filters.forEach((filter) => url.searchParams.append('filters', filter));
+      if (selectedDate) url.searchParams.append('date', selectedDate);
+      if (fromDate) url.searchParams.append('fromDate', fromDate);
+      if (toDate) url.searchParams.append('toDate', toDate);
       return url.pathname + url.search;
     };
 
@@ -143,21 +157,21 @@ export default function TodayOrdersClient({
 
     if (activeTab === 'subscription') {
       const params = new URLSearchParams({ type: 'subscription' });
-      if (scope === 'today') params.set('today', '1');
+      if (scope === 'today' && !selectedDate && !fromDate && !toDate) params.set('today', '1');
       return appendFilters(`/admin/orders/subscription-orders/table?${params.toString()}`);
     }
 
     if (activeTab === 'one-time') {
       const params = new URLSearchParams({ type: 'one-time' });
-      if (scope === 'today') params.set('today', '1');
+      if (scope === 'today' && !selectedDate && !fromDate && !toDate) params.set('today', '1');
       return appendFilters(`/admin/orders/onetime-orders/table?${params.toString()}`);
     }
 
-    if (scope === 'today') {
+    if (scope === 'today' && !selectedDate && !fromDate && !toDate) {
       return appendFilters(`/admin/orders/today/table`);
     }
     return appendFilters(`/admin/orders/table`);
-  }, [activeTab, endpointOverride, filters, scope]);
+  }, [activeTab, endpointOverride, filters, fromDate, scope, selectedDate, toDate]);
 
   // Fetch orders list for Cards view
   const fetchOrdersList = useCallback(async () => {
@@ -454,6 +468,13 @@ export default function TodayOrdersClient({
         onSlotFilterChange={setSlotFilter}
         urgentOnly={urgentOnly}
         onUrgentToggle={() => setUrgentOnly((v) => !v)}
+        selectedDate={selectedDate}
+        onSelectedDateChange={(d) => { setSelectedDate(d); setFromDate(''); setToDate(''); }}
+        fromDate={fromDate}
+        onFromDateChange={(fd) => { setFromDate(fd); setSelectedDate(''); }}
+        toDate={toDate}
+        onToDateChange={(td) => { setToDate(td); setSelectedDate(''); }}
+        onClearDates={() => { setSelectedDate(''); setFromDate(''); setToDate(''); }}
       />
 
       {/* ── View Mode Containers ── */}

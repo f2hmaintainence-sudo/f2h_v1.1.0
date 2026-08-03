@@ -86,9 +86,9 @@ export class PackageService {
           COALESCE(SUM(ccb.lost_quantity), 0)::int AS lost_quantity
         FROM containers c
         LEFT JOIN customer_container_balances ccb
-          ON ccb.packaging_type_id = c.container_id AND ccb.deleted_at IS NULL
+          ON (ccb.container_id = c.container_id OR ccb.container_id = c.id::text) AND ccb.deleted_at IS NULL
         WHERE c.deleted_at IS NULL
-        GROUP BY c.container_id, c.name
+        GROUP BY c.container_id, c.id, c.name
         ORDER BY c.name ASC
         `,
       );
@@ -98,14 +98,13 @@ export class PackageService {
         SELECT
           ct.id,
           ct.customer_id,
-          COALESCE(cnt.name, pt.name, ct.packaging_type_id) AS packaging_type,
+          COALESCE(cnt.name, ct.container_id) AS packaging_type,
           ct.transaction_type,
           ct.quantity,
           ct.transaction_date::text,
           ct.created_at::text
         FROM container_transactions ct
-        LEFT JOIN packaging_types pt ON pt.id = ct.packaging_type_id AND pt.deleted_at IS NULL
-        LEFT JOIN containers cnt ON cnt.container_id = ct.packaging_type_id AND cnt.deleted_at IS NULL
+        LEFT JOIN containers cnt ON (cnt.container_id = ct.container_id OR cnt.id::text = ct.container_id) AND cnt.deleted_at IS NULL
         WHERE ct.deleted_at IS NULL
         ORDER BY ct.created_at DESC
         LIMIT 8
@@ -150,31 +149,58 @@ export class PackageService {
           OR c.phone ILIKE $${params.length}
           OR cnt.name ILIKE $${params.length}
           OR cnt.container_id ILIKE $${params.length}
-          OR pt.name ILIKE $${params.length}
         )`;
       }
 
       const sql = `
         SELECT
           ccb.customer_id,
-          COALESCE(c.full_name, CONCAT(c.first_name, ' ', c.last_name)) AS customer_name,
-          c.phone,
-          COALESCE(cnt.container_id, pt.id, ccb.packaging_type_id) AS container_type_id,
-          COALESCE(cnt.name, pt.name, ccb.packaging_type_id) AS container_name,
-          COALESCE(pt.capacity::text, '1') AS capacity,
-          COALESCE(pt.unit, 'PCS') AS unit,
+          COALESCE(
+            NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''),
+            NULLIF(TRIM(u.user_name), ''),
+            NULLIF(TRIM(c.full_name), ''),
+            NULLIF(TRIM(CONCAT_WS(' ', c.first_name, c.last_name)), ''),
+            NULLIF(TRIM(latest_ord.customer_name), ''),
+            CONCAT('Customer #', ccb.customer_id)
+          ) AS customer_name,
+          COALESCE(
+            NULLIF(TRIM(u.phone), ''),
+            NULLIF(TRIM(c.phone), ''),
+            NULLIF(TRIM(c.mobile), ''),
+            'N/A'
+          ) AS phone,
+          ccb.container_id AS container_type_id,
+          COALESCE(cnt.name, ccb.container_id) AS container_name,
+          '1' AS capacity,
+          'PCS' AS unit,
           ccb.issued_quantity,
           ccb.returned_quantity,
           ccb.damaged_quantity,
           ccb.lost_quantity,
-          GREATEST(0, ccb.issued_quantity - ccb.returned_quantity - ccb.damaged_quantity - ccb.lost_quantity) AS pending_count,
-          ccb.updated_at
+          COALESCE(ccb.balance_quantity, (ccb.issued_quantity - ccb.returned_quantity - ccb.damaged_quantity - ccb.lost_quantity)) AS pending_count,
+          ccb.updated_at,
+          latest_ord.order_id AS latest_order_id,
+          latest_ord.delivery_partner_name,
+          latest_ord.delivery_partner_phone,
+          latest_ord.delivered_at AS latest_delivery_date
         FROM customer_container_balances ccb
-        JOIN customers c ON c.customer_id = ccb.customer_id
-        LEFT JOIN packaging_types pt ON pt.id = ccb.packaging_type_id AND pt.deleted_at IS NULL
-        LEFT JOIN containers cnt ON cnt.container_id = ccb.packaging_type_id AND cnt.deleted_at IS NULL
+        LEFT JOIN users u ON u.user_id = ccb.customer_id
+        LEFT JOIN customers c ON (c.customer_id = ccb.customer_id OR c.id::text = ccb.customer_id)
+        LEFT JOIN containers cnt ON (cnt.container_id = ccb.container_id OR cnt.id::text = ccb.container_id) AND cnt.deleted_at IS NULL
+        LEFT JOIN LATERAL (
+          SELECT 
+            o.order_id,
+            o.customer_name,
+            dp.full_name AS delivery_partner_name,
+            dp.phone AS delivery_partner_phone,
+            COALESCE(o.updated_at, o.created_at) AS delivered_at
+          FROM orders o
+          LEFT JOIN delivery_partners dp ON (dp.delivery_partner_id = o.delivery_partner_id OR dp.id::text = o.delivery_partner_id)
+          WHERE o.customer_id = ccb.customer_id OR o.customer_id = c.customer_id
+          ORDER BY o.created_at DESC
+          LIMIT 1
+        ) latest_ord ON true
         WHERE ccb.deleted_at IS NULL
-          AND GREATEST(0, ccb.issued_quantity - ccb.returned_quantity - ccb.damaged_quantity - ccb.lost_quantity) > 0
           ${searchClause}
         ORDER BY ccb.updated_at DESC
       `;
@@ -251,10 +277,10 @@ export class PackageService {
 
         await client.query(
           `INSERT INTO customer_container_balances (
-            customer_id, packaging_type_id, issued_quantity, returned_quantity,
+            customer_id, container_id, issued_quantity, returned_quantity,
             damaged_quantity, lost_quantity, updated_at
           ) VALUES ($1, $2, 0, $3, $4, $5, NOW())
-          ON CONFLICT (customer_id, packaging_type_id)
+          ON CONFLICT (customer_id, container_id)
           DO UPDATE SET
             ${col} = customer_container_balances.${col} + $${action === 'returned' ? 3 : action === 'damaged' ? 4 : 5},
             updated_at = NOW()`,

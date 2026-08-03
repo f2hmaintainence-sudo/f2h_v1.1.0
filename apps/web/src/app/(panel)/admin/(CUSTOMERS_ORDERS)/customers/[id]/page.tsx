@@ -146,7 +146,7 @@ export default function CustomerDetailsPage() {
             </div>
             
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-600 mb-3">
-              <div className="flex items-center gap-1.5"><Phone size={14} className="text-fresh-green" /> {customer.phone || 'N/A'}</div>
+              <div className="flex items-center gap-1.5"><Phone size={14} className="text-fresh-green" /> {(!customer.phone || customer.phone.startsWith('NO_PHONE_')) ? 'N/A' : customer.phone}</div>
               <div className="flex items-center gap-1.5"><Mail size={14} className="text-fresh-green" /> {customer.email || 'N/A'}</div>
               {primaryAddress && (
                 <div className="flex items-center gap-1.5"><MapPin size={14} className="text-fresh-green" /> {primaryAddress.address_line_1 || primaryAddress.city || 'N/A'}</div>
@@ -267,11 +267,11 @@ export default function CustomerDetailsPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <MetricCard title="TOTAL REVENUE" value={`₹${Number(stats.lifetimeRevenue || 0).toLocaleString()}`} sub="Cumulative spend" onClick={() => setActiveTab('Revenue Trends')} />
+        <MetricCard title="TOTAL REVENUE" value={`₹${Number(stats.lifetimeRevenue ?? stats.lifetime_revenue ?? 0).toLocaleString()}`} sub="Cumulative spend" onClick={() => setActiveTab('Revenue Trends')} />
         <MetricCard title="TOTAL ORDERS" value={`${totalOrdersCount} (${deliveredCount} ✓ / ${cancelledCount} ✕)`} sub="Click for orders" onClick={() => setActiveTab(tabs[1]?.name || 'Orders')} />
-        <MetricCard title="AVG ORDER VALUE" value={`₹${Number(stats.aov || 0).toLocaleString()}`} sub="Average per order" onClick={() => setActiveTab(tabs[1]?.name || 'Orders')} />
+        <MetricCard title="AVG ORDER VALUE" value={`₹${Number(stats.aov ?? stats.avg_order_value ?? 0).toLocaleString()}`} sub="Average per order" onClick={() => setActiveTab(tabs[1]?.name || 'Orders')} />
         <MetricCard title="WALLET BALANCE" value={`₹${Number(customer.wallet_balance || 0).toLocaleString()}`} sub="Prepaid balance" onClick={() => setActiveTab('Wallet Analytics')} />
-        <MetricCard title="OUTSTANDING DUE" value={`₹${Number(stats.outstandingDue || 0).toLocaleString()}`} sub="Postpaid balance due" onClick={() => setActiveTab('Postpaid Ledger')} />
+        <MetricCard title="OUTSTANDING DUE" value={`₹${Number(stats.outstandingDue ?? stats.outstanding_due ?? 0).toLocaleString()}`} sub="Postpaid balance due" onClick={() => setActiveTab('Postpaid Ledger')} />
         <MetricCard title="REWARD POINTS" value={`${customer.reward_points || 0} pts`} sub="Earned reward points" onClick={() => setActiveTab('Overview & Insights')} />
       </div>
 
@@ -395,6 +395,14 @@ function OverviewTab({ customer, formattedOrders, primaryAddress }: { customer: 
 
 function OrdersTab({ orders }: { orders: any[] }) {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
+
+  const totalPages = Math.ceil(orders.length / itemsPerPage) || 1;
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return orders.slice(start, start + itemsPerPage);
+  }, [orders, currentPage]);
 
   const toggleExpand = (id: string) => {
     setExpandedOrderId(prev => (prev === id ? null : id));
@@ -412,220 +420,251 @@ function OrdersTab({ orders }: { orders: any[] }) {
       {orders.length === 0 ? (
         <p className="text-sm text-gray-500">No orders found for this customer.</p>
       ) : (
-        <div className="space-y-3">
-          {orders.map((order, i) => {
-            const isExpanded = expandedOrderId === order.order_id;
-            const isSubscription = Boolean(order.is_subscription || order.subscription_id || order.order_source === 'subscription');
-            const items = order.items || [];
-            const containers = order.containers || [];
+        <>
+          <div className="space-y-3">
+            {paginatedOrders.map((order, i) => {
+              const isExpanded = expandedOrderId === order.order_id;
+              const isSubscription = Boolean(order.is_subscription || order.subscription_id || order.order_source === 'subscription');
+              const items = order.items || [];
+              const containers = order.containers || [];
 
-            return (
-              <div 
-                key={order.order_id || i} 
-                className={`border rounded-2xl transition-all duration-200 overflow-hidden bg-white ${
-                  isExpanded ? 'border-emerald-300 shadow-md ring-1 ring-emerald-200' : 'border-gray-200/80 hover:border-emerald-200 hover:shadow-xs'
-                }`}
-              >
-                {/* Header Row */}
+              return (
                 <div 
-                  onClick={() => toggleExpand(order.order_id)}
-                  className="flex flex-col md:flex-row md:items-center justify-between p-4 cursor-pointer select-none gap-4"
+                  key={order.order_id || i} 
+                  className={`border rounded-2xl transition-all duration-200 overflow-hidden bg-white ${
+                    isExpanded ? 'border-emerald-300 shadow-md ring-1 ring-emerald-200' : 'border-gray-200/80 hover:border-emerald-200 hover:shadow-xs'
+                  }`}
                 >
-                  <div className="flex items-start gap-4">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 font-bold ${
-                      order.status === 'delivered' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 
-                      order.status === 'assigned' || order.status === 'dispatched' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
-                      'bg-blue-50 text-blue-600 border border-blue-100'
-                    }`}>
-                      {isSubscription ? <Calendar size={20} /> : <ShoppingBag size={20} />}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="font-extrabold text-gray-900 text-base">#{order.order_id}</span>
-                        
-                        {/* Status Badge */}
-                        <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
-                          order.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' : 
-                          order.status === 'assigned' || order.status === 'dispatched' ? 'bg-amber-100 text-amber-800' : 
-                          order.status === 'cancelled' ? 'bg-rose-100 text-rose-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {order.status || 'PENDING'}
-                        </span>
-
-                        {/* Order Type Badge */}
-                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 ${
-                          isSubscription ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-700 border border-slate-200'
-                        }`}>
-                          {isSubscription ? <><Calendar size={10} /> Subscription Order</> : <><ShoppingBag size={10} /> One-Time Order</>}
-                        </span>
-                      </div>
-
-                      <p className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
-                        <span>Placed on {new Date(order.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                        <span>•</span>
-                        <span>Slot: <strong className="capitalize text-gray-700">{order.delivery_slot || 'Morning'}</strong></span>
-                        {order.scheduled_date && (
-                          <>
-                            <span>•</span>
-                            <span>Scheduled: <strong className="text-gray-700">{new Date(order.scheduled_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</strong></span>
-                          </>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between md:justify-end gap-6 pt-2 md:pt-0 border-t md:border-t-0 border-gray-100">
-                    <div className="text-left md:text-right">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Payment Method</p>
-                      <span className={`inline-flex items-center gap-1.5 text-xs font-bold capitalize px-2 py-0.5 rounded-md ${
-                        order.payment_status === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                  {/* Header Row */}
+                  <div 
+                    onClick={() => toggleExpand(order.order_id)}
+                    className="flex flex-col md:flex-row md:items-center justify-between p-4 cursor-pointer select-none gap-4"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 font-bold ${
+                        order.status === 'delivered' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 
+                        order.status === 'assigned' || order.status === 'dispatched' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                        'bg-blue-50 text-blue-600 border border-blue-100'
                       }`}>
-                        {order.payment_mode || 'Wallet'} 
-                        <span className="text-[10px]">({order.payment_status === 'paid' ? 'Paid' : 'Unpaid'})</span>
-                      </span>
+                        {isSubscription ? <Calendar size={20} /> : <ShoppingBag size={20} />}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="font-extrabold text-gray-900 text-base">#{order.order_id}</span>
+                          
+                          {/* Status Badge */}
+                          <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                            order.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' : 
+                            order.status === 'assigned' || order.status === 'dispatched' ? 'bg-amber-100 text-amber-800' : 
+                            order.status === 'cancelled' ? 'bg-rose-100 text-rose-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {order.status || 'PENDING'}
+                          </span>
+
+                          {/* Order Type Badge */}
+                          <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 ${
+                            isSubscription ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-700 border border-slate-200'
+                          }`}>
+                            {isSubscription ? <><Calendar size={10} /> Subscription Order</> : <><ShoppingBag size={10} /> One-Time Order</>}
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
+                          <span>Placed on {new Date(order.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                          <span>•</span>
+                          <span>Slot: <strong className="capitalize text-gray-700">{order.delivery_slot || 'Morning'}</strong></span>
+                          {order.scheduled_date && (
+                            <>
+                              <span>•</span>
+                              <span>Scheduled: <strong className="text-gray-700">{new Date(order.scheduled_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</strong></span>
+                            </>
+                          )}
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="text-right flex items-center gap-3">
-                      <div>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Total Amount</p>
-                        <p className="text-base font-black text-gray-900">₹{Number(order.total_amount || 0).toLocaleString()}</p>
+                    <div className="flex items-center justify-between md:justify-end gap-6 pt-2 md:pt-0 border-t md:border-t-0 border-gray-100">
+                      <div className="text-left md:text-right">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Payment Method</p>
+                        <span className={`inline-flex items-center gap-1.5 text-xs font-bold capitalize px-2 py-0.5 rounded-md ${
+                          order.payment_status === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                        }`}>
+                          {order.payment_mode || 'Wallet'} 
+                          <span className="text-[10px]">({order.payment_status === 'paid' ? 'Paid' : 'Unpaid'})</span>
+                        </span>
                       </div>
-                      <div className={`p-1.5 rounded-full bg-slate-100 text-slate-500 transition-transform ${isExpanded ? 'rotate-180 bg-emerald-100 text-emerald-700' : ''}`}>
-                        <ChevronDown size={18} />
+
+                      <div className="text-right flex items-center gap-3">
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Total Amount</p>
+                          <p className="text-base font-black text-gray-900">₹{Number(order.total_amount || 0).toLocaleString()}</p>
+                        </div>
+                        <div className={`p-1.5 rounded-full bg-slate-100 text-slate-500 transition-transform ${isExpanded ? 'rotate-180 bg-emerald-100 text-emerald-700' : ''}`}>
+                          <ChevronDown size={18} />
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Expanded Details Section */}
-                {isExpanded && (
-                  <div className="border-t border-gray-100 bg-slate-50/70 p-5 space-y-5 animate-in fade-in duration-200">
-                    
-                    {/* Delivery Partner & Logistics Details */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs">
-                        <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                          <Truck size={14} className="text-emerald-600" /> Delivery Agent / Partner
-                        </p>
-                        {order.delivery_partner_name ? (
-                          <div className="space-y-1">
-                            <p className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
-                              {order.delivery_partner_name}
-                            </p>
-                            {order.delivery_partner_phone && (
-                              <a href={`tel:${order.delivery_partner_phone}`} className="text-xs text-emerald-600 font-semibold flex items-center gap-1 hover:underline">
-                                <Phone size={12} /> {order.delivery_partner_phone}
-                              </a>
-                            )}
-                            {order.delivery_run_id && (
-                              <p className="text-[11px] text-gray-500 font-mono">Run ID: {order.delivery_run_id}</p>
-                            )}
+                  {/* Expanded Details Section */}
+                  {isExpanded && (
+                    <div className="border-t border-gray-100 bg-slate-50/70 p-5 space-y-5 animate-in fade-in duration-200">
+                      
+                      {/* Delivery Partner & Logistics Details */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs">
+                          <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <Truck size={14} className="text-emerald-600" /> Delivery Agent / Partner
+                          </p>
+                          {order.delivery_partner_name ? (
+                            <div className="space-y-1">
+                              <p className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                                {order.delivery_partner_name}
+                              </p>
+                              {order.delivery_partner_phone && (
+                                <a href={`tel:${order.delivery_partner_phone}`} className="text-xs text-emerald-600 font-semibold flex items-center gap-1 hover:underline">
+                                  <Phone size={12} /> {order.delivery_partner_phone}
+                                </a>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-gray-400 italic">Not assigned to a delivery partner yet</p>
+                          )}
+                        </div>
+
+                        <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs">
+                          <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <CreditCard size={14} className="text-blue-600" /> Payment & Billing
+                          </p>
+                          <div className="space-y-1 text-xs">
+                            <p className="text-gray-700">Mode: <strong className="capitalize font-bold text-gray-900">{order.payment_mode || 'Wallet'}</strong></p>
+                            <p className="text-gray-700">Status: <strong className={`font-bold capitalize ${order.payment_status === 'paid' ? 'text-emerald-600' : 'text-rose-600'}`}>{order.payment_status || 'Pending'}</strong></p>
+                            {order.created_by && <p className="text-gray-500">Source: {order.created_by}</p>}
                           </div>
-                        ) : (
-                          <p className="text-xs text-gray-400 italic">Not assigned to a delivery partner yet</p>
-                        )}
-                      </div>
+                        </div>
 
-                      <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs">
-                        <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                          <CreditCard size={14} className="text-blue-600" /> Payment & Billing
-                        </p>
-                        <div className="space-y-1 text-xs">
-                          <p className="text-gray-700">Mode: <strong className="capitalize font-bold text-gray-900">{order.payment_mode || 'Wallet'}</strong></p>
-                          <p className="text-gray-700">Status: <strong className={`font-bold capitalize ${order.payment_status === 'paid' ? 'text-emerald-600' : 'text-rose-600'}`}>{order.payment_status || 'Pending'}</strong></p>
-                          {order.created_by && <p className="text-gray-500">Source: {order.created_by}</p>}
+                        <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs">
+                          <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <Box size={14} className="text-purple-600" /> Containers & Packaging
+                          </p>
+                          {containers.length > 0 ? (
+                            <div className="space-y-1 text-xs">
+                              {containers.map((c: any, idx: number) => (
+                                <div key={idx} className="flex justify-between items-center text-gray-700">
+                                  <span>{c.packaging_name}:</span>
+                                  <span className="font-bold text-purple-700">{c.quantity} units</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-gray-400 italic">Standard recyclable packaging</p>
+                          )}
                         </div>
                       </div>
 
-                      <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs">
-                        <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                          <Box size={14} className="text-purple-600" /> Containers & Packaging
-                        </p>
-                        {containers.length > 0 ? (
-                          <div className="space-y-1 text-xs">
-                            {containers.map((c: any, idx: number) => (
-                              <div key={idx} className="flex justify-between items-center text-gray-700">
-                                <span>{c.packaging_name}:</span>
-                                <span className="font-bold text-purple-700">{c.quantity} units</span>
+                      {/* Order Items Table */}
+                      <div className="bg-white rounded-xl border border-gray-200/80 overflow-hidden shadow-2xs">
+                        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                          <span className="text-xs font-extrabold text-gray-700 uppercase tracking-wider">Ordered Items ({items.length})</span>
+                          <span className="text-xs text-gray-500 font-semibold">Subtotal: ₹{Number(order.subtotal || order.total_amount).toLocaleString()}</span>
+                        </div>
+                        {items.length === 0 ? (
+                          <div className="p-4 text-xs text-gray-400 italic text-center">No item details recorded for this order.</div>
+                        ) : (
+                          <div className="divide-y divide-gray-100">
+                            {items.map((item: any, idx: number) => (
+                              <div key={idx} className="p-3.5 flex items-center justify-between text-xs hover:bg-slate-50 transition-colors">
+                                <div className="space-y-0.5">
+                                  <p className="font-bold text-gray-900 text-sm">{item.product_name}</p>
+                                  {item.variant_name && <p className="text-gray-500 text-[11px] font-medium">{item.variant_name}</p>}
+                                </div>
+                                <div className="flex items-center gap-6 text-right">
+                                  <div>
+                                    <p className="text-gray-500 font-medium">Qty</p>
+                                    <p className="font-bold text-gray-900">{item.quantity}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-gray-500 font-medium">Unit Price</p>
+                                    <p className="font-semibold text-gray-700">₹{Number(item.unit_price || 0).toLocaleString()}</p>
+                                  </div>
+                                  <div className="min-w-[70px]">
+                                    <p className="text-gray-500 font-medium">Total</p>
+                                    <p className="font-black text-gray-900">₹{Number(item.total_price || (item.unit_price * item.quantity)).toLocaleString()}</p>
+                                  </div>
+                                </div>
                               </div>
                             ))}
                           </div>
-                        ) : (
-                          <p className="text-xs text-gray-400 italic">Standard recyclable packaging</p>
                         )}
-                      </div>
-                    </div>
-
-                    {/* Order Items Table */}
-                    <div className="bg-white rounded-xl border border-gray-200/80 overflow-hidden shadow-2xs">
-                      <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                        <span className="text-xs font-extrabold text-gray-700 uppercase tracking-wider">Ordered Items ({items.length})</span>
-                        <span className="text-xs text-gray-500 font-semibold">Subtotal: ₹{Number(order.subtotal || order.total_amount).toLocaleString()}</span>
-                      </div>
-                      {items.length === 0 ? (
-                        <div className="p-4 text-xs text-gray-400 italic text-center">No item details recorded for this order.</div>
-                      ) : (
-                        <div className="divide-y divide-gray-100">
-                          {items.map((item: any, idx: number) => (
-                            <div key={idx} className="p-3.5 flex items-center justify-between text-xs hover:bg-slate-50 transition-colors">
-                              <div className="space-y-0.5">
-                                <p className="font-bold text-gray-900 text-sm">{item.product_name}</p>
-                                {item.variant_name && <p className="text-gray-500 text-[11px] font-medium">{item.variant_name}</p>}
-                              </div>
-                              <div className="flex items-center gap-6 text-right">
-                                <div>
-                                  <p className="text-gray-500 font-medium">Qty</p>
-                                  <p className="font-bold text-gray-900">{item.quantity}</p>
-                                </div>
-                                <div>
-                                  <p className="text-gray-500 font-medium">Unit Price</p>
-                                  <p className="font-semibold text-gray-700">₹{Number(item.unit_price || 0).toLocaleString()}</p>
-                                </div>
-                                <div className="min-w-[70px]">
-                                  <p className="text-gray-500 font-medium">Total</p>
-                                  <p className="font-black text-gray-900">₹{Number(item.total_price || (item.unit_price * item.quantity)).toLocaleString()}</p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      
-                      {/* Price Summary Footer */}
-                      <div className="p-4 bg-slate-50 border-t border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-xs">
-                        {order.special_instructions && (
-                          <div className="text-gray-600 bg-amber-50 border border-amber-200 p-2 rounded-lg text-[11px]">
-                            <strong className="text-amber-800">Note:</strong> {order.special_instructions}
-                          </div>
-                        )}
-                        <div className="ml-auto space-y-1 text-right min-w-[200px]">
-                          {Number(order.discount_amount || 0) > 0 && (
-                            <div className="flex justify-between text-emerald-600 font-semibold">
-                              <span>Discount:</span>
-                              <span>-₹{Number(order.discount_amount).toLocaleString()}</span>
+                        
+                        {/* Price Summary Footer */}
+                        <div className="p-4 bg-slate-50 border-t border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-xs">
+                          {order.special_instructions && (
+                            <div className="text-gray-600 bg-amber-50 border border-amber-200 p-2 rounded-lg text-[11px]">
+                              <strong className="text-amber-800">Note:</strong> {order.special_instructions}
                             </div>
                           )}
-                          {Number(order.gst_amount || 0) > 0 && (
-                            <div className="flex justify-between text-gray-500">
-                              <span>GST Tax:</span>
-                              <span>₹{Number(order.gst_amount).toLocaleString()}</span>
+                          <div className="ml-auto space-y-1 text-right min-w-[200px]">
+                            {Number(order.discount_amount || 0) > 0 && (
+                              <div className="flex justify-between text-emerald-600 font-semibold">
+                                <span>Discount:</span>
+                                <span>-₹{Number(order.discount_amount).toLocaleString()}</span>
+                              </div>
+                            )}
+                            {Number(order.gst_amount || 0) > 0 && (
+                              <div className="flex justify-between text-gray-500">
+                                <span>GST Tax:</span>
+                                <span>₹{Number(order.gst_amount).toLocaleString()}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between text-sm font-black text-gray-900 pt-1 border-t border-gray-200">
+                              <span>Final Total:</span>
+                              <span className="text-emerald-700">₹{Number(order.total_amount || 0).toLocaleString()}</span>
                             </div>
-                          )}
-                          <div className="flex justify-between text-sm font-black text-gray-900 pt-1 border-t border-gray-200">
-                            <span>Final Total:</span>
-                            <span className="text-emerald-700">₹{Number(order.total_amount || 0).toLocaleString()}</span>
                           </div>
                         </div>
                       </div>
-                    </div>
 
-                  </div>
-                )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Pagination Footer */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-gray-200/80 text-xs font-medium text-slate-600">
+              <div>
+                Showing <strong className="text-slate-900">{(currentPage - 1) * itemsPerPage + 1}</strong> to{" "}
+                <strong className="text-slate-900">{Math.min(currentPage * itemsPerPage, orders.length)}</strong> of{" "}
+                <strong className="text-slate-900">{orders.length}</strong> orders
               </div>
-            );
-          })}
-        </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition-all font-bold shadow-2xs cursor-pointer"
+                >
+                  Previous
+                </button>
+                <span className="px-2 font-bold text-slate-800">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition-all font-bold shadow-2xs cursor-pointer"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
