@@ -15,8 +15,8 @@ class CatalogRepositoryImpl implements CatalogRepository {
 
     // 1. Try to load from cache
     try {
-      // Bumped cache key to cached_products_v12 to force reload deduplicated variant listing
-      final cachedData = prefs.getString('cached_products_v12');
+      // Bumped cache key to cached_products_v13 to force reload variant multi-image data
+      final cachedData = prefs.getString('cached_products_v13');
       if (cachedData != null) {
         final List<dynamic> decoded = jsonDecode(cachedData);
         final cachedProducts = decoded
@@ -50,7 +50,7 @@ class CatalogRepositoryImpl implements CatalogRepository {
 
       if (products.isNotEmpty) {
         final encoded = jsonEncode(products.map((p) => p.toJson()).toList());
-        await prefs.setString('cached_products_v12', encoded);
+        await prefs.setString('cached_products_v13', encoded);
       }
 
       return products;
@@ -114,6 +114,16 @@ class CatalogRepositoryImpl implements CatalogRepository {
             isVariantLowStock = true;
           }
         }
+        final variantImagePath = item['image_path']?.toString();
+        final rawVarImgs = item['images'] ?? item['variant_images'];
+        List<String> parsedVarImgs = [];
+        if (rawVarImgs is List) {
+          parsedVarImgs = rawVarImgs.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+        }
+        if (parsedVarImgs.isEmpty && variantImagePath != null && variantImagePath.isNotEmpty) {
+          parsedVarImgs = [variantImagePath];
+        }
+
         vars.add(ProductVariant(
           id: variantId,
           label: variantName.trim().isNotEmpty ? variantName.trim() : 'Standard',
@@ -125,6 +135,8 @@ class CatalogRepositoryImpl implements CatalogRepository {
           availableQuantity: availQty,
           lowStockThreshold: lowThreshold,
           isLowStock: isVariantLowStock,
+          imagePath: variantImagePath,
+          images: parsedVarImgs,
         ));
       }
       productVariantsMap[pid] = vars;
@@ -165,6 +177,14 @@ class CatalogRepositoryImpl implements CatalogRepository {
 
       final isProductOutOfStock = _readBool(item['is_out_of_stock'], fallback: false);
       final imageAsset = item['image_path']?.toString();
+      final rawProdImgs = item['images'] ?? item['variant_images'];
+      List<String> parsedProdImgs = [];
+      if (rawProdImgs is List) {
+        parsedProdImgs = rawProdImgs.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+      }
+      if (parsedProdImgs.isEmpty && imageAsset != null && imageAsset.isNotEmpty) {
+        parsedProdImgs = [imageAsset];
+      }
 
       final price = double.tryParse(item['price']?.toString() ?? '') ?? 0.0;
       final subscriptionPrice = isSubscribable ? double.tryParse(item['subscription_price']?.toString() ?? '') : null;
@@ -198,7 +218,7 @@ class CatalogRepositoryImpl implements CatalogRepository {
         badge: badge,
         badgeColor: kPrimaryMid,
         imageAsset: imageAsset,
-        images: imageAsset != null && imageAsset.isNotEmpty ? [imageAsset] : const [],
+        images: parsedProdImgs,
         variants: siblingVariants,
       ));
     }

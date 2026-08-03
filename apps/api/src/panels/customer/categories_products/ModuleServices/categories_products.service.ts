@@ -93,7 +93,7 @@ export class CategoriesProductsService {
 
   // ─────────────────────────────────────────────────────────────────────────
   // GET PRODUCTS (all active variants)
-  // Variant images  → product_images.url (variants/ folder, variant_id FK)
+  // Variant images  → product_images.storage_key (variants/ folder, variant_id FK)
   // Product fallback → products.image_path (products/ folder)
   // ─────────────────────────────────────────────────────────────────────────
   async getProducts() {
@@ -131,11 +131,22 @@ export class CategoriesProductsService {
           c.name AS category,
           p.image_path AS product_image,
           (
-            SELECT pi.url FROM product_images pi
+            SELECT pi.storage_key FROM product_images pi
             WHERE pi.variant_id = pv.variant_id
               AND pi.deleted_at IS NULL
-            ORDER BY pi.is_primary DESC LIMIT 1
-          ) AS variant_image
+              AND pi.storage_key IS NOT NULL
+              AND pi.storage_key <> ''
+              AND (pi.is_primary = true OR pi.sort_order = 0)
+            ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST LIMIT 1
+          ) AS variant_image,
+          (
+            SELECT COALESCE(json_agg(pi.storage_key ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST, pi.id ASC), '[]'::json)
+            FROM product_images pi
+            WHERE pi.variant_id = pv.variant_id
+              AND pi.deleted_at IS NULL
+              AND pi.storage_key IS NOT NULL
+              AND pi.storage_key <> ''
+          ) AS variant_images
         FROM product_variants pv
         LEFT JOIN products p ON pv.product_id = p.product_id
         LEFT JOIN categories c ON p.category_id = c.category_id
@@ -148,12 +159,6 @@ export class CategoriesProductsService {
           FROM stock_balances
           GROUP BY product_variant_id
         ) sb ON sb.product_variant_id = pv.variant_id
-        LEFT JOIN LATERAL (
-          SELECT url FROM product_images pi2
-          WHERE pi2.variant_id = pv.variant_id AND pi2.deleted_at IS NULL
-          ORDER BY pi2.is_primary DESC NULLS LAST, pi2.id ASC
-          LIMIT 1
-        ) pi ON true
         WHERE (pv.status = 'active' OR pv.status IS NULL)
           AND (p.is_active = true OR p.is_active IS NULL)
           AND p.deleted_at IS NULL
@@ -162,11 +167,19 @@ export class CategoriesProductsService {
 
       const mappedData = (rows || []).map((item: any) => {
         const ratingInfo = ratingsMap.get(item.product_id) ?? { rating: 0.0, reviews: 0 };
-        // Variant image takes precedence; fall back to product image
+        const rawVariantImages = Array.isArray(item.variant_images) ? item.variant_images : [];
+        const variantImages = rawVariantImages.map((img: string) => resolveImageUrl(img, baseUrl)).filter(Boolean);
         const rawImage = item.variant_image || item.product_image;
+        const primaryImage = resolveImageUrl(rawImage, baseUrl);
+        const allImages = variantImages.length > 0
+          ? variantImages
+          : (primaryImage ? [primaryImage] : []);
+
         return {
           ...item,
-          image_path: resolveImageUrl(rawImage, baseUrl),
+          image_path: primaryImage,
+          variant_images: allImages,
+          images: allImages,
           rating: ratingInfo.rating,
           reviews: ratingInfo.reviews,
         };
@@ -215,11 +228,22 @@ export class CategoriesProductsService {
           c.name AS category,
           p.image_path AS product_image,
           (
-            SELECT pi.url FROM product_images pi
+            SELECT pi.storage_key FROM product_images pi
             WHERE pi.variant_id = pv.variant_id
               AND pi.deleted_at IS NULL
-            ORDER BY pi.is_primary DESC LIMIT 1
-          ) AS variant_image
+              AND pi.storage_key IS NOT NULL
+              AND pi.storage_key <> ''
+              AND (pi.is_primary = true OR pi.sort_order = 0)
+            ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST LIMIT 1
+          ) AS variant_image,
+          (
+            SELECT COALESCE(json_agg(pi.storage_key ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST, pi.id ASC), '[]'::json)
+            FROM product_images pi
+            WHERE pi.variant_id = pv.variant_id
+              AND pi.deleted_at IS NULL
+              AND pi.storage_key IS NOT NULL
+              AND pi.storage_key <> ''
+          ) AS variant_images
         FROM product_variants pv
         LEFT JOIN products p ON pv.product_id = p.product_id
         LEFT JOIN categories c ON p.category_id = c.category_id
@@ -232,12 +256,6 @@ export class CategoriesProductsService {
           FROM stock_balances
           GROUP BY product_variant_id
         ) sb ON sb.product_variant_id = pv.variant_id
-        LEFT JOIN LATERAL (
-          SELECT url FROM product_images pi2
-          WHERE pi2.variant_id = pv.variant_id AND pi2.deleted_at IS NULL
-          ORDER BY pi2.is_primary DESC NULLS LAST, pi2.id ASC
-          LIMIT 1
-        ) pi ON true
         WHERE (pv.status = 'active' OR pv.status IS NULL)
           AND (p.is_active = true OR p.is_active IS NULL)
           AND p.deleted_at IS NULL
@@ -247,10 +265,19 @@ export class CategoriesProductsService {
 
       const mappedData = (rows || []).map((item: any) => {
         const ratingInfo = ratingsMap.get(item.product_id) ?? { rating: 0.0, reviews: 0 };
+        const rawVariantImages = Array.isArray(item.variant_images) ? item.variant_images : [];
+        const variantImages = rawVariantImages.map((img: string) => resolveImageUrl(img, baseUrl)).filter(Boolean);
         const rawImage = item.variant_image || item.product_image;
+        const primaryImage = resolveImageUrl(rawImage, baseUrl);
+        const allImages = variantImages.length > 0
+          ? variantImages
+          : (primaryImage ? [primaryImage] : []);
+
         return {
           ...item,
-          image_path: resolveImageUrl(rawImage, baseUrl),
+          image_path: primaryImage,
+          variant_images: allImages,
+          images: allImages,
           rating: ratingInfo.rating,
           reviews: ratingInfo.reviews,
         };

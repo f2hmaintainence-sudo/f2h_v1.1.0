@@ -12,8 +12,6 @@ import '../bloc/catalog_event.dart';
 import '../bloc/cart/cart_bloc.dart';
 import '../bloc/cart/cart_state.dart';
 import '../../../../core/widgets/custom_button.dart';
-import '../../../../core/session/customer_session_cubit.dart';
-import '../../../../core/session/customer_session_state.dart';
 
 // ══════════════════════════════════════════════════════════
 //  BROWSE SCREEN — Blinkit-style top chips + sidebar + grid
@@ -133,67 +131,59 @@ class _BrowseState extends State<BrowseScreen> {
             left: Navigator.canPop(context) ? 0 : 16,
             right: 12,
           ),
-          child: BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
-            builder: (context, sessionState) {
-              final isVip = sessionState.profile?.isMember == true;
-
-              return Container(
-                height: 42,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFAFBF9),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(
-                    color: isVip ? const Color(0xFFFFD700) : kPrimary.withValues(alpha: 0.12),
-                    width: 1.5,
+          child: Container(
+            height: 42,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFAFBF9),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(
+                color: kPrimary.withValues(alpha: 0.12),
+                width: 1.0,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: kPrimary.withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                const SizedBox(width: 12),
+                const Icon(
+                  Icons.search_rounded,
+                  color: kPrimary,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: kText,
+                    ),
+                    onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                    decoration: const InputDecoration(
+                      hintText: 'Search milk, ghee, paneer…',
+                      hintStyle: TextStyle(color: kTextSub, fontSize: 13.5),
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: isVip
-                          ? const Color(0xFFFFD700).withValues(alpha: 0.3)
-                          : kPrimary.withValues(alpha: 0.03),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
                 ),
-                child: Row(
-                  children: [
-                    const SizedBox(width: 12),
-                    Icon(
-                      Icons.search_rounded,
-                      color: isVip ? const Color(0xFFB8860B) : kPrimary,
-                      size: 20,
+                if (_searchQuery.isNotEmpty)
+                  GestureDetector(
+                    onTap: () => _searchController.clear(),
+                    child: const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Icon(Icons.close_rounded, size: 16, color: kTextSub),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        style: const TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600,
-                          color: kText,
-                        ),
-                        onTapOutside: (_) => FocusScope.of(context).unfocus(),
-                        decoration: const InputDecoration(
-                          hintText: 'Search milk, ghee, paneer…',
-                          hintStyle: TextStyle(color: kTextSub, fontSize: 13.5),
-                          border: InputBorder.none,
-                          isDense: true,
-                        ),
-                      ),
-                    ),
-                    if (_searchQuery.isNotEmpty)
-                      GestureDetector(
-                        onTap: () => _searchController.clear(),
-                        child: const Padding(
-                          padding: EdgeInsets.all(8),
-                          child: Icon(Icons.close_rounded, size: 16, color: kTextSub),
-                        ),
-                      ),
-                  ],
-                ),
-              );
-            },
+                  ),
+              ],
+            ),
           ),
         ),
         titleSpacing: 0,

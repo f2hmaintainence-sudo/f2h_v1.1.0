@@ -24,10 +24,20 @@ class PauseSubscriptionRequested extends SubscriptionEvent {
 
 class ResumeSubscriptionRequested extends SubscriptionEvent {
   final String subscriptionId;
-  const ResumeSubscriptionRequested({required this.subscriptionId});
+  final String? resumeDate;
+  const ResumeSubscriptionRequested({required this.subscriptionId, this.resumeDate});
 
   @override
-  List<Object?> get props => [subscriptionId];
+  List<Object?> get props => [subscriptionId, resumeDate];
+}
+
+class UpdateAutoRenewRequested extends SubscriptionEvent {
+  final String subscriptionId;
+  final bool autoRenew;
+  const UpdateAutoRenewRequested({required this.subscriptionId, required this.autoRenew});
+
+  @override
+  List<Object?> get props => [subscriptionId, autoRenew];
 }
 
 // ══════════════════════════════════════════════════════════

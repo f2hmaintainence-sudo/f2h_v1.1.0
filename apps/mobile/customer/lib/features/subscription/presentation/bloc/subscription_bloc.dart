@@ -19,6 +19,7 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
     on<CancelSubscriptionItemRequested>(_onCancelSubscriptionItem);
     on<CancelSubscriptionRequested>(_onCancelSubscription);
     on<LoadPauseHistoryRequested>(_onLoadPauseHistory);
+    on<UpdateAutoRenewRequested>(_onUpdateAutoRenew);
   }
 
   Future<void> _onLoadSubscriptions(LoadSubscriptions event, Emitter<SubscriptionState> emit) async {
@@ -230,7 +231,10 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
   Future<void> _onResumeSubscription(ResumeSubscriptionRequested event, Emitter<SubscriptionState> emit) async {
     emit(SubscriptionLoading());
     try {
-      final success = await subscriptionRepository.resumeSubscription(event.subscriptionId);
+      final success = await subscriptionRepository.resumeSubscription(
+        event.subscriptionId,
+        resumeDate: event.resumeDate,
+      );
       if (success) {
         emit(const SubscriptionActionSuccess('Subscription resumed'));
         final results = await Future.wait([
@@ -246,6 +250,23 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
       }
     } catch (e) {
       emit(SubscriptionError(extractErrorMessage(e)));
+    }
+  }
+
+  Future<void> _onUpdateAutoRenew(UpdateAutoRenewRequested event, Emitter<SubscriptionState> emit) async {
+    try {
+      await subscriptionRepository.updateAutoRenew(event.subscriptionId, event.autoRenew);
+      // Reload subscriptions to reflect updated auto_renew
+      final results = await Future.wait([
+        subscriptionRepository.getSubscriptions(),
+        subscriptionRepository.getOrders(),
+      ]);
+      emit(SubscriptionLoaded(
+        subscriptions: results[0] as List<Subscription>,
+        orders: results[1] as List<Order>,
+      ));
+    } catch (e) {
+      // Silently fail — auto renew toggle is best-effort
     }
   }
 

@@ -69,8 +69,6 @@ class _HomeScreenState extends State<HomeScreen>
     'Search "thick curd"...',
   ];
 
-
-
   @override
   void initState() {
     super.initState();
@@ -122,13 +120,19 @@ class _HomeScreenState extends State<HomeScreen>
                 context.read<CartBloc>().add(LoadCartEvent(customerId));
                 context.read<NotificationsBloc>().add(LoadNotifications());
               }
-              
+
               await Future.wait([
-                context.read<CatalogBloc>().stream.firstWhere((s) => s is CatalogLoaded || s is CatalogError),
+                context.read<CatalogBloc>().stream.firstWhere(
+                  (s) => s is CatalogLoaded || s is CatalogError,
+                ),
                 if (customerId != null) ...[
-                  context.read<CartBloc>().stream.firstWhere((s) => s is CartLoadedState || s is CartErrorState),
-                  context.read<NotificationsBloc>().stream.firstWhere((s) => s is NotificationsLoaded || s is NotificationsError),
-                ]
+                  context.read<CartBloc>().stream.firstWhere(
+                    (s) => s is CartLoadedState || s is CartErrorState,
+                  ),
+                  context.read<NotificationsBloc>().stream.firstWhere(
+                    (s) => s is NotificationsLoaded || s is NotificationsError,
+                  ),
+                ],
               ]);
             },
             child: CustomScrollView(
@@ -146,7 +150,8 @@ class _HomeScreenState extends State<HomeScreen>
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const BrowseScreen(initialCategory: 'All'),
+                          builder: (_) =>
+                              const BrowseScreen(initialCategory: 'All'),
                         ),
                       );
                     },
@@ -180,7 +185,8 @@ class _HomeScreenState extends State<HomeScreen>
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => const BrowseScreen(initialCategory: 'All'),
+                                builder: (_) =>
+                                    const BrowseScreen(initialCategory: 'All'),
                               ),
                             );
                           },
@@ -211,15 +217,19 @@ class _HomeScreenState extends State<HomeScreen>
                 SliverToBoxAdapter(
                   child: BlocBuilder<CatalogBloc, CatalogState>(
                     builder: (context, state) {
-                      final isOffline = context.read<NetworkBloc>().state is NetworkOffline;
-                      if (state is CatalogLoading || state is CatalogInitial || isOffline) {
+                      final isOffline =
+                          context.read<NetworkBloc>().state is NetworkOffline;
+                      if (state is CatalogLoading ||
+                          state is CatalogInitial ||
+                          isOffline) {
                         return SizedBox(
                           height: 245,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             itemCount: 4,
-                            separatorBuilder: (_, __) => const SizedBox(width: 12),
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(width: 12),
                             itemBuilder: (_, __) => const SizedBox(
                               width: 162,
                               child: _HomeSkeletonCard(),
@@ -233,7 +243,9 @@ class _HomeScreenState extends State<HomeScreen>
                           height: 245,
                           child: Center(
                             child: TextButton.icon(
-                              onPressed: () => context.read<CatalogBloc>().add(LoadCatalog()),
+                              onPressed: () => context.read<CatalogBloc>().add(
+                                LoadCatalog(),
+                              ),
                               icon: const Icon(Icons.refresh),
                               label: const Text('Retry products'),
                             ),
@@ -243,14 +255,18 @@ class _HomeScreenState extends State<HomeScreen>
 
                       List<Product> products = [];
                       if (state is CatalogLoaded) {
-                         products = state.products.where((p) => p.isSubscribable).toList();
+                        products = state.products
+                            .where((p) => p.isSubscribable)
+                            .toList();
                       }
                       if (products.isEmpty) {
                         return SizedBox(
                           height: 245,
                           child: Center(
                             child: TextButton.icon(
-                              onPressed: () => context.read<CatalogBloc>().add(LoadCatalog()),
+                              onPressed: () => context.read<CatalogBloc>().add(
+                                LoadCatalog(),
+                              ),
                               icon: const Icon(Icons.refresh),
                               label: const Text('Retry products'),
                             ),
@@ -266,7 +282,9 @@ class _HomeScreenState extends State<HomeScreen>
                         items: products
                             .map(
                               (p) => Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
                                 child: _subscriptionProductCard(context, p),
                               ),
                             )
@@ -283,8 +301,6 @@ class _HomeScreenState extends State<HomeScreen>
                     child: ImageBanner(),
                   ),
                 ),
-
-
 
                 // 6. One time Product
                 SliverToBoxAdapter(
@@ -307,7 +323,8 @@ class _HomeScreenState extends State<HomeScreen>
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => const BrowseScreen(initialCategory: 'All'),
+                                builder: (_) =>
+                                    const BrowseScreen(initialCategory: 'All'),
                               ),
                             );
                           },
@@ -338,15 +355,19 @@ class _HomeScreenState extends State<HomeScreen>
                 SliverToBoxAdapter(
                   child: BlocBuilder<CatalogBloc, CatalogState>(
                     builder: (context, state) {
-                      final isOffline = context.read<NetworkBloc>().state is NetworkOffline;
-                      if (state is CatalogLoading || state is CatalogInitial || isOffline) {
+                      final isOffline =
+                          context.read<NetworkBloc>().state is NetworkOffline;
+                      if (state is CatalogLoading ||
+                          state is CatalogInitial ||
+                          isOffline) {
                         return SizedBox(
                           height: 245,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             itemCount: 4,
-                            separatorBuilder: (_, __) => const SizedBox(width: 12),
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(width: 12),
                             itemBuilder: (_, __) => const SizedBox(
                               width: 162,
                               child: _HomeSkeletonCard(),
@@ -361,7 +382,9 @@ class _HomeScreenState extends State<HomeScreen>
 
                       List<Product> products = [];
                       if (state is CatalogLoaded) {
-                         products = state.products.where((p) => !p.isSubscribable).toList();
+                        products = state.products
+                            .where((p) => !p.isSubscribable)
+                            .toList();
                       }
                       if (products.isEmpty) {
                         return const SizedBox.shrink();
@@ -375,7 +398,9 @@ class _HomeScreenState extends State<HomeScreen>
                         items: products
                             .map(
                               (p) => Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
                                 child: _oneTimeProductCard(context, p),
                               ),
                             )
@@ -386,9 +411,7 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
 
                 // 6. Referral Banner (Invite Friends, Earn Rewards!)
-                const SliverToBoxAdapter(
-                  child: _HomeReferralBanner(),
-                ),
+                const SliverToBoxAdapter(child: _HomeReferralBanner()),
 
                 // 7. The F2H Promise
                 SliverToBoxAdapter(child: _promiseStrip()),
@@ -561,17 +584,21 @@ class _HomeScreenState extends State<HomeScreen>
                           end: Alignment.bottomRight,
                         )
                       : null,
-                  color: isVip ? null : (isAuthenticated ? const Color(0xFF16653A) : Colors.white),
+                  color: isVip
+                      ? null
+                      : (isAuthenticated
+                            ? const Color(0xFF16653A)
+                            : Colors.white),
                   shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: isVip
-                          ? const Color(0xFFFFD700).withValues(alpha: 0.45)
-                          : Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
+                  // boxShadow: [
+                  //   BoxShadow(
+                  //     color: isVip
+                  //         ? const Color(0xFFFFD700).withValues(alpha: 0.45)
+                  //         : Colors.black.withValues(alpha: 0.08),
+                  //     blurRadius: 8,
+                  //     offset: const Offset(0, 3),
+                  //   ),
+                  // ],
                 ),
                 // ── Inner circle (VIP: white, normal: transparent) ──────
                 padding: isVip ? const EdgeInsets.all(2.5) : EdgeInsets.zero,
@@ -587,7 +614,9 @@ class _HomeScreenState extends State<HomeScreen>
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w900,
-                              color: isVip ? const Color(0xFF133220) : Colors.white,
+                              color: isVip
+                                  ? const Color(0xFF133220)
+                                  : Colors.white,
                               height: 1.0,
                             ),
                           )
@@ -657,7 +686,8 @@ class _HomeScreenState extends State<HomeScreen>
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const BrowseScreen(initialCategory: 'All'),
+                      builder: (_) =>
+                          const BrowseScreen(initialCategory: 'All'),
                     ),
                   );
                 },
@@ -672,7 +702,7 @@ class _HomeScreenState extends State<HomeScreen>
                 return _categoryShortcutItem(
                   label: label,
                   imagePath: imagePath,
-                  bgColor: bgColor,
+                  // bgColor: bgColor,
                   onTap: () {
                     Navigator.push(
                       context,
@@ -692,7 +722,8 @@ class _HomeScreenState extends State<HomeScreen>
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const BrowseScreen(initialCategory: 'All'),
+                      builder: (_) =>
+                          const BrowseScreen(initialCategory: 'All'),
                     ),
                   );
                 },
@@ -728,15 +759,16 @@ class _HomeScreenState extends State<HomeScreen>
                 color: isAll
                     ? const Color(0xFF16653A)
                     : (isMore
-                        ? const Color(0xFFECEFF1)
-                        : (bgColor ?? Colors.white)),
+                          ? const Color(0xFFECEFF1)
+                          : (bgColor ?? Colors.white)),
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: isAll
                       ? Colors.transparent
                       : (isMore
-                          ? const Color(0xFFECEFF1)
-                          : (bgColor?.withValues(alpha: 0.8) ?? const Color(0xFFECEFF1))),
+                            ? const Color(0xFFECEFF1)
+                            : (bgColor?.withValues(alpha: 0.8) ??
+                                  const Color(0xFFECEFF1))),
                   width: 1.0,
                 ),
                 boxShadow: [
@@ -755,21 +787,21 @@ class _HomeScreenState extends State<HomeScreen>
                         size: 30,
                       )
                     : (imagePath != null && imagePath.isNotEmpty
-                        ? ClipOval(
-                            child: Padding(
-                              padding: const EdgeInsets.all(4.0),
-                              child: buildProductImage(
-                                label,
-                                imageAsset: imagePath,
-                                fit: BoxFit.contain,
+                          ? ClipOval(
+                              child: Padding(
+                                padding: const EdgeInsets.all(4.0),
+                                child: buildProductImage(
+                                  label,
+                                  imageAsset: imagePath,
+                                  fit: BoxFit.contain,
+                                ),
                               ),
-                            ),
-                          )
-                        : const Icon(
-                            Icons.shopping_bag_outlined,
-                            color: Color(0xFF16653A),
-                            size: 26,
-                          )),
+                            )
+                          : const Icon(
+                              Icons.shopping_bag_outlined,
+                              color: Color(0xFF16653A),
+                              size: 26,
+                            )),
               ),
             ),
             const SizedBox(height: 6),
@@ -868,11 +900,7 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 ),
                 if (idx < list.length - 1)
-                  Container(
-                    width: 1,
-                    height: 36,
-                    color: kBorderLt,
-                  ),
+                  Container(width: 1, height: 36, color: kBorderLt),
               ],
             ),
           );
@@ -916,10 +944,12 @@ class _HomeScreenState extends State<HomeScreen>
                 Container(
                   height: 120,
                   width: double.infinity,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE8F5E9),
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                  ),
+                  // decoration: const BoxDecoration(
+                  //   color: Color(0xFFE8F5E9),
+                  //   borderRadius: BorderRadius.vertical(
+                  //     top: Radius.circular(20),
+                  //   ),
+                  // ),
                   child: Padding(
                     padding: const EdgeInsets.all(8.0),
                     child: buildProductImage(
@@ -946,19 +976,35 @@ class _HomeScreenState extends State<HomeScreen>
                           letterSpacing: -0.2,
                         ),
                       ),
-                      if ((p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit).isNotEmpty && (p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit).toLowerCase() != p.name.toLowerCase()) ...[
+                      if ((p.formattedUnit.isNotEmpty
+                                  ? p.formattedUnit
+                                  : p.unit)
+                              .isNotEmpty &&
+                          (p.formattedUnit.isNotEmpty
+                                      ? p.formattedUnit
+                                      : p.unit)
+                                  .toLowerCase() !=
+                              p.name.toLowerCase()) ...[
                         const SizedBox(height: 4),
                         UnconstrainedBox(
                           alignment: Alignment.centerLeft,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF3F4F6),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
+                              border: Border.all(
+                                color: const Color(0xFFE5E7EB),
+                                width: 1.0,
+                              ),
                             ),
                             child: Text(
-                              p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit,
+                              p.formattedUnit.isNotEmpty
+                                  ? p.formattedUnit
+                                  : p.unit,
                               style: const TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w700,
@@ -985,16 +1031,31 @@ class _HomeScreenState extends State<HomeScreen>
                           textBaseline: TextBaseline.alphabetic,
                           children: [
                             Flexible(
-                              child: Text('₹${p.price.toStringAsFixed(0)}',
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: kText),
-                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                              child: Text(
+                                '₹${p.price.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  color: kText,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                             if (p.originalPrice > p.price) ...[
                               const SizedBox(width: 3),
                               Flexible(
-                                child: Text('₹${p.originalPrice.toStringAsFixed(0)}',
-                                  style: const TextStyle(fontSize: 9.5, color: kMuted, decoration: TextDecoration.lineThrough, fontWeight: FontWeight.w600),
-                                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                                child: Text(
+                                  '₹${p.originalPrice.toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    fontSize: 9.5,
+                                    color: kMuted,
+                                    decoration: TextDecoration.lineThrough,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ],
@@ -1007,24 +1068,32 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ],
             ),
-            if (p.isSubscribable && p.subscriptionPrice != null && p.subscriptionPrice! > 0)
+            if (p.isSubscribable &&
+                p.subscriptionPrice != null &&
+                p.subscriptionPrice! > 0)
               Positioned(
                 top: 94,
                 left: 0,
                 right: 0,
                 child: Container(
                   height: 26,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFDCFCE7),
-                  ),
+                  decoration: const BoxDecoration(color: Color(0xFFDCFCE7)),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.sync_rounded, size: 12, color: Color(0xFF16653A)),
+                      const Icon(
+                        Icons.sync_rounded,
+                        size: 12,
+                        color: Color(0xFF16653A),
+                      ),
                       const SizedBox(width: 3),
                       Text(
                         'Subscribe @ ₹${p.subscriptionPrice!.toStringAsFixed(0)}',
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF16653A)),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF16653A),
+                        ),
                       ),
                     ],
                   ),
@@ -1035,11 +1104,17 @@ class _HomeScreenState extends State<HomeScreen>
                 top: 8,
                 left: 8,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFFFFE0B2), width: 0.8),
+                    border: Border.all(
+                      color: const Color(0xFFFFE0B2),
+                      width: 0.8,
+                    ),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.04),
@@ -1051,11 +1126,19 @@ class _HomeScreenState extends State<HomeScreen>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.star_rounded, size: 10, color: Colors.amber),
+                      const Icon(
+                        Icons.star_rounded,
+                        size: 10,
+                        color: Colors.amber,
+                      ),
                       const SizedBox(width: 2),
                       Text(
                         '${p.rating.toStringAsFixed(1)} (${p.reviews})',
-                        style: const TextStyle(fontSize: 7.5, fontWeight: FontWeight.w800, color: Color(0xFFE65100)),
+                        style: const TextStyle(
+                          fontSize: 7.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFE65100),
+                        ),
                       ),
                     ],
                   ),
@@ -1066,15 +1149,26 @@ class _HomeScreenState extends State<HomeScreen>
                 top: 8,
                 right: 8,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFEBEE),
                     borderRadius: BorderRadius.circular(100),
-                    border: Border.all(color: const Color(0xFFEF5350), width: 0.8),
+                    border: Border.all(
+                      color: const Color(0xFFEF5350),
+                      width: 0.8,
+                    ),
                   ),
                   child: Text(
                     p.isOutOfStock ? 'OUT OF STOCK' : 'LOW STOCK',
-                    style: const TextStyle(fontSize: 6.5, fontWeight: FontWeight.w900, color: Color(0xFFD32F2F), letterSpacing: 0.3),
+                    style: const TextStyle(
+                      fontSize: 6.5,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFD32F2F),
+                      letterSpacing: 0.3,
+                    ),
                   ),
                 ),
               )
@@ -1083,11 +1177,17 @@ class _HomeScreenState extends State<HomeScreen>
                 top: 8,
                 right: 8,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFF7E6),
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: const Color(0xFFFFD54F), width: 0.8),
+                    border: Border.all(
+                      color: const Color(0xFFFFD54F),
+                      width: 0.8,
+                    ),
                   ),
                   child: const Text(
                     'Best Seller',
@@ -1144,7 +1244,9 @@ class _HomeScreenState extends State<HomeScreen>
                   width: double.infinity,
                   decoration: const BoxDecoration(
                     color: Colors.transparent,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
                   ),
                   child: Padding(
                     padding: EdgeInsets.zero,
@@ -1172,19 +1274,35 @@ class _HomeScreenState extends State<HomeScreen>
                           letterSpacing: -0.2,
                         ),
                       ),
-                      if ((p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit).isNotEmpty && (p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit).toLowerCase() != p.name.toLowerCase()) ...[
+                      if ((p.formattedUnit.isNotEmpty
+                                  ? p.formattedUnit
+                                  : p.unit)
+                              .isNotEmpty &&
+                          (p.formattedUnit.isNotEmpty
+                                      ? p.formattedUnit
+                                      : p.unit)
+                                  .toLowerCase() !=
+                              p.name.toLowerCase()) ...[
                         const SizedBox(height: 4),
                         UnconstrainedBox(
                           alignment: Alignment.centerLeft,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF3F4F6),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
+                              border: Border.all(
+                                color: const Color(0xFFE5E7EB),
+                                width: 1.0,
+                              ),
                             ),
                             child: Text(
-                              p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit,
+                              p.formattedUnit.isNotEmpty
+                                  ? p.formattedUnit
+                                  : p.unit,
                               style: const TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w700,
@@ -1211,16 +1329,31 @@ class _HomeScreenState extends State<HomeScreen>
                           textBaseline: TextBaseline.alphabetic,
                           children: [
                             Flexible(
-                              child: Text('₹${p.price.toStringAsFixed(0)}',
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: kText),
-                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                              child: Text(
+                                '₹${p.price.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  color: kText,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                             if (p.originalPrice > p.price) ...[
                               const SizedBox(width: 3),
                               Flexible(
-                                child: Text('₹${p.originalPrice.toStringAsFixed(0)}',
-                                  style: const TextStyle(fontSize: 9.5, color: kMuted, decoration: TextDecoration.lineThrough, fontWeight: FontWeight.w600),
-                                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                                child: Text(
+                                  '₹${p.originalPrice.toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    fontSize: 9.5,
+                                    color: kMuted,
+                                    decoration: TextDecoration.lineThrough,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ],
@@ -1238,11 +1371,17 @@ class _HomeScreenState extends State<HomeScreen>
                 top: 8,
                 left: 8,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFFFFE0B2), width: 0.8),
+                    border: Border.all(
+                      color: const Color(0xFFFFE0B2),
+                      width: 0.8,
+                    ),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.04),
@@ -1254,11 +1393,19 @@ class _HomeScreenState extends State<HomeScreen>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.star_rounded, size: 10, color: Colors.amber),
+                      const Icon(
+                        Icons.star_rounded,
+                        size: 10,
+                        color: Colors.amber,
+                      ),
                       const SizedBox(width: 2),
                       Text(
                         '${p.rating.toStringAsFixed(1)} (${p.reviews})',
-                        style: const TextStyle(fontSize: 7.5, fontWeight: FontWeight.w800, color: Color(0xFFE65100)),
+                        style: const TextStyle(
+                          fontSize: 7.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFE65100),
+                        ),
                       ),
                     ],
                   ),
@@ -1269,15 +1416,26 @@ class _HomeScreenState extends State<HomeScreen>
                 top: 8,
                 right: 8,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFEBEE),
                     borderRadius: BorderRadius.circular(100),
-                    border: Border.all(color: const Color(0xFFEF5350), width: 0.8),
+                    border: Border.all(
+                      color: const Color(0xFFEF5350),
+                      width: 0.8,
+                    ),
                   ),
                   child: Text(
                     p.isOutOfStock ? 'OUT OF STOCK' : 'LOW STOCK',
-                    style: const TextStyle(fontSize: 6.5, fontWeight: FontWeight.w900, color: Color(0xFFD32F2F), letterSpacing: 0.3),
+                    style: const TextStyle(
+                      fontSize: 6.5,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFD32F2F),
+                      letterSpacing: 0.3,
+                    ),
                   ),
                 ),
               )
@@ -1286,11 +1444,17 @@ class _HomeScreenState extends State<HomeScreen>
                 top: 8,
                 right: 8,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFF7E6),
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: const Color(0xFFFFD54F), width: 0.8),
+                    border: Border.all(
+                      color: const Color(0xFFFFD54F),
+                      width: 0.8,
+                    ),
                   ),
                   child: const Text(
                     'Best Seller',
@@ -1310,7 +1474,8 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _subscriptionBanner() {
-    final imageUrl = '${ApiEndpoints.host}/uploads/banners/subscription_banner.png';
+    final imageUrl =
+        '${ApiEndpoints.host}/uploads/banners/subscription_banner.png';
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: ClipRRect(
@@ -1347,7 +1512,10 @@ class _HomeScreenState extends State<HomeScreen>
                           SizedBox(height: 4),
                           Text(
                             'Subscription to fresh milk, curd, paneer & more for hassle-free morning deliveries.',
-                            style: TextStyle(color: Colors.white70, fontSize: 11),
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11,
+                            ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -1355,14 +1523,21 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.amber,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Text(
                         'Order Now >',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 12),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                   ],
@@ -1378,36 +1553,40 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _freshBatchStepper() {
     final steps = [
       (
-        svg: '''<svg viewBox="0 0 24 24" fill="none" stroke="#16653A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        svg:
+            '''<svg viewBox="0 0 24 24" fill="none" stroke="#16653A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M6 10h12l-1 11H7L6 10z"/>
           <path d="M9 10V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v5"/>
           <line x1="7" y1="5" x2="17" y2="5"/>
         </svg>''',
-        label: 'Collected'
+        label: 'Collected',
       ),
       (
-        svg: '''<svg viewBox="0 0 24 24" fill="none" stroke="#16653A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        svg:
+            '''<svg viewBox="0 0 24 24" fill="none" stroke="#16653A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 20h6a2 2 0 0 0 2-2V10a4 4 0 0 0-1-2.63V4a2 2 0 0 0-2-2H10a2 2 0 0 0-2 2v3.37A4 4 0 0 0 7 10v8a2 2 0 0 0 2 2z"/>
           <line x1="8" y1="12" x2="16" y2="12"/>
           <line x1="9" y1="6" x2="15" y2="6"/>
         </svg>''',
-        label: 'Packed'
+        label: 'Packed',
       ),
       (
-        svg: '''<svg viewBox="0 0 24 24" fill="none" stroke="#16653A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        svg:
+            '''<svg viewBox="0 0 24 24" fill="none" stroke="#16653A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <rect x="1" y="3" width="15" height="13" rx="2" ry="2"/>
           <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
           <circle cx="5.5" cy="18.5" r="2.5"/>
           <circle cx="18.5" cy="18.5" r="2.5"/>
         </svg>''',
-        label: 'In Delivery'
+        label: 'In Delivery',
       ),
       (
-        svg: '''<svg viewBox="0 0 24 24" fill="none" stroke="#16653A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        svg:
+            '''<svg viewBox="0 0 24 24" fill="none" stroke="#16653A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
           <polyline points="9 22 9 12 15 12 15 22"/>
         </svg>''',
-        label: 'Delivered'
+        label: 'Delivered',
       ),
     ];
 
@@ -1477,11 +1656,7 @@ class _HomeScreenState extends State<HomeScreen>
                         color: Color(0xFFEEF9F1),
                         shape: BoxShape.circle,
                       ),
-                      child: SvgPicture.string(
-                        step.svg,
-                        width: 22,
-                        height: 22,
-                      ),
+                      child: SvgPicture.string(step.svg, width: 22, height: 22),
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -1504,22 +1679,15 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _promiseStrip() {
-    final List<({IconData icon, String label, VoidCallback? onTap})> promises = [
+    final List<({IconData icon, String label, VoidCallback? onTap})>
+    promises = [
       (
         icon: Icons.notifications_off_rounded,
         label: 'Zero Contact,\nNo Ring',
         onTap: null,
       ),
-      (
-        icon: Icons.verified_rounded,
-        label: 'Premium\nQuality',
-        onTap: null,
-      ),
-      (
-        icon: Icons.eco_rounded,
-        label: '100% Safe\n& Hygienic',
-        onTap: null,
-      ),
+      (icon: Icons.verified_rounded, label: 'Premium\nQuality', onTap: null),
+      (icon: Icons.eco_rounded, label: '100% Safe\n& Hygienic', onTap: null),
     ];
 
     return Container(
@@ -1557,11 +1725,7 @@ class _HomeScreenState extends State<HomeScreen>
             children: promises.map((p) {
               final content = Column(
                 children: [
-                  Icon(
-                    p.icon,
-                    color: const Color(0xFF16653A),
-                    size: 22,
-                  ),
+                  Icon(p.icon, color: const Color(0xFF16653A), size: 22),
                   const SizedBox(height: 8),
                   Text(
                     p.label,
@@ -1647,7 +1811,14 @@ class _HomeScreenState extends State<HomeScreen>
                     Row(
                       children: [
                         Row(
-                          children: List.generate(5, (_) => const Icon(Icons.star_rounded, color: kAccent, size: 14)),
+                          children: List.generate(
+                            5,
+                            (_) => const Icon(
+                              Icons.star_rounded,
+                              color: kAccent,
+                              size: 14,
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 6),
                         const Text(
@@ -1706,7 +1877,12 @@ class _HomeScreenState extends State<HomeScreen>
         int total = 0;
         total = items.fold(0, (sum, item) {
           if (item.purchaseType == 'subscription') {
-            final schedSum = item.schedules?.fold(0, (s, sched) => s + sched.mQuantity + sched.eQuantity) ?? 0;
+            final schedSum =
+                item.schedules?.fold(
+                  0,
+                  (s, sched) => s + sched.mQuantity + sched.eQuantity,
+                ) ??
+                0;
             return sum + (schedSum > 0 ? schedSum : 1);
           }
           return sum + (item.quantity ?? 1);
@@ -2003,11 +2179,17 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
   });
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     final double minHeight = minExtent;
     final double maxHeight = maxExtent;
     final double delta = maxHeight - minHeight;
-    final double shrinkFactor = delta > 0 ? (shrinkOffset / delta).clamp(0.0, 1.0) : 0.0;
+    final double shrinkFactor = delta > 0
+        ? (shrinkOffset / delta).clamp(0.0, 1.0)
+        : 0.0;
 
     return Container(
       decoration: BoxDecoration(
@@ -2018,7 +2200,7 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
                   color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
-                )
+                ),
               ]
             : [],
       ),
@@ -2033,9 +2215,7 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
               errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  color: const Color(0xFFE8F5E9),
-                );
+                return Container(color: const Color(0xFFE8F5E9));
               },
             ),
           ),
@@ -2056,10 +2236,7 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   stops: const [0.0, 1.0],
-                  colors: [
-                    Colors.transparent,
-                    kBg.withValues(alpha: 0.85),
-                  ],
+                  colors: [Colors.transparent, kBg.withValues(alpha: 0.85)],
                 ),
               ),
             ),
@@ -2086,7 +2263,11 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
                           width: 32,
                           height: 32,
                           color: const Color(0xFF16653A),
-                          child: const Icon(Icons.eco_rounded, color: Colors.white, size: 20),
+                          child: const Icon(
+                            Icons.eco_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                         );
                       },
                     ),
@@ -2113,61 +2294,57 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
           Positioned(
             left: 16,
             right: 16,
-            top: topPadding + 170 - (shrinkFactor * 162), // Interpolates from topPadding+170 to topPadding+8
-            child: BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
-              builder: (context, sessionState) {
-                final isVip = sessionState.profile?.isMember == true;
-
-                return GestureDetector(
-                  onTap: onSearchTap,
-                  child: Container(
-                    height: 46,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(
-                        color: isVip ? const Color(0xFFFFD700) : const Color(0xFF16653A).withValues(alpha: 0.12),
-                        width: isVip ? 1.5 : 1.0,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: isVip
-                              ? const Color(0xFFFFD700).withValues(alpha: 0.3)
-                              : const Color(0xFF16653A).withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.search_rounded,
-                          color: isVip ? const Color(0xFFB8860B) : const Color(0xFF16653A),
-                          size: 20,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            searchHint,
-                            style: const TextStyle(
-                              color: kTextSub,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        Icon(
-                          Icons.tune_rounded,
-                          color: isVip ? const Color(0xFFB8860B) : const Color(0xFF16653A),
-                          size: 20,
-                        ),
-                      ],
-                    ),
+            top:
+                topPadding +
+                170 -
+                (shrinkFactor *
+                    162), // Interpolates from topPadding+170 to topPadding+8
+            child: GestureDetector(
+              onTap: onSearchTap,
+              child: Container(
+                height: 46,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(
+                    color: const Color(0xFF16653A).withValues(alpha: 0.12),
+                    width: 1.0,
                   ),
-                );
-              },
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF16653A).withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.search_rounded,
+                      color: Color(0xFF16653A),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        searchHint,
+                        style: const TextStyle(
+                          color: kTextSub,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const Icon(
+                      Icons.tune_rounded,
+                      color: Color(0xFF16653A),
+                      size: 20,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -2202,10 +2379,17 @@ class _HomeReferralBanner extends StatelessWidget {
       builder: (context, sessionState) {
         final profile = sessionState.profile;
         final isLoggedIn = profile != null;
-        final rawCode = profile?.referralCode ?? sessionState.wallet['referral_code']?.toString();
-        final rawStatus = profile?.referralStatus ?? sessionState.wallet['referral_status']?.toString();
+        final rawCode =
+            profile?.referralCode ??
+            sessionState.wallet['referral_code']?.toString();
+        final rawStatus =
+            profile?.referralStatus ??
+            sessionState.wallet['referral_status']?.toString();
         final isLocked = isLoggedIn && (rawStatus?.toLowerCase() == 'locked');
-        final code = (isLoggedIn && !isLocked && rawCode != null && rawCode.isNotEmpty) ? rawCode : null;
+        final code =
+            (isLoggedIn && !isLocked && rawCode != null && rawCode.isNotEmpty)
+            ? rawCode
+            : null;
 
         // ponytail: scale factor based on screen width for 320-430+ range
         final sw = MediaQuery.of(context).size.width;
@@ -2234,7 +2418,10 @@ class _HomeReferralBanner extends StatelessWidget {
           },
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 12 * scale),
+            padding: EdgeInsets.symmetric(
+              horizontal: 14 * scale,
+              vertical: 12 * scale,
+            ),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [
@@ -2282,7 +2469,9 @@ class _HomeReferralBanner extends StatelessWidget {
                   ),
                   child: Center(
                     child: Icon(
-                      isLocked ? Icons.lock_outline_rounded : Icons.card_giftcard_rounded,
+                      isLocked
+                          ? Icons.lock_outline_rounded
+                          : Icons.card_giftcard_rounded,
                       color: const Color(0xFFB45309),
                       size: 20 * scale,
                     ),
@@ -2336,10 +2525,19 @@ class _HomeReferralBanner extends StatelessWidget {
     );
   }
 
-  Widget _buildCta(BuildContext ctx, bool isLoggedIn, bool isLocked, String? code, double scale) {
+  Widget _buildCta(
+    BuildContext ctx,
+    bool isLoggedIn,
+    bool isLocked,
+    String? code,
+    double scale,
+  ) {
     if (!isLoggedIn) {
       return Container(
-        padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 8 * scale),
+        padding: EdgeInsets.symmetric(
+          horizontal: 14 * scale,
+          vertical: 8 * scale,
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -2354,7 +2552,11 @@ class _HomeReferralBanner extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.login_rounded, color: const Color(0xFF064E3B), size: 14 * scale),
+            Icon(
+              Icons.login_rounded,
+              color: const Color(0xFF064E3B),
+              size: 14 * scale,
+            ),
             SizedBox(width: 5 * scale),
             Text(
               'Login',
@@ -2371,7 +2573,10 @@ class _HomeReferralBanner extends StatelessWidget {
 
     if (isLocked) {
       return Container(
-        padding: EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 7 * scale),
+        padding: EdgeInsets.symmetric(
+          horizontal: 12 * scale,
+          vertical: 7 * scale,
+        ),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFFFEF3C7), Color(0xFFFDE68A)],
@@ -2384,7 +2589,11 @@ class _HomeReferralBanner extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.lock_rounded, color: const Color(0xFFB45309), size: 13 * scale),
+            Icon(
+              Icons.lock_rounded,
+              color: const Color(0xFFB45309),
+              size: 13 * scale,
+            ),
             SizedBox(width: 4 * scale),
             Text(
               'Unlock',
@@ -2405,11 +2614,17 @@ class _HomeReferralBanner extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 3 * scale),
+            padding: EdgeInsets.symmetric(
+              horizontal: 8 * scale,
+              vertical: 3 * scale,
+            ),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.18),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.white.withOpacity(0.45), width: 1),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.45),
+                width: 1,
+              ),
             ),
             child: Text(
               code,
@@ -2427,7 +2642,10 @@ class _HomeReferralBanner extends StatelessWidget {
           GestureDetector(
             onTap: () => _shareCode(ctx, code),
             child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 4 * scale),
+              padding: EdgeInsets.symmetric(
+                horizontal: 10 * scale,
+                vertical: 4 * scale,
+              ),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
@@ -2442,7 +2660,11 @@ class _HomeReferralBanner extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.share_rounded, color: const Color(0xFF064E3B), size: 11 * scale),
+                  Icon(
+                    Icons.share_rounded,
+                    color: const Color(0xFF064E3B),
+                    size: 11 * scale,
+                  ),
                   SizedBox(width: 3 * scale),
                   Text(
                     'Share',
@@ -2464,7 +2686,8 @@ class _HomeReferralBanner extends StatelessWidget {
   }
 
   static Future<void> _shareCode(BuildContext context, String code) async {
-    final message = 'Your F2H Invite is Ready\n\n'
+    final message =
+        'Your F2H Invite is Ready\n\n'
         'Get ₹100 on your first order!\n'
         'Fresh farm products, delivered to your doorstep.\n\n'
         'Invite Code: $code\n'
@@ -2491,4 +2714,3 @@ class _HomeReferralBanner extends StatelessWidget {
     }
   }
 }
-

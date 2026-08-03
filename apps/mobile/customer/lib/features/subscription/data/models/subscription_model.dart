@@ -183,6 +183,7 @@ class SubscriptionPauseModel {
   final String? startDate;
   final String? endDate;
   final String? reason;
+  final String? status; // 'paused' | 'resumed'
 
   const SubscriptionPauseModel({
     required this.id,
@@ -191,6 +192,7 @@ class SubscriptionPauseModel {
     this.startDate,
     this.endDate,
     this.reason,
+    this.status,
   });
 
   factory SubscriptionPauseModel.fromJson(Map<String, dynamic> json) {
@@ -216,6 +218,7 @@ class SubscriptionPauseModel {
             json['pauseToDate'],
       ),
       reason: _asString(json['reason']),
+      status: _asString(json['status']),
     );
   }
 

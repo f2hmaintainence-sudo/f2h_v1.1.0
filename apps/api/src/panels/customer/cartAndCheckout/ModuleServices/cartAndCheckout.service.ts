@@ -107,13 +107,15 @@ export class CartService {
           p.name AS product_name, 
           p.is_subscribable, 
           p.is_one_time, 
-          COALESCE(pi.url, p.image_path) AS image_path
+          COALESCE(pi.storage_key, p.image_path) AS image_path
          FROM product_variants pv
          LEFT JOIN products p ON pv.product_id = p.product_id
          LEFT JOIN LATERAL (
-            SELECT url FROM product_images pi2
-            WHERE pi2.variant_id = pv.variant_id OR (pi2.variant_id IS NULL AND pi2.product_id = p.product_id)
-            ORDER BY pi2.is_primary DESC NULLS LAST, pi2.id ASC
+            SELECT storage_key FROM product_images pi2
+            WHERE pi2.variant_id = pv.variant_id
+              AND pi2.storage_key IS NOT NULL AND pi2.storage_key <> ''
+              AND (pi2.is_primary = true OR pi2.sort_order = 0)
+            ORDER BY pi2.is_primary DESC NULLS LAST, pi2.sort_order ASC NULLS LAST
             LIMIT 1
           ) pi ON true
          WHERE pv.variant_id = ANY($1) AND pv.status = 'active'`,

@@ -950,12 +950,6 @@ export class AuthService {
         { column: 'user_id', operator: '=', value: userId },
       ]);
     } catch (_) {}
-
-    try {
-      await this.Data.update('customers', { fcm_token: fcmToken, updated_at: now }, [
-        { column: 'customer_id', operator: '=', value: userId },
-      ]);
-    } catch (_) {}
   }
 
   /*===============================================================================================

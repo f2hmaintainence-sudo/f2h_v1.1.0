@@ -11,7 +11,6 @@ import '../bloc/cart/cart_event.dart';
 import '../bloc/cart/cart_state.dart';
 import '../../domain/entities/cart/cart_item_entity.dart';
 import '../../../../core/guards/auth_guard.dart';
-import 'cart_screen.dart';
 import '../../../../core/widgets/custom_button.dart';
 import '../widgets/cart_widgets.dart';
 import '../../../subscription/presentation/widgets/subscription_button.dart';
@@ -32,7 +31,6 @@ class ProductDetailViewScreen extends StatefulWidget {
 class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
     with SingleTickerProviderStateMixin {
   bool _detailsExpanded = false;
-  int _selectedRelatedIdx = 0;
   int _currentImageIndex = 0;
   late final PageController _pageController;
   late final AnimationController _slideCtrl;
@@ -121,11 +119,10 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
     final categoryProducts = allProducts
         .where((prod) => prod.category == p.category)
         .toList();
-    categoryProducts.sort((a, b) => (a.id ?? '').compareTo(b.id ?? ''));
+    categoryProducts.sort((a, b) => a.id.compareTo(b.id));
     if (categoryProducts.isEmpty) {
       categoryProducts.addAll(allProducts.take(4));
     }
-    final stripProducts = categoryProducts.take(4).toList();
 
     final discPct = _selectedVariant.originalPrice > 0
         ? (((_selectedVariant.originalPrice - _selectedVariant.price) /
@@ -133,6 +130,17 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                   100)
               .round()
         : 0;
+
+    final activeImages = _selectedVariant.images.isNotEmpty
+        ? _selectedVariant.images
+        : (_selectedVariant.imagePath != null &&
+                _selectedVariant.imagePath!.isNotEmpty
+            ? [_selectedVariant.imagePath!]
+            : (p.images.isNotEmpty
+                ? p.images
+                : (p.imageAsset != null && p.imageAsset!.isNotEmpty
+                    ? [p.imageAsset!]
+                    : <String>[])));
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F2F2),
@@ -150,16 +158,18 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                     child: Stack(
                       children: [
                         // Product image full width with sliding PageView
-                        p.images.length > 1
+                        activeImages.length > 1
                             ? PageView.builder(
                                 controller: _pageController,
-                                itemCount: p.images.length,
+                                itemCount: activeImages.length,
                                 onPageChanged: (index) {
                                   setState(() {
                                     _currentImageIndex = index;
                                   });
                                 },
                                 itemBuilder: (context, index) {
+                                  final imgUrl = activeImages[index];
+                                  debugPrint('[ImageCarousel] idx=$index url=$imgUrl');
                                   return Hero(
                                     tag: index == 0
                                         ? 'product-v-${p.id}'
@@ -169,7 +179,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                       height: double.infinity,
                                       child: buildProductImage(
                                         p.name,
-                                        imageAsset: p.images[index],
+                                        imageAsset: imgUrl,
                                         fit: BoxFit.cover,
                                       ),
                                     ),
@@ -183,7 +193,9 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                   height: double.infinity,
                                   child: buildProductImage(
                                     p.name,
-                                    imageAsset: p.imageAsset,
+                                    imageAsset: activeImages.isNotEmpty
+                                        ? activeImages.first
+                                        : p.imageAsset,
                                     fit: BoxFit.cover,
                                   ),
                                 ),
@@ -233,7 +245,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                           ),
 
                         // Dot indicators for multiple images
-                        if (p.images.length > 1)
+                        if (activeImages.length > 1)
                           Positioned(
                             bottom: 14,
                             left: 0,
@@ -241,7 +253,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: List.generate(
-                                p.images.length,
+                                activeImages.length,
                                 (index) => AnimatedContainer(
                                   duration: const Duration(milliseconds: 250),
                                   margin: const EdgeInsets.symmetric(
@@ -408,6 +420,10 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                     onTap: () {
                                       setState(() {
                                         _selectedVariant = v;
+                                        _currentImageIndex = 0;
+                                        if (_pageController.hasClients) {
+                                          _pageController.jumpToPage(0);
+                                        }
                                       });
                                     },
                                     child: Container(
@@ -955,90 +971,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
     );
   }
 
-  Widget _buildThumbnailStrip(List<Product> stripProducts, Product current) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(stripProducts.length, (i) {
-          final isSelected = stripProducts[i].id == current.id;
-          return GestureDetector(
-            onTap: () {
-              if (isSelected) return;
-              HapticFeedback.selectionClick();
-              Navigator.pushReplacement(
-                context,
-                PageRouteBuilder(
-                  pageBuilder: (_, a, __) =>
-                      ProductDetailViewScreen(product: stripProducts[i]),
-                  transitionsBuilder: (_, a, __, child) =>
-                      FadeTransition(opacity: a, child: child),
-                  transitionDuration: const Duration(milliseconds: 200),
-                ),
-              );
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOutCubic,
-              margin: const EdgeInsets.symmetric(horizontal: 6),
-              width: isSelected ? 54 : 44,
-              height: isSelected ? 54 : 44,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isSelected ? kPrimary : const Color(0xFFE0E0E0),
-                  width: isSelected ? 2 : 1,
-                ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: kPrimary.withOpacity(0.15),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ]
-                    : [],
-              ),
-              child: ClipOval(
-                child: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: buildProductImage(
-                    stripProducts[i].name,
-                    imageAsset: stripProducts[i].imageAsset,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
 
-  Widget _iconBtn(IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Icon(icon, color: kText, size: 18),
-      ),
-    );
-  }
 
   Widget _buildAddButton(Product p) {
     return BlocBuilder<CartBloc, CartState>(
@@ -1228,112 +1161,5 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
     );
   }
 
-  Widget _infoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: kTextSub,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const Spacer(),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 12,
-              color: kText,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildFloatingCartBadge() {
-    return BlocBuilder<CartBloc, CartState>(
-      builder: (context, state) {
-        final items = context.read<CartBloc>().currentItems;
-        int total = 0;
-        total = items.fold(0, (sum, item) {
-          if (item.purchaseType == 'subscription') {
-            final schedSum =
-                item.schedules?.fold(
-                  0,
-                  (s, sched) => s + sched.mQuantity + sched.eQuantity,
-                ) ??
-                0;
-            return sum + (schedSum > 0 ? schedSum : 1);
-          }
-          return sum + (item.quantity ?? 1);
-        });
-        return AnimatedScale(
-          scale: total > 0 ? 1.0 : 0.0,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.elasticOut,
-          child: GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CartScreen()),
-              );
-            },
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFE5A93B), Color(0xFFC78A1D)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFE5A93B).withOpacity(0.35),
-                        blurRadius: 12,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.shopping_cart_outlined,
-                    color: Colors.white,
-                    size: 26,
-                  ),
-                ),
-                Positioned(
-                  top: -2,
-                  right: -2,
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: kAccent,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: Text(
-                      '$total',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF1A1000),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 }

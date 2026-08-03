@@ -264,7 +264,7 @@ export class CatalogShowEditService {
       }
 
       const imageResult = await this.dataService.query('product_images', {
-        select: ['url'],
+        select: ['storage_key'],
         where: [
           { column: 'variant_id', operator: '=', value: variant.variant_id },
           { column: 'deleted_at', operator: 'IS', value: null },
@@ -272,7 +272,7 @@ export class CatalogShowEditService {
         orderBy: 'sort_order',
         orderDirection: 'ASC',
       });
-      const variantImages = (imageResult?.data || []).map((img: any) => img.url);
+      const variantImages = (imageResult?.data || []).map((img: any) => img.storage_key);
 
       // product_id is VARCHAR — keep as string for the select field
       const formattedData = {

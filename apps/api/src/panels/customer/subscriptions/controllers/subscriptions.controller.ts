@@ -97,8 +97,11 @@ export class SubscriptionsController {
 
   @Public()
   @Post(':id/resume')
-  async resumeSubscription(@Param('id') id: string) {
-    return this.service.resumeSubscription(id);
+  async resumeSubscription(
+    @Param('id') id: string,
+    @Body() body: { resume_date?: string },
+  ) {
+    return this.service.resumeSubscription(id, body?.resume_date);
   }
 
   @Public()
@@ -128,10 +131,18 @@ export class SubscriptionsController {
     return this.service.getSubscriptionBills(id);
   }
 
+  @Public()
+  @Patch(':id/auto-renew')
+  async updateAutoRenew(
+    @Param('id') id: string,
+    @Body() body: { auto_renew: boolean },
+  ) {
+    return this.service.updateAutoRenew(id, body.auto_renew);
+  }
+
   // @Public()
   // @Post(':id/cancel')
   // async cancelSubscriptionItem(@Param('id') id: string) {
   //   return this.service.cancelSubscriptionItem(id);
   // }
 }
-
