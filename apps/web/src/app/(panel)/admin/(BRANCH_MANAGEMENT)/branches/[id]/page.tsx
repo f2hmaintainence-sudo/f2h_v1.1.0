@@ -11,7 +11,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/services/api.client';
 import { showSuccessToast } from '@/services/toast.service';
 
-const HexSectorMap = dynamic(() => import('@/components/branch/HexSectorMap'), { ssr: false });
+const SectorMap = dynamic(() => import('@/components/branch/SectorMap'), { ssr: false });
 
 export default function Branch360PortfolioPage() {
   const params = useParams();
@@ -22,8 +22,6 @@ export default function Branch360PortfolioPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Partner Fleet');
 
-  const [hexes, setHexes] = useState<{ hex_id: string; sector_index: number }[]>([]);
-  const [hexMessage, setHexMessage] = useState('');
 
   const [branchPartners, setBranchPartners] = useState<any[]>([]);
   const [unassignedPartners, setUnassignedPartners] = useState<any[]>([]);
@@ -47,18 +45,13 @@ export default function Branch360PortfolioPage() {
     if (!id) return;
     setLoading(true);
     try {
-      const [fullRes, hexRes, partnersRes] = await Promise.all([
+      const [fullRes, partnersRes] = await Promise.all([
         api.get<any>(`/admin/branch/${id}/detail`),
-        api.get<any>(`/admin/branch/hexes/${id}`),
         api.get<any>(`/admin/delivery/partners?limit=200`),
       ]);
 
       if (fullRes.data?.status && fullRes.data?.data) {
         setBranch(fullRes.data.data);
-      }
-      if (hexRes.data?.status) {
-        setHexes(hexRes.data.data || []);
-        setHexMessage(hexRes.data.message || '');
       }
 
       if (partnersRes.data?.data) {
@@ -198,18 +191,18 @@ export default function Branch360PortfolioPage() {
               </div>
             </div>
 
-            {/* H3 Hex Density */}
+            {/* Sector Count */}
             <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition-all group">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">H3 Coverage Hexes</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Delivery Sectors</span>
                 <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
                   <Hexagon size={18} />
                 </div>
               </div>
-              <p className="text-3xl font-black text-slate-900">{hexes.length}</p>
+              <p className="text-3xl font-black text-slate-900">{branch.sector_count || 0}</p>
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px] font-medium">
-                <span className="text-indigo-600 font-bold">Res-{branch.h3_resolution || 8}</span>
-                <span className="text-slate-400">{branch.hex_shape || 'Hexagon'}</span>
+                <span className="text-indigo-600 font-bold">Pie-slice zones</span>
+                <span className="text-slate-400">{branch.delivery_radius_km || 0}km radius</span>
               </div>
             </div>
 
@@ -253,26 +246,18 @@ export default function Branch360PortfolioPage() {
               <Globe size={16} className="text-emerald-600" />
               <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">Live Service Zone Coverage Map</span>
             </div>
-            <span className="text-[10px] font-mono px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold rounded-md">Interactive Leaflet Tiles</span>
+            <span className="text-[10px] font-mono px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold rounded-md">Google Maps Live</span>
           </div>
 
           <div className="flex-1 w-full h-full min-h-[380px] p-3">
-            {branch.lat && branch.lng ? (
-              <HexSectorMap
-                hexes={hexes}
-                centerLat={Number(branch.lat)}
-                centerLng={Number(branch.lng)}
-                radiusKm={Number(branch.delivery_radius_km)}
-                bufferZoneKm={Number(branch.buffer_zone)}
-                height="380px"
-                emptyMessage={hexMessage}
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-slate-400 min-h-[350px]">
-                <AlertTriangle size={36} className="text-amber-500 mb-2" />
-                <p className="font-bold text-xs">Coordinates missing for map rendering</p>
-              </div>
-            )}
+            <SectorMap
+              centerLat={branch.lat ? Number(branch.lat) : undefined}
+              centerLng={branch.lng ? Number(branch.lng) : undefined}
+              sectorCount={branch.sector_count || 3}
+              radiusKm={Number(branch.delivery_radius_km) || 5}
+              bufferZoneKm={Number(branch.buffer_zone) || 0}
+              height="380px"
+            />
           </div>
         </div>
 
@@ -481,25 +466,17 @@ export default function Branch360PortfolioPage() {
               <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden min-h-[450px] flex flex-col">
                 <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                   <h3 className="font-bold text-slate-800 uppercase tracking-wider text-xs">Interactive Service Zone Coverage Map</h3>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">Leaflet H3 Grid Overlay</span>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">Google Maps Sector View</span>
                 </div>
                 <div className="p-3 flex-1 min-h-[400px]">
-                  {branch.lat && branch.lng ? (
-                    <HexSectorMap
-                      hexes={hexes}
-                      centerLat={Number(branch.lat)}
-                      centerLng={Number(branch.lng)}
-                      radiusKm={Number(branch.delivery_radius_km)}
-                      bufferZoneKm={Number(branch.buffer_zone)}
-                      height="400px"
-                      emptyMessage={hexMessage}
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full py-20 text-slate-400">
-                      <AlertTriangle size={36} className="text-amber-500 mb-2" />
-                      <p className="font-bold text-xs">Coordinates missing for map view</p>
-                    </div>
-                  )}
+                  <SectorMap
+                    centerLat={branch.lat ? Number(branch.lat) : undefined}
+                    centerLng={branch.lng ? Number(branch.lng) : undefined}
+                    sectorCount={branch.sector_count || 3}
+                    radiusKm={Number(branch.delivery_radius_km) || 5}
+                    bufferZoneKm={Number(branch.buffer_zone) || 0}
+                    height="400px"
+                  />
                 </div>
               </div>
             </div>
@@ -524,9 +501,9 @@ export default function Branch360PortfolioPage() {
                 </div>
 
                 <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">H3 Grid Density</p>
-                  <p className="text-xl font-mono font-bold text-indigo-600 mt-2">{hexes.length} Hexagons</p>
-                  <p className="text-xs text-slate-400 mt-1">Resolution index: H3 Res-{branch.h3_resolution || 8}</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sector Coverage</p>
+                  <p className="text-xl font-mono font-bold text-indigo-600 mt-2">{branch.sector_count || 0} Sectors</p>
+                  <p className="text-xs text-slate-400 mt-1">Angular pie-slice zones within {branch.delivery_radius_km || 0}km radius</p>
                 </div>
               </div>
             </div>

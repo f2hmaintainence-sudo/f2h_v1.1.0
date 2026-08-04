@@ -10,7 +10,6 @@ import { DeveloperService } from '../../../../shared/logger/Developer.service';
 import { CreateBranchDto } from '../dto/branch.dto';
 import { IdGeneratorService } from '../../../../shared/services/idGenerator.service';
 import { SectorService } from '../ModuleServices/sector.service';
-import { H3_RESOLUTION } from '../constants/h3.constants';
 
 @Injectable()
 export class BranchSaveAddService {
@@ -24,12 +23,11 @@ export class BranchSaveAddService {
   ) { }
 
   // ═══════════════════════════════════════════════════════════════
-  // BRANCH — Save Add (with H3 Hex Disk Generation)
+  // BRANCH — Save Add (Google Maps: lat/lng/radius + sector slices)
   // ═══════════════════════════════════════════════════════════════
 
   async saveBranch(body: CreateBranchDto, adminId: string) {
     try {
-      // 1. Validate required fields
       if (!body.branch_name?.trim()) {
         throw new BadRequestException({ status: false, message: 'Branch name is required' });
       }
@@ -37,7 +35,7 @@ export class BranchSaveAddService {
         throw new BadRequestException({ status: false, message: 'Branch code is required' });
       }
 
-      // 2. Unique check — branch_code
+      // Unique check — branch_code
       const existing = await this.Data.query('branches', {
         select: ['id'],
         where: [{ column: 'branch_code', operator: '=', value: String(body.branch_code).trim() }],
@@ -50,38 +48,15 @@ export class BranchSaveAddService {
           errors: { branch_code: 'This branch code is already in use' },
         });
       }
+
       const branch_id = this.idGenerator.generateId('BRANCH', 12);
       const isActive = body.is_active === true || String(body.is_active) === 'true';
       const allowBufferOrder = body.allow_buffer_order === true || String(body.allow_buffer_order) === 'true';
-      const resolution = body.h3_resolution || H3_RESOLUTION;
       const sectorCount = body.sector_count || 3;
       const radiusKm = body.delivery_radius_km || 5;
       const bufferZone = body.buffer_zone || 0;
-      const hexShape = ['hexagon', 'circle', 'square'].includes(String(body.hex_shape)) ? String(body.hex_shape) : 'hexagon';
 
-      // 3. If lat/lng provided, generate H3 hex disk
-      let hexCount = 0;
-      let centerHex: string | null = null;
-      let hexes: { hex_id: string; sector_index: number }[] = [];
-
-      if (body.lat && body.lng) {
-        centerHex = this.sectorService.getCenterHex(body.lat, body.lng, resolution);
-        hexes = this.sectorService.generateHexDisk(body.lat, body.lng, radiusKm, sectorCount, resolution);
-        hexCount = hexes.length;
-
-        // 4. Overlap check
-        const overlap = await this.sectorService.checkOverlap(hexes.map(h => h.hex_id));
-        if (overlap) {
-          throw new BadRequestException({
-            status: false,
-            message: `Branch zone overlaps with "${overlap.branchName}". ${overlap.conflicting} hex(es) conflict. Reduce the radius or move the warehouse pin.`,
-          });
-        }
-      }
-
-      // 5. Transaction: Insert branch + hexes + sectors
       return await this.Data.executeTransaction(async (tx) => {
-        // Insert branch
         const branchData: Record<string, any> = {
           branch_id,
           branch_name: body.branch_name.trim(),
@@ -94,56 +69,37 @@ export class BranchSaveAddService {
           lng: body.lng || null,
           delivery_radius_km: radiusKm,
           buffer_zone: bufferZone,
-          center_hex: centerHex,
           sector_count: sectorCount,
-          h3_resolution: resolution,
-          hex_shape: hexShape,
         };
         this.Developer.log('Branch data', { branchData });
         const branchResult = await this.Data.insert('branches', branchData, { transaction: tx });
         if (!branchResult.status) throw new Error(branchResult.message || 'Branch insert failed');
 
-        // Insert hexes (if coordinates provided)
-        if (hexes.length > 0) {
-          await this.sectorService.bulkInsertHexes(branch_id, hexes, tx);
-        }
-
-        // Create sector rows
+        // Create angle-based sector rows
         if (body.lat && body.lng) {
           await this.sectorService.createSectors(branch_id, sectorCount, tx);
         }
 
-        // Audit log (Wrap in try-catch to prevent transaction abort on non-critical failure)
         try {
           await this.Data.insert('admin_audit_logs', {
             admin_id: adminId,
             action: 'branch_create',
             target_type: 'branches',
             target_id: branch_id,
-            details: JSON.stringify({
-              branch_name: body.branch_name,
-              hex_count: hexCount,
-              sector_count: sectorCount,
-            }),
+            details: JSON.stringify({ branch_name: body.branch_name, sector_count: sectorCount }),
           }, { transaction: tx });
         } catch (auditError) {
-          this.Developer.warn('Failed to save audit log, but continuing branch creation', { error: auditError.message });
+          this.Developer.warn('Failed to save audit log', { error: auditError.message });
         }
 
         return {
           status: true,
-          message: `Branch created successfully. ${hexCount} hexes generated across ${sectorCount} sectors.`,
-          data: { branch_id, hex_count: hexCount, sector_count: sectorCount },
+          message: `Branch created successfully with ${sectorCount} sectors.`,
+          data: { branch_id, sector_count: sectorCount },
         };
       });
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
-      if (error?.code === '23505' && error?.constraint === 'idx_bzh_hex_id') {
-        throw new BadRequestException({
-          status: false,
-          message: 'Branch zone overlaps with existing branch coverage. Reduce the radius or move the warehouse pin.',
-        });
-      }
       this.Developer.error('saveBranch error', { error });
       throw new InternalServerErrorException('Failed to create branch');
     }

@@ -12,7 +12,7 @@ import { api } from '@/services/api.client';
 import { showSuccessToast } from '@/services/toast.service';
 
 const MapPicker = dynamic(() => import('@/components/shared/MapPicker'), { ssr: false });
-const HexSectorMap = dynamic(() => import('@/components/branch/HexSectorMap'), { ssr: false });
+const SectorMap = dynamic(() => import('@/components/branch/SectorMap'), { ssr: false });
 
 type BranchHexShape = 'hexagon' | 'circle' | 'square';
 
@@ -30,9 +30,6 @@ interface Branch {
   buffer_zone?: number | null;
   allow_buffer_order?: boolean | null;
   sector_count?: number | null;
-  h3_resolution?: number | null;
-  center_hex?: string | null;
-  hex_shape?: BranchHexShape | string | null;
 }
 
 type FormState = {
@@ -47,7 +44,6 @@ type FormState = {
   allow_buffer_order: boolean;
   sector_count: number;
   is_active: boolean;
-  hex_shape: BranchHexShape;
 };
 
 export default function BranchesPage() {
@@ -62,7 +58,7 @@ export default function BranchesPage() {
   // Form state (shared between create and edit)
   const emptyForm: FormState = {
     branch_name: '', branch_code: '', city: '', state: '',
-    lat: null, lng: null, delivery_radius_km: 5, buffer_zone: 0, allow_buffer_order: false, sector_count: 3, is_active: true, hex_shape: 'hexagon',
+    lat: null, lng: null, delivery_radius_km: 5, buffer_zone: 0, allow_buffer_order: false, sector_count: 3, is_active: true,
   };
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -72,9 +68,7 @@ export default function BranchesPage() {
   const [detailStep, setDetailStep] = useState(1);
   const [formModalOpen, setFormModalOpen] = useState(false);
 
-  // Hex data & Partner Allocation for detail view
-  const [hexes, setHexes] = useState<{ hex_id: string; sector_index: number }[]>([]);
-  const [hexMessage, setHexMessage] = useState('');
+  // Detail view state
   const [sectors, setSectors] = useState<any[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
@@ -120,25 +114,17 @@ export default function BranchesPage() {
     setStep('detail');
     setDetailStep(1);
     setLoadingDetail(true);
-    setHexes([]);
-    setHexMessage('');
     setSectors([]);
     setBranchPartners([]);
     setUnassignedPartners([]);
     try {
-      const [fullRes, hexRes, sectorRes, partnersRes] = await Promise.all([
+      const [fullRes, sectorRes, partnersRes] = await Promise.all([
         api.get<any>(`/admin/branch/${branch.branch_id}/detail`),
-        api.get<any>(`/admin/branch/hexes/${branch.branch_id}`),
         api.get<any>(`/admin/zone/sectors/${branch.branch_id}`),
         api.get<any>(`/admin/delivery/partners?limit=200`),
       ]);
-      if (fullRes.data?.status && fullRes.data?.data) setSelectedBranch({ ...fullRes.data.data, hex_shape: normalizeHexShape(fullRes.data.data.hex_shape) });
-      if (hexRes.data?.status) {
-        setHexes(hexRes.data.data || []);
-        setHexMessage(hexRes.data.message || '');
-      }
+      if (fullRes.data?.status && fullRes.data?.data) setSelectedBranch(fullRes.data.data);
       if (sectorRes.data?.status) setSectors(sectorRes.data.data || []);
-
       if (partnersRes.data?.data) {
         const all = partnersRes.data.data || [];
         const allocated = all.filter((p: any) => p.branch_id === branch.branch_id);
@@ -222,7 +208,7 @@ export default function BranchesPage() {
     setError('');
   };
 
-  const willRegenHexes = selectedBranch && mode === 'edit' && (
+  const willRegenSectors = selectedBranch && mode === 'edit' && (
     (form.lat !== null && form.lng !== null) && (
       String(form.lat) !== String(selectedBranch.lat) ||
       String(form.lng) !== String(selectedBranch.lng) ||
@@ -244,7 +230,6 @@ export default function BranchesPage() {
       allow_buffer_order: !!branch.allow_buffer_order,
       sector_count: Number(branch.sector_count) || 3,
       is_active: branch.is_active,
-      hex_shape: normalizeHexShape(branch.hex_shape),
     });
     setError('');
     setMode('edit');
@@ -454,8 +439,8 @@ export default function BranchesPage() {
                       <p className="mt-1 text-sm font-extrabold text-slate-900">{Number(b.buffer_zone || 0).toFixed(2)} <span className="text-[10px] text-slate-400">km</span></p>
                     </div>
                     <div className="rounded-2xl bg-white px-3 py-3 text-center border border-slate-100">
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Hex</p>
-                      <p className="mt-1 text-sm font-extrabold text-slate-900">{b.center_hex ? 'Ready' : 'Pending'}</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Sectors</p>
+                      <p className="mt-1 text-sm font-extrabold text-slate-900">{b.sector_count || 0} <span className="text-[10px] text-slate-400">slices</span></p>
                     </div>
                   </div>
 
@@ -663,13 +648,13 @@ export default function BranchesPage() {
                     />
                   </div>
 
-                  {mode === 'edit' && willRegenHexes && (
+                  {mode === 'edit' && willRegenSectors && (
                     <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-3">
                       <AlertTriangle size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
                       <div>
-                        <p className="text-xs font-bold text-amber-800 uppercase tracking-wider">Zone Regeneration</p>
+                        <p className="text-xs font-bold text-amber-800 uppercase tracking-wider">Sector Regeneration</p>
                         <p className="text-xs text-amber-700 leading-relaxed mt-1">
-                          Updating the location pin or service radius will reset all delivery sectors and assignments. This operation is destructive.
+                          Updating the location pin, radius, or sector count will reset all delivery sectors and assignments.
                         </p>
                       </div>
                     </div>

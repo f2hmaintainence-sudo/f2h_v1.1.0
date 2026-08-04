@@ -6,13 +6,6 @@ import {
 import { DataService } from '../../../../shared/database/Data.service';
 import { DatabaseService } from '../../../../shared/database/Database.service';
 import { DeveloperService } from '../../../../shared/logger/Developer.service';
-import {
-  H3_RESOLUTION,
-  H3_AVG_HEX_RADIUS_KM,
-} from '../constants/h3.constants';
-
-// h3-js is a CommonJS module
-const h3 = require('h3-js');
 
 @Injectable()
 export class SectorService {
@@ -23,75 +16,25 @@ export class SectorService {
   ) {}
 
   // ═══════════════════════════════════════════════════════════════
-  // H3 Hex Disk Generation (used by saveAdd and saveEdit)
+  // Pure-math bearing → sector index (no H3 needed)
   // ═══════════════════════════════════════════════════════════════
 
   /**
-   * Generate H3 hex disk and compute sector_index for each hex.
-   * Returns array of { hex_id, sector_index }.
+   * Compute which sector index a lat/lng falls in relative to branch center.
+   * Sectors are equal-angle pie slices starting from North (0°).
    */
-  generateHexDisk(
-    lat: number,
-    lng: number,
-    radiusKm: number,
+  computeSectorIndex(
+    centerLat: number,
+    centerLng: number,
+    pointLat: number,
+    pointLng: number,
     sectorCount: number,
-    resolution: number = H3_RESOLUTION,
-  ): { hex_id: string; sector_index: number }[] {
-    const centerHex = h3.latLngToCell(lat, lng, resolution);
-    const avgRadius = H3_AVG_HEX_RADIUS_KM[resolution] || 0.174;
-    const k = Math.ceil(radiusKm / avgRadius);
-    const hexIds: string[] = h3.gridDisk(centerHex, k);
-
-    return hexIds.map(hexId => {
-      const [hexLat, hexLng] = h3.cellToLatLng(hexId);
-      let angle = Math.atan2(hexLng - lng, hexLat - lat);
-      if (angle < 0) angle += 2 * Math.PI;
-      const angleDeg = angle * (180 / Math.PI);
-      const sectorIndex = Math.floor(angleDeg / (360 / sectorCount));
-
-      return { hex_id: hexId, sector_index: Math.min(sectorIndex, sectorCount - 1) };
-    });
-  }
-
-  /**
-   * Get the center hex for a given lat/lng.
-   */
-  getCenterHex(lat: number, lng: number, resolution: number = H3_RESOLUTION): string {
-    return h3.latLngToCell(lat, lng, resolution);
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Bulk insert hex rows (chunked for performance)
-  // ═══════════════════════════════════════════════════════════════
-
-  async bulkInsertHexes(
-    branchId: string,
-    hexes: { hex_id: string; sector_index: number }[],
-    tx?: any,
-  ): Promise<number> {
-    const CHUNK_SIZE = 500;
-    let inserted = 0;
-
-    for (let i = 0; i < hexes.length; i += CHUNK_SIZE) {
-      const chunk = hexes.slice(i, i + CHUNK_SIZE);
-      const values: string[] = [];
-      const params: any[] = [];
-      let paramIndex = 1;
-
-      for (const hex of chunk) {
-        values.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, NOW())`);
-        params.push(branchId, hex.hex_id, hex.sector_index);
-        paramIndex += 3;
-      }
-
-      await (tx || this.db).query(
-        `INSERT INTO branch_zone_hexes (branch_id, hex_id, sector_index, created_at) VALUES ${values.join(', ')} ON CONFLICT DO NOTHING`,
-        params,
-      );
-      inserted += chunk.length;
-    }
-
-    return inserted;
+  ): number {
+    const dLat = pointLat - centerLat;
+    const dLng = pointLng - centerLng;
+    let angle = Math.atan2(dLng, dLat) * (180 / Math.PI);
+    if (angle < 0) angle += 360;
+    return Math.min(Math.floor(angle / (360 / sectorCount)), sectorCount - 1);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -109,54 +52,12 @@ export class SectorService {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Check for hex overlap with existing branches
-  // ═══════════════════════════════════════════════════════════════
-
-  async checkOverlap(
-    hexIds: string[],
-    excludeBranchId?: string,
-  ): Promise<{ conflicting: number; branchName: string } | null> {
-    if (hexIds.length === 0) return null;
-
-    // Check in batches
-    const BATCH_SIZE = 500;
-    for (let i = 0; i < hexIds.length; i += BATCH_SIZE) {
-      const batch = hexIds.slice(i, i + BATCH_SIZE);
-      const placeholders = batch.map((_, idx) => `$${idx + 1}`).join(', ');
-      let sql = `
-        SELECT bzh.hex_id, b.branch_name
-        FROM branch_zone_hexes bzh
-        JOIN branches b ON b.branch_id = bzh.branch_id
-        WHERE bzh.hex_id IN (${placeholders})
-      `;
-      const params: any[] = [...batch];
-
-      if (excludeBranchId) {
-        sql += ` AND bzh.branch_id != $${params.length + 1}`;
-        params.push(excludeBranchId);
-      }
-
-      const result = await this.db.query(sql, params);
-      if (result?.length > 0) {
-        return {
-          conflicting: result.length,
-          branchName: result[0].branch_name,
-        };
-      }
-    }
-
-    return null;
-  }
-
-  // ═══════════════════════════════════════════════════════════════
   // Get sectors for a branch (with delivery boy + customer count)
   // ═══════════════════════════════════════════════════════════════
 
   async getSectorsForBranch(branchId: string) {
     try {
-      // ── Step 1: Check if branch_sectors rows exist ──────────────
-      // Old branches created before sector feature may have no rows.
-      // Auto-seed them from the branch record if missing.
+      // Auto-seed missing sector rows from branch.sector_count
       const existingRows = await this.db.query(
         `SELECT COUNT(*) AS cnt FROM branch_sectors WHERE branch_id = $1`,
         [branchId],
@@ -164,14 +65,11 @@ export class SectorService {
       const rowCount = parseInt(existingRows?.[0]?.cnt ?? '0', 10);
 
       if (rowCount === 0) {
-        // Fetch the branch's sector_count to seed rows
         const branch = await this.db.query(
           `SELECT sector_count FROM branches WHERE branch_id = $1`,
           [branchId],
         );
         const sectorCount = branch?.[0]?.sector_count ?? 3;
-
-        // Insert missing sector rows
         for (let i = 0; i < sectorCount; i++) {
           await this.db.query(
             `INSERT INTO branch_sectors (branch_id, sector_index, delivery_partner_id)
@@ -182,20 +80,18 @@ export class SectorService {
         }
       }
 
-      // ── Step 2: Fetch sectors with safe customer count ──────────
-      // customers.sector_index may not exist in older DB schemas.
-      // Try with it first, fall back without it on error.
+      // Fetch sectors with safe customer count
       let result: any[] = [];
       try {
         result = await this.db.query(
           `SELECT
             bs.sector_index,
             bs.delivery_partner_id,
-            db.full_name AS delivery_partner_name,
-            db.phone AS delivery_partner_phone,
+            dp.full_name AS delivery_partner_name,
+            dp.phone AS delivery_partner_phone,
             COALESCE(c.customer_count, 0)::int AS customer_count
           FROM branch_sectors bs
-          LEFT JOIN delivery_partners db ON db.delivery_partner_id = bs.delivery_partner_id
+          LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = bs.delivery_partner_id
           LEFT JOIN (
             SELECT branch_id, sector_index, COUNT(*)::int AS customer_count
             FROM customers
@@ -206,18 +102,16 @@ export class SectorService {
           ORDER BY bs.sector_index`,
           [branchId],
         );
-      } catch (sqlErr: any) {
-        // If customers.sector_index column doesn't exist yet, fall back without count
-        this.developer.warn('getSectorsForBranch: sector_index column missing in customers, using fallback', { error: sqlErr?.message });
+      } catch {
         result = await this.db.query(
           `SELECT
             bs.sector_index,
             bs.delivery_partner_id,
-            db.full_name AS delivery_partner_name,
-            db.phone AS delivery_partner_phone,
+            dp.full_name AS delivery_partner_name,
+            dp.phone AS delivery_partner_phone,
             0 AS customer_count
           FROM branch_sectors bs
-          LEFT JOIN delivery_partners db ON db.delivery_partner_id = bs.delivery_partner_id
+          LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = bs.delivery_partner_id
           WHERE bs.branch_id = $1
           ORDER BY bs.sector_index`,
           [branchId],
@@ -237,7 +131,6 @@ export class SectorService {
     }
   }
 
-
   // ═══════════════════════════════════════════════════════════════
   // Assign delivery boy to a sector
   // ═══════════════════════════════════════════════════════════════
@@ -248,7 +141,6 @@ export class SectorService {
     deliveryPartnerId: string,
   ) {
     try {
-      // Validate delivery boy exists and belongs to this branch
       const boy = await this.db.query(
         `SELECT id, full_name FROM delivery_partners WHERE id = $1 AND branch_id = $2 AND is_active = true`,
         [deliveryPartnerId, branchId],
@@ -257,13 +149,11 @@ export class SectorService {
         throw new BadRequestException('Delivery boy not found or not in this branch');
       }
 
-      // Update sector
       await this.db.query(
         `UPDATE branch_sectors SET delivery_partner_id = $1 WHERE branch_id = $2 AND sector_index = $3`,
         [deliveryPartnerId, branchId, sectorIndex],
       );
 
-      // Bulk update customers in this sector (who don't have an override)
       const customerResult = await this.db.query(
         `UPDATE customers SET delivery_partner_id = $1
          WHERE branch_id = $2 AND sector_index = $3
@@ -289,11 +179,7 @@ export class SectorService {
   // Get customers in a sector (paginated)
   // ═══════════════════════════════════════════════════════════════
 
-  async getCustomersInSector(
-    branchId: string,
-    sectorIndex: number,
-    query: any,
-  ) {
+  async getCustomersInSector(branchId: string, sectorIndex: number, query: any) {
     try {
       const page = parseInt(query.page) || 1;
       const limit = parseInt(query.limit) || 20;
@@ -305,11 +191,11 @@ export class SectorService {
           c.id, c.full_name, c.phone, c.email,
           c.delivery_partner_id,
           c.override_delivery_partner_id,
-          db.full_name AS delivery_partner_name,
-          odb.full_name AS override_boy_name
+          dp.full_name AS delivery_partner_name,
+          odp.full_name AS override_boy_name
         FROM customers c
-        LEFT JOIN delivery_partners db ON db.id = c.delivery_partner_id
-        LEFT JOIN delivery_partners odb ON odb.id = c.override_delivery_partner_id
+        LEFT JOIN delivery_partners dp ON dp.id = c.delivery_partner_id
+        LEFT JOIN delivery_partners odp ON odp.id = c.override_delivery_partner_id
         WHERE c.branch_id = $1 AND c.sector_index = $2
       `;
       const params: any[] = [branchId, sectorIndex];
@@ -324,7 +210,6 @@ export class SectorService {
 
       const data = await this.db.query(sql, params);
 
-      // Count total
       let countSql = `SELECT COUNT(*)::int AS total FROM customers WHERE branch_id = $1 AND sector_index = $2`;
       const countParams: any[] = [branchId, sectorIndex];
       if (search) {
@@ -352,14 +237,12 @@ export class SectorService {
 
   async overrideCustomerDeliveryPartner(customerId: string, deliveryPartnerId: string) {
     try {
-      // Get customer
       const customer = await this.db.query(
         `SELECT id, branch_id FROM customers WHERE id = $1`,
         [customerId],
       );
       if (!customer?.length) throw new BadRequestException('Customer not found');
 
-      // Validate delivery boy belongs to same branch
       const boy = await this.db.query(
         `SELECT id, full_name FROM delivery_partners WHERE id = $1 AND branch_id = $2 AND is_active = true`,
         [deliveryPartnerId, customer[0].branch_id],
@@ -416,15 +299,13 @@ export class SectorService {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Change sector count (destructive remap)
+  // Change sector count (destructive remap using bearing math)
   // ═══════════════════════════════════════════════════════════════
 
   async changeSectorCount(branchId: string, newSectorCount: number) {
     try {
-      // Get branch
       const branch = await this.db.query(
-        `SELECT branch_id, branch_name, lat, lng, delivery_radius_km, h3_resolution
-         FROM branches WHERE branch_id = $1`,
+        `SELECT branch_id, branch_name, lat, lng, delivery_radius_km FROM branches WHERE branch_id = $1`,
         [branchId],
       );
       if (!branch?.length) throw new BadRequestException('Branch not found');
@@ -434,45 +315,20 @@ export class SectorService {
         throw new BadRequestException('Branch has no coordinates set');
       }
 
-      // Regenerate hex disk with new sector count
-      const hexes = this.generateHexDisk(
-        parseFloat(b.lat), parseFloat(b.lng),
-        parseFloat(b.delivery_radius_km),
-        newSectorCount,
-        b.h3_resolution || H3_RESOLUTION,
-      );
+      const centerLat = parseFloat(b.lat);
+      const centerLng = parseFloat(b.lng);
 
-      // Transaction: delete old, insert new
-      return await this.Data.executeTransaction(async (tx) => {
-        // Delete old hexes
-        await this.db.query(
-          `DELETE FROM branch_zone_hexes WHERE branch_id = $1`,
-          [branchId],
-        );
-
+      return await this.Data.executeTransaction(async () => {
         // Delete old sectors
-        await this.db.query(
-          `DELETE FROM branch_sectors WHERE branch_id = $1`,
-          [branchId],
-        );
+        await this.db.query(`DELETE FROM branch_sectors WHERE branch_id = $1`, [branchId]);
 
-        // Clean up routes: clear route_id from customers, delete route_customers, delete routes
+        // Clean up routes
+        await this.db.query(`UPDATE customers SET route_id = NULL WHERE branch_id = $1`, [branchId]);
         await this.db.query(
-          `UPDATE customers SET route_id = NULL WHERE branch_id = $1`,
+          `DELETE FROM delivery_route_customers WHERE route_id IN (SELECT id FROM delivery_routes WHERE branch_id = $1)`,
           [branchId],
         );
-        await this.db.query(
-          `DELETE FROM delivery_route_customers
-           WHERE route_id IN (SELECT id FROM delivery_routes WHERE branch_id = $1)`,
-          [branchId],
-        );
-        await this.db.query(
-          `DELETE FROM delivery_routes WHERE branch_id = $1`,
-          [branchId],
-        );
-
-        // Re-insert hexes
-        const hexCount = await this.bulkInsertHexes(branchId, hexes);
+        await this.db.query(`DELETE FROM delivery_routes WHERE branch_id = $1`, [branchId]);
 
         // Create new sectors
         await this.createSectors(branchId, newSectorCount);
@@ -483,59 +339,38 @@ export class SectorService {
           [newSectorCount, branchId],
         );
 
-        // Remap customers
+        // Remap customers using bearing math
         let customersRemapped = 0;
         const customers = await this.db.query(
-          `SELECT id, address_hex FROM customers WHERE branch_id = $1 AND address_hex IS NOT NULL`,
+          `SELECT id, address_lat, address_lng FROM customers WHERE branch_id = $1 AND address_lat IS NOT NULL AND address_lng IS NOT NULL`,
           [branchId],
         );
 
         if (customers?.length) {
           for (const cust of customers) {
-            const hexRow = hexes.find(h => h.hex_id === cust.address_hex);
-            if (hexRow) {
-              await this.db.query(
-                `UPDATE customers SET sector_index = $1, delivery_partner_id = NULL
-                 WHERE id = $2 AND override_delivery_partner_id IS NULL`,
-                [hexRow.sector_index, cust.id],
-              );
-              customersRemapped++;
-            }
+            const newSectorIndex = this.computeSectorIndex(
+              centerLat, centerLng,
+              parseFloat(cust.address_lat), parseFloat(cust.address_lng),
+              newSectorCount,
+            );
+            await this.db.query(
+              `UPDATE customers SET sector_index = $1, delivery_partner_id = NULL WHERE id = $2 AND override_delivery_partner_id IS NULL`,
+              [newSectorIndex, cust.id],
+            );
+            customersRemapped++;
           }
         }
 
         return {
           status: true,
-          message: `Sector count changed to ${newSectorCount}. ${hexCount} hexes remapped. ${customersRemapped} customers remapped.`,
-          data: { hex_count: hexCount, customers_remapped: customersRemapped },
+          message: `Sector count changed to ${newSectorCount}. ${customersRemapped} customers remapped.`,
+          data: { sector_count: newSectorCount, customers_remapped: customersRemapped },
         };
       });
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
       this.developer.error('changeSectorCount error', { error });
-      console.error('[changeSectorCount exact error]', error);
       throw error;
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Get branch hexes (lightweight — for frontend map rendering)
-  // ═══════════════════════════════════════════════════════════════
-
-  async getBranchHexes(branchId: string) {
-    try {
-      const result = await this.db.query(
-        `SELECT hex_id, sector_index FROM branch_zone_hexes WHERE branch_id = $1`,
-        [branchId],
-      );
-
-      return {
-        status: true,
-        data: result || [],
-      };
-    } catch (error) {
-      this.developer.error('getBranchHexes error', { error });
-      throw new InternalServerErrorException('Failed to fetch hexes');
     }
   }
 
@@ -549,11 +384,7 @@ export class SectorService {
         `SELECT id, full_name, phone FROM delivery_partners WHERE branch_id = $1 AND is_active = true ORDER BY full_name`,
         [branchId],
       );
-
-      return {
-        status: true,
-        data: result || [],
-      };
+      return { status: true, data: result || [] };
     } catch (error) {
       this.developer.error('getDeliveryPartnersForBranch error', { error });
       throw new InternalServerErrorException('Failed to fetch delivery boys');
@@ -561,10 +392,7 @@ export class SectorService {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Phase 5A — Assign sector to customer on registration
-  // Called by customer registration flow when GPS is provided.
-  // Looks up the H3 hex → sector_index → delivery boy.
-  // Falls back to apartment-name fuzzy match if no hex found.
+  // Assign customer to sector on registration (bearing math, no H3)
   // ═══════════════════════════════════════════════════════════════
 
   async assignCustomerToSectorOnRegistration(
@@ -573,37 +401,26 @@ export class SectorService {
     lat: number | null,
     lng: number | null,
     apartmentName?: string | null,
-  ): Promise<{ sector_index: number | null; delivery_partner_id: string | null; address_hex: string | null }> {
+  ): Promise<{ sector_index: number | null; delivery_partner_id: string | null }> {
     try {
-      let addressHex: string | null = null;
       let sectorIndex: number | null = null;
       let deliveryPartnerId: string | null = null;
 
-      // ── Priority 1: GPS → H3 hex lookup ────────────────────────
       if (lat && lng && lat !== 0 && lng !== 0) {
-        addressHex = h3.latLngToCell(lat, lng, H3_RESOLUTION);
-
-        const hexRow = await this.db.query(
-          `SELECT sector_index FROM branch_zone_hexes
-           WHERE branch_id = $1 AND hex_id = $2
-           LIMIT 1`,
-          [branchId, addressHex],
+        const branch = await this.db.query(
+          `SELECT lat, lng, sector_count FROM branches WHERE branch_id = $1`,
+          [branchId],
         );
-
-        if (hexRow?.length) {
-          sectorIndex = hexRow[0].sector_index;
-        } else {
-          // GPS exists but falls outside branch coverage
-          // Find nearest covered hex to assign closest sector
-          const nearestHex = await this.db.query(
-            `SELECT sector_index FROM branch_zone_hexes WHERE branch_id = $1 LIMIT 1`,
-            [branchId],
+        if (branch?.length && branch[0].lat && branch[0].lng) {
+          sectorIndex = this.computeSectorIndex(
+            parseFloat(branch[0].lat), parseFloat(branch[0].lng),
+            lat, lng,
+            branch[0].sector_count || 3,
           );
-          sectorIndex = nearestHex?.[0]?.sector_index ?? null;
         }
       }
 
-      // ── Priority 2: Apartment name fuzzy match (no GPS) ────────
+      // Fallback: apartment name fuzzy match
       if (sectorIndex === null && apartmentName?.trim()) {
         const aptResult = await this.db.query(
           `SELECT c.sector_index
@@ -619,37 +436,30 @@ export class SectorService {
         sectorIndex = aptResult?.[0]?.sector_index ?? null;
       }
 
-      // ── Lookup delivery boy for this sector ─────────────────────
+      // Lookup delivery boy for this sector
       if (sectorIndex !== null) {
         const sectorRow = await this.db.query(
-          `SELECT delivery_partner_id FROM branch_sectors
-           WHERE branch_id = $1 AND sector_index = $2`,
+          `SELECT delivery_partner_id FROM branch_sectors WHERE branch_id = $1 AND sector_index = $2`,
           [branchId, sectorIndex],
         );
         deliveryPartnerId = sectorRow?.[0]?.delivery_partner_id ?? null;
       }
 
-      // ── Persist on customer record ──────────────────────────────
+      // Persist on customer record
       await this.db.query(
-        `UPDATE customers
-         SET address_hex = $1, sector_index = $2, delivery_partner_id = $3,
-             address_lat = $4, address_lng = $5
-         WHERE id = $6`,
-        [addressHex, sectorIndex, deliveryPartnerId, lat, lng, customerId],
+        `UPDATE customers SET sector_index = $1, delivery_partner_id = $2, address_lat = $3, address_lng = $4 WHERE id = $5`,
+        [sectorIndex, deliveryPartnerId, lat, lng, customerId],
       );
 
-      return { sector_index: sectorIndex, delivery_partner_id: deliveryPartnerId, address_hex: addressHex };
+      return { sector_index: sectorIndex, delivery_partner_id: deliveryPartnerId };
     } catch (error) {
       this.developer.error('assignCustomerToSectorOnRegistration error', { error });
-      // Non-fatal: log and return nulls rather than crashing registration
-      return { sector_index: null, delivery_partner_id: null, address_hex: null };
+      return { sector_index: null, delivery_partner_id: null };
     }
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Phase 5B — Real-time delivery boy location ping (upsert)
-  // Driver app calls this every 30s during active shift.
-  // Single-row-per-boy UPSERT for minimum DB pressure.
+  // Real-time delivery boy location ping (upsert)
   // ═══════════════════════════════════════════════════════════════
 
   async upsertDeliveryPartnerLocation(
@@ -659,26 +469,24 @@ export class SectorService {
     shiftType: 'morning' | 'evening' = 'morning',
   ) {
     try {
-      // Resolve deliveryPartnerId: support user_id (e.g., USERSHI1CX) or delivery_partners.id UUID
-      let resolvedBoyId: string | null = null;
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(deliveryPartnerId);
+      let resolvedBoyId: string | null = null;
+
       if (isUuid) {
         const dbBoy = await this.db.query(
           `SELECT id FROM delivery_partners WHERE id = $1::uuid OR user_id = $2 OR delivery_partner_id = $2 LIMIT 1`,
-          [deliveryPartnerId, deliveryPartnerId]
+          [deliveryPartnerId, deliveryPartnerId],
         );
         resolvedBoyId = dbBoy?.[0]?.id || null;
       } else {
         const dbBoy = await this.db.query(
           `SELECT id FROM delivery_partners WHERE user_id = $1 OR delivery_partner_id = $1 LIMIT 1`,
-          [deliveryPartnerId]
+          [deliveryPartnerId],
         );
         resolvedBoyId = dbBoy?.[0]?.id || null;
       }
 
-      if (!resolvedBoyId) {
-        return { status: false, message: 'Delivery boy profile not found' };
-      }
+      if (!resolvedBoyId) return { status: false, message: 'Delivery boy profile not found' };
 
       await this.db.query(
         `INSERT INTO delivery_partner_locations (delivery_partner_id, lat, lng, recorded_at, shift_type)
@@ -699,42 +507,36 @@ export class SectorService {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Phase 5B — Get all active delivery boy locations for a branch
-  // Used by admin map view to show real-time positions.
+  // Get all active delivery boy locations for a branch
   // ═══════════════════════════════════════════════════════════════
 
   async getDeliveryPartnerLocations(branchId: string, shiftType?: 'morning' | 'evening') {
     try {
       let sql = `
         SELECT
-          dbl.delivery_partner_id,
-          dbl.lat,
-          dbl.lng,
-          dbl.recorded_at,
-          dbl.shift_type,
-          db.full_name,
-          db.phone,
-          -- Flag stale pings (> 5 minutes old = boy may be offline)
-          (NOW() - dbl.recorded_at) > INTERVAL '5 minutes' AS is_stale
-        FROM delivery_partner_locations dbl
-        JOIN delivery_partners db ON db.id = dbl.delivery_partner_id
-        WHERE db.branch_id = $1
+          dpl.delivery_partner_id,
+          dpl.lat,
+          dpl.lng,
+          dpl.recorded_at,
+          dpl.shift_type,
+          dp.full_name,
+          dp.phone,
+          (NOW() - dpl.recorded_at) > INTERVAL '5 minutes' AS is_stale
+        FROM delivery_partner_locations dpl
+        JOIN delivery_partners dp ON dp.id = dpl.delivery_partner_id
+        WHERE dp.branch_id = $1
       `;
       const params: any[] = [branchId];
 
       if (shiftType) {
-        sql += ` AND dbl.shift_type = $2`;
+        sql += ` AND dpl.shift_type = $2`;
         params.push(shiftType);
       }
 
-      sql += ` ORDER BY db.full_name`;
+      sql += ` ORDER BY dp.full_name`;
       const result = await this.db.query(sql, params);
 
-      return {
-        status: true,
-        data: result || [],
-        total: result?.length || 0,
-      };
+      return { status: true, data: result || [], total: result?.length || 0 };
     } catch (error) {
       this.developer.error('getDeliveryPartnerLocations error', { error });
       throw new InternalServerErrorException('Failed to fetch locations');
@@ -742,36 +544,28 @@ export class SectorService {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Warehouse summary — how many customers per sector + boy
+  // Warehouse summary — customers & routes per sector
   // ═══════════════════════════════════════════════════════════════
 
-   async getWarehouseSummary(branchId: string, date?: string) {
+  async getWarehouseSummary(branchId: string, date?: string) {
     try {
       const targetDate = date || new Date().toISOString().split('T')[0];
 
       const result = await this.db.query(
         `SELECT
           bs.sector_index,
-          bs.sector_name,
-          db.full_name AS delivery_partner_name,
-          db.phone AS delivery_partner_phone,
+          dp.full_name AS delivery_partner_name,
+          dp.phone AS delivery_partner_phone,
           COUNT(DISTINCT c.id)::int AS total_customers,
           COUNT(DISTINCT CASE WHEN c.route_id IS NOT NULL THEN c.id END)::int AS routed_customers,
           COUNT(DISTINCT CASE WHEN c.route_id IS NULL THEN c.id END)::int AS unrouted_customers,
-          COUNT(DISTINCT r.id)::int AS route_count,
-          COALESCE((
-            SELECT SUM(ss.m_quantity + ss.e_quantity)::int
-            FROM customers cust
-            JOIN subscriptions sub ON sub.customer_id = cust.customer_id AND sub.status = 'active'
-            JOIN subscription_weekly_schedule ss ON ss.subscription_id = sub.subscription_id
-            WHERE cust.branch_id = $1 AND cust.sector_index = bs.sector_index
-          ), 0) AS total_items
+          COUNT(DISTINCT r.id)::int AS route_count
         FROM branch_sectors bs
-        LEFT JOIN delivery_partners db ON db.delivery_partner_id= bs.delivery_partner_id
+        LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = bs.delivery_partner_id
         LEFT JOIN customers c ON c.branch_id = bs.branch_id AND c.sector_index = bs.sector_index
         LEFT JOIN delivery_routes r ON r.branch_id = bs.branch_id AND r.sector_index = bs.sector_index AND r.is_active = true
-        WHERE bs.branch_id = $1 AND bs.is_active = true
-        GROUP BY bs.sector_index, bs.sector_name, db.full_name, db.phone
+        WHERE bs.branch_id = $1
+        GROUP BY bs.sector_index, dp.full_name, dp.phone
         ORDER BY bs.sector_index`,
         [branchId],
       );
@@ -782,18 +576,13 @@ export class SectorService {
           routed_customers: acc.routed_customers + (r.routed_customers || 0),
           unrouted_customers: acc.unrouted_customers + (r.unrouted_customers || 0),
           route_count: acc.route_count + (r.route_count || 0),
-          total_items: acc.total_items + (r.total_items || 0),
         }),
-        { total_customers: 0, routed_customers: 0, unrouted_customers: 0, route_count: 0, total_items: 0 },
+        { total_customers: 0, routed_customers: 0, unrouted_customers: 0, route_count: 0 },
       );
 
       return {
         status: true,
-        data: {
-          date: targetDate,
-          sectors: result || [],
-          totals,
-        },
+        data: { date: targetDate, sectors: result || [], totals },
       };
     } catch (error) {
       this.developer.error('getWarehouseSummary error', { error });

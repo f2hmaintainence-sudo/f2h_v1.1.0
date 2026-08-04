@@ -11,7 +11,7 @@ import { BranchShowAddService } from './showAdd.service';
 import { BranchShowEditService } from './showEdit.service';
 import { SectorService } from '../ModuleServices/sector.service';
 import { CreateBranchDto } from '../dto/branch.dto';
-import { H3_RESOLUTION } from '../constants/h3.constants';
+
 
 @Injectable()
 export class BranchSaveEditService {
@@ -37,8 +37,8 @@ export class BranchSaveEditService {
     try {
       // 1. Fetch current branch data to detect geo changes
       const currentRows = await this.db.query(
-        `SELECT branch_id, branch_name, branch_code, city, state, is_active, allow_buffer_order, hex_shape,
-                lat, lng, delivery_radius_km, buffer_zone, sector_count, h3_resolution, center_hex
+        `SELECT branch_id, branch_name, branch_code, city, state, is_active, allow_buffer_order,
+                lat, lng, delivery_radius_km, buffer_zone, sector_count
          FROM branches WHERE branch_id = $1`,
         [branchId],
       );
@@ -77,8 +77,6 @@ export class BranchSaveEditService {
       const newSectorCount = body.sector_count !== undefined
         ? body.sector_count
         : current.sector_count;
-      const resolution = body.h3_resolution || current.h3_resolution || H3_RESOLUTION;
-
       const geoChanged = (
         (newLat !== null && newLat !== undefined) &&
         (newLng !== null && newLng !== undefined) &&
@@ -112,49 +110,15 @@ export class BranchSaveEditService {
       if (body.buffer_zone !== undefined) {
         updateData.buffer_zone = body.buffer_zone;
       }
-      if (body.hex_shape !== undefined) {
-        updateData.hex_shape = ['hexagon', 'circle', 'square'].includes(String(body.hex_shape)) ? String(body.hex_shape) : 'hexagon';
-      }
-
-      let hexCount = 0;
-      let newCenterHex: string | null = current.center_hex;
-
-      // 5. Hex regeneration if coordinates changed
+      // 5. Sector regeneration if geo changed (bearing math, no H3)
       if (needsHexRegen) {
-        // 5a. Generate hex disk
-        newCenterHex = this.sectorService.getCenterHex(newLat, newLng, resolution);
-        const hexes = this.sectorService.generateHexDisk(newLat, newLng, newRadiusKm, newSectorCount, resolution);
-        hexCount = hexes.length;
+        await this.db.query('DELETE FROM branch_sectors WHERE branch_id = $1', [branchId]);
+        await this.sectorService.createSectors(branchId, newSectorCount);
 
-        // 5b. Overlap check (exclude self)
-        const overlap = await this.sectorService.checkOverlap(hexes.map(h => h.hex_id), branchId);
-        if (overlap) {
-          throw new BadRequestException({
-            status: false,
-            message: `Zone overlaps with "${overlap.branchName}". ${overlap.conflicting} hex(es) conflict. Reduce radius or move location.`,
-          });
-        }
-
-        // 5c. Execute in a transaction: delete old + insert new
-        await this.dataService.executeTransaction(async (tx) => {
-          // Delete old hexes and sectors
-          await this.db.query('DELETE FROM branch_zone_hexes WHERE branch_id = $1', [branchId]);
-          await this.db.query('DELETE FROM branch_sectors WHERE branch_id = $1', [branchId]);
-
-          // Insert new hexes
-          await this.sectorService.bulkInsertHexes(branchId, hexes, tx);
-
-          // Create new sector rows
-          await this.sectorService.createSectors(branchId, newSectorCount, tx);
-        });
-
-        // Update geo fields in branches row
         updateData.lat = newLat;
         updateData.lng = newLng;
         updateData.delivery_radius_km = newRadiusKm;
         updateData.sector_count = newSectorCount;
-        updateData.center_hex = newCenterHex;
-        updateData.h3_resolution = resolution;
       }
 
       // 6. Update the branches table
@@ -185,7 +149,7 @@ export class BranchSaveEditService {
       }
 
       const successMsg = needsHexRegen
-        ? `Branch updated. ${hexCount} hexes regenerated across ${newSectorCount} sectors.`
+        ? `Branch updated. ${newSectorCount} sectors reconfigured.`
         : 'Branch updated successfully.';
 
       return { status: true, message: successMsg };

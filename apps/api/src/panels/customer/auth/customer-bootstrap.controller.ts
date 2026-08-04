@@ -18,7 +18,6 @@ import type { Request } from 'express';
 import { DataService } from 'src/shared/database/Data.service';
 import { DeveloperService } from 'src/shared/logger/Developer.service';
 import { AuthService } from './auth.service';
-const h3 = require('h3-js');
 const COORDINATE_EPSILON = 0.0000001;
 
 @Controller('customer')
@@ -293,11 +292,9 @@ export class CustomerBootstrapController {
       );
     }
 
-    const h3Index = h3.latLngToCell(latitude, longitude, 9);
-
     return {
       branch_id: nearestBranch.branch_id,
-      h3_index: h3Index,
+      h3_index: null,
     };
   }
 

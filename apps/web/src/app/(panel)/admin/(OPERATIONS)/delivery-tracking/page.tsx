@@ -1,6 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import {
+  APIProvider,
+  Map as GMap,
+  AdvancedMarker,
+  InfoWindow,
+  Polyline,
+} from "@vis.gl/react-google-maps";
 import { api } from "@/services/api.client";
 import {
   MapPin, Truck, CheckCircle2, Clock, AlertTriangle, XCircle,
@@ -118,11 +125,8 @@ export default function DeliveryTrackingPage() {
   // Scroll container ref for partner carousel
   const partnerScrollRef = useRef<HTMLDivElement>(null);
 
-  // Map instance ref
-  const mapRef = useRef<any>(null);
-  const tileLayerRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
-  const [mapStyle, setMapStyle] = useState<"google_roadmap" | "google_satellite" | "google_hybrid" | "carto_light">("google_roadmap");
+  // Popup state for Google Maps InfoWindow
+  const [mapInfoTarget, setMapInfoTarget] = useState<string | null>(null);
 
   // Simulation tick for partner GPS movement animation
   const [simTick, setSimTick] = useState(0);
@@ -178,9 +182,8 @@ export default function DeliveryTrackingPage() {
   >({});
   const [mapsApiKey, setMapsApiKey] = useState<string>("");
 
-  // Fetch initial live positions & Google Maps API key
+  // Fetch initial live positions
   useEffect(() => {
-    // 1. Live positions
     api.get<any>("/admin/delivery/partners/live-positions")
       .then((res) => {
         const list = Array.isArray(res.data?.data) ? res.data.data : Array.isArray(res.data) ? res.data : [];
@@ -197,30 +200,6 @@ export default function DeliveryTrackingPage() {
         setPartnerPositions(prev => ({ ...initialMap, ...prev }));
       })
       .catch(() => {});
-
-    // 2. Google Maps API key (try admin integration endpoint + public client config fallback)
-    const fetchKey = async () => {
-      try {
-        const res = await api.get<any>("/admin/developer/api-integrations/maps");
-        const raw = res.data;
-        const list = Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : [];
-        const activeConfig = list.find((c: any) => c.is_active);
-        const key = activeConfig?.config_data?.apiKey || activeConfig?.apiKey;
-        if (key) {
-          setMapsApiKey(key);
-          return;
-        }
-      } catch (_) {}
-
-      try {
-        const devRes = await api.get<any>("/device/client-config");
-        const devKey = devRes.data?.data?.google_maps?.apiKey;
-        if (devKey) {
-          setMapsApiKey(devKey);
-        }
-      } catch (_) {}
-    };
-    fetchKey();
   }, []);
 
   // Connect Socket.io for real-time GPS streaming
@@ -446,235 +425,7 @@ export default function DeliveryTrackingPage() {
     }
   };
 
-  // Initialize & Update Leaflet Light Map
-  useEffect(() => {
-    if (typeof window === "undefined") return;
 
-    if (!document.getElementById("leaflet-css")) {
-      const link = document.createElement("link");
-      link.id = "leaflet-css";
-      link.rel = "stylesheet";
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      document.head.appendChild(link);
-    }
-
-    import("leaflet").then((L) => {
-      const container = document.getElementById("live-leaflet-container");
-      if (!container) return;
-
-      if (!mapRef.current) {
-        const map = L.map(container, {
-          center: [activeBranch.lat, activeBranch.lng],
-          zoom: 14,
-          zoomControl: true,
-        });
-
-        mapRef.current = map;
-      }
-
-      const map = mapRef.current;
-
-      // Update Tile Layer dynamically whenever mapsApiKey or mapStyle changes
-      if (tileLayerRef.current) {
-        tileLayerRef.current.remove();
-      }
-
-      let tileUrl = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
-      let tileOptions: any = {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap',
-      };
-
-      if (mapStyle.startsWith("google") || mapsApiKey) {
-        const lyrs = mapStyle === "google_satellite" ? "s" : mapStyle === "google_hybrid" ? "y" : "m";
-        const keyParam = mapsApiKey ? `&key=${mapsApiKey}` : "";
-        tileUrl = `https://{s}.google.com/vt/lyrs=${lyrs}&x={x}&y={y}&z={z}${keyParam}`;
-        tileOptions = {
-          maxZoom: 20,
-          subdomains: ["mt0", "mt1", "mt2", "mt3"],
-          attribution: '&copy; <a href="https://maps.google.com" target="_blank">Google Maps</a>',
-        };
-      }
-
-      tileLayerRef.current = L.tileLayer(tileUrl, tileOptions).addTo(map);
-
-      setTimeout(() => map.invalidateSize(), 150);
-
-      markersRef.current.forEach(m => m.remove());
-      markersRef.current = [];
-
-      const hubLat = Number(activeBranch.lat);
-      const hubLng = Number(activeBranch.lng);
-
-      // Collect waypoints for auto fitBounds and route path line
-      const routeWaypoints: Array<[number, number]> = [];
-      if (!isNaN(hubLat) && !isNaN(hubLng)) {
-        routeWaypoints.push([hubLat, hubLng]);
-      }
-
-      // 1. Hub Marker (Green Hub with Branch Name)
-      if (!isNaN(hubLat) && !isNaN(hubLng)) {
-        const hubIcon = L.divIcon({
-          className: "custom-leaflet-hub",
-          html: `
-            <div style="background:#059669;color:white;width:38px;height:38px;border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(5,150,105,0.4);border:2.5px solid white;">
-              🏢
-            </div>
-            <div style="background:#0f172a;color:#f8fafc;font-size:10px;font-weight:800;padding:3px 8px;border-radius:12px;margin-top:4px;box-shadow:0 4px 12px rgba(0,0,0,0.2);white-space:nowrap;border:1px solid rgba(255,255,255,0.15);">
-              Hub • ${activeBranch.name}
-            </div>
-          `,
-          iconSize: [38, 65],
-          iconAnchor: [19, 19],
-        });
-        const hubMarker = L.marker([hubLat, hubLng], { icon: hubIcon }).addTo(map);
-        markersRef.current.push(hubMarker);
-      }
-
-      let pLat: number | null = null;
-      let pLng: number | null = null;
-
-      // 2. Selected Partner Marker (Clean Uber-Style Vehicle Puck with Exact Speed & Battery)
-      if (selectedPartner && livePartnerPos) {
-        const parsedPLat = Number(livePartnerPos.lat);
-        const parsedPLng = Number(livePartnerPos.lng);
-        if (!isNaN(parsedPLat) && !isNaN(parsedPLng)) {
-          pLat = parsedPLat;
-          pLng = parsedPLng;
-
-          const rawSpeed = livePartnerPos.speed != null ? Math.round(Number(livePartnerPos.speed)) : 0;
-          const partnerSpeed = `${rawSpeed} km/h`;
-          const partnerBat = livePartnerPos.battery != null ? `${livePartnerPos.battery}%` : "—";
-
-          const partnerIcon = L.divIcon({
-            className: "custom-leaflet-partner-uber",
-            html: `
-              <div style="position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;">
-                <div style="position:absolute;top:-4px;width:52px;height:52px;border-radius:50%;background:rgba(16,185,129,0.22);border:1.5px solid #10b981;animation:ping 2.2s cubic-bezier(0,0,0.2,1) infinite;"></div>
-                
-                <div style="background:linear-gradient(145deg, #059669, #047857);color:white;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(5,150,105,0.45), 0 2px 6px rgba(0,0,0,0.3);border:3px solid #ffffff;z-index:2;">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="18.5" cy="17.5" r="2.5"/>
-                    <circle cx="5.5" cy="17.5" r="2.5"/>
-                    <path d="M12 17.5V14l-3-3 4-3 2 3h3"/>
-                    <path d="M9 11l-3 3.5H3"/>
-                  </svg>
-                </div>
-
-                <div style="background:#0f172a;color:#f8fafc;font-size:10px;font-weight:800;padding:4px 12px;border-radius:20px;margin-top:6px;box-shadow:0 6px 20px rgba(0,0,0,0.3);white-space:nowrap;border:1px solid rgba(255,255,255,0.15);display:flex;align-items:center;gap:6px;">
-                  <span style="width:7px;height:7px;border-radius:50%;background:${rawSpeed > 0 ? '#10b981' : '#f59e0b'};box-shadow:0 0 8px ${rawSpeed > 0 ? '#10b981' : '#f59e0b'};display:inline-block;"></span>
-                  <span>${selectedPartner.full_name}</span>
-                  <span style="color:${rawSpeed > 0 ? '#34d399' : '#fbbf24'};font-weight:700;">• ${partnerSpeed}</span>
-                  <span style="color:#94a3b8;font-weight:600;">• 🔋 ${partnerBat}</span>
-                </div>
-              </div>
-            `,
-            iconSize: [140, 80],
-            iconAnchor: [70, 22],
-          });
-          const partnerMarker = L.marker([pLat, pLng], { icon: partnerIcon }).addTo(map);
-          markersRef.current.push(partnerMarker);
-
-          // Smooth camera tracking
-          map.panTo([pLat, pLng], { animate: true, duration: 1.2 });
-
-          routeWaypoints.push([pLat, pLng]);
-        }
-      }
-
-      // 3. Order Stop Markers (Clear visual distinction for Delivered vs In Transit vs Pending)
-      const stopGroups = new Map<string, { lat: number; lng: number; stops: any[] }>();
-
-      partnerOrders.forEach((o, idx) => {
-        if (o.lat == null || o.lng == null) return;
-        const oLat = Number(o.lat);
-        const oLng = Number(o.lng);
-        if (isNaN(oLat) || isNaN(oLng)) return;
-
-        const locKey = `${oLat.toFixed(5)}_${oLng.toFixed(5)}`;
-        if (!stopGroups.has(locKey)) {
-          stopGroups.set(locKey, { lat: oLat, lng: oLng, stops: [] });
-        }
-        stopGroups.get(locKey)!.stops.push({ ...o, defaultStopNum: idx + 1 });
-        routeWaypoints.push([oLat, oLng]);
-      });
-
-      stopGroups.forEach((group) => {
-        const { lat: oLat, lng: oLng, stops } = group;
-        const firstStop = stops[0];
-        const stopNums = stops.map(s => s.stop_number || s.defaultStopNum).join(' & ');
-        const isAllDelivered = stops.every(s => s.status === "delivered");
-        const hasInTransit = stops.some(s => s.status === "out_for_delivery");
-
-        const rawAddr = firstStop.address_line || "Customer Address";
-        const customerAddr = rawAddr.length > 32 ? rawAddr.substring(0, 30) + "..." : rawAddr;
-
-        const stopIcon = L.divIcon({
-          className: "custom-leaflet-stop-uber",
-          html: `
-            <div style="display:flex;flex-direction:column;align-items:center;cursor:pointer;">
-              <div style="background:${isAllDelivered ? '#059669' : hasInTransit ? '#2563eb' : '#1e293b'};color:white;min-width:32px;height:32px;padding:0 6px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;box-shadow:0 4px 14px ${isAllDelivered ? 'rgba(5,150,105,0.45)' : 'rgba(0,0,0,0.3)'};border:2.5px solid white;">
-                ${isAllDelivered ? '✓' : `#${stopNums}`}
-              </div>
-              <div style="background:${isAllDelivered ? '#f0fdf4' : '#ffffff'};color:${isAllDelivered ? '#166534' : '#0f172a'};font-size:9.5px;font-weight:800;padding:4px 9px;border-radius:8px;margin-top:3px;box-shadow:0 4px 12px rgba(0,0,0,0.15);white-space:nowrap;border:1px solid ${isAllDelivered ? '#86efac' : '#cbd5e1'};display:flex;flex-direction:column;align-items:center;gap:1px;">
-                <div style="display:flex;align-items:center;gap:4px;">
-                  <span>${isAllDelivered ? '✓ DELIVERED' : `Stop #${stopNums}`}</span>
-                  <span style="color:${isAllDelivered ? '#15803d' : '#2563eb'}; font-weight:900;">• ${firstStop.customer_name}${stops.length > 1 ? ` (${stops.length})` : ''}</span>
-                </div>
-                <div style="font-size:8.5px;color:#64748b;font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;">
-                  📍 ${customerAddr}
-                </div>
-              </div>
-            </div>
-          `,
-          iconSize: [160, 65],
-          iconAnchor: [80, 16],
-        });
-
-        const stopMarker = L.marker([oLat, oLng], { icon: stopIcon }).addTo(map);
-        markersRef.current.push(stopMarker);
-      });
-
-      // 4. Ultra-Premium Apple Maps Cyber Royal Sapphire Route Polyline (Royal Blue & Cyber Cyan)
-      if (routeWaypoints.length > 1) {
-        // Layer 1: Dark Obsidian Road Contrast Casing
-        const darkCasing = L.polyline(routeWaypoints, {
-          color: '#090d16',
-          weight: 8,
-          opacity: 0.45,
-          lineCap: 'round',
-          lineJoin: 'round',
-        }).addTo(map);
-        markersRef.current.push(darkCasing);
-
-        // Layer 2: Electric Royal Blue Core Line
-        const royalBlueLine = L.polyline(routeWaypoints, {
-          color: '#3b82f6', // Apple Maps Cyber Royal Blue
-          weight: 4,
-          opacity: 1.0,
-          lineCap: 'round',
-          lineJoin: 'round',
-        }).addTo(map);
-        markersRef.current.push(royalBlueLine);
-
-        // Layer 3: Cyber Cyan Animated Trajectory Pulse Overlay
-        const cyanPulseLine = L.polyline(routeWaypoints, {
-          color: '#38bdf8', // Cyber Cyan
-          weight: 2,
-          dashArray: '6, 12',
-          opacity: 0.85,
-          lineCap: 'round',
-          lineJoin: 'round',
-        }).addTo(map);
-        markersRef.current.push(cyanPulseLine);
-
-        try {
-          const bounds = L.latLngBounds(routeWaypoints);
-          map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
-        } catch (_) {}
-      }
-    });
-  }, [selectedPartner, livePartnerPos, partnerOrders, activeLayoutMode, activeBranch, mapsApiKey, mapStyle]);
 
   const formattedToday = useMemo(() => {
     return new Date().toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" });
@@ -987,8 +738,116 @@ export default function DeliveryTrackingPage() {
             </div>
           </div>
 
-          {/* Leaflet Map DOM Container */}
-          <div id="live-leaflet-container" className="w-full flex-1 z-10" />
+          {/* Google Maps Container */}
+          <div className="w-full flex-1 z-10 min-h-[400px]">
+            <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || mapsApiKey || ""}>
+              <GMap
+                defaultCenter={{ lat: activeBranch.lat, lng: activeBranch.lng }}
+                defaultZoom={14}
+                mapId="f2h-delivery-tracking"
+                gestureHandling="greedy"
+                disableDefaultUI={false}
+                mapTypeControl={false}
+                streetViewControl={false}
+                fullscreenControl={false}
+                zoomControl
+                style={{ width: "100%", height: "100%", minHeight: 400 }}
+              >
+                {/* Hub Marker */}
+                <AdvancedMarker
+                  position={{ lat: activeBranch.lat, lng: activeBranch.lng }}
+                  title={activeBranch.name}
+                  zIndex={50}
+                >
+                  <div style={{
+                    background: "#059669", color: "white", width: 40, height: 40,
+                    borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center",
+                    boxShadow: "0 6px 16px rgba(5,150,105,0.4)", border: "2.5px solid white",
+                    fontSize: 20,
+                  }}>🏢</div>
+                </AdvancedMarker>
+
+                {/* Selected Partner Marker */}
+                {selectedPartner && livePartnerPos && (
+                  <AdvancedMarker
+                    position={{ lat: Number(livePartnerPos.lat), lng: Number(livePartnerPos.lng) }}
+                    title={selectedPartner.full_name}
+                    onClick={() => setMapInfoTarget(mapInfoTarget === "partner" ? null : "partner")}
+                    zIndex={60}
+                  >
+                    <div style={{
+                      background: "linear-gradient(145deg,#059669,#047857)", color: "white",
+                      width: 44, height: 44, borderRadius: "50%", display: "flex", alignItems: "center",
+                      justifyContent: "center", boxShadow: "0 8px 20px rgba(5,150,105,0.45)",
+                      border: "3px solid white", fontSize: 20,
+                    }}>🏍</div>
+                  </AdvancedMarker>
+                )}
+                {mapInfoTarget === "partner" && selectedPartner && livePartnerPos && (
+                  <InfoWindow
+                    position={{ lat: Number(livePartnerPos.lat), lng: Number(livePartnerPos.lng) }}
+                    onCloseClick={() => setMapInfoTarget(null)}
+                  >
+                    <div className="p-2 min-w-[140px]">
+                      <p className="font-bold text-slate-800 text-sm">{selectedPartner.full_name}</p>
+                      {livePartnerPos.speed != null && <p className="text-xs text-slate-500">{livePartnerPos.speed} km/h</p>}
+                      {livePartnerPos.battery != null && <p className="text-xs text-slate-500">🔋 {livePartnerPos.battery}%</p>}
+                      <p className="text-[10px] text-slate-400">{livePartnerPos.area}</p>
+                    </div>
+                  </InfoWindow>
+                )}
+
+                {/* Order Stop Markers */}
+                {partnerOrders.map((o, idx) => {
+                  if (o.lat == null || o.lng == null) return null;
+                  const isDelivered = o.status === "delivered";
+                  const isInTransit = o.status === "out_for_delivery";
+                  const bg = isDelivered ? "#059669" : isInTransit ? "#2563eb" : "#1e293b";
+                  return (
+                    <AdvancedMarker
+                      key={o.order_id}
+                      position={{ lat: Number(o.lat), lng: Number(o.lng) }}
+                      title={`Stop #${idx + 1} — ${o.customer_name}`}
+                      onClick={() => setMapInfoTarget(mapInfoTarget === o.order_id ? null : o.order_id)}
+                      zIndex={40}
+                    >
+                      <div style={{
+                        background: bg, color: "white", minWidth: 32, height: 32,
+                        padding: "0 8px", borderRadius: 16, display: "flex", alignItems: "center",
+                        justifyContent: "center", fontSize: 12, fontWeight: 900,
+                        boxShadow: "0 4px 14px rgba(0,0,0,0.3)", border: "2.5px solid white",
+                      }}>{isDelivered ? "✓" : `#${idx + 1}`}</div>
+                    </AdvancedMarker>
+                  );
+                })}
+
+                {/* Route Polyline */}
+                {(() => {
+                  const waypoints: google.maps.LatLngLiteral[] = [];
+                  if (!isNaN(activeBranch.lat) && !isNaN(activeBranch.lng)) {
+                    waypoints.push({ lat: activeBranch.lat, lng: activeBranch.lng });
+                  }
+                  if (selectedPartner && livePartnerPos) {
+                    waypoints.push({ lat: Number(livePartnerPos.lat), lng: Number(livePartnerPos.lng) });
+                  }
+                  partnerOrders.forEach(o => {
+                    if (o.lat != null && o.lng != null && !isNaN(Number(o.lat)) && !isNaN(Number(o.lng))) {
+                      waypoints.push({ lat: Number(o.lat), lng: Number(o.lng) });
+                    }
+                  });
+                  if (waypoints.length < 2) return null;
+                  return (
+                    <Polyline
+                      path={waypoints}
+                      strokeColor="#3b82f6"
+                      strokeWeight={4}
+                      strokeOpacity={0.9}
+                    />
+                  );
+                })()}
+              </GMap>
+            </APIProvider>
+          </div>
 
           {/* Map Telemetry Footer Overlay */}
           {selectedPartner && (
