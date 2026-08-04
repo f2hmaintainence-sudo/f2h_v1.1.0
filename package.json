@@ -2,6 +2,14 @@
   "name": "f2h-monorepo",
   "version": "1.0.0",
   "private": true,
+  "scripts": {
+    "build:api": "npm --workspace=apps/api run build",
+    "build:web": "npm --workspace=apps/web run build",
+    "build:customer-web": "cd apps/mobile/customer && flutter build web --release",
+    "build:partner-web": "cd apps/mobile/delivery && flutter build web --release",
+    "deploy:customer-web": "cd apps/mobile/customer && flutter build web --release && cp -r build/web/* /home/f2hfresh-customer/htdocs/customer.f2hfresh.com/",
+    "deploy:partner-web": "cd apps/mobile/delivery && flutter build web --release && cp -r build/web/* /home/f2hfresh-partner/htdocs/partner.f2hfresh.com/"
+  },
   "workspaces": [
     "apps/api",
     "apps/web",
