@@ -2,11 +2,12 @@ name: f2hfresh
 
 services:
   api:
+    container_name: f2h_api_service
     build:
       context: ./apps/api
       dockerfile: Dockerfile
       target: development
-    command: node dist/main.js
+    command: npm run start:dev
     ports:
       - "5001:5001"
     volumes:
@@ -31,13 +32,16 @@ services:
       - GOOGLE_CLIENT_ID=dummy_google_client_id_dev
       - GOOGLE_CLIENT_SECRET=dummy_google_client_secret_dev
       - REDIS_HOST=redis
+      - REDIS_PORT=6379
     env_file:
       - path: ./apps/api/.env
         required: false
+    depends_on:
+      - redis
     restart: unless-stopped
 
   web:
-    container_name: web_app_service
+    container_name: f2h_web_service
     build:
       context: ./apps/web
       dockerfile: Dockerfile
@@ -51,12 +55,16 @@ services:
       - NODE_ENV=development
       - PORT=3000
       - NEXT_PUBLIC_API_URL=http://localhost:5001
+      - INTERNAL_API_URL=http://api:5001
     depends_on:
       - api
     restart: unless-stopped
 
   redis:
+    container_name: f2h_redis_service
     image: redis:alpine
     ports:
       - "6379:6379"
     restart: unless-stopped
+
+
