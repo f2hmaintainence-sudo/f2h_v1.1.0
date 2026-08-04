@@ -13,7 +13,7 @@ import { Activity, RefreshCw, MapPin } from 'lucide-react';
 import MapErrorBoundary from '@/components/shared/MapErrorBoundary';
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-const DEFAULT_CENTER = { lat: 12.9716, lng: 77.5946 }; // Bangalore
+const DEFAULT_CENTER = { lat: 12.9716, lng: 77.5946 };
 
 export default function TrackingPage() {
   const [locations, setLocations] = useState<DeliveryPartnerLocation[]>([]);
@@ -47,9 +47,21 @@ export default function TrackingPage() {
         }
       : DEFAULT_CENTER;
 
+  const infoContent = selectedPartner ? (
+    <div style={{ padding: '4px 6px' }}>
+      <p style={{ fontWeight: 600, fontSize: 13, color: '#1e293b', margin: 0 }}>
+        {selectedPartner.user_id}
+      </p>
+      {selectedPartner.timestamp ? (
+        <p style={{ fontSize: 10, color: '#94a3b8', margin: '2px 0 0' }}>
+          Updated: {new Date(selectedPartner.timestamp).toLocaleTimeString()}
+        </p>
+      ) : null}
+    </div>
+  ) : null;
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-gray-900">Live GPS Tracking</h1>
@@ -74,7 +86,10 @@ export default function TrackingPage() {
           Loading delivery partner locations...
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden" style={{ height: '600px' }}>
+        <div
+          className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+          style={{ height: '600px' }}
+        >
           {locations.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3">
               <MapPin size={40} className="text-gray-300" />
@@ -99,7 +114,11 @@ export default function TrackingPage() {
                     <AdvancedMarker
                       key={loc.user_id}
                       position={{ lat: loc.latitude, lng: loc.longitude }}
-                      onClick={() => setSelectedPartner(selectedPartner?.user_id === loc.user_id ? null : loc)}
+                      onClick={() =>
+                        setSelectedPartner(
+                          selectedPartner?.user_id === loc.user_id ? null : loc,
+                        )
+                      }
                       title={loc.user_id}
                     >
                       <div
@@ -117,18 +136,15 @@ export default function TrackingPage() {
                     </AdvancedMarker>
                   ))}
 
-                  {selectedPartner && (
+                  {selectedPartner && infoContent && (
                     <InfoWindow
-                      position={{ lat: selectedPartner.latitude, lng: selectedPartner.longitude }}
+                      position={{
+                        lat: selectedPartner.latitude,
+                        lng: selectedPartner.longitude,
+                      }}
                       onCloseClick={() => setSelectedPartner(null)}
                     >
-                      <div>
-                        <p className="font-semibold text-slate-800 text-sm">{selectedPartner.user_id}</p>
-                        {selectedPartner.timestamp && (
-                          <p className="text-slate-400 text-[10px] mt-0.5">
-                            Updated: {new Date(selectedPartner.timestamp).toLocaleTimeString()}
-                          </p>
-                        )}
+                      {infoContent}
                     </InfoWindow>
                   )}
                 </Map>
@@ -138,7 +154,6 @@ export default function TrackingPage() {
         </div>
       )}
 
-      {/* Partner list */}
       {!loading && locations.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {locations.map((loc) => (
