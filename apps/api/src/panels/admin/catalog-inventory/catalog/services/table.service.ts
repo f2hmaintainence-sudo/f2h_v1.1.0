@@ -143,7 +143,7 @@ export class CatalogTableService {
           name: ['products.name AS name', false],
           batch_product: ['products.batch_product', false],
           gst: ['products.gst_percentage', true],
-          packaging_type: ['COALESCE(products.packaging_type_id::text, \'Standard\') AS packaging_type', true],
+          packaging_type: ['COALESCE(products.unit_type::text, \'Standard\') AS packaging_type', true],
           subscribable: ['products.is_subscribable AS subscribable', true],
           one_time: ['products.is_one_time AS one_time', true],
           returnable: ['products.is_returnable AS returnable', true],
