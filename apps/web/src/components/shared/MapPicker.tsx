@@ -224,7 +224,7 @@ function MapContents({
 
       {/* Selected location marker (Green Theme) */}
       <AdvancedMarker
-        position={{ lat, lng }}
+        position={{ lat: Number(lat), lng: Number(lng) }}
         draggable
         onDragEnd={(e) => {
           if (e.latLng) onLocationChange(e.latLng.lat(), e.latLng.lng());
@@ -236,8 +236,8 @@ function MapContents({
 
       {/* Delivery radius circle (Green Theme) */}
       <Circle
-        center={{ lat, lng }}
-        radius={radiusKm * 1000}
+        center={{ lat: Number(lat), lng: Number(lng) }}
+        radius={Number(radiusKm) * 1000}
         strokeColor="#16a34a"
         strokeWeight={2}
         strokeOpacity={0.9}
@@ -246,10 +246,10 @@ function MapContents({
       />
 
       {/* Buffer zone ring */}
-      {bufferZoneKm > 0 && (
+      {Number(bufferZoneKm) > 0 && (
         <Circle
-          center={{ lat, lng }}
-          radius={(radiusKm + bufferZoneKm) * 1000}
+          center={{ lat: Number(lat), lng: Number(lng) }}
+          radius={(Number(radiusKm) + Number(bufferZoneKm)) * 1000}
           strokeColor="#a855f7"
           strokeWeight={1.5}
           strokeOpacity={0.7}
@@ -259,19 +259,23 @@ function MapContents({
       )}
 
       {/* Existing branches */}
-      {existingBranches.map((b) =>
-        b.lat && b.lng ? (
+      {existingBranches.map((b) => {
+        const blat = b.lat !== null && b.lat !== undefined ? Number(b.lat) : NaN;
+        const blng = b.lng !== null && b.lng !== undefined ? Number(b.lng) : NaN;
+        if (isNaN(blat) || isNaN(blng)) return null;
+
+        return (
           <React.Fragment key={b.branch_id || b.branch_name}>
             <AdvancedMarker
-              position={{ lat: b.lat, lng: b.lng }}
+              position={{ lat: blat, lng: blng }}
               title={b.branch_name}
             >
               <Pin background="#059669" borderColor="#047857" glyphColor="#fff" scale={0.9} />
             </AdvancedMarker>
-            {b.delivery_radius_km && (
+            {b.delivery_radius_km && !isNaN(Number(b.delivery_radius_km)) && (
               <Circle
-                center={{ lat: b.lat, lng: b.lng }}
-                radius={b.delivery_radius_km * 1000}
+                center={{ lat: blat, lng: blng }}
+                radius={Number(b.delivery_radius_km) * 1000}
                 strokeColor="#059669"
                 strokeWeight={1.5}
                 strokeOpacity={0.5}
@@ -280,8 +284,8 @@ function MapContents({
               />
             )}
           </React.Fragment>
-        ) : null
-      )}
+        );
+      })}
     </>
   );
 }

@@ -290,13 +290,18 @@ export default function SectorMap({
           </AdvancedMarker>
 
           {/* Live delivery partner markers */}
-          {livePartners.map((p) => (
-            <AdvancedMarker
-              key={p.delivery_partner_id}
-              position={{ lat: p.lat, lng: p.lng }}
-              title={`${p.full_name || 'Delivery Partner'}${p.is_stale ? ' (stale)' : ' (live)'}`}
-              zIndex={40}
-            >
+          {livePartners.map((p) => {
+            const plat = p.lat !== null && p.lat !== undefined ? Number(p.lat) : NaN;
+            const plng = p.lng !== null && p.lng !== undefined ? Number(p.lng) : NaN;
+            if (isNaN(plat) || isNaN(plng)) return null;
+
+            return (
+              <AdvancedMarker
+                key={p.delivery_partner_id}
+                position={{ lat: plat, lng: plng }}
+                title={`${p.full_name || 'Delivery Partner'}${p.is_stale ? ' (stale)' : ' (live)'}`}
+                zIndex={40}
+              >
               <div
                 className="flex items-center justify-center rounded-full text-white font-bold text-[10px] shadow-lg"
                 style={{
@@ -308,8 +313,9 @@ export default function SectorMap({
               >
                 🏍
               </div>
-            </AdvancedMarker>
-          ))}
+              </AdvancedMarker>
+            );
+          })}
         </Map>
       </APIProvider>
       </MapErrorBoundary>
