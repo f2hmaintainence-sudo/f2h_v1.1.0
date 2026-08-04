@@ -74,7 +74,6 @@ export class CustomerTableService {
           buffer_zone: ['branches.buffer_zone', true],
           allow_buffer_order: ['branches.allow_buffer_order', true],
           sector_count: ['branches.sector_count', true],
-          center_hex: ['branches.center_hex', true],
           hex_shape: ['branches.hex_shape', true],
           lat: ['branches.lat', true],
           lng: ['branches.lng', true],

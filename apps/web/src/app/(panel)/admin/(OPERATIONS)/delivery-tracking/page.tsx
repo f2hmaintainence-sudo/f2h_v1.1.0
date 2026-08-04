@@ -9,6 +9,7 @@ import {
   Polyline,
 } from "@vis.gl/react-google-maps";
 import { api } from "@/services/api.client";
+import MapErrorBoundary from "@/components/shared/MapErrorBoundary";
 import {
   MapPin, Truck, CheckCircle2, Clock, AlertTriangle, XCircle,
   RefreshCw, Home, ChevronRight, Package, Users, Search,
@@ -740,7 +741,8 @@ export default function DeliveryTrackingPage() {
 
           {/* Google Maps Container */}
           <div className="w-full flex-1 z-10 min-h-[400px]">
-            <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || mapsApiKey || ""}>
+            <MapErrorBoundary fallbackMessage="Google Maps service unavailable (ApiProjectMapError). Tracking details remain active.">
+              <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || mapsApiKey || ""}>
               <GMap
                 defaultCenter={{ lat: activeBranch.lat, lng: activeBranch.lng }}
                 defaultZoom={14}
@@ -847,6 +849,7 @@ export default function DeliveryTrackingPage() {
                 })()}
               </GMap>
             </APIProvider>
+          </MapErrorBoundary>
           </div>
 
           {/* Map Telemetry Footer Overlay */}

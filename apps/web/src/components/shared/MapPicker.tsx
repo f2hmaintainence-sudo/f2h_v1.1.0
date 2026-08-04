@@ -10,6 +10,7 @@ import {
   useMap,
   useMapsLibrary,
 } from '@vis.gl/react-google-maps';
+import MapErrorBoundary from './MapErrorBoundary';
 import { Search, Loader2, MapPin } from 'lucide-react';
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
@@ -281,41 +282,43 @@ export default function MapPicker({
 
   return (
     <div className="relative w-full h-full rounded-xl overflow-hidden border border-slate-200 shadow">
-      <APIProvider apiKey={GOOGLE_MAPS_API_KEY} libraries={['places']}>
-        <Map
-          defaultCenter={center}
-          defaultZoom={lat && lng ? 13 : 11}
-          mapId="f2h-branch-map"
-          gestureHandling="greedy"
-          disableDefaultUI={false}
-          mapTypeControl={false}
-          streetViewControl={false}
-          fullscreenControl={false}
-          zoomControl
-          style={{ width: '100%', height: '100%' }}
-          onClick={(e) => {
-            if (e.detail?.latLng) {
-              onLocationChange(e.detail.latLng.lat, e.detail.latLng.lng);
-            }
-          }}
-        >
-          {lat && lng && (
-            <MapContents
-              lat={lat}
-              lng={lng}
-              radiusKm={radiusKm}
-              bufferZoneKm={bufferZoneKm}
-              existingBranches={existingBranches}
-              onLocationChange={onLocationChange}
-            />
-          )}
-          {!lat && (
-            <PlacesSearch
-              onPlaceSelect={(plat, plng) => onLocationChange(plat, plng)}
-            />
-          )}
-        </Map>
-      </APIProvider>
+      <MapErrorBoundary fallbackMessage="Google Maps API Key Error (ApiProjectMapError). Please check NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in .env.">
+        <APIProvider apiKey={GOOGLE_MAPS_API_KEY} libraries={['places']}>
+          <Map
+            defaultCenter={center}
+            defaultZoom={lat && lng ? 13 : 11}
+            mapId="f2h-branch-map"
+            gestureHandling="greedy"
+            disableDefaultUI={false}
+            mapTypeControl={false}
+            streetViewControl={false}
+            fullscreenControl={false}
+            zoomControl
+            style={{ width: '100%', height: '100%' }}
+            onClick={(e) => {
+              if (e.detail?.latLng) {
+                onLocationChange(e.detail.latLng.lat, e.detail.latLng.lng);
+              }
+            }}
+          >
+            {lat && lng && (
+              <MapContents
+                lat={lat}
+                lng={lng}
+                radiusKm={radiusKm}
+                bufferZoneKm={bufferZoneKm}
+                existingBranches={existingBranches}
+                onLocationChange={onLocationChange}
+              />
+            )}
+            {!lat && (
+              <PlacesSearch
+                onPlaceSelect={(plat, plng) => onLocationChange(plat, plng)}
+              />
+            )}
+          </Map>
+        </APIProvider>
+      </MapErrorBoundary>
 
       {/* Overlay hint */}
       {!lat && (

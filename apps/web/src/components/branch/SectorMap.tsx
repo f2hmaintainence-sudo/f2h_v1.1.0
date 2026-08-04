@@ -9,6 +9,7 @@ import {
   Polygon,
   Circle,
 } from '@vis.gl/react-google-maps';
+import MapErrorBoundary from '../shared/MapErrorBoundary';
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
@@ -182,7 +183,8 @@ export default function SectorMap({
 
   return (
     <div className="relative rounded-xl overflow-hidden border border-slate-200 shadow" style={{ height }}>
-      <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
+      <MapErrorBoundary fallbackMessage="Google Maps API Key Error (ApiProjectMapError). Delivery sector metrics & partner allocation remain operational.">
+        <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
         <Map
           defaultCenter={center}
           defaultZoom={13}
@@ -310,6 +312,7 @@ export default function SectorMap({
           ))}
         </Map>
       </APIProvider>
+      </MapErrorBoundary>
 
       {/* Legend */}
       {slices.length > 0 && (

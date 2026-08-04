@@ -11,6 +11,8 @@ import {
 import { locationTrackingService, DeliveryPartnerLocation } from '@/services/locationTrackingService';
 import { Activity, RefreshCw, MapPin } from 'lucide-react';
 
+import MapErrorBoundary from '@/components/shared/MapErrorBoundary';
+
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 const DEFAULT_CENTER = { lat: 12.9716, lng: 77.5946 }; // Bangalore
 
@@ -92,49 +94,57 @@ export default function TrackingPage() {
                 streetViewControl={false}
                 fullscreenControl={false}
                 style={{ width: '100%', height: '100%' }}
-              >
-                {locations.map((loc) => (
-                  <AdvancedMarker
-                    key={loc.user_id}
-                    position={{ lat: loc.latitude, lng: loc.longitude }}
-                    onClick={() => setSelectedPartner(selectedPartner?.user_id === loc.user_id ? null : loc)}
-                    title={loc.user_id}
-                  >
-                    <div
-                      className="flex items-center justify-center rounded-full text-white font-bold text-xs shadow-lg cursor-pointer hover:scale-110 transition-transform"
-                      style={{
-                        width: 36,
-                        height: 36,
-                        background: '#f97316',
-                        border: '3px solid white',
-                        boxShadow: '0 4px 12px rgba(249,115,22,0.4)',
-                      }}
+            <MapErrorBoundary fallbackMessage="Google Maps API key error. Live partner list is active below.">
+              <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
+                <Map
+                  defaultCenter={center}
+                  defaultZoom={12}
+                  mapId="f2h-tracking-map"
+                  gestureHandling="greedy"
+                  disableDefaultUI={false}
+                  mapTypeControl={false}
+                  streetViewControl={false}
+                  fullscreenControl={false}
+                  style={{ width: '100%', height: '100%' }}
+                >
+                  {locations.map((loc) => (
+                    <AdvancedMarker
+                      key={loc.user_id}
+                      position={{ lat: loc.latitude, lng: loc.longitude }}
+                      onClick={() => setSelectedPartner(selectedPartner?.user_id === loc.user_id ? null : loc)}
+                      title={loc.user_id}
                     >
-                      🏍
-                    </div>
-                  </AdvancedMarker>
-                ))}
+                      <div
+                        className="flex items-center justify-center rounded-full text-white font-bold text-xs shadow-lg cursor-pointer hover:scale-110 transition-transform"
+                        style={{
+                          width: 36,
+                          height: 36,
+                          background: '#f97316',
+                          border: '3px solid white',
+                          boxShadow: '0 4px 12px rgba(249,115,22,0.4)',
+                        }}
+                      >
+                        🏍
+                      </div>
+                    </AdvancedMarker>
+                  ))}
 
-                {selectedPartner && (
-                  <InfoWindow
-                    position={{ lat: selectedPartner.latitude, lng: selectedPartner.longitude }}
-                    onCloseClick={() => setSelectedPartner(null)}
-                  >
-                    <div className="p-2 min-w-[160px]">
-                      <p className="font-bold text-slate-800 text-sm">{selectedPartner.user_id}</p>
-                      <p className="text-slate-400 text-[10px] mt-1">
-                        {selectedPartner.latitude.toFixed(6)}, {selectedPartner.longitude.toFixed(6)}
-                      </p>
-                      {selectedPartner.timestamp && (
-                        <p className="text-slate-400 text-[10px] mt-0.5">
-                          Updated: {new Date(selectedPartner.timestamp).toLocaleTimeString()}
-                        </p>
-                      )}
-                    </div>
-                  </InfoWindow>
-                )}
-              </Map>
-            </APIProvider>
+                  {selectedPartner && (
+                    <InfoWindow
+                      position={{ lat: selectedPartner.latitude, lng: selectedPartner.longitude }}
+                      onCloseClick={() => setSelectedPartner(null)}
+                    >
+                        {selectedPartner.timestamp && (
+                          <p className="text-slate-400 text-[10px] mt-0.5">
+                            Updated: {new Date(selectedPartner.timestamp).toLocaleTimeString()}
+                          </p>
+                        )}
+                      </div>
+                    </InfoWindow>
+                  )}
+                </Map>
+              </APIProvider>
+            </MapErrorBoundary>
           )}
         </div>
       )}

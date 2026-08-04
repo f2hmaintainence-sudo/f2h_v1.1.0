@@ -166,11 +166,11 @@ export class AppModule {
     //    Must run BEFORE LoggerMiddleware so logs see the resolved role.
     consumer
       .apply(RoleHeaderMiddleware)
-      .forRoutes({ path: '*', method: RequestMethod.ALL });
+      .forRoutes({ path: '(.*)', method: RequestMethod.ALL });
 
     // 2. Request logger (runs after headers are expanded)
     consumer
       .apply(LoggerMiddleware)
-      .forRoutes({ path: '*', method: RequestMethod.ALL });
+      .forRoutes({ path: '(.*)', method: RequestMethod.ALL });
   }
 }

@@ -1007,7 +1007,7 @@ export class AuthService {
       `INSERT INTO device_sessions
        (id, user_id, refresh_jti, refresh_token_hash, device_id, fcm_token,
         ip_address, user_agent, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, now() + interval '100 years')`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now() + interval '100 years')`,
       [
         crypto.randomUUID(),
         data.userId,
@@ -1024,7 +1024,7 @@ export class AuthService {
   private async revokeStoredSession(refreshJti: string) {
     await this.DataBase.query(
       `UPDATE device_sessions SET revoked_at = now()
-       WHERE refresh_jti = ? AND revoked_at IS NULL`,
+       WHERE refresh_jti = $1 AND revoked_at IS NULL`,
       [refreshJti],
     );
   }
@@ -1461,6 +1461,13 @@ export class AuthService {
       if (roleId === 'CUSTOMER') {
         try {
           const now = new Date();
+          const activeBranchRes = await this.Data.query('branches', {
+            select: ['branch_id'],
+            where: [{ column: 'is_active', operator: '=', value: true }],
+            limit: 1,
+          });
+          const targetBranchId = activeBranchRes?.data?.[0]?.branch_id || null;
+
           await this.Data.insert('customers', {
             customer_id: userId,
             first_name: body.name || email.split('@')[0],
@@ -1468,7 +1475,7 @@ export class AuthService {
             mobile: null,
             phone: null,
             email: email.toLowerCase().trim(),
-            branch_id: 'BRANCH_DEFAULT',
+            branch_id: targetBranchId,
             created_at: now,
             updated_at: now,
           });

@@ -12,9 +12,7 @@ CREATE TABLE branch_sectors (
     is_active BOOLEAN DEFAULT true,
 
     created_at TIMESTAMPTZ DEFAULT now(),
-
-    updated_at TIMESTAMPTZ DEFAULT now(),
-
+    updated_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX idx_branch_sectors_branch_id
 ON branch_sectors(branch_id);

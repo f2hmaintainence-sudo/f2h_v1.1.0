@@ -1174,8 +1174,6 @@ export class BranchManagementService {
           'branches.buffer_zone',
           'branches.allow_buffer_order',
           'branches.sector_count',
-          'branches.h3_resolution',
-          'branches.center_hex',
           'branches.hex_shape',
           'branches.is_active',
           'branches.created_at',

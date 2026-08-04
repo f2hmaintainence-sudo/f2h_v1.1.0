@@ -375,50 +375,54 @@ export default function BranchesPage() {
               <p className="text-xs text-slate-400 mt-1 max-w-xs">We couldn't find any branches matching your search query or filters.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filtered.map((b, idx) => (
                 <div
                   key={b.branch_id || `branch-${idx}`}
                   onClick={() => router.push(`/admin/branches/${b.branch_id}`)}
-                  className="group relative flex min-h-[240px] flex-col justify-between overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-emerald-300 hover:shadow-xl cursor-pointer"
+                  className="group relative flex min-h-[240px] flex-col justify-between overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-emerald-300 hover:shadow-xl cursor-pointer"
                 >
                   <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-sky-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
                   <div>
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 group-hover:border-emerald-100 transition-colors shrink-0 shadow-inner">
-                          <Building2 size={22} />
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-3 flex-1">
+                        <div className="w-11 h-11 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 group-hover:border-emerald-100 transition-colors shrink-0 shadow-inner">
+                          <Building2 size={20} />
                         </div>
-                        <div className="min-w-0">
-                          <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-widest block">CODE: {b.branch_code || '-'}</span>
-                          <h3 className="mt-0.5 font-black text-slate-900 text-lg leading-tight group-hover:text-emerald-700 transition-colors line-clamp-1">{b.branch_name}</h3>
+                        <div className="min-w-0 flex-1">
+                          <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block truncate">
+                            CODE: {b.branch_code || '-'}
+                          </span>
+                          <h3 className="mt-0.5 font-black text-slate-900 text-base leading-tight group-hover:text-emerald-700 transition-colors truncate" title={b.branch_name}>
+                            {b.branch_name}
+                          </h3>
                         </div>
                       </div>
 
-                      <div className="flex shrink-0 items-center gap-2">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${b.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-600 border border-rose-200'}`}>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${b.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-600 border border-rose-200'}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${b.is_active ? 'bg-emerald-500' : 'bg-rose-400'}`} />
                           {b.is_active ? 'Active' : 'Inactive'}
                         </span>
                         <button
                           type="button"
                           onClick={(event) => { event.stopPropagation(); openEditBranch(b); }}
-                          className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all shadow-xs"
+                          className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all shadow-xs"
                           title="Edit branch"
                           aria-label={`Edit ${b.branch_name}`}
                         >
-                          <Pencil size={13} />
+                          <Pencil size={12} />
                         </button>
                       </div>
                     </div>
 
-                    <p className="mt-4 text-xs text-slate-500 flex items-center gap-1.5">
+                    <p className="mt-3.5 text-xs text-slate-500 flex items-center gap-1.5">
                       <MapPin size={13} className="text-slate-400 shrink-0" />
-                      <span className="line-clamp-1">{b.city || 'Unassigned city'}{b.state ? `, ${b.state}` : ''}</span>
+                      <span className="truncate">{b.city || 'Unassigned city'}{b.state ? `, ${b.state}` : ''}</span>
                     </p>
 
-                    <div className="mt-4 flex flex-wrap gap-2">
+                    <div className="mt-3.5 flex flex-wrap gap-2">
                       <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider ${b.allow_buffer_order ? 'bg-teal-50 text-teal-700 border border-teal-100' : 'bg-slate-50 text-slate-400 border border-slate-100'}`}>
                         <span className={`h-1.5 w-1.5 rounded-full ${b.allow_buffer_order ? 'bg-teal-500' : 'bg-slate-300'}`} />
                         Buffer Orders {b.allow_buffer_order ? 'On' : 'Off'}
@@ -429,18 +433,18 @@ export default function BranchesPage() {
                     </div>
                   </div>
 
-                  <div className="mt-auto grid grid-cols-3 gap-2 border-t border-slate-100 bg-slate-50/70 p-3">
-                    <div className="rounded-2xl bg-white px-3 py-3 text-center border border-slate-100">
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Radius</p>
-                      <p className="mt-1 text-sm font-extrabold text-slate-900">{Number(b.delivery_radius_km || 0).toFixed(2)} <span className="text-[10px] text-slate-400">km</span></p>
+                  <div className="mt-4 grid grid-cols-3 gap-2 border-t border-slate-100 bg-slate-50/70 p-2.5 rounded-2xl">
+                    <div className="rounded-xl bg-white px-2 py-2 text-center border border-slate-100">
+                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Radius</p>
+                      <p className="mt-0.5 text-xs font-extrabold text-slate-900">{Number(b.delivery_radius_km || 0).toFixed(1)} <span className="text-[9px] text-slate-400 font-medium">km</span></p>
                     </div>
-                    <div className="rounded-2xl bg-white px-3 py-3 text-center border border-slate-100">
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Buffer</p>
-                      <p className="mt-1 text-sm font-extrabold text-slate-900">{Number(b.buffer_zone || 0).toFixed(2)} <span className="text-[10px] text-slate-400">km</span></p>
+                    <div className="rounded-xl bg-white px-2 py-2 text-center border border-slate-100">
+                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Buffer</p>
+                      <p className="mt-0.5 text-xs font-extrabold text-slate-900">{Number(b.buffer_zone || 0).toFixed(1)} <span className="text-[9px] text-slate-400 font-medium">km</span></p>
                     </div>
-                    <div className="rounded-2xl bg-white px-3 py-3 text-center border border-slate-100">
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Sectors</p>
-                      <p className="mt-1 text-sm font-extrabold text-slate-900">{b.sector_count || 0} <span className="text-[10px] text-slate-400">slices</span></p>
+                    <div className="rounded-xl bg-white px-2 py-2 text-center border border-slate-100">
+                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Sectors</p>
+                      <p className="mt-0.5 text-xs font-extrabold text-slate-900">{b.sector_count || 0} <span className="text-[9px] text-slate-400 font-medium">slices</span></p>
                     </div>
                   </div>
 
