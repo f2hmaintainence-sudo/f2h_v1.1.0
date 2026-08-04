@@ -208,7 +208,18 @@ export class CatalogShowAddService {
 
   async getCategoryForm(): Promise<FormResponse> {
     try {
-      const fields = this.categoryFields();
+      const categoriesResult = await this.dataService.query('categories', {
+        select: ['id', 'category_id', 'name'],
+        where: [{ column: 'deleted_at', operator: 'IS', value: null }],
+        order: { name: 'ASC' },
+      });
+
+      const parentOptions = (categoriesResult?.data || []).map((cat: any) => ({
+        value: String(cat.category_id || cat.id),
+        label: cat.name,
+      }));
+
+      const fields = this.categoryFields(parentOptions);
       return this.formHelper.generateResponse({
         title: 'Add Category',
         submitLabel: 'Add Category',
@@ -234,15 +245,9 @@ export class CatalogShowAddService {
       { name: 'highlights', label: 'Highlights', type: 'textarea', required: false, width: 'half', group: 'Content & Media', placeholder: 'Key product highlights', validation: { maxLength: 2000 }, },
       { name: 'ingredients', label: 'Ingredients', type: 'textarea', required: false, width: 'half', group: 'Content & Media', placeholder: 'Product ingredients', validation: { maxLength: 2000 }, },
       { name: 'legal_info', label: 'Legal Information', type: 'textarea', required: false, width: 'half', group: 'Content & Media', placeholder: 'Legal disclaimers and information', validation: { maxLength: 2000 }, },
-      { name: 'lift_days', label: 'Lift Days', type: 'number', required: false, width: 'half', group: 'Units & Rules', placeholder: 'Days for subscription lift', validation: { min: 0, max: 365 }, },
-      { name: 'gst_percentage', label: 'GST Percentage', type: 'number', required: false, width: 'half', group: 'Units & Rules', defaultValue: 0, placeholder: '0.00', validation: { min: 0, max: 100 }, },
-      { name: 'packaging_type_id', label: 'Packaging Type (Returnable)', type: 'select', required: false, width: 'half', group: 'Units & Rules', options: packagingOptions, },
-      { name: 'container_id', label: 'Associated Container', type: 'select', required: false, width: 'half', group: 'Units & Rules', options: containerOptions, },
-      { name: 'is_subscribable', label: 'Subscribable', type: 'toggle', required: false, width: 'quarter', group: 'Permissions', defaultValue: false, },
-      { name: 'is_one_time', label: 'One-time Purchase', type: 'toggle', required: false, width: 'quarter', group: 'Permissions', defaultValue: true, },
-      { name: 'is_returnable', label: 'Returnable', type: 'toggle', required: false, width: 'quarter', group: 'Permissions', defaultValue: false, },
-      { name: 'is_out_of_stock', label: 'Out of Stock', type: 'toggle', required: false, width: 'quarter', group: 'Permissions', defaultValue: false, },
-      { name: 'is_active', label: 'Active', type: 'toggle', required: false, width: 'quarter', group: 'Permissions', defaultValue: true, },
+      { name: 'is_subscribable', label: 'Subscribable', type: 'toggle', required: false, width: 'third', group: 'Permissions', defaultValue: false, },
+      { name: 'is_out_of_stock', label: 'Out of Stock', type: 'toggle', required: false, width: 'third', group: 'Permissions', defaultValue: false, },
+      { name: 'is_active', label: 'Active', type: 'toggle', required: false, width: 'third', group: 'Permissions', defaultValue: true, },
     ];
   }
 
@@ -263,14 +268,13 @@ export class CatalogShowAddService {
       { name: 'variant_image_4', label: 'Upload Image 4 (Optional)', type: 'file', required: false, width: 'half', group: 'Variant Images (Min 1 Mandatory, Max 5)', accept: 'image/png,image/jpeg,image/webp', crop: true, aspectRatio: 1, cropWidth: 800, cropHeight: 800 },
       { name: 'variant_image_5', label: 'Upload Image 5 (Optional)', type: 'file', required: false, width: 'half', group: 'Variant Images (Min 1 Mandatory, Max 5)', accept: 'image/png,image/jpeg,image/webp', crop: true, aspectRatio: 1, cropWidth: 800, cropHeight: 800 },
       { name: 'additional_image_urls', label: 'Additional Image URLs (Optional - Up to 4 more URLs separated by comma/newline)', type: 'textarea', required: false, width: 'full', group: 'Variant Images (Min 1 Mandatory, Max 5)', placeholder: 'https://images.unsplash.com/...\nhttps://images.unsplash.com/...', validation: { maxLength: 4000 }, },
-      { name: 'price', label: 'Price', type: 'number', required: true, width: 'half', group: 'Pricing & Value', placeholder: '0.00', validation: { min: 0.01, max: 999999, message: 'Price must be greater than 0' }, },
+      { name: 'original_price', label: 'Original Price (MRP)', type: 'number', required: false, width: 'half', group: 'Pricing & Value', placeholder: '0.00', validation: { min: 0.01, max: 999999 }, },
+      { name: 'price', label: 'Selling Price (Price)', type: 'number', required: true, width: 'half', group: 'Pricing & Value', placeholder: '0.00', validation: { min: 0.01, max: 999999, message: 'Price must be greater than 0' }, },
       { name: 'subscription_price', label: 'Subscription Price', type: 'number', required: false, width: 'half', group: 'Pricing & Value', placeholder: '0.00', validation: { min: 0.01, max: 999999, message: 'Subscription price must be greater than 0' }, },
       { name: 'unit_type', label: 'Unit Type', type: 'select', required: false, width: 'half', group: 'Pricing & Value', options: [{ value: 'ltr', label: 'Liters' }, { value: 'ml', label: 'Milliliters' }, { value: 'kg', label: 'Kilograms' }, { value: 'gm', label: 'Grams' }, { value: 'piece', label: 'Pieces' }, { value: 'pack', label: 'Pack' },], },
       { name: 'unit_value', label: 'Unit Value', type: 'number', required: false, width: 'half', group: 'Pricing & Value', placeholder: 'e.g., 500 for 500ml', validation: { min: 0.01, max: 99999, message: 'Unit value must be greater than 0' }, },
-      { name: 'fulfillment_mode', label: 'Fulfillment Mode', type: 'select', required: false, width: 'half', defaultValue: 'prepacked', options: [{ value: 'bulk', label: 'Bulk' }, { value: 'prepacked', label: 'Pre Packed' },], },
       { name: 'manageable_qty', label: 'Manageable Quantity', type: 'number', required: false, width: 'third', group: 'Management', defaultValue: 0, placeholder: '0', validation: { min: 0, max: 99999 }, },
       { name: 'sort_order', label: 'Sort Order', type: 'number', required: false, width: 'third', group: 'Management', defaultValue: 0, placeholder: '0', validation: { min: 0, max: 9999 }, },
-      { name: 'packaging_type_id', label: 'Packaging Type (Returnable)', type: 'select', required: false, width: 'third', group: 'Management', options: packagingOptions, },
       { name: 'container_id', label: 'Associated Container', type: 'select', required: false, width: 'third', group: 'Management', options: containerOptions, },
       { name: 'status', label: 'Status', type: 'toggle', required: false, width: 'third', group: 'Management', defaultValue: true, toggleOptions: { onLabel: 'Active', offLabel: 'Inactive', pill: true }, },
     ];

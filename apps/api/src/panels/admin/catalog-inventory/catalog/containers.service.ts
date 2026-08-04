@@ -9,8 +9,17 @@ export class ContainersService {
     private readonly developer: DeveloperService,
   ) {}
 
+  private async ensureWarehouseColumn() {
+    try {
+      await this.db.query(`ALTER TABLE containers ADD COLUMN IF NOT EXISTS warehouse_id VARCHAR(100) DEFAULT NULL;`);
+    } catch {
+      // Ignore if table/column exists or permission
+    }
+  }
+
   async getContainers(query: any) {
     try {
+      await this.ensureWarehouseColumn();
       const page = parseInt(query.page || '1', 10);
       const limit = parseInt(query.limit || '10', 10);
       const offset = (page - 1) * limit;
@@ -25,8 +34,9 @@ export class ContainersService {
       }
 
       const listSql = `
-        SELECT c.*
+        SELECT c.*, COALESCE(w.name, 'Default Warehouse') as warehouse_name
         FROM containers c
+        LEFT JOIN warehouses w ON (w.warehouse_id = c.warehouse_id OR w.id::text = c.warehouse_id)
         ${whereClause}
         ORDER BY c.created_at DESC
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
@@ -66,8 +76,9 @@ export class ContainersService {
 
   async createContainer(body: any) {
     try {
-      const { container_id, name, quantity, is_returnable = true, status = 'active' } = body;
-      if (!name || !quantity) {
+      await this.ensureWarehouseColumn();
+      const { container_id, name, quantity, warehouse_id = null, is_returnable = true, status = 'active' } = body;
+      if (!name || quantity === undefined || quantity === null) {
         throw new BadRequestException('Container name and quantity are required');
       }
 
@@ -82,10 +93,10 @@ export class ContainersService {
       }
 
       const insertRes = await this.db.query(
-        `INSERT INTO containers (container_id, name, quantity, is_returnable, status)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO containers (container_id, name, quantity, warehouse_id, is_returnable, status)
+         VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING *`,
-        [generatedId, name, Math.abs(Number(quantity || 0)), Boolean(is_returnable), status]
+        [generatedId, name, Math.abs(Number(quantity || 0)), warehouse_id, Boolean(is_returnable), status]
       );
 
       return {
@@ -102,7 +113,8 @@ export class ContainersService {
 
   async updateContainer(id: string, body: any) {
     try {
-      const { name, quantity, is_returnable, status } = body;
+      await this.ensureWarehouseColumn();
+      const { name, quantity, warehouse_id, is_returnable, status } = body;
 
       const checkRes = await this.db.query(
         `SELECT * FROM containers WHERE (container_id = $1 OR id::text = $2) AND deleted_at IS NULL`,
@@ -116,15 +128,16 @@ export class ContainersService {
 
       const updatedName = name ?? target.name;
       const updatedQty = quantity !== undefined ? Math.abs(Number(quantity)) : Number(target.quantity);
+      const updatedWarehouse = warehouse_id !== undefined ? warehouse_id : target.warehouse_id;
       const updatedReturnable = is_returnable !== undefined ? Boolean(is_returnable) : target.is_returnable;
       const updatedStatus = status ?? target.status;
 
       const updateRes = await this.db.query(
         `UPDATE containers 
-         SET name = $1, quantity = $2, is_returnable = $3, status = $4, updated_at = NOW()
-         WHERE id = $5
+         SET name = $1, quantity = $2, warehouse_id = $3, is_returnable = $4, status = $5, updated_at = NOW()
+         WHERE id = $6
          RETURNING *`,
-        [updatedName, updatedQty, updatedReturnable, updatedStatus, target.id]
+        [updatedName, updatedQty, updatedWarehouse, updatedReturnable, updatedStatus, target.id]
       );
 
       return {

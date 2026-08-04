@@ -323,8 +323,22 @@ export class CatalogShowEditService {
         image: category.image_path || '',
       };
 
-      // 2. Use SAME fields from showAdd (no duplication)
-      const fields = this.showAddService.categoryFields();
+      // 2. Fetch categories for dynamic parent dropdown
+      const categoriesResult = await this.dataService.query('categories', {
+        select: ['id', 'category_id', 'name'],
+        where: [{ column: 'deleted_at', operator: 'IS', value: null }],
+        order: { name: 'ASC' },
+      });
+
+      const parentOptions = (categoriesResult?.data || [])
+        .filter((cat: any) => String(cat.id) !== String(id) && String(cat.category_id) !== String(id))
+        .map((cat: any) => ({
+          value: String(cat.category_id || cat.id),
+          label: cat.name,
+        }));
+
+      // 3. Use SAME fields from showAdd (no duplication)
+      const fields = this.showAddService.categoryFields(parentOptions);
 
       // 3. Return form with pre-filled data
       return this.formHelper.generateResponse({

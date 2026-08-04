@@ -88,7 +88,7 @@ export class CatalogController {
     @Req() req: any,
   ) {
     const adminId = req.user?.user_id ?? 'system';
-    return this.saveEditService.saveVariant(id, body, adminId);
+    return this.saveEditService.updateVariant(id, body, adminId);
   }
 
   // ═══════════════════════════════════════════════════════════════

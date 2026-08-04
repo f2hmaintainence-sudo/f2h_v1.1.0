@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { FormHelper } from '../../../../../helpers/FormHelper';
 import { DataService } from '../../../../../shared/database/Data.service';
+import { DatabaseService } from '../../../../../shared/database/Database.service';
 import { DeveloperService } from '../../../../../shared/logger/Developer.service';
 import { CatalogShowAddService } from './showAdd.service';
 import { generateId } from '../../../../../helpers/RandomHelper';
@@ -16,6 +17,7 @@ export class CatalogSaveAddService {
   constructor(
     private readonly formHelper: FormHelper,
     private readonly dataService: DataService,
+    private readonly db: DatabaseService,
     private readonly developer: DeveloperService,
     private readonly showAddService: CatalogShowAddService,
     private readonly storageService: LocalStorageService,
@@ -548,48 +550,51 @@ export class CatalogSaveAddService {
     return value;
   }
 
+  private async ensureVariantColumns() {
+    try {
+      await this.db.query(`ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS original_price NUMERIC(10,2) DEFAULT NULL;`);
+      await this.db.query(`ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS discount NUMERIC(10,2) DEFAULT NULL;`);
+    } catch {
+      // Ignore if column exists
+    }
+  }
+
   async saveVariant(body: any, adminId: string) {
     try {
+      await this.ensureVariantColumns();
+      // 1. Fetch dynamic options
+      const [productsRes, packagingRes, containersRes] = await Promise.all([
+        this.dataService.query('products', {
+          select: ['id', 'product_id', 'name'],
+          where: [{ column: 'deleted_at', operator: 'IS', value: null }],
+        }),
+        this.dataService.query('packaging_types', {
+          select: ['id', 'packaging_id', 'name'],
+          where: [{ column: 'deleted_at', operator: 'IS', value: null }],
+        }),
+        this.dataService.query('containers', {
+          select: ['id', 'container_id', 'name'],
+          where: [{ column: 'deleted_at', operator: 'IS', value: null }],
+        }),
+      ]);
 
-      // 1. Fetch products for dynamic dropdown
-      const productsResult = await this.dataService.query('products', {
-        select: ['id', 'product_id', 'name'],
-        where: [
-          { column: 'deleted_at', operator: 'IS', value: null },
-          { column: 'is_active', operator: '=', value: true },
-        ],
-        orderBy: 'name',
-        orderDirection: 'ASC',
-      });
+      const productOptions = (productsRes.data || []).map((p: any) => ({
+        value: String(p.product_id),
+        label: `${p.name} (${p.product_id})`,
+      }));
 
-      // Fetch active packaging types
-      const packagingTypesResult = await this.dataService.query('packaging_types', {
-        select: ['id', 'name'],
-        where: [
-          { column: 'status', operator: '=', value: 'active' },
-        ],
-        orderBy: 'name',
-        orderDirection: 'ASC',
-      });
+      const packagingOptions = (packagingRes.data || []).map((p: any) => ({
+        value: String(p.packaging_id),
+        label: p.name,
+      }));
 
-      const productOptions = [
-        { value: '', label: 'Select Product' },
-        ...(productsResult.data || []).map((product: any) => ({
-          value: String(product.product_id),
-          label: product.name,
-        })),
-      ];
-
-      const packagingOptions = [
-        { value: '', label: 'No Returnable Packaging (Disposable)' },
-        ...(packagingTypesResult.data || []).map((pkg: any) => ({
-          value: String(pkg.id),
-          label: pkg.name,
-        })),
-      ];
+      const containerOptions = (containersRes.data || []).map((c: any) => ({
+        value: String(c.container_id),
+        label: `${c.name} (${c.container_id})`,
+      }));
 
       // 2. Validate using dynamic fields
-      const fields = this.showAddService.variantFields(productOptions, packagingOptions);
+      const fields = this.showAddService.variantFields(productOptions, packagingOptions, containerOptions);
       const validation = this.formHelper.validateFields(fields, body);
 
       if (!validation.valid) {
@@ -637,11 +642,24 @@ export class CatalogSaveAddService {
         }
       }
 
-      // 5. Defaults
+      // 5. Defaults & Discount Calculation
       insertData.variant_id = generateId('VRT', 12);
       insertData.status = insertData.status ?? 'active';
       insertData.manageable_qty = insertData.manageable_qty ?? 0;
       insertData.sort_order = insertData.sort_order ?? 0;
+
+      const price = Number(insertData.price || 0);
+      const originalPrice = insertData.original_price !== undefined && insertData.original_price !== null && String(insertData.original_price).trim() !== ''
+        ? Number(insertData.original_price)
+        : price;
+
+      let discount = 0;
+      if (originalPrice > 0 && originalPrice > price) {
+        discount = Math.max(0, Math.round(((originalPrice - price) / originalPrice) * 100 * 100) / 100);
+      }
+
+      insertData.original_price = originalPrice;
+      insertData.discount = discount;
       
 
       const variantImages = [

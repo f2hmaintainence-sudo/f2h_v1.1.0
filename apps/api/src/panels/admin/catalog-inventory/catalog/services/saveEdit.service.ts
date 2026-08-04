@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { FormHelper } from '../../../../../helpers/FormHelper';
 import { DataService } from '../../../../../shared/database/Data.service';
+import { DatabaseService } from '../../../../../shared/database/Database.service';
 import { DeveloperService } from '../../../../../shared/logger/Developer.service';
 import { CatalogShowAddService } from './showAdd.service';
 import { saveImageUpload } from '../../../../../helpers/ImageHelper';
@@ -15,6 +16,7 @@ export class CatalogSaveEditService {
   constructor(
     private readonly formHelper: FormHelper,
     private readonly dataService: DataService,
+    private readonly db: DatabaseService,
     private readonly developer: DeveloperService,
     private readonly showAddService: CatalogShowAddService,
     private readonly storageService: LocalStorageService,
@@ -326,8 +328,22 @@ export class CatalogSaveEditService {
     }
   }
 
-  async saveVariant(id: string, body: any, adminId: string) {
+  private async ensureVariantColumns() {
     try {
+      await this.db.query(`ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS original_price NUMERIC(10,2) DEFAULT NULL;`);
+      await this.db.query(`ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS discount NUMERIC(10,2) DEFAULT NULL;`);
+    } catch {
+      // Ignore if column exists
+    }
+  }
+
+  async saveVariant(id: string, body: any, adminId: string) {
+    return this.updateVariant(id, body, adminId);
+  }
+
+  async updateVariant(id: string, body: any, adminId: string) {
+    try {
+      await this.ensureVariantColumns();
       // 1. Fetch products for dynamic dropdown validation
       const productsResult = await this.dataService.query('products', {
         select: ['id', 'product_id', 'name'],
@@ -466,6 +482,7 @@ export class CatalogSaveEditService {
         'product_id',
         'name',
         'sku',
+        'original_price',
         'price',
         'subscription_price',
         'unit_value',
@@ -474,8 +491,8 @@ export class CatalogSaveEditService {
         'manageable_qty',
         'sort_order',
         'is_out_of_stock',
-        'packaging_type_id',
         'container_id',
+        'discount',
       ];
 
       // 6. Build update payload
@@ -491,6 +508,7 @@ export class CatalogSaveEditService {
 
           if (
             [
+              'original_price',
               'price',
               'subscription_price',
               'unit_value',
@@ -519,10 +537,11 @@ export class CatalogSaveEditService {
               }
 
               if (
-                ['price', 'subscription_price', 'unit_value'].includes(fieldName) &&
+                ['original_price', 'price', 'subscription_price', 'unit_value'].includes(fieldName) &&
                 value <= 0
               ) {
                 const labelMap: Record<string, string> = {
+                  original_price: 'Original price',
                   price: 'Price',
                   subscription_price: 'Subscription price',
                   unit_value: 'Unit value',
@@ -554,12 +573,24 @@ export class CatalogSaveEditService {
             value = null;
           }
 
-          if ((fieldName === 'packaging_type_id' || fieldName === 'container_id') && (value === '' || value === 'null')) {
-            value = null;
-          }
-
           updateData[fieldName] = value;
         }
+      }
+
+      // Calculate discount percentage if price or original_price is provided/updated
+      const currentPrice = updateData.price !== undefined ? Number(updateData.price) : Number(existingVariant.price || 0);
+      const currentOriginalPrice = updateData.original_price !== undefined
+        ? (updateData.original_price !== null ? Number(updateData.original_price) : currentPrice)
+        : Number(existingVariant.original_price || currentPrice);
+
+      let discount = 0;
+      if (currentOriginalPrice > 0 && currentOriginalPrice > currentPrice) {
+        discount = Math.max(0, Math.round(((currentOriginalPrice - currentPrice) / currentOriginalPrice) * 100 * 100) / 100);
+      }
+
+      if (updateData.original_price !== undefined || updateData.price !== undefined) {
+        updateData.original_price = currentOriginalPrice;
+        updateData.discount = discount;
       }
 
       // 7. Ensure at least one field exists
