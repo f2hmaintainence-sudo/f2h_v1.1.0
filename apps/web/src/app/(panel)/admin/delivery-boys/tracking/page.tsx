@@ -5,7 +5,6 @@ import {
   APIProvider,
   Map,
   AdvancedMarker,
-  Pin,
   InfoWindow,
 } from '@vis.gl/react-google-maps';
 import { locationTrackingService, DeliveryPartnerLocation } from '@/services/locationTrackingService';
@@ -123,6 +122,8 @@ export default function TrackingPage() {
                       position={{ lat: selectedPartner.latitude, lng: selectedPartner.longitude }}
                       onCloseClick={() => setSelectedPartner(null)}
                     >
+                      <div>
+                        <p className="font-semibold text-slate-800 text-sm">{selectedPartner.user_id}</p>
                         {selectedPartner.timestamp && (
                           <p className="text-slate-400 text-[10px] mt-0.5">
                             Updated: {new Date(selectedPartner.timestamp).toLocaleTimeString()}
