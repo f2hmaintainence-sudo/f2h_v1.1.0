@@ -141,7 +141,7 @@ export class BranchSaveEditService {
           details: JSON.stringify({
             changes: Object.keys(updateData),
             hex_regenerated: needsHexRegen,
-            hex_count: hexCount,
+            sector_count: newSectorCount,
           }),
         });
       } catch (auditError) {

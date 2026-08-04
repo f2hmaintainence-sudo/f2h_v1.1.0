@@ -10,7 +10,7 @@ import {
 import RouteCard from '@/components/branch/RouteCard';
 import { api } from '@/services/api.client';
 
-const HexSectorMap = dynamic(() => import('@/components/branch/HexSectorMap'), { ssr: false });
+const SectorMap = dynamic(() => import('@/components/branch/SectorMap'), { ssr: false });
 const RunSheetModal = dynamic(() => import('@/components/branch/RunSheetModal'), { ssr: false });
 
 const SECTOR_COLORS = [
@@ -26,7 +26,6 @@ export default function ZonesPage() {
 
   // Sectors
   const [sectors, setSectors] = useState<any[]>([]);
-  const [hexes, setHexes] = useState<{ hex_id: string; sector_index: number }[]>([]);
   const [selectedSector, setSelectedSector] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -88,12 +87,10 @@ export default function ZonesPage() {
     setLoading(true);
 
     try {
-      const [hexRes, sectorRes, boysRes] = await Promise.all([
-        api.get<any>(`/admin/branch/hexes/${branchId}`),
+      const [sectorRes, boysRes] = await Promise.all([
         api.get<any>(`/admin/zone/sectors/${branchId}`),
         api.get<any>(`/admin/zone/delivery-boys/${branchId}`),
       ]);
-      if (hexRes.data?.status) setHexes(hexRes.data.data || []);
       if (sectorRes.data?.status) setSectors(sectorRes.data.data || []);
       if (boysRes.data?.status) setDeliveryPartners(boysRes.data.data || []);
     } catch { }
@@ -240,7 +237,6 @@ export default function ZonesPage() {
           <div className="flex gap-2 text-xs text-gray-500 ml-2">
             <span className="px-2.5 py-1 bg-gray-50 rounded-md">📍 {selectedBranch.delivery_radius_km || '?'} km</span>
             <span className="px-2.5 py-1 bg-gray-50 rounded-md">🔷 {sectors.length} sectors</span>
-            <span className="px-2.5 py-1 bg-gray-50 rounded-md">⬡ {hexes.length} hexes</span>
           </div>
         )}
       </div>
@@ -387,8 +383,17 @@ export default function ZonesPage() {
           <div className="w-[35%] flex flex-col overflow-y-auto bg-gray-50/30">
             {/* Map */}
             <div className="p-3">
-              <HexSectorMap hexes={hexes} centerLat={Number(selectedBranch?.lat)} centerLng={Number(selectedBranch?.lng)}
-                selectedSector={selectedSector} onSectorClick={loadSectorRoutes} height="280px" />
+              <SectorMap
+                sectors={sectors}
+                sectorCount={selectedBranch?.sector_count || sectors.length || 3}
+                centerLat={Number(selectedBranch?.lat)}
+                centerLng={Number(selectedBranch?.lng)}
+                radiusKm={Number(selectedBranch?.delivery_radius_km) || 5}
+                bufferZoneKm={Number(selectedBranch?.buffer_zone) || 0}
+                selectedSector={selectedSector}
+                onSectorClick={loadSectorRoutes}
+                height="280px"
+              />
             </div>
 
             {/* Unrouted Customers */}

@@ -50,10 +50,10 @@ export class BranchController {
     return this.saveAddService.saveBranch(body, adminId);
   }
 
-  // ─── H3 HEXES FOR MAP RENDERING ──────────────────────────────
+  // ─── H3 HEXES FOR MAP RENDERING (legacy endpoint) ─────────────
   @Get('hexes/:branchId')
   async getBranchHexes(@Param('branchId') branchId: string) {
-    return this.sectorService.getBranchHexes(branchId);
+    return { status: true, data: [] };
   }
 
   @Get('segments')
