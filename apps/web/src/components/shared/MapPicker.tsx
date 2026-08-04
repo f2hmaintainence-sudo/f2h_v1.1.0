@@ -281,62 +281,105 @@ export default function MapPicker({
   const center = lat && lng ? { lat, lng } : defaultCenter;
 
   return (
-    <div className="relative w-full h-full rounded-xl overflow-hidden border border-slate-200 shadow">
-      <MapErrorBoundary fallbackMessage="Google Maps API Key Error (ApiProjectMapError). Please check NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in .env.">
-        <APIProvider apiKey={GOOGLE_MAPS_API_KEY} libraries={['places']}>
-          <Map
-            defaultCenter={center}
-            defaultZoom={lat && lng ? 13 : 11}
-            mapId="f2h-branch-map"
-            gestureHandling="greedy"
-            disableDefaultUI={false}
-            mapTypeControl={false}
-            streetViewControl={false}
-            fullscreenControl={false}
-            zoomControl
-            style={{ width: '100%', height: '100%' }}
-            onClick={(e) => {
-              if (e.detail?.latLng) {
-                onLocationChange(e.detail.latLng.lat, e.detail.latLng.lng);
-              }
-            }}
-          >
-            {lat && lng && (
-              <MapContents
-                lat={lat}
-                lng={lng}
-                radiusKm={radiusKm}
-                bufferZoneKm={bufferZoneKm}
-                existingBranches={existingBranches}
-                onLocationChange={onLocationChange}
-              />
-            )}
-            {!lat && (
-              <PlacesSearch
-                onPlaceSelect={(plat, plng) => onLocationChange(plat, plng)}
-              />
-            )}
-          </Map>
-        </APIProvider>
-      </MapErrorBoundary>
+    <div className="flex flex-col gap-3 w-full h-full min-h-[360px]">
+      {/* Hub Location Coordinates Bar */}
+      <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <div className="flex items-center gap-2 font-bold text-xs text-slate-700">
+          <MapPin size={16} className="text-emerald-600 shrink-0" />
+          <span>Geocoded Hub Location:</span>
+        </div>
 
-      {/* Overlay hint */}
-      {!lat && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-          <div className="bg-white/90 backdrop-blur px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2 text-sm text-slate-600 font-medium">
-            <MapPin size={16} className="text-emerald-600" />
-            Search an address or click the map to set branch location
+        <div className="flex items-center gap-2 flex-1 max-w-md min-w-[260px]">
+          <div className="relative flex-1">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[9px] font-mono font-bold text-slate-400">LAT</span>
+            <input
+              type="number"
+              step="any"
+              placeholder="12.762813"
+              value={lat !== null && lat !== undefined ? lat : ''}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                onLocationChange(isNaN(val) ? 0 : val, lng !== null && lng !== undefined ? lng : 77.5946);
+              }}
+              className="w-full pl-9 pr-2 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 focus:border-emerald-600 focus:outline-none shadow-2xs"
+            />
           </div>
-        </div>
-      )}
 
-      {/* Coord display */}
-      {lat && lng && (
-        <div className="absolute bottom-3 left-3 bg-white/95 backdrop-blur text-xs text-emerald-800 font-semibold px-3 py-1.5 rounded-lg shadow border border-emerald-100 flex items-center gap-1.5 z-10">
-          <MapPin size={14} className="text-emerald-600" />
-          {lat.toFixed(6)}, {lng.toFixed(6)}
+          <div className="relative flex-1">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[9px] font-mono font-bold text-slate-400">LNG</span>
+            <input
+              type="number"
+              step="any"
+              placeholder="78.351635"
+              value={lng !== null && lng !== undefined ? lng : ''}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                onLocationChange(lat !== null && lat !== undefined ? lat : 12.9716, isNaN(val) ? 0 : val);
+              }}
+              className="w-full pl-9 pr-2 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 focus:border-emerald-600 focus:outline-none shadow-2xs"
+            />
+          </div>
+
+          {(!lat || !lng) && (
+            <button
+              type="button"
+              onClick={() => onLocationChange(12.762813, 78.351635)}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors shrink-0 cursor-pointer"
+            >
+              Set Location
+            </button>
+          )}
         </div>
-      )}
+      </div>
+
+      {/* Interactive Map View */}
+      <div className="relative w-full flex-1 min-h-[280px] rounded-2xl overflow-hidden border border-slate-200 shadow-xs">
+        <MapErrorBoundary fallbackMessage="Google Maps API Key Error (ApiProjectMapError). Use the Latitude/Longitude fields above to configure hub coordinates.">
+          <APIProvider apiKey={GOOGLE_MAPS_API_KEY} libraries={['places']}>
+            <Map
+              defaultCenter={center}
+              defaultZoom={lat && lng ? 13 : 11}
+              mapId="f2h-branch-map"
+              gestureHandling="greedy"
+              disableDefaultUI={false}
+              mapTypeControl={false}
+              streetViewControl={false}
+              fullscreenControl={false}
+              zoomControl
+              style={{ width: '100%', height: '100%' }}
+              onClick={(e) => {
+                if (e.detail?.latLng) {
+                  onLocationChange(e.detail.latLng.lat, e.detail.latLng.lng);
+                }
+              }}
+            >
+              {lat && lng && (
+                <MapContents
+                  lat={lat}
+                  lng={lng}
+                  radiusKm={radiusKm}
+                  bufferZoneKm={bufferZoneKm}
+                  existingBranches={existingBranches}
+                  onLocationChange={onLocationChange}
+                />
+              )}
+              {!lat && (
+                <PlacesSearch
+                  onPlaceSelect={(plat, plng) => onLocationChange(plat, plng)}
+                />
+              )}
+            </Map>
+          </APIProvider>
+        </MapErrorBoundary>
+
+        {/* Coord display badge */}
+        {lat !== null && lng !== null && lat !== undefined && lng !== undefined && (
+          <div className="absolute bottom-3 left-3 bg-white/95 backdrop-blur text-xs text-emerald-800 font-semibold px-3 py-1.5 rounded-lg shadow border border-emerald-100 flex items-center gap-1.5 z-10">
+            <MapPin size={14} className="text-emerald-600" />
+            {Number(lat).toFixed(6)}, {Number(lng).toFixed(6)}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
