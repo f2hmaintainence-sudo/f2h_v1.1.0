@@ -128,7 +128,6 @@ export default function TrackingPage() {
                             Updated: {new Date(selectedPartner.timestamp).toLocaleTimeString()}
                           </p>
                         )}
-                      </div>
                     </InfoWindow>
                   )}
                 </Map>
