@@ -36,7 +36,7 @@ const STATIC_PATTERNS = [
   '/sitemap.xml',
 ];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
   // Skip middleware for static assets
