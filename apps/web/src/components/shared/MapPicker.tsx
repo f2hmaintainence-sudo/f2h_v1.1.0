@@ -58,29 +58,36 @@ function PlacesSearch({ onPlaceSelect }: { onPlaceSelect: (lat: number, lng: num
   // Initialize Google Autocomplete if places library loaded
   useEffect(() => {
     if (!placesLib || !inputRef.current) return;
+    let listener: any = null;
     try {
-      autocompleteRef.current = new placesLib.Autocomplete(inputRef.current, {
-        types: ['geocode', 'establishment'],
-        componentRestrictions: { country: 'in' },
-        fields: ['geometry', 'formatted_address'],
-      });
-      autocompleteRef.current.addListener('place_changed', () => {
-        const place = autocompleteRef.current?.getPlace();
-        if (place?.geometry?.location) {
-          const lat = place.geometry.location.lat();
-          const lng = place.geometry.location.lng();
-          onPlaceSelect(lat, lng, place.formatted_address || '');
-          map?.panTo({ lat, lng });
-          map?.setZoom(14);
-          setShowDropdown(false);
-        }
-      });
+      if (typeof placesLib.Autocomplete === 'function') {
+        autocompleteRef.current = new placesLib.Autocomplete(inputRef.current, {
+          types: ['geocode', 'establishment'],
+          componentRestrictions: { country: 'in' },
+          fields: ['geometry', 'formatted_address'],
+        });
+        listener = autocompleteRef.current.addListener('place_changed', () => {
+          try {
+            const place = autocompleteRef.current?.getPlace();
+            if (place?.geometry?.location) {
+              const lat = place.geometry.location.lat();
+              const lng = place.geometry.location.lng();
+              onPlaceSelect(lat, lng, place.formatted_address || '');
+              if (map) {
+                map.panTo({ lat, lng });
+                map.setZoom(14);
+              }
+              setShowDropdown(false);
+            }
+          } catch { }
+        });
+      }
     } catch { }
 
     return () => {
-      if (autocompleteRef.current) {
+      if (listener && typeof google !== 'undefined' && google?.maps?.event) {
         try {
-          google.maps.event.clearInstanceListeners(autocompleteRef.current);
+          google.maps.event.removeListener(listener);
         } catch { }
       }
     };
@@ -130,8 +137,10 @@ function PlacesSearch({ onPlaceSelect }: { onPlaceSelect: (lat: number, lng: num
 
   const selectSuggestion = (s: SearchSuggestion) => {
     onPlaceSelect(s.lat, s.lng, s.display_name);
-    map?.panTo({ lat: s.lat, lng: s.lng });
-    map?.setZoom(14);
+    if (map) {
+      map.panTo({ lat: s.lat, lng: s.lng });
+      map.setZoom(14);
+    }
     setInputValue(s.display_name);
     setShowDropdown(false);
   };
@@ -178,10 +187,21 @@ function ClickHandler({ onClick }: { onClick: (lat: number, lng: number) => void
   const map = useMap();
   useEffect(() => {
     if (!map) return;
-    const listener = map.addListener('click', (e: google.maps.MapMouseEvent) => {
-      if (e.latLng) onClick(e.latLng.lat(), e.latLng.lng());
-    });
-    return () => google.maps.event.removeListener(listener);
+    let listener: any = null;
+    try {
+      if (typeof google !== 'undefined' && google?.maps?.event) {
+        listener = map.addListener('click', (e: google.maps.MapMouseEvent) => {
+          if (e?.latLng) onClick(e.latLng.lat(), e.latLng.lng());
+        });
+      }
+    } catch { }
+    return () => {
+      if (listener && typeof google !== 'undefined' && google?.maps?.event) {
+        try {
+          google.maps.event.removeListener(listener);
+        } catch { }
+      }
+    };
   }, [map, onClick]);
   return null;
 }
