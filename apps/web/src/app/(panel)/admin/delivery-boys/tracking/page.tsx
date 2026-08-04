@@ -83,17 +83,6 @@ export default function TrackingPage() {
               <p className="text-xs">Partners show up here when they ping their GPS location</p>
             </div>
           ) : (
-            <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
-              <Map
-                defaultCenter={center}
-                defaultZoom={12}
-                mapId="f2h-tracking-map"
-                gestureHandling="greedy"
-                disableDefaultUI={false}
-                mapTypeControl={false}
-                streetViewControl={false}
-                fullscreenControl={false}
-                style={{ width: '100%', height: '100%' }}
             <MapErrorBoundary fallbackMessage="Google Maps API key error. Live partner list is active below.">
               <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
                 <Map
