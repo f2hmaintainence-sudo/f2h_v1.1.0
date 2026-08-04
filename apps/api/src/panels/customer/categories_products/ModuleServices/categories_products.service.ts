@@ -129,7 +129,7 @@ export class CategoriesProductsService {
           p.is_one_time,
           pv.subscription_price,
           c.name AS category,
-          p.image_path AS product_image,
+          c.image_path AS product_image,
           (
             SELECT pi.storage_key FROM product_images pi
             WHERE pi.variant_id = pv.variant_id
@@ -226,7 +226,7 @@ export class CategoriesProductsService {
           p.is_one_time,
           pv.subscription_price,
           c.name AS category,
-          p.image_path AS product_image,
+          c.image_path AS product_image,
           (
             SELECT pi.storage_key FROM product_images pi
             WHERE pi.variant_id = pv.variant_id

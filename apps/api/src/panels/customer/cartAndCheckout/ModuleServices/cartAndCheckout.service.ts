@@ -107,7 +107,7 @@ export class CartService {
           p.name AS product_name, 
           p.is_subscribable, 
           p.is_one_time, 
-          COALESCE(pi.storage_key, p.image_path) AS image_path
+          pi.storage_key AS image_path
          FROM product_variants pv
          LEFT JOIN products p ON pv.product_id = p.product_id
          LEFT JOIN LATERAL (

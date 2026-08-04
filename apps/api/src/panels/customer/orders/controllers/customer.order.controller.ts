@@ -74,7 +74,7 @@ export class CustomerOrderController {
              pv.sku,
              p.name     AS product_name,
              p.product_id,
-             COALESCE(pi.storage_key, p.image_path) AS image_path
+             pi.storage_key AS image_path
            FROM order_items oi
            LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id AND (pv.deleted_at IS NULL)
            LEFT JOIN products p          ON p.product_id = pv.product_id AND (p.deleted_at IS NULL)
@@ -434,7 +434,7 @@ export class CustomerOrderController {
            pv.sku,
            p.name     AS product_name,
            p.product_id,
-           COALESCE(pi.storage_key, p.image_path) AS image_path
+           pi.storage_key AS image_path
          FROM order_items oi
          LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id AND (pv.deleted_at IS NULL)
          LEFT JOIN products p          ON p.product_id = pv.product_id AND (p.deleted_at IS NULL)
