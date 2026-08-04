@@ -8,7 +8,7 @@
     "clean": "rm -rf .next",
     "build": "next build",
     "build:clean": "npm run clean && npm run build",
-    "start": "next start -p 5002",
+    "start": "next start -H 0.0.0.0 -p 5002",
     "deploy:prod": "pm2 stop f2hfresh-frontend && npm run build:clean && pm2 start /home/f2hfresh/htdocs/f2hfresh.com/ecosystem.config.js --only f2hfresh-frontend --update-env",
     "restart:prod": "pm2 restart f2hfresh-frontend --update-env",
     "lint": "eslint"
