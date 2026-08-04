@@ -14,9 +14,9 @@ module.exports = {
       name: 'frontend-f2hfresh',
       cwd: '/home/f2hfresh/htdocs/f2hfresh.com/apps/web',
       script: 'npm',
-      args: 'start -- -H 0.0.0.0 -p 5002',
+      args: 'run dev',
       env: {
-        NODE_ENV: 'production',
+        NODE_ENV: 'development',
         PORT: 5002,
       },
     },
