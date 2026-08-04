@@ -89,16 +89,18 @@ export default function BranchesPage() {
       const res = await api.get<any>(`/admin/branch/table?page=1&limit=100&_=${Date.now()}`);
       if (res.data?.status && res.data?.data) {
         const rawRows = Array.isArray(res.data.data) ? res.data.data : res.data.data.rows || [];
-        const normalized = rawRows.map((b: any) => ({
-          ...b,
-          is_active: typeof b.is_active === 'string'
-            ? (b.is_active.includes('badge-success') || b.is_active.includes('Active'))
-            : !!b.is_active,
-          allow_buffer_order: typeof b.allow_buffer_order === 'string'
-            ? b.allow_buffer_order === 'true' || b.allow_buffer_order.includes('badge-success') || b.allow_buffer_order.includes('Allowed')
-            : !!b.allow_buffer_order,
-          hex_shape: normalizeHexShape(b.hex_shape)
-        }));
+        const normalized = rawRows
+          .filter((b: any) => b && typeof b === 'object')
+          .map((b: any) => ({
+            ...b,
+            is_active: typeof b.is_active === 'string'
+              ? (b.is_active.includes('badge-success') || b.is_active.includes('Active') || b.is_active === 'true')
+              : !!b.is_active,
+            allow_buffer_order: typeof b.allow_buffer_order === 'string'
+              ? b.allow_buffer_order === 'true' || b.allow_buffer_order.includes('badge-success') || b.allow_buffer_order.includes('Allowed')
+              : !!b.allow_buffer_order,
+            hex_shape: normalizeHexShape(b.hex_shape)
+          }));
         setBranches(normalized);
       }
     } catch { }
