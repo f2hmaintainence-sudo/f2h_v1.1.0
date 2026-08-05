@@ -1007,7 +1007,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               (authState is Authenticated || profile != null) &&
               state.status != CustomerSessionStatus.unauthenticated;
           String customerName = 'Guest';
-          String customerMobile = 'Login to unlock your farm-fresh dashboard';
+          String customerMobile = 'Login to unlock your farm-fresh dashboard Test';
           String customerInfo = 'NORMAL';
           String customerEmail = 'Fresh market essentials, delivered daily';
 
