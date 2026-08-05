@@ -60,8 +60,32 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         );
       }
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Connection error';
+      throw _extractError(e, 'Invalid email or password');
     }
+  }
+
+  String _extractError(DioException e, String fallback) {
+    final data = e.response?.data;
+    if (data is Map) {
+      final message = data['message'];
+      if (message is List) {
+        return message.map((item) => item.toString()).join('\n');
+      }
+      if (message != null && message.toString().trim().isNotEmpty) {
+        return message.toString();
+      }
+      final error = data['error'];
+      if (error != null && error.toString().trim().isNotEmpty) {
+        return error.toString();
+      }
+    }
+    if (e.response?.statusCode == 401) {
+      return 'Invalid email, phone or password. Please check your login credentials.';
+    }
+    if (e.response?.statusCode == 403) {
+      return 'Access denied. Account is restricted or delivery partner role is required.';
+    }
+    return e.message ?? fallback;
   }
 
   @override

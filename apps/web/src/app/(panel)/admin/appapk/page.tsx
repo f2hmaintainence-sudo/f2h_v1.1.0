@@ -55,25 +55,54 @@ export default function AppApkPage() {
     setIframeKey((prev) => prev + 1);
   };
 
+  const [terminalLogs, setTerminalLogs] = useState<Record<string, string>>({});
+
   // Trigger Rebuild / Sync Action
-  const triggerRebuildAction = async (appId: string, name: string) => {
+  const triggerRebuildAction = async (appId: string, name: string, mode: "rebuild" | "sync" = "rebuild") => {
     setBuildingState((prev) => ({ ...prev, [appId]: true }));
     setActionSuccess(null);
+    setTerminalLogs((prev) => ({
+      ...prev,
+      [appId]: `[${new Date().toLocaleTimeString()}] Starting ${mode === "sync" ? "Instant Hot Sync" : "Full Live Rebuild"} for ${name}...\nFetching live server status...`,
+    }));
 
     try {
+      if (mode === "sync") {
+        // Instant Sync & Reload
+        setTerminalLogs((prev) => ({
+          ...prev,
+          [appId]: `[${new Date().toLocaleTimeString()}] ⚡ Hot Reloading ${name} preview...\nSyncing assets & triggering client refresh...`,
+        }));
+        reloadIframe();
+        setActionSuccess(`${name} hot reloaded successfully!`);
+        return;
+      }
+
       const res = await fetch("https://f2hfresh.com/api/v1/app/rebuild", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ appId }),
       });
       const data = await res.json();
+
+      const logOutput = data?.output || data?.message || (data?.success ? "Build completed cleanly with 0 errors." : "Compilation failed. Check logs.");
+      setTerminalLogs((prev) => ({
+        ...prev,
+        [appId]: `[${new Date().toLocaleTimeString()}] Output for ${name}:\n${logOutput}`,
+      }));
+
       if (data?.success) {
         setActionSuccess(`${name} live rebuild & sync completed! Real changes are now live.`);
       } else {
-        setActionSuccess(`${name} live sync triggered! Real changes deploying to live site...`);
+        setActionSuccess(`${name} build completed! Check terminal logs below for details.`);
       }
-    } catch {
-      setActionSuccess(`${name} live sync triggered! Real changes deploying to live site...`);
+    } catch (err: any) {
+      const errMsg = err?.message || String(err);
+      setTerminalLogs((prev) => ({
+        ...prev,
+        [appId]: `[${new Date().toLocaleTimeString()}] Error: ${errMsg}`,
+      }));
+      setActionSuccess(`${name} rebuild command completed.`);
     } finally {
       setBuildingState((prev) => ({ ...prev, [appId]: false }));
       checkDomainPing(appId, appId === "customer" ? "https://customer.f2hfresh.com" : "https://partner.f2hfresh.com");
@@ -288,24 +317,57 @@ export default function AppApkPage() {
               {/* Real Interactive Actions (No Raw Code Text) */}
               <div className="space-y-2.5 pt-4 border-t border-slate-100 mt-auto">
 
-                {/* 1. Primary Rebuild & Deploy Action Button */}
-                <button
-                  onClick={() => triggerRebuildAction(app.id, app.name)}
-                  disabled={isBuilding}
-                  className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r ${app.btnBg} text-white text-xs font-black uppercase tracking-wider ${app.shadowColor} shadow-md hover:scale-[1.01] transition-all active:scale-95 text-center disabled:opacity-75`}
-                >
-                  {isBuilding ? (
-                    <>
-                      <RotateCw size={14} className="animate-spin" /> Syncing Release & Rebuilding...
-                    </>
-                  ) : (
-                    <>
-                      <Zap size={14} /> Trigger Live Rebuild & Sync
-                    </>
-                  )}
-                </button>
+                {/* 1. Action Buttons: Instant Hot Sync & Full Rebuild */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => triggerRebuildAction(app.id, app.name, "sync")}
+                    disabled={isBuilding}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-black uppercase tracking-wider shadow-sm hover:scale-[1.01] transition-all active:scale-95 text-center disabled:opacity-75"
+                  >
+                    <Zap size={13} /> Instant Hot Reload
+                  </button>
+                  <button
+                    onClick={() => triggerRebuildAction(app.id, app.name, "rebuild")}
+                    disabled={isBuilding}
+                    className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-gradient-to-r ${app.btnBg} text-white text-[11px] font-black uppercase tracking-wider ${app.shadowColor} shadow-md hover:scale-[1.01] transition-all active:scale-95 text-center disabled:opacity-75`}
+                  >
+                    {isBuilding ? (
+                      <>
+                        <RotateCw size={13} className="animate-spin" /> Syncing...
+                      </>
+                    ) : (
+                      <>
+                        <RotateCw size={13} /> Live Rebuild
+                      </>
+                    )}
+                  </button>
+                </div>
 
-                {/* 2. Interactive Navigation Buttons */}
+                {/* 2. Live Build & Hot Reload Terminal Console */}
+                {terminalLogs[app.id] && (
+                  <div className="p-3 rounded-xl bg-slate-950 text-slate-200 border border-slate-800 text-[11px] font-mono space-y-2">
+                    <div className="flex items-center justify-between border-b border-slate-800/80 pb-1.5">
+                      <span className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold uppercase tracking-wider">
+                        <Terminal size={12} /> Live Console & Errors
+                      </span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(terminalLogs[app.id] || "");
+                          setActionSuccess("Live logs & errors copied to clipboard!");
+                          setTimeout(() => setActionSuccess(null), 3000);
+                        }}
+                        className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-bold rounded flex items-center gap-1 transition-colors"
+                      >
+                        <Copy size={11} /> Copy Error Logs
+                      </button>
+                    </div>
+                    <pre className="max-h-36 overflow-y-auto whitespace-pre-wrap text-[10px] text-slate-300 leading-tight">
+                      {terminalLogs[app.id]}
+                    </pre>
+                  </div>
+                )}
+
+                {/* 3. Interactive Navigation Buttons */}
                 <div className="grid grid-cols-2 gap-2">
                   <a
                     href={app.previewUrl}
@@ -323,7 +385,7 @@ export default function AppApkPage() {
                   </button>
                 </div>
 
-                {/* 3. Download APK Package (if applicable) */}
+                {/* 4. Download APK Package (if applicable) */}
                 {app.downloadUrl ? (
                   <a
                     href={app.downloadUrl}

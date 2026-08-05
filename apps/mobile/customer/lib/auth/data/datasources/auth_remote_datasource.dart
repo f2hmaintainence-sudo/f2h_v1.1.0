@@ -58,10 +58,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         return error.toString();
       }
     }
-    if (e.error != null) {
-      return e.error.toString();
+    if (e.response?.statusCode == 401) {
+      return 'Invalid email, phone or password. Please check your login details.';
     }
-    return fallback;
+    if (e.response?.statusCode == 403) {
+      return 'Access denied. Account is restricted or role is invalid.';
+    }
+    return e.message ?? fallback;
   }
 
   @override

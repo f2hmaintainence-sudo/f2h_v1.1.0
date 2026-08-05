@@ -1389,66 +1389,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ),
                                     ],
                                   ),
-                                  // if (!isLoggedIn) ...[
-                                  //   const SizedBox(height: 18),
-                                  //   // Login button for Guest Users
-                                  //   Container(
-                                  //     padding: const EdgeInsets.all(12),
-                                  //     decoration: BoxDecoration(
-                                  //       color: Colors.white.withValues(
-                                  //         alpha: 0.07,
-                                  //       ),
-                                  //       borderRadius: BorderRadius.circular(16),
-                                  //       border: Border.all(
-                                  //         color: Colors.white.withValues(
-                                  //           alpha: 0.12,
-                                  //         ),
-                                  //         width: 1,
-                                  //       ),
-                                  //     ),
-                                  //     child: SizedBox(
-                                  //       width: double.infinity,
-                                  //       child: ElevatedButton.icon(
-                                  //         onPressed: () {
-                                  //           Navigator.push(
-                                  //             context,
-                                  //             MaterialPageRoute(
-                                  //               builder: (_) =>
-                                  //                   const LoginScreen(
-                                  //                     popOnSuccess: true,
-                                  //                   ),
-                                  //             ),
-                                  //           );
-                                  //         },
-                                  //         icon: const Icon(
-                                  //           Icons.login_rounded,
-                                  //           size: 18,
-                                  //           color: kPrimary,
-                                  //         ),
-                                  //         label: const Text(
-                                  //           'Login / Sign Up',
-                                  //           style: TextStyle(
-                                  //             fontSize: 14,
-                                  //             fontWeight: FontWeight.w900,
-                                  //             color: kPrimary,
-                                  //           ),
-                                  //         ),
-                                  //         style: ElevatedButton.styleFrom(
-                                  //           backgroundColor: Colors.white,
-                                  //           foregroundColor: kPrimary,
-                                  //           padding: const EdgeInsets.symmetric(
-                                  //             vertical: 12,
-                                  //           ),
-                                  //           elevation: 2,
-                                  //           shape: RoundedRectangleBorder(
-                                  //             borderRadius:
-                                  //                 BorderRadius.circular(14),
-                                  //           ),
-                                  //         ),
-                                  //       ),
-                                  //     ),
-                                  //   ),
-                                  // ],
                                 ],
                               ),
                             ),
@@ -2041,7 +1981,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(width: 14),
                   const Expanded(
                     child: Text(
-                      'Package container balance and transactions',
+                      'Container balance',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,

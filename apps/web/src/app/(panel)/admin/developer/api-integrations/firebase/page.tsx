@@ -248,19 +248,19 @@ export default function FirebaseIntegrationsPage() {
                     <div className="flex justify-between">
                       <span className="text-slate-400 font-sans">Sender ID:</span>
                       <span className="font-semibold text-slate-700">
-                        {data.messaging_sender_id || "N/A"}
+                        {data.messaging_sender_id || data.messagingSenderId || "N/A"}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400 font-sans">Auth Domain:</span>
                       <span className="font-semibold text-slate-700 truncate max-w-[150px]">
-                        {data.auth_domain || "N/A"}
+                        {data.auth_domain || data.authDomain || "N/A"}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400 font-sans">Android ID:</span>
                       <span className="font-semibold text-slate-700 truncate max-w-[150px]">
-                        {data.android_app_id || "N/A"}
+                        {data.android_app_id || data.appId || "N/A"}
                       </span>
                     </div>
                   </div>
