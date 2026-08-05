@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CircleCheck, MapPin, Star, Clock, Sunrise, Sunset, Snowflake, Microscope, Radar, Tractor, TestTube, Boxes, Bike, Home, SunMedium, ShieldCheck, Layers, Send, MoonStar, X, Navigation, Loader2, AlertCircle } from "lucide-react";
 import { EyebrowPill } from "./EyebrowPill";
@@ -165,16 +165,83 @@ function DeliveryRouteSvg() {
   );
 }
 
+// ── Leaflet Radius Map Component ──────────────────────────────────
+function BranchRadiusMap({ lat, lng, radiusKm, branchName }: { lat: number; lng: number; radiusKm: number; branchName: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    let mapInstance: any = null;
+
+    import("leaflet").then((L) => {
+      if (!containerRef.current) return;
+
+      // Inject Leaflet CSS if not already loaded
+      if (!document.getElementById("leaflet-css-cdn")) {
+        const link = document.createElement("link");
+        link.id = "leaflet-css-cdn";
+        link.rel = "stylesheet";
+        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        document.head.appendChild(link);
+      }
+
+      // Fix icon paths
+      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+        iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+      });
+
+      mapInstance = L.map(containerRef.current, { scrollWheelZoom: false }).setView([lat, lng], 12);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; OpenStreetMap',
+        maxZoom: 18,
+      }).addTo(mapInstance);
+
+      // Delivery Radius Circle overlay (radius in meters)
+      const circle = L.circle([lat, lng], {
+        color: "#2d8a45",
+        fillColor: "#2d8a45",
+        fillOpacity: 0.22,
+        weight: 3,
+        dashArray: "6, 6",
+        radius: radiusKm * 1000,
+      }).addTo(mapInstance);
+
+      // Center Marker with Popup
+      L.marker([lat, lng])
+        .addTo(mapInstance)
+        .bindPopup(`
+          <div style="font-family: system-ui, sans-serif; text-align: center; padding: 4px 2px;">
+            <strong style="color: #0d3d1a; font-size: 14px; font-weight: 700;">${branchName}</strong>
+            <div style="margin-top: 4px; font-size: 12px; color: #2d8a45; font-weight: 600;">
+              ⭕ ${radiusKm} KM Delivery Radius
+            </div>
+          </div>
+        `)
+        .openPopup();
+
+      mapInstance.fitBounds(circle.getBounds(), { padding: [30, 30] });
+    });
+
+    return () => {
+      if (mapInstance) {
+        mapInstance.remove();
+      }
+    };
+  }, [lat, lng, radiusKm, branchName]);
+
+  return <div ref={containerRef} className="w-full h-full z-0" />;
+}
+
 // ── Branch Map Modal ──────────────────────────────────────────────
 function BranchMapModal({ branch, onClose }: { branch: Branch; onClose: () => void }) {
   const lat = parseFloat(String(branch.lat ?? ""));
   const lng = parseFloat(String(branch.lng ?? ""));
   const radius = parseFloat(String(branch.delivery_radius_km ?? "5"));
   const hasCoords = !isNaN(lat) && !isNaN(lng);
-
-  const mapSrc = hasCoords
-    ? `https://www.google.com/maps?q=${lat},${lng}&z=14&output=embed`
-    : null;
 
   const mapsLink = hasCoords
     ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
@@ -220,7 +287,7 @@ function BranchMapModal({ branch, onClose }: { branch: Branch; onClose: () => vo
         </div>
 
         {/* Meta row */}
-        <div className="flex items-center gap-4 px-5 py-3 bg-white border-b border-gray-100">
+        <div className="flex items-center gap-3 px-5 py-3 bg-white border-b border-gray-100 flex-wrap">
           <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-fresh-green bg-fresh-green/8 border border-fresh-green/15 rounded-full px-3 py-1">
             <span className="relative flex h-1.5 w-1.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-fresh-green opacity-60" />
@@ -229,8 +296,9 @@ function BranchMapModal({ branch, onClose }: { branch: Branch; onClose: () => vo
             Active Branch
           </span>
           {!isNaN(radius) && (
-            <span className="text-xs text-muted font-medium">
-              Coverage radius: <strong className="text-deep-green">{radius} km</strong>
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-deep-green bg-gradient-to-r from-fresh-green/10 to-gold/10 border border-fresh-green/20 rounded-full px-3 py-1">
+              <span className="h-2 w-2 rounded-full border border-fresh-green bg-fresh-green/30" />
+              Delivery Radius: {radius} km
             </span>
           )}
           <a
@@ -240,20 +308,26 @@ function BranchMapModal({ branch, onClose }: { branch: Branch; onClose: () => vo
             className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-fresh-green hover:underline"
           >
             <Navigation className="w-3.5 h-3.5" />
-            Open in Maps
+            Open in Google Maps
           </a>
         </div>
 
-        {/* Map */}
-        <div className="h-72 sm:h-96 bg-gray-100 relative">
-          {mapSrc ? (
-            <iframe
-              src={mapSrc}
-              className="w-full h-full border-0"
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              title={`Map for ${branch.branch_name}`}
-            />
+        {/* Map Container */}
+        <div className="h-80 sm:h-96 bg-gray-100 relative">
+          {hasCoords ? (
+            <>
+              <BranchRadiusMap
+                lat={lat}
+                lng={lng}
+                radiusKm={radius}
+                branchName={branch.branch_name}
+              />
+              {/* Radius legend badge overlay */}
+              <div className="absolute bottom-3 left-3 z-[1000] bg-white/90 backdrop-blur-md border border-fresh-green/20 rounded-xl px-3 py-2 shadow-md flex items-center gap-2 text-xs font-semibold text-deep-green">
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-fresh-green bg-fresh-green/20" />
+                <span>{radius} km Radius Coverage Zone</span>
+              </div>
+            </>
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-muted">
               <MapPin className="w-10 h-10 text-fresh-green/40" />
