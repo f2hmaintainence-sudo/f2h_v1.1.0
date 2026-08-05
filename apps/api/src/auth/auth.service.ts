@@ -348,16 +348,18 @@ export class AuthService {
       }
     }
 
-    const rawName = body.name || (body as any).name;
-    let firstName = body.first_name || '';
-    let lastName = body.last_name || '';
+    const rawFullName = (
+      body.first_name ||
+      (body as any).full_name ||
+      body.name ||
+      (body as any).fullName ||
+      body.user_name ||
+      (email ? email.split('@')[0] : 'User')
+    ).trim();
+    let firstName = rawFullName;
+    let lastName = body.last_name ? body.last_name.trim() : '';
 
-    if (rawName && !firstName && !lastName) {
-      const parts = rawName.trim().split(/\s+/);
-      firstName = parts[0] || '';
-      lastName = parts.slice(1).join(' ') || '';
-    }
-    const userName = body.user_name || rawName || email?.split('@')[0] || phone;
+    const userName = body.user_name || rawFullName || email?.split('@')[0] || phone;
 
     // Check existing users via indexed SQL query
     let existingUser: any = null;
@@ -404,17 +406,6 @@ export class AuthService {
     const hashedPassword = body.password
       ? await bcrypt.hash(body.password, 12)
       : crypto.randomUUID();
-
-    const rawFullName = (
-      body.first_name ||
-      body.full_name ||
-      body.name ||
-      (body as any).fullName ||
-      body.user_name ||
-      (email ? email.split('@')[0] : 'User')
-    ).trim();
-    const firstName = rawFullName;
-    const lastName = body.last_name ? body.last_name.trim() : '';
 
     await this.Data.executeTransaction(async (transaction) => {
       if (existingUser) {

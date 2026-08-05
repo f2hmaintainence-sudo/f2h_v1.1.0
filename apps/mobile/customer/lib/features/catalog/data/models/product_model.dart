@@ -336,6 +336,9 @@ IconData getProductFallbackIcon(String name) {
   return (const Color(0xFFF5F5F5), const Color(0xFF16653A));
 }
 
+final Map<String, int> _failedUrlAttempts = {};
+final Set<String> _failedImageUrls = {};
+
 /// Renders the product image using the remote URL if available, falling back to an icon.
 Widget buildProductImage(
   String name, {
@@ -350,12 +353,16 @@ Widget buildProductImage(
   if (asset != null && asset.isNotEmpty) {
     if (asset.startsWith('assets/')) {
       final imageUrl = AppAssetService.getAssetUrl(asset);
+      if (_failedImageUrls.contains(imageUrl)) {
+        return _fallbackIconWidget(name, width, height, fallbackColor);
+      }
       return CachedNetworkImage(
         imageUrl: imageUrl,
         width: width,
         height: height,
         fit: fit,
         errorWidget: (context, url, error) {
+          _failedImageUrls.add(url);
           return _fallbackIconWidget(name, width, height, fallbackColor);
         },
       );
@@ -414,6 +421,11 @@ Widget buildProductImage(
           // Fallback if URL parsing fails
         }
 
+        // Stop retrying / polling if image URL failed 3 times or is marked failed
+        if ((_failedUrlAttempts[resolvedAsset] ?? 0) >= 3 || _failedImageUrls.contains(resolvedAsset)) {
+          return _fallbackIconWidget(name, width, height, fallbackColor);
+        }
+
         return CachedNetworkImage(
           imageUrl: resolvedAsset,
           width: width,
@@ -422,7 +434,11 @@ Widget buildProductImage(
           placeholder: (context, url) =>
               _fallbackIconWidget(name, width, height, fallbackColor),
           errorWidget: (context, url, err) {
-            debugPrint('[buildProductImage] FAILED url=$url err=$err');
+            final attempts = (_failedUrlAttempts[url] ?? 0) + 1;
+            _failedUrlAttempts[url] = attempts;
+            if (attempts >= 3) {
+              _failedImageUrls.add(url);
+            }
             return _fallbackIconWidget(name, width, height, fallbackColor);
           },
         );
@@ -430,7 +446,6 @@ Widget buildProductImage(
     }
   }
 
-  debugPrint('[buildProductImage] NO_URL asset=$imageAsset');
   return _fallbackIconWidget(name, width, height, fallbackColor);
 }
 
