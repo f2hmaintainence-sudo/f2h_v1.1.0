@@ -368,4 +368,32 @@ export class AppController {
 
     return 0;
   }
+
+  @Post('app/rebuild')
+  async triggerAppRebuild(@Body() body: { appId: string }) {
+    const appId = (body?.appId || '').toLowerCase().trim();
+    let command = '';
+
+    if (appId === 'customer') {
+      command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/customer && /opt/flutter/bin/flutter build web --release && rsync -avz --delete /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/customer/build/web/ /home/f2hfresh-customer/htdocs/customer.f2hfresh.com/`;
+    } else if (appId === 'partner' || appId === 'delivery') {
+      command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/delivery && /opt/flutter/bin/flutter build web --release && rsync -avz --delete /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/delivery/build/web/ /home/f2hfresh-partner/htdocs/partner.f2hfresh.com/`;
+    } else if (appId === 'admin') {
+      command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/web && npm run build && pm2 restart frontend-f2hfresh`;
+    } else {
+      throw new BadRequestException('Invalid appId');
+    }
+
+    const { exec } = await import('child_process');
+    return new Promise((resolve) => {
+      exec(command, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`[AppRebuild] Error building ${appId}:`, stderr);
+          return resolve({ success: false, message: stderr || error.message });
+        }
+        console.log(`[AppRebuild] Successfully rebuilt ${appId}`);
+        resolve({ success: true, message: `${appId} live sync completed successfully!`, output: stdout });
+      });
+    });
+  }
 }

@@ -19,7 +19,7 @@ import type { Request, Response, NextFunction } from 'express';
 
 @Injectable()
 export class RoleHeaderMiddleware implements NestMiddleware {
-  /** Single-char code → full CUSTOMER/DELIVERY_BOY/ADMIN role string */
+  /** Single-char code → full CUSTOMER/DELIVERY_PARTNER/ADMIN role string */
   private static readonly ROLE_MAP: Record<string, string> = {
     C: 'CUSTOMER',
     D: 'DELIVERY_PARTNER',
