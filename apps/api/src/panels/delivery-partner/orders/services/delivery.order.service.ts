@@ -35,7 +35,11 @@ export class DeliveryOrderService {
 
   async resolveDeliveryPartner(userId: string) {
     const boyRes = await this.db.query(
-      `SELECT id, user_id, full_name, branch_id FROM delivery_partners WHERE user_id = $1 OR delivery_partner_id = $1 LIMIT 1`,
+      `SELECT dp.id, dp.user_id, dp.delivery_partner_id, dp.branch_id,
+              u.first_name || ' ' || u.last_name AS full_name
+       FROM delivery_partners dp
+       LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
+       WHERE dp.user_id = $1 OR dp.delivery_partner_id = $1 LIMIT 1`,
       [userId],
     );
     if (!boyRes?.length) {
@@ -536,8 +540,8 @@ export class DeliveryOrderService {
           o.payment_screenshot,
           o.created_at,
           o.updated_at,
-          COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '') AS customer_name,
-          c.phone AS customer_phone,
+          COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '') AS customer_name,
+          cu.phone AS customer_phone,
           COALESCE(ca.flat_no, '') || ' ' ||
           COALESCE(ca.building_name, '') || ' ' ||
           COALESCE(ca.street, '') || ' ' ||
@@ -547,7 +551,7 @@ export class DeliveryOrderService {
           COALESCE(ca.longitude, 0.0) AS address_lng,
           o.run_sequence AS sequence_number
        FROM orders o
-       JOIN customers c ON c.customer_id = o.customer_id
+       JOIN users cu ON cu.user_id = o.customer_id
        LEFT JOIN customer_addresses ca
          ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
         WHERE (o.delivery_partner_id = $1 OR o.delivery_run_id = ANY($5))
@@ -763,6 +767,21 @@ export class DeliveryOrderService {
         );
       }
     });
+
+    // Send FCM push notifications to customers for delivered orders
+    for (const order of stopsRes) {
+      if (status === 'delivered') {
+        try {
+          await this.pushNotificationService.sendNotificationToUsers(
+            [order.customer_id],
+            {
+              title: '🚚 Order Delivered! 🎉',
+              body: 'Your F2H Fresh order has been delivered successfully. Enjoy your fresh items!',
+            },
+          );
+        } catch (e) {}
+      }
+    }
 
     return { success: true, message: `Stop marked as ${status} successfully` };
   }
@@ -1018,11 +1037,11 @@ export class DeliveryOrderService {
              o.address_id,
              o.order_id,
              o.customer_id,
-             COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '') AS customer_name,
+             COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '') AS customer_name,
              COALESCE(ca.flat_no, '') || ' ' || COALESCE(ca.building_name, '') || ' ' || COALESCE(ca.street, '') || ' ' || COALESCE(ca.area, '') AS customer_address,
              COALESCE(ca.landmark, '') AS customer_landmark
            FROM orders o
-           JOIN customers c ON c.customer_id = o.customer_id
+           JOIN users cu ON cu.user_id = o.customer_id
            LEFT JOIN customer_addresses ca ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
            WHERE o.delivery_run_id = ANY($1)
              AND o.status IN ('confirmed', 'out_for_delivery', 'assigned', 'packed')
@@ -1044,11 +1063,11 @@ export class DeliveryOrderService {
            o.address_id,
            o.order_id,
            o.customer_id,
-           COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '') AS customer_name,
+           COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '') AS customer_name,
            COALESCE(ca.flat_no, '') || ' ' || COALESCE(ca.building_name, '') || ' ' || COALESCE(ca.street, '') || ' ' || COALESCE(ca.area, '') AS customer_address,
            COALESCE(ca.landmark, '') AS customer_landmark
          FROM orders o
-         JOIN customers c ON c.customer_id = o.customer_id
+         JOIN users cu ON cu.user_id = o.customer_id
          LEFT JOIN customer_addresses ca ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
          WHERE o.delivery_partner_id = $1
            AND DATE(o.scheduled_date AT TIME ZONE 'Asia/Kolkata') = $2::date

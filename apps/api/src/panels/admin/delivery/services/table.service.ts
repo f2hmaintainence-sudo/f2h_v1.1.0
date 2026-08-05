@@ -70,7 +70,7 @@ export class DeliveryLeaveTableService {
         columns: {
           id:               ['delivery_leave_requests.id', false],
           delivery_partner_id:  ['delivery_leave_requests.delivery_partner_id', true],
-          delivery_partner_name:['delivery_partners.full_name', true],
+          delivery_partner_name: ["CONCAT_WS(' ', users.first_name, users.last_name)", true],
           leave_date:       ['delivery_leave_requests.leave_date', true],
           end_date:         ['delivery_leave_requests.end_date', true],
           leave_type:       ['delivery_leave_requests.leave_type', true],
@@ -84,8 +84,8 @@ export class DeliveryLeaveTableService {
         joins: [
           {
             type: 'LEFT',
-            table: 'delivery_partners',
-            on: [['delivery_partners.delivery_partner_id', 'delivery_leave_requests.delivery_partner_id']],
+            table: 'users',
+            on: [['users.user_id', 'delivery_leave_requests.delivery_partner_id']],
           },
         ],
         conditions,

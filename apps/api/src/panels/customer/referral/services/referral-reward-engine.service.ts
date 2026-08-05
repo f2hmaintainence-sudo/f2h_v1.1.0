@@ -52,15 +52,17 @@ export class ReferralRewardEngineService {
       const refRes = await client.query(
         `SELECT * FROM referrals
          WHERE (
+           referred_user_id = $1 OR
+           referrer_user_id = $1 OR
            referred_customer_id = $1 OR
            referred_customer_id = $2 OR
            (referee_phone = $3 AND $3 != '')
          )
          AND status != 'rewarded'
          AND rewarded_at IS NULL
-         ORDER BY created_at DESC
-         FOR UPDATE LIMIT 1`,
-        [refereeCustomerId, realRefereeId, refereePhone],
+         LIMIT 1
+         FOR UPDATE`,
+        [realRefereeId, refereeCustomerId, refereePhone],
       );
 
       let referralRecord = refRes.rows?.[0];

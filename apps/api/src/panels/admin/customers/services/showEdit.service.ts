@@ -150,7 +150,7 @@ export class CustomerShowEditService {
   async getWalletTransactionsEditForm(id: string): Promise<FormResponse> {
     try {
       // 1. Fetch existing record
-      const result = await this.dataService.query('wallet_transactions', {
+      const result = await this.dataService.query('customer_wallet_transactions', {
         select: ['wallet_transactions.*'],
         where: [{ column: 'wallet_transactions.id', operator: '=', value: id }],
         limit: 1,

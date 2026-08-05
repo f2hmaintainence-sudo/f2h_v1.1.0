@@ -262,7 +262,7 @@ export class AuthService {
     if (!code || !code.trim()) return null;
     const cleanCode = code.trim().toUpperCase();
 
-    // 1. Search by referral_code in customers
+    // 1. Search by referral_code in customers (only valid columns: referral_code, customer_id)
     const noHyphen = cleanCode.replace(/-/g, '');
     const withHyphen = noHyphen.startsWith('F2H') && noHyphen.length > 3 ? 'F2H-' + noHyphen.substring(3) : cleanCode;
     const variations = Array.from(new Set([cleanCode, noHyphen, withHyphen]));
@@ -275,17 +275,15 @@ export class AuthService {
       if (res?.data?.length) return res.data[0];
     }
 
-    // 2. Search by customer_id, phone, mobile, or email in customers
-    for (const field of ['customer_id', 'phone', 'mobile', 'email']) {
-      const res = await this.Data.query('customers', {
-        where: [{ column: field, operator: '=', value: code.trim() }],
-        limit: 1,
-      });
-      if (res?.data?.length) return res.data[0];
-    }
+    // 2. Search by customer_id in customers
+    const custByIdRes = await this.Data.query('customers', {
+      where: [{ column: 'customer_id', operator: '=', value: code.trim() }],
+      limit: 1,
+    });
+    if (custByIdRes?.data?.length) return custByIdRes.data[0];
 
-    // 3. Search by user_id, phone, email in users
-    for (const field of ['user_id', 'phone', 'email']) {
+    // 3. Search by referral_code, user_id, phone, email in users
+    for (const field of ['referral_code', 'user_id', 'phone', 'email']) {
       const res = await this.Data.query('users', {
         where: [{ column: field, operator: '=', value: code.trim() }],
         limit: 1,
@@ -293,36 +291,20 @@ export class AuthService {
       if (res?.data?.length) return res.data[0];
     }
 
-    // 4. Fallback for phone-suffix referral codes e.g. F2HASH647, F2H-0305, 0305
+    // 4. Fallback for phone-suffix referral codes — search users by phone last digits
     const digitsOnly = cleanCode.replace(/\D/g, '');
     if (digitsOnly.length >= 3) {
       const lastDigits = digitsOnly.length >= 4 ? digitsOnly.slice(-4) : digitsOnly;
-      for (const field of ['phone', 'mobile']) {
-        const phoneMatch = await this.Data.query('customers', {
-          where: [{ column: field, operator: 'LIKE', value: `%${lastDigits}` }],
-          limit: 1,
-        });
-        if (phoneMatch?.data?.length) {
-          const matchedCust = phoneMatch.data[0];
-          await this.Data.update(
-            'customers',
-            { referral_code: cleanCode, updated_at: new Date() },
-            [{ column: 'customer_id', operator: '=', value: matchedCust.customer_id }]
-          );
-          matchedCust.referral_code = cleanCode;
-          return matchedCust;
-        }
-      }
+      const phoneMatch = await this.DataBase.query(
+        `SELECT user_id, referral_code FROM users WHERE phone LIKE $1 LIMIT 1`,
+        [`%${lastDigits}`]
+      );
+      if (phoneMatch?.length) return phoneMatch[0];
     }
 
-    // 5. Robust resolution for any formatted referral codes (e.g. F2HASH647, F2HPUR636, etc.)
-    if (cleanCode.length >= 3) {
-      const namePart = cleanCode.replace(/\d/g, '').replace(/F2H/g, '');
-      const firstName = cleanCode.includes('ASH') ? 'Ashok' : (namePart.length > 0 ? namePart.charAt(0).toUpperCase() + namePart.slice(1).toLowerCase() : 'F2H Referrer');
-      const lastName = cleanCode.includes('ASH') ? 'Roman' : 'User';
+    // 5. Create a placeholder customer row for legacy referral codes not yet in the system
+    if (cleanCode.length >= 3 && cleanCode.startsWith('F2H')) {
       const newCustId = `USER_${cleanCode}`;
-      const placeholderEmail = cleanCode === 'F2HASH647' ? 'ashokroman007@gmail.com' : `ref_${cleanCode.toLowerCase()}@f2hfresh.com`;
-      const placeholderPhone = `999${digitsOnly.padEnd(7, '0').slice(-7)}`;
 
       const existing = await this.Data.query('customers', {
         where: [{ column: 'customer_id', operator: '=', value: newCustId }],
@@ -332,11 +314,6 @@ export class AuthService {
 
       const custData = {
         customer_id: newCustId,
-        first_name: firstName,
-        last_name: lastName,
-        email: placeholderEmail,
-        mobile: placeholderPhone,
-        phone: placeholderPhone,
         referral_code: cleanCode,
         referral_status: 'active',
         created_at: new Date(),
@@ -496,11 +473,8 @@ export class AuthService {
         );
 
         if (existingCust?.data?.length > 0) {
+          // Update only valid customers table columns (no first_name/last_name/phone/email/mobile)
           const custPayload: any = {
-            first_name: body.first_name || body.user_name || 'Customer',
-            last_name: body.last_name || '',
-            mobile: phone || null,
-            email: email || null,
             updated_at: now,
           };
           if (referrerId) {
@@ -513,15 +487,12 @@ export class AuthService {
             { transaction },
           );
         } else {
+          // Insert only valid customers table columns (no first_name/last_name/phone/email/mobile)
           const custPayload: any = {
             customer_id: userId,
-            first_name: custFirstName,
-            last_name: lastName,
-            mobile: phone || null,
-            phone: phone || null,
-            email: email || null,
             referral_code: generatedRefCode,
             referral_status: 'locked',
+            branch_id: body.branch_id || null,
             created_at: now,
             updated_at: now,
           };
@@ -531,6 +502,14 @@ export class AuthService {
           await this.Data.insert('customers', custPayload, { transaction });
         }
 
+        // Also store referral_code in users table for unified lookup
+        await this.Data.update(
+          'users',
+          { referral_code: generatedRefCode, updated_at: now },
+          [{ column: 'user_id', operator: '=', value: userId }],
+          { transaction },
+        );
+
         // Insert row into referrals table if user registered with a referral code
         if (referrerId) {
           try {
@@ -539,9 +518,9 @@ export class AuthService {
             const refereeName = [body.first_name, body.last_name].filter(Boolean).join(' ').trim() || body.name || 'Customer';
             const refereePhone = body.phone || (body as any).contact_number || '';
 
-            // Check if referring user is a DP
-            const [dpReferrerRows] = await transaction.query(
-              'SELECT delivery_partner_id FROM delivery_partners WHERE delivery_partner_id = ? LIMIT 1',
+            // Check if referring user is a DP via PostgreSQL
+            const dpReferrerRows = await this.DataBase.query(
+              `SELECT delivery_partner_id FROM delivery_partners WHERE delivery_partner_id = $1 LIMIT 1`,
               [referrerId],
             );
             const isDpRef = dpReferrerRows?.length > 0;
@@ -552,6 +531,8 @@ export class AuthService {
                 refer_id: referId,
                 referrer_customer_id: referrerId,
                 referred_customer_id: userId,
+                referrer_user_id: referrerId,
+                referred_user_id: userId,
                 referral_code: refCode,
                 referrer_reward_amount: isDpRef ? 75.00 : 50.00,
                 referred_reward_amount: isDpRef ? 0.00 : 50.00,
@@ -609,17 +590,13 @@ export class AuthService {
           limit: 1,
         });
 
-        const partnerFullName = `${firstName} ${lastName}`.trim() || userName || 'Partner';
-
         if (existingDp?.data?.length > 0) {
+          // Update only valid delivery_partners columns (no full_name, phone, email)
           await this.Data.update(
             'delivery_partners',
             {
               user_id: userId,
-              full_name: partnerFullName,
-              phone: phone || null,
-              email: email || null,
-              branch_id: selectedBranchId || 'BRANCH_DEFAULT',
+              branch_id: selectedBranchId || existingDp.data[0].branch_id || null,
               current_lat: body.latitude !== undefined && body.latitude !== null ? Number(body.latitude) : null,
               current_lng: body.longitude !== undefined && body.longitude !== null ? Number(body.longitude) : null,
               referred_by: referrerId,
@@ -629,17 +606,16 @@ export class AuthService {
             { transaction },
           );
         } else {
+          // Insert only valid delivery_partners columns (no full_name, phone, email)
           await this.Data.insert(
             'delivery_partners',
             {
               delivery_partner_id: userId,
               user_id: userId,
-              full_name: partnerFullName,
-              phone: phone || null,
-              email: email || null,
               branch_id: selectedBranchId || null,
-              is_active: 0,
-              is_verified: 0,
+              is_active: false,
+              is_verified: false,
+              is_available: true,
               vehicle_type: 'BIKE',
               vehicle_number: 'N/A',
               current_lat: body.latitude !== undefined && body.latitude !== null ? Number(body.latitude) : null,
@@ -652,9 +628,9 @@ export class AuthService {
           );
         }
 
-        // Ensure active role assignment exists in role_assignments table
-        const [existingRaRows] = await transaction.query(
-          'SELECT id FROM role_assignments WHERE user_id = ? AND role_id = ? LIMIT 1',
+        // Ensure active role assignment exists in role_assignments table (PostgreSQL $1 placeholders)
+        const existingRaRows = await this.DataBase.query(
+          `SELECT id FROM role_assignments WHERE user_id = $1 AND role_id = $2 LIMIT 1`,
           [userId, roleId]
         );
 
@@ -673,7 +649,7 @@ export class AuthService {
           );
         }
 
-        // Insert referral row when DP signed up with a referral code (referrer gets ₹75 via salary, referee gets 0)
+        // Insert referral row when DP signed up with a referral code
         if (referrerId) {
           try {
             const referId = generateId('REF', 8);
@@ -681,9 +657,9 @@ export class AuthService {
             const refereeName = [body.first_name, body.last_name].filter(Boolean).join(' ').trim() || body.name || 'Delivery Partner';
             const refereePhone = body.phone || (body as any).contact_number || '';
 
-            // Check if referring user is a DP
-            const [dpReferrerRows] = await transaction.query(
-              'SELECT delivery_partner_id FROM delivery_partners WHERE delivery_partner_id = ? LIMIT 1',
+            // Check if referring user is a DP via PostgreSQL
+            const dpReferrerRows = await this.DataBase.query(
+              `SELECT delivery_partner_id FROM delivery_partners WHERE delivery_partner_id = $1 LIMIT 1`,
               [referrerId],
             );
             const isDpRef = dpReferrerRows?.length > 0;
@@ -694,6 +670,8 @@ export class AuthService {
                 refer_id: referId,
                 referrer_customer_id: referrerId,
                 referred_customer_id: userId,
+                referrer_user_id: referrerId,
+                referred_user_id: userId,
                 referral_code: refCode,
                 referrer_reward_amount: isDpRef ? 75.00 : 50.00,
                 referred_reward_amount: isDpRef ? 0.00 : 50.00,
@@ -881,20 +859,22 @@ export class AuthService {
         const suffix = phoneDigits.length >= 3 ? phoneDigits.slice(-3) : Math.floor(100 + Math.random() * 900).toString();
         const generatedRefCode = `F2H${prefix}${suffix}`;
 
+        // Insert only valid customers table columns (no first_name/last_name/phone/email/mobile)
         const customerInsertData: any = {
           customer_id: userId,
-          first_name: email ? email.split('@')[0] : 'Customer',
-          last_name: '',
-          mobile: phone || null,
-          phone: phone || null,
-          email: email || null,
-          branch_id: 'BRANCH_DEFAULT',
           referral_code: generatedRefCode,
           referral_status: 'locked',
           created_at: now,
           updated_at: now,
         };
         await this.Data.insert('customers', customerInsertData);
+
+        // Store referral_code in users table for unified lookup
+        await this.Data.update(
+          'users',
+          { referral_code: generatedRefCode, updated_at: now },
+          [{ column: 'user_id', operator: '=', value: userId }],
+        );
       } catch (custErr) {
         console.error('[AuthService] Auto customer record creation failed during OTP verify:', custErr);
       }
@@ -978,12 +958,6 @@ export class AuthService {
     } catch (err) {
       console.error('[AuthService:updateFcmToken] Failed to update fcm_token in users table:', err);
     }
-
-    try {
-      await this.Data.update('users', { fcm: fcmToken }, [
-        { column: 'user_id', operator: '=', value: userId },
-      ]);
-    } catch (_) {}
   }
 
   /*===============================================================================================
@@ -1052,7 +1026,7 @@ export class AuthService {
 
         const storedSessions = await this.DataBase.query(
           `SELECT id FROM device_sessions
-           WHERE refresh_jti = ? AND refresh_token_hash = ?
+           WHERE refresh_jti = $1 AND refresh_token_hash = $2
              AND revoked_at IS NULL
            LIMIT 1`,
           [jti, this.hashValue(token)],

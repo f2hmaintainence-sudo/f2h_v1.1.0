@@ -52,7 +52,6 @@ export class BranchSaveAddService {
       const branch_id = this.idGenerator.generateId('BRANCH', 12);
       const isActive = body.is_active === true || String(body.is_active) === 'true';
       const allowBufferOrder = body.allow_buffer_order === true || String(body.allow_buffer_order) === 'true';
-      const sectorCount = body.sector_count || 3;
       const radiusKm = body.delivery_radius_km || 5;
       const bufferZone = body.buffer_zone || 0;
 
@@ -69,16 +68,10 @@ export class BranchSaveAddService {
           lng: body.lng || null,
           delivery_radius_km: radiusKm,
           buffer_zone: bufferZone,
-          sector_count: sectorCount,
         };
         this.Developer.log('Branch data', { branchData });
         const branchResult = await this.Data.insert('branches', branchData, { transaction: tx });
         if (!branchResult.status) throw new Error(branchResult.message || 'Branch insert failed');
-
-        // Create angle-based sector rows
-        if (body.lat && body.lng) {
-          await this.sectorService.createSectors(branch_id, sectorCount, tx);
-        }
 
         try {
           await this.Data.insert('admin_audit_logs', {
@@ -86,7 +79,7 @@ export class BranchSaveAddService {
             action: 'branch_create',
             target_type: 'branches',
             target_id: branch_id,
-            details: JSON.stringify({ branch_name: body.branch_name, sector_count: sectorCount }),
+            details: JSON.stringify({ branch_name: body.branch_name }),
           }, { transaction: tx });
         } catch (auditError) {
           this.Developer.warn('Failed to save audit log', { error: auditError.message });
@@ -94,8 +87,8 @@ export class BranchSaveAddService {
 
         return {
           status: true,
-          message: `Branch created successfully with ${sectorCount} sectors.`,
-          data: { branch_id, sector_count: sectorCount },
+          message: 'Branch created successfully.',
+          data: { branch_id },
         };
       });
     } catch (error) {

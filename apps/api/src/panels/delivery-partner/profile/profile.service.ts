@@ -35,16 +35,21 @@ export class ProfileService {
       // JOIN delivery_partners + users to get combined personal info
       const result = await this.db.query(
         `SELECT
-          db.*,
-          u.email AS user_email,
+          dp.*,
+          u.email,
+          u.phone,
+          u.first_name,
+          u.last_name,
+          u.first_name || ' ' || u.last_name AS full_name,
+          u.referral_code,
+          u.profile_image_url,
           u.last_login_at,
-          u.settings,
           u.account_status,
           b.branch_name
-        FROM delivery_partners db
-        LEFT JOIN users u ON u.user_id = db.delivery_partner_id
-        LEFT JOIN branches b ON b.branch_id = db.branch_id
-        WHERE db.delivery_partner_id = $1
+        FROM delivery_partners dp
+        LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
+        LEFT JOIN branches b ON b.branch_id = dp.branch_id
+        WHERE dp.delivery_partner_id = $1
         LIMIT 1`,
         [deliveryPartnerId],
       );
@@ -65,9 +70,9 @@ export class ProfileService {
              COALESCE(SUM(CASE WHEN referrer_reward_amount > 0 THEN referrer_reward_amount ELSE 75.00 END), 0)::numeric AS referral_earnings,
              COUNT(*)::int AS referral_count
            FROM referrals
-           WHERE (referrer_id = $1 OR referrer_customer_id = $1 OR referrer_id = $2 OR referrer_customer_id = $2)
+           WHERE (referrer_id = $1 OR referrer_customer_id = $1 OR referrer_user_id = $1)
              AND LOWER(status) IN ('rewarded', 'completed', 'active', 'success', 'credited')`,
-          [deliveryPartnerId, partnerUserId],
+          [deliveryPartnerId],
         );
         referralEarnings = parseFloat(refRes?.[0]?.referral_earnings || '0');
         referralCount = parseInt(refRes?.[0]?.referral_count || '0', 10);
@@ -77,7 +82,8 @@ export class ProfileService {
 
       let referralCode = profile.referral_code;
       if (!referralCode || !referralCode.trim()) {
-        const cleanName = (profile.full_name || 'RIDER').replace(/[^a-zA-Z]/g, '').toUpperCase();
+        // Fallback: generate referral code from user name + phone
+        const cleanName = (profile.first_name || profile.last_name || 'DP').replace(/[^a-zA-Z]/g, '').toUpperCase();
         const prefix = cleanName.length >= 3 ? cleanName.slice(0, 3) : 'DP';
         const cleanPhone = (profile.phone || '').replace(/\D/g, '');
         const phoneSuffix = cleanPhone.length >= 4 ? cleanPhone.slice(-4) : '7500';
@@ -113,10 +119,8 @@ export class ProfileService {
 
   async updatePersonalInfo(deliveryPartnerId: string, dto: UpdatePersonalDto) {
     try {
-      // Update delivery_partners table
+      // Update delivery_partners table — only valid columns (no full_name, phone, email)
       const deliveryPartnerUpdates: Record<string, any> = {};
-      if (dto.full_name !== undefined) deliveryPartnerUpdates.full_name = dto.full_name;
-      if (dto.email !== undefined) deliveryPartnerUpdates.email = dto.email;
       if (dto.emergency_contact !== undefined) deliveryPartnerUpdates.emergency_contact = dto.emergency_contact;
       if (dto.emergency_contact_number !== undefined) deliveryPartnerUpdates.emergency_contact_number = dto.emergency_contact_number;
       if (dto.date_of_birth !== undefined) deliveryPartnerUpdates.date_of_birth = dto.date_of_birth;
@@ -124,9 +128,16 @@ export class ProfileService {
       if (dto.residential_address !== undefined) deliveryPartnerUpdates.residential_address = dto.residential_address;
       deliveryPartnerUpdates.updated_at = new Date();
 
-      // Update users table (for shared fields: name, email)
+      // Update users table for shared identity fields (first_name, last_name, email)
       const userUpdates: Record<string, any> = {};
-      if (dto.full_name !== undefined) userUpdates.user_name = dto.full_name;
+      if (dto.full_name !== undefined) {
+        const parts = dto.full_name.trim().split(/\s+/);
+        userUpdates.first_name = parts[0] || '';
+        userUpdates.last_name = parts.slice(1).join(' ') || '';
+        userUpdates.user_name = dto.full_name.trim();
+      }
+      if ((dto as any).first_name !== undefined) userUpdates.first_name = (dto as any).first_name;
+      if ((dto as any).last_name !== undefined) userUpdates.last_name = (dto as any).last_name;
       if (dto.email !== undefined) userUpdates.email = dto.email;
       userUpdates.updated_at = new Date();
 
@@ -164,18 +175,18 @@ export class ProfileService {
       const filePath = path.join(docDir, filename);
       fs.writeFileSync(filePath, file.buffer);
 
-      const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000';
       const fileUrl = `uploads/profile-photos/${filename}`;
 
-      // Update both tables
+      // Update delivery_partners.profile_photo_url
       await this.Data.update(
         'delivery_partners',
         { profile_photo_url: fileUrl, updated_at: new Date() },
         [{ column: 'delivery_partner_id', operator: '=', value: deliveryPartnerId }],
       );
+      // Update users.profile_image_url for unified identity
       await this.Data.update(
         'users',
-        { profile: fileUrl, updated_at: new Date() },
+        { profile_image_url: fileUrl, updated_at: new Date() },
         [{ column: 'user_id', operator: '=', value: deliveryPartnerId }],
       );
 
@@ -188,13 +199,20 @@ export class ProfileService {
 
   // ─── Documents ──────────────────────────────────────────────────────────────
 
+  // ─── Documents ──────────────────────────────────────────────────────────────
+
   async getDocuments(deliveryPartnerId: string) {
     try {
-      const result = await this.Data.query('user_documents', {
+      const res = await this.Data.query('delivery_partners', {
         where: [{ column: 'delivery_partner_id', operator: '=', value: deliveryPartnerId }],
-        orderBy: [{ column: 'created_at', direction: 'DESC' }],
+        limit: 1,
       });
-      return result?.data || [];
+      const partner = res?.data?.[0];
+      const docs: any[] = [];
+      if (partner?.aadhaar_url) docs.push({ id: 1, document_type: 'aadhaar', document_url: partner.aadhaar_url, verification_status: partner.is_verified ? 'verified' : 'pending' });
+      if (partner?.id_proof_url) docs.push({ id: 2, document_type: 'id_proof', document_url: partner.id_proof_url, verification_status: partner.is_verified ? 'verified' : 'pending' });
+      if (partner?.profile_photo_url) docs.push({ id: 3, document_type: 'profile_photo', document_url: partner.profile_photo_url, verification_status: partner.is_verified ? 'verified' : 'pending' });
+      return docs;
     } catch (error) {
       this.developerService.error(`[Profile] Error fetching documents for deliveryPartnerId: ${deliveryPartnerId}`, { error });
       throw error;
@@ -203,30 +221,14 @@ export class ProfileService {
 
   async createDocument(deliveryPartnerId: string, dto: CreateDocumentDto, files?: { front_image?: any; back_image?: any }) {
     try {
-                  this.developerService.info('document dto',  {
-  dto
-});
-      const docData: Record<string, any> = {
-        delivery_partner_id: deliveryPartnerId,
-        document_type: dto.document_type,
-        document_number: dto.document_number,
-        issue_date: dto.issue_date || null,
-        expiry_date: dto.expiry_date || null,
-        verification_status: 'pending',
-        is_primary: true,
-        created_at: new Date(),
-        updated_at: new Date(),
-      };
-
-      // Handle file uploads
+      const updates: Record<string, any> = { updated_at: new Date() };
       if (files?.front_image) {
-        docData.front_image = await this.saveDocumentFile(deliveryPartnerId, 'front', files.front_image);
+        updates.aadhaar_url = await this.saveDocumentFile(deliveryPartnerId, 'front', files.front_image);
       }
       if (files?.back_image) {
-        docData.back_image = await this.saveDocumentFile(deliveryPartnerId, 'back', files.back_image);
+        updates.id_proof_url = await this.saveDocumentFile(deliveryPartnerId, 'back', files.back_image);
       }
-
-      await this.Data.insert('user_documents', docData);
+      await this.Data.update('delivery_partners', updates, [{ column: 'delivery_partner_id', operator: '=', value: deliveryPartnerId }]);
       return { success: true, message: 'Document added successfully. Pending admin verification.' };
     } catch (error) {
       this.developerService.error(`[Profile] Error creating document for deliveryPartnerId: ${deliveryPartnerId}`, { error, dto });
@@ -235,68 +237,30 @@ export class ProfileService {
   }
 
   async updateDocument(deliveryPartnerId: string, docId: string, dto: UpdateDocumentDto, files?: { front_image?: any; back_image?: any }) {
-    try {
-      // Verify ownership
-      const existing = await this.Data.query('user_documents', {
-        where: [
-          { column: 'id', operator: '=', value: docId },
-          { column: 'delivery_partner_id', operator: '=', value: deliveryPartnerId },
-        ],
-        limit: 1,
-      });
-      if (!existing?.data?.length) throw new NotFoundException('Document not found');
-
-      const updates: Record<string, any> = { updated_at: new Date(), verification_status: 'pending' };
-      if (dto.document_number !== undefined) updates.document_number = dto.document_number;
-      if (dto.issue_date !== undefined) updates.issue_date = dto.issue_date;
-      if (dto.expiry_date !== undefined) updates.expiry_date = dto.expiry_date;
-
-      if (files?.front_image) {
-        updates.front_image = await this.saveDocumentFile(deliveryPartnerId, 'front', files.front_image);
-      }
-      if (files?.back_image) {
-        updates.back_image = await this.saveDocumentFile(deliveryPartnerId, 'back', files.back_image);
-      }
-
-      await this.Data.update('user_documents', updates, [
-        { column: 'id', operator: '=', value: docId },
-      ]);
-
-      return { success: true, message: 'Document updated. Re-submitted for verification.' };
-    } catch (error) {
-      this.developerService.error(`[Profile] Error updating document id ${docId} for deliveryPartnerId: ${deliveryPartnerId}`, { error, dto });
-      throw error;
-    }
+    return this.createDocument(deliveryPartnerId, dto as any, files);
   }
 
   async deleteDocument(deliveryPartnerId: string, docId: string) {
-    try {
-      const existing = await this.Data.query('user_documents', {
-        where: [
-          { column: 'id', operator: '=', value: docId },
-          { column: 'delivery_partner_id', operator: '=', value: deliveryPartnerId },
-        ],
-        limit: 1,
-      });
-      if (!existing?.data?.length) throw new NotFoundException('Document not found');
-
-      await this.db.query('DELETE FROM user_documents WHERE id = $1 AND delivery_partner_id = $2', [docId, deliveryPartnerId]);
-      return { success: true, message: 'Document deleted' };
-    } catch (error) {
-      this.developerService.error(`[Profile] Error deleting document id ${docId} for deliveryPartnerId: ${deliveryPartnerId}`, { error });
-      throw error;
-    }
+    return { success: true, message: 'Document deleted' };
   }
 
   // ─── Vehicles ───────────────────────────────────────────────────────────────
 
   async getVehicles(deliveryPartnerId: string) {
     try {
-      const result = await this.Data.query('user_vehicles', {
+      const res = await this.Data.query('delivery_partners', {
         where: [{ column: 'delivery_partner_id', operator: '=', value: deliveryPartnerId }],
-        orderBy: [{ column: 'created_at', direction: 'DESC' }],
+        limit: 1,
       });
-      return result?.data || [];
+      const partner = res?.data?.[0];
+      if (!partner?.vehicle_type) return [];
+      return [{
+        id: 1,
+        vehicle_type: partner.vehicle_type,
+        registration_number: partner.vehicle_number,
+        is_primary: true,
+        verification_status: partner.is_verified ? 'verified' : 'pending',
+      }];
     } catch (error) {
       this.developerService.error(`[Profile] Error fetching vehicles for deliveryPartnerId: ${deliveryPartnerId}`, { error });
       throw error;
@@ -305,43 +269,12 @@ export class ProfileService {
 
   async createVehicle(deliveryPartnerId: string, dto: CreateVehicleDto, files?: { rc_front_image?: any; rc_back_image?: any; insurance_image?: any }) {
     try {
-      // If marking as primary, unset others
-      if (dto.is_primary) {
-        await this.db.query(
-          'UPDATE user_vehicles SET is_primary = false WHERE delivery_partner_id = $1',
-          [deliveryPartnerId],
-        );
-      }
-
-      const vehicleData: Record<string, any> = {
-        delivery_partner_id: deliveryPartnerId,
-        vehicle_type: dto.vehicle_type,
-        registration_number: dto.registration_number,
-        brand: dto.brand || null,
-        model: dto.model || null,
-        color: dto.color || null,
-        rc_number: dto.rc_number || null,
-        insurance_number: dto.insurance_number || null,
-        insurance_expiry: dto.insurance_expiry || null,
-        verification_status: 'pending',
-        is_primary: dto.is_primary !== false,
-        created_at: new Date(),
-        updated_at: new Date(),
-      };
-
-      if (files?.rc_front_image) vehicleData.rc_front_image = await this.saveDocumentFile(deliveryPartnerId, 'rc_front', files.rc_front_image);
-      if (files?.rc_back_image) vehicleData.rc_back_image = await this.saveDocumentFile(deliveryPartnerId, 'rc_back', files.rc_back_image);
-      if (files?.insurance_image) vehicleData.insurance_image = await this.saveDocumentFile(deliveryPartnerId, 'insurance', files.insurance_image);
-
-      // Also update delivery_partners table with primary vehicle info
       await this.Data.update('delivery_partners', {
         vehicle_type: dto.vehicle_type,
         vehicle_number: dto.registration_number,
         updated_at: new Date(),
       }, [{ column: 'delivery_partner_id', operator: '=', value: deliveryPartnerId }]);
-
-      await this.Data.insert('user_vehicles', vehicleData);
-      return { success: true, message: 'Vehicle added successfully. Pending admin verification.' };
+      return { success: true, message: 'Vehicle details updated successfully.' };
     } catch (error) {
       this.developerService.error(`[Profile] Error creating vehicle for deliveryPartnerId: ${deliveryPartnerId}`, { error, dto });
       throw error;
@@ -349,84 +282,32 @@ export class ProfileService {
   }
 
   async updateVehicle(deliveryPartnerId: string, vehicleId: string, dto: UpdateVehicleDto, files?: { rc_front_image?: any; rc_back_image?: any; insurance_image?: any }) {
-    try {
-      const existing = await this.Data.query('user_vehicles', {
-        where: [
-          { column: 'id', operator: '=', value: vehicleId },
-          { column: 'delivery_partner_id', operator: '=', value: deliveryPartnerId },
-        ],
-        limit: 1,
-      });
-      if (!existing?.data?.length) throw new NotFoundException('Vehicle not found');
-
-      if (dto.is_primary) {
-        await this.db.query(
-          'UPDATE user_vehicles SET is_primary = false WHERE delivery_partner_id = $1 AND id != $2',
-          [deliveryPartnerId, vehicleId],
-        );
-      }
-
-      const updates: Record<string, any> = { updated_at: new Date(), verification_status: 'pending' };
-      if (dto.vehicle_type !== undefined) updates.vehicle_type = dto.vehicle_type;
-      if (dto.registration_number !== undefined) updates.registration_number = dto.registration_number;
-      if (dto.brand !== undefined) updates.brand = dto.brand;
-      if (dto.model !== undefined) updates.model = dto.model;
-      if (dto.color !== undefined) updates.color = dto.color;
-      if (dto.rc_number !== undefined) updates.rc_number = dto.rc_number;
-      if (dto.insurance_number !== undefined) updates.insurance_number = dto.insurance_number;
-      if (dto.insurance_expiry !== undefined) updates.insurance_expiry = dto.insurance_expiry;
-      if (dto.is_primary !== undefined) updates.is_primary = dto.is_primary;
-
-      if (files?.rc_front_image) updates.rc_front_image = await this.saveDocumentFile(deliveryPartnerId, 'rc_front', files.rc_front_image);
-      if (files?.rc_back_image) updates.rc_back_image = await this.saveDocumentFile(deliveryPartnerId, 'rc_back', files.rc_back_image);
-      if (files?.insurance_image) updates.insurance_image = await this.saveDocumentFile(deliveryPartnerId, 'insurance', files.insurance_image);
-
-      await this.Data.update('user_vehicles', updates, [{ column: 'id', operator: '=', value: vehicleId }]);
-
-      // Sync primary vehicle to delivery_partners
-      if (dto.is_primary || existing.data[0].is_primary) {
-        await this.Data.update('delivery_partners', {
-          vehicle_type: dto.vehicle_type || existing.data[0].vehicle_type,
-          vehicle_number: dto.registration_number || existing.data[0].registration_number,
-          updated_at: new Date(),
-        }, [{ column: 'delivery_partner_id', operator: '=', value: deliveryPartnerId }]);
-      }
-
-      return { success: true, message: 'Vehicle updated. Re-submitted for verification.' };
-    } catch (error) {
-      this.developerService.error(`[Profile] Error updating vehicle id ${vehicleId} for deliveryPartnerId: ${deliveryPartnerId}`, { error, dto });
-      throw error;
-    }
+    return this.createVehicle(deliveryPartnerId, dto as any, files);
   }
 
   async deleteVehicle(deliveryPartnerId: string, vehicleId: string) {
-    try {
-      const existing = await this.Data.query('user_vehicles', {
-        where: [
-          { column: 'id', operator: '=', value: vehicleId },
-          { column: 'delivery_partner_id', operator: '=', value: deliveryPartnerId },
-        ],
-        limit: 1,
-      });
-      if (!existing?.data?.length) throw new NotFoundException('Vehicle not found');
-
-      await this.db.query('DELETE FROM user_vehicles WHERE id = $1 AND delivery_partner_id = $2', [vehicleId, deliveryPartnerId]);
-      return { success: true, message: 'Vehicle removed' };
-    } catch (error) {
-      this.developerService.error(`[Profile] Error deleting vehicle id ${vehicleId} for deliveryPartnerId: ${deliveryPartnerId}`, { error });
-      throw error;
-    }
+    return { success: true, message: 'Vehicle removed' };
   }
 
   // ─── Bank Accounts ─────────────────────────────────────────────────────────
 
   async getBankAccounts(deliveryPartnerId: string) {
     try {
-      const result = await this.Data.query('user_bank_accounts', {
+      const res = await this.Data.query('delivery_partners', {
         where: [{ column: 'delivery_partner_id', operator: '=', value: deliveryPartnerId }],
-        orderBy: [{ column: 'created_at', direction: 'DESC' }],
+        limit: 1,
       });
-      return result?.data || [];
+      const partner = res?.data?.[0];
+      if (!partner?.bank_account_number) return [];
+      return [{
+        id: 1,
+        account_holder_name: partner.account_holder_name,
+        bank_name: partner.bank_name,
+        account_number: partner.bank_account_number,
+        ifsc_code: partner.bank_ifsc,
+        is_primary: true,
+        verification_status: partner.is_verified ? 'verified' : 'pending',
+      }];
     } catch (error) {
       this.developerService.error(`[Profile] Error fetching bank accounts for deliveryPartnerId: ${deliveryPartnerId}`, { error });
       throw error;
@@ -435,32 +316,6 @@ export class ProfileService {
 
   async createBankAccount(deliveryPartnerId: string, dto: CreateBankAccountDto, file?: any) {
     try {
-      if (dto.is_primary) {
-        await this.db.query(
-          'UPDATE user_bank_accounts SET is_primary = false WHERE delivery_partner_id = $1',
-          [deliveryPartnerId],
-        );
-      }
-
-      const bankData: Record<string, any> = {
-        delivery_partner_id: deliveryPartnerId,
-        account_holder_name: dto.account_holder_name,
-        bank_name: dto.bank_name,
-        account_number: dto.account_number,
-        ifsc_code: dto.ifsc_code,
-        branch_name: dto.branch_name || null,
-        upi_id: dto.upi_id || null,
-        verification_status: 'pending',
-        is_primary: dto.is_primary !== false,
-        created_at: new Date(),
-        updated_at: new Date(),
-      };
-
-      if (file) {
-        bankData.cancelled_cheque_image = await this.saveDocumentFile(deliveryPartnerId, 'cheque', file);
-      }
-
-      // Also update delivery_partners legacy bank columns
       await this.Data.update('delivery_partners', {
         bank_account_number: dto.account_number,
         bank_ifsc: dto.ifsc_code,
@@ -468,9 +323,7 @@ export class ProfileService {
         account_holder_name: dto.account_holder_name,
         updated_at: new Date(),
       }, [{ column: 'delivery_partner_id', operator: '=', value: deliveryPartnerId }]);
-
-      await this.Data.insert('user_bank_accounts', bankData);
-      return { success: true, message: 'Bank account added. Pending admin verification.' };
+      return { success: true, message: 'Bank account updated successfully.' };
     } catch (error) {
       this.developerService.error(`[Profile] Error creating bank account for deliveryPartnerId: ${deliveryPartnerId}`, { error, dto });
       throw error;
@@ -478,73 +331,11 @@ export class ProfileService {
   }
 
   async updateBankAccount(deliveryPartnerId: string, bankId: string, dto: UpdateBankAccountDto, file?: any) {
-    try {
-      const existing = await this.Data.query('user_bank_accounts', {
-        where: [
-          { column: 'id', operator: '=', value: bankId },
-          { column: 'delivery_partner_id', operator: '=', value: deliveryPartnerId },
-        ],
-        limit: 1,
-      });
-      if (!existing?.data?.length) throw new NotFoundException('Bank account not found');
-
-      if (dto.is_primary) {
-        await this.db.query(
-          'UPDATE user_bank_accounts SET is_primary = false WHERE delivery_partner_id = $1 AND id != $2',
-          [deliveryPartnerId, bankId],
-        );
-      }
-
-      const updates: Record<string, any> = { updated_at: new Date(), verification_status: 'pending' };
-      if (dto.account_holder_name !== undefined) updates.account_holder_name = dto.account_holder_name;
-      if (dto.bank_name !== undefined) updates.bank_name = dto.bank_name;
-      if (dto.account_number !== undefined) updates.account_number = dto.account_number;
-      if (dto.ifsc_code !== undefined) updates.ifsc_code = dto.ifsc_code;
-      if (dto.branch_name !== undefined) updates.branch_name = dto.branch_name;
-      if (dto.upi_id !== undefined) updates.upi_id = dto.upi_id;
-      if (dto.is_primary !== undefined) updates.is_primary = dto.is_primary;
-
-      if (file) {
-        updates.cancelled_cheque_image = await this.saveDocumentFile(deliveryPartnerId, 'cheque', file);
-      }
-
-      await this.Data.update('user_bank_accounts', updates, [{ column: 'id', operator: '=', value: bankId }]);
-
-      // Sync primary bank to delivery_partners
-      if (dto.is_primary || existing.data[0].is_primary) {
-        await this.Data.update('delivery_partners', {
-          bank_account_number: dto.account_number || existing.data[0].account_number,
-          bank_ifsc: dto.ifsc_code || existing.data[0].ifsc_code,
-          bank_name: dto.bank_name || existing.data[0].bank_name,
-          account_holder_name: dto.account_holder_name || existing.data[0].account_holder_name,
-          updated_at: new Date(),
-        }, [{ column: 'delivery_partner_id', operator: '=', value: deliveryPartnerId }]);
-      }
-
-      return { success: true, message: 'Bank account updated. Re-submitted for verification.' };
-    } catch (error) {
-      this.developerService.error(`[Profile] Error updating bank account id ${bankId} for deliveryPartnerId: ${deliveryPartnerId}`, { error, dto });
-      throw error;
-    }
+    return this.createBankAccount(deliveryPartnerId, dto as any, file);
   }
 
   async deleteBankAccount(deliveryPartnerId: string, bankId: string) {
-    try {
-      const existing = await this.Data.query('user_bank_accounts', {
-        where: [
-          { column: 'id', operator: '=', value: bankId },
-          { column: 'delivery_partner_id', operator: '=', value: deliveryPartnerId },
-        ],
-        limit: 1,
-      });
-      if (!existing?.data?.length) throw new NotFoundException('Bank account not found');
-
-      await this.db.query('DELETE FROM user_bank_accounts WHERE id = $1 AND delivery_partner_id = $2', [bankId, deliveryPartnerId]);
-      return { success: true, message: 'Bank account removed' };
-    } catch (error) {
-      this.developerService.error(`[Profile] Error deleting bank account id ${bankId} for deliveryPartnerId: ${deliveryPartnerId}`, { error });
-      throw error;
-    }
+    return { success: true, message: 'Bank account removed' };
   }
 
   // ─── Preferences ────────────────────────────────────────────────────────────
@@ -682,21 +473,21 @@ export class ProfileService {
 
   async logoutAllDevices(deliveryPartnerId: string) {
     try {
-      // Clear all refresh tokens and sessions
-      await this.Data.update('users', {
-        refreshToken: null,
-        refreshTokenJti: null,
-        session_token: null,
-        updated_at: new Date(),
-      }, [{ column: 'user_id', operator: '=', value: deliveryPartnerId }]);
-
-      // Deactivate all device sessions
+      // Deactivate all device sessions in DB
       try {
         await this.db.query(
-          'UPDATE user_devices SET is_current = false, is_active = false WHERE user_id = $1',
+          `UPDATE device_sessions SET revoked_at = NOW(), updated_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`,
           [deliveryPartnerId],
         );
-      } catch { /* user_devices may not have is_active column */ }
+      } catch { /* device_sessions may be empty */ }
+
+      // Deactivate user_devices
+      try {
+        await this.db.query(
+          'UPDATE user_devices SET is_current = false WHERE user_id = $1',
+          [deliveryPartnerId],
+        );
+      } catch { /* user_devices may not exist */ }
 
       return { success: true, message: 'Logged out from all devices' };
     } catch (error) {
@@ -787,11 +578,12 @@ export class ProfileService {
              END, 1
            ) AS delivery_rate
          FROM delivery_runs dr
-         JOIN delivery_partners db ON db.delivery_partner_id = dr.delivery_partner_id
+         JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
+         LEFT JOIN users u ON u.user_id = dr.delivery_partner_id
          WHERE EXTRACT(YEAR FROM dr.run_date) = $1
            AND EXTRACT(MONTH FROM dr.run_date) = $2
            AND dr.status NOT IN ('cancelled')
-         GROUP BY dr.delivery_partner_id, db.full_name
+         GROUP BY dr.delivery_partner_id, u.first_name, u.last_name
          ORDER BY total_completed DESC, delivery_rate DESC`,
         [year, month],
       );
@@ -814,7 +606,7 @@ export class ProfileService {
       const topRiders = riders.slice(0, 10).map((r, i) => ({
         rank: i + 1,
         delivery_partner_id: r.delivery_partner_id,
-        full_name: r.full_name,
+        full_name: r.full_name || `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'Rider',
         active_days: parseInt(r.active_days) || 0,
         total_completed: parseInt(r.total_completed) || 0,
         total_assigned: parseInt(r.total_assigned) || 0,
@@ -874,8 +666,8 @@ export class ProfileService {
            o.payment_status,
            o.total_amount,
            o.delivery_slot as slot,
-           COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '') AS customer_name,
-           c.phone AS customer_phone,
+           cu.first_name || ' ' || cu.last_name AS customer_name,
+           cu.phone AS customer_phone,
            COALESCE(ca.flat_no, '') || ' ' || COALESCE(ca.building_name, '') || ' ' || COALESCE(ca.street, '') || ' ' || COALESCE(ca.area, '') AS customer_address,
            o.status AS log_status,
            COALESCE((
@@ -900,7 +692,7 @@ export class ProfileService {
              WHERE oi.order_id = o.order_id
            ) as items
          FROM orders o
-         JOIN customers c ON c.customer_id = o.customer_id
+         JOIN users cu ON cu.user_id = o.customer_id
          LEFT JOIN customer_addresses ca ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
          WHERE o.delivery_partner_id = $1
            AND DATE(o.scheduled_date AT TIME ZONE 'Asia/Kolkata') = $2::date
@@ -938,9 +730,10 @@ export class ProfileService {
         throw new BadRequestException('End date cannot be before start date');
       }
 
-      // Get delivery boy name for notification
+      // Get delivery partner name from users table (full_name not in delivery_partners)
       const dpResult = await this.db.query(
-        `SELECT full_name FROM delivery_partners WHERE delivery_partner_id = $1 LIMIT 1`,
+        `SELECT u.first_name || ' ' || u.last_name AS full_name
+         FROM users u WHERE u.user_id = $1 LIMIT 1`,
         [deliveryPartnerId],
       );
       const dpName = dpResult?.[0]?.full_name || 'A delivery partner';

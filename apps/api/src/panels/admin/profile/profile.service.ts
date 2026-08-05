@@ -116,47 +116,16 @@ export class ProfileService {
             COALESCE(u.first_name, u.user_name) AS first_name,
             COALESCE(u.last_name, '') AS last_name,
             COALESCE(u.phone, '') AS phone,
-            u.profile,
+            u.role_id,
             u.account_status,
-            u.created_at AS user_created_at,
-            ms.management_id,
-            ms.branch_id,
-            ms.department,
-            ms.designation,
-            ms.bio,
-            ms.gender,
-            ms.date_of_birth,
-            ms.marital_status,
-            ms.alt_phone,
-            ms.address_line1,
-            ms.address_line2,
-            ms.city,
-            ms.state,
-            ms.postal_code,
-            ms.education,
-            ms.is_active AS staff_active,
-            b.branch_name
+            u.created_at AS user_created_at
           FROM users u
-          LEFT JOIN management_staff ms ON ms.user_id = u.user_id
-          LEFT JOIN branches b ON b.branch_id = ms.branch_id
           WHERE u.user_id = $1 OR u.email = $1
           LIMIT 1
         `;
         rows = await this.db.query(sql, [userId]);
       } catch (err) {
-        console.warn('[getMyProfile] Primary query failed, attempting fallback query:', err);
-        const fallbackSql = `
-          SELECT
-            u.user_id, u.email, u.user_name,
-            COALESCE(u.first_name, u.user_name) AS first_name,
-            COALESCE(u.last_name, '') AS last_name,
-            COALESCE(u.phone, '') AS phone,
-            u.profile, u.account_status, u.created_at AS user_created_at
-          FROM users u
-          WHERE u.user_id = $1 OR u.email = $1
-          LIMIT 1
-        `;
-        rows = await this.db.query(fallbackSql, [userId]);
+        console.warn('[getMyProfile] Primary query failed:', err);
       }
 
       if (!rows.length) return { status: false, message: 'User not found' };

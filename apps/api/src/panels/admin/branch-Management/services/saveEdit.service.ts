@@ -38,7 +38,7 @@ export class BranchSaveEditService {
       // 1. Fetch current branch data to detect geo changes
       const currentRows = await this.db.query(
         `SELECT branch_id, branch_name, branch_code, city, state, is_active, allow_buffer_order,
-                lat, lng, delivery_radius_km, buffer_zone, sector_count
+                lat, lng, delivery_radius_km, buffer_zone
          FROM branches WHERE branch_id = $1`,
         [branchId],
       );
@@ -74,17 +74,13 @@ export class BranchSaveEditService {
       const newRadiusKm = body.delivery_radius_km !== undefined
         ? body.delivery_radius_km
         : Number(current.delivery_radius_km);
-      const newSectorCount = body.sector_count !== undefined
-        ? body.sector_count
-        : current.sector_count;
       const geoChanged = (
         (newLat !== null && newLat !== undefined) &&
         (newLng !== null && newLng !== undefined) &&
         (
           String(newLat) !== String(current.lat) ||
           String(newLng) !== String(current.lng) ||
-          Number(newRadiusKm) !== Number(current.delivery_radius_km) ||
-          Number(newSectorCount) !== Number(current.sector_count)
+          Number(newRadiusKm) !== Number(current.delivery_radius_km)
         )
       );
 
@@ -93,7 +89,7 @@ export class BranchSaveEditService {
         (!current.lat || !current.lng)
       );
 
-      const needsHexRegen = geoChanged || coordinatesNowProvided;
+      const geoUpdated = geoChanged || coordinatesNowProvided;
 
       // 4. Build simple fields update
       const updateData: Record<string, any> = {};
@@ -110,18 +106,13 @@ export class BranchSaveEditService {
       if (body.buffer_zone !== undefined) {
         updateData.buffer_zone = body.buffer_zone;
       }
-      // 5. Sector regeneration if geo changed (bearing math, no H3)
-      if (needsHexRegen) {
-        await this.db.query('DELETE FROM branch_sectors WHERE branch_id = $1', [branchId]);
-        await this.sectorService.createSectors(branchId, newSectorCount);
-
+      if (geoUpdated) {
         updateData.lat = newLat;
         updateData.lng = newLng;
         updateData.delivery_radius_km = newRadiusKm;
-        updateData.sector_count = newSectorCount;
       }
 
-      // 6. Update the branches table
+      // 5. Update the branches table
       updateData.updated_at = new Date().toISOString();
 
       if (Object.keys(updateData).length > 1) { // > 1 because updated_at is always there
@@ -131,7 +122,7 @@ export class BranchSaveEditService {
         );
       }
 
-      // 7. Audit log (non-fatal)
+      // 6. Audit log (non-fatal)
       try {
         await this.dataService.insert('admin_audit_logs', {
           admin_id: adminId,
@@ -140,19 +131,14 @@ export class BranchSaveEditService {
           target_id: branchId,
           details: JSON.stringify({
             changes: Object.keys(updateData),
-            hex_regenerated: needsHexRegen,
-            sector_count: newSectorCount,
+            geo_updated: geoUpdated,
           }),
         });
       } catch (auditError) {
         this.developer.warn('Audit log failed on branch edit', { error: auditError.message });
       }
 
-      const successMsg = needsHexRegen
-        ? `Branch updated. ${newSectorCount} sectors reconfigured.`
-        : 'Branch updated successfully.';
-
-      return { status: true, message: successMsg };
+      return { status: true, message: 'Branch updated successfully.' };
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
       this.developer.error('saveBranch edit error', { error, branchId });

@@ -42,6 +42,8 @@ interface PartnerInfo {
 import { FirstOrderDetectorService } from '../../customer/referral/services/first-order-detector.service';
 import { ReferralRewardEngineService } from '../../customer/referral/services/referral-reward-engine.service';
 
+import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
+
 @Injectable()
 export class DeliveryRunService {
   private readonly logger = new Logger(DeliveryRunService.name);
@@ -50,6 +52,7 @@ export class DeliveryRunService {
     private readonly db: DatabaseService,
     private readonly developer: DeveloperService,
     private notificationService: NotificationService,
+    private pushNotificationService: PushNotificationService,
     private authServices: AuthService,
     private firstOrderDetector: FirstOrderDetectorService,
     private referralRewardEngine: ReferralRewardEngineService,
@@ -416,6 +419,16 @@ export class DeliveryRunService {
                   AND delivery_run_id IS NULL`,
                 [order.order_id, partnerId, runId, method, currentMaxSeq],
               );
+
+              try {
+                await this.pushNotificationService.sendNotificationToUsers(
+                  [order.customer_id],
+                  {
+                    title: 'Delivery Scheduled! 🚚',
+                    body: `Your F2H Fresh order has been scheduled for ${slotName || 'today'} delivery.`,
+                  },
+                );
+              } catch (e) {}
 
               // Insert ONE delivery_log per order (prevent duplicates)
               const itemsJson = orderItemsMap.get(order.order_id) || [];

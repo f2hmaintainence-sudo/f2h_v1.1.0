@@ -30,7 +30,6 @@ export const AVOID_DELETED_AT = [
   'zones',
   'zone_hexagons',
   'branch_zone_hexes',
-  'branch_sectors',
   'branches',
   'permissions',
   'permission_for_roles',

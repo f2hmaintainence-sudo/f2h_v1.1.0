@@ -54,6 +54,15 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["react-icons", "lucide-react"],
   },
+  async redirects() {
+    return [
+      {
+        source: '/admin/delivery-boys/:path*',
+        destination: '/admin/delivery/partners/:path*',
+        permanent: true,
+      },
+    ];
+  },
   async rewrites() {
     return [
       {

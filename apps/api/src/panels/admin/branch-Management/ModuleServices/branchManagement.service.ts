@@ -385,7 +385,7 @@ export class BranchManagementService {
 
       const reqSet: ReqSet = {
         key: 'customer_wallet',
-        table: 'wallet_transactions',
+        table: 'customer_wallet_transactions',
         filters: {
           search: '',
           dateRange: {},
@@ -532,7 +532,7 @@ export class BranchManagementService {
         ],
       });
 
-      await this.dataService.insert('wallet_transactions', {
+      await this.dataService.insert('customer_wallet_transactions', {
         customer_id: customerId,
         type: 'credit',
         amount,
@@ -576,7 +576,7 @@ export class BranchManagementService {
         ],
       });
 
-      await this.dataService.insert('wallet_transactions', {
+      await this.dataService.insert('customer_wallet_transactions', {
         customer_id: customerId,
         type: 'debit',
         amount,
@@ -973,7 +973,7 @@ export class BranchManagementService {
           { column: 'orders.customer_id', operator: '=', value: customerId },
         ],
       });
-      const walletTxns = await this.dataService.query('wallet_transactions', {
+      const walletTxns = await this.dataService.query('customer_wallet_transactions', {
         select: ['*'],
         where: [
           {
@@ -1092,7 +1092,7 @@ export class BranchManagementService {
 
   async getWalletTransactionView(id: string) {
     try {
-      const result = await this.dataService.query('wallet_transactions', {
+      const result = await this.dataService.query('customer_wallet_transactions', {
         select: ['wallet_transactions.*'],
         where: [
           { column: 'wallet_transactions.id', operator: '=', value: id },
@@ -1120,7 +1120,7 @@ export class BranchManagementService {
 
   async softDeleteWalletTransaction(id: string, adminId: string = 'system') {
     try {
-      const result = await this.dataService.query('wallet_transactions', {
+      const result = await this.dataService.query('customer_wallet_transactions', {
         update: { deleted_at: new Date().toISOString() },
         where: [
           { column: 'id', operator: '=', value: id },
@@ -1138,7 +1138,7 @@ export class BranchManagementService {
       await this.dataService.insert('admin_audit_logs', {
         admin_id: adminId,
         action: 'wallet_transactions_soft_delete',
-        target_type: 'wallet_transactions',
+        target_type: 'customer_wallet_transactions',
         target_id: id,
         details: JSON.stringify({ action: 'soft_delete' }),
       });

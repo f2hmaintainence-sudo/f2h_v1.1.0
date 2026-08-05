@@ -1,47 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { DeveloperService } from '../logger/Developer.service';
-import { DataService } from '../database/Data.service';
+import { DatabaseService } from '../database/Database.service';
 import * as admin from 'firebase-admin';
 import * as fs from 'fs';
 import * as path from 'path';
 
-let firebaseInitialized = false;
-
-if (!admin.apps.length) {
-    try {
-        const serviceAccountPath = path.join(
-            process.cwd(),
-            'src/shared/secrets/firebasepushnotification.json',
-        );
-        const distServiceAccountPath = path.join(
-            process.cwd(),
-            'dist/shared/secrets/firebasepushnotification.json',
-        );
-
-        let finalPath = serviceAccountPath;
-        if (fs.existsSync(distServiceAccountPath)) {
-            finalPath = distServiceAccountPath;
-        }
-
-        if (fs.existsSync(finalPath)) {
-            const rawContent = fs.readFileSync(finalPath, 'utf8').trim();
-            if (rawContent && rawContent.startsWith('{')) {
-                const serviceAccount = JSON.parse(rawContent);
-                admin.initializeApp({
-                    credential: admin.credential.cert(serviceAccount),
-                });
-                firebaseInitialized = true;
-            }
-        }
-    } catch (e: any) {
-        console.warn('Firebase push notification initialization warning:', e?.message || e);
-    }
-} else {
-    firebaseInitialized = true;
-}
+import { DataService } from '../database/Data.service';
 
 @Injectable()
-export class PushNotificationService {
+export class PushNotificationService implements OnModuleInit {
     private get messaging() {
         if (!admin.apps.length) return null;
         try {
@@ -53,8 +20,63 @@ export class PushNotificationService {
 
     constructor(
         private readonly developerService: DeveloperService,
+        private readonly db: DatabaseService,
         private readonly dataService: DataService,
     ) { }
+
+    async onModuleInit() {
+        await this.ensureFirebaseInitialized();
+    }
+
+    private async ensureFirebaseInitialized() {
+        if (admin.apps.length) return;
+
+        // 1. Try loading from database api_integrations_config table
+        try {
+            const rows = await this.db.query(
+                `SELECT config_data FROM api_integrations_config WHERE config_key = 'firebase:admin' AND is_active = true LIMIT 1`,
+            );
+            if (rows && rows.length > 0 && rows[0].config_data) {
+                const config = typeof rows[0].config_data === 'string'
+                    ? JSON.parse(rows[0].config_data)
+                    : rows[0].config_data;
+                if (config && config.client_email && config.private_key) {
+                    admin.initializeApp({
+                        credential: admin.credential.cert(config),
+                    });
+                    this.developerService.info('Firebase Admin SDK initialized dynamically from database api_integrations_config');
+                    return;
+                }
+            }
+        } catch (err: any) {
+            this.developerService.warn('Failed to fetch Firebase admin config from DB:', err?.message || err);
+        }
+
+        // 2. Fallback to file system (/home/f2hfresh/htdocs/f2hfresh.com/firebase or local secrets)
+        const possiblePaths = [
+            '/home/f2hfresh/htdocs/f2hfresh.com/firebase/f2hfresh-65beb-firebase-adminsdk-fbsvc-732ac6da2d.json',
+            path.join(process.cwd(), 'src/shared/secrets/firebasepushnotification.json'),
+            path.join(process.cwd(), 'dist/shared/secrets/firebasepushnotification.json'),
+        ];
+
+        for (const p of possiblePaths) {
+            if (fs.existsSync(p)) {
+                try {
+                    const rawContent = fs.readFileSync(p, 'utf8').trim();
+                    if (rawContent && rawContent.startsWith('{')) {
+                        const serviceAccount = JSON.parse(rawContent);
+                        admin.initializeApp({
+                            credential: admin.credential.cert(serviceAccount),
+                        });
+                        this.developerService.info(`Firebase Admin SDK initialized from fallback file: ${p}`);
+                        return;
+                    }
+                } catch (e: any) {
+                    console.warn(`Firebase initialization warning from ${p}:`, e?.message || e);
+                }
+            }
+        }
+    }
 
     async sendToMultipleDevices(tokens: string[], title: string, body: string) {
         if (!tokens || tokens.length === 0)

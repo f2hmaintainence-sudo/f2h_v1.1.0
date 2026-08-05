@@ -155,7 +155,7 @@ export class CustomerSaveAddService {
 
       // 3. INSERT
       const result = await this.dataService.insert(
-        'wallet_transactions',
+        'customer_wallet_transactions',
         insertData,
       );
       if (!result.status) {
@@ -168,10 +168,10 @@ export class CustomerSaveAddService {
       await this.dataService.insert('admin_audit_logs', {
         admin_id: adminId,
         action: 'wallet_transactions_create',
-        target_type: 'wallet_transactions',
+        target_type: 'customer_wallet_transactions',
         target_id: insertData.id || 'new',
         details: JSON.stringify({
-          table: 'wallet_transactions',
+          table: 'customer_wallet_transactions',
           key_fields: Object.keys(insertData).slice(0, 5),
         }),
       });

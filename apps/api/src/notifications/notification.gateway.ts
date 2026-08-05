@@ -104,6 +104,9 @@ export class NotificationGateway
     battery?: number;
     speed?: number;
     timestamp: string;
+    activeRunId?: string;
+    currentStop?: string;
+    remainingStops?: number;
   }): void {
     this.server.to('admin_tracking').emit('partner_location_update', payload);
   }

@@ -459,6 +459,7 @@ export class CartService {
             unit_price: entry.price,
             quantity: entry.qty,
             total_price: entry.qty * entry.price,
+            final_price: entry.qty * entry.price,
             is_free: false,
             created_at: new Date(),
           },

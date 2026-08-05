@@ -10,22 +10,28 @@ import {
   Put,
   Req,
   UseGuards,
-
 } from '@nestjs/common';
 import { generateId } from 'src/helpers/RandomHelper';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
 import { DataService } from 'src/shared/database/Data.service';
+import { DatabaseService } from 'src/database/database.service';
 import { DeveloperService } from 'src/shared/logger/Developer.service';
 import { AuthService } from './auth.service';
 const COORDINATE_EPSILON = 0.0000001;
 
+/** Cached firebase client configs (TTL: 1h per process) */
+const _firebaseConfigCache: Record<string, { config: any; cachedAt: number }> = {};
+const FIREBASE_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
 @Controller('customer')
 export class CustomerBootstrapController {
-  constructor(private readonly Data: DataService,
+  constructor(
+    private readonly Data: DataService,
+    private readonly db: DatabaseService,
     private readonly Developer: DeveloperService,
-    private readonly authService: AuthService
-  ) { }
+    private readonly authService: AuthService,
+  ) {}
 
   private normalizeAddress(addr: any) {
     if (!addr) return addr;
@@ -57,6 +63,8 @@ export class CustomerBootstrapController {
       where: [{ column: 'is_active', operator: '=', value: true }],
     });
 
+    const firebaseConfig = await this.loadFirebaseClientConfig('firebase:customer');
+
     return {
       profile,
       addresses: (addressesResult?.data || []).map((addr: any) => this.normalizeAddress(addr)),
@@ -68,7 +76,38 @@ export class CustomerBootstrapController {
       subscription_summary: subscriptionSummary,
       notifications_count: 0,
       branches: branchesResult?.data || [],
+      firebase_config: firebaseConfig,
     };
+  }
+
+  /** Public endpoint — no auth required. Returns active Firebase client config for the requested app panel. */
+  @Get('device/firebase-config')
+  async getFirebaseConfig() {
+    const config = await this.loadFirebaseClientConfig('firebase:customer');
+    return { status: true, firebase_config: config };
+  }
+
+  private async loadFirebaseClientConfig(configKey: string): Promise<any | null> {
+    const now = Date.now();
+    const cached = _firebaseConfigCache[configKey];
+    if (cached && now - cached.cachedAt < FIREBASE_CACHE_TTL_MS) {
+      return cached.config;
+    }
+    try {
+      const rows = await this.db.query(
+        `SELECT config_data FROM api_integrations_config WHERE config_key = $1 AND is_active = true LIMIT 1`,
+        [configKey],
+      );
+      const row = rows?.[0];
+      const config = row?.config_data ?? null;
+      if (config) {
+        _firebaseConfigCache[configKey] = { config, cachedAt: now };
+      }
+      return config;
+    } catch {
+      this.Developer.error(`Failed to load firebase client config for key: ${configKey}`, {});
+      return null;
+    }
   }
 
   private async resolveCustomer(userId: string, email?: string) {

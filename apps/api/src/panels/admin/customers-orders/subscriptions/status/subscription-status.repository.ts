@@ -34,11 +34,12 @@ export class SubscriptionStatusRepository {
         c.wallet_balance,
         c.is_postpaid_enabled,
         c.postpaid_credit_limit,
-        c.first_name,
-        c.phone,
-        c.email
+        u.first_name,
+        u.phone,
+        u.email
       FROM subscriptions s
       JOIN customers c ON c.customer_id = s.customer_id
+      LEFT JOIN users u ON u.user_id = s.customer_id
       WHERE s.status = 'active'
         AND (s.end_date - CURRENT_DATE) IN (${placeholders})
       ORDER BY s.end_date ASC
@@ -405,11 +406,12 @@ export class SubscriptionStatusRepository {
         c.wallet_balance,
         c.is_postpaid_enabled,
         c.postpaid_credit_limit,
-        c.first_name,
-        c.phone,
-        c.email
+        u.first_name,
+        u.phone,
+        u.email
       FROM subscriptions s
       JOIN customers c ON c.customer_id = s.customer_id
+      LEFT JOIN users u ON u.user_id = s.customer_id
       WHERE s.subscription_id = $1
       LIMIT 1
     `;

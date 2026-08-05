@@ -14,8 +14,13 @@ export class SubscriptionsService {
   async getSubscriptionView(subscriptionId: string) {
     try {
       const rows = await this.databaseService.query(
-        `SELECT s.*, COALESCE(c.full_name, CONCAT(c.first_name, ' ', c.last_name)) AS customer_name, COALESCE(c.mobile, c.phone) AS phone, c.wallet_balance
+        `SELECT s.*,
+                u.first_name || ' ' || u.last_name AS customer_name,
+                u.phone AS phone,
+                u.email AS customer_email,
+                c.wallet_balance
          FROM subscriptions s
+         LEFT JOIN users u ON u.user_id = s.customer_id
          LEFT JOIN customers c ON c.customer_id = s.customer_id
          WHERE s.id::text = $1 OR s.subscription_id = $1 OR s.subscription_number = $1
          LIMIT 1`,

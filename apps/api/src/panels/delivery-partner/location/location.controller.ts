@@ -27,7 +27,7 @@ function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): 
   return R * c;
 }
 
-@Controller({ path: 'DeliveryPartner/location', version: '1' })
+@Controller({ path: 'delivery-partner/location', version: '1' })
 export class LocationController {
   constructor(
     private readonly redisService: RedisService,
@@ -84,105 +84,77 @@ export class LocationController {
       fs.appendFileSync('location_debug.log', logMsg);
     } catch (e) {}
 
-    // 1. Get delivery_partner ID (UUID) using user_id and log asynchronously
+    // 1. Log to database asynchronously if movement threshold is met
     if (shouldLogToDb) {
-      this.db.query(`SELECT id FROM delivery_partners WHERE user_id = $1 OR delivery_partner_id = $1`, [userId])
-        .then(async (boyRows) => {
-          try {
-            const fs = require('fs');
-            fs.appendFileSync('location_debug.log', `[${new Date().toISOString()}] SELECT results: ${JSON.stringify(boyRows)}\n`);
-          } catch (e) {}
+      (async () => {
+        try {
+          // Update recent coordinates on delivery_partners table
+          await this.db.query(
+            `UPDATE delivery_partners SET current_lat = $1, current_lng = $2, updated_at = NOW() WHERE user_id = $3 OR delivery_partner_id = $3`,
+            [Number(body.latitude), Number(body.longitude), userId]
+          );
 
-          if (boyRows && boyRows.length > 0) {
-            const deliveryPartnerId = boyRows[0].id;
-            try {
-              // Update recent coordinates on delivery_partners table
-              await this.db.query(
-                `UPDATE delivery_partners SET current_lat = $1, current_lng = $2, updated_at = NOW() WHERE id = $3`,
-                [Number(body.latitude), Number(body.longitude), deliveryPartnerId]
+          const insertHistoryQuery = `
+            INSERT INTO delivery_location_logs (user_id, latitude, longitude, speed, battery, recorded_at)
+            VALUES ($1, $2, $3, $4, $5, NOW())`;
+          await this.db.query(insertHistoryQuery, [
+            userId,
+            Number(body.latitude),
+            Number(body.longitude),
+            body.speed !== undefined ? Number(body.speed) : 0,
+            body.battery !== undefined ? Number(body.battery) : 100,
+          ]);
+        } catch (err) {
+          console.error('[LocationUpdate] Failed to log location history to database:', err);
+        }
+
+        // Check distance to next delivery for arriving-soon push notification
+        try {
+          const nextOrderRes = await this.db.query(`
+            SELECT 
+              o.order_id, 
+              o.customer_id, 
+              o.is_arriving_notified,
+              ca.latitude AS address_lat, 
+              ca.longitude AS address_lng
+            FROM orders o
+            JOIN customers c ON c.customer_id = o.customer_id
+            LEFT JOIN customer_addresses ca ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
+            WHERE (o.delivery_partner_id = $1 OR o.delivery_partner_id IN (SELECT delivery_partner_id FROM delivery_partners WHERE user_id = $1))
+              AND o.scheduled_date = CURRENT_DATE
+              AND o.status IN ('pending', 'out_for_delivery')
+            ORDER BY o.run_sequence ASC NULLS LAST, o.created_at ASC
+            LIMIT 1
+          `, [userId]);
+
+          if (nextOrderRes && nextOrderRes.length > 0) {
+            const nextOrder = nextOrderRes[0];
+            if (!nextOrder.is_arriving_notified && nextOrder.address_lat && nextOrder.address_lng) {
+              const dist = getDistanceKm(
+                Number(body.latitude), 
+                Number(body.longitude), 
+                Number(nextOrder.address_lat), 
+                Number(nextOrder.address_lng)
               );
-
-              const insertHistoryQuery = `
-                INSERT INTO delivery_location_logs (delivery_partner_id, latitude, longitude, recorded_at)
-                VALUES ($1, $2, $3, NOW())`;
-              const insertResult = await this.db.query(insertHistoryQuery, [
-                deliveryPartnerId,
-                Number(body.latitude),
-                Number(body.longitude),
-              ]);
-              try {
-                const fs = require('fs');
-                fs.appendFileSync('location_debug.log', `[${new Date().toISOString()}] INSERT success: ${JSON.stringify(insertResult)}\n`);
-              } catch (e) {}
-            } catch (err) {
-              console.error('[LocationUpdate] Failed to log location history to database:', err);
-              try {
-                const fs = require('fs');
-                fs.appendFileSync('location_debug.log', `[${new Date().toISOString()}] INSERT error: ${err.message}\n`);
-              } catch (e) {}
-            }
-
-            // Check distance to next delivery
-            try {
-              const nextOrderRes = await this.db.query(`
-                SELECT 
-                  o.order_id, 
-                  o.customer_id, 
-                  o.is_arriving_notified,
-                  ca.latitude AS address_lat, 
-                  ca.longitude AS address_lng
-                FROM orders o
-                JOIN customers c ON c.customer_id = o.customer_id
-                LEFT JOIN customer_addresses ca ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
-                WHERE o.delivery_partner_id = $1
-                  AND o.scheduled_date = CURRENT_DATE
-                  AND o.status IN ('pending', 'out_for_delivery')
-                ORDER BY o.run_sequence ASC NULLS LAST, o.created_at ASC
-                LIMIT 1
-              `, [deliveryPartnerId]);
-
-              if (nextOrderRes && nextOrderRes.length > 0) {
-                const nextOrder = nextOrderRes[0];
-                if (!nextOrder.is_arriving_notified && nextOrder.address_lat && nextOrder.address_lng) {
-                  const dist = getDistanceKm(
-                    Number(body.latitude), 
-                    Number(body.longitude), 
-                    Number(nextOrder.address_lat), 
-                    Number(nextOrder.address_lng)
-                  );
-                  if (dist <= 1.0) { // 1 km threshold
-                    await this.pushNotificationService.sendNotificationToUsers(
-                      [nextOrder.customer_id],
-                      {
-                        title: 'Your Delivery Partner is Arriving Soon!',
-                        body: 'Your F2H Fresh order is less than 1km away.',
-                      }
-                    );
-                    await this.db.query(
-                      `UPDATE orders SET is_arriving_notified = true WHERE order_id = $1`,
-                      [nextOrder.order_id]
-                    );
+              if (dist <= 1.0) { // 1 km threshold
+                await this.pushNotificationService.sendNotificationToUsers(
+                  [nextOrder.customer_id],
+                  {
+                    title: 'Your Delivery Partner is Arriving Soon!',
+                    body: 'Your F2H Fresh order is less than 1km away.',
                   }
-                }
+                );
+                await this.db.query(
+                  `UPDATE orders SET is_arriving_notified = true WHERE order_id = $1`,
+                  [nextOrder.order_id]
+                );
               }
-            } catch (err) {
-              console.error('[LocationUpdate] Failed to process arriving soon notification:', err);
             }
-
-          } else {
-            try {
-              const fs = require('fs');
-              fs.appendFileSync('location_debug.log', `[${new Date().toISOString()}] No boy found for userId: ${userId}\n`);
-            } catch (e) {}
           }
-        })
-        .catch((err) => {
-          console.error('[LocationUpdate] Failed to fetch delivery boy ID for background logging:', err);
-          try {
-            const fs = require('fs');
-            fs.appendFileSync('location_debug.log', `[${new Date().toISOString()}] SELECT error: ${err.message}\n`);
-          } catch (e) {}
-        });
+        } catch (err) {
+          console.error('[LocationUpdate] Failed to process arriving soon notification:', err);
+        }
+      })();
     }
 
     // Preserve the SOS status on subsequent updates until explicitly cleared
@@ -276,9 +248,9 @@ export class LocationController {
         console.error('Failed to fetch delivery boy ID for SOS logging:', err);
       });
 
-    // Broadcast location update with 'SOS' status to all connected Socket.io clients
+    // Broadcast SOS alert strictly to admin clients in admin_tracking room
     if (this.notificationGateway && this.notificationGateway.server) {
-      this.notificationGateway.server.emit('delivery_location_update', {
+      this.notificationGateway.server.to('admin_tracking').emit('delivery_sos_alert', {
         userId,
         latitude,
         longitude,

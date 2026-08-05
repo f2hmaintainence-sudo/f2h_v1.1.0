@@ -29,7 +29,6 @@ interface Branch {
   delivery_radius_km?: number | null;
   buffer_zone?: number | null;
   allow_buffer_order?: boolean | null;
-  sector_count?: number | null;
 }
 
 type FormState = {
@@ -42,7 +41,6 @@ type FormState = {
   delivery_radius_km: number;
   buffer_zone: number;
   allow_buffer_order: boolean;
-  sector_count: number;
   is_active: boolean;
 };
 
@@ -58,7 +56,7 @@ export default function BranchesPage() {
   // Form state (shared between create and edit)
   const emptyForm: FormState = {
     branch_name: '', branch_code: '', city: '', state: '',
-    lat: null, lng: null, delivery_radius_km: 5, buffer_zone: 0, allow_buffer_order: false, sector_count: 3, is_active: true,
+    lat: null, lng: null, delivery_radius_km: 5, buffer_zone: 0, allow_buffer_order: false, is_active: true,
   };
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -214,8 +212,7 @@ export default function BranchesPage() {
     (form.lat !== null && form.lng !== null) && (
       String(form.lat) !== String(selectedBranch.lat) ||
       String(form.lng) !== String(selectedBranch.lng) ||
-      form.delivery_radius_km !== Number(selectedBranch.delivery_radius_km) ||
-      form.sector_count !== Number(selectedBranch.sector_count)
+      form.delivery_radius_km !== Number(selectedBranch.delivery_radius_km)
     )
   );
   const openEditBranch = (branch: Branch) => {
@@ -230,7 +227,6 @@ export default function BranchesPage() {
       delivery_radius_km: Number(branch.delivery_radius_km) || 5,
       buffer_zone: Number(branch.buffer_zone) || 0,
       allow_buffer_order: !!branch.allow_buffer_order,
-      sector_count: Number(branch.sector_count) || 3,
       is_active: branch.is_active,
     });
     setError('');
@@ -261,7 +257,6 @@ export default function BranchesPage() {
   const activeHubs = branches.filter(b => b.is_active).length;
   const inactiveHubs = totalHubs - activeHubs;
   const totalCoverageKm = branches.reduce((acc, curr) => acc + (curr.is_active ? Number(curr.delivery_radius_km || 0) : 0), 0);
-  const totalSectorsCount = branches.reduce((acc, curr) => acc + (curr.is_active ? Number(curr.sector_count || 0) : 0), 0);
 
   return (
     <div className="w-full h-[calc(100vh-80px)] bg-slate-50/50 overflow-hidden relative flex flex-col animate-in fade-in duration-300" style={{ fontFamily: "'Plus Jakarta Sans', var(--font-plus-jakarta), sans-serif", fontStyle: 'normal' }}>
@@ -283,7 +278,7 @@ export default function BranchesPage() {
           </div>
 
           {/* Stats Summary Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/30 p-6 rounded-[2rem] border border-indigo-100/50 relative overflow-hidden group hover:shadow-md transition-all duration-300">
               <div className="absolute right-[-10px] bottom-[-10px] text-indigo-200/40 group-hover:scale-110 transition-transform duration-500 pointer-events-none">
                 <Building2 size={110} strokeWidth={0.5} />
@@ -303,17 +298,6 @@ export default function BranchesPage() {
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl font-extrabold text-emerald-950">{totalCoverageKm.toFixed(1)}</span>
                 <span className="text-xs text-emerald-600 font-bold bg-emerald-100/50 px-2 py-0.5 rounded-full">KM Combined</span>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100/30 p-6 rounded-[2rem] border border-blue-100/50 relative overflow-hidden group hover:shadow-md transition-all duration-300">
-              <div className="absolute right-[-10px] bottom-[-10px] text-blue-200/40 group-hover:scale-110 transition-transform duration-500 pointer-events-none">
-                <Hexagon size={110} strokeWidth={0.5} />
-              </div>
-              <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1">Total Sectors</p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-blue-950">{totalSectorsCount}</span>
-                <span className="text-xs text-blue-600 font-bold bg-blue-100/50 px-2 py-0.5 rounded-full">Operational</span>
               </div>
             </div>
 
@@ -429,13 +413,10 @@ export default function BranchesPage() {
                         <span className={`h-1.5 w-1.5 rounded-full ${b.allow_buffer_order ? 'bg-teal-500' : 'bg-slate-300'}`} />
                         Buffer Orders {b.allow_buffer_order ? 'On' : 'Off'}
                       </span>
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-indigo-700 border border-indigo-100">
-                        <Hexagon size={10} /> {b.sector_count || 0} Sectors
-                      </span>
                     </div>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-3 gap-2 border-t border-slate-100 bg-slate-50/70 p-2.5 rounded-2xl">
+                  <div className="mt-4 grid grid-cols-2 gap-2 border-t border-slate-100 bg-slate-50/70 p-2.5 rounded-2xl">
                     <div className="rounded-xl bg-white px-2 py-2 text-center border border-slate-100">
                       <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Radius</p>
                       <p className="mt-0.5 text-xs font-extrabold text-slate-900">{Number(b.delivery_radius_km || 0).toFixed(1)} <span className="text-[9px] text-slate-400 font-medium">km</span></p>
@@ -443,10 +424,6 @@ export default function BranchesPage() {
                     <div className="rounded-xl bg-white px-2 py-2 text-center border border-slate-100">
                       <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Buffer</p>
                       <p className="mt-0.5 text-xs font-extrabold text-slate-900">{Number(b.buffer_zone || 0).toFixed(1)} <span className="text-[9px] text-slate-400 font-medium">km</span></p>
-                    </div>
-                    <div className="rounded-xl bg-white px-2 py-2 text-center border border-slate-100">
-                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Sectors</p>
-                      <p className="mt-0.5 text-xs font-extrabold text-slate-900">{b.sector_count || 0} <span className="text-[9px] text-slate-400 font-medium">slices</span></p>
                     </div>
                   </div>
 
@@ -570,7 +547,7 @@ export default function BranchesPage() {
                   </div>
 
                   {/* Numeric params */}
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Radius (km)</label>
                       <input
@@ -589,16 +566,6 @@ export default function BranchesPage() {
                         onChange={e => setForm(f => ({ ...f, buffer_zone: parseFloat(e.target.value) || 0 }))}
                         className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-slate-700"
                         min={0} max={20} step={0.1}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Sectors Count</label>
-                      <input
-                        type="number"
-                        value={form.sector_count}
-                        onChange={e => setForm(f => ({ ...f, sector_count: parseInt(e.target.value) || 3 }))}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-slate-700"
-                        min={1} max={20}
                       />
                     </div>
                   </div>
@@ -658,9 +625,9 @@ export default function BranchesPage() {
                     <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-3">
                       <AlertTriangle size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
                       <div>
-                        <p className="text-xs font-bold text-amber-800 uppercase tracking-wider">Sector Regeneration</p>
+                        <p className="text-xs font-bold text-amber-800 uppercase tracking-wider">Coverage Reconfiguration</p>
                         <p className="text-xs text-amber-700 leading-relaxed mt-1">
-                          Updating the location pin, radius, or sector count will reset all delivery sectors and assignments.
+                          Updating the location pin or delivery radius will update the hub's operational boundary.
                         </p>
                       </div>
                     </div>

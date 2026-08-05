@@ -1,8 +1,9 @@
 import { Body, Controller, Get, Post, UseGuards, Req, BadRequestException, Param } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Request } from 'express';
 import { DataService } from 'src/shared/database/Data.service';
 import { DatabaseService } from 'src/shared/database/Database.service';
-import { Request } from 'express';
+import { RedisService } from 'src/shared/redis/redis.service';
 
 @Controller({ path: 'customer/orders', version: '1' })
 @UseGuards(AuthGuard('jwt'))
@@ -10,6 +11,7 @@ export class CustomerOrderController {
   constructor(
     private readonly data: DataService,
     private readonly db: DatabaseService,
+    private readonly redisService: RedisService,
   ) {}
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -852,26 +854,51 @@ export class CustomerOrderController {
       };
     }
 
-    // Get driver's current location
+    // Get driver's current location (Redis cache first, then DB fallback)
     let driverLat: number | null = null;
     let driverLng: number | null = null;
     let driverName: string | null = null;
     let driverPhone: string | null = null;
 
     if (order.delivery_partner_id) {
-      const locRes = await this.db.query(
-        `SELECT dpl.latitude, dpl.longitude, dp.name AS driver_name, dp.phone
-         FROM delivery_partner_locations dpl
-         JOIN delivery_partners dp ON dp.user_id = dpl.user_id
-         WHERE dpl.user_id = $1
-         ORDER BY dpl.recorded_at DESC LIMIT 1`,
+      // 1. Try Redis cache first (real-time telemetry)
+      const cachedLoc: any = await this.redisService.fetch(
+        `delivery_partner_location:${order.delivery_partner_id}`,
+      );
+      if (cachedLoc && cachedLoc.latitude && cachedLoc.longitude) {
+        driverLat = Number(cachedLoc.latitude);
+        driverLng = Number(cachedLoc.longitude);
+      }
+
+      // Fetch driver profile (name & phone) from users / delivery_partners
+      const driverProfile = await this.db.query(
+        `SELECT 
+           COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), dp.full_name, dp.name, 'Delivery Partner') AS driver_name,
+           COALESCE(u.phone, dp.phone) AS phone
+         FROM users u
+         LEFT JOIN delivery_partners dp ON (dp.user_id = u.user_id OR dp.delivery_partner_id = u.user_id)
+         WHERE u.user_id = $1 OR dp.delivery_partner_id = $1 OR dp.id::text = $1
+         LIMIT 1`,
         [order.delivery_partner_id],
       );
-      if (locRes?.length) {
-        driverLat = Number(locRes[0].latitude);
-        driverLng = Number(locRes[0].longitude);
-        driverName = locRes[0].driver_name;
-        driverPhone = locRes[0].phone;
+      if (driverProfile?.length) {
+        driverName = driverProfile[0].driver_name;
+        driverPhone = driverProfile[0].phone;
+      }
+
+      // 2. Fallback to DB if Redis cache missed
+      if (driverLat === null || driverLng === null) {
+        const locRes = await this.db.query(
+          `SELECT latitude, longitude
+           FROM delivery_location_logs
+           WHERE user_id = $1
+           ORDER BY recorded_at DESC LIMIT 1`,
+          [order.delivery_partner_id],
+        );
+        if (locRes?.length) {
+          driverLat = Number(locRes[0].latitude);
+          driverLng = Number(locRes[0].longitude);
+        }
       }
     }
 

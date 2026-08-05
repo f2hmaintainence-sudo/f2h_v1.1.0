@@ -73,7 +73,6 @@ export class CustomerTableService {
           delivery_radius_km: ['branches.delivery_radius_km', true],
           buffer_zone: ['branches.buffer_zone', true],
           allow_buffer_order: ['branches.allow_buffer_order', true],
-          sector_count: ['branches.sector_count', true],
           hex_shape: ['branches.hex_shape', true],
           lat: ['branches.lat', true],
           lng: ['branches.lng', true],
@@ -230,15 +229,20 @@ export class CustomerTableService {
       const set: TableSet = {
         columns: {
           id: ['customers.id', false],
-          full_name: ['customers.full_name', true],
-          phone: ['customers.phone', true],
-          email: ['customers.email', true],
+          full_name: ["CONCAT_WS(' ', users.first_name, users.last_name)", true],
+          phone: ['users.phone', true],
+          email: ['users.email', true],
           zone_name: ['zones.name', true],
           branch_name: ['branches.branch_name', true],
           total_orders: ['customers.total_orders', true],
           created_at: ['customers.created_at', true],
         },
         joins: [
+          {
+            type: 'LEFT',
+            table: 'users',
+            on: [['users.user_id', 'customers.customer_id']],
+          },
           {
             type: 'LEFT',
             table: 'zones',

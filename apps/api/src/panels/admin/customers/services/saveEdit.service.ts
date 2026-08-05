@@ -177,7 +177,7 @@ export class CustomerSaveEditService {
       }
 
       // 3. UPDATE
-      const result = await this.dataService.query('wallet_transactions', {
+      const result = await this.dataService.query('customer_wallet_transactions', {
         update: updateData,
         where: [{ column: 'id', operator: '=', value: id }],
       });
@@ -189,7 +189,7 @@ export class CustomerSaveEditService {
       await this.dataService.insert('admin_audit_logs', {
         admin_id: adminId,
         action: 'wallet_transactions_update',
-        target_type: 'wallet_transactions',
+        target_type: 'customer_wallet_transactions',
         target_id: id,
         details: JSON.stringify({ changes: Object.keys(updateData) }),
       });

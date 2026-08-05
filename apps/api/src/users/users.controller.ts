@@ -40,7 +40,7 @@ export class UsersController {
     if (!userId) return { error: 'Unauthorized' };
 
     const users = await this.db.query(
-      `SELECT user_id, email, user_name, first_name, last_name, profile
+      `SELECT user_id, email, user_name, first_name, last_name
        FROM users WHERE user_id = ?`,
       [userId],
     );
@@ -94,7 +94,6 @@ export class UsersController {
       user_name: user.user_name,
       first_name: user.first_name,
       last_name: user.last_name,
-      profile: user.profile,
       roles: roles.map((r: any) => ({
         role_id: r.role_id,
         role_name: r.role_name,

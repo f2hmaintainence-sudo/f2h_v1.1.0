@@ -89,16 +89,6 @@ export class BranchShowAddService {
           defaultValue: 5,
           validation: { min: 0.5, max: 50 },
         },
-        {
-          name: 'sector_count',
-          label: 'Number of Sectors',
-          type: 'number',
-          required: false,
-          width: 'half',
-          placeholder: '3',
-          defaultValue: 3,
-          validation: { min: 1, max: 20 },
-        },
       ],
     ];
   }

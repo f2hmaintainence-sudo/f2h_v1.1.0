@@ -54,9 +54,9 @@ class ApiEndpoints {
   // ---------------------------------------------------------------------------
   // Delivery Partner Location & SOS
   // ---------------------------------------------------------------------------
-  static const String locationUpdate   = '/DeliveryPartner/location/update';
-  static const String sos              = '/DeliveryPartner/location/sos';
-  static const String clearSos         = '/DeliveryPartner/location/clear-sos';
+  static const String locationUpdate   = '/delivery-partner/location/update';
+  static const String sos              = '/delivery-partner/location/sos';
+  static const String clearSos         = '/delivery-partner/location/clear-sos';
 
   // ---------------------------------------------------------------------------
   // Profile & Onboarding

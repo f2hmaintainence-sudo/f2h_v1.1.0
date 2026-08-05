@@ -159,7 +159,7 @@ export default function Branch360PortfolioPage() {
         
         {/* Left Column: Light KPI Cards */}
         <div className="lg:col-span-5 space-y-4 flex flex-col justify-between">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-4">
             
             {/* Allocated Fleet */}
             <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition-all group">
@@ -188,21 +188,6 @@ export default function Branch360PortfolioPage() {
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px] font-medium">
                 <span className="text-purple-600 font-bold">+{branch.buffer_zone || 0} KM Buffer</span>
                 <span className="text-slate-400">{branch.allow_buffer_order ? 'Buffer On' : 'Buffer Off'}</span>
-              </div>
-            </div>
-
-            {/* Sector Count */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition-all group">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Delivery Sectors</span>
-                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-                  <Hexagon size={18} />
-                </div>
-              </div>
-              <p className="text-3xl font-black text-slate-900">{branch.sector_count || 0}</p>
-              <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px] font-medium">
-                <span className="text-indigo-600 font-bold">Pie-slice zones</span>
-                <span className="text-slate-400">{branch.delivery_radius_km || 0}km radius</span>
               </div>
             </div>
 
@@ -485,7 +470,7 @@ export default function Branch360PortfolioPage() {
           {/* Tab 3: Analytics */}
           {activeTab === 'Branch Performance & Analytics' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Fleet Ratio</p>
                   <p className="text-3xl font-black text-slate-900 mt-1">{activePartnerCount} / {branchPartners.length}</p>
@@ -498,12 +483,6 @@ export default function Branch360PortfolioPage() {
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Buffer Orders Allowed</p>
                   <p className="text-xl font-bold text-slate-900 mt-2">{branch.allow_buffer_order ? 'Enabled' : 'Disabled'}</p>
                   <p className="text-xs text-slate-400 mt-1">Customer orders permitted within buffer zone radius.</p>
-                </div>
-
-                <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sector Coverage</p>
-                  <p className="text-xl font-mono font-bold text-indigo-600 mt-2">{branch.sector_count || 0} Sectors</p>
-                  <p className="text-xs text-slate-400 mt-1">Angular pie-slice zones within {branch.delivery_radius_km || 0}km radius</p>
                 </div>
               </div>
             </div>

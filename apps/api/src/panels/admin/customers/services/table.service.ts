@@ -89,22 +89,19 @@ export class CustomerTableService {
         columns: {
           id: ['customers.customer_id', false],
           is_postpaid_enabled: ['customers.is_postpaid_enabled', false],
-          full_name: ['customers.full_name', true],
+          full_name: ["CONCAT_WS(' ', users.first_name, users.last_name)", true],
           postpaid_credit_limit: ['customers.postpaid_credit_limit', isPostpaidTable],
           wallet_balance: ['customer_wallet_balances.wallet_balance', true],
-          phone: ['customers.phone', true],
-          email: ['customers.email', true],
-
-          // branch: ['b.branch_name', true],
-
-          subscription_number: ['customers.subscription_number', true],
-          // subscription_status: ['s.status', true],
-          // billing_cycle: ['s.billing_cycle', true],
-          // payment_type: ['s.payment_type', true],
-
+          phone: ['users.phone', true],
+          email: ['users.email', true],
           created_at: ['customers.created_at', true],
         },
         joins: [
+          {
+            type: 'left',
+            table: 'users',
+            on: [['users.user_id', 'customers.customer_id']],
+          },
           {
             type: 'left',
             table: 'customer_wallet_balances',

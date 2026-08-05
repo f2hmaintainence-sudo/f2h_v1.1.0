@@ -78,13 +78,6 @@ export class CreateBranchDto {
 
   @IsOptional()
   @IsInt()
-  @Min(1)
-  @Max(20)
-  @Type(() => Number)
-  sector_count?: number;
-
-  @IsOptional()
-  @IsInt()
   @Min(7)
   @Max(10)
   @Type(() => Number)

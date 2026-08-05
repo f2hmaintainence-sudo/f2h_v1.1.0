@@ -1,5 +1,0 @@
-SET session_replication_role = 'replica';
-
-INSERT INTO "users" ("id", "sno", "user_id", "email", "user_name", "password", "first_name", "last_name", "phone", "profile", "colors", "cover", "settings", "email_verified_at", "password_changed_at", "locked_at", "fcm", "otp", "last_login_at", "session_token", "session_timeout", "session_warning", "refreshToken", "refreshTokenJti", "tokenRotationTracking", "account_status", "max_logins", "created_by", "updated_by", "delete_on", "restored_at", "deleted_at", "created_at", "updated_at", "must_change_password") VALUES
-(NULL, 1001, 'USRADMINDEMO001', 'admin.panel@f2hfresh.com', 'admin_demo', '$2b$12$5LD58.gq.iXGu/LYhp6F4O7CTJney1LOxvuQtubHIp90apoDblQnS', 'enc::1b3b5c0fb3cf2b52c76f9f7483e49bbe:cc09f16d34ef6a7d939476f03cfb7ad1:1b377ec75f', 'enc::73e109d3fd4f89b265d734dbf1217cd0:cf492ad02f2dda8b3039830c9d136d70:ddaffcfa', NULL, NULL, NULL, NULL, NULL, '2026-03-30 12:44:02', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'active', 0, 'SYSTEM', 'SYSTEM', NULL, NULL, NULL, '2026-03-30 18:14:02', '2026-04-16 20:07:07', 0);
-SET session_replication_role = 'origin';

@@ -97,9 +97,9 @@ export class DeliveryManagementService {
           db.delivery_partner_id,
           db.delivery_partner_id AS user_id,
           db.is_verified,
-          db.full_name,
-          db.phone,
-          db.email,
+          COALESCE(u.first_name || ' ' || u.last_name, u.user_name, 'Delivery Partner') AS full_name,
+          u.phone,
+          u.email,
           db.branch_id,
           b.branch_name,
           db.is_active,
@@ -139,9 +139,10 @@ export class DeliveryManagementService {
           ) AS assigned_orders,
           db.created_at
         FROM delivery_partners db
+        LEFT JOIN users u ON u.user_id = db.delivery_partner_id
         LEFT JOIN branches b ON b.branch_id = db.branch_id
         ${whereClause}
-        ORDER BY db.is_active DESC, db.full_name ASC
+        ORDER BY db.is_active DESC, u.first_name ASC
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
       `;
 
@@ -259,7 +260,7 @@ export class DeliveryManagementService {
         UPDATE delivery_partners
         SET ${updateFields.join(', ')}
         WHERE delivery_partner_id = $${params.length}
-        RETURNING delivery_partner_id, full_name, is_active, is_available, branch_id, daily_salary
+        RETURNING delivery_partner_id, is_active, is_available, branch_id, daily_salary
       `;
 
       const rows = await this.db.query(sql, params);
@@ -307,37 +308,40 @@ export class DeliveryManagementService {
       const userId = partnerObj?.user_id || targetId;
       const boyId = partnerObj?.delivery_partner_id || targetId;
 
-      const docsSql = `
-        SELECT *
-        FROM user_documents
-        WHERE delivery_partner_id = $1 OR delivery_partner_id = $2
-        ORDER BY created_at DESC
-      `;
-      const docRows = await this.db.query(docsSql, [boyId, userId]);
+      const docsList: any[] = [];
+      if (partnerObj?.aadhaar_url) {
+        docsList.push({ id: 1, document_type: 'aadhaar', document_url: partnerObj.aadhaar_url, verification_status: partnerObj.is_verified ? 'verified' : 'pending' });
+      }
+      if (partnerObj?.id_proof_url) {
+        docsList.push({ id: 2, document_type: 'id_proof', document_url: partnerObj.id_proof_url, verification_status: partnerObj.is_verified ? 'verified' : 'pending' });
+      }
+      if (partnerObj?.profile_photo_url) {
+        docsList.push({ id: 3, document_type: 'profile_photo', document_url: partnerObj.profile_photo_url, verification_status: partnerObj.is_verified ? 'verified' : 'pending' });
+      }
 
-      const vehiclesSql = `
-        SELECT *
-        FROM user_vehicles
-        WHERE delivery_partner_id = $1 OR delivery_partner_id = $2
-        ORDER BY created_at DESC
-      `;
-      const vehicleRows = await this.db.query(vehiclesSql, [boyId, userId]);
+      const vehicleList: any[] = partnerObj?.vehicle_type ? [{
+        id: 1,
+        vehicle_type: partnerObj.vehicle_type,
+        vehicle_number: partnerObj.vehicle_number,
+        verification_status: partnerObj.is_verified ? 'verified' : 'pending',
+      }] : [];
 
-      const bankSql = `
-        SELECT *
-        FROM user_bank_accounts
-        WHERE delivery_partner_id = $1 OR delivery_partner_id = $2
-        ORDER BY created_at DESC
-      `;
-      const bankRows = await this.db.query(bankSql, [boyId, userId]);
+      const bankList: any[] = partnerObj?.bank_account_number ? [{
+        id: 1,
+        bank_account_number: partnerObj.bank_account_number,
+        bank_ifsc: partnerObj.bank_ifsc,
+        bank_name: partnerObj.bank_name,
+        account_holder_name: partnerObj.account_holder_name,
+        verification_status: partnerObj.is_verified ? 'verified' : 'pending',
+      }] : [];
 
       return {
         status: true,
         data: {
           partner: partnerObj,
-          documents: docRows || [],
-          vehicles: vehicleRows || [],
-          bank_accounts: bankRows || [],
+          documents: docsList,
+          vehicles: vehicleList,
+          bank_accounts: bankList,
         },
         message: 'Partner documents and verification details fetched',
       };
@@ -358,68 +362,14 @@ export class DeliveryManagementService {
     bank_status?: string;
   }) {
     try {
-      if (body.document_id !== undefined && body.document_status) {
-        await this.db.query(
-          `UPDATE user_documents SET verification_status = $1, rejection_reason = $2, verified_at = NOW() WHERE id = $3`,
-          [body.document_status, body.rejection_reason || null, body.document_id],
-        );
-        const title = `Identity Document ${body.document_status === 'verified' ? 'Approved ✅' : 'Rejected ❌'}`;
-        const msg = body.document_status === 'verified'
-          ? `Your uploaded identity document (ID: #${body.document_id}) has been successfully verified.`
-          : `Your identity document (ID: #${body.document_id}) was rejected${body.rejection_reason ? `: ${body.rejection_reason}` : '. Please upload a valid document.'}`;
-        await this.notifyPartner(partnerId, title, msg);
-      }
-
-      if (body.vehicle_id !== undefined && body.vehicle_status) {
-        await this.db.query(
-          `UPDATE user_vehicles SET verification_status = $1, verified_at = NOW() WHERE id = $2`,
-          [body.vehicle_status, body.vehicle_id],
-        );
-        const title = `Vehicle Details ${body.vehicle_status === 'verified' ? 'Approved ✅' : 'Rejected ❌'}`;
-        const msg = body.vehicle_status === 'verified'
-          ? `Your uploaded vehicle details and documents have been verified.`
-          : `Your uploaded vehicle documents were marked as rejected. Please check and upload valid documents.`;
-        await this.notifyPartner(partnerId, title, msg);
-      }
-
-      if (body.bank_account_id !== undefined && body.bank_status) {
-        await this.db.query(
-          `UPDATE user_bank_accounts SET verification_status = $1, verified_at = NOW() WHERE id = $2`,
-          [body.bank_status, body.bank_account_id],
-        );
-        const title = `Bank Account Details ${body.bank_status === 'verified' ? 'Approved ✅' : 'Rejected ❌'}`;
-        const msg = body.bank_status === 'verified'
-          ? `Your bank account and cheque details have been verified successfully.`
-          : `Your bank account details were marked as not approved. Please verify account number and IFSC.`;
-        await this.notifyPartner(partnerId, title, msg);
-      }
-
       if (body.is_verified !== undefined) {
         const boySql = `
           UPDATE delivery_partners
           SET is_verified = $1, updated_at = NOW()
-          WHERE delivery_partner_id = $2 OR id::text = $2
-          RETURNING delivery_partner_id, full_name, is_verified, is_active
+          WHERE delivery_partner_id = $2 OR user_id = $2 OR id::text = $2
+          RETURNING delivery_partner_id, is_verified, is_active
         `;
-        const rows = await this.db.query(boySql, [body.is_verified, partnerId]);
-
-        if (body.is_verified === true) {
-          const boyId = rows[0]?.delivery_partner_id || partnerId;
-          const userId = boyId;
-
-          await this.db.query(
-            `UPDATE user_documents SET verification_status = 'verified', verified_at = NOW() WHERE (delivery_partner_id = $1 OR delivery_partner_id = $2) AND verification_status = 'pending'`,
-            [boyId, userId],
-          );
-          await this.db.query(
-            `UPDATE user_vehicles SET verification_status = 'verified', verified_at = NOW() WHERE (delivery_partner_id = $1 OR delivery_partner_id = $2) AND verification_status = 'pending'`,
-            [boyId, userId],
-          );
-          await this.db.query(
-            `UPDATE user_bank_accounts SET verification_status = 'verified', verified_at = NOW() WHERE (delivery_partner_id = $1 OR delivery_partner_id = $2) AND verification_status = 'pending'`,
-            [boyId, userId],
-          );
-        }
+        await this.db.query(boySql, [body.is_verified, partnerId]);
 
         const title = body.is_verified ? 'KYC Fully Verified 🎉' : 'KYC Status Update ⚠️';
         const msg = body.is_verified
@@ -429,15 +379,11 @@ export class DeliveryManagementService {
 
         return {
           status: true,
-          data: rows[0] ?? { delivery_partner_id: partnerId, is_verified: body.is_verified },
-          message: `Delivery partner marked as ${body.is_verified ? 'Verified' : 'Not Verified'}`,
+          message: `Partner verification status updated to ${body.is_verified}`,
         };
       }
 
-      return {
-        status: true,
-        message: 'Verification item updated successfully',
-      };
+      return { status: true, message: 'Verification details updated successfully' };
     } catch (error) {
       this.developer.error('updatePartnerVerification error', { error });
       throw new InternalServerErrorException('Failed to update verification details');
@@ -597,7 +543,7 @@ export class DeliveryManagementService {
       const sql = `
         SELECT
           dp.delivery_partner_id,
-          dp.full_name,
+          COALESCE(u.first_name || ' ' || u.last_name, u.user_name, 'Delivery Partner') AS full_name,
           dp.branch_id,
           b.branch_name,
           dp.current_lat,
@@ -607,6 +553,7 @@ export class DeliveryManagementService {
           dp.is_available,
           dp.is_active
         FROM delivery_partners dp
+        LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
         LEFT JOIN branches b ON b.branch_id = dp.branch_id
         WHERE ${where.join(' AND ')}
         ORDER BY dp.last_location_at DESC NULLS LAST
@@ -783,9 +730,10 @@ export class DeliveryManagementService {
           o.address_line,
           o.contact_number,
           o.delivery_partner_id,
-          db.full_name AS partner_name
+          COALESCE(u.first_name || ' ' || u.last_name, u.user_name) AS partner_name
         FROM orders o
         LEFT JOIN delivery_partners db ON db.delivery_partner_id = o.delivery_partner_id
+        LEFT JOIN users u ON u.user_id = o.delivery_partner_id
         WHERE ${where.join(' AND ')}
         ORDER BY o.scheduled_date DESC
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
@@ -823,8 +771,10 @@ export class DeliveryManagementService {
       }
 
       const dbRes = await this.db.query(
-        `SELECT delivery_partner_id, full_name FROM delivery_partners 
-         WHERE delivery_partner_id = $1 OR id::text = $1 LIMIT 1`,
+        `SELECT dp.delivery_partner_id, COALESCE(u.first_name || ' ' || u.last_name, u.user_name, 'Delivery Partner') AS full_name
+         FROM delivery_partners dp
+         LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
+         WHERE dp.delivery_partner_id = $1 OR dp.id::text = $1 LIMIT 1`,
         [dto.delivery_partner_id],
       );
       if (!dbRes || dbRes.length === 0) {
@@ -990,9 +940,9 @@ export class DeliveryManagementService {
       const partnerId = partner.delivery_partner_id;
 
       const orders = await this.db.query(
-        `SELECT o.order_id, o.customer_id, c.full_name as customer_name, o.total_amount, o.status, o.delivery_slot, o.created_at, o.scheduled_date
+        `SELECT o.order_id, o.customer_id, COALESCE(cu.first_name || ' ' || cu.last_name, cu.user_name) as customer_name, o.total_amount, o.status, o.delivery_slot, o.created_at, o.scheduled_date
          FROM orders o
-         LEFT JOIN customers c ON c.customer_id = o.customer_id
+         LEFT JOIN users cu ON cu.user_id = o.customer_id
          WHERE o.delivery_partner_id = $1 OR o.delivery_partner_id = $2
          ORDER BY o.created_at DESC
          LIMIT 20`,
