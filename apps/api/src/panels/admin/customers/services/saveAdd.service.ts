@@ -32,8 +32,8 @@ export class CustomerSaveAddService {
 
       // 2. Unique check — phone
       if (body.phone) {
-        const existing = await this.dataService.query('customers', {
-          select: ['id'],
+        const existing = await this.dataService.query('users', {
+          select: ['user_id'],
           where: [
             {
               column: 'phone',
@@ -52,61 +52,67 @@ export class CustomerSaveAddService {
         }
       }
 
-      // 3. Build insert data from form fields
-      const insertData: Record<string, any> = {};
-      for (const field of fields) {
-        if (body[field.name] !== undefined) {
-          let value = body[field.name];
-          if (typeof value === 'string') value = value.trim();
-          if (field.type === 'email' && typeof value === 'string')
-            value = value.toLowerCase();
-          insertData[field.name] = value;
-        }
+      // Generate unique user_id / customer_id
+      const customerId = `USER${Math.random().toString(36).substring(2, 12).toUpperCase()}${Date.now().toString(36).toUpperCase()}`;
+
+      const nameParts = String(body.full_name || body.name || '').trim().split(/\s+/);
+      const firstName = nameParts[0] || 'Customer';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      // 3. INSERT INTO users (identity single source of truth)
+      const userData = {
+        user_id: customerId,
+        first_name: firstName,
+        last_name: lastName,
+        phone: body.phone ? String(body.phone).trim() : null,
+        email: body.email ? String(body.email).trim().toLowerCase() : null,
+        role_id: 'CUSTOMER',
+        account_status: 'active',
+        created_by: adminId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const userInsert = await this.dataService.insert('users', userData);
+      if (!userInsert.status) {
+        throw new InternalServerErrorException(userInsert.message || 'User creation failed');
       }
 
-      // 4. Transform booleans and generated columns
-      insertData.is_postpaid_enabled =
-        body.is_postpaid_enabled === true ||
-        body.is_postpaid_enabled === 'true' ||
-        body.is_postpaid_enabled === 1 ||
-        body.is_postpaid_enabled === '1';
-      insertData.is_blocked =
-        body.is_blocked === true ||
-        body.is_blocked === 'true' ||
-        body.is_blocked === 1 ||
-        body.is_blocked === '1';
+      // 4. INSERT INTO customers (satellite domain extension)
+      const isPostpaid = body.is_postpaid_enabled === true || body.is_postpaid_enabled === 'true' || body.is_postpaid_enabled === 1 || body.is_postpaid_enabled === '1';
+      const isBlocked = body.is_blocked === true || body.is_blocked === 'true' || body.is_blocked === 1 || body.is_blocked === '1';
+      const creditLimit = body.postpaid_credit_limit === '' || body.postpaid_credit_limit === null ? 0 : Number(body.postpaid_credit_limit || 0);
 
-      if (insertData.postpaid_credit_limit !== undefined) {
-        insertData.postpaid_credit_limit =
-          insertData.postpaid_credit_limit === '' || insertData.postpaid_credit_limit === null
-            ? 0
-            : Number(insertData.postpaid_credit_limit);
-      }
+      const customerData = {
+        customer_id: customerId,
+        customer_status: isBlocked ? 'blocked' : 'active',
+        customer_type: body.customer_type || 'retail',
+        is_blocked: isBlocked,
+        block_reason: body.block_reason || null,
+        is_postpaid_enabled: isPostpaid,
+        postpaid_credit_limit: creditLimit,
+        referral_status: body.referral_status || 'unlocked',
+        created_by: adminId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
-      if (insertData.full_name !== undefined) {
-        const parts = String(insertData.full_name).trim().split(/\s+/);
-        insertData.first_name = parts[0] || '';
-        insertData.last_name = parts.slice(1).join(' ') || '';
-        delete insertData.full_name;
-      }
-
-      // 5. INSERT
-      const result = await this.dataService.insert('customers', insertData);
+      const result = await this.dataService.insert('customers', customerData);
       if (!result.status) {
         throw new InternalServerErrorException(
           result.message || 'Database insert failed',
         );
       }
 
-      // 6. Audit log
+      // 5. Audit log
       await this.dataService.insert('admin_audit_logs', {
         admin_id: adminId,
         action: 'customers_create',
         target_type: 'customers',
-        target_id: insertData.id || 'new',
+        target_id: customerId,
         details: JSON.stringify({
           table: 'customers',
-          key_fields: Object.keys(insertData).slice(0, 5),
+          key_fields: Object.keys(customerData).slice(0, 5),
         }),
       });
 

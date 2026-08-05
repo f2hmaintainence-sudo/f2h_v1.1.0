@@ -32,15 +32,15 @@ export class CustomerSaveEditService {
 
       // 2. Unique check — phone (exclude self)
       if (body.phone) {
-        const existing = await this.dataService.query('customers', {
-          select: ['customer_id'],
+        const existing = await this.dataService.query('users', {
+          select: ['user_id'],
           where: [
             {
               column: 'phone',
               operator: '=',
               value: String(body.phone).trim(),
             },
-            { column: 'customer_id', operator: '!=', value: id },
+            { column: 'user_id', operator: '!=', value: id },
           ],
           limit: 1,
         });
@@ -53,61 +53,65 @@ export class CustomerSaveEditService {
         }
       }
 
-      // 3. Build update data (whitelist — confirmed columns in customers table)
-      const allowedUpdateFields = [
-        'phone',
-        'email',
+      // 3. Build update data for users (identity) and customers (extension)
+      const userUpdateData: Record<string, any> = {};
+      const customerUpdateData: Record<string, any> = {};
+
+      if (body.full_name !== undefined) {
+        const parts = String(body.full_name).trim().split(/\s+/);
+        userUpdateData.first_name = parts[0] || '';
+        userUpdateData.last_name = parts.slice(1).join(' ') || '';
+      }
+      if (body.phone !== undefined) {
+        userUpdateData.phone = String(body.phone).trim();
+      }
+      if (body.email !== undefined) {
+        userUpdateData.email = String(body.email).trim().toLowerCase();
+      }
+
+      const customerFields = [
         'referral_status',
         'postpaid_credit_limit',
         'is_postpaid_enabled',
         'is_blocked',
         'block_reason',
       ];
-      const updateData: Record<string, any> = {};
 
-      // Handle full_name (which is a GENERATED ALWAYS column in PostgreSQL from first_name and last_name)
-      if (body.full_name !== undefined) {
-        const parts = String(body.full_name).trim().split(/\s+/);
-        updateData.first_name = parts[0] || '';
-        updateData.last_name = parts.slice(1).join(' ') || '';
-      }
-
-      for (const fieldName of allowedUpdateFields) {
+      for (const fieldName of customerFields) {
         if (body[fieldName] !== undefined) {
           let value = body[fieldName];
           if (typeof value === 'string') value = value.trim();
-          if (fieldName === 'email' && typeof value === 'string')
-            value = value.toLowerCase();
 
           if (fieldName === 'postpaid_credit_limit') {
             value = value === '' || value === null ? 0 : Number(value);
           }
 
-          // Transform booleans
-          if (
-            fieldName === 'is_postpaid_enabled' ||
-            fieldName === 'is_blocked'
-          ) {
+          if (fieldName === 'is_postpaid_enabled' || fieldName === 'is_blocked') {
             value = value === true || value === 'true' || value === 1 || value === '1';
           }
 
-          updateData[fieldName] = value;
+          customerUpdateData[fieldName] = value;
         }
       }
 
-      if (Object.keys(updateData).length === 0) {
+      if (Object.keys(userUpdateData).length === 0 && Object.keys(customerUpdateData).length === 0) {
         throw new BadRequestException('No valid fields to update');
       }
 
       // 4. UPDATE
-      updateData.updated_at = new Date().toISOString();
-      const result = await this.dataService.query('customers', {
-        update: updateData,
+      if (Object.keys(userUpdateData).length > 0) {
+        userUpdateData.updated_at = new Date().toISOString();
+        await this.dataService.query('users', {
+          update: userUpdateData,
+          where: [{ column: 'user_id', operator: '=', value: id }],
+        });
+      }
+
+      customerUpdateData.updated_at = new Date().toISOString();
+      await this.dataService.query('customers', {
+        update: customerUpdateData,
         where: [{ column: 'customer_id', operator: '=', value: id }],
       });
-      if (!result?.status) {
-        throw new InternalServerErrorException('Database update failed');
-      }
 
       // 5. Audit log
       await this.dataService.insert('admin_audit_logs', {
@@ -115,7 +119,7 @@ export class CustomerSaveEditService {
         action: 'customers_update',
         target_type: 'customers',
         target_id: id,
-        details: JSON.stringify({ changes: Object.keys(updateData) }),
+        details: JSON.stringify({ changes: [...Object.keys(userUpdateData), ...Object.keys(customerUpdateData)] }),
       });
 
       return {

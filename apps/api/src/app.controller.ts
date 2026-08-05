@@ -369,6 +369,18 @@ export class AppController {
     return 0;
   }
 
+  // ─── In-memory build job tracker ──────────────────────────────────────────
+  private buildJobs: Map<string, {
+    jobId: string;
+    appId: string;
+    action: string;
+    status: 'pending' | 'running' | 'success' | 'error';
+    startedAt: Date;
+    completedAt?: Date;
+    output?: string;
+    error?: string;
+  }> = new Map();
+
   @Post('app/rebuild')
   async triggerAppRebuild(@Body() body: { appId: string; action?: string }) {
     const appId = (body?.appId || '').toLowerCase().trim();
@@ -393,9 +405,9 @@ export class AppController {
       }
     } else {
       if (appId === 'customer') {
-        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/customer && /opt/flutter/bin/flutter build web --release && rsync -avz --delete build/web/ /home/f2hfresh-customer/htdocs/customer.f2hfresh.com/`;
+        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/customer && /opt/flutter/bin/flutter build web --profile --no-pub && rsync -avz --delete build/web/ /home/f2hfresh-customer/htdocs/customer.f2hfresh.com/`;
       } else if (appId === 'partner' || appId === 'delivery') {
-        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/delivery && /opt/flutter/bin/flutter build web --release && rsync -avz --delete build/web/ /home/f2hfresh-partner/htdocs/partner.f2hfresh.com/`;
+        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/delivery && /opt/flutter/bin/flutter build web --profile --no-pub && rsync -avz --delete build/web/ /home/f2hfresh-partner/htdocs/partner.f2hfresh.com/`;
       } else if (appId === 'admin') {
         command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/web && npm run build && pm2 restart frontend-f2hfresh`;
       } else {
@@ -403,16 +415,46 @@ export class AppController {
       }
     }
 
+    // Create a unique job ID
+    const jobId = `${appId}-${action}-${Date.now()}`;
+    const job = { jobId, appId, action, status: 'running' as const, startedAt: new Date() };
+    this.buildJobs.set(jobId, job);
+
+    // Evict jobs older than 30 minutes to prevent memory leak
+    const cutoff = Date.now() - 30 * 60 * 1000;
+    for (const [id, j] of this.buildJobs.entries()) {
+      if (j.startedAt.getTime() < cutoff) this.buildJobs.delete(id);
+    }
+
     const { exec } = await import('child_process');
-    return new Promise((resolve) => {
-      exec(command, (error, stdout, stderr) => {
-        if (error) {
-          console.error(`[AppRebuild:${action}] Error building ${appId}:`, stderr);
-          return resolve({ success: false, message: stderr || error.message });
-        }
+    exec(command, { maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`[AppRebuild:${action}] Error building ${appId}:`, stderr || error.message);
+        this.buildJobs.set(jobId, { ...job, status: 'error', completedAt: new Date(), error: stderr || error.message, output: stdout });
+      } else {
         console.log(`[AppRebuild:${action}] Successfully executed for ${appId}`);
-        resolve({ success: true, message: `${appId} (${action}) completed successfully!`, output: stdout || 'Command executed cleanly.' });
-      });
+        this.buildJobs.set(jobId, { ...job, status: 'success', completedAt: new Date(), output: stdout || 'Build completed cleanly.' });
+      }
     });
+
+    return { success: true, jobId, message: `${appId} (${action}) build started.` };
+  }
+
+  @Get('app/rebuild/status/:jobId')
+  async getBuildJobStatus(@Param('jobId') jobId: string) {
+    const job = this.buildJobs.get(jobId);
+    if (!job) {
+      return { status: 'not_found', message: 'Job not found or expired.' };
+    }
+    return {
+      jobId: job.jobId,
+      appId: job.appId,
+      action: job.action,
+      status: job.status,
+      startedAt: job.startedAt,
+      completedAt: job.completedAt,
+      output: job.output,
+      error: job.error,
+    };
   }
 }

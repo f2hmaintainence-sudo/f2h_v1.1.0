@@ -747,27 +747,30 @@ export class AuthService {
       if (email) {
         const normalizedEmail = email.toLowerCase().trim();
         const existingEmailUser = await this.Data.query('users', {
-          select: ['user_id', 'email'],
+          select: ['user_id', 'email', 'password', 'account_status'],
           where: [{ column: 'email', operator: '=', value: normalizedEmail }],
           limit: 1,
         });
-        if (existingEmailUser?.data?.length > 0) {
-          throw new ConflictException('Email address is already registered.');
+        const found = existingEmailUser?.data?.[0];
+        if (found && found.password && !found.password.startsWith('temp_') && found.account_status !== 'pending_verification') {
+          throw new ConflictException('Email address is already registered. Please sign in instead.');
         }
       }
 
       if (phone) {
         const trimmedPhone = phone.trim();
         const existingPhoneUser = await this.Data.query('users', {
-          select: ['user_id', 'phone'],
+          select: ['user_id', 'phone', 'password', 'account_status'],
           where: [{ column: 'phone', operator: '=', value: trimmedPhone }],
           limit: 1,
         });
-        if (existingPhoneUser?.data?.length > 0) {
-          throw new ConflictException('Phone number is already registered.');
+        const found = existingPhoneUser?.data?.[0];
+        if (found && found.password && !found.password.startsWith('temp_') && found.account_status !== 'pending_verification') {
+          throw new ConflictException('Phone number is already registered. Please sign in instead.');
         }
       }
     }
+
 
     const identifier = phone || email!;
     const rateCheck = await this.otpRateLimitService.checkRequestLimit(identifier);
@@ -1269,10 +1272,11 @@ export class AuthService {
       let isAllowed = false;
       switch (cRole) {
         case 'CUSTOMER':
-          isAllowed = uRole === 'CUSTOMER';
+          // All registered users can reset password on Customer app
+          isAllowed = true;
           break;
         case 'DELIVERY_PARTNER':
-          isAllowed = uRole === 'DELIVERY_PARTNER';
+          isAllowed = ['DELIVERY_PARTNER', 'ADMIN', 'SUPER_ADMIN'].includes(uRole);
           break;
         case 'ADMIN':
           isAllowed = !['CUSTOMER', 'DELIVERY_PARTNER'].includes(uRole);
@@ -1280,6 +1284,7 @@ export class AuthService {
         default:
           isAllowed = true;
       }
+
 
       if (!isAllowed) {
         throw new NotFoundException('User does not exist');

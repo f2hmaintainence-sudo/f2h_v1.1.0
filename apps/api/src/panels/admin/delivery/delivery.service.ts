@@ -34,7 +34,7 @@ export class DeliveryManagementService {
   private async notifyPartner(partnerId: string, title: string, messageBody: string): Promise<void> {
     try {
       const boyRows = await this.db.query(
-        `SELECT delivery_partner_id FROM delivery_partners WHERE delivery_partner_id = $1 OR id::text = $1`,
+        `SELECT delivery_partner_id FROM delivery_partners WHERE delivery_partner_id = $1 OR user_id = $1`,
         [partnerId],
       );
       if (!boyRows || boyRows.length === 0) return;
@@ -299,7 +299,7 @@ export class DeliveryManagementService {
           b.branch_name
         FROM delivery_partners db
         LEFT JOIN branches b ON b.branch_id = db.branch_id
-        WHERE db.delivery_partner_id = $1 OR db.id::text = $1
+        WHERE db.delivery_partner_id = $1 OR db.user_id = $1
       `;
       const boyRows = await this.db.query(boySql, [partnerId]);
       const partnerObj = boyRows[0] ?? null;
@@ -842,7 +842,7 @@ export class DeliveryManagementService {
       }
       if (delivery_partner_id) {
         params.push(delivery_partner_id);
-        where.push(`(dlr.delivery_partner_id = $${params.length} OR db.id::text = $${params.length})`);
+        where.push(`dlr.delivery_partner_id = $${params.length}`);
       }
 
       const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
@@ -850,10 +850,11 @@ export class DeliveryManagementService {
       const sql = `
         SELECT
           dlr.*,
-          db.full_name AS partner_name,
-          db.phone AS partner_phone
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''), u.user_name, 'Delivery Partner') AS partner_name,
+          u.phone AS partner_phone
         FROM delivery_leave_requests dlr
-        LEFT JOIN delivery_partners db ON db.delivery_partner_id = dlr.delivery_partner_id
+        LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dlr.delivery_partner_id
+        LEFT JOIN users u ON u.user_id = dp.user_id
         ${whereClause}
         ORDER BY dlr.leave_date DESC, dlr.created_at DESC
       `;
@@ -925,10 +926,16 @@ export class DeliveryManagementService {
   async getPartnerPortfolio(id: string) {
     try {
       const partnerRows = await this.db.query(
-        `SELECT db.*, b.branch_name
-         FROM delivery_partners db
-         LEFT JOIN branches b ON b.branch_id = db.branch_id
-         WHERE db.delivery_partner_id = $1 OR db.user_id = $1 OR db.id::text = $1`,
+        `SELECT dp.*,
+                b.branch_name,
+                COALESCE(NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''), u.user_name, 'Delivery Partner') AS full_name,
+                COALESCE(u.phone, '') AS phone,
+                COALESCE(u.email, '') AS email,
+                u.profile_image_url AS profile_image
+         FROM delivery_partners dp
+         LEFT JOIN branches b ON b.branch_id = dp.branch_id
+         LEFT JOIN users u ON u.user_id = dp.user_id
+         WHERE dp.delivery_partner_id = $1 OR dp.user_id = $1`,
         [id],
       );
 

@@ -78,13 +78,13 @@ export class AuthController {
     let isRoleAllowed = false;
     switch (clientRole) {
       case 'CUSTOMER':
-        // Customer App: only CUSTOMER users
-        isRoleAllowed = userRole === 'CUSTOMER';
+        // Customer App: All registered users (CUSTOMER, DELIVERY_PARTNER, ADMIN, etc.) can log in to shop
+        isRoleAllowed = true;
         break;
 
       case 'DELIVERY_PARTNER':
-        // Delivery Partner App: only DELIVERY_PARTNER users
-        isRoleAllowed = userRole === 'DELIVERY_PARTNER';
+        // Delivery Partner App: allow DELIVERY_PARTNER, ADMIN, SUPER_ADMIN
+        isRoleAllowed = ['DELIVERY_PARTNER', 'ADMIN', 'SUPER_ADMIN'].includes(userRole);
         break;
 
       case 'ADMIN':
@@ -99,6 +99,26 @@ export class AuthController {
       );
       throw new UnauthorizedException(`Unauthorized role for ${clientRole} application`);
     }
+
+    // Check account verification status
+    if (user.account_status === 'pending_verification') {
+      const targetIdentifier = user.email || user.phone;
+      if (targetIdentifier) {
+        await this.authService.requestMobileOtp({
+          email: user.email,
+          phone: user.phone,
+          purpose: 'registration',
+        }).catch(() => {});
+      }
+      return res.status(HttpStatus.ACCEPTED).json({
+        requires_otp: true,
+        verification_pending: true,
+        message: 'Account verification pending. An OTP has been sent to your registered email/phone.',
+        identifier: targetIdentifier,
+        user_id: user.user_id,
+      });
+    }
+
 
     const incomingFcmToken = body.fcm_token || (body as any).fcmToken;
     if (incomingFcmToken) {

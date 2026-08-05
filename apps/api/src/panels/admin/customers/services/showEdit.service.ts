@@ -25,7 +25,20 @@ export class CustomerShowEditService {
     try {
       // 1. Fetch existing record
       const result = await this.dataService.query('customers', {
-        select: ['customers.*'],
+        select: [
+          'customers.*',
+          'users.first_name',
+          'users.last_name',
+          'users.phone',
+          'users.email',
+        ],
+        joins: [
+          {
+            type: 'left',
+            table: 'users',
+            on: [['customers.customer_id', 'users.user_id']],
+          },
+        ],
         where: [{ column: 'customers.customer_id', operator: '=', value: id }],
         limit: 1,
       });
@@ -33,6 +46,9 @@ export class CustomerShowEditService {
       if (!result?.data?.length) {
         throw new BadRequestException('Customer not found');
       }
+
+      const custData = result.data[0];
+      custData.full_name = custData.full_name || `${custData.first_name || ''} ${custData.last_name || ''}`.trim();
 
       // 2. Use SAME fields from showAdd (no duplication)
       const fields: FieldDef[] = [

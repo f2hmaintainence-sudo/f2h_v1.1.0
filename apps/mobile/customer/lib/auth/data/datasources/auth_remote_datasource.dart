@@ -116,13 +116,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }) async {
     try {
       final body = <String, dynamic>{
+        'first_name': userName,   // full name → users.first_name column
         'user_name': userName,
+        'name': userName,
         'email': email,
         'phone': phone,
         'password': password,
         'verification_token': verificationToken,
         if (fcmToken != null && fcmToken.isNotEmpty) 'fcm_token': fcmToken,
       };
+
       if (referralCode != null && referralCode.isNotEmpty) {
         body['referral_code'] = referralCode;
       }

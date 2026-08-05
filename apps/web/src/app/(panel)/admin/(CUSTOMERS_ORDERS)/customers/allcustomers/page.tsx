@@ -247,78 +247,77 @@ export default function AllCustomersPage() {
       ) : data.length === 0 ? (
         <div className="text-center py-20 text-gray-500">No customers found.</div>
       ) : (
-        <div className={`grid gap-3.5 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}>
+        <div className={`grid gap-3 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}>
           {data.map((c, i) => (
-            <div key={i} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between h-full min-w-0 overflow-hidden relative group">
-              <div>
-                {/* Header */}
-                <div className="flex items-center justify-between gap-2 mb-3 min-w-0">
-                  <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
-                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 ${getAvatarColors(c.full_name)}`}>
-                      {c.full_name?.charAt(0)?.toUpperCase() || 'U'}
-                    </div>
-                    <div className="min-w-0 flex-1 overflow-hidden">
-                      <h3 className="font-bold text-gray-900 text-xs sm:text-sm truncate block" title={c.full_name || 'Customer'}>
-                        {c.full_name || 'Customer'}
-                      </h3>
-                      <p className="text-[10px] font-mono text-gray-400 truncate block" title={c.customer_id}>
-                        #{c.customer_id}
-                      </p>
-                    </div>
+            <div
+              key={i}
+              onClick={() => router.push(`/admin/customers/${c.customer_id}`)}
+              className="bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-fresh-green/20 transition-all cursor-pointer relative overflow-hidden group"
+            >
+              {/* Arrow — absolutely positioned, never overflows */}
+              <div className="absolute top-2.5 right-2.5 w-6 h-6 rounded-md bg-gray-100 group-hover:bg-fresh-green flex items-center justify-center transition-colors z-10 pointer-events-none">
+                <ArrowRight size={12} className="text-gray-400 group-hover:text-white transition-colors" />
+              </div>
+
+              <div className="p-3.5">
+                {/* Header — pr-8 keeps text away from the arrow */}
+                <div className="flex items-center gap-2 mb-2.5 pr-8">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${getAvatarColors(c.full_name)}`}>
+                    {c.full_name?.charAt(0)?.toUpperCase() || 'U'}
                   </div>
-                  <button 
-                    onClick={() => router.push(`/admin/customers/${c.customer_id}`)}
-                    className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-fresh-green group-hover:text-white transition-colors shrink-0"
-                    title="View Portfolio"
-                  >
-                    <ArrowRight size={14} />
-                  </button>
+                  <div className="min-w-0 flex-1 overflow-hidden">
+                    <h3 className="font-semibold text-gray-900 text-xs truncate" title={c.full_name || 'Customer'}>
+                      {c.full_name || 'Customer'}
+                    </h3>
+                    <p className="text-[9px] font-mono text-gray-400 truncate" title={`#${c.customer_id}`}>
+                      #{c.customer_id}
+                    </p>
+                  </div>
                 </div>
 
-                {/* Details */}
-                <div className="space-y-1.5 mb-3 text-xs">
-                  <div className="flex items-center gap-2 text-gray-600 min-w-0">
-                    <Phone size={13} className="text-fresh-green shrink-0" />
-                    <span className="truncate" title={c.phone || 'No Phone Registered'}>
-                      {(!c.phone || c.phone.startsWith('NO_PHONE_')) ? (
-                        <span className="text-gray-400 font-normal">No Phone Registered</span>
-                      ) : (
-                        c.phone
-                      )}
+                {/* Contact Details */}
+                <div className="space-y-1 mb-2.5">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Phone size={11} className="text-fresh-green shrink-0" />
+                    <span className="text-[11px] text-gray-600 truncate">
+                      {(!c.phone || c.phone === '' || c.phone.startsWith('NO_PHONE_'))
+                        ? <span className="text-gray-400 italic">No Phone</span>
+                        : c.phone
+                      }
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 text-gray-600 min-w-0">
-                    <Mail size={13} className="text-fresh-green shrink-0" />
-                    <span className="truncate text-gray-500" title={c.email || 'No Email'}>
-                      {c.email || <span className="text-gray-400 font-normal">No Email</span>}
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Mail size={11} className="text-fresh-green shrink-0" />
+                    <span className="text-[11px] text-gray-500 truncate" title={c.email || ''}>
+                      {c.email || <span className="text-gray-400 italic">No Email</span>}
                     </span>
                   </div>
                 </div>
 
                 {/* Status Badge */}
-                <div className="mb-3">
-                  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                <div className="mb-2.5">
+                  <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${
                     c.customer_status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
                   }`}>
-                    <div className={`w-1.5 h-1.5 rounded-full ${c.customer_status === 'active' ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                    <div className={`w-1 h-1 rounded-full shrink-0 ${c.customer_status === 'active' ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
                     <span className="capitalize">{c.customer_status || 'active'}</span>
                   </span>
                 </div>
-              </div>
 
-              {/* KPI Footer Grid */}
-              <div className="grid grid-cols-3 gap-1.5 pt-2.5 border-t border-gray-100 text-center">
-                <div className="min-w-0">
-                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider truncate">Revenue</p>
-                  <p className="font-bold text-gray-900 text-xs truncate">₹{Number(c.lifetime_revenue || 0).toLocaleString()}</p>
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider truncate">Wallet</p>
-                  <p className="font-bold text-gray-900 text-xs truncate">₹{Number(c.wallet_balance || 0).toLocaleString()}</p>
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider truncate">Due</p>
-                  <p className="font-bold text-gray-900 text-xs truncate">₹{Number(c.outstanding_due || 0).toLocaleString()}</p>
+                {/* KPI Footer */}
+                <div className="grid grid-cols-3 gap-1 pt-2 border-t border-gray-100 text-center">
+                  <div className="min-w-0">
+                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wide truncate">Revenue</p>
+                    <p className="font-bold text-gray-800 text-[11px] truncate">₹{Number(c.lifetime_revenue || 0).toLocaleString()}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wide truncate">Wallet</p>
+                    <p className="font-bold text-gray-800 text-[11px] truncate">₹{Number(c.wallet_balance || 0).toLocaleString()}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wide truncate">Due</p>
+                    <p className="font-bold text-gray-800 text-[11px] truncate">₹{Number(c.outstanding_due || 0).toLocaleString()}</p>
+                  </div>
                 </div>
               </div>
             </div>

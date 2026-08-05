@@ -108,7 +108,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final response = await dioClient.dio.post(
         ApiEndpoints.register,
         data: {
+          'first_name': name,  // full name → users.first_name column
           'name': name,
+          'user_name': name,
           'email': email,
           'password': password,
           'phone': phone,
@@ -121,6 +123,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           'referral_code': referralCode,
         },
       );
+
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         // After registration, tokens (if any) are at top-level

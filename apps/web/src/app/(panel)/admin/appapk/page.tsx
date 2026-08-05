@@ -8,6 +8,7 @@ import {
   RotateCw, X, Monitor, Tablet, Activity, Play, Zap, RefreshCw, Layers
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { getApiBaseUrl } from "@/lib/api-config";
 
 export default function AppApkPage() {
   // Domain Health & Action States
@@ -57,49 +58,105 @@ export default function AppApkPage() {
 
   const [terminalLogs, setTerminalLogs] = useState<Record<string, string>>({});
 
-  // Trigger Rebuild / Sync Action
+  // Trigger Rebuild / Sync Action — with real job tracking + polling
   const triggerRebuildAction = async (appId: string, name: string, action: "run" | "clean" | "reload" | "rebuild" = "rebuild") => {
     setBuildingState((prev) => ({ ...prev, [appId]: true }));
     setActionSuccess(null);
     const actionLabel = action === "run" ? "Flutter Run" : action === "clean" ? "Flutter Clean" : action === "reload" ? "Hot Reload" : "Full Rebuild";
+
     setTerminalLogs((prev) => ({
       ...prev,
-      [appId]: `[${new Date().toLocaleTimeString()}] Executing ${actionLabel} for ${name}...\nRunning command on server...`,
+      [appId]: `[${new Date().toLocaleTimeString()}] ⏳ Starting ${actionLabel} for ${name}...\nConnecting to build server...`,
     }));
 
     try {
-      const res = await fetch("https://f2hfresh.com/api/v1/app/rebuild", {
+      const apiBaseUrl = getApiBaseUrl();
+
+      // Step 1: Kick off build and get jobId
+      const res = await fetch(`${apiBaseUrl}/app/rebuild`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ appId, action }),
       });
-      const data = await res.json();
 
-      const logOutput = data?.output || data?.message || (data?.success ? `${actionLabel} completed cleanly with 0 errors.` : "Operation failed. Check logs.");
+      let startData: any = null;
+      const ct = res.headers.get("content-type");
+      if (ct && ct.includes("application/json")) {
+        startData = await res.json();
+      } else {
+        const text = await res.text();
+        startData = { success: res.ok, message: text || res.statusText };
+      }
+
+      if (!startData?.jobId) {
+        // Fallback: no jobId returned (old API or error)
+        setTerminalLogs((prev) => ({
+          ...prev,
+          [appId]: `[${new Date().toLocaleTimeString()}] ${startData?.message || "Build initiated."}`,
+        }));
+        setActionSuccess(`${name} ${actionLabel} initiated.`);
+        return;
+      }
+
+      const jobId = startData.jobId;
       setTerminalLogs((prev) => ({
         ...prev,
-        [appId]: `[${new Date().toLocaleTimeString()}] ${actionLabel} output for ${name}:\n${logOutput}`,
+        [appId]: `[${new Date().toLocaleTimeString()}] ⚙️ Build started (Job: ${jobId})\nPolling for completion...`,
       }));
 
-      if (data?.success) {
-        setActionSuccess(`${name} ${actionLabel} completed successfully!`);
-      } else {
-        setActionSuccess(`${name} ${actionLabel} executed. Check terminal logs below for details.`);
-      }
+      // Step 2: Poll status every 4s until done
+      await new Promise<void>((resolve) => {
+        const poll = setInterval(async () => {
+          try {
+            const statusRes = await fetch(`${apiBaseUrl}/app/rebuild/status/${jobId}`);
+            const statusData = await statusRes.json();
+            const elapsed = statusData.startedAt
+              ? `${Math.round((Date.now() - new Date(statusData.startedAt).getTime()) / 1000)}s elapsed`
+              : "";
+
+            if (statusData.status === "success") {
+              clearInterval(poll);
+              setTerminalLogs((prev) => ({
+                ...prev,
+                [appId]: `[${new Date().toLocaleTimeString()}] ✅ ${actionLabel} completed for ${name} (${elapsed})\n\n${statusData.output || "Build deployed cleanly."}`,
+              }));
+              setActionSuccess(`${name} ${actionLabel} completed successfully!`);
+              checkDomainPing(appId, appId === "customer" ? "https://customer.f2hfresh.com" : "https://partner.f2hfresh.com");
+              reloadIframe();
+              setTimeout(() => setActionSuccess(null), 6000);
+              resolve();
+            } else if (statusData.status === "error") {
+              clearInterval(poll);
+              setTerminalLogs((prev) => ({
+                ...prev,
+                [appId]: `[${new Date().toLocaleTimeString()}] ❌ ${actionLabel} failed for ${name} (${elapsed})\n\n${statusData.error || "Unknown error."}`,
+              }));
+              setActionSuccess(null);
+              resolve();
+            } else {
+              // Still running — update log with elapsed time
+              setTerminalLogs((prev) => ({
+                ...prev,
+                [appId]: `[${new Date().toLocaleTimeString()}] ⚙️ Building... ${elapsed}\nFlutter compiling dart2js — please wait...`,
+              }));
+            }
+          } catch {
+            // Network blip — keep polling silently
+          }
+        }, 4000);
+      });
+
     } catch (err: any) {
       const errMsg = err?.message || String(err);
       setTerminalLogs((prev) => ({
         ...prev,
-        [appId]: `[${new Date().toLocaleTimeString()}] Error during ${actionLabel}: ${errMsg}`,
+        [appId]: `[${new Date().toLocaleTimeString()}] ❌ Error during ${actionLabel}: ${errMsg}`,
       }));
-      setActionSuccess(`${name} ${actionLabel} executed.`);
     } finally {
       setBuildingState((prev) => ({ ...prev, [appId]: false }));
-      checkDomainPing(appId, appId === "customer" ? "https://customer.f2hfresh.com" : "https://partner.f2hfresh.com");
-      reloadIframe();
-      setTimeout(() => setActionSuccess(null), 5000);
     }
   };
+
 
   const apps = [
     {

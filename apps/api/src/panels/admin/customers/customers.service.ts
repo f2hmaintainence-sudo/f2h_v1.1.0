@@ -1768,4 +1768,105 @@ export class CustomersService {
       throw new InternalServerErrorException('Failed to settle postpaid bill');
     }
   }
+
+  // ─── SPECIAL PRICES ────────────────────────────────────────────
+
+  async getProductsList() {
+    try {
+      const rows = await this.databaseService.query(
+        `SELECT product_id, name, unit_type, is_active
+         FROM products
+         WHERE deleted_at IS NULL AND is_active = true
+         ORDER BY name ASC`,
+        [],
+      );
+      return { status: true, data: rows };
+    } catch (error) {
+      this.developer.error('getProductsList error', { error });
+      throw new InternalServerErrorException('Failed to fetch products');
+    }
+  }
+
+  async getProductVariants(productId: string) {
+    try {
+      const rows = await this.databaseService.query(
+        `SELECT variant_id, product_id, name, price, subscription_price,
+                original_price, discount, unit_value, unit_type, status
+         FROM product_variants
+         WHERE product_id = $1 AND deleted_at IS NULL AND status = 'active'
+         ORDER BY sort_order ASC, name ASC`,
+        [productId],
+      );
+      return { status: true, data: rows };
+    } catch (error) {
+      this.developer.error('getProductVariants error', { error });
+      throw new InternalServerErrorException('Failed to fetch product variants');
+    }
+  }
+
+  async getSpecialPrices(customerId: string) {
+    try {
+      const rows = await this.databaseService.query(
+        `SELECT csp.id, csp.customer_id, csp.product_variant_id, csp.discount,
+                csp.created_at, csp.updated_at,
+                pv.name AS variant_name, pv.price AS selling_price, pv.original_price,
+                p.name AS product_name, p.product_id
+         FROM customer_special_prices csp
+         JOIN product_variants pv ON pv.variant_id = csp.product_variant_id
+         JOIN products p ON p.product_id = pv.product_id
+         WHERE csp.customer_id = $1 AND csp.deleted_at IS NULL
+         ORDER BY p.name ASC, pv.name ASC`,
+        [customerId],
+      );
+      return { status: true, data: rows };
+    } catch (error) {
+      this.developer.error('getSpecialPrices error', { error });
+      throw new InternalServerErrorException('Failed to fetch special prices');
+    }
+  }
+
+  async saveSpecialPrices(
+    customerId: string,
+    items: Array<{ product_variant_id: string; discount: number }>,
+    adminId: string,
+  ) {
+    try {
+      if (!items || items.length === 0) {
+        throw new BadRequestException('No items provided');
+      }
+      for (const item of items) {
+        const discount = Number(item.discount ?? 0);
+        if (discount < 0 || discount > 100) {
+          throw new BadRequestException(`Discount must be between 0 and 100 — got ${discount}`);
+        }
+        // Upsert: insert or update on conflict
+        await this.databaseService.query(
+          `INSERT INTO customer_special_prices (customer_id, product_variant_id, discount, created_at, updated_at)
+           VALUES ($1, $2, $3, NOW(), NOW())
+           ON CONFLICT (customer_id, product_variant_id)
+           DO UPDATE SET discount = EXCLUDED.discount, updated_at = NOW(), deleted_at = NULL`,
+          [customerId, item.product_variant_id, discount],
+        );
+      }
+      return { status: true, message: `Special prices saved for ${items.length} variant(s)` };
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      this.developer.error('saveSpecialPrices error', { error, customerId });
+      throw new InternalServerErrorException('Failed to save special prices');
+    }
+  }
+
+  async deleteSpecialPrice(customerId: string, variantId: string) {
+    try {
+      await this.databaseService.query(
+        `UPDATE customer_special_prices SET deleted_at = NOW()
+         WHERE customer_id = $1 AND product_variant_id = $2`,
+        [customerId, variantId],
+      );
+      return { status: true, message: 'Special price removed' };
+    } catch (error) {
+      this.developer.error('deleteSpecialPrice error', { error });
+      throw new InternalServerErrorException('Failed to delete special price');
+    }
+  }
 }

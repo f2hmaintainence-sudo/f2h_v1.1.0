@@ -12,16 +12,22 @@ export class MailService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
+    const isSSL = process.env.INFO_MAIL_ENCRYPTION === 'ssl';
     this.transporter = nodemailer.createTransport({
       host: process.env.INFO_MAIL_HOST,
-      port: Number(process.env.INFO_MAIL_PORT),
-      secure: process.env.INFO_MAIL_ENCRYPTION === 'ssl',
+      port: Number(process.env.INFO_MAIL_PORT || 587),
+      secure: isSSL,
+      requireTLS: !isSSL, // force STARTTLS on port 587/tls
       auth: {
         user: process.env.INFO_MAIL_USERNAME,
         pass: process.env.INFO_MAIL_PASSWORD,
       },
+      tls: {
+        rejectUnauthorized: false, // allow self-signed certs on shared hosting
+      },
     });
   }
+
 
   async sendOtp(email: string, otp: string) {
     await this.sendAuthTemplate(email, forgotPasswordOtpTemplate(otp));

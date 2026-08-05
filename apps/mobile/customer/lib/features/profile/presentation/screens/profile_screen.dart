@@ -1007,7 +1007,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               (authState is Authenticated || profile != null) &&
               state.status != CustomerSessionStatus.unauthenticated;
           String customerName = 'Guest';
-          String customerMobile = 'Login to unlock your farm-fresh dashboard Test';
+          String customerMobile = 'Login to unlock your dashboard';
           String customerInfo = 'NORMAL';
           String customerEmail = 'Fresh market essentials, delivered daily';
 
@@ -1437,18 +1437,71 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         child: Row(
                           children: [
+                            // _quickAction(
+                            //   Icons.person_outline_rounded,
+                            //   'Details',
+                            //   const Color(0xFFE8F5E9),
+                            //   const Color(0xFF2E7D32),
+                            //   () {
+                            //     if (isLoggedIn) {
+                            //       _showPersonalDetails(context, profile);
+                            //     } else {
+                            //       _showLoginDrawer(context);
+                            //     }
+                            //   },
+                            // ),
                             _quickAction(
-                              Icons.person_outline_rounded,
-                              'Details',
+                              Icons.card_giftcard_rounded,
+                              'Refer',
                               const Color(0xFFE8F5E9),
                               const Color(0xFF2E7D32),
                               () {
-                                if (isLoggedIn) {
-                                  _showPersonalDetails(context, profile);
+                                if (isLoggedIn && profile != null) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ReferralScreen(
+                                        referralCode: profile.referralCode,
+                                        referralStatus: profile.referralStatus,
+                                      ),
+                                    ),
+                                  );
                                 } else {
                                   _showLoginDrawer(context);
                                 }
                               },
+                            ),
+
+                            _quickAction(
+                              Icons.receipt_long_outlined,
+                              'Bills',
+                              const Color(0xFFE8F5E9),
+                              const Color(0xFF2E7D32),
+                              () {
+                                if (isLoggedIn) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const CustomerBillsScreen(),
+                                    ),
+                                  );
+                                } else {
+                                  _showLoginDrawer(context);
+                                }
+                              },
+                            ),
+                            _quickAction(
+                              Icons.receipt_long_outlined,
+                              'Orders',
+                              const Color(0xFFE3F2FD),
+                              const Color(0xFF1565C0),
+                              () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const OrderHistoryScreen(),
+                                ),
+                              ),
                             ),
                             _quickAction(
                               Icons.location_on_outlined,
@@ -1479,161 +1532,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 }
                               },
                             ),
-                            _quickAction(
-                              Icons.receipt_long_outlined,
-                              'Orders',
-                              const Color(0xFFE3F2FD),
-                              const Color(0xFF1565C0),
-                              () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const OrderHistoryScreen(),
-                                ),
-                              ),
-                            ),
-                            _quickAction(
-                              Icons.inventory_2_outlined,
-                              'Containers',
+                            // _quickAction(
+                            //   Icons.inventory_2_outlined,
+                            //   'Containers',
+                            //   const Color(0xFFFFF3E0),
+                            //   _marketOrange,
+                            //   () => Navigator.push(
+                            //     context,
+                            //     MaterialPageRoute(
+                            //       builder: (_) =>
+                            //           const ContainerBalanceScreen(),
+                            //     ),
+                            //   ),
+                            // ),
+
+                             _quickAction(
+                              Icons.notifications_none_outlined,
+                              'Notifications',
                               const Color(0xFFFFF3E0),
                               _marketOrange,
                               () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) =>
-                                      const ContainerBalanceScreen(),
+                                      const  NotificationsScreen(),
                                 ),
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Account Settings Group
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 8,
-                        ),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'ACCOUNT SETTINGS',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                              color: kTextSub.withValues(alpha: 0.8),
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: kBorderLt, width: 1.2),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: _softShadow,
-                              blurRadius: 20,
-                              offset: Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            _menuItem(
-                              Icons.card_giftcard_rounded,
-                              'Refer & Earn ₹50',
-                              const Color(0xFFECFDF5),
-                              const Color(0xFF16653A),
-                              onTap: () {
-                                if (isLoggedIn && profile != null) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => ReferralScreen(
-                                        referralCode: profile.referralCode,
-                                        referralStatus: profile.referralStatus,
-                                      ),
-                                    ),
-                                  );
-                                } else {
-                                  _showLoginDrawer(context);
-                                }
-                              },
-                            ),
-                            _divider(),
-                            _menuItem(
-                              Icons.receipt_long_outlined,
-                              'Customer Bills',
-                              const Color(0xFFEDE9FE),
-                              const Color(0xFF7C3AED),
-                              onTap: () {
-                                if (isLoggedIn) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          const CustomerBillsScreen(),
-                                    ),
-                                  );
-                                } else {
-                                  _showLoginDrawer(context);
-                                }
-                              },
-                            ),
-                            _divider(),
-                            _menuItem(
-                              Icons.notifications_none_outlined,
-                              'My Notifications',
-                              const Color(0xFFE8F5E9),
-                              kPrimary,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const NotificationsScreen(),
-                                  ),
-                                );
-                              },
-                            ),
-                            _divider(),
-                            // _menuItem(
-                            //   Icons.language_outlined,
-                            //   'Language - English',
-                            //   const Color(0xFFE0F7FA),
-                            //   const Color(0xFF0097A7),
-                            //   onTap: () => _showLanguageSelector(context),
-                            // ),
-                            // _divider(),
-                            _menuItem(
+                            _quickAction(
                               Icons.security_outlined,
-                              'Privacy & Security',
-                              const Color(0xFFF1F8E9),
-                              const Color(0xFF558B2F),
-                              onTap: () {
-                                // redirect to privacy_screen.dart
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const PrivacyScreen(),
-                                  ),
-                                );
-                              },
+                              'Privacy',
+                              const Color(0xFFFFF3E0),
+                              _marketOrange,
+                              () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const PrivacyScreen(),
+                                ),
+                              ),
                             ),
-                            _divider(),
-                            _menuItem(
-                              Icons.star_outline_rounded,
-                              'Rate F2H App',
-                              const Color(0xFFFFFDE7),
-                              const Color(0xFFFBC02D),
-                              onTap: () {
-                                // redirct to google play store or apple store
-                                // launchUrl(Uri.parse('https://play.google.com/store/apps/details?id=com.f2h.customer'));
+                             _quickAction(
+                              Icons.inventory_2_outlined,
+                              'Containers',
+                              const Color(0xFFFFF3E0),
+                              _marketOrange,
+                              () {
                                 showDialog(
                                   context: context,
                                   builder: (_) => AlertDialog(
@@ -1696,9 +1640,203 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 );
                               },
                             ),
+
+
                           ],
                         ),
                       ),
+                      const SizedBox(height: 16),
+
+                      // Account Settings Group
+                      // Padding(
+                      //   padding: const EdgeInsets.symmetric(
+                      //     horizontal: 20,
+                      //     vertical: 8,
+                      //   ),
+                      //   child: Align(
+                      //     alignment: Alignment.centerLeft,
+                      //     child: Text(
+                      //       'ACCOUNT SETTINGS',
+                      //       style: TextStyle(
+                      //         fontSize: 11,
+                      //         fontWeight: FontWeight.w900,
+                      //         color: kTextSub.withValues(alpha: 0.8),
+                      //         letterSpacing: 1.2,
+                      //       ),
+                      //     ),
+                      //   ),
+                      // ),
+                      // Container(
+                      //   margin: const EdgeInsets.symmetric(horizontal: 16),
+                      //   decoration: BoxDecoration(
+                      //     color: Colors.white,
+                      //     borderRadius: BorderRadius.circular(24),
+                      //     border: Border.all(color: kBorderLt, width: 1.2),
+                      //     boxShadow: const [
+                      //       BoxShadow(
+                      //         color: _softShadow,
+                      //         blurRadius: 20,
+                      //         offset: Offset(0, 8),
+                      //       ),
+                      //     ],
+                      //   ),
+                      //   child: Column(
+                      //     children: [
+                      //       // _menuItem(
+                      //       //   Icons.card_giftcard_rounded,
+                      //       //   'Refer & Earn ₹50',
+                      //       //   const Color(0xFFECFDF5),
+                      //       //   const Color(0xFF16653A),
+                      //       //   onTap: () {
+                      //       //     if (isLoggedIn && profile != null) {
+                      //       //       Navigator.push(
+                      //       //         context,
+                      //       //         MaterialPageRoute(
+                      //       //           builder: (_) => ReferralScreen(
+                      //       //             referralCode: profile.referralCode,
+                      //       //             referralStatus: profile.referralStatus,
+                      //       //           ),
+                      //       //         ),
+                      //       //       );
+                      //       //     } else {
+                      //       //       _showLoginDrawer(context);
+                      //       //     }
+                      //       //   },
+                      //       // ),
+                      //       // _divider(),
+                      //       // _menuItem(
+                      //       //   Icons.receipt_long_outlined,
+                      //       //   'Customer Bills',
+                      //       //   const Color(0xFFEDE9FE),
+                      //       //   const Color(0xFF7C3AED),
+                      //       //   onTap: () {
+                      //       //     if (isLoggedIn) {
+                      //       //       Navigator.push(
+                      //       //         context,
+                      //       //         MaterialPageRoute(
+                      //       //           builder: (_) =>
+                      //       //               const CustomerBillsScreen(),
+                      //       //         ),
+                      //       //       );
+                      //       //     } else {
+                      //       //       _showLoginDrawer(context);
+                      //       //     }
+                      //       //   },
+                      //       // ),
+                      //       // _divider(),
+                      //       // _menuItem(
+                      //       //   Icons.notifications_none_outlined,
+                      //       //   'My Notifications',
+                      //       //   const Color(0xFFE8F5E9),
+                      //       //   kPrimary,
+                      //       //   onTap: () {
+                      //       //     Navigator.push(
+                      //       //       context,
+                      //       //       MaterialPageRoute(
+                      //       //         builder: (context) =>
+                      //       //             const NotificationsScreen(),
+                      //       //       ),
+                      //       //     );
+                      //       //   },
+                      //       // ),
+                      //       // _divider(),
+                      //       // _menuItem(
+                      //       //   Icons.language_outlined,
+                      //       //   'Language - English',
+                      //       //   const Color(0xFFE0F7FA),
+                      //       //   const Color(0xFF0097A7),
+                      //       //   onTap: () => _showLanguageSelector(context),
+                      //       // ),
+                      //       // _divider(),
+                      //       // _menuItem(
+                      //       //   Icons.security_outlined,
+                      //       //   'Privacy & Security',
+                      //       //   const Color(0xFFF1F8E9),
+                      //       //   const Color(0xFF558B2F),
+                      //       //   onTap: () {
+                      //       //     // redirect to privacy_screen.dart
+                      //       //     Navigator.push(
+                      //       //       context,
+                      //       //       MaterialPageRoute(
+                      //       //         builder: (_) => const PrivacyScreen(),
+                      //       //       ),
+                      //       //     );
+                      //       //   },
+                      //       // ),
+                      //       // _divider(),
+                      //       // _menuItem(
+                      //       //   Icons.star_outline_rounded,
+                      //       //   'Rate F2H App',
+                      //       //   const Color(0xFFFFFDE7),
+                      //       //   const Color(0xFFFBC02D),
+                      //       //   onTap: () {
+                      //       //     // redirct to google play store or apple store
+                      //       //     // launchUrl(Uri.parse('https://play.google.com/store/apps/details?id=com.f2h.customer'));
+                      //       //     showDialog(
+                      //       //       context: context,
+                      //       //       builder: (_) => AlertDialog(
+                      //       //         title: const Text('Rate F2H App'),
+                      //       //         content: Column(
+                      //       //           mainAxisSize: MainAxisSize.min,
+                      //       //           children: [
+                      //       //             const Text(
+                      //       //               'How would you rate F2H App?',
+                      //       //             ),
+                      //       //             const SizedBox(height: 16),
+                      //       //             Row(
+                      //       //               mainAxisAlignment:
+                      //       //                   MainAxisAlignment.center,
+                      //       //               children: [
+                      //       //                 for (int i = 1; i <= 5; i++)
+                      //       //                   IconButton(
+                      //       //                     icon: Icon(
+                      //       //                       Icons.star,
+                      //       //                       color: i <= 3
+                      //       //                           ? Colors.grey
+                      //       //                           : Colors.orange,
+                      //       //                     ),
+                      //       //                     onPressed: () {
+                      //       //                       Navigator.pop(context);
+                      //       //                       if (i <= 3) {
+                      //       //                         ScaffoldMessenger.of(
+                      //       //                           context,
+                      //       //                         ).showSnackBar(
+                      //       //                           const SnackBar(
+                      //       //                             content: Text(
+                      //       //                               'Thank you for your feedback!',
+                      //       //                             ),
+                      //       //                             behavior:
+                      //       //                                 SnackBarBehavior
+                      //       //                                     .floating,
+                      //       //                           ),
+                      //       //                         );
+                      //       //                       } else {
+                      //       //                         ScaffoldMessenger.of(
+                      //       //                           context,
+                      //       //                         ).showSnackBar(
+                      //       //                           const SnackBar(
+                      //       //                             content: Text(
+                      //       //                               'Thank you for rating F2H App 5 stars!',
+                      //       //                             ),
+                      //       //                             behavior:
+                      //       //                                 SnackBarBehavior
+                      //       //                                     .floating,
+                      //       //                           ),
+                      //       //                         );
+                      //       //                       }
+                      //       //                     },
+                      //       //                   ),
+                      //       //               ],
+                      //       //             ),
+                      //       //           ],
+                      //       //         ),
+                      //       //       ),
+                      //       //     );
+                      //       //   },
+                      //       // ),
+                      //     ],
+                      //   ),
+                      // ),
                       const SizedBox(height: 20),
 
                       // Support & Info Group

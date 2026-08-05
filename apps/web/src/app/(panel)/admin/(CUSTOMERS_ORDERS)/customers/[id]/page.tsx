@@ -22,7 +22,13 @@ import {
   Box,
   Truck,
   CheckCircle2,
-  Bell
+  Bell,
+  Tag,
+  X,
+  Plus,
+  Trash2,
+  Percent,
+  Save
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -48,6 +54,89 @@ export default function CustomerDetailsPage() {
   const [isPostpaidModalOpen, setIsPostpaidModalOpen] = useState(false);
   const [postpaidInput, setPostpaidInput] = useState('');
   const [savingPostpaid, setSavingPostpaid] = useState(false);
+  // Special Price Modal
+  const [isSpecialPriceModalOpen, setIsSpecialPriceModalOpen] = useState(false);
+  const [spProducts, setSpProducts] = useState([]);
+  const [spRows, setSpRows] = useState([]);
+  const [spLoading, setSpLoading] = useState(false);
+  const [spSaving, setSpSaving] = useState(false);
+  const [spRowCounter, setSpRowCounter] = useState(0);
+
+  const openSpecialPriceModal = async () => {
+    setIsSpecialPriceModalOpen(true);
+    setSpLoading(true);
+    try {
+      const [prodRes, existRes] = await Promise.all([
+        api.get('/admin/customer/products/list'),
+        api.get(`/admin/customer/${id}/special-prices`),
+      ]);
+      const products = prodRes.data?.data || [];
+      const existing = existRes.data?.data || [];
+      setSpProducts(products);
+      if (existing.length > 0) {
+        let counter = 0;
+        const rows = [];
+        for (const e of existing) {
+          const varRes = await api.get(`/admin/customer/products/${e.product_id}/variants`);
+          const variants = varRes.data?.data || [];
+          const variantData = variants.find(v => v.variant_id === e.product_variant_id) || null;
+          rows.push({ rowId: counter++, productId: e.product_id, variants, variantId: e.product_variant_id, variantData, discount: String(e.discount) });
+        }
+        setSpRowCounter(counter);
+        setSpRows(rows);
+      } else {
+        setSpRowCounter(1);
+        setSpRows([{ rowId: 0, productId: '', variants: [], variantId: '', variantData: null, discount: '' }]);
+      }
+    } catch (err) { console.error(err); }
+    finally { setSpLoading(false); }
+  };
+
+  const addSpRow = () => {
+    const newId = spRowCounter;
+    setSpRowCounter(p => p + 1);
+    setSpRows(p => [...p, { rowId: newId, productId: '', variants: [], variantId: '', variantData: null, discount: '' }]);
+  };
+
+  const removeSpRow = rowId => setSpRows(p => p.filter(r => r.rowId !== rowId));
+
+  const handleSpProductChange = async (rowId, productId) => {
+    setSpRows(p => p.map(r => r.rowId === rowId ? { ...r, productId, variants: [], variantId: '', variantData: null } : r));
+    if (!productId) return;
+    try {
+      const res = await api.get(`/admin/customer/products/${productId}/variants`);
+      const variants = res.data?.data || [];
+      setSpRows(p => p.map(r => r.rowId === rowId ? { ...r, variants } : r));
+    } catch (err) { console.error(err); }
+  };
+
+  const handleSpVariantChange = (rowId, variantId, variants) => {
+    const variantData = variants.find(v => v.variant_id === variantId) || null;
+    setSpRows(p => p.map(r => r.rowId === rowId ? { ...r, variantId, variantData } : r));
+  };
+
+  const handleSpDiscountChange = (rowId, discount) =>
+    setSpRows(p => p.map(r => r.rowId === rowId ? { ...r, discount } : r));
+
+  const saveSpecialPrices = async () => {
+    const valid = spRows.filter(r => r.variantId && r.discount !== '');
+    if (!valid.length) return;
+    setSpSaving(true);
+    try {
+      await api.post(`/admin/customer/${id}/special-prices`, {
+        items: valid.map(r => ({ product_variant_id: r.variantId, discount: Number(r.discount) })),
+      });
+      setIsSpecialPriceModalOpen(false);
+    } catch (err) { console.error(err); }
+    finally { setSpSaving(false); }
+  };
+
+  const deleteSpecialPrice = async (rowId, variantId) => {
+    try {
+      if (variantId) await api.delete(`/admin/customer/${id}/special-prices/${variantId}`);
+      removeSpRow(rowId);
+    } catch (err) { console.error(err); }
+  };
 
   useEffect(() => {
     if (id && !['allcustomers', 'add', 'postpaidcustomers', 'groups', 'wallets', 'branch-customers'].includes(id)) {
@@ -121,6 +210,7 @@ export default function CustomerDetailsPage() {
   ];
 
   return (
+    <>
     <div className="space-y-6 p-4 md:p-6 font-sans min-h-screen bg-slate-50/50">
       
       {/* Return to Customers Navigation */}
@@ -163,6 +253,12 @@ export default function CustomerDetailsPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={openSpecialPriceModal}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors flex items-center gap-2 cursor-pointer"
+          >
+            <Tag size={16} /> Special Price
+          </button>
           <button 
             onClick={() => {
               setPostpaidInput(String(customer.postpaid_credit_limit || 0));
@@ -1609,9 +1705,152 @@ function ActivityLogTab({ timeline }: { timeline: any[] }) {
         </div>
       )}
     </div>
+
+      {/* SPECIAL PRICE MODAL */}
+      {isSpecialPriceModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-50 rounded-xl"><Tag size={20} className="text-emerald-600" /></div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">Special Pricing</h3>
+                  <p className="text-xs text-slate-500">Customer: <span className="font-semibold text-slate-700">{data?.customer?.full_name || 'Customer'}</span> &nbsp;{'·'}&nbsp; #{data?.customer?.customer_id}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {data?.customer?.phone && data.customer.phone !== '' && (
+                  <span className="text-xs text-slate-500 flex items-center gap-1"><Phone size={12} />{data.customer.phone}</span>
+                )}
+                <button onClick={() => setIsSpecialPriceModalOpen(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"><X size={18} /></button>
+              </div>
+            </div>
+            <div className="overflow-y-auto flex-1 px-6 py-5">
+              {spLoading ? (
+                <div className="flex justify-center py-16"><div className="animate-spin w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full"></div></div>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    {spRows.map((row, idx) => {
+                      const sellingPrice = Number(row.variantData?.price || 0);
+                      const discountNum = Number(row.discount || 0);
+                      const specialPrice = sellingPrice - (sellingPrice * discountNum / 100);
+                      const saving = sellingPrice - specialPrice;
+                      return (
+                        <div key={row.rowId} className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                          <div className="flex items-start gap-3">
+                            <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center shrink-0 mt-1">{idx + 1}</div>
+                            <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Product</label>
+                                <select value={row.productId} onChange={e => handleSpProductChange(row.rowId, e.target.value)} className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                                  <option value="">Select Product...</option>
+                                  {spProducts.map(p => <option key={p.product_id} value={p.product_id}>{p.name}</option>)}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Variant</label>
+                                <select value={row.variantId} onChange={e => handleSpVariantChange(row.rowId, e.target.value, row.variants)} disabled={!row.productId} className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 disabled:opacity-50">
+                                  <option value="">Select Variant...</option>
+                                  {row.variants.map(v => <option key={v.variant_id} value={v.variant_id}>{v.name} ({Number(v.price).toLocaleString('en-IN')})</option>)}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Discount (%)</label>
+                                <div className="relative">
+                                  <input type="number" min="0" max="100" step="0.01" placeholder="0" value={row.discount} onChange={e => handleSpDiscountChange(row.rowId, e.target.value)} disabled={!row.variantId} className="w-full text-xs border border-slate-200 rounded-lg pl-2.5 pr-8 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 disabled:opacity-50" />
+                                  <Percent size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                </div>
+                              </div>
+                            </div>
+                            <button onClick={() => deleteSpecialPrice(row.rowId, row.variantId)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0 mt-1"><Trash2 size={15} /></button>
+                          </div>
+                          {row.variantData && row.discount !== '' && (
+                            <div className="mt-3 ml-9 grid grid-cols-3 gap-2 p-3 bg-white rounded-xl border border-emerald-100">
+                              <div className="text-center">
+                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Selling Price</p>
+                                <p className="font-bold text-slate-800 text-sm">Rs.{sellingPrice.toLocaleString('en-IN', {minimumFractionDigits:2})}</p>
+                              </div>
+                              <div className="text-center border-x border-slate-100">
+                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Discount</p>
+                                <p className="font-bold text-orange-500 text-sm">{discountNum}% off</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Special Price</p>
+                                <p className="font-bold text-emerald-600 text-sm">Rs.{specialPrice.toLocaleString('en-IN', {minimumFractionDigits:2})}</p>
+                              </div>
+                              {saving > 0 && (
+                                <div className="col-span-3 text-center mt-1">
+                                  <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-3 py-0.5 rounded-full">Customer saves Rs.{saving.toLocaleString('en-IN', {minimumFractionDigits:2})} per order</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <button onClick={addSpRow} className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-slate-200 hover:border-emerald-400 text-slate-400 hover:text-emerald-600 rounded-xl text-xs font-semibold transition-all">
+                    <Plus size={14} /> Add Another Product Variant
+                  </button>
+                  {spRows.some(r => r.variantData && r.discount !== '') && (
+                    <div className="mt-5">
+                      <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Pricing Summary</h4>
+                      <div className="rounded-xl border border-slate-100 overflow-hidden">
+                        <table className="w-full text-xs">
+                          <thead className="bg-slate-50">
+                            <tr>
+                              <th className="text-left py-2.5 px-4 text-[10px] font-bold text-slate-500 uppercase">Product / Variant</th>
+                              <th className="text-right py-2.5 px-4 text-[10px] font-bold text-slate-500 uppercase">Selling Price</th>
+                              <th className="text-right py-2.5 px-4 text-[10px] font-bold text-slate-500 uppercase">Discount</th>
+                              <th className="text-right py-2.5 px-4 text-[10px] font-bold text-slate-500 uppercase">Special Price</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {spRows.filter(r => r.variantData && r.discount !== '').map((row, i) => {
+                              const sp = Number(row.variantData.price || 0);
+                              const d = Number(row.discount || 0);
+                              const fin = sp - (sp * d / 100);
+                              const prodName = spProducts.find(p => p.product_id === row.productId)?.name || 'Product';
+                              return (
+                                <tr key={row.rowId} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                                  <td className="py-2.5 px-4 font-semibold text-slate-800">{prodName} <span className="text-slate-400 font-normal">/ {row.variantData.name}</span></td>
+                                  <td className="py-2.5 px-4 text-right text-slate-600">Rs.{sp.toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+                                  <td className="py-2.5 px-4 text-right text-orange-500 font-bold">{d}%</td>
+                                  <td className="py-2.5 px-4 text-right text-emerald-600 font-bold">Rs.{fin.toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+                                </tr>
+                              );
+                            })}
+                            <tr className="bg-emerald-50 border-t border-emerald-100">
+                              <td className="py-2.5 px-4 font-bold text-slate-800">Total</td>
+                              <td className="py-2.5 px-4 text-right font-bold text-slate-800">Rs.{spRows.filter(r=>r.variantData&&r.discount!=='').reduce((s,r)=>s+Number(r.variantData.price||0),0).toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+                              <td className="py-2.5 px-4 text-right">-</td>
+                              <td className="py-2.5 px-4 text-right font-bold text-emerald-700">Rs.{spRows.filter(r=>r.variantData&&r.discount!=='').reduce((s,r)=>{const sp=Number(r.variantData.price||0);const d=Number(r.discount||0);return s+(sp-sp*d/100);},0).toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between shrink-0">
+              <p className="text-xs text-slate-500">{spRows.filter(r => r.variantId && r.discount !== '').length} variant(s) ready to save</p>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setIsSpecialPriceModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
+                <button onClick={saveSpecialPrices} disabled={spSaving || spRows.filter(r => r.variantId && r.discount !== '').length === 0} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2">
+                  {spSaving ? <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : <Save size={15} />}
+                  Save Special Prices
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
-
 function getAvatarColors(name: string) {
   const char = name?.charAt(0)?.toUpperCase() || 'A';
   if (['A','B','C','D','P'].includes(char)) return 'bg-emerald-50 text-emerald-600';

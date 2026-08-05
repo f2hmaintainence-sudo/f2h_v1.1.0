@@ -253,9 +253,38 @@ export class CustomersController {
     return this.customersService.exportCustomerData(id);
   }
 
-  @Delete(':id')
-  async deleteAccount(@Param('id') id: string, @Req() req: any) {
+  // ─── SPECIAL PRICES ────────────────────────────────────────────
+  @Get('products/list')
+  async getProductsList() {
+    return this.customersService.getProductsList();
+  }
+
+  @Get('products/:productId/variants')
+  async getProductVariants(@Param('productId') productId: string) {
+    return this.customersService.getProductVariants(productId);
+  }
+
+  @Get(':id/special-prices')
+  async getSpecialPrices(@Param('id') id: string) {
+    return this.customersService.getSpecialPrices(id);
+  }
+
+  @Post(':id/special-prices')
+  async saveSpecialPrices(
+    @Param('id') id: string,
+    @Body() body: { items: Array<{ product_variant_id: string; discount: number }> },
+    @Req() req: any,
+  ) {
     const adminId = req.user?.user_id ?? 'system';
-    return this.customersService.deleteAccount(id, adminId);
+    return this.customersService.saveSpecialPrices(id, body.items, adminId);
+  }
+
+  @Delete(':id/special-prices/:variantId')
+  async deleteSpecialPrice(
+    @Param('id') id: string,
+    @Param('variantId') variantId: string,
+    @Req() req: any,
+  ) {
+    return this.customersService.deleteSpecialPrice(id, variantId);
   }
 }
