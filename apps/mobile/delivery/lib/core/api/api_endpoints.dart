@@ -22,7 +22,7 @@ class ApiEndpoints {
   // ---------------------------------------------------------------------------
   static const String _envBaseUrl = String.fromEnvironment('F2H_API_BASE_URL');
   static String get _devBaseUrl {
-    if (kReleaseMode && _envBaseUrl.isEmpty) {
+    if (kIsWeb || kReleaseMode || _envBaseUrl.isEmpty) {
       return 'https://f2hfresh.com';
     }
     return 'http://192.168.1.16:5001';
@@ -61,28 +61,28 @@ class ApiEndpoints {
   // ---------------------------------------------------------------------------
   // Profile & Onboarding
   // ---------------------------------------------------------------------------
-  static const String profile          = '/DeliveryPartner/auth/profile';
-  static const String uploadDoc        = '/DeliveryPartner/auth/upload-doc';
-  static const String updateKyc        = '/DeliveryPartner/auth/update-kyc';
+  static const String profile          = '/delivery-partner/auth/profile';
+  static const String uploadDoc        = '/delivery-partner/auth/upload-doc';
+  static const String updateKyc        = '/delivery-partner/auth/update-kyc';
 
-  static const String profilePersonal   = '/DeliveryPartner/profile/personal';
-  static const String profilePhoto      = '/DeliveryPartner/profile/personal/photo';
-  static const String profileDocs       = '/DeliveryPartner/profile/documents';
-  static String profileDocItem(String id) => '/DeliveryPartner/profile/documents/$id';
-  static const String profileVehicles   = '/DeliveryPartner/profile/vehicles';
-  static String profileVehicleItem(String id) => '/DeliveryPartner/profile/vehicles/$id';
-  static const String profileBank       = '/DeliveryPartner/profile/bank-accounts';
-  static String profileBankItem(String id) => '/DeliveryPartner/profile/bank-accounts/$id';
-  static const String profilePrefs      = '/DeliveryPartner/profile/preferences';
-  static const String profileActivity   = '/DeliveryPartner/profile/activity';
-  static const String profileChangePass = '/DeliveryPartner/profile/security/change-password';
-  static const String profileLogoutAll  = '/DeliveryPartner/profile/security/logout-all';
-  static const String profileAttendance = '/DeliveryPartner/profile/attendance';
-  static const String profileAttendanceDayDetails = '/DeliveryPartner/profile/attendance/day-details';
-  static const String profileLeaderboard = '/DeliveryPartner/profile/leaderboard';
+  static const String profilePersonal   = '/delivery-partner/profile/personal';
+  static const String profilePhoto      = '/delivery-partner/profile/personal/photo';
+  static const String profileDocs       = '/delivery-partner/profile/documents';
+  static String profileDocItem(String id) => '/delivery-partner/profile/documents/$id';
+  static const String profileVehicles   = '/delivery-partner/profile/vehicles';
+  static String profileVehicleItem(String id) => '/delivery-partner/profile/vehicles/$id';
+  static const String profileBank       = '/delivery-partner/profile/bank-accounts';
+  static String profileBankItem(String id) => '/delivery-partner/profile/bank-accounts/$id';
+  static const String profilePrefs      = '/delivery-partner/profile/preferences';
+  static const String profileActivity   = '/delivery-partner/profile/activity';
+  static const String profileChangePass = '/delivery-partner/profile/security/change-password';
+  static const String profileLogoutAll  = '/delivery-partner/profile/security/logout-all';
+  static const String profileAttendance = '/delivery-partner/profile/attendance';
+  static const String profileAttendanceDayDetails = '/delivery-partner/profile/attendance/day-details';
+  static const String profileLeaderboard = '/delivery-partner/profile/leaderboard';
 
-  static const String profileLeaveRequests = '/DeliveryPartner/profile/leave-requests';
-  static String profileLeaveRequestItem(String id) => '/DeliveryPartner/profile/leave-requests/$id';
+  static const String profileLeaveRequests = '/delivery-partner/profile/leave-requests';
+  static String profileLeaveRequestItem(String id) => '/delivery-partner/profile/leave-requests/$id';
 
   // ---------------------------------------------------------------------------
   // Pickup & Delivery Operations
