@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   X,
   Search,
@@ -68,7 +68,6 @@ export default function CustomerSpecialPriceModal({
   editingRule = null,
 }: CustomerSpecialPriceModalProps) {
   const [saving, setSaving] = useState(false);
-  const [fetchingOptions, setFetchingOptions] = useState(false);
   const [formError, setFormError] = useState('');
 
   // Master Lists
@@ -80,6 +79,7 @@ export default function CustomerSpecialPriceModal({
   const [selectedCustomer, setSelectedCustomer] = useState<OptionCustomer | null>(initialCustomer);
   const [customerSearch, setCustomerSearch] = useState('');
   const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Repeater Items for the customer
   const [repeaterRows, setRepeaterRows] = useState<RepeaterItem[]>([]);
@@ -90,6 +90,17 @@ export default function CustomerSpecialPriceModal({
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
   const [draftVariantId, setDraftVariantId] = useState('');
   const [draftSpecialDiscount, setDraftSpecialDiscount] = useState('');
+
+  // Close customer dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsCustomerDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -135,7 +146,6 @@ export default function CustomerSpecialPriceModal({
   }, [isOpen, initialCustomer, editingRule]);
 
   const fetchMasterOptions = async () => {
-    setFetchingOptions(true);
     try {
       if (!initialCustomer) {
         const custRes = await api.get('/admin/customer/special-prices/options');
@@ -152,8 +162,6 @@ export default function CustomerSpecialPriceModal({
       }
     } catch (err) {
       console.error('Failed to load modal master options:', err);
-    } finally {
-      setFetchingOptions(false);
     }
   };
 
@@ -187,6 +195,22 @@ export default function CustomerSpecialPriceModal({
     await fetchProductVariants(prod.product_id);
   };
 
+  // Helper calculation for discount clamping
+  const calculateRowValues = (actual: number, selling: number, discountInput: string) => {
+    let numDisc = parseFloat(discountInput) || 0;
+    if (numDisc < 0) numDisc = 0;
+    if (numDisc > 100) numDisc = 100;
+
+    const calcSpecial = Math.max(0, parseFloat((selling * (1 - numDisc / 100)).toFixed(2)));
+    const overallPct = actual > 0 ? parseFloat((((actual - calcSpecial) / actual) * 100).toFixed(1)) : 0;
+
+    return {
+      clampedDisc: String(numDisc),
+      specialPrice: calcSpecial,
+      overallDiscountPercent: Math.max(0, overallPct),
+    };
+  };
+
   const handleAddVariantRow = () => {
     setFormError('');
     if (!draftProductId) {
@@ -205,20 +229,17 @@ export default function CustomerSpecialPriceModal({
       return;
     }
 
-    const productObj = products.find((p) => p.product_id === draftProductId);
-    const numDisc = parseFloat(draftSpecialDiscount) || 0;
+    const rawDisc = parseFloat(draftSpecialDiscount) || 0;
+    if (rawDisc < 0 || rawDisc > 100) {
+      setFormError('Special Discount percentage must be between 0% and 100%.');
+      return;
+    }
 
+    const productObj = products.find((p) => p.product_id === draftProductId);
     const actual = variantObj.original_price || variantObj.price;
     const selling = variantObj.price;
 
-    let calcSpecial = selling;
-    if (numDisc > 0 && numDisc <= 100) {
-      calcSpecial = Math.max(0, parseFloat((selling * (1 - numDisc / 100)).toFixed(2)));
-    } else if (numDisc > 100) {
-      calcSpecial = Math.max(0, parseFloat((selling - numDisc).toFixed(2)));
-    }
-
-    const overallPct = actual > 0 ? parseFloat((((actual - calcSpecial) / actual) * 100).toFixed(1)) : 0;
+    const { clampedDisc, specialPrice, overallDiscountPercent } = calculateRowValues(actual, selling, draftSpecialDiscount);
 
     const newRow: RepeaterItem = {
       id: String(Date.now()),
@@ -228,9 +249,9 @@ export default function CustomerSpecialPriceModal({
       variantName: variantObj.name,
       actualPrice: actual,
       sellingPrice: selling,
-      specialDiscountInput: draftSpecialDiscount,
-      specialPrice: calcSpecial,
-      overallDiscountPercent: Math.max(0, overallPct),
+      specialDiscountInput: clampedDisc,
+      specialPrice,
+      overallDiscountPercent,
     };
 
     setRepeaterRows((prev) => {
@@ -242,6 +263,26 @@ export default function CustomerSpecialPriceModal({
     setDraftProductSearch('');
     setDraftVariantId('');
     setDraftSpecialDiscount('');
+  };
+
+  // Real-time update for summary table row editing
+  const handleUpdateRowDiscount = (id: string, newDiscountStr: string) => {
+    setRepeaterRows((prev) =>
+      prev.map((row) => {
+        if (row.id !== id) return row;
+        let numVal = parseFloat(newDiscountStr) || 0;
+        if (numVal < 0) numVal = 0;
+        if (numVal > 100) numVal = 100;
+
+        const { specialPrice, overallDiscountPercent } = calculateRowValues(row.actualPrice, row.sellingPrice, String(numVal));
+        return {
+          ...row,
+          specialDiscountInput: newDiscountStr,
+          specialPrice,
+          overallDiscountPercent,
+        };
+      })
+    );
   };
 
   const handleRemoveRow = (id: string) => {
@@ -263,7 +304,7 @@ export default function CustomerSpecialPriceModal({
     try {
       const payloadItems = repeaterRows.map((r) => ({
         product_variant_id: r.variantId,
-        discount: parseFloat(r.specialDiscountInput) || 0,
+        discount: Math.min(100, Math.max(0, parseFloat(r.specialDiscountInput) || 0)),
       }));
 
       const res = await api.post(`/admin/customer/${selectedCustomer.id}/special-prices`, {
@@ -305,16 +346,15 @@ export default function CustomerSpecialPriceModal({
   // Draft calculations
   const currentAvailableVariants = variantsMap[draftProductId] || [];
   const selectedDraftVariant = currentAvailableVariants.find((v) => v.variant_id === draftVariantId);
-  const draftNumDisc = parseFloat(draftSpecialDiscount) || 0;
+  
+  let draftNumDisc = parseFloat(draftSpecialDiscount) || 0;
+  if (draftNumDisc < 0) draftNumDisc = 0;
+  if (draftNumDisc > 100) draftNumDisc = 100;
+
   const draftSelling = selectedDraftVariant ? selectedDraftVariant.price : 0;
   const draftActual = selectedDraftVariant ? (selectedDraftVariant.original_price || selectedDraftVariant.price) : 0;
 
-  let draftSpecial = draftSelling;
-  if (draftNumDisc > 0 && draftNumDisc <= 100) {
-    draftSpecial = Math.max(0, parseFloat((draftSelling * (1 - draftNumDisc / 100)).toFixed(2)));
-  } else if (draftNumDisc > 100) {
-    draftSpecial = Math.max(0, parseFloat((draftSelling - draftNumDisc).toFixed(2)));
-  }
+  const draftSpecial = Math.max(0, parseFloat((draftSelling * (1 - draftNumDisc / 100)).toFixed(2)));
   const draftOverallPct = draftActual > 0 ? parseFloat((((draftActual - draftSpecial) / draftActual) * 100).toFixed(1)) : 0;
 
   if (!isOpen) return null;
@@ -330,7 +370,7 @@ export default function CustomerSpecialPriceModal({
               Configure Customer Special Prices
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Apply customer-specific negotiated discounts. Stored as special discount on selling price.
+              Apply custom negotiated discounts (0% - 100%) on selling prices.
             </p>
           </div>
           <button
@@ -371,8 +411,8 @@ export default function CustomerSpecialPriceModal({
             </span>
           </div>
         ) : (
-          /* Searchable Customer Selection Dropdown (Only CUSTOMER role) */
-          <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 space-y-2">
+          /* Searchable Customer Selection Dropdown (Only CUSTOMER role) - Non-overlapping */
+          <div ref={dropdownRef} className="bg-slate-50 p-4 rounded-xl border border-gray-200 space-y-2 relative">
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
               1. Select Customer * <span className="text-[11px] font-normal text-slate-400">(Customer role users only)</span>
             </label>
@@ -393,8 +433,9 @@ export default function CustomerSpecialPriceModal({
                 <ChevronDown className="w-4 h-4 text-slate-400" />
               </button>
 
+              {/* Clean Non-overlapping Dropdown Menu */}
               {isCustomerDropdownOpen && (
-                <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl p-2 space-y-2 max-h-60 overflow-y-auto">
+                <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl p-2 space-y-2 max-h-60 overflow-y-auto">
                   <div className="relative">
                     <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
                     <input
@@ -438,11 +479,11 @@ export default function CustomerSpecialPriceModal({
           </div>
         )}
 
-        {/* STEP 2: Product & Variant Picker + Live Pricing Calculator */}
+        {/* STEP 2: Product & Variant Picker + Live Pricing Breakdown */}
         {selectedCustomer && (
           <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 space-y-4">
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-              {initialCustomer ? '1.' : '2.'} Add Product Variant & Special Discount
+              {initialCustomer ? '1.' : '2.'} Add Product Variant & Special Discount (%)
             </label>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -459,7 +500,7 @@ export default function CustomerSpecialPriceModal({
                 </button>
 
                 {isProductDropdownOpen && (
-                  <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl p-2 space-y-2 max-h-56 overflow-y-auto">
+                  <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl p-2 space-y-2 max-h-56 overflow-y-auto">
                     <input
                       type="text"
                       placeholder="Search product..."
@@ -504,16 +545,23 @@ export default function CustomerSpecialPriceModal({
                 </select>
               </div>
 
-              {/* Special Discount Input */}
+              {/* Special Discount Input (%) */}
               <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Special Discount (% or ₹)</label>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Special Discount (%)</label>
                 <div className="flex gap-2">
                   <input
                     type="number"
-                    step="0.01"
-                    placeholder="e.g. 10 or 5"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    placeholder="0 to 100%"
                     value={draftSpecialDiscount}
-                    onChange={(e) => setDraftSpecialDiscount(e.target.value)}
+                    onChange={(e) => {
+                      let val = parseFloat(e.target.value);
+                      if (val > 100) val = 100;
+                      if (val < 0) val = 0;
+                      setDraftSpecialDiscount(e.target.value === '' ? '' : String(val));
+                    }}
                     className="w-full bg-white border border-gray-300 text-slate-800 text-xs p-2.5 rounded-xl focus:outline-none focus:border-emerald-500 font-bold"
                   />
                   <button
@@ -527,26 +575,26 @@ export default function CustomerSpecialPriceModal({
               </div>
             </div>
 
-            {/* Live Pricing Breakdown Card */}
+            {/* Live Pricing Breakdown Card - Overall Savings FIRST */}
             {selectedDraftVariant && (
               <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3.5 grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
                 <div>
-                  <span className="text-slate-500 font-medium">Actual MRP:</span>
+                  <span className="text-slate-500 font-medium">Actual Price:</span>
                   <div className="font-bold text-slate-400 line-through">₹{draftActual.toFixed(2)}</div>
                 </div>
                 <div>
-                  <span className="text-slate-500 font-medium">Standard Selling:</span>
+                  <span className="text-slate-500 font-medium">Selling Price:</span>
                   <div className="font-bold text-slate-800">₹{draftSelling.toFixed(2)}</div>
+                </div>
+                <div>
+                  <span className="text-slate-500 font-bold text-purple-700">Overall Savings:</span>
+                  <div className="font-black text-purple-700">{draftOverallPct}% OFF</div>
                 </div>
                 <div>
                   <span className="text-slate-500 font-medium">Special Discount:</span>
                   <div className="font-bold text-amber-600">
-                    {draftNumDisc > 0 && draftNumDisc <= 100 ? `${draftNumDisc}% OFF` : `- ₹${draftNumDisc.toFixed(2)}`}
+                    {draftNumDisc}% OFF
                   </div>
-                </div>
-                <div>
-                  <span className="text-slate-500 font-medium">Overall Savings:</span>
-                  <div className="font-bold text-purple-700">{draftOverallPct}% OFF MRP</div>
                 </div>
                 <div>
                   <span className="text-slate-600 font-bold">Special Price:</span>
@@ -557,7 +605,7 @@ export default function CustomerSpecialPriceModal({
           </div>
         )}
 
-        {/* STEP 3: Summary Table Below inside Modal */}
+        {/* STEP 3: Summary Table with In-Table Editable Special Discount */}
         {selectedCustomer && (
           <div className="space-y-2">
             <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
@@ -571,11 +619,11 @@ export default function CustomerSpecialPriceModal({
                   <tr>
                     <th className="py-2.5 px-3">Product</th>
                     <th className="py-2.5 px-3">Variant</th>
-                    <th className="py-2.5 px-3 text-right">Actual MRP</th>
+                    <th className="py-2.5 px-3 text-right">Actual Price</th>
                     <th className="py-2.5 px-3 text-right">Selling Price</th>
-                    <th className="py-2.5 px-3 text-center">Special Discount</th>
-                    <th className="py-2.5 px-3 text-center">Overall Discount</th>
-                    <th className="py-2.5 px-3 text-right">Special Selling Price</th>
+                    <th className="py-2.5 px-3 text-center">Overall Savings</th>
+                    <th className="py-2.5 px-3 text-center">Special Discount (%)</th>
+                    <th className="py-2.5 px-3 text-right">Special Price</th>
                     <th className="py-2.5 px-3 text-center">Remove</th>
                   </tr>
                 </thead>
@@ -597,13 +645,24 @@ export default function CustomerSpecialPriceModal({
                         <td className="py-2.5 px-3 text-right font-medium">
                           ₹{row.sellingPrice.toFixed(2)}
                         </td>
-                        <td className="py-2.5 px-3 text-center font-semibold text-amber-600">
-                          {parseFloat(row.specialDiscountInput) > 0 && parseFloat(row.specialDiscountInput) <= 100
-                            ? `${row.specialDiscountInput}% OFF`
-                            : `- ₹${parseFloat(row.specialDiscountInput || '0').toFixed(2)}`}
-                        </td>
                         <td className="py-2.5 px-3 text-center font-bold text-purple-700">
                           {row.overallDiscountPercent}% OFF
+                        </td>
+                        {/* Interactive In-Table Editable Discount (%) */}
+                        <td className="py-2.5 px-3 text-center">
+                          <div className="inline-flex items-center gap-1 justify-center">
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.1"
+                              value={row.specialDiscountInput}
+                              onChange={(e) => handleUpdateRowDiscount(row.id, e.target.value)}
+                              className="w-16 bg-amber-50 border border-amber-300 text-amber-900 font-bold text-xs px-2 py-1 rounded text-center focus:bg-white focus:border-emerald-500 focus:outline-none"
+                              title="Click or edit discount % in real-time"
+                            />
+                            <span className="text-amber-700 font-bold">%</span>
+                          </div>
                         </td>
                         <td className="py-2.5 px-3 text-right font-black text-emerald-700">
                           ₹{row.specialPrice.toFixed(2)}

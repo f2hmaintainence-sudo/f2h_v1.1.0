@@ -2064,24 +2064,15 @@ class _HomeReferralBanner extends StatelessWidget {
 
         return GestureDetector(
           onTap: () {
-            if (!isLoggedIn) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const LoginScreen(popOnSuccess: true),
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ReferralScreen(
+                  referralCode: rawCode,
+                  referralStatus: rawStatus,
                 ),
-              );
-            } else {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ReferralScreen(
-                    referralCode: rawCode,
-                    referralStatus: rawStatus,
-                  ),
-                ),
-              );
-            }
+              ),
+            );
           },
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -2217,13 +2208,13 @@ class _HomeReferralBanner extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.login_rounded,
+              Icons.card_giftcard_rounded,
               color: const Color(0xFF064E3B),
               size: 14 * scale,
             ),
             SizedBox(width: 5 * scale),
             Text(
-              'Login',
+              'Refer',
               style: TextStyle(
                 fontSize: 12 * scale,
                 fontWeight: FontWeight.w900,

@@ -40,12 +40,11 @@ class _ReferralScreenState extends State<ReferralScreen>
     with SingleTickerProviderStateMixin {
   bool _isLoading = true;
   String _code = '';
-  String _status = 'unlocked';
+  String _status = 'locked';
   double _totalEarnings = 0.0;
   int _totalCount = 0;
 
-
-  bool get _isLocked => _status.toLowerCase() == 'locked';
+  bool get _isLocked => _code.isEmpty || _status.toLowerCase() != 'unlocked';
   String get _activeCode => _code;
   String get _referralLink => 'https://f2h.app.link/$_activeCode';
 
