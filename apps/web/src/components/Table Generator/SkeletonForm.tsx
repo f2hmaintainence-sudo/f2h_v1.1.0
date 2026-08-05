@@ -774,6 +774,18 @@ export default function SkeletonForm({
           initial[field.name] = field.type === 'toggle' ? false : '';
         }
       }
+      // Auto-calculate discount_percent on initial load if original_price & price exist
+      if (initial.original_price && initial.price) {
+        const orig = parseFloat(initial.original_price);
+        const sell = parseFloat(initial.price);
+        if (!isNaN(orig) && !isNaN(sell) && orig > 0 && orig >= sell) {
+          const calculatedDisc = Math.round(((orig - sell) / orig) * 100 * 10) / 10;
+          if (!initial.discount_percent && initial.discount_percent !== 0) {
+            initial.discount_percent = calculatedDisc;
+          }
+        }
+      }
+
       setFormData(initial);
       setFileStates(initialFileStates);
 
@@ -846,7 +858,29 @@ export default function SkeletonForm({
 
   // ── Field change handler ───────────────────────────────────
   const handleChange = (name: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => {
+      const next = { ...prev, [name]: value };
+
+      // Realtime discount calculation for original_price, price & discount_percent
+      if (name === 'original_price' || name === 'price') {
+        const orig = parseFloat(next.original_price);
+        const sell = parseFloat(next.price);
+        if (!isNaN(orig) && !isNaN(sell) && orig > 0 && orig >= sell) {
+          next.discount_percent = Math.round(((orig - sell) / orig) * 100 * 10) / 10;
+        } else if (!isNaN(orig) && orig > 0 && (isNaN(sell) || sell > orig)) {
+          next.discount_percent = 0;
+        }
+      } else if (name === 'discount_percent') {
+        const orig = parseFloat(next.original_price);
+        const disc = parseFloat(value);
+        if (!isNaN(orig) && !isNaN(disc) && orig > 0 && disc >= 0 && disc <= 100) {
+          next.price = Math.round(orig * (1 - disc / 100) * 100) / 100;
+        }
+      }
+
+      return next;
+    });
+
     // Clear error on change
     if (errors[name]) {
       setErrors((prev) => {

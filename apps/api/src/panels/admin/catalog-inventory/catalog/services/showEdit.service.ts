@@ -274,9 +274,17 @@ export class CatalogShowEditService {
       });
       const variantImages = (imageResult?.data || []).map((img: any) => img.storage_key);
 
+      const origPrice = Number(variant.original_price || variant.price || 0);
+      const sellPrice = Number(variant.price || 0);
+      let discPercent = Number(variant.discount || variant.discount_percent || 0);
+      if (!discPercent && origPrice > sellPrice && origPrice > 0) {
+        discPercent = Math.round(((origPrice - sellPrice) / origPrice) * 100 * 10) / 10;
+      }
+
       // product_id is VARCHAR — keep as string for the select field
       const formattedData = {
         ...variant,
+        discount_percent: discPercent,
         product_id: String(variant.product_id || ''),
         packaging_type_id: String(variant.packaging_type_id || ''),
         container_id: String(variant.container_id || ''),
