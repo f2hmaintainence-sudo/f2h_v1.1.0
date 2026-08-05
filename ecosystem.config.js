@@ -3,10 +3,9 @@ module.exports = {
     {
       name: 'api-f2hfresh',
       cwd: '/home/f2hfresh/htdocs/f2hfresh.com/apps/api',
-      script: 'npm',
-      args: 'run start:dev',
+      script: 'dist/main.js',
       env: {
-        NODE_ENV: 'development',
+        NODE_ENV: 'production',
         APP_PORT: 5001,
         PORT: 5001,
       },
@@ -15,9 +14,9 @@ module.exports = {
       name: 'frontend-f2hfresh',
       cwd: '/home/f2hfresh/htdocs/f2hfresh.com/apps/web',
       script: 'npm',
-      args: 'run dev',
+      args: 'start',
       env: {
-        NODE_ENV: 'development',
+        NODE_ENV: 'production',
         PORT: 5002,
       },
     },
