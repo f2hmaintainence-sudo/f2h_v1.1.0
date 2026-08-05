@@ -861,7 +861,7 @@ export default function SkeletonForm({
     setFormData((prev) => {
       const next = { ...prev, [name]: value };
 
-      // Realtime discount calculation for original_price, price & discount_percent
+      // Realtime discount calculation for original_price & price
       if (name === 'original_price' || name === 'price') {
         const orig = parseFloat(next.original_price);
         const sell = parseFloat(next.price);
@@ -869,12 +869,6 @@ export default function SkeletonForm({
           next.discount_percent = Math.round(((orig - sell) / orig) * 100 * 10) / 10;
         } else if (!isNaN(orig) && orig > 0 && (isNaN(sell) || sell > orig)) {
           next.discount_percent = 0;
-        }
-      } else if (name === 'discount_percent') {
-        const orig = parseFloat(next.original_price);
-        const disc = parseFloat(value);
-        if (!isNaN(orig) && !isNaN(disc) && orig > 0 && disc >= 0 && disc <= 100) {
-          next.price = Math.round(orig * (1 - disc / 100) * 100) / 100;
         }
       }
 
