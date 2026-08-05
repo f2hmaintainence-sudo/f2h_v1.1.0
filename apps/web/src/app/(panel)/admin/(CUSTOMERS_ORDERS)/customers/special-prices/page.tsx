@@ -14,7 +14,11 @@ import {
   Package,
   ChevronLeft,
   ChevronRight,
-  UserCheck
+  ChevronDown,
+  ChevronUp,
+  UserCheck,
+  Layers,
+  Filter
 } from 'lucide-react';
 import { api } from '@/services/api.client';
 import CustomerSpecialPriceModal, { OptionCustomer } from '@/components/f2h/CustomerSpecialPriceModal';
@@ -61,9 +65,12 @@ export default function CustomerSpecialPricesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  // Pagination
+  // Pagination & Display settings
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 5;
+  const [pageSize, setPageSize] = useState(5);
+
+  // Accordion collapsed state for customer rows (all open by default)
+  const [collapsedCustomerIds, setCollapsedCustomerIds] = useState<Set<string>>(new Set());
 
   // Modal Control
   const [showAddModal, setShowAddModal] = useState(false);
@@ -101,7 +108,8 @@ export default function CustomerSpecialPricesPage() {
     setShowAddModal(true);
   };
 
-  const handleOpenCustomerModal = (group: CustomerGroup) => {
+  const handleOpenCustomerModal = (e: React.MouseEvent, group: CustomerGroup) => {
+    e.stopPropagation();
     setModalCustomer({
       id: group.customer_id,
       name: group.customer_name,
@@ -136,6 +144,18 @@ export default function CustomerSpecialPricesPage() {
     } catch (err) {
       alert('Failed to delete special price rule');
     }
+  };
+
+  const toggleCustomerExpand = (customerId: string) => {
+    setCollapsedCustomerIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(customerId)) {
+        next.delete(customerId);
+      } else {
+        next.add(customerId);
+      }
+      return next;
+    });
   };
 
   // Group Special Price items by Customer
@@ -175,7 +195,7 @@ export default function CustomerSpecialPricesPage() {
         </div>
       )}
 
-      {/* Header Banner - Matching F2H Light Theme */}
+      {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
@@ -188,7 +208,7 @@ export default function CustomerSpecialPricesPage() {
             Customer Special Prices
           </h1>
           <p className="text-slate-500 text-sm">
-            Grouped by customer with live overall savings calculation and paginated customer views.
+            Row-grouped master pricing rules with collapsible customer accordions and live pagination.
           </p>
         </div>
 
@@ -210,7 +230,7 @@ export default function CustomerSpecialPricesPage() {
         </div>
       </div>
 
-      {/* Summary KPI Cards - Light Theme */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white border border-gray-200 p-5 rounded-2xl shadow-sm flex items-center gap-4">
           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
@@ -243,7 +263,7 @@ export default function CustomerSpecialPricesPage() {
         </div>
       </div>
 
-      {/* Search Filter Bar */}
+      {/* Search & Filter Bar */}
       <div className="bg-white border border-gray-200 p-4 rounded-2xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="relative w-full sm:w-96">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
@@ -259,146 +279,197 @@ export default function CustomerSpecialPricesPage() {
           />
         </div>
 
-        <div className="text-xs text-slate-500 font-medium">
-          Showing <span className="text-emerald-700 font-bold">{customerGroups.length}</span> customer(s) with special pricing
+        <div className="flex items-center gap-4 text-xs text-slate-500 font-medium">
+          <div className="flex items-center gap-2">
+            <span>Per Page:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="bg-slate-50 border border-gray-200 font-bold text-slate-800 rounded-lg p-1 text-xs focus:outline-none"
+            >
+              <option value={5}>5 Customers</option>
+              <option value={10}>10 Customers</option>
+              <option value={20}>20 Customers</option>
+            </select>
+          </div>
+
+          <div>
+            Showing <span className="text-emerald-700 font-bold">{customerGroups.length}</span> customer(s)
+          </div>
         </div>
       </div>
 
-      {/* Grouped Customer Cards List */}
-      <div className="space-y-6">
-        {loading ? (
-          <div className="bg-white border border-gray-200 rounded-2xl p-12 text-center text-slate-400">
-            <RefreshCw className="w-6 h-6 animate-spin mx-auto text-emerald-600 mb-2" />
-            Loading customer special prices...
-          </div>
-        ) : customerGroups.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-2xl p-12 text-center text-slate-400">
-            <Tag className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-            No special prices configured yet. Click &quot;Add Special Price&quot; to create rules.
-          </div>
-        ) : (
-          paginatedGroups.map((group) => (
-            <div key={group.customer_id} className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden space-y-0">
-              {/* Customer Group Header */}
-              <div className="bg-slate-50/80 p-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm border border-emerald-200 shrink-0">
-                    <UserCheck className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-base">{group.customer_name}</h3>
-                    <div className="text-xs text-slate-500 flex flex-wrap items-center gap-2 mt-0.5">
-                      {group.customer_phone && <span className="bg-white px-2 py-0.5 rounded border border-gray-200">📞 {group.customer_phone}</span>}
-                      {group.customer_email && <span className="bg-white px-2 py-0.5 rounded border border-gray-200">✉️ {group.customer_email}</span>}
-                      <span className="font-mono text-slate-400">ID: #{group.customer_id}</span>
-                    </div>
-                  </div>
-                </div>
+      {/* Single Master Unified Table with Row Grouping */}
+      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm text-slate-700 border-collapse">
+            <thead className="bg-slate-100/80 text-slate-500 text-xs uppercase tracking-wider border-b border-gray-200 font-bold">
+              <tr>
+                <th className="py-3.5 px-4">Customer / Product & Variant</th>
+                <th className="py-3.5 px-4 text-right">Actual Price</th>
+                <th className="py-3.5 px-4 text-right">Standard Selling</th>
+                <th className="py-3.5 px-4 text-center">Overall Savings</th>
+                <th className="py-3.5 px-4 text-center">Special Discount (%)</th>
+                <th className="py-3.5 px-4 text-right">Special Price</th>
+                <th className="py-3.5 px-4 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                    <RefreshCw className="w-6 h-6 animate-spin mx-auto text-emerald-600 mb-2" />
+                    Loading special prices master table...
+                  </td>
+                </tr>
+              ) : customerGroups.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                    <Tag className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                    No special prices configured yet. Click &quot;Add Special Price&quot; to create rules.
+                  </td>
+                </tr>
+              ) : (
+                paginatedGroups.map((group) => {
+                  const isCollapsed = collapsedCustomerIds.has(group.customer_id);
+                  const ruleCount = group.rules.length;
 
-                <div className="flex items-center gap-3">
-                  <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold rounded-xl">
-                    {group.rules.length} Rule(s) Configured
-                  </span>
-                  <button
-                    onClick={() => handleOpenCustomerModal(group)}
-                    className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3.5 py-1.5 rounded-xl transition shadow-2xs"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add Rule
-                  </button>
-                </div>
-              </div>
+                  return (
+                    <React.Fragment key={group.customer_id}>
+                      {/* Customer Row Group Header */}
+                      <tr
+                        onClick={() => toggleCustomerExpand(group.customer_id)}
+                        className="bg-slate-50/90 font-bold border-t border-b border-slate-200 hover:bg-emerald-50/40 cursor-pointer transition-colors"
+                      >
+                        <td colSpan={5} className="py-3 px-4">
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              className="text-slate-400 hover:text-emerald-700 p-0.5 rounded transition"
+                            >
+                              {isCollapsed ? (
+                                <ChevronRight className="w-4 h-4 text-slate-500" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4 text-emerald-700" />
+                              )}
+                            </button>
 
-              {/* Group Rules Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-slate-700">
-                  <thead className="bg-white text-slate-400 text-xs uppercase tracking-wider border-b border-gray-100">
-                    <tr>
-                      <th className="py-3 px-4 font-bold">Product & Variant</th>
-                      <th className="py-3 px-4 font-bold text-right">Actual Price</th>
-                      <th className="py-3 px-4 font-bold text-right">Standard Selling</th>
-                      <th className="py-3 px-4 font-bold text-center">Overall Savings</th>
-                      <th className="py-3 px-4 font-bold text-center">Special Discount (%)</th>
-                      <th className="py-3 px-4 font-bold text-right">Special Price</th>
-                      <th className="py-3 px-4 font-bold text-center">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {group.rules.map((rule) => {
-                      const actual = rule.actual_price || rule.selling_price;
-                      const overallPct = actual > 0 ? (((actual - rule.special_price) / actual) * 100).toFixed(1) : '0';
-
-                      return (
-                        <tr key={rule.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="py-3.5 px-4">
-                            <div className="font-semibold text-slate-900">{rule.product_name}</div>
-                            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 mt-0.5">
-                              <Package className="w-3 h-3" />
-                              {rule.variant_name}
+                            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs border border-emerald-200 shrink-0">
+                              <UserCheck className="w-4 h-4" />
                             </div>
-                          </td>
 
-                          <td className="py-3.5 px-4 text-right font-medium text-slate-400 line-through">
-                            ₹{rule.actual_price.toFixed(2)}
-                          </td>
-
-                          <td className="py-3.5 px-4 text-right font-semibold text-slate-800">
-                            ₹{rule.selling_price.toFixed(2)}
-                          </td>
-
-                          <td className="py-3.5 px-4 text-center font-bold text-purple-700">
-                            {overallPct}% OFF
-                          </td>
-
-                          <td className="py-3.5 px-4 text-center">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                              <TrendingDown className="w-3.5 h-3.5 text-amber-600" />
-                              {rule.discount}% OFF
-                            </span>
-                          </td>
-
-                          <td className="py-3.5 px-4 text-right">
-                            <div className="inline-block px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-xl">
-                              <span className="text-sm font-extrabold text-emerald-700">
-                                ₹{rule.special_price.toFixed(2)}
-                              </span>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-extrabold text-slate-900 text-sm">{group.customer_name}</span>
+                                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[11px] font-bold rounded-full border border-emerald-200">
+                                  {ruleCount} Rule{ruleCount > 1 ? 's' : ''}
+                                </span>
+                              </div>
+                              <div className="text-xs text-slate-400 font-normal flex items-center gap-2 mt-0.5">
+                                {group.customer_phone && <span>📞 {group.customer_phone}</span>}
+                                {group.customer_email && <span>✉️ {group.customer_email}</span>}
+                                <span>· ID: #{group.customer_id}</span>
+                              </div>
                             </div>
-                          </td>
+                          </div>
+                        </td>
 
-                          <td className="py-3.5 px-4 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <button
-                                onClick={() => handleEditRule(rule)}
-                                className="p-1.5 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition"
-                                title="Edit Rule"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteRule(rule)}
-                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                                title="Delete Rule"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ))
-        )}
+                        <td colSpan={2} className="py-3 px-4 text-right">
+                          <button
+                            onClick={(e) => handleOpenCustomerModal(e, group)}
+                            className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition shadow-2xs"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> Add Rule
+                          </button>
+                        </td>
+                      </tr>
+
+                      {/* Nested Product Variant Rows */}
+                      {!isCollapsed &&
+                        group.rules.map((rule) => {
+                          const actual = rule.actual_price || rule.selling_price;
+                          const overallPct = actual > 0 ? (((actual - rule.special_price) / actual) * 100).toFixed(1) : '0';
+
+                          return (
+                            <tr key={rule.id} className="hover:bg-slate-50/70 transition-colors bg-white">
+                              {/* Indented Product Variant Name */}
+                              <td className="py-3 px-4 pl-12">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></div>
+                                  <span className="font-semibold text-slate-900">{rule.product_name}</span>
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <Package className="w-3 h-3" />
+                                    {rule.variant_name}
+                                  </span>
+                                </div>
+                              </td>
+
+                              <td className="py-3 px-4 text-right font-medium text-slate-400 line-through">
+                                ₹{rule.actual_price.toFixed(2)}
+                              </td>
+
+                              <td className="py-3 px-4 text-right font-semibold text-slate-800">
+                                ₹{rule.selling_price.toFixed(2)}
+                              </td>
+
+                              <td className="py-3 px-4 text-center font-bold text-purple-700">
+                                <span className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded-md border border-purple-100 text-xs">
+                                  {overallPct}% OFF
+                                </span>
+                              </td>
+
+                              <td className="py-3 px-4 text-center">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                  <TrendingDown className="w-3.5 h-3.5 text-amber-600" />
+                                  {rule.discount}% OFF
+                                </span>
+                              </td>
+
+                              <td className="py-3 px-4 text-right">
+                                <span className="text-sm font-extrabold text-emerald-700 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                  ₹{rule.special_price.toFixed(2)}
+                                </span>
+                              </td>
+
+                              <td className="py-3 px-4 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button
+                                    onClick={() => handleEditRule(rule)}
+                                    className="p-1.5 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition"
+                                    title="Edit Rule"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteRule(rule)}
+                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                    title="Delete Rule"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </React.Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* Pagination Bar */}
-      {totalPages > 1 && (
-        <div className="bg-white border border-gray-200 p-4 rounded-2xl shadow-sm flex items-center justify-between gap-4">
+      {/* Global Clean Pagination Bar */}
+      {totalPages > 0 && (
+        <div className="bg-white border border-gray-200 p-4 rounded-2xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-xs text-slate-500 font-medium">
-            Page <span className="font-bold text-slate-900">{currentPage}</span> of{' '}
-            <span className="font-bold text-slate-900">{totalPages}</span> ({customerGroups.length} total customers)
+            Showing Page <span className="font-bold text-slate-900">{currentPage}</span> of{' '}
+            <span className="font-bold text-slate-900">{totalPages}</span> ({customerGroups.length} total customers, {items.length} total rules)
           </div>
 
           <div className="flex items-center gap-2">
