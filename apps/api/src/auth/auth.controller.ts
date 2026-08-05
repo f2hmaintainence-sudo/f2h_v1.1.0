@@ -19,6 +19,7 @@ import { DeviceFingerprintService } from './device-fingerprint.service';
 import { AuditLoggerService } from './audit-logger.service';
 import { RegisterDto, LoginDto, SendOtpDto, VerifyOtpDto } from './dto/auth.dto';
 import { Public } from './decorators/public.decorator';
+import { DatabaseService } from 'src/database/database.service';
 
 @Controller({ path: 'auth', version: '1' })
 export class AuthController {
@@ -28,6 +29,7 @@ export class AuthController {
     private readonly redisService: RedisService,
     private readonly deviceFingerprintService: DeviceFingerprintService,
     private readonly auditLogger: AuditLoggerService,
+    private readonly db: DatabaseService,
   ) { }
 
   @Public()
@@ -417,6 +419,49 @@ export class AuthController {
     });
     this.setCookies(res, result.accessToken, result.refreshToken);
     return result;
+  }
+
+  @Public()
+  @Get('public/branches')
+  @HttpCode(HttpStatus.OK)
+  async getPublicBranches() {
+    try {
+      const rows = await this.db.query(`
+        SELECT branch_id, branch_name, city, state,
+               lat, lng, delivery_radius_km
+        FROM branches
+        WHERE is_active = true
+        ORDER BY branch_name ASC
+      `, []);
+      return { status: true, data: rows };
+    } catch {
+      return { status: false, data: [] };
+    }
+  }
+
+  @Public()
+  @Get('public/site-settings')
+  @HttpCode(HttpStatus.OK)
+  async getPublicSiteSettings() {
+    try {
+      await this.db.query(`
+        CREATE TABLE IF NOT EXISTS site_settings (
+          key   VARCHAR(120) PRIMARY KEY,
+          value TEXT NOT NULL DEFAULT '',
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `, []);
+      const rows: { key: string; value: string }[] = await this.db.query(
+        'SELECT key, value FROM site_settings ORDER BY key ASC', []
+      );
+      const data: Record<string, any> = {};
+      for (const row of rows) {
+        try { data[row.key] = JSON.parse(row.value); } catch { data[row.key] = row.value; }
+      }
+      return { status: true, data };
+    } catch {
+      return { status: false, data: {} };
+    }
   }
 
   private setCookies(res: Response, accessToken: string, refreshToken: string) {

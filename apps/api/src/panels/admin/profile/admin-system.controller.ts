@@ -79,4 +79,16 @@ export class AdminSystemController {
   async updateAppConfig(@Param('platform') platform: string, @Body() body: any) {
     return this.systemService.updateAppConfig(platform, body);
   }
+
+  // ── Site Settings (footer / contact) ──
+
+  @Get('site-settings')
+  async getSiteSettings() {
+    return this.systemService.getSiteSettings();
+  }
+
+  @Post('site-settings')
+  async upsertSiteSettings(@Body() body: Record<string, any>) {
+    return this.systemService.upsertSiteSettings(body);
+  }
 }

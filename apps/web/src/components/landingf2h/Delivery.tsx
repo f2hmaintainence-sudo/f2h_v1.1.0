@@ -1,9 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CircleCheck, MapPin, Star, Clock, Sunrise, Sunset, Snowflake, Microscope, Radar, Tractor, TestTube, Boxes, Bike, Home, SunMedium, ShieldCheck, Layers, Send, MoonStar } from "lucide-react";
+import { CircleCheck, MapPin, Star, Clock, Sunrise, Sunset, Snowflake, Microscope, Radar, Tractor, TestTube, Boxes, Bike, Home, SunMedium, ShieldCheck, Layers, Send, MoonStar, X, Navigation, Loader2, AlertCircle } from "lucide-react";
 import { EyebrowPill } from "./EyebrowPill";
+
+interface Branch {
+  branch_id: string;
+  branch_name: string;
+  city: string | null;
+  state: string | null;
+  lat: string | number | null;
+  lng: string | number | null;
+  delivery_radius_km: string | number | null;
+}
 
 const promises = [
   {
@@ -98,24 +108,6 @@ const eveningSchedule = [
   },
 ];
 
-const morningZones = [
-  { name: "Belthur & Seegahalli", status: "Active" as const },
-  { name: "Kadugodi", status: "Active" as const },
-  { name: "Maitri Layout", status: "Active" as const },
-  { name: "Prashant Layout & Springdale Layout", status: "Active" as const },
-  { name: "Nagondanahalli", status: "Active" as const },
-  { name: "Nellurahalli", status: "Active" as const },
-  { name: "Hoodi", status: "Active" as const },
-];
-
-const eveningZones = [
-  { name: "Nagondanahalli", status: "Active" as const },
-  { name: "Hope Farm", status: "Active" as const },
-  { name: "Borewell Road", status: "Active" as const },
-  { name: "ECC Road", status: "Active" as const },
-  { name: "Immidihalli", status: "Active" as const },
-];
-
 function DeliveryRouteSvg() {
   return (
     <svg
@@ -173,12 +165,150 @@ function DeliveryRouteSvg() {
   );
 }
 
+// ── Branch Map Modal ──────────────────────────────────────────────
+function BranchMapModal({ branch, onClose }: { branch: Branch; onClose: () => void }) {
+  const lat = parseFloat(String(branch.lat ?? ""));
+  const lng = parseFloat(String(branch.lng ?? ""));
+  const radius = parseFloat(String(branch.delivery_radius_km ?? "5"));
+  const hasCoords = !isNaN(lat) && !isNaN(lng);
+
+  const mapSrc = hasCoords
+    ? `https://www.google.com/maps?q=${lat},${lng}&z=14&output=embed`
+    : null;
+
+  const mapsLink = hasCoords
+    ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((branch.branch_name ?? "") + " " + (branch.city ?? "") + " " + (branch.state ?? ""))}`;
+
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+
+      {/* Modal */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.93, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.93, y: 20 }}
+        transition={{ duration: 0.22 }}
+        className="relative z-10 w-full max-w-2xl rounded-2xl overflow-hidden bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3 px-5 py-4 bg-gradient-to-r from-fresh-green/[0.08] to-transparent border-b border-fresh-green/15">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-fresh-green/10 text-fresh-green ring-1 ring-fresh-green/20">
+              <MapPin className="w-5 h-5" />
+            </span>
+            <div>
+              <h3 className="font-bold text-deep-green text-base leading-tight">{branch.branch_name}</h3>
+              {(branch.city || branch.state) && (
+                <p className="text-xs text-muted mt-0.5">{[branch.city, branch.state].filter(Boolean).join(", ")}</p>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white border border-gray-200 text-gray-500 hover:border-red-200 hover:text-red-500 hover:bg-red-50 transition-all duration-200"
+            aria-label="Close map"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Meta row */}
+        <div className="flex items-center gap-4 px-5 py-3 bg-white border-b border-gray-100">
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-fresh-green bg-fresh-green/8 border border-fresh-green/15 rounded-full px-3 py-1">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-fresh-green opacity-60" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-fresh-green" />
+            </span>
+            Active Branch
+          </span>
+          {!isNaN(radius) && (
+            <span className="text-xs text-muted font-medium">
+              Coverage radius: <strong className="text-deep-green">{radius} km</strong>
+            </span>
+          )}
+          <a
+            href={mapsLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-fresh-green hover:underline"
+          >
+            <Navigation className="w-3.5 h-3.5" />
+            Open in Maps
+          </a>
+        </div>
+
+        {/* Map */}
+        <div className="h-72 sm:h-96 bg-gray-100 relative">
+          {mapSrc ? (
+            <iframe
+              src={mapSrc}
+              className="w-full h-full border-0"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              title={`Map for ${branch.branch_name}`}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-muted">
+              <MapPin className="w-10 h-10 text-fresh-green/40" />
+              <p className="text-sm font-medium">Location coordinates not available</p>
+              <a
+                href={mapsLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-xs font-semibold text-white bg-fresh-green rounded-full px-4 py-2 hover:bg-deep-green transition-colors"
+              >
+                <Navigation className="w-3.5 h-3.5" />
+                Search on Google Maps
+              </a>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────────
 export function Delivery() {
   const [scheduleTab, setScheduleTab] = useState<"morning" | "evening">("morning");
-  const [zoneTab, setZoneTab] = useState<"morning" | "evening">("morning");
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [branchesLoading, setBranchesLoading] = useState(true);
+  const [branchesError, setBranchesError] = useState(false);
+  const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
 
   const activeSchedule = scheduleTab === "morning" ? morningSchedule : eveningSchedule;
-  const activeZones = zoneTab === "morning" ? morningZones : eveningZones;
+
+  useEffect(() => {
+    let cancelled = false;
+    setBranchesLoading(true);
+    setBranchesError(false);
+
+    const base = (process.env.NEXT_PUBLIC_API_URL || "").trim().replace(/\/$/, "");
+    const url = base ? `${base}/api/v1/auth/public/branches` : "/api/v1/auth/public/branches";
+
+    fetch(url)
+      .then((r) => r.json())
+      .then((json) => {
+        if (!cancelled) {
+          if (json.status && Array.isArray(json.data)) {
+            setBranches(json.data);
+          } else {
+            setBranchesError(true);
+          }
+        }
+      })
+      .catch(() => { if (!cancelled) setBranchesError(true); })
+      .finally(() => { if (!cancelled) setBranchesLoading(false); });
+
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <section
@@ -352,7 +482,7 @@ export function Delivery() {
             viewport={{ once: true }}
             className="flex flex-col gap-6"
           >
-            {/* ── COVERAGE ZONES ── */}
+            {/* ── DELIVERY COVERAGE ZONES (real-time from API) ── */}
             <div>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-deep-green">
                 Delivery{" "}
@@ -360,139 +490,79 @@ export function Delivery() {
               </h2>
               <div className="mt-4 h-px w-16 bg-fresh-green/30 rounded-full" />
               <p className="text-muted text-sm leading-relaxed mt-4">
-                We deliver across these localities every single day — morning and evening slots available.
-                Not in the list? Register interest and we'll notify you when we arrive.
+                We operate across these real-time active branches every single day. Click any branch to view its location on the map.
+                Not nearby? Register interest and we'll notify you when we expand.
               </p>
 
-              {/* Zone tab switcher */}
-              <div className="mt-5 flex items-center gap-1 rounded-xl bg-white/80 border border-fresh-green/15 shadow-sm p-1 w-fit">
-                <button
-                  onClick={() => setZoneTab("morning")}
-                  className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 ${
-                    zoneTab === "morning"
-                      ? "bg-fresh-green text-white shadow-sm"
-                      : "text-muted hover:text-deep-green"
-                  }`}
-                >
-                  <Sunrise className="w-4 h-4" />
-                  Morning
-                  <span
-                    className={`text-[10px] font-bold rounded-full px-1.5 py-0.5 ${
-                      zoneTab === "morning" ? "bg-white/25 text-white" : "bg-fresh-green/10 text-fresh-green"
-                    }`}
-                  >
-                    {morningZones.length}
-                  </span>
-                </button>
-                <button
-                  onClick={() => setZoneTab("evening")}
-                  className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 ${
-                    zoneTab === "evening"
-                      ? "bg-amber-500 text-white shadow-sm"
-                      : "text-muted hover:text-deep-green"
-                  }`}
-                >
-                  <Sunset className="w-4 h-4" />
-                  Evening
-                  <span
-                    className={`text-[10px] font-bold rounded-full px-1.5 py-0.5 ${
-                      zoneTab === "evening" ? "bg-white/25 text-white" : "bg-amber-100 text-amber-700"
-                    }`}
-                  >
-                    {eveningZones.length}
-                  </span>
-                </button>
+              {/* Branch cards */}
+              <div className="mt-5">
+                {branchesLoading ? (
+                  <div className="flex items-center gap-3 text-muted text-sm py-8 justify-center">
+                    <Loader2 className="w-5 h-5 animate-spin text-fresh-green" />
+                    Loading delivery zones…
+                  </div>
+                ) : branchesError || branches.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 text-muted text-sm py-8">
+                    <AlertCircle className="w-7 h-7 text-amber-400" />
+                    {branchesError
+                      ? "Could not load branches right now. Please check back shortly."
+                      : "No active delivery zones found."}
+                  </div>
+                ) : (
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.25 }}
+                      className="grid sm:grid-cols-2 gap-3"
+                    >
+                      {branches.map((branch, i) => (
+                        <motion.button
+                          key={branch.branch_id}
+                          initial={{ opacity: 0, scale: 0.97 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: i * 0.04, duration: 0.22 }}
+                          onClick={() => setSelectedBranch(branch)}
+                          className="group relative flex items-center gap-3 overflow-hidden rounded-xl border border-fresh-green/25 bg-white/90 text-sm font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-fresh-green/40 px-4 py-3.5 text-deep-green text-left cursor-pointer"
+                          type="button"
+                          title={`View ${branch.branch_name} on map`}
+                        >
+                          {/* Left accent bar */}
+                          <span className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl bg-fresh-green" />
+                          {/* Dot */}
+                          <span className="ml-1 h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white bg-fresh-green" aria-hidden />
+                          <span className="flex-1 min-w-0 pl-0.5 leading-snug">
+                            {branch.branch_name}
+                            {(branch.city || branch.state) && (
+                              <span className="block text-[11px] font-normal text-muted mt-0.5">
+                                {[branch.city, branch.state].filter(Boolean).join(", ")}
+                              </span>
+                            )}
+                          </span>
+                          <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide shrink-0 bg-fresh-green/10 text-fresh-green group-hover:bg-fresh-green group-hover:text-white transition-all duration-200">
+                            <MapPin className="w-3 h-3" />
+                            Map
+                          </span>
+                        </motion.button>
+                      ))}
+                    </motion.div>
+                  </AnimatePresence>
+                )}
               </div>
 
-              {/* Zone timing badge */}
-              <div className="mt-3">
-                <AnimatePresence mode="wait">
-                  {zoneTab === "morning" ? (
-                    <motion.div
-                      key="morning-zone-badge"
-                      initial={{ opacity: 0, y: 4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -4 }}
-                      transition={{ duration: 0.2 }}
-                      className="inline-flex items-center gap-2 text-xs font-semibold text-fresh-green bg-fresh-green/8 border border-fresh-green/15 rounded-full px-3 py-1.5"
-                    >
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-fresh-green opacity-60" />
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-fresh-green" />
-                      </span>
-                      Morning Shift · Monday to Sunday
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="evening-zone-badge"
-                      initial={{ opacity: 0, y: 4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -4 }}
-                      transition={{ duration: 0.2 }}
-                      className="inline-flex items-center gap-2 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200/60 rounded-full px-3 py-1.5"
-                    >
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-60" />
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
-                      </span>
-                      Evening Shift · Monday to Sunday
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Zone cards */}
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={zoneTab}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.25 }}
-                  className="mt-4 grid sm:grid-cols-2 gap-3"
-                >
-                  {activeZones.map((z, i) => (
-                    <motion.div
-                      key={z.name}
-                      initial={{ opacity: 0, scale: 0.97 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: i * 0.04, duration: 0.22 }}
-                      className={`group relative flex items-center gap-3 overflow-hidden rounded-xl border px-4 py-3.5 text-sm font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
-                        zoneTab === "morning"
-                          ? "border-fresh-green/25 bg-white/90 text-deep-green hover:border-fresh-green/40"
-                          : "border-amber-200/80 bg-gradient-to-r from-amber-50/80 to-white/90 text-deep-green hover:border-amber-300/70"
-                      }`}
-                    >
-                      {/* Left accent bar */}
-                      <span
-                        className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl ${
-                          zoneTab === "morning" ? "bg-fresh-green" : "bg-amber-500"
-                        }`}
-                      />
-                      {/* List bullet (no index) */}
-                      <span
-                        className={`ml-1 h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white ${
-                          zoneTab === "morning" ? "bg-fresh-green" : "bg-amber-500"
-                        }`}
-                        aria-hidden
-                      />
-                      <span className="flex-1 min-w-0 pl-0.5 leading-snug">{z.name}</span>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide shrink-0 ${
-                          zoneTab === "morning"
-                            ? "bg-fresh-green/10 text-fresh-green"
-                            : "bg-amber-100 text-amber-700"
-                        }`}
-                      >
-                        Active
-                      </span>
-                    </motion.div>
-                  ))}
-                </motion.div>
-              </AnimatePresence>
+              {/* Live badge */}
+              {!branchesLoading && !branchesError && branches.length > 0 && (
+                <div className="mt-4">
+                  <div className="inline-flex items-center gap-2 text-xs font-semibold text-fresh-green bg-fresh-green/8 border border-fresh-green/15 rounded-full px-3 py-1.5">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-fresh-green opacity-60" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-fresh-green" />
+                    </span>
+                    {branches.length} active branch{branches.length !== 1 ? "es" : ""} · Daily delivery
+                  </div>
+                </div>
+              )}
             </div>
-
-           
 
             {/* WhatsApp alerts */}
             <div className="flex gap-4 rounded-2xl border border-fresh-green/20 bg-white/90 p-5 md:p-6 shadow-md shadow-green-glow backdrop-blur-sm transition-shadow hover:shadow-lg">
@@ -546,6 +616,16 @@ export function Delivery() {
           </motion.div>
         </div>
       </div>
+
+      {/* Branch Map Modal */}
+      <AnimatePresence>
+        {selectedBranch && (
+          <BranchMapModal
+            branch={selectedBranch}
+            onClose={() => setSelectedBranch(null)}
+          />
+        )}
+      </AnimatePresence>
     </section>
   );
 }

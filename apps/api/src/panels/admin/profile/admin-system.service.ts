@@ -309,4 +309,92 @@ export class AdminSystemService {
       throw new InternalServerErrorException('Failed to update app configuration');
     }
   }
+
+  // ────────────────────────────────────────────────
+  // Site Settings (footer / contact info)
+  // ────────────────────────────────────────────────
+
+  /** Ensure the site_settings table exists, then return all settings as a key-value map. */
+  async getSiteSettings(): Promise<{ status: boolean; data: Record<string, any> }> {
+    try {
+      await this.db.query(`
+        CREATE TABLE IF NOT EXISTS site_settings (
+          key   VARCHAR(120) PRIMARY KEY,
+          value TEXT NOT NULL DEFAULT '',
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `, []);
+
+      const rows: { key: string; value: string }[] = await this.db.query(
+        'SELECT key, value FROM site_settings ORDER BY key ASC', []
+      );
+
+      const data: Record<string, any> = {};
+      for (const row of rows) {
+        try { data[row.key] = JSON.parse(row.value); } catch { data[row.key] = row.value; }
+      }
+      return { status: true, data };
+    } catch (error) {
+      this.developer.error('getSiteSettings error', { error });
+      throw new InternalServerErrorException('Failed to retrieve site settings');
+    }
+  }
+
+  /** Insert or update one site setting. */
+  async upsertSiteSetting(key: string, value: any): Promise<{ status: boolean; message: string }> {
+    try {
+      await this.db.query(`
+        CREATE TABLE IF NOT EXISTS site_settings (
+          key   VARCHAR(120) PRIMARY KEY,
+          value TEXT NOT NULL DEFAULT '',
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `, []);
+
+      const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+      await this.db.query(`
+        INSERT INTO site_settings (key, value, updated_at)
+        VALUES ($1, $2, NOW())
+        ON CONFLICT (key) DO UPDATE
+          SET value = EXCLUDED.value, updated_at = NOW()
+      `, [key, serialized]);
+
+      return { status: true, message: 'Site setting saved' };
+    } catch (error) {
+      this.developer.error('upsertSiteSetting error', { error });
+      throw new InternalServerErrorException('Failed to save site setting');
+    }
+  }
+
+  /** Bulk upsert — body is a plain object { key: value, ... } */
+  async upsertSiteSettings(body: Record<string, any>): Promise<{ status: boolean; message: string }> {
+    try {
+      for (const [key, value] of Object.entries(body)) {
+        await this.upsertSiteSetting(key, value);
+      }
+      return { status: true, message: 'Site settings saved' };
+    } catch (error) {
+      this.developer.error('upsertSiteSettings error', { error });
+      throw new InternalServerErrorException('Failed to save site settings');
+    }
+  }
+
+  // ────────────────────────────────────────────────
+  // Public: Active Branches list for landing page
+  // ────────────────────────────────────────────────
+  async getPublicBranches(): Promise<{ status: boolean; data: any[] }> {
+    try {
+      const rows = await this.db.query(`
+        SELECT branch_id, branch_name, city, state,
+               lat, lng, delivery_radius_km
+        FROM branches
+        WHERE is_active = true
+        ORDER BY branch_name ASC
+      `, []);
+      return { status: true, data: rows };
+    } catch (error) {
+      this.developer.error('getPublicBranches error', { error });
+      return { status: false, data: [] };
+    }
+  }
 }

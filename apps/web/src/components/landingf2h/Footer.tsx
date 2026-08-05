@@ -15,15 +15,7 @@ const quickLinks = [
   { name: "Contact", href: "#contact" },
 ];
 
-const socialLinks = [
-  { name: "instagram", icon: FaInstagram, href: "#", hoverClass: "hover:bg-pink-500" },
-  { name: "whatsapp", icon: FaWhatsapp, href: "https://wa.me/919148773591", hoverClass: "hover:bg-green-500" },
-  { name: "facebook", icon: FaFacebookF, href: "#", hoverClass: "hover:bg-blue-600" },
-  { name: "youtube", icon: FaYoutube, href: "#", hoverClass: "hover:bg-red-600" },
-];
-
 const badges = ["Pure & Natural", "No Preservatives", "Daily Fresh Delivery", "Directly from Farms", "Cold-Chain Maintained"];
-
 
 const DROPS = Array.from({ length: 14 }, (_, i) => ({
   id: i,
@@ -33,10 +25,32 @@ const DROPS = Array.from({ length: 14 }, (_, i) => ({
   size: 4 + (i * 0.3) % 5,
 }));
 
+/* ── Default contact values (shown if admin hasn't configured yet) ── */
+const DEFAULT_CONTACT = {
+  phone: "+91 91487 73591",
+  phone_url: "tel:+919148773591",
+  whatsapp: "+91 91487 73591",
+  whatsapp_url: "https://wa.me/919148773591",
+  email: "hello@f2hfresh.com",
+  address: "1st Cross, SJP Layout, Nagondanahalli, Whitefield, Bangalore – 560066",
+  instagram_url: "#",
+  facebook_url: "#",
+  youtube_url: "#",
+};
+
+type SiteSettings = typeof DEFAULT_CONTACT;
+
+function buildApiUrl(path: string): string {
+  const base = (process.env.NEXT_PUBLIC_API_URL || "").trim().replace(/\/$/, "");
+  return base ? base + path : path;
+}
+
 export function Footer() {
   const footerRef = useRef<HTMLElement>(null);
   const [visible, setVisible] = useState(false);
+  const [contact, setContact] = useState<SiteSettings>(DEFAULT_CONTACT);
 
+  // Intersection Observer for entrance animation
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => { if (entry.isIntersecting) setVisible(true); },
@@ -45,6 +59,44 @@ export function Footer() {
     if (footerRef.current) observer.observe(footerRef.current);
     return () => observer.disconnect();
   }, []);
+
+  // Fetch site settings from admin-configured API
+  useEffect(() => {
+    let cancelled = false;
+    fetch(buildApiUrl("/api/v1/auth/public/site-settings"))
+      .then((r) => r.json())
+      .then((json) => {
+        if (!cancelled && json.status && json.data) {
+          const d = json.data as Partial<SiteSettings>;
+          setContact((prev) => ({
+            phone: d.phone || prev.phone,
+            phone_url: d.phone_url || (d.phone ? `tel:${d.phone.replace(/\s/g, "")}` : prev.phone_url),
+            whatsapp: d.whatsapp || d.phone || prev.whatsapp,
+            whatsapp_url: d.whatsapp_url || (d.whatsapp ? `https://wa.me/${d.whatsapp.replace(/[^0-9]/g, "")}` : prev.whatsapp_url),
+            email: d.email || prev.email,
+            address: d.address || prev.address,
+            instagram_url: d.instagram_url || prev.instagram_url,
+            facebook_url: d.facebook_url || prev.facebook_url,
+            youtube_url: d.youtube_url || prev.youtube_url,
+          }));
+        }
+      })
+      .catch(() => { /* silent — fall back to defaults */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  const socialLinks = [
+    { name: "instagram", icon: FaInstagram, href: contact.instagram_url, hoverClass: "hover:bg-pink-500" },
+    { name: "whatsapp", icon: FaWhatsapp, href: contact.whatsapp_url, hoverClass: "hover:bg-green-500" },
+    { name: "facebook", icon: FaFacebookF, href: contact.facebook_url, hoverClass: "hover:bg-blue-600" },
+    { name: "youtube", icon: FaYoutube, href: contact.youtube_url, hoverClass: "hover:bg-red-600" },
+  ];
+
+  const contactItems = [
+    { href: contact.phone_url, Icon: FiPhone, label: contact.phone },
+    { href: contact.whatsapp_url, Icon: FaWhatsapp, label: "WhatsApp Us" },
+    { href: `mailto:${contact.email}`, Icon: FiMail, label: contact.email },
+  ];
 
   return (
     <footer
@@ -180,7 +232,6 @@ export function Footer() {
           </g>
 
           {/* Delivery Scooter — animated to move right-to-left */}
-          {/* CHANGED: removed static transform, added animating style */}
           <g filter="url(#glow)" style={{ animation: "scooterMove 12s linear infinite" }}>
             {/* Headlight beam */}
             <path d="M145,30 L200,15 L200,45Z" fill="#fde68a" opacity="0.15" />
@@ -271,7 +322,7 @@ export function Footer() {
             </p>
             <div className="flex gap-2 text-white/55 text-xs leading-relaxed mb-3">
               <FiMapPin className="mt-0.5 shrink-0 text-green-400" size={12} />
-              <span>1st Cross, SJP Layout, Nagondanahalli,<br />Whitefield, Bangalore – 560066</span>
+              <span>{contact.address}</span>
             </div>
             <div className="flex gap-2.5">
               {socialLinks.map(({ name, icon: Icon, href, hoverClass }) => (
@@ -300,17 +351,13 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Contact */}
+          {/* Contact — dynamically loaded */}
           <div className="transition-all duration-700" style={{ opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(28px)", transitionDelay: "200ms" }}>
             <h4 className="text-white text-xs font-bold mb-5 uppercase tracking-[0.2em] flex items-center gap-2">
               <span className="w-4 h-px bg-green-500 inline-block" />Contact Us
             </h4>
             <ul className="space-y-3.5 text-sm text-white/65">
-              {[
-                { href: "tel:+919148773591", Icon: FiPhone, label: "+91 91487 73591" },
-                { href: "https://wa.me/919148773591", Icon: FaWhatsapp, label: "WhatsApp Us" },
-                { href: "mailto:hello@f2hfresh.com", Icon: FiMail, label: "hello@f2hfresh.com" },
-              ].map(({ href, Icon, label }) => (
+              {contactItems.map(({ href, Icon, label }) => (
                 <li key={label}>
                   <a href={href} className="group flex items-center gap-3 hover:text-green-400 transition-colors duration-200">
                     <span className="w-8 h-8 flex items-center justify-center rounded-full bg-white/6 border border-white/8 group-hover:border-green-500/40 group-hover:bg-green-500/10 transition-all duration-200">
@@ -324,7 +371,7 @@ export function Footer() {
                 <span className="w-8 h-8 flex items-center justify-center rounded-full bg-white/6 border border-white/8 group-hover:border-green-500/40 group-hover:bg-green-500/10 transition-all duration-200 shrink-0">
                   <FiMapPin size={13} />
                 </span>
-                Whitefield, Bangalore
+                <span className="text-xs leading-relaxed">{contact.address}</span>
               </li>
             </ul>
           </div>
