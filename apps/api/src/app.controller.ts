@@ -370,29 +370,56 @@ export class AppController {
   }
 
   @Post('app/rebuild')
-  async triggerAppRebuild(@Body() body: { appId: string }) {
+  async triggerAppRebuild(@Body() body: { appId: string; action?: string }) {
     const appId = (body?.appId || '').toLowerCase().trim();
+    const action = (body?.action || 'rebuild').toLowerCase().trim();
     let command = '';
 
-    if (appId === 'customer') {
-      command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/customer && /opt/flutter/bin/flutter build web --release && rsync -avz --delete /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/customer/build/web/ /home/f2hfresh-customer/htdocs/customer.f2hfresh.com/`;
-    } else if (appId === 'partner' || appId === 'delivery') {
-      command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/delivery && /opt/flutter/bin/flutter build web --release && rsync -avz --delete /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/delivery/build/web/ /home/f2hfresh-partner/htdocs/partner.f2hfresh.com/`;
-    } else if (appId === 'admin') {
-      command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/web && npm run build && pm2 restart frontend-f2hfresh`;
+    if (action === 'clean') {
+      if (appId === 'customer') {
+        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/customer && /opt/flutter/bin/flutter clean && /opt/flutter/bin/flutter pub get`;
+      } else if (appId === 'partner' || appId === 'delivery') {
+        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/delivery && /opt/flutter/bin/flutter clean && /opt/flutter/bin/flutter pub get`;
+      } else {
+        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/web && rm -rf .next node_modules/.cache`;
+      }
+    } else if (action === 'run') {
+      if (appId === 'customer') {
+        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/customer && /opt/flutter/bin/flutter build web --profile --no-pub && rsync -avz --delete /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/customer/build/web/ /home/f2hfresh-customer/htdocs/customer.f2hfresh.com/`;
+      } else if (appId === 'partner' || appId === 'delivery') {
+        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/delivery && /opt/flutter/bin/flutter build web --profile --no-pub && rsync -avz --delete /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/delivery/build/web/ /home/f2hfresh-partner/htdocs/partner.f2hfresh.com/`;
+      } else {
+        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/web && pm2 restart frontend-f2hfresh`;
+      }
+    } else if (action === 'reload') {
+      if (appId === 'customer') {
+        command = `rsync -avz --delete /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/customer/build/web/ /home/f2hfresh-customer/htdocs/customer.f2hfresh.com/`;
+      } else if (appId === 'partner' || appId === 'delivery') {
+        command = `rsync -avz --delete /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/delivery/build/web/ /home/f2hfresh-partner/htdocs/partner.f2hfresh.com/`;
+      } else {
+        command = `pm2 restart frontend-f2hfresh`;
+      }
     } else {
-      throw new BadRequestException('Invalid appId');
+      if (appId === 'customer') {
+        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/customer && /opt/flutter/bin/flutter build web --release && rsync -avz --delete /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/customer/build/web/ /home/f2hfresh-customer/htdocs/customer.f2hfresh.com/`;
+      } else if (appId === 'partner' || appId === 'delivery') {
+        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/delivery && /opt/flutter/bin/flutter build web --release && rsync -avz --delete /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/delivery/build/web/ /home/f2hfresh-partner/htdocs/partner.f2hfresh.com/`;
+      } else if (appId === 'admin') {
+        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/web && npm run build && pm2 restart frontend-f2hfresh`;
+      } else {
+        throw new BadRequestException('Invalid appId');
+      }
     }
 
     const { exec } = await import('child_process');
     return new Promise((resolve) => {
       exec(command, (error, stdout, stderr) => {
         if (error) {
-          console.error(`[AppRebuild] Error building ${appId}:`, stderr);
+          console.error(`[AppRebuild:${action}] Error building ${appId}:`, stderr);
           return resolve({ success: false, message: stderr || error.message });
         }
-        console.log(`[AppRebuild] Successfully rebuilt ${appId}`);
-        resolve({ success: true, message: `${appId} live sync completed successfully!`, output: stdout });
+        console.log(`[AppRebuild:${action}] Successfully executed for ${appId}`);
+        resolve({ success: true, message: `${appId} (${action}) completed successfully!`, output: stdout || 'Command executed cleanly.' });
       });
     });
   }

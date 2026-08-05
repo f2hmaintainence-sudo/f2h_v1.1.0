@@ -653,6 +653,14 @@ export class CatalogSaveAddService {
         ? Number(insertData.original_price)
         : price;
 
+      if (originalPrice > 0 && price > originalPrice) {
+        throw new BadRequestException({
+          status: false,
+          message: `Selling price (₹${price}) cannot be greater than Original Price (MRP: ₹${originalPrice})`,
+          errors: { price: 'Selling price cannot exceed Original Price (MRP)' },
+        });
+      }
+
       let discount = 0;
       if (originalPrice > 0 && originalPrice > price) {
         discount = Math.max(0, Math.round(((originalPrice - price) / originalPrice) * 100 * 100) / 100);

@@ -58,51 +58,41 @@ export default function AppApkPage() {
   const [terminalLogs, setTerminalLogs] = useState<Record<string, string>>({});
 
   // Trigger Rebuild / Sync Action
-  const triggerRebuildAction = async (appId: string, name: string, mode: "rebuild" | "sync" = "rebuild") => {
+  const triggerRebuildAction = async (appId: string, name: string, action: "run" | "clean" | "reload" | "rebuild" = "rebuild") => {
     setBuildingState((prev) => ({ ...prev, [appId]: true }));
     setActionSuccess(null);
+    const actionLabel = action === "run" ? "Flutter Run" : action === "clean" ? "Flutter Clean" : action === "reload" ? "Hot Reload" : "Full Rebuild";
     setTerminalLogs((prev) => ({
       ...prev,
-      [appId]: `[${new Date().toLocaleTimeString()}] Starting ${mode === "sync" ? "Instant Hot Sync" : "Full Live Rebuild"} for ${name}...\nFetching live server status...`,
+      [appId]: `[${new Date().toLocaleTimeString()}] Executing ${actionLabel} for ${name}...\nRunning command on server...`,
     }));
 
     try {
-      if (mode === "sync") {
-        // Instant Sync & Reload
-        setTerminalLogs((prev) => ({
-          ...prev,
-          [appId]: `[${new Date().toLocaleTimeString()}] ⚡ Hot Reloading ${name} preview...\nSyncing assets & triggering client refresh...`,
-        }));
-        reloadIframe();
-        setActionSuccess(`${name} hot reloaded successfully!`);
-        return;
-      }
-
       const res = await fetch("https://f2hfresh.com/api/v1/app/rebuild", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appId }),
+        body: JSON.stringify({ appId, action }),
       });
       const data = await res.json();
 
-      const logOutput = data?.output || data?.message || (data?.success ? "Build completed cleanly with 0 errors." : "Compilation failed. Check logs.");
+      const logOutput = data?.output || data?.message || (data?.success ? `${actionLabel} completed cleanly with 0 errors.` : "Operation failed. Check logs.");
       setTerminalLogs((prev) => ({
         ...prev,
-        [appId]: `[${new Date().toLocaleTimeString()}] Output for ${name}:\n${logOutput}`,
+        [appId]: `[${new Date().toLocaleTimeString()}] ${actionLabel} output for ${name}:\n${logOutput}`,
       }));
 
       if (data?.success) {
-        setActionSuccess(`${name} live rebuild & sync completed! Real changes are now live.`);
+        setActionSuccess(`${name} ${actionLabel} completed successfully!`);
       } else {
-        setActionSuccess(`${name} build completed! Check terminal logs below for details.`);
+        setActionSuccess(`${name} ${actionLabel} executed. Check terminal logs below for details.`);
       }
     } catch (err: any) {
       const errMsg = err?.message || String(err);
       setTerminalLogs((prev) => ({
         ...prev,
-        [appId]: `[${new Date().toLocaleTimeString()}] Error: ${errMsg}`,
+        [appId]: `[${new Date().toLocaleTimeString()}] Error during ${actionLabel}: ${errMsg}`,
       }));
-      setActionSuccess(`${name} rebuild command completed.`);
+      setActionSuccess(`${name} ${actionLabel} executed.`);
     } finally {
       setBuildingState((prev) => ({ ...prev, [appId]: false }));
       checkDomainPing(appId, appId === "customer" ? "https://customer.f2hfresh.com" : "https://partner.f2hfresh.com");
@@ -317,29 +307,39 @@ export default function AppApkPage() {
               {/* Real Interactive Actions (No Raw Code Text) */}
               <div className="space-y-2.5 pt-4 border-t border-slate-100 mt-auto">
 
-                {/* 1. Action Buttons: Instant Hot Sync & Full Rebuild */}
-                <div className="grid grid-cols-2 gap-2">
+                {/* 1. Operation Buttons: Run, Clean, Reload, Rebuild */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                   <button
-                    onClick={() => triggerRebuildAction(app.id, app.name, "sync")}
+                    onClick={() => triggerRebuildAction(app.id, app.name, "run")}
                     disabled={isBuilding}
-                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-black uppercase tracking-wider shadow-sm hover:scale-[1.01] transition-all active:scale-95 text-center disabled:opacity-75"
+                    className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-wider shadow-xs hover:scale-[1.02] transition-all active:scale-95 text-center disabled:opacity-75"
+                    title="Run Flutter Dev Build / Fast Sync"
                   >
-                    <Zap size={13} /> Instant Hot Reload
+                    <Play size={12} /> Run
+                  </button>
+                  <button
+                    onClick={() => triggerRebuildAction(app.id, app.name, "clean")}
+                    disabled={isBuilding}
+                    className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-slate-700 hover:bg-slate-800 text-white text-[10px] font-black uppercase tracking-wider shadow-xs hover:scale-[1.02] transition-all active:scale-95 text-center disabled:opacity-75"
+                    title="Flutter Clean build cache & pub get"
+                  >
+                    <RotateCw size={12} /> Clean
+                  </button>
+                  <button
+                    onClick={() => triggerRebuildAction(app.id, app.name, "reload")}
+                    disabled={isBuilding}
+                    className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-black uppercase tracking-wider shadow-xs hover:scale-[1.02] transition-all active:scale-95 text-center disabled:opacity-75"
+                    title="Instant Hot Reload & Refresh Iframe"
+                  >
+                    <Zap size={12} /> Reload
                   </button>
                   <button
                     onClick={() => triggerRebuildAction(app.id, app.name, "rebuild")}
                     disabled={isBuilding}
-                    className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-gradient-to-r ${app.btnBg} text-white text-[11px] font-black uppercase tracking-wider ${app.shadowColor} shadow-md hover:scale-[1.01] transition-all active:scale-95 text-center disabled:opacity-75`}
+                    className={`flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-gradient-to-r ${app.btnBg} text-white text-[10px] font-black uppercase tracking-wider ${app.shadowColor} shadow-xs hover:scale-[1.02] transition-all active:scale-95 text-center disabled:opacity-75`}
+                    title="Full Production Release Rebuild"
                   >
-                    {isBuilding ? (
-                      <>
-                        <RotateCw size={13} className="animate-spin" /> Syncing...
-                      </>
-                    ) : (
-                      <>
-                        <RotateCw size={13} /> Live Rebuild
-                      </>
-                    )}
+                    <RefreshCw size={12} /> Rebuild
                   </button>
                 </div>
 

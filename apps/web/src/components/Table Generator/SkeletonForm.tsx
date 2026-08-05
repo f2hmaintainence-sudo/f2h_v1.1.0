@@ -90,13 +90,21 @@ interface SkeletonFormProps {
 
 // ─── Validation ──────────────────────────────────────────────
 
-function validateField(field: FieldDef, value: any): string | null {
+function validateField(field: FieldDef, value: any, formData?: Record<string, any>): string | null {
   const isEmpty = value === undefined || value === null || String(value).trim() === '';
 
   if (field.required && isEmpty) {
     return `${field.label} is required`;
   }
   if (isEmpty) return null;
+
+  if (field.name === 'price' && formData && formData.original_price) {
+    const orig = parseFloat(formData.original_price);
+    const sell = parseFloat(value);
+    if (!isNaN(orig) && !isNaN(sell) && orig > 0 && sell > orig) {
+      return `Selling Price cannot exceed Original Price (MRP: ₹${orig})`;
+    }
+  }
 
   const v = field.validation;
   if (!v) return null;
@@ -861,14 +869,36 @@ export default function SkeletonForm({
     setFormData((prev) => {
       const next = { ...prev, [name]: value };
 
-      // Realtime discount calculation for original_price & price
-      if (name === 'original_price' || name === 'price') {
+      // Selling price <= Original Price (MRP) enforcement & realtime discount calculation
+      if (name === 'price') {
         const orig = parseFloat(next.original_price);
-        const sell = parseFloat(next.price);
-        if (!isNaN(orig) && !isNaN(sell) && orig > 0 && orig >= sell) {
-          next.discount_percent = Math.round(((orig - sell) / orig) * 100 * 10) / 10;
-        } else if (!isNaN(orig) && orig > 0 && (isNaN(sell) || sell > orig)) {
+        const sell = parseFloat(value);
+        if (!isNaN(orig) && !isNaN(sell) && orig > 0 && sell > orig) {
+          next.price = orig;
           next.discount_percent = 0;
+          setTimeout(() => {
+            setErrors((prevErr) => ({
+              ...prevErr,
+              price: `Selling Price cannot exceed Original Price (MRP: ₹${orig})`,
+            }));
+          }, 0);
+        } else if (!isNaN(orig) && !isNaN(sell) && orig > 0 && orig >= sell) {
+          next.discount_percent = Math.round(((orig - sell) / orig) * 100 * 10) / 10;
+        }
+      } else if (name === 'original_price') {
+        const orig = parseFloat(value);
+        const sell = parseFloat(next.price);
+        if (!isNaN(orig) && !isNaN(sell) && orig > 0 && sell > orig) {
+          next.price = orig;
+          next.discount_percent = 0;
+          setTimeout(() => {
+            setErrors((prevErr) => ({
+              ...prevErr,
+              price: `Selling Price adjusted to match Original Price (MRP: ₹${orig})`,
+            }));
+          }, 0);
+        } else if (!isNaN(orig) && !isNaN(sell) && orig > 0 && orig >= sell) {
+          next.discount_percent = Math.round(((orig - sell) / orig) * 100 * 10) / 10;
         }
       }
 
@@ -876,7 +906,7 @@ export default function SkeletonForm({
     });
 
     // Clear error on change
-    if (errors[name]) {
+    if (errors[name] && name !== 'price') {
       setErrors((prev) => {
         const copy = { ...prev };
         delete copy[name];

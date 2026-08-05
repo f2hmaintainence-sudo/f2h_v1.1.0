@@ -583,6 +583,14 @@ export class CatalogSaveEditService {
         ? (updateData.original_price !== null ? Number(updateData.original_price) : currentPrice)
         : Number(existingVariant.original_price || currentPrice);
 
+      if (currentOriginalPrice > 0 && currentPrice > currentOriginalPrice) {
+        throw new BadRequestException({
+          status: false,
+          message: `Selling price (₹${currentPrice}) cannot be greater than Original Price (MRP: ₹${currentOriginalPrice})`,
+          errors: { price: 'Selling price cannot exceed Original Price (MRP)' },
+        });
+      }
+
       let discount = 0;
       if (currentOriginalPrice > 0 && currentOriginalPrice > currentPrice) {
         discount = Math.max(0, Math.round(((currentOriginalPrice - currentPrice) / currentOriginalPrice) * 100 * 100) / 100);
