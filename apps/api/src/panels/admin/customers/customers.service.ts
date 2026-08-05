@@ -2009,10 +2009,12 @@ export class CustomersService {
           COALESCE(u.email, '') AS email,
           COALESCE(u.phone, '') AS phone
         FROM users u
+        JOIN customers c ON c.customer_id = u.user_id
         WHERE u.deleted_at IS NULL
         ORDER BY u.first_name ASC, u.created_at DESC
         LIMIT 500
       `);
+
 
       const variants = await this.databaseService.query(`
         SELECT 

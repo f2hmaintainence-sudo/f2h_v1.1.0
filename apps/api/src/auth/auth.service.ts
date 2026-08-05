@@ -279,18 +279,38 @@ export class AuthService {
       }
     }
 
-    const rawFullName = (
-      body.first_name ||
-      (body as any).full_name ||
-      body.name ||
-      (body as any).fullName ||
-      body.user_name ||
-      (email ? email.split('@')[0] : 'User')
-    ).trim();
-    let firstName = rawFullName;
-    let lastName = body.last_name ? body.last_name.trim() : '';
+    // Parse name fields (first_name, last_name, user_name, full_name/name)
+    let firstName = (body.first_name || '').trim();
+    let lastName = (body.last_name || '').trim();
 
-    const userName = body.user_name || rawFullName || email?.split('@')[0] || phone;
+    if (!firstName) {
+      const fullName = (
+        (body as any).full_name ||
+        body.name ||
+        (body as any).fullName ||
+        ''
+      ).trim();
+
+      if (fullName) {
+        const parts = fullName.split(/\s+/);
+        firstName = parts[0] || '';
+        lastName = parts.slice(1).join(' ') || lastName;
+      } else if (body.user_name) {
+        firstName = body.user_name.trim();
+      } else if (email) {
+        firstName = email.split('@')[0];
+      } else {
+        firstName = 'User';
+      }
+    }
+
+    const userName = (
+      body.user_name ||
+      (firstName + (lastName ? ` ${lastName}` : '')) ||
+      email?.split('@')[0] ||
+      phone ||
+      'user'
+    ).trim();
 
     // Check existing users via indexed SQL query
     let existingUser: any = null;
@@ -311,13 +331,15 @@ export class AuthService {
       existingUser = phoneRes?.data?.[0];
     }
 
-    // If user is already fully registered with a password and matching role, return success directly (prevents double submit token errors)
-    if (
+    // Only skip duplicate registration if user is already fully registered WITH a set name/user_name and matching role
+    const isFullyRegistered =
       existingUser &&
+      (existingUser.first_name || existingUser.user_name) &&
       existingUser.password &&
       !existingUser.password.startsWith('temp_') &&
-      existingUser.role_id === roleId
-    ) {
+      existingUser.role_id === roleId;
+
+    if (isFullyRegistered) {
       this.developer.debug(`[AuthService:register] User ${existingUser.user_id} already registered. Skipping duplicate OTP consumption.`);
       return {
         message: 'Registration successful',
@@ -346,7 +368,7 @@ export class AuthService {
         const userUpdatePayload: any = {
           email,
           phone,
-          user_name: body.user_name || email?.split('@')[0] || phone,
+          user_name: userName,
           first_name: firstName,
           last_name: lastName,
           password: hashedPassword,
@@ -369,7 +391,7 @@ export class AuthService {
           user_id: userId,
           email,
           phone,
-          user_name: body.user_name || email?.split('@')[0] || phone,
+          user_name: userName,
           first_name: firstName,
           last_name: lastName,
           password: hashedPassword,
