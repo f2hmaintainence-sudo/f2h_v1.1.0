@@ -40,8 +40,8 @@ export class UsersController {
     if (!userId) return { error: 'Unauthorized' };
 
     const users = await this.db.query(
-      `SELECT user_id, email, user_name, first_name, last_name
-       FROM users WHERE user_id = ?`,
+      `SELECT user_id, email, user_name, first_name, last_name, profile_image_url AS profile
+       FROM users WHERE user_id = $1`,
       [userId],
     );
     const rawUser = users?.[0];
@@ -52,7 +52,7 @@ export class UsersController {
       `SELECT ra.role_id, r.name as role_name
        FROM role_assignments ra
        JOIN roles r ON UPPER(ra.role_id) = UPPER(r.role_id) 
-       WHERE ra.user_id = ? AND ra.is_active = 1 AND ra.deleted_at IS NULL
+       WHERE ra.user_id = $1 AND ra.is_active = 1 AND ra.deleted_at IS NULL
        ORDER BY CASE UPPER(ra.role_id) WHEN 'ADMIN' THEN 1 WHEN 'DELIVERY_PARTNER' THEN 2 WHEN 'CUSTOMER' THEN 3 ELSE 4 END`,
       [userId],
     );
@@ -72,7 +72,7 @@ export class UsersController {
       roles.unshift({ role_id: 'ADMIN', role_name: 'ADMIN' });
       this.db.query(
         `INSERT INTO role_assignments (id, user_id, role_id, is_active, created_at, updated_at)
-         VALUES (?, ?, 'ADMIN', 1, NOW(), NOW())
+         VALUES ($1, $2, 'ADMIN', 1, NOW(), NOW())
          ON CONFLICT DO NOTHING`,
         [Date.now(), userId],
       ).catch(() => {});
@@ -94,6 +94,7 @@ export class UsersController {
       user_name: user.user_name,
       first_name: user.first_name,
       last_name: user.last_name,
+      profile: user.profile,
       roles: roles.map((r: any) => ({
         role_id: r.role_id,
         role_name: r.role_name,
@@ -128,7 +129,7 @@ export class UsersController {
     // Validate role exists for this user
     const roles = await this.db.query(
       `SELECT ra.role_id FROM role_assignments ra
-       WHERE ra.user_id = ? `,
+       WHERE ra.user_id = $1 AND ra.role_id = $2`,
       [userId, role_key],
     );
 
