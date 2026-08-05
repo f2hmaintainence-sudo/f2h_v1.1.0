@@ -195,7 +195,7 @@ export class PackageService {
             dp.phone AS delivery_partner_phone,
             COALESCE(o.updated_at, o.created_at) AS delivered_at
           FROM orders o
-          LEFT JOIN delivery_partners dp ON (dp.delivery_partner_id = o.delivery_partner_id OR dp.id::text = o.delivery_partner_id)
+          LEFT JOIN delivery_partners dp ON (dp.delivery_partner_id = o.delivery_partner_id OR dp.user_id = o.delivery_partner_id)
           WHERE o.customer_id = ccb.customer_id OR o.customer_id = c.customer_id
           ORDER BY o.created_at DESC
           LIMIT 1

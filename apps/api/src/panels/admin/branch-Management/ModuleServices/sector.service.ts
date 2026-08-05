@@ -194,8 +194,8 @@ export class SectorService {
           dp.full_name AS delivery_partner_name,
           odp.full_name AS override_boy_name
         FROM customers c
-        LEFT JOIN delivery_partners dp ON dp.id = c.delivery_partner_id
-        LEFT JOIN delivery_partners odp ON odp.id = c.override_delivery_partner_id
+        LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = c.delivery_partner_id
+        LEFT JOIN delivery_partners odp ON odp.delivery_partner_id = c.override_delivery_partner_id
         WHERE c.branch_id = $1 AND c.sector_index = $2
       `;
       const params: any[] = [branchId, sectorIndex];
@@ -523,7 +523,7 @@ export class SectorService {
           dp.phone,
           (NOW() - dpl.recorded_at) > INTERVAL '5 minutes' AS is_stale
         FROM delivery_partner_locations dpl
-        JOIN delivery_partners dp ON dp.id = dpl.delivery_partner_id
+        JOIN delivery_partners dp ON dp.delivery_partner_id = dpl.delivery_partner_id
         WHERE dp.branch_id = $1
       `;
       const params: any[] = [branchId];

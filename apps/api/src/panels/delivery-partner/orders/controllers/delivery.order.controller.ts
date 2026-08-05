@@ -61,7 +61,7 @@ export class DeliveryOrderController {
          AND (
            delivery_partner_id = $2 OR delivery_partner_id = $3
          )`,
-      [orderId, boy.id, boy.user_id],
+      [orderId, boy.delivery_partner_id, boy.user_id],
     );
     if (!orderRes?.length) throw new NotFoundException('Order not found');
 

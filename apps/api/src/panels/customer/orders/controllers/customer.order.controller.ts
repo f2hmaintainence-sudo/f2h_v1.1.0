@@ -877,7 +877,7 @@ export class CustomerOrderController {
            COALESCE(u.phone, dp.phone) AS phone
          FROM users u
          LEFT JOIN delivery_partners dp ON (dp.user_id = u.user_id OR dp.delivery_partner_id = u.user_id)
-         WHERE u.user_id = $1 OR dp.delivery_partner_id = $1 OR dp.id::text = $1
+         WHERE u.user_id = $1 OR dp.delivery_partner_id = $1 OR dp.user_id = $1
          LIMIT 1`,
         [order.delivery_partner_id],
       );

@@ -11,7 +11,7 @@ export class AuthService {
     }
 
     const boyRes = await this.db.query(
-      `SELECT id, is_active, delivery_partner_id, user_id FROM delivery_partners WHERE user_id = $1 OR delivery_partner_id = $1 LIMIT 1`,
+      `SELECT is_active, delivery_partner_id, user_id FROM delivery_partners WHERE user_id = $1 OR delivery_partner_id = $1 LIMIT 1`,
       [userId],
     );
 
@@ -40,8 +40,8 @@ export class AuthService {
     }
 
     await this.db.execute(
-      `UPDATE delivery_partners SET is_active = $1, is_online = $1, updated_at = NOW() WHERE id = $2`,
-      [newStatus, boyRes[0].id],
+      `UPDATE delivery_partners SET is_active = $1, is_online = $1, updated_at = NOW() WHERE delivery_partner_id = $2`,
+      [newStatus, boyRes[0].delivery_partner_id],
     );
 
     return {

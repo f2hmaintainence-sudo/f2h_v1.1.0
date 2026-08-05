@@ -774,7 +774,7 @@ export class DeliveryManagementService {
         `SELECT dp.delivery_partner_id, COALESCE(u.first_name || ' ' || u.last_name, u.user_name, 'Delivery Partner') AS full_name
          FROM delivery_partners dp
          LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
-         WHERE dp.delivery_partner_id = $1 OR dp.id::text = $1 LIMIT 1`,
+         WHERE dp.delivery_partner_id = $1 OR dp.user_id = $1 LIMIT 1`,
         [dto.delivery_partner_id],
       );
       if (!dbRes || dbRes.length === 0) {

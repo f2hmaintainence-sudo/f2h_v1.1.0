@@ -1271,7 +1271,24 @@ export class AuthService {
         where: [{ column: 'phone', operator: '=', value: rawIdentifier }],
         limit: 1,
       });
-      if (phoneRes?.data?.length) user = phoneRes.data[0];
+      if (phoneRes?.data?.length) {
+        user = phoneRes.data[0];
+      } else {
+        const cleanPhoneInput = rawIdentifier.replace(/\D/g, '');
+        if (cleanPhoneInput.length >= 10) {
+          const last10 = cleanPhoneInput.slice(-10);
+          const phoneMatchRes = await this.DataBase.query(
+            `SELECT user_id, email, phone, user_name, role_id
+             FROM users
+             WHERE REGEXP_REPLACE(phone, '\\D', '', 'g') LIKE $1
+             LIMIT 1`,
+            [`%${last10}`]
+          );
+          if (phoneMatchRes?.length) {
+            user = phoneMatchRes[0];
+          }
+        }
+      }
     }
 
     if (!user) {

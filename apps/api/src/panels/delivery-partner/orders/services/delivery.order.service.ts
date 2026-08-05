@@ -35,7 +35,7 @@ export class DeliveryOrderService {
 
   async resolveDeliveryPartner(userId: string) {
     const boyRes = await this.db.query(
-      `SELECT dp.id, dp.user_id, dp.delivery_partner_id, dp.branch_id,
+      `SELECT dp.delivery_partner_id, dp.user_id, dp.delivery_partner_id, dp.branch_id,
               u.first_name || ' ' || u.last_name AS full_name
        FROM delivery_partners dp
        LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
@@ -601,7 +601,7 @@ export class DeliveryOrderService {
     if (!orders?.length) {
       return {
         status: true,
-        delivery_partner: { id: boy.id, name: boy.full_name },
+        delivery_partner: { id: boy.delivery_partner_id, name: boy.full_name },
         date: targetDate,
         run_id: activeRunId,
         run_status: activeRunStatus,
@@ -614,7 +614,7 @@ export class DeliveryOrderService {
 
     return {
       status: true,
-      delivery_partner: { id: boy.id, name: boy.full_name },
+      delivery_partner: { id: boy.delivery_partner_id, name: boy.full_name },
       date: targetDate,
       run_id: activeRunId,
       run_status: activeRunStatus,
@@ -1087,7 +1087,7 @@ export class DeliveryOrderService {
     if (!runs?.length && !stops?.length) {
       return {
         status: true,
-        delivery_partner: { id: boy.id, name: boy.full_name },
+        delivery_partner: { id: boy.delivery_partner_id, name: boy.full_name },
         date: targetDate,
         run_id: null,
         pickup_confirmed: false,
@@ -1189,7 +1189,7 @@ export class DeliveryOrderService {
 
     return {
       status: true,
-      delivery_partner: { id: boy.id, name: boy.full_name },
+      delivery_partner: { id: boy.delivery_partner_id, name: boy.full_name },
       date: targetDate,
       run_id: runIdentifier,
       run_status: runStatus,
