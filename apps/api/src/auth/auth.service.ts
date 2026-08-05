@@ -405,6 +405,17 @@ export class AuthService {
       ? await bcrypt.hash(body.password, 12)
       : crypto.randomUUID();
 
+    const rawFullName = (
+      body.first_name ||
+      body.full_name ||
+      body.name ||
+      (body as any).fullName ||
+      body.user_name ||
+      (email ? email.split('@')[0] : 'User')
+    ).trim();
+    const firstName = rawFullName;
+    const lastName = body.last_name ? body.last_name.trim() : '';
+
     await this.Data.executeTransaction(async (transaction) => {
       if (existingUser) {
         // Update placeholder user created during OTP verification
@@ -414,8 +425,8 @@ export class AuthService {
           email,
           phone,
           user_name: body.user_name || email?.split('@')[0] || phone,
-          first_name: body.first_name || '',
-          last_name: body.last_name || '',
+          first_name: firstName,
+          last_name: lastName,
           password: hashedPassword,
           role_id: roleId,
           updated_at: now,
@@ -437,8 +448,8 @@ export class AuthService {
           email,
           phone,
           user_name: body.user_name || email?.split('@')[0] || phone,
-          first_name: body.first_name || '',
-          last_name: body.last_name || '',
+          first_name: firstName,
+          last_name: lastName,
           password: hashedPassword,
           role_id: roleId,
           created_at: now,

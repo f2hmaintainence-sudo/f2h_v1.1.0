@@ -232,13 +232,17 @@ async function bootstrap() {
     allowedHeaders: [
       'Content-Type',
       'Authorization',
-      'X-Role',   // compact: C=CUSTOMER, D=DELIVERY_BOY, A=ADMIN
+      'X-Role',   // compact: C=CUSTOMER, D=DELIVERY_PARTNER, A=ADMIN
       'X-Plt',    // compact: ac=android_customer, ic=ios_customer, ad/id=delivery
       'X-Ver',    // compact: semver build string e.g. 1.0.3+10
       'X-Csrf',   // compact: CSRF uuid for mutations
-      // Legacy verbose headers (kept for admin panel / web clients during migration)
       'x-role',
+      'x-app-platform',
+      'x-app-version',
       'x-csrf-token',
+      'x-requested-with',
+      'accept',
+      'origin',
     ].join(', '),
     credentials: true,
     maxAge: 86400, // 24-hour preflight cache
