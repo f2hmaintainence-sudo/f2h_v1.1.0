@@ -42,7 +42,7 @@ export class CustomersService {
       const sortBy = query.sortBy || 'created_at';
       const sortDir = query.sortDir?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-      const whereClauses: string[] = [];
+      const whereClauses: string[] = ['c.deleted_at IS NULL'];
       const params: any[] = [];
 
       if (search) {
@@ -50,12 +50,13 @@ export class CustomersService {
         const pIdx = params.length;
         whereClauses.push(`(
           c.customer_id ILIKE $${pIdx} OR 
-          COALESCE(c.full_name, '') ILIKE $${pIdx} OR 
-          COALESCE(c.first_name, '') ILIKE $${pIdx} OR 
-          COALESCE(c.last_name, '') ILIKE $${pIdx} OR 
-          COALESCE(c.mobile, '') ILIKE $${pIdx} OR 
-          COALESCE(c.phone, '') ILIKE $${pIdx} OR 
-          COALESCE(c.email, '') ILIKE $${pIdx}
+          COALESCE(u.first_name, '') ILIKE $${pIdx} OR 
+          COALESCE(u.last_name, '') ILIKE $${pIdx} OR 
+          COALESCE((COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), '') ILIKE $${pIdx} OR 
+          COALESCE(u.user_name, '') ILIKE $${pIdx} OR 
+          COALESCE(u.phone, '') ILIKE $${pIdx} OR 
+          COALESCE(c.alternate_mobile, '') ILIKE $${pIdx} OR 
+          COALESCE(u.email, '') ILIKE $${pIdx}
         )`);
       }
 
@@ -72,9 +73,9 @@ export class CustomersService {
       if (typeFilter === 'postpaid') {
         whereClauses.push(`c.is_postpaid_enabled = true`);
       } else if (typeFilter === 'subscriber') {
-        whereClauses.push(`c.subscription_number IS NOT NULL AND c.subscription_number != ''`);
+        whereClauses.push(`EXISTS (SELECT 1 FROM subscriptions s WHERE s.customer_id = c.customer_id AND s.status = 'active')`);
       } else if (typeFilter === 'non_subscriber') {
-        whereClauses.push(`(c.subscription_number IS NULL OR c.subscription_number = '')`);
+        whereClauses.push(`NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.customer_id = c.customer_id AND s.status = 'active')`);
       } else if (typeFilter === 'vip') {
         whereClauses.push(`c.customer_type = 'vip'`);
       }
@@ -109,7 +110,7 @@ export class CustomersService {
       } else if (sortBy === 'due') {
         orderBySql = `ORDER BY COALESCE(cb.outstanding_due, 0) ${sortDir}`;
       } else if (sortBy === 'name') {
-        orderBySql = `ORDER BY COALESCE(c.first_name, c.full_name, '') ${sortDir}`;
+        orderBySql = `ORDER BY COALESCE(u.first_name, u.user_name, '') ${sortDir}`;
       }
 
       const mainSql = `
@@ -139,6 +140,7 @@ export class CustomersService {
         sub_stats AS (
           SELECT DISTINCT ON (customer_id)
             customer_id,
+            subscription_number,
             status as subscription_status,
             billing_cycle,
             schedule_type
@@ -146,17 +148,22 @@ export class CustomersService {
           ORDER BY customer_id, created_at DESC
         )
         SELECT 
-          c.id,
+          c.customer_id as id,
           c.customer_id,
-          COALESCE(c.first_name, '') as first_name,
-          COALESCE(c.last_name, '') as last_name,
-          COALESCE(NULLIF(c.full_name, ''), (COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, ''))) as full_name,
-          COALESCE(NULLIF(c.mobile, ''), NULLIF(c.phone, ''), '') as phone,
+          COALESCE(u.first_name, '') as first_name,
+          COALESCE(u.last_name, '') as last_name,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, u.phone, 'Customer') as full_name,
+          COALESCE(
+            NULLIF(u.phone, ''),
+            NULLIF(c.alternate_mobile, ''),
+            (SELECT NULLIF(ca.contact_mobile, '') FROM customer_addresses ca WHERE ca.customer_id = c.customer_id AND ca.contact_mobile IS NOT NULL AND ca.contact_mobile != '' ORDER BY ca.is_default DESC, ca.id DESC LIMIT 1),
+            ''
+          ) as phone,
           COALESCE(c.alternate_mobile, '') as alternate_phone,
-          c.email,
+          u.email,
           c.gender,
           c.dob,
-          c.profile_image,
+          u.profile_image_url as profile_image,
           c.customer_status,
           c.customer_type,
           COALESCE(c.wallet_balance, 0)::numeric as wallet_balance,
@@ -165,7 +172,7 @@ export class CustomersService {
           COALESCE(c.postpaid_credit_limit, 0)::numeric as postpaid_credit_limit,
           COALESCE(c.is_blocked, false) as is_blocked,
           c.block_reason,
-          c.subscription_number,
+          sub.subscription_number,
           c.created_at,
           c.updated_at,
           
@@ -183,6 +190,7 @@ export class CustomersService {
           sub.billing_cycle,
           sub.schedule_type
         FROM customers c
+        JOIN users u ON u.user_id = c.customer_id
         LEFT JOIN order_stats ord ON ord.customer_id = c.customer_id
         LEFT JOIN bill_stats cb ON cb.customer_id = c.customer_id
         LEFT JOIN sub_stats sub ON sub.customer_id = c.customer_id
@@ -194,6 +202,7 @@ export class CustomersService {
       const countSql = `
         SELECT COUNT(DISTINCT c.customer_id)::int as total
         FROM customers c
+        JOIN users u ON u.user_id = c.customer_id
         LEFT JOIN (
           SELECT customer_id, COALESCE(SUM(due_amount), 0) as outstanding_due
           FROM customer_bills WHERE status != 'paid' AND status != 'cancelled' GROUP BY customer_id
@@ -203,13 +212,15 @@ export class CustomersService {
 
       const statsSql = `
         SELECT 
-          COUNT(*)::int as total_customers,
-          COUNT(CASE WHEN subscription_number IS NOT NULL AND subscription_number != '' THEN 1 END)::int as active_subscribers,
-          COUNT(CASE WHEN is_postpaid_enabled = true THEN 1 END)::int as postpaid_accounts,
-          COUNT(CASE WHEN is_blocked = true THEN 1 END)::int as blocked_accounts,
+          COUNT(DISTINCT c.customer_id)::int as total_customers,
+          COUNT(DISTINCT CASE WHEN s.status = 'active' THEN c.customer_id END)::int as active_subscribers,
+          COUNT(DISTINCT CASE WHEN c.is_postpaid_enabled = true THEN c.customer_id END)::int as postpaid_accounts,
+          COUNT(DISTINCT CASE WHEN c.is_blocked = true THEN c.customer_id END)::int as blocked_accounts,
           COALESCE((SELECT SUM(total_amount) FROM orders WHERE status = 'delivered'), 0)::numeric as total_revenue,
           COALESCE((SELECT SUM(due_amount) FROM customer_bills WHERE status != 'paid' AND status != 'cancelled'), 0)::numeric as total_due
-        FROM customers
+        FROM customers c
+        LEFT JOIN subscriptions s ON s.customer_id = c.customer_id AND s.status = 'active'
+        WHERE c.deleted_at IS NULL
       `;
 
       const branchesSql = `SELECT branch_id, branch_name FROM branches WHERE deleted_at IS NULL ORDER BY branch_name ASC`;
@@ -247,10 +258,16 @@ export class CustomersService {
   async getCustomerPortfolio(id: string) {
     try {
       const custRes = await this.databaseService.query(
-        `SELECT c.*
+        `SELECT c.*, 
+                COALESCE(u.first_name, '') as first_name,
+                COALESCE(u.last_name, '') as last_name,
+                COALESCE(u.phone, '') as phone,
+                COALESCE(u.email, '') as email,
+                u.profile_image_url as profile_image
          FROM customers c
-         WHERE c.customer_id = ? OR c.id::text = ?`,
-        [id, id]
+         JOIN users u ON u.user_id = c.customer_id
+         WHERE c.customer_id = $1`,
+        [id]
       );
 
       if (!custRes || custRes.length === 0) {
@@ -267,10 +284,11 @@ export class CustomersService {
 
       const ordersRes = await this.databaseService.query(
         `SELECT o.*, 
-                dp.full_name as delivery_partner_name,
-                dp.phone as delivery_partner_phone
+                COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Delivery Partner') as delivery_partner_name,
+                u.phone as delivery_partner_phone
          FROM orders o
          LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = o.delivery_partner_id
+         LEFT JOIN users u ON u.user_id = dp.user_id
          WHERE o.customer_id = ?
          ORDER BY o.created_at DESC`,
         [customerId]
@@ -582,7 +600,7 @@ export class CustomersService {
       const containerBalancesRes = await this.databaseService.query(
         `SELECT ccb.*, COALESCE(cnt.name, pt.name, ccb.packaging_type_id) as packaging_name, COALESCE(pt.unit, 'PCS') as packaging_unit, COALESCE(pt.deposit_amount, 0) as deposit_amount
          FROM customer_container_balances ccb
-         LEFT JOIN packaging_types pt ON pt.id = ccb.packaging_type_id AND pt.deleted_at IS NULL
+         LEFT JOIN packaging_types pt ON pt.id::text = ccb.packaging_type_id AND pt.deleted_at IS NULL
          LEFT JOIN containers cnt ON cnt.container_id = ccb.packaging_type_id AND cnt.deleted_at IS NULL
          WHERE ccb.customer_id = ? AND ccb.deleted_at IS NULL`,
         [customerId]
@@ -591,7 +609,7 @@ export class CustomersService {
       const containerTxnsRes = await this.databaseService.query(
         `SELECT ct.*, COALESCE(cnt.name, pt.name, ct.packaging_type_id) as packaging_name
          FROM container_transactions ct
-         LEFT JOIN packaging_types pt ON pt.id = ct.packaging_type_id AND pt.deleted_at IS NULL
+         LEFT JOIN packaging_types pt ON pt.id::text = ct.packaging_type_id AND pt.deleted_at IS NULL
          LEFT JOIN containers cnt ON cnt.container_id = ct.packaging_type_id AND cnt.deleted_at IS NULL
          WHERE ct.customer_id = ? AND ct.deleted_at IS NULL
          ORDER BY ct.created_at DESC`,
@@ -603,7 +621,7 @@ export class CustomersService {
          FROM containers 
          WHERE (status = 'active' OR status IS NULL) AND deleted_at IS NULL
          UNION ALL
-         SELECT id, name, capacity, unit, is_returnable, deposit_amount 
+         SELECT id::text, name, capacity, unit, is_returnable, deposit_amount 
          FROM packaging_types 
          WHERE (status = 'active' OR status IS NULL) AND deleted_at IS NULL
          ORDER BY name ASC`
@@ -774,25 +792,20 @@ export class CustomersService {
   async getCustomerTable(query: any) {
     try {
       const columns: Record<string, [string, boolean]> = {
-        id: ['customers.id', false],
-        customer_name: ['users.first_name', true],
+        id: ['customers.customer_id', false],
+        customer_name: ["CONCAT_WS(' ', users.first_name, users.last_name)", true],
         phone: ['users.phone', true],
         email: ['users.email', true],
         joined: ['customers.created_at', true],
-        wallet_balance: ['wallets.balance', true],
-        status: ['customers.status', true],
+        wallet_balance: ['customers.wallet_balance', true],
+        status: ['customers.customer_status', true],
       };
 
       const joins: JoinDef[] = [
         {
           type: 'left',
           table: 'users',
-          on: [['customers.user_id', 'users.user_id']],
-        },
-        {
-          type: 'left',
-          table: 'wallets',
-          on: [['customers.id', 'wallets.customer_id']],
+          on: [['customers.customer_id', 'users.user_id']],
         },
       ];
 
@@ -800,7 +813,7 @@ export class CustomersService {
 
       if (query.status) {
         conditions.push({
-          column: 'customers.status',
+          column: 'customers.customer_status',
           operator: '=',
           value: query.status,
         });
@@ -870,7 +883,7 @@ export class CustomersService {
         select: { count: true },
         where: [
           {
-            column: 'customers.status',
+            column: 'customers.customer_status',
             operator: '=',
             value: 'active',
           },
@@ -880,7 +893,7 @@ export class CustomersService {
         select: { count: true },
         where: [
           {
-            column: 'customers.status',
+            column: 'customers.customer_status',
             operator: '=',
             value: 'dormant',
           },
@@ -890,7 +903,7 @@ export class CustomersService {
         select: { count: true },
         where: [
           {
-            column: 'customers.status',
+            column: 'customers.customer_status',
             operator: '=',
             value: 'paused',
           },
@@ -899,7 +912,7 @@ export class CustomersService {
       const blocked = await this.dataService.query('customers', {
         select: { count: true },
         where: [
-          { column: 'customers.status', operator: '=', value: 'blocked' },
+          { column: 'customers.customer_status', operator: '=', value: 'blocked' },
         ],
       });
 
@@ -932,22 +945,15 @@ export class CustomersService {
           'users.email',
           'users.phone',
           'users.created_at AS user_created_at',
-          'wallets.balance AS wallet_balance',
-          'wallets.is_frozen AS wallet_frozen',
         ],
         joins: [
           {
             type: 'left',
             table: 'users',
-            on: [['customers.user_id', 'users.user_id']],
-          },
-          {
-            type: 'left',
-            table: 'wallets',
-            on: [['customers.id', 'wallets.customer_id']],
+            on: [['customers.customer_id', 'users.user_id']],
           },
         ],
-        where: [{ column: 'customers.id', operator: '=', value: id }],
+        where: [{ column: 'customers.customer_id', operator: '=', value: id }],
         limit: 1,
       });
 

@@ -247,59 +247,78 @@ export default function AllCustomersPage() {
       ) : data.length === 0 ? (
         <div className="text-center py-20 text-gray-500">No customers found.</div>
       ) : (
-        <div className={`grid gap-4 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}>
+        <div className={`grid gap-3.5 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}>
           {data.map((c, i) => (
-            <div key={i} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow group relative">
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex gap-3">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg ${getAvatarColors(c.full_name)}`}>
-                    {c.full_name?.charAt(0)?.toUpperCase() || 'U'}
+            <div key={i} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between h-full min-w-0 overflow-hidden relative group">
+              <div>
+                {/* Header */}
+                <div className="flex items-center justify-between gap-2 mb-3 min-w-0">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 ${getAvatarColors(c.full_name)}`}>
+                      {c.full_name?.charAt(0)?.toUpperCase() || 'U'}
+                    </div>
+                    <div className="min-w-0 flex-1 overflow-hidden">
+                      <h3 className="font-bold text-gray-900 text-xs sm:text-sm truncate block" title={c.full_name || 'Customer'}>
+                        {c.full_name || 'Customer'}
+                      </h3>
+                      <p className="text-[10px] font-mono text-gray-400 truncate block" title={c.customer_id}>
+                        #{c.customer_id}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-gray-900 truncate max-w-[150px]">{c.full_name || 'Unknown User'}</h3>
-                    <p className="text-[11px] font-mono text-gray-400">#{c.customer_id}</p>
+                  <button 
+                    onClick={() => router.push(`/admin/customers/${c.customer_id}`)}
+                    className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-fresh-green group-hover:text-white transition-colors shrink-0"
+                    title="View Portfolio"
+                  >
+                    <ArrowRight size={14} />
+                  </button>
+                </div>
+
+                {/* Details */}
+                <div className="space-y-1.5 mb-3 text-xs">
+                  <div className="flex items-center gap-2 text-gray-600 min-w-0">
+                    <Phone size={13} className="text-fresh-green shrink-0" />
+                    <span className="truncate" title={c.phone || 'No Phone Registered'}>
+                      {(!c.phone || c.phone.startsWith('NO_PHONE_')) ? (
+                        <span className="text-gray-400 font-normal">No Phone Registered</span>
+                      ) : (
+                        c.phone
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-600 min-w-0">
+                    <Mail size={13} className="text-fresh-green shrink-0" />
+                    <span className="truncate text-gray-500" title={c.email || 'No Email'}>
+                      {c.email || <span className="text-gray-400 font-normal">No Email</span>}
+                    </span>
                   </div>
                 </div>
-                <button 
-                  onClick={() => router.push(`/admin/customers/${c.customer_id}`)}
-                  className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-fresh-green group-hover:text-white transition-colors flex-shrink-0"
-                >
-                  <ArrowRight size={16} />
-                </button>
-              </div>
 
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Phone size={14} className="text-fresh-green" />
-                  {(!c.phone || c.phone.startsWith('NO_PHONE_')) ? 'No Phone Registered' : c.phone}
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Mail size={14} className="text-fresh-green shrink-0" />
-                  <span className="truncate">{c.email || 'No Email'}</span>
+                {/* Status Badge */}
+                <div className="mb-3">
+                  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                    c.customer_status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+                  }`}>
+                    <div className={`w-1.5 h-1.5 rounded-full ${c.customer_status === 'active' ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                    <span className="capitalize">{c.customer_status || 'active'}</span>
+                  </span>
                 </div>
               </div>
 
-              <div className="mb-4">
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
-                  c.customer_status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
-                }`}>
-                  <div className={`w-1.5 h-1.5 rounded-full ${c.customer_status === 'active' ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
-                  {c.customer_status || 'active'}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 pt-4 border-t border-gray-50">
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Revenue</p>
-                  <p className="font-bold text-gray-900">₹{Number(c.lifetime_revenue || 0).toLocaleString()}</p>
+              {/* KPI Footer Grid */}
+              <div className="grid grid-cols-3 gap-1.5 pt-2.5 border-t border-gray-100 text-center">
+                <div className="min-w-0">
+                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider truncate">Revenue</p>
+                  <p className="font-bold text-gray-900 text-xs truncate">₹{Number(c.lifetime_revenue || 0).toLocaleString()}</p>
                 </div>
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Wallet</p>
-                  <p className="font-bold text-gray-900">₹{Number(c.wallet_balance || 0).toLocaleString()}</p>
+                <div className="min-w-0">
+                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider truncate">Wallet</p>
+                  <p className="font-bold text-gray-900 text-xs truncate">₹{Number(c.wallet_balance || 0).toLocaleString()}</p>
                 </div>
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Due</p>
-                  <p className="font-bold text-gray-900">₹{Number(c.outstanding_due || 0).toLocaleString()}</p>
+                <div className="min-w-0">
+                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider truncate">Due</p>
+                  <p className="font-bold text-gray-900 text-xs truncate">₹{Number(c.outstanding_due || 0).toLocaleString()}</p>
                 </div>
               </div>
             </div>
