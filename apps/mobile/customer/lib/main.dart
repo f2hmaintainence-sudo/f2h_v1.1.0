@@ -41,21 +41,20 @@ void main() async {
   await di.init();
 
   // 2. Firebase init — must complete before runApp so FCM token is ready
-  if (!kIsWeb) {
-    try {
-      if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.currentPlatform,
-        );
-      }
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+    if (!kIsWeb) {
       FirebaseMessaging.onBackgroundMessage(
         _firebaseMessagingBackgroundHandler,
       );
-      // Await so FCM token is cached before user can log in
       await sl<NotificationService>().initialize();
-    } catch (e) {
-      debugPrint('[main] Firebase init failed: $e');
     }
+  } catch (e) {
+    debugPrint('[main] Firebase init skipped: $e');
   }
 
   SystemChrome.setSystemUIOverlayStyle(

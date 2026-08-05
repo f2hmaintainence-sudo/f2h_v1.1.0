@@ -147,14 +147,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   Future<String?> _getFcmToken() async {
-    if (kIsWeb || Firebase.apps.isEmpty) {
-      print('Skipping FCM token generation (Web or Firebase not initialized)');
+    if (Firebase.apps.isEmpty) {
       return null;
     }
     try {
       return await FirebaseMessaging.instance.getToken();
-    } catch (e) {
-      print('Error getting FCM token: $e');
+    } catch (_) {
       return null;
     }
   }

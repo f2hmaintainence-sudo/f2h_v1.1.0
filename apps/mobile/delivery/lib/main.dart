@@ -25,19 +25,19 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await di.init();
   
-  if (!kIsWeb) {
-    try {
-      if (Firebase.apps.isEmpty && AppConfig.firebaseProjectId.isNotEmpty) {
-        await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.currentPlatform,
-        );
+  try {
+    if (Firebase.apps.isEmpty && AppConfig.firebaseProjectId.isNotEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      if (!kIsWeb) {
         FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
         FirebaseMessaging messaging = FirebaseMessaging.instance;
         await messaging.requestPermission();
       }
-    } catch (e) {
-      debugPrint('[main] Firebase initialization failed: $e');
     }
+  } catch (e) {
+    debugPrint('[main] Firebase initialization skipped: $e');
   }
 
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(

@@ -1161,8 +1161,15 @@ export class BranchManagementService {
 
   async getBranchById(branchId: string) {
     try {
-      const result = await this.dataService.query('branches', {
+      const isNum = !isNaN(Number(branchId));
+      let whereClause: any[] = [{ column: 'branches.branch_id', operator: '=', value: branchId }];
+      if (isNum) {
+        whereClause = [{ column: 'branches.id', operator: '=', value: Number(branchId) }];
+      }
+
+      let result = await this.dataService.query('branches', {
         select: [
+          'branches.id',
           'branches.branch_id',
           'branches.branch_name',
           'branches.branch_code',
@@ -1173,15 +1180,38 @@ export class BranchManagementService {
           'branches.delivery_radius_km',
           'branches.buffer_zone',
           'branches.allow_buffer_order',
-          'branches.sector_count',
           'branches.hex_shape',
           'branches.is_active',
           'branches.created_at',
           'branches.updated_at',
         ],
-        where: [{ column: 'branches.branch_id', operator: '=', value: branchId }],
+        where: whereClause,
         limit: 1,
       });
+
+      if (!result?.data?.length && !isNum) {
+        result = await this.dataService.query('branches', {
+          select: [
+            'branches.id',
+            'branches.branch_id',
+            'branches.branch_name',
+            'branches.branch_code',
+            'branches.city',
+            'branches.state',
+            'branches.lat',
+            'branches.lng',
+            'branches.delivery_radius_km',
+            'branches.buffer_zone',
+            'branches.allow_buffer_order',
+            'branches.hex_shape',
+            'branches.is_active',
+            'branches.created_at',
+            'branches.updated_at',
+          ],
+          where: [{ column: 'branches.branch_code', operator: '=', value: branchId }],
+          limit: 1,
+        });
+      }
 
       if (!result?.data?.length) {
         return { status: false, message: 'Branch not found' };

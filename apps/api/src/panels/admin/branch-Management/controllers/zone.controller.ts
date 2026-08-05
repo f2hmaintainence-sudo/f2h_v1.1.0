@@ -351,7 +351,6 @@ export class ZoneController {
           'branches.lat',
           'branches.lng',
           'branches.delivery_radius_km',
-          'branches.sector_count',
         ],
         where: whereClause,
       });
