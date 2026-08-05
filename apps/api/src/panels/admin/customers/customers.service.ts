@@ -627,6 +627,24 @@ export class CustomersService {
          ORDER BY name ASC`
       ).catch(() => []);
 
+      const specialPricesRes = await this.databaseService.query(
+        `SELECT csp.id, csp.customer_id, csp.product_variant_id, csp.discount,
+                csp.created_at, csp.updated_at,
+                pv.name AS variant_name, pv.price AS selling_price, COALESCE(pv.original_price, pv.price) AS actual_price,
+                p.name AS product_name, p.product_id,
+                CASE 
+                  WHEN csp.discount > 0 AND csp.discount <= 100 THEN ROUND(pv.price * (1 - (csp.discount / 100.0)), 2)
+                  WHEN csp.discount > 100 THEN GREATEST(0, pv.price - csp.discount)
+                  ELSE pv.price
+                END AS special_price
+         FROM customer_special_prices csp
+         JOIN product_variants pv ON pv.variant_id = csp.product_variant_id
+         JOIN products p ON p.product_id = pv.product_id
+         WHERE csp.customer_id = $1 AND csp.deleted_at IS NULL
+         ORDER BY p.name ASC, pv.name ASC`,
+        [customerId]
+      ).catch(() => []);
+
       const customerProfileObj = {
         id: customer.id,
         customer_id: customer.customer_id,
@@ -774,6 +792,13 @@ export class CustomersService {
               total_spend: Number(p.total_spend),
             })),
           },
+          special_prices: (specialPricesRes || []).map((r: any) => ({
+            ...r,
+            selling_price: Number(r.selling_price || 0),
+            actual_price: Number(r.actual_price || 0),
+            discount: Number(r.discount || 0),
+            special_price: Number(r.special_price || 0),
+          })),
           smart_insights: insights,
           activity_timeline: timelineEvents,
         },
@@ -1809,8 +1834,14 @@ export class CustomersService {
       const rows = await this.databaseService.query(
         `SELECT csp.id, csp.customer_id, csp.product_variant_id, csp.discount,
                 csp.created_at, csp.updated_at,
-                pv.name AS variant_name, pv.price AS selling_price, pv.original_price,
-                p.name AS product_name, p.product_id
+                pv.name AS variant_name, pv.price AS selling_price,
+                COALESCE(pv.original_price, pv.price) AS actual_price,
+                p.name AS product_name, p.product_id,
+                CASE 
+                  WHEN csp.discount > 0 AND csp.discount <= 100 THEN ROUND(pv.price * (1 - (csp.discount / 100.0)), 2)
+                  WHEN csp.discount > 100 THEN GREATEST(0, pv.price - csp.discount)
+                  ELSE pv.price
+                END AS special_price
          FROM customer_special_prices csp
          JOIN product_variants pv ON pv.variant_id = csp.product_variant_id
          JOIN products p ON p.product_id = pv.product_id
@@ -1818,12 +1849,22 @@ export class CustomersService {
          ORDER BY p.name ASC, pv.name ASC`,
         [customerId],
       );
-      return { status: true, data: rows };
+      return {
+        status: true,
+        data: rows.map((r: any) => ({
+          ...r,
+          actual_price: Number(r.actual_price || 0),
+          selling_price: Number(r.selling_price || 0),
+          discount: Number(r.discount || 0),
+          special_price: Number(r.special_price || 0),
+        })),
+      };
     } catch (error) {
       this.developer.error('getSpecialPrices error', { error });
       throw new InternalServerErrorException('Failed to fetch special prices');
     }
   }
+
 
   async saveSpecialPrices(
     customerId: string,

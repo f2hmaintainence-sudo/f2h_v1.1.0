@@ -258,75 +258,6 @@ export class AuthService {
     Registration Flow:
    ================================================================================================*/
 
-  async findReferrer(code: string): Promise<any> {
-    if (!code || !code.trim()) return null;
-    const cleanCode = code.trim().toUpperCase();
-
-    // 1. Search by referral_code in customers (only valid columns: referral_code, customer_id)
-    const noHyphen = cleanCode.replace(/-/g, '');
-    const withHyphen = noHyphen.startsWith('F2H') && noHyphen.length > 3 ? 'F2H-' + noHyphen.substring(3) : cleanCode;
-    const variations = Array.from(new Set([cleanCode, noHyphen, withHyphen]));
-
-    for (const vCode of variations) {
-      const res = await this.Data.query('customers', {
-        where: [{ column: 'referral_code', operator: '=', value: vCode }],
-        limit: 1,
-      });
-      if (res?.data?.length) return res.data[0];
-    }
-
-    // 2. Search by customer_id in customers
-    const custByIdRes = await this.Data.query('customers', {
-      where: [{ column: 'customer_id', operator: '=', value: code.trim() }],
-      limit: 1,
-    });
-    if (custByIdRes?.data?.length) return custByIdRes.data[0];
-
-    // 3. Search by referral_code, user_id, phone, email in users
-    for (const field of ['referral_code', 'user_id', 'phone', 'email']) {
-      const res = await this.Data.query('users', {
-        where: [{ column: field, operator: '=', value: code.trim() }],
-        limit: 1,
-      });
-      if (res?.data?.length) return res.data[0];
-    }
-
-    // 4. Fallback for phone-suffix referral codes — search users by phone last digits
-    const digitsOnly = cleanCode.replace(/\D/g, '');
-    if (digitsOnly.length >= 3) {
-      const lastDigits = digitsOnly.length >= 4 ? digitsOnly.slice(-4) : digitsOnly;
-      const phoneMatch = await this.DataBase.query(
-        `SELECT user_id, referral_code FROM users WHERE phone LIKE $1 LIMIT 1`,
-        [`%${lastDigits}`]
-      );
-      if (phoneMatch?.length) return phoneMatch[0];
-    }
-
-    // 5. Create a placeholder customer row for legacy referral codes not yet in the system
-    if (cleanCode.length >= 3 && cleanCode.startsWith('F2H')) {
-      const newCustId = `USER_${cleanCode}`;
-
-      const existing = await this.Data.query('customers', {
-        where: [{ column: 'customer_id', operator: '=', value: newCustId }],
-        limit: 1,
-      });
-      if (existing?.data?.length) return existing.data[0];
-
-      const custData = {
-        customer_id: newCustId,
-        referral_code: cleanCode,
-        referral_status: 'active',
-        created_at: new Date(),
-        updated_at: new Date(),
-      };
-      try {
-        await this.Data.insert('customers', custData);
-      } catch (_) { }
-      return custData;
-    }
-
-    return null;
-  }
 
   async register(body: RegisterDto) {
     const now = new Date();
@@ -334,7 +265,7 @@ export class AuthService {
     const phone = body.phone ? body.phone.trim() : null;
     const roleId = (body.role || 'CUSTOMER').toUpperCase();
 
-   this.developer.debug('register', body);
+    this.developer.debug('register', body);
     if (!email && !phone) {
       throw new BadRequestException('Email and phone is required');
     }
@@ -722,6 +653,75 @@ export class AuthService {
     };
   }
 
+  async findReferrer(code: string): Promise<any> {
+    if (!code || !code.trim()) return null;
+    const cleanCode = code.trim().toUpperCase();
+
+    // 1. Search by referral_code in customers (only valid columns: referral_code, customer_id)
+    const noHyphen = cleanCode.replace(/-/g, '');
+    const withHyphen = noHyphen.startsWith('F2H') && noHyphen.length > 3 ? 'F2H-' + noHyphen.substring(3) : cleanCode;
+    const variations = Array.from(new Set([cleanCode, noHyphen, withHyphen]));
+
+    for (const vCode of variations) {
+      const res = await this.Data.query('customers', {
+        where: [{ column: 'referral_code', operator: '=', value: vCode }],
+        limit: 1,
+      });
+      if (res?.data?.length) return res.data[0];
+    }
+
+    // 2. Search by customer_id in customers
+    const custByIdRes = await this.Data.query('customers', {
+      where: [{ column: 'customer_id', operator: '=', value: code.trim() }],
+      limit: 1,
+    });
+    if (custByIdRes?.data?.length) return custByIdRes.data[0];
+
+    // 3. Search by referral_code, user_id, phone, email in users
+    for (const field of ['referral_code', 'user_id', 'phone', 'email']) {
+      const res = await this.Data.query('users', {
+        where: [{ column: field, operator: '=', value: code.trim() }],
+        limit: 1,
+      });
+      if (res?.data?.length) return res.data[0];
+    }
+
+    // 4. Fallback for phone-suffix referral codes — search users by phone last digits
+    const digitsOnly = cleanCode.replace(/\D/g, '');
+    if (digitsOnly.length >= 3) {
+      const lastDigits = digitsOnly.length >= 4 ? digitsOnly.slice(-4) : digitsOnly;
+      const phoneMatch = await this.DataBase.query(
+        `SELECT user_id, referral_code FROM users WHERE phone LIKE $1 LIMIT 1`,
+        [`%${lastDigits}`]
+      );
+      if (phoneMatch?.length) return phoneMatch[0];
+    }
+
+    // 5. Create a placeholder customer row for legacy referral codes not yet in the system
+    if (cleanCode.length >= 3 && cleanCode.startsWith('F2H')) {
+      const newCustId = `USER_${cleanCode}`;
+
+      const existing = await this.Data.query('customers', {
+        where: [{ column: 'customer_id', operator: '=', value: newCustId }],
+        limit: 1,
+      });
+      if (existing?.data?.length) return existing.data[0];
+
+      const custData = {
+        customer_id: newCustId,
+        referral_code: cleanCode,
+        referral_status: 'active',
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+      try {
+        await this.Data.insert('customers', custData);
+      } catch (_) { }
+      return custData;
+    }
+
+    return null;
+  }
   private getHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
     const dLat = (lat2 - lat1) * (Math.PI / 180);
     const dLon = (lon2 - lon1) * (Math.PI / 180);

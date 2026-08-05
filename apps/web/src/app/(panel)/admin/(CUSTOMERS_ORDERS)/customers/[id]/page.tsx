@@ -22,7 +22,14 @@ import {
   Box,
   Truck,
   CheckCircle2,
-  Bell
+  Bell,
+  Tag,
+  Trash2,
+  Plus,
+  Percent,
+  Check,
+  Search,
+  X
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -112,6 +119,7 @@ export default function CustomerDetailsPage() {
   const tabs = [
     { name: 'Overview & Insights', icon: <Sparkles size={16} /> },
     { name: `Orders (${totalOrdersCount})`, icon: <ShoppingBag size={16} /> },
+    { name: 'Special Prices', icon: <Tag size={16} /> },
     { name: 'Containers & Returns', icon: <Box size={16} /> },
     { name: 'Postpaid Ledger', icon: <CreditCard size={16} /> },
     { name: 'Wallet Analytics', icon: <Wallet size={16} /> },
@@ -131,7 +139,15 @@ export default function CustomerDetailsPage() {
         >
           <ArrowLeft size={14} /> Return to Customers
         </Link>
+
+        <button
+          onClick={() => setActiveTab('Special Prices')}
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 text-xs font-bold rounded-xl shadow-2xs transition-all cursor-pointer"
+        >
+          <Tag size={14} /> Configure Special Prices
+        </button>
       </div>
+
       
       {/* Header Panel */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -297,6 +313,14 @@ export default function CustomerDetailsPage() {
         <div className="p-6">
           {activeTab === 'Overview & Insights' && <OverviewTab customer={customer} formattedOrders={formattedOrders} primaryAddress={primaryAddress} />}
           {activeTab.startsWith('Orders') && <OrdersTab orders={formattedOrders} />}
+          {activeTab === 'Special Prices' && (
+            <SpecialPricesTab
+              specialPrices={data.special_prices || []}
+              customerId={customer.customer_id || id}
+              customerName={customer.full_name || customer.first_name || 'Customer'}
+              onRefresh={fetchPortfolio}
+            />
+          )}
           {activeTab === 'Containers & Returns' && (
             <ContainersTab 
               containerData={data.container_tracking} 
@@ -1581,4 +1605,341 @@ function getAvatarColors(name: string) {
   if (['M','O','Q'].includes(char)) return 'bg-amber-50 text-amber-600';
   if (['R','T','U','V'].includes(char)) return 'bg-purple-50 text-purple-600';
   return 'bg-rose-50 text-rose-600';
+}
+
+function SpecialPricesTab({
+  specialPrices,
+  customerId,
+  customerName,
+  onRefresh,
+}: {
+  specialPrices: any[];
+  customerId: string;
+  customerName: string;
+  onRefresh: () => void;
+}) {
+  const rules = specialPrices || [];
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [loadingOptions, setLoadingOptions] = useState(false);
+  const [variantsList, setVariantsList] = useState<any[]>([]);
+  const [selectedVariantId, setSelectedVariantId] = useState('');
+  const [discountPercent, setDiscountPercent] = useState<string>('10');
+  const [customPrice, setCustomPrice] = useState<string>('');
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const fetchOptions = async () => {
+    setLoadingOptions(true);
+    try {
+      const res = await api.get<any>('/admin/customers/special-prices/options');
+      if (res.data?.variants) {
+        setVariantsList(res.data.variants);
+      }
+    } catch (err) {
+      console.error('Failed to fetch variants list:', err);
+    } finally {
+      setLoadingOptions(false);
+    }
+  };
+
+  const openModal = () => {
+    setIsModalOpen(true);
+    fetchOptions();
+  };
+
+  const selectedVariant = variantsList.find((v) => (v.id || v.variant_id) === selectedVariantId);
+  const standardPrice = Number(selectedVariant?.selling_price || 0);
+
+  const calculatedDiscount = React.useMemo(() => {
+    if (customPrice && !isNaN(Number(customPrice)) && standardPrice > 0) {
+      const priceNum = Number(customPrice);
+      const diff = Math.max(0, standardPrice - priceNum);
+      return Math.round((diff / standardPrice) * 100 * 10) / 10;
+    }
+    return Math.min(100, Math.max(0, Number(discountPercent || 0)));
+  }, [customPrice, discountPercent, standardPrice]);
+
+  const finalSpecialPrice = React.useMemo(() => {
+    if (customPrice && !isNaN(Number(customPrice))) {
+      return Number(customPrice);
+    }
+    if (standardPrice > 0) {
+      return Math.round(standardPrice * (1 - calculatedDiscount / 100) * 100) / 100;
+    }
+    return 0;
+  }, [customPrice, standardPrice, calculatedDiscount]);
+
+  const handleSaveRule = async () => {
+    if (!selectedVariantId) return;
+    setSaving(true);
+    try {
+      await api.post(`/admin/customer/${customerId}/special-prices`, {
+        items: [{ product_variant_id: selectedVariantId, discount: calculatedDiscount }],
+      });
+      setIsModalOpen(false);
+      setSelectedVariantId('');
+      setDiscountPercent('10');
+      setCustomPrice('');
+      onRefresh();
+    } catch (err) {
+      console.error('Failed to save special price rule:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteRule = async (ruleId: string, variantId: string) => {
+    setDeletingId(ruleId);
+    try {
+      await api.delete(`/admin/customer/${customerId}/special-prices/${variantId}`);
+      onRefresh();
+    } catch (err) {
+      console.error('Failed to delete special price rule:', err);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const avgDiscount = rules.length > 0
+    ? (rules.reduce((acc, r) => acc + Number(r.discount || 0), 0) / rules.length).toFixed(1)
+    : '0';
+
+  return (
+    <div className="space-y-6 font-sans">
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/60 p-6 rounded-2xl border border-gray-100">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100 shrink-0">
+            <Tag size={24} />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-gray-900">Customer Special Prices</h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Configure custom discounted pricing for specific product variants exclusively for {customerName}.
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={openModal}
+          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer shrink-0 self-start sm:self-auto"
+        >
+          <Plus size={16} /> Add Special Price Rule
+        </button>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Active Special Price Rules</p>
+          <p className="text-2xl font-black text-gray-900 mt-1">{rules.length} Items</p>
+          <p className="text-xs text-emerald-600 font-semibold mt-1">Exclusive Custom Rates</p>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Average Special Discount</p>
+          <p className="text-2xl font-black text-purple-600 mt-1">{avgDiscount}% OFF</p>
+          <p className="text-xs text-gray-500 font-medium mt-1">Across configured products</p>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pricing Strategy Tier</p>
+          <p className="text-xl font-bold text-gray-900 mt-1">{rules.length > 0 ? 'VIP Custom Pricing' : 'Standard Pricing'}</p>
+          <p className="text-xs text-gray-500 font-medium mt-1">{rules.length > 0 ? 'Overridden rates active' : 'No custom overrides'}</p>
+        </div>
+      </div>
+
+      {/* Rules Table */}
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-2xs">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-slate-50/50">
+          <span className="text-xs font-bold text-gray-900 uppercase tracking-wider">Configured Product Rules ({rules.length})</span>
+          <span className="text-[10px] font-mono px-2.5 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 font-bold rounded-md">Live Price Overrides</span>
+        </div>
+
+        {rules.length === 0 ? (
+          <div className="p-12 text-center text-xs text-gray-400 font-medium">
+            No custom special prices configured for this customer yet. Click "Add Special Price Rule" above to create one.
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {rules.map((rule: any) => {
+              const stdPrice = Number(rule.selling_price || rule.actual_price || 0);
+              const specPrice = Number(rule.special_price || 0);
+              const savings = Math.max(0, stdPrice - specPrice);
+
+              return (
+                <div key={rule.id || rule.product_variant_id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/50 transition-colors">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-xs shrink-0 border border-purple-100">
+                      <Tag size={18} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-gray-900">{rule.product_name} — <span className="text-emerald-700">{rule.variant_name}</span></p>
+                      <div className="flex items-center gap-3 text-[11px] text-gray-500 mt-0.5">
+                        <span>Standard Price: <span className="line-through text-gray-400">₹{stdPrice}</span></span>
+                        <span>•</span>
+                        <span className="text-purple-700 font-bold">{rule.discount}% Discount</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-6 shrink-0">
+                    <div className="text-right">
+                      <p className="text-sm font-black text-emerald-700">₹{specPrice.toFixed(2)}</p>
+                      <p className="text-[10px] text-emerald-600 font-semibold">Saves ₹{savings.toFixed(2)} / unit</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={deletingId === rule.id}
+                      onClick={() => handleDeleteRule(rule.id, rule.product_variant_id)}
+                      className="p-2 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 rounded-xl border border-rose-200/60 transition-all cursor-pointer disabled:opacity-50"
+                      title="Remove Special Price Rule"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Add Special Price Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-5">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+              <div className="flex items-center gap-2">
+                <Tag size={18} className="text-purple-600" />
+                <h3 className="text-sm font-bold text-gray-900">Add Special Price Rule</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {loadingOptions ? (
+              <div className="py-8 text-center text-xs text-gray-400 flex items-center justify-center gap-2">
+                <div className="animate-spin w-5 h-5 border-2 border-purple-600 border-t-transparent rounded-full"></div>
+                Loading product variants...
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Select Variant */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                    Select Product Variant
+                  </label>
+                  <select
+                    value={selectedVariantId}
+                    onChange={(e) => {
+                      setSelectedVariantId(e.target.value);
+                      setCustomPrice('');
+                    }}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:border-purple-600 focus:outline-none"
+                  >
+                    <option value="">Choose product variant...</option>
+                    {variantsList.map((v) => (
+                      <option key={v.id || v.variant_id} value={v.id || v.variant_id}>
+                        {v.full_name || `${v.product_name} (${v.variant_name})`} — ₹{v.selling_price}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedVariant && (
+                  <div className="p-3.5 bg-purple-50/60 rounded-xl border border-purple-100 space-y-1 text-xs">
+                    <div className="flex justify-between text-gray-600">
+                      <span>Standard Selling Price:</span>
+                      <span className="font-bold text-gray-900">₹{standardPrice}</span>
+                    </div>
+                    {selectedVariant.actual_price > standardPrice && (
+                      <div className="flex justify-between text-gray-500 text-[11px]">
+                        <span>MRP (Actual Price):</span>
+                        <span className="line-through">₹{selectedVariant.actual_price}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Discount input options */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                      Discount %
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={discountPercent}
+                        onChange={(e) => {
+                          setDiscountPercent(e.target.value);
+                          setCustomPrice('');
+                        }}
+                        className="w-full pl-3 pr-7 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:border-purple-600 focus:outline-none"
+                      />
+                      <Percent size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                      OR Special Price (₹)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder={`e.g. ${standardPrice ? Math.round(standardPrice * 0.9) : 85}`}
+                      value={customPrice}
+                      onChange={(e) => setCustomPrice(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:border-purple-600 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Live Preview */}
+                {selectedVariant && (
+                  <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center justify-between text-xs">
+                    <div>
+                      <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Effective Customer Price</p>
+                      <p className="text-xl font-black text-emerald-900 mt-0.5">₹{finalSpecialPrice.toFixed(2)}</p>
+                    </div>
+                    <span className="px-2.5 py-1 bg-emerald-600 text-white font-black text-xs rounded-lg">
+                      {calculatedDiscount}% OFF
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="px-4 py-2 text-gray-600 text-xs font-bold hover:bg-gray-100 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!selectedVariantId || saving}
+                onClick={handleSaveRule}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+              >
+                {saving ? 'Saving Rule...' : 'Save Special Price'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
