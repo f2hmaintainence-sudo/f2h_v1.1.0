@@ -6,13 +6,12 @@ import { DeviceInformationService } from '../ModuleServices/device_information.s
 export class DeviceInformationController {
   constructor(private readonly service: DeviceInformationService) { }
 
-  @Post('device/deviceInformation')
+  @Post(['device/device-information', 'device/deviceInformation'])
   async registerDevice(@Body() dto: CreateDeviceInformationDto) {
-
     return this.service.registerOrUpdateDevice(dto);
   }
 
-  @Get('deviceInformation/check-version/:deviceId')
+  @Get(['device-information/check-version/:deviceId', 'deviceInformation/check-version/:deviceId'])
   async checkVersion(@Param('deviceId') deviceId: string) {
     return this.service.checkDeviceVersion(deviceId);
   }

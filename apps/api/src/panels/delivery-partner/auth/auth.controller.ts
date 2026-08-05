@@ -3,7 +3,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
 import { AuthService } from './auth.service';
 
-@Controller({ path: 'DeliveryPartner/auth', version: '1' })
+@Controller({ path: ['delivery-partner/auth', 'DeliveryPartner/auth'], version: '1' })
 @UseGuards(AuthGuard('jwt'))
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
