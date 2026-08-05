@@ -385,9 +385,9 @@ export class AppController {
       }
     } else if (action === 'run' || action === 'reload') {
       if (appId === 'customer') {
-        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/customer && mkdir -p build/web && ([ -f build/web/index.html ] || /opt/flutter/bin/flutter build web --release) && rsync -avz --delete build/web/ /home/f2hfresh-customer/htdocs/customer.f2hfresh.com/`;
+        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/customer && /opt/flutter/bin/flutter build web --profile --no-pub && rsync -avz --delete build/web/ /home/f2hfresh-customer/htdocs/customer.f2hfresh.com/`;
       } else if (appId === 'partner' || appId === 'delivery') {
-        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/delivery && mkdir -p build/web && ([ -f build/web/index.html ] || /opt/flutter/bin/flutter build web --release) && rsync -avz --delete build/web/ /home/f2hfresh-partner/htdocs/partner.f2hfresh.com/`;
+        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/delivery && /opt/flutter/bin/flutter build web --profile --no-pub && rsync -avz --delete build/web/ /home/f2hfresh-partner/htdocs/partner.f2hfresh.com/`;
       } else {
         command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/web && pm2 restart frontend-f2hfresh`;
       }

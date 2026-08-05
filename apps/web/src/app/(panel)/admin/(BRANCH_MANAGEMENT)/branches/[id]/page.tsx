@@ -13,6 +13,19 @@ import { showSuccessToast } from '@/services/toast.service';
 
 const SectorMap = dynamic(() => import('@/components/branch/SectorMap'), { ssr: false });
 
+function getPartnerDisplayName(p: any): string {
+  if (!p) return 'Delivery Partner';
+  if (p.full_name?.trim()) return p.full_name.trim();
+  if (p.name?.trim()) return p.name.trim();
+  const first = p.first_name?.trim() || '';
+  const last = p.last_name?.trim() || '';
+  if (first || last) return `${first} ${last}`.trim();
+  if (p.user_name?.trim()) return p.user_name.trim();
+  if (p.phone?.trim()) return `Partner (${p.phone.trim()})`;
+  if (p.mobile?.trim()) return `Partner (${p.mobile.trim()})`;
+  return `Partner #${p.delivery_partner_id || p.id || '001'}`;
+}
+
 export default function Branch360PortfolioPage() {
   const params = useParams();
   const router = useRouter();
@@ -76,11 +89,14 @@ export default function Branch360PortfolioPage() {
   const filteredUnassignedPartners = useMemo(() => {
     if (!partnerSearchQuery.trim()) return unassignedPartners;
     const q = partnerSearchQuery.toLowerCase();
-    return unassignedPartners.filter(p =>
-      (p.full_name || '').toLowerCase().includes(q) ||
-      (p.phone || '').toLowerCase().includes(q) ||
-      (p.vehicle_type || '').toLowerCase().includes(q)
-    );
+    return unassignedPartners.filter(p => {
+      const name = getPartnerDisplayName(p).toLowerCase();
+      return (
+        name.includes(q) ||
+        (p.phone || '').toLowerCase().includes(q) ||
+        (p.vehicle_type || '').toLowerCase().includes(q)
+      );
+    });
   }, [unassignedPartners, partnerSearchQuery]);
 
   const handleAllocatePartner = async (partnerId: string, targetBranchId: string | null) => {
@@ -91,8 +107,8 @@ export default function Branch360PortfolioPage() {
       const targetPartner = all.find(p => (p.delivery_partner_id || p.id) === partnerId);
       if (targetPartner) {
         await api.post(`/admin/delivery/partners/saveEdit/${partnerId}`, {
-          full_name: targetPartner.full_name,
-          phone: targetPartner.phone,
+          full_name: getPartnerDisplayName(targetPartner),
+          phone: targetPartner.phone || targetPartner.mobile,
           branch_id: targetBranchId
         });
         showSuccessToast(targetBranchId ? 'Delivery partner allocated to branch!' : 'Delivery partner de-allocated!', 3000);
@@ -174,7 +190,7 @@ export default function Branch360PortfolioPage() {
       </div>
 
       {/* Metric Cards & Live Coverage Map */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         
         {/* Left Column: KPI Cards */}
         <div className="lg:col-span-5 space-y-4 flex flex-col justify-between">
@@ -243,23 +259,25 @@ export default function Branch360PortfolioPage() {
           </div>
         </div>
 
-        {/* Right Column: Geographic Map Container */}
-        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col min-h-[420px]">
-          <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        {/* Right Column: Full-Bleed Map Card Covering Entire Container */}
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col relative h-full min-h-[460px]">
+          {/* Floating Glassmorphism Map Header Overlay */}
+          <div className="absolute top-3 left-3 right-3 z-10 bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-xl border border-slate-200/80 shadow-sm flex items-center justify-between pointer-events-auto">
             <div className="flex items-center gap-2">
               <Globe size={16} className="text-emerald-600" />
-              <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">Live Service Zone & Radius Map</span>
+              <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">Live Service Zone Coverage Map</span>
             </div>
             <span className="text-[10px] font-mono px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold rounded-md">Google Maps Live</span>
           </div>
 
-          <div className="flex-1 w-full h-full min-h-[380px] p-3">
+          {/* Map Expands 100% Edge-to-Edge */}
+          <div className="w-full h-full flex-1 min-h-[460px]">
             <SectorMap
               centerLat={branch.lat ? Number(branch.lat) : undefined}
               centerLng={branch.lng ? Number(branch.lng) : undefined}
               radiusKm={Number(branch.delivery_radius_km) || 5}
               bufferZoneKm={Number(branch.buffer_zone) || 0}
-              height="380px"
+              height="100%"
             />
           </div>
         </div>
@@ -346,28 +364,29 @@ export default function Branch360PortfolioPage() {
                           filteredUnassignedPartners.map((p) => {
                             const partnerId = p.delivery_partner_id || p.id;
                             const isSelected = selectedPartnerToAssign === partnerId;
+                            const partnerName = getPartnerDisplayName(p);
                             return (
                               <button
                                 key={partnerId}
                                 type="button"
                                 onClick={() => {
                                   setSelectedPartnerToAssign(partnerId);
-                                  setPartnerSearchQuery(p.full_name || '');
+                                  setPartnerSearchQuery(partnerName);
                                   setDropdownOpen(false);
                                 }}
                                 className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between text-xs gap-3 ${
                                   isSelected ? 'bg-emerald-50/50 hover:bg-emerald-50' : ''
                                 }`}
                               >
-                                <div className="flex flex-col min-w-0 gap-1.5">
-                                  <div className="flex items-center gap-1.5 font-bold text-slate-800">
-                                    <User size={13} className="text-slate-400 shrink-0" />
-                                    <span className="truncate">{p.full_name || 'Delivery Partner'}</span>
+                                <div className="flex flex-col min-w-0 gap-1">
+                                  <div className="flex items-center gap-2 font-bold text-slate-900 text-xs">
+                                    <User size={14} className="text-emerald-600 shrink-0" />
+                                    <span className="truncate">{partnerName}</span>
                                   </div>
-                                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500 font-semibold">
+                                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500 font-semibold pl-5">
                                     <span className="flex items-center gap-1">
                                       <Phone size={10} className="text-slate-400 shrink-0" />
-                                      {p.phone || 'No Phone'}
+                                      {p.phone || p.mobile || 'No Phone'}
                                     </span>
                                     <span className="flex items-center gap-1 capitalize">
                                       <Truck size={10} className="text-slate-400 shrink-0" />
@@ -411,26 +430,38 @@ export default function Branch360PortfolioPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {branchPartners.map((p) => {
                       const isActive = p.is_active;
+                      const partnerName = getPartnerDisplayName(p);
+                      const initials = partnerName
+                        .split(' ')
+                        .filter(Boolean)
+                        .map((part: string) => part[0])
+                        .join('')
+                        .slice(0, 2)
+                        .toUpperCase();
+
                       return (
                         <div key={p.delivery_partner_id || p.id} className="relative overflow-hidden bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-4 hover:border-emerald-300 hover:shadow-md transition-all group">
                           <div className={`absolute top-0 left-0 right-0 h-1 transition-opacity ${isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
 
                           <div className="flex items-start justify-between gap-3 pt-1">
                             <div className="flex items-center gap-3">
-                              <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${isActive ? 'from-emerald-500 to-teal-600' : 'from-slate-400 to-slate-500'} text-white font-black text-sm flex items-center justify-center shrink-0 shadow-inner group-hover:scale-105 transition-transform`}>
-                                {(p.full_name || 'D').charAt(0).toUpperCase()}
+                              <div className={`w-11 h-11 rounded-2xl ${
+                                isActive ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-emerald-500/20' : 'bg-gradient-to-br from-slate-600 to-slate-800 text-white shadow-slate-700/20'
+                              } font-black text-sm flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-105`}>
+                                {initials || <Truck size={18} />}
                               </div>
-                              <div>
-                                <Link href={`/admin/delivery/partners/${p.delivery_partner_id || p.id}`} className="text-xs font-black text-slate-900 hover:text-emerald-600 transition-colors flex items-center gap-1">
-                                  {p.full_name} <ArrowUpRight size={12} className="text-slate-400 group-hover:text-emerald-500 transition-colors" />
+                              <div className="min-w-0">
+                                <Link href={`/admin/delivery/partners/${p.delivery_partner_id || p.id}`} className="text-xs font-black text-slate-900 hover:text-emerald-600 transition-colors flex items-center gap-1 truncate">
+                                  <span className="truncate">{partnerName}</span>
+                                  <ArrowUpRight size={12} className="text-slate-400 group-hover:text-emerald-500 transition-colors shrink-0" />
                                 </Link>
                                 <p className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5 mt-0.5">
-                                  <Phone size={11} className="text-slate-400" /> {p.phone || 'N/A'}
+                                  <Phone size={11} className="text-slate-400 shrink-0" /> {p.phone || p.mobile || 'No Phone'}
                                 </p>
                               </div>
                             </div>
 
-                            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 ${
                               isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-100 text-slate-600 border border-slate-200'
                             }`}>
                               {isActive ? 'Active' : 'Inactive'}
@@ -467,18 +498,18 @@ export default function Branch360PortfolioPage() {
           {/* Tab 2: Map */}
           {activeTab === 'map' && (
             <div className="space-y-6">
-              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden min-h-[450px] flex flex-col">
-                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden h-[500px] flex flex-col relative">
+                <div className="absolute top-3 left-3 right-3 z-10 bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-xl border border-slate-200/80 shadow-sm flex items-center justify-between pointer-events-auto">
                   <h3 className="font-bold text-slate-800 uppercase tracking-wider text-xs">Interactive Service Zone Coverage Map</h3>
                   <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">Google Maps Service View</span>
                 </div>
-                <div className="p-3 flex-1 min-h-[400px]">
+                <div className="w-full h-full flex-1">
                   <SectorMap
                     centerLat={branch.lat ? Number(branch.lat) : undefined}
                     centerLng={branch.lng ? Number(branch.lng) : undefined}
                     radiusKm={Number(branch.delivery_radius_km) || 5}
                     bufferZoneKm={Number(branch.buffer_zone) || 0}
-                    height="400px"
+                    height="100%"
                   />
                 </div>
               </div>
