@@ -1869,4 +1869,150 @@ export class CustomersService {
       throw new InternalServerErrorException('Failed to delete special price');
     }
   }
+
+  async getSpecialPricesTable(query: any) {
+    try {
+      const search = query?.search?.trim() || '';
+      const params: any[] = [];
+      const whereClauses: string[] = ['csp.deleted_at IS NULL'];
+
+      if (search) {
+        params.push(`%${search}%`);
+        const pIdx = params.length;
+        whereClauses.push(`(
+          csp.customer_id ILIKE $${pIdx} OR 
+          COALESCE(u.first_name, '') ILIKE $${pIdx} OR 
+          COALESCE(u.last_name, '') ILIKE $${pIdx} OR 
+          COALESCE((COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), '') ILIKE $${pIdx} OR 
+          COALESCE(u.email, '') ILIKE $${pIdx} OR 
+          COALESCE(u.phone, '') ILIKE $${pIdx} OR 
+          p.name ILIKE $${pIdx} OR 
+          pv.name ILIKE $${pIdx}
+        )`);
+      }
+
+      const sql = `
+        SELECT 
+          csp.id,
+          csp.customer_id,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, u.email, u.phone, csp.customer_id) AS customer_name,
+          COALESCE(u.email, '') AS customer_email,
+          COALESCE(u.phone, '') AS customer_phone,
+          csp.product_variant_id,
+          pv.name AS variant_name,
+          pv.product_id,
+          p.name AS product_name,
+          COALESCE(pv.original_price, pv.price) AS actual_price,
+          pv.price AS selling_price,
+          csp.discount,
+          CASE 
+            WHEN csp.discount > 0 AND csp.discount <= 100 THEN ROUND(pv.price * (1 - (csp.discount / 100.0)), 2)
+            WHEN csp.discount > 100 THEN GREATEST(0, pv.price - csp.discount)
+            ELSE pv.price
+          END AS special_price,
+          csp.created_at,
+          csp.updated_at
+        FROM customer_special_prices csp
+        JOIN users u ON u.user_id = csp.customer_id
+        JOIN product_variants pv ON pv.variant_id = csp.product_variant_id
+        JOIN products p ON p.product_id = pv.product_id
+        WHERE ${whereClauses.join(' AND ')}
+        ORDER BY csp.created_at DESC
+      `;
+
+      const rows = await this.databaseService.query(sql, params);
+
+      const totalRules = rows.length;
+      const uniqueCustomers = new Set(rows.map((r: any) => r.customer_id)).size;
+      const avgDiscount = totalRules > 0 
+        ? (rows.reduce((acc: number, r: any) => acc + Number(r.discount || 0), 0) / totalRules).toFixed(1)
+        : '0';
+
+      return {
+        status: true,
+        summary: {
+          total_rules: totalRules,
+          unique_customers: uniqueCustomers,
+          avg_discount: avgDiscount,
+        },
+        data: rows.map((r: any) => ({
+          id: r.id,
+          customer_id: r.customer_id,
+          customer_name: r.customer_name || 'Customer',
+          customer_email: r.customer_email,
+          customer_phone: r.customer_phone,
+          product_id: r.product_id,
+          product_name: r.product_name,
+          product_variant_id: r.product_variant_id,
+          variant_name: r.variant_name,
+          actual_price: Number(r.actual_price || 0),
+          selling_price: Number(r.selling_price || 0),
+          discount: Number(r.discount || 0),
+          special_price: Number(r.special_price || 0),
+          created_at: r.created_at,
+          updated_at: r.updated_at,
+        })),
+      };
+    } catch (error) {
+      this.developer.error('getSpecialPricesTable error', { error });
+      throw new InternalServerErrorException('Failed to fetch special prices table');
+    }
+  }
+
+  async getSpecialPricesOptions() {
+    try {
+      const customers = await this.databaseService.query(`
+        SELECT 
+          u.user_id AS id, 
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, u.email, u.phone, u.user_id) AS name,
+          COALESCE(u.email, '') AS email,
+          COALESCE(u.phone, '') AS phone
+        FROM users u
+        WHERE u.deleted_at IS NULL
+        ORDER BY u.first_name ASC, u.created_at DESC
+        LIMIT 500
+      `);
+
+      const variants = await this.databaseService.query(`
+        SELECT 
+          pv.variant_id AS id,
+          p.name AS product_name,
+          pv.name AS variant_name,
+          (p.name || ' (' || pv.name || ')') AS full_name,
+          pv.price AS selling_price,
+          COALESCE(pv.original_price, pv.price) AS actual_price
+        FROM product_variants pv
+        JOIN products p ON p.product_id = pv.product_id
+        WHERE pv.deleted_at IS NULL AND p.deleted_at IS NULL
+        ORDER BY p.name ASC, pv.name ASC
+      `);
+
+      return {
+        status: true,
+        customers,
+        variants: variants.map((v: any) => ({
+          ...v,
+          selling_price: Number(v.selling_price || 0),
+          actual_price: Number(v.actual_price || 0),
+        })),
+      };
+    } catch (error) {
+      this.developer.error('getSpecialPricesOptions error', { error });
+      throw new InternalServerErrorException('Failed to fetch special prices options');
+    }
+  }
+
+  async deleteSpecialPriceById(id: string) {
+    try {
+      await this.databaseService.query(
+        `UPDATE customer_special_prices SET deleted_at = NOW() WHERE id = $1`,
+        [id],
+      );
+      return { status: true, message: 'Special price rule deleted' };
+    } catch (error) {
+      this.developer.error('deleteSpecialPriceById error', { error });
+      throw new InternalServerErrorException('Failed to delete special price rule');
+    }
+  }
 }
+

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/pakage_screen.dart';
@@ -1413,14 +1414,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
 
-                      // Quick actions card
+                      
+
+                      // Quick actions card - 3 items per row
                       Container(
                         margin: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 8,
                         ),
                         padding: const EdgeInsets.symmetric(
-                          vertical: 8,
+                          vertical: 14,
                           horizontal: 10,
                         ),
                         decoration: BoxDecoration(
@@ -1435,408 +1438,181 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ],
                         ),
-                        child: Row(
+                        child: Column(
                           children: [
-                            // _quickAction(
-                            //   Icons.person_outline_rounded,
-                            //   'Details',
-                            //   const Color(0xFFE8F5E9),
-                            //   const Color(0xFF2E7D32),
-                            //   () {
-                            //     if (isLoggedIn) {
-                            //       _showPersonalDetails(context, profile);
-                            //     } else {
-                            //       _showLoginDrawer(context);
-                            //     }
-                            //   },
-                            // ),
-                            _quickAction(
-                              Icons.card_giftcard_rounded,
-                              'Refer',
-                              const Color(0xFFE8F5E9),
-                              const Color(0xFF2E7D32),
-                              () {
-                                if (isLoggedIn && profile != null) {
-                                  Navigator.push(
+                            // Row 1: Bills, Orders, Address
+                            Row(
+                              children: [
+                                _quickAction(
+                                  Icons.receipt_long_outlined,
+                                  'Bills',
+                                  const Color(0xFFE8F5E9),
+                                  const Color(0xFF2E7D32),
+                                  () {
+                                    if (isLoggedIn) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const CustomerBillsScreen(),
+                                        ),
+                                      );
+                                    } else {
+                                      _showLoginDrawer(context);
+                                    }
+                                  },
+                                ),
+                                _quickAction(
+                                  Icons.shopping_bag_outlined,
+                                  'Orders',
+                                  const Color(0xFFE3F2FD),
+                                  const Color(0xFF1565C0),
+                                  () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => ReferralScreen(
-                                        referralCode: profile.referralCode,
-                                        referralStatus: profile.referralStatus,
-                                      ),
+                                      builder: (_) => const OrderHistoryScreen(),
                                     ),
-                                  );
-                                } else {
-                                  _showLoginDrawer(context);
-                                }
-                              },
+                                  ),
+                                ),
+                                _quickAction(
+                                  Icons.location_on_outlined,
+                                  'Address',
+                                  const Color(0xFFF3E5F5),
+                                  const Color(0xFF7B1FA2),
+                                  () async {
+                                    if (isLoggedIn) {
+                                      final selected =
+                                          await AddressSelectorDrawer.show(context);
+                                      if (selected != null &&
+                                          selected.addressId != null &&
+                                          context.mounted) {
+                                        await context
+                                            .read<CustomerSessionCubit>()
+                                            .updateDefaultAddress(
+                                              selected.addressId!,
+                                            );
+                                        if (context.mounted) {
+                                          F2HToast.success(
+                                            context,
+                                            'Default address updated',
+                                          );
+                                        }
+                                      }
+                                    } else {
+                                      _showLoginDrawer(context);
+                                    }
+                                  },
+                                ),                                
+                              ],
                             ),
+                            const SizedBox(height: 12),
+                            // Row 2: Notifications, Privacy,Rate App
+                            Row(
+                              children: [
 
-                            _quickAction(
-                              Icons.receipt_long_outlined,
-                              'Bills',
-                              const Color(0xFFE8F5E9),
-                              const Color(0xFF2E7D32),
-                              () {
-                                if (isLoggedIn) {
-                                  Navigator.push(
+                                _quickAction(
+                                  Icons.notifications_none_outlined,
+                                  'Notifications',
+                                  const Color(0xFFFFF3E0),
+                                  _marketOrange,
+                                  () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) =>
-                                          const CustomerBillsScreen(),
-                                    ),
-                                  );
-                                } else {
-                                  _showLoginDrawer(context);
-                                }
-                              },
-                            ),
-                            _quickAction(
-                              Icons.receipt_long_outlined,
-                              'Orders',
-                              const Color(0xFFE3F2FD),
-                              const Color(0xFF1565C0),
-                              () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const OrderHistoryScreen(),
-                                ),
-                              ),
-                            ),
-                            _quickAction(
-                              Icons.location_on_outlined,
-                              'Address',
-                              const Color(0xFFF3E5F5),
-                              const Color(0xFF7B1FA2),
-                              () async {
-                                if (isLoggedIn) {
-                                  final selected =
-                                      await AddressSelectorDrawer.show(context);
-                                  if (selected != null &&
-                                      selected.addressId != null &&
-                                      context.mounted) {
-                                    await context
-                                        .read<CustomerSessionCubit>()
-                                        .updateDefaultAddress(
-                                          selected.addressId!,
-                                        );
-                                    if (context.mounted) {
-                                      F2HToast.success(
-                                        context,
-                                        'Default address updated',
-                                      );
-                                    }
-                                  }
-                                } else {
-                                  _showLoginDrawer(context);
-                                }
-                              },
-                            ),
-                            // _quickAction(
-                            //   Icons.inventory_2_outlined,
-                            //   'Containers',
-                            //   const Color(0xFFFFF3E0),
-                            //   _marketOrange,
-                            //   () => Navigator.push(
-                            //     context,
-                            //     MaterialPageRoute(
-                            //       builder: (_) =>
-                            //           const ContainerBalanceScreen(),
-                            //     ),
-                            //   ),
-                            // ),
-
-                             _quickAction(
-                              Icons.notifications_none_outlined,
-                              'Notifications',
-                              const Color(0xFFFFF3E0),
-                              _marketOrange,
-                              () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      const  NotificationsScreen(),
-                                ),
-                              ),
-                            ),
-                            _quickAction(
-                              Icons.security_outlined,
-                              'Privacy',
-                              const Color(0xFFFFF3E0),
-                              _marketOrange,
-                              () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      const PrivacyScreen(),
-                                ),
-                              ),
-                            ),
-                             _quickAction(
-                              Icons.inventory_2_outlined,
-                              'Containers',
-                              const Color(0xFFFFF3E0),
-                              _marketOrange,
-                              () {
-                                showDialog(
-                                  context: context,
-                                  builder: (_) => AlertDialog(
-                                    title: const Text('Rate F2H App'),
-                                    content: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Text(
-                                          'How would you rate F2H App?',
-                                        ),
-                                        const SizedBox(height: 16),
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            for (int i = 1; i <= 5; i++)
-                                              IconButton(
-                                                icon: Icon(
-                                                  Icons.star,
-                                                  color: i <= 3
-                                                      ? Colors.grey
-                                                      : Colors.orange,
-                                                ),
-                                                onPressed: () {
-                                                  Navigator.pop(context);
-                                                  if (i <= 3) {
-                                                    ScaffoldMessenger.of(
-                                                      context,
-                                                    ).showSnackBar(
-                                                      const SnackBar(
-                                                        content: Text(
-                                                          'Thank you for your feedback!',
-                                                        ),
-                                                        behavior:
-                                                            SnackBarBehavior
-                                                                .floating,
-                                                      ),
-                                                    );
-                                                  } else {
-                                                    ScaffoldMessenger.of(
-                                                      context,
-                                                    ).showSnackBar(
-                                                      const SnackBar(
-                                                        content: Text(
-                                                          'Thank you for rating F2H App 5 stars!',
-                                                        ),
-                                                        behavior:
-                                                            SnackBarBehavior
-                                                                .floating,
-                                                      ),
-                                                    );
-                                                  }
-                                                },
-                                              ),
-                                          ],
-                                        ),
-                                      ],
+                                          const NotificationsScreen(),
                                     ),
                                   ),
-                                );
-                              },
-                            ),
+                                ),
+                                _quickAction(
+                                  Icons.security_outlined,
+                                  'Privacy',
+                                  const Color(0xFFE8F5E9),
+                                  const Color(0xFF2E7D32),
+                                  () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const PrivacyScreen(),
+                                    ),
+                                  ),
+                                ),
+                                _quickAction(
+                                  Icons.star_outline_rounded,
+                                  'Rate App',
+                                  const Color(0xFFFFFDE7),
+                                  const Color(0xFFFBC02D),
+                                  () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (_) => AlertDialog(
+                                        title: const Text('Rate F2H App'),
+                                        content: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Text(
+                                              'How would you rate F2H App?',
+                                            ),
+                                            const SizedBox(height: 16),
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                for (int i = 1; i <= 5; i++)
+                                                  IconButton(
+                                                    icon: Icon(
+                                                      Icons.star,
+                                                      color: i <= 3
+                                                          ? Colors.grey
+                                                          : Colors.orange,
+                                                    ),
+                                                    onPressed: () {
+                                                      Navigator.pop(context);
+                                                      if (i <= 3) {
+                                                        ScaffoldMessenger.of(
+                                                          context,
+                                                        ).showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text(
+                                                              'Thank you for your feedback!',
+                                                            ),
+                                                            behavior:
+                                                                SnackBarBehavior
+                                                                    .floating,
+                                                          ),
+                                                        );
+                                                      } else {
+                                                        ScaffoldMessenger.of(
+                                                          context,
+                                                        ).showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text(
+                                                              'Thank you for rating F2H App 5 stars!',
+                                                            ),
+                                                            behavior:
+                                                                SnackBarBehavior
+                                                                    .floating,
+                                                          ),
+                                                        );
+                                                      }
+                                                    },
+                                                  ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),                                
+                              ],
+                            ),                         
                           ],
                         ),
                       ),
-                      const SizedBox(height: 16),
-
-                      // Account Settings Group
-                      // Padding(
-                      //   padding: const EdgeInsets.symmetric(
-                      //     horizontal: 20,
-                      //     vertical: 8,
-                      //   ),
-                      //   child: Align(
-                      //     alignment: Alignment.centerLeft,
-                      //     child: Text(
-                      //       'ACCOUNT SETTINGS',
-                      //       style: TextStyle(
-                      //         fontSize: 11,
-                      //         fontWeight: FontWeight.w900,
-                      //         color: kTextSub.withValues(alpha: 0.8),
-                      //         letterSpacing: 1.2,
-                      //       ),
-                      //     ),
-                      //   ),
-                      // ),
-                      // Container(
-                      //   margin: const EdgeInsets.symmetric(horizontal: 16),
-                      //   decoration: BoxDecoration(
-                      //     color: Colors.white,
-                      //     borderRadius: BorderRadius.circular(24),
-                      //     border: Border.all(color: kBorderLt, width: 1.2),
-                      //     boxShadow: const [
-                      //       BoxShadow(
-                      //         color: _softShadow,
-                      //         blurRadius: 20,
-                      //         offset: Offset(0, 8),
-                      //       ),
-                      //     ],
-                      //   ),
-                      //   child: Column(
-                      //     children: [
-                      //       // _menuItem(
-                      //       //   Icons.card_giftcard_rounded,
-                      //       //   'Refer & Earn ₹50',
-                      //       //   const Color(0xFFECFDF5),
-                      //       //   const Color(0xFF16653A),
-                      //       //   onTap: () {
-                      //       //     if (isLoggedIn && profile != null) {
-                      //       //       Navigator.push(
-                      //       //         context,
-                      //       //         MaterialPageRoute(
-                      //       //           builder: (_) => ReferralScreen(
-                      //       //             referralCode: profile.referralCode,
-                      //       //             referralStatus: profile.referralStatus,
-                      //       //           ),
-                      //       //         ),
-                      //       //       );
-                      //       //     } else {
-                      //       //       _showLoginDrawer(context);
-                      //       //     }
-                      //       //   },
-                      //       // ),
-                      //       // _divider(),
-                      //       // _menuItem(
-                      //       //   Icons.receipt_long_outlined,
-                      //       //   'Customer Bills',
-                      //       //   const Color(0xFFEDE9FE),
-                      //       //   const Color(0xFF7C3AED),
-                      //       //   onTap: () {
-                      //       //     if (isLoggedIn) {
-                      //       //       Navigator.push(
-                      //       //         context,
-                      //       //         MaterialPageRoute(
-                      //       //           builder: (_) =>
-                      //       //               const CustomerBillsScreen(),
-                      //       //         ),
-                      //       //       );
-                      //       //     } else {
-                      //       //       _showLoginDrawer(context);
-                      //       //     }
-                      //       //   },
-                      //       // ),
-                      //       // _divider(),
-                      //       // _menuItem(
-                      //       //   Icons.notifications_none_outlined,
-                      //       //   'My Notifications',
-                      //       //   const Color(0xFFE8F5E9),
-                      //       //   kPrimary,
-                      //       //   onTap: () {
-                      //       //     Navigator.push(
-                      //       //       context,
-                      //       //       MaterialPageRoute(
-                      //       //         builder: (context) =>
-                      //       //             const NotificationsScreen(),
-                      //       //       ),
-                      //       //     );
-                      //       //   },
-                      //       // ),
-                      //       // _divider(),
-                      //       // _menuItem(
-                      //       //   Icons.language_outlined,
-                      //       //   'Language - English',
-                      //       //   const Color(0xFFE0F7FA),
-                      //       //   const Color(0xFF0097A7),
-                      //       //   onTap: () => _showLanguageSelector(context),
-                      //       // ),
-                      //       // _divider(),
-                      //       // _menuItem(
-                      //       //   Icons.security_outlined,
-                      //       //   'Privacy & Security',
-                      //       //   const Color(0xFFF1F8E9),
-                      //       //   const Color(0xFF558B2F),
-                      //       //   onTap: () {
-                      //       //     // redirect to privacy_screen.dart
-                      //       //     Navigator.push(
-                      //       //       context,
-                      //       //       MaterialPageRoute(
-                      //       //         builder: (_) => const PrivacyScreen(),
-                      //       //       ),
-                      //       //     );
-                      //       //   },
-                      //       // ),
-                      //       // _divider(),
-                      //       // _menuItem(
-                      //       //   Icons.star_outline_rounded,
-                      //       //   'Rate F2H App',
-                      //       //   const Color(0xFFFFFDE7),
-                      //       //   const Color(0xFFFBC02D),
-                      //       //   onTap: () {
-                      //       //     // redirct to google play store or apple store
-                      //       //     // launchUrl(Uri.parse('https://play.google.com/store/apps/details?id=com.f2h.customer'));
-                      //       //     showDialog(
-                      //       //       context: context,
-                      //       //       builder: (_) => AlertDialog(
-                      //       //         title: const Text('Rate F2H App'),
-                      //       //         content: Column(
-                      //       //           mainAxisSize: MainAxisSize.min,
-                      //       //           children: [
-                      //       //             const Text(
-                      //       //               'How would you rate F2H App?',
-                      //       //             ),
-                      //       //             const SizedBox(height: 16),
-                      //       //             Row(
-                      //       //               mainAxisAlignment:
-                      //       //                   MainAxisAlignment.center,
-                      //       //               children: [
-                      //       //                 for (int i = 1; i <= 5; i++)
-                      //       //                   IconButton(
-                      //       //                     icon: Icon(
-                      //       //                       Icons.star,
-                      //       //                       color: i <= 3
-                      //       //                           ? Colors.grey
-                      //       //                           : Colors.orange,
-                      //       //                     ),
-                      //       //                     onPressed: () {
-                      //       //                       Navigator.pop(context);
-                      //       //                       if (i <= 3) {
-                      //       //                         ScaffoldMessenger.of(
-                      //       //                           context,
-                      //       //                         ).showSnackBar(
-                      //       //                           const SnackBar(
-                      //       //                             content: Text(
-                      //       //                               'Thank you for your feedback!',
-                      //       //                             ),
-                      //       //                             behavior:
-                      //       //                                 SnackBarBehavior
-                      //       //                                     .floating,
-                      //       //                           ),
-                      //       //                         );
-                      //       //                       } else {
-                      //       //                         ScaffoldMessenger.of(
-                      //       //                           context,
-                      //       //                         ).showSnackBar(
-                      //       //                           const SnackBar(
-                      //       //                             content: Text(
-                      //       //                               'Thank you for rating F2H App 5 stars!',
-                      //       //                             ),
-                      //       //                             behavior:
-                      //       //                                 SnackBarBehavior
-                      //       //                                     .floating,
-                      //       //                           ),
-                      //       //                         );
-                      //       //                       }
-                      //       //                     },
-                      //       //                   ),
-                      //       //               ],
-                      //       //             ),
-                      //       //           ],
-                      //       //         ),
-                      //       //       ),
-                      //       //     );
-                      //       //   },
-                      //       // ),
-                      //     ],
-                      //   ),
-                      // ),
                       const SizedBox(height: 20),
 
+                      // Referral Banner (Invite Friends & Earn Rewards!)
+                      const _HomeReferralBanner(),
                       // Support & Info Group
                       Padding(
                         padding: const EdgeInsets.symmetric(
@@ -2258,3 +2034,348 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _divider() =>
       const Divider(height: 1, thickness: 1, color: kBorderLt, indent: 76);
 }
+
+// ══════════════════════════════════════════════════════════
+//  HOME REFERRAL BANNER (Invite Friends, Earn Rewards!)
+// ══════════════════════════════════════════════════════════
+class _HomeReferralBanner extends StatelessWidget {
+  const _HomeReferralBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
+      builder: (context, sessionState) {
+        final profile = sessionState.profile;
+        final isLoggedIn = profile != null;
+        final rawCode =
+            profile?.referralCode ??
+            sessionState.wallet['referral_code']?.toString();
+        final rawStatus =
+            profile?.referralStatus ??
+            sessionState.wallet['referral_status']?.toString();
+        final isLocked = isLoggedIn && (rawStatus?.toLowerCase() == 'locked');
+        final code =
+            (isLoggedIn && !isLocked && rawCode != null && rawCode.isNotEmpty)
+                ? rawCode
+                : null;
+
+        final sw = MediaQuery.of(context).size.width;
+        final scale = (sw / 375).clamp(0.82, 1.15);
+
+        return GestureDetector(
+          onTap: () {
+            if (!isLoggedIn) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const LoginScreen(popOnSuccess: true),
+                ),
+              );
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ReferralScreen(
+                    referralCode: rawCode,
+                    referralStatus: rawStatus,
+                  ),
+                ),
+              );
+            }
+          },
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: EdgeInsets.symmetric(
+              horizontal: 14 * scale,
+              vertical: 12 * scale,
+            ),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF0B4628),
+                  Color(0xFF145C34),
+                  Color(0xFF043927),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: const Color(0xFF34D399).withValues(alpha: 0.35),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF064E3B).withValues(alpha: 0.25),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40 * scale,
+                  height: 40 * scale,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFEF3C7), Color(0xFFFDE68A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFD97706).withValues(alpha: 0.25),
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Icon(
+                      isLocked
+                          ? Icons.lock_outline_rounded
+                          : Icons.card_giftcard_rounded,
+                      color: const Color(0xFFB45309),
+                      size: 20 * scale,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 10 * scale),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Invite Friends & Earn ₹50!',
+                        style: TextStyle(
+                          fontSize: 13.5 * scale,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          height: 1.2,
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      SizedBox(height: 3 * scale),
+                      Text(
+                        isLocked
+                            ? 'Make your 1st order to unlock referral code.'
+                            : 'You & your friend both get ₹50 on first order.',
+                        style: TextStyle(
+                          fontSize: 10.5 * scale,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFFA7F3D0),
+                          height: 1.2,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(width: 8 * scale),
+                _buildCta(context, isLoggedIn, isLocked, code, scale),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCta(
+    BuildContext ctx,
+    bool isLoggedIn,
+    bool isLocked,
+    String? code,
+    double scale,
+  ) {
+    if (!isLoggedIn) {
+      return Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: 14 * scale,
+          vertical: 8 * scale,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 5,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.login_rounded,
+              color: const Color(0xFF064E3B),
+              size: 14 * scale,
+            ),
+            SizedBox(width: 5 * scale),
+            Text(
+              'Login',
+              style: TextStyle(
+                fontSize: 12 * scale,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF064E3B),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (isLocked) {
+      return Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: 12 * scale,
+          vertical: 7 * scale,
+        ),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFEF3C7), Color(0xFFFDE68A)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white, width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.lock_rounded,
+              color: const Color(0xFFB45309),
+              size: 13 * scale,
+            ),
+            SizedBox(width: 4 * scale),
+            Text(
+              'Unlock',
+              style: TextStyle(
+                fontSize: 11.5 * scale,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFFB45309),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (code != null) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: 8 * scale,
+              vertical: 3 * scale,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.45),
+                width: 1,
+              ),
+            ),
+            child: Text(
+              code,
+              style: TextStyle(
+                fontSize: 10 * scale,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                letterSpacing: 0.3,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          SizedBox(height: 4 * scale),
+          GestureDetector(
+            onTap: () => _shareCode(ctx, code),
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: 10 * scale,
+                vertical: 4 * scale,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.share_rounded,
+                    color: const Color(0xFF064E3B),
+                    size: 11 * scale,
+                  ),
+                  SizedBox(width: 3 * scale),
+                  Text(
+                    'Share',
+                    style: TextStyle(
+                      fontSize: 10 * scale,
+                      fontWeight: FontWeight.w900,
+                      color: const Color(0xFF064E3B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  static Future<void> _shareCode(BuildContext context, String code) async {
+    final message =
+        'Your F2H Invite is Ready\n\n'
+        'Get ₹100 on your first order!\n'
+        'Fresh farm products, delivered to your doorstep.\n\n'
+        'Invite Code: $code\n'
+        'https://f2h.app.link/$code\n\n'
+        'F2H — Farm To Home\n'
+        'Fresh. Smart. Rewarding.';
+    final encodedMsg = Uri.encodeComponent(message);
+    final whatsappUri = Uri.parse('https://wa.me/?text=$encodedMsg');
+
+    try {
+      if (await canLaunchUrl(whatsappUri)) {
+        await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
+      } else {
+        Clipboard.setData(ClipboardData(text: message));
+        if (context.mounted) {
+          F2HToast.success(context, 'Referral message copied to clipboard!');
+        }
+      }
+    } catch (_) {
+      Clipboard.setData(ClipboardData(text: message));
+      if (context.mounted) {
+        F2HToast.success(context, 'Referral message copied to clipboard!');
+      }
+    }
+  }
+}
+

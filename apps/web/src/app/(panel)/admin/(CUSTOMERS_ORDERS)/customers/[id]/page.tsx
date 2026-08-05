@@ -22,13 +22,7 @@ import {
   Box,
   Truck,
   CheckCircle2,
-  Bell,
-  Tag,
-  X,
-  Plus,
-  Trash2,
-  Percent,
-  Save
+  Bell
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -54,89 +48,6 @@ export default function CustomerDetailsPage() {
   const [isPostpaidModalOpen, setIsPostpaidModalOpen] = useState(false);
   const [postpaidInput, setPostpaidInput] = useState('');
   const [savingPostpaid, setSavingPostpaid] = useState(false);
-  // Special Price Modal
-  const [isSpecialPriceModalOpen, setIsSpecialPriceModalOpen] = useState(false);
-  const [spProducts, setSpProducts] = useState([]);
-  const [spRows, setSpRows] = useState([]);
-  const [spLoading, setSpLoading] = useState(false);
-  const [spSaving, setSpSaving] = useState(false);
-  const [spRowCounter, setSpRowCounter] = useState(0);
-
-  const openSpecialPriceModal = async () => {
-    setIsSpecialPriceModalOpen(true);
-    setSpLoading(true);
-    try {
-      const [prodRes, existRes] = await Promise.all([
-        api.get('/admin/customer/products/list'),
-        api.get(`/admin/customer/${id}/special-prices`),
-      ]);
-      const products = prodRes.data?.data || [];
-      const existing = existRes.data?.data || [];
-      setSpProducts(products);
-      if (existing.length > 0) {
-        let counter = 0;
-        const rows = [];
-        for (const e of existing) {
-          const varRes = await api.get(`/admin/customer/products/${e.product_id}/variants`);
-          const variants = varRes.data?.data || [];
-          const variantData = variants.find(v => v.variant_id === e.product_variant_id) || null;
-          rows.push({ rowId: counter++, productId: e.product_id, variants, variantId: e.product_variant_id, variantData, discount: String(e.discount) });
-        }
-        setSpRowCounter(counter);
-        setSpRows(rows);
-      } else {
-        setSpRowCounter(1);
-        setSpRows([{ rowId: 0, productId: '', variants: [], variantId: '', variantData: null, discount: '' }]);
-      }
-    } catch (err) { console.error(err); }
-    finally { setSpLoading(false); }
-  };
-
-  const addSpRow = () => {
-    const newId = spRowCounter;
-    setSpRowCounter(p => p + 1);
-    setSpRows(p => [...p, { rowId: newId, productId: '', variants: [], variantId: '', variantData: null, discount: '' }]);
-  };
-
-  const removeSpRow = rowId => setSpRows(p => p.filter(r => r.rowId !== rowId));
-
-  const handleSpProductChange = async (rowId, productId) => {
-    setSpRows(p => p.map(r => r.rowId === rowId ? { ...r, productId, variants: [], variantId: '', variantData: null } : r));
-    if (!productId) return;
-    try {
-      const res = await api.get(`/admin/customer/products/${productId}/variants`);
-      const variants = res.data?.data || [];
-      setSpRows(p => p.map(r => r.rowId === rowId ? { ...r, variants } : r));
-    } catch (err) { console.error(err); }
-  };
-
-  const handleSpVariantChange = (rowId, variantId, variants) => {
-    const variantData = variants.find(v => v.variant_id === variantId) || null;
-    setSpRows(p => p.map(r => r.rowId === rowId ? { ...r, variantId, variantData } : r));
-  };
-
-  const handleSpDiscountChange = (rowId, discount) =>
-    setSpRows(p => p.map(r => r.rowId === rowId ? { ...r, discount } : r));
-
-  const saveSpecialPrices = async () => {
-    const valid = spRows.filter(r => r.variantId && r.discount !== '');
-    if (!valid.length) return;
-    setSpSaving(true);
-    try {
-      await api.post(`/admin/customer/${id}/special-prices`, {
-        items: valid.map(r => ({ product_variant_id: r.variantId, discount: Number(r.discount) })),
-      });
-      setIsSpecialPriceModalOpen(false);
-    } catch (err) { console.error(err); }
-    finally { setSpSaving(false); }
-  };
-
-  const deleteSpecialPrice = async (rowId, variantId) => {
-    try {
-      if (variantId) await api.delete(`/admin/customer/${id}/special-prices/${variantId}`);
-      removeSpRow(rowId);
-    } catch (err) { console.error(err); }
-  };
 
   useEffect(() => {
     if (id && !['allcustomers', 'add', 'postpaidcustomers', 'groups', 'wallets', 'branch-customers'].includes(id)) {
@@ -210,7 +121,6 @@ export default function CustomerDetailsPage() {
   ];
 
   return (
-    <>
     <div className="space-y-6 p-4 md:p-6 font-sans min-h-screen bg-slate-50/50">
       
       {/* Return to Customers Navigation */}
@@ -236,7 +146,7 @@ export default function CustomerDetailsPage() {
             </div>
             
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-600 mb-3">
-              <div className="flex items-center gap-1.5"><Phone size={14} className="text-fresh-green" /> {(!customer.phone || customer.phone.startsWith('NO_PHONE_')) ? 'N/A' : customer.phone}</div>
+              <div className="flex items-center gap-1.5"><Phone size={14} className="text-fresh-green" /> {customer.phone || 'N/A'}</div>
               <div className="flex items-center gap-1.5"><Mail size={14} className="text-fresh-green" /> {customer.email || 'N/A'}</div>
               {primaryAddress && (
                 <div className="flex items-center gap-1.5"><MapPin size={14} className="text-fresh-green" /> {primaryAddress.address_line_1 || primaryAddress.city || 'N/A'}</div>
@@ -253,12 +163,6 @@ export default function CustomerDetailsPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={openSpecialPriceModal}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors flex items-center gap-2 cursor-pointer"
-          >
-            <Tag size={16} /> Special Price
-          </button>
           <button 
             onClick={() => {
               setPostpaidInput(String(customer.postpaid_credit_limit || 0));
@@ -363,11 +267,11 @@ export default function CustomerDetailsPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <MetricCard title="TOTAL REVENUE" value={`₹${Number(stats.lifetimeRevenue ?? stats.lifetime_revenue ?? 0).toLocaleString()}`} sub="Cumulative spend" onClick={() => setActiveTab('Revenue Trends')} />
+        <MetricCard title="TOTAL REVENUE" value={`₹${Number(stats.lifetimeRevenue || 0).toLocaleString()}`} sub="Cumulative spend" onClick={() => setActiveTab('Revenue Trends')} />
         <MetricCard title="TOTAL ORDERS" value={`${totalOrdersCount} (${deliveredCount} ✓ / ${cancelledCount} ✕)`} sub="Click for orders" onClick={() => setActiveTab(tabs[1]?.name || 'Orders')} />
-        <MetricCard title="AVG ORDER VALUE" value={`₹${Number(stats.aov ?? stats.avg_order_value ?? 0).toLocaleString()}`} sub="Average per order" onClick={() => setActiveTab(tabs[1]?.name || 'Orders')} />
+        <MetricCard title="AVG ORDER VALUE" value={`₹${Number(stats.aov || 0).toLocaleString()}`} sub="Average per order" onClick={() => setActiveTab(tabs[1]?.name || 'Orders')} />
         <MetricCard title="WALLET BALANCE" value={`₹${Number(customer.wallet_balance || 0).toLocaleString()}`} sub="Prepaid balance" onClick={() => setActiveTab('Wallet Analytics')} />
-        <MetricCard title="OUTSTANDING DUE" value={`₹${Number(stats.outstandingDue ?? stats.outstanding_due ?? 0).toLocaleString()}`} sub="Postpaid balance due" onClick={() => setActiveTab('Postpaid Ledger')} />
+        <MetricCard title="OUTSTANDING DUE" value={`₹${Number(stats.outstandingDue || 0).toLocaleString()}`} sub="Postpaid balance due" onClick={() => setActiveTab('Postpaid Ledger')} />
         <MetricCard title="REWARD POINTS" value={`${customer.reward_points || 0} pts`} sub="Earned reward points" onClick={() => setActiveTab('Overview & Insights')} />
       </div>
 
@@ -491,14 +395,6 @@ function OverviewTab({ customer, formattedOrders, primaryAddress }: { customer: 
 
 function OrdersTab({ orders }: { orders: any[] }) {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
-
-  const totalPages = Math.ceil(orders.length / itemsPerPage) || 1;
-  const paginatedOrders = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return orders.slice(start, start + itemsPerPage);
-  }, [orders, currentPage]);
 
   const toggleExpand = (id: string) => {
     setExpandedOrderId(prev => (prev === id ? null : id));
@@ -516,251 +412,220 @@ function OrdersTab({ orders }: { orders: any[] }) {
       {orders.length === 0 ? (
         <p className="text-sm text-gray-500">No orders found for this customer.</p>
       ) : (
-        <>
-          <div className="space-y-3">
-            {paginatedOrders.map((order, i) => {
-              const isExpanded = expandedOrderId === order.order_id;
-              const isSubscription = Boolean(order.is_subscription || order.subscription_id || order.order_source === 'subscription');
-              const items = order.items || [];
-              const containers = order.containers || [];
+        <div className="space-y-3">
+          {orders.map((order, i) => {
+            const isExpanded = expandedOrderId === order.order_id;
+            const isSubscription = Boolean(order.is_subscription || order.subscription_id || order.order_source === 'subscription');
+            const items = order.items || [];
+            const containers = order.containers || [];
 
-              return (
+            return (
+              <div 
+                key={order.order_id || i} 
+                className={`border rounded-2xl transition-all duration-200 overflow-hidden bg-white ${
+                  isExpanded ? 'border-emerald-300 shadow-md ring-1 ring-emerald-200' : 'border-gray-200/80 hover:border-emerald-200 hover:shadow-xs'
+                }`}
+              >
+                {/* Header Row */}
                 <div 
-                  key={order.order_id || i} 
-                  className={`border rounded-2xl transition-all duration-200 overflow-hidden bg-white ${
-                    isExpanded ? 'border-emerald-300 shadow-md ring-1 ring-emerald-200' : 'border-gray-200/80 hover:border-emerald-200 hover:shadow-xs'
-                  }`}
+                  onClick={() => toggleExpand(order.order_id)}
+                  className="flex flex-col md:flex-row md:items-center justify-between p-4 cursor-pointer select-none gap-4"
                 >
-                  {/* Header Row */}
-                  <div 
-                    onClick={() => toggleExpand(order.order_id)}
-                    className="flex flex-col md:flex-row md:items-center justify-between p-4 cursor-pointer select-none gap-4"
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 font-bold ${
-                        order.status === 'delivered' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 
-                        order.status === 'assigned' || order.status === 'dispatched' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
-                        'bg-blue-50 text-blue-600 border border-blue-100'
-                      }`}>
-                        {isSubscription ? <Calendar size={20} /> : <ShoppingBag size={20} />}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <span className="font-extrabold text-gray-900 text-base">#{order.order_id}</span>
-                          
-                          {/* Status Badge */}
-                          <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
-                            order.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' : 
-                            order.status === 'assigned' || order.status === 'dispatched' ? 'bg-amber-100 text-amber-800' : 
-                            order.status === 'cancelled' ? 'bg-rose-100 text-rose-700' :
-                            'bg-gray-100 text-gray-700'
-                          }`}>
-                            {order.status || 'PENDING'}
-                          </span>
-
-                          {/* Order Type Badge */}
-                          <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 ${
-                            isSubscription ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-700 border border-slate-200'
-                          }`}>
-                            {isSubscription ? <><Calendar size={10} /> Subscription Order</> : <><ShoppingBag size={10} /> One-Time Order</>}
-                          </span>
-                        </div>
-
-                        <p className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
-                          <span>Placed on {new Date(order.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                          <span>•</span>
-                          <span>Slot: <strong className="capitalize text-gray-700">{order.delivery_slot || 'Morning'}</strong></span>
-                          {order.scheduled_date && (
-                            <>
-                              <span>•</span>
-                              <span>Scheduled: <strong className="text-gray-700">{new Date(order.scheduled_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</strong></span>
-                            </>
-                          )}
-                        </p>
-                      </div>
+                  <div className="flex items-start gap-4">
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 font-bold ${
+                      order.status === 'delivered' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 
+                      order.status === 'assigned' || order.status === 'dispatched' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                      'bg-blue-50 text-blue-600 border border-blue-100'
+                    }`}>
+                      {isSubscription ? <Calendar size={20} /> : <ShoppingBag size={20} />}
                     </div>
-
-                    <div className="flex items-center justify-between md:justify-end gap-6 pt-2 md:pt-0 border-t md:border-t-0 border-gray-100">
-                      <div className="text-left md:text-right">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Payment Method</p>
-                        <span className={`inline-flex items-center gap-1.5 text-xs font-bold capitalize px-2 py-0.5 rounded-md ${
-                          order.payment_status === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                    <div>
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="font-extrabold text-gray-900 text-base">#{order.order_id}</span>
+                        
+                        {/* Status Badge */}
+                        <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                          order.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' : 
+                          order.status === 'assigned' || order.status === 'dispatched' ? 'bg-amber-100 text-amber-800' : 
+                          order.status === 'cancelled' ? 'bg-rose-100 text-rose-700' :
+                          'bg-gray-100 text-gray-700'
                         }`}>
-                          {order.payment_mode || 'Wallet'} 
-                          <span className="text-[10px]">({order.payment_status === 'paid' ? 'Paid' : 'Unpaid'})</span>
+                          {order.status || 'PENDING'}
+                        </span>
+
+                        {/* Order Type Badge */}
+                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 ${
+                          isSubscription ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-700 border border-slate-200'
+                        }`}>
+                          {isSubscription ? <><Calendar size={10} /> Subscription Order</> : <><ShoppingBag size={10} /> One-Time Order</>}
                         </span>
                       </div>
 
-                      <div className="text-right flex items-center gap-3">
-                        <div>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Total Amount</p>
-                          <p className="text-base font-black text-gray-900">₹{Number(order.total_amount || 0).toLocaleString()}</p>
-                        </div>
-                        <div className={`p-1.5 rounded-full bg-slate-100 text-slate-500 transition-transform ${isExpanded ? 'rotate-180 bg-emerald-100 text-emerald-700' : ''}`}>
-                          <ChevronDown size={18} />
-                        </div>
-                      </div>
+                      <p className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
+                        <span>Placed on {new Date(order.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                        <span>•</span>
+                        <span>Slot: <strong className="capitalize text-gray-700">{order.delivery_slot || 'Morning'}</strong></span>
+                        {order.scheduled_date && (
+                          <>
+                            <span>•</span>
+                            <span>Scheduled: <strong className="text-gray-700">{new Date(order.scheduled_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</strong></span>
+                          </>
+                        )}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Expanded Details Section */}
-                  {isExpanded && (
-                    <div className="border-t border-gray-100 bg-slate-50/70 p-5 space-y-5 animate-in fade-in duration-200">
-                      
-                      {/* Delivery Partner & Logistics Details */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs">
-                          <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            <Truck size={14} className="text-emerald-600" /> Delivery Agent / Partner
-                          </p>
-                          {order.delivery_partner_name ? (
-                            <div className="space-y-1">
-                              <p className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
-                                {order.delivery_partner_name}
-                              </p>
-                              {order.delivery_partner_phone && (
-                                <a href={`tel:${order.delivery_partner_phone}`} className="text-xs text-emerald-600 font-semibold flex items-center gap-1 hover:underline">
-                                  <Phone size={12} /> {order.delivery_partner_phone}
-                                </a>
-                              )}
-                            </div>
-                          ) : (
-                            <p className="text-xs text-gray-400 italic">Not assigned to a delivery partner yet</p>
-                          )}
-                        </div>
+                  <div className="flex items-center justify-between md:justify-end gap-6 pt-2 md:pt-0 border-t md:border-t-0 border-gray-100">
+                    <div className="text-left md:text-right">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Payment Method</p>
+                      <span className={`inline-flex items-center gap-1.5 text-xs font-bold capitalize px-2 py-0.5 rounded-md ${
+                        order.payment_status === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                      }`}>
+                        {order.payment_mode || 'Wallet'} 
+                        <span className="text-[10px]">({order.payment_status === 'paid' ? 'Paid' : 'Unpaid'})</span>
+                      </span>
+                    </div>
 
-                        <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs">
-                          <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            <CreditCard size={14} className="text-blue-600" /> Payment & Billing
-                          </p>
-                          <div className="space-y-1 text-xs">
-                            <p className="text-gray-700">Mode: <strong className="capitalize font-bold text-gray-900">{order.payment_mode || 'Wallet'}</strong></p>
-                            <p className="text-gray-700">Status: <strong className={`font-bold capitalize ${order.payment_status === 'paid' ? 'text-emerald-600' : 'text-rose-600'}`}>{order.payment_status || 'Pending'}</strong></p>
-                            {order.created_by && <p className="text-gray-500">Source: {order.created_by}</p>}
+                    <div className="text-right flex items-center gap-3">
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Total Amount</p>
+                        <p className="text-base font-black text-gray-900">₹{Number(order.total_amount || 0).toLocaleString()}</p>
+                      </div>
+                      <div className={`p-1.5 rounded-full bg-slate-100 text-slate-500 transition-transform ${isExpanded ? 'rotate-180 bg-emerald-100 text-emerald-700' : ''}`}>
+                        <ChevronDown size={18} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Expanded Details Section */}
+                {isExpanded && (
+                  <div className="border-t border-gray-100 bg-slate-50/70 p-5 space-y-5 animate-in fade-in duration-200">
+                    
+                    {/* Delivery Partner & Logistics Details */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs">
+                        <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <Truck size={14} className="text-emerald-600" /> Delivery Agent / Partner
+                        </p>
+                        {order.delivery_partner_name ? (
+                          <div className="space-y-1">
+                            <p className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                              {order.delivery_partner_name}
+                            </p>
+                            {order.delivery_partner_phone && (
+                              <a href={`tel:${order.delivery_partner_phone}`} className="text-xs text-emerald-600 font-semibold flex items-center gap-1 hover:underline">
+                                <Phone size={12} /> {order.delivery_partner_phone}
+                              </a>
+                            )}
+                            {order.delivery_run_id && (
+                              <p className="text-[11px] text-gray-500 font-mono">Run ID: {order.delivery_run_id}</p>
+                            )}
                           </div>
-                        </div>
+                        ) : (
+                          <p className="text-xs text-gray-400 italic">Not assigned to a delivery partner yet</p>
+                        )}
+                      </div>
 
-                        <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs">
-                          <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            <Box size={14} className="text-purple-600" /> Containers & Packaging
-                          </p>
-                          {containers.length > 0 ? (
-                            <div className="space-y-1 text-xs">
-                              {containers.map((c: any, idx: number) => (
-                                <div key={idx} className="flex justify-between items-center text-gray-700">
-                                  <span>{c.packaging_name}:</span>
-                                  <span className="font-bold text-purple-700">{c.quantity} units</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-xs text-gray-400 italic">Standard recyclable packaging</p>
-                          )}
+                      <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs">
+                        <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <CreditCard size={14} className="text-blue-600" /> Payment & Billing
+                        </p>
+                        <div className="space-y-1 text-xs">
+                          <p className="text-gray-700">Mode: <strong className="capitalize font-bold text-gray-900">{order.payment_mode || 'Wallet'}</strong></p>
+                          <p className="text-gray-700">Status: <strong className={`font-bold capitalize ${order.payment_status === 'paid' ? 'text-emerald-600' : 'text-rose-600'}`}>{order.payment_status || 'Pending'}</strong></p>
+                          {order.created_by && <p className="text-gray-500">Source: {order.created_by}</p>}
                         </div>
                       </div>
 
-                      {/* Order Items Table */}
-                      <div className="bg-white rounded-xl border border-gray-200/80 overflow-hidden shadow-2xs">
-                        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                          <span className="text-xs font-extrabold text-gray-700 uppercase tracking-wider">Ordered Items ({items.length})</span>
-                          <span className="text-xs text-gray-500 font-semibold">Subtotal: ₹{Number(order.subtotal || order.total_amount).toLocaleString()}</span>
-                        </div>
-                        {items.length === 0 ? (
-                          <div className="p-4 text-xs text-gray-400 italic text-center">No item details recorded for this order.</div>
-                        ) : (
-                          <div className="divide-y divide-gray-100">
-                            {items.map((item: any, idx: number) => (
-                              <div key={idx} className="p-3.5 flex items-center justify-between text-xs hover:bg-slate-50 transition-colors">
-                                <div className="space-y-0.5">
-                                  <p className="font-bold text-gray-900 text-sm">{item.product_name}</p>
-                                  {item.variant_name && <p className="text-gray-500 text-[11px] font-medium">{item.variant_name}</p>}
-                                </div>
-                                <div className="flex items-center gap-6 text-right">
-                                  <div>
-                                    <p className="text-gray-500 font-medium">Qty</p>
-                                    <p className="font-bold text-gray-900">{item.quantity}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-gray-500 font-medium">Unit Price</p>
-                                    <p className="font-semibold text-gray-700">₹{Number(item.unit_price || 0).toLocaleString()}</p>
-                                  </div>
-                                  <div className="min-w-[70px]">
-                                    <p className="text-gray-500 font-medium">Total</p>
-                                    <p className="font-black text-gray-900">₹{Number(item.total_price || (item.unit_price * item.quantity)).toLocaleString()}</p>
-                                  </div>
-                                </div>
+                      <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs">
+                        <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <Box size={14} className="text-purple-600" /> Containers & Packaging
+                        </p>
+                        {containers.length > 0 ? (
+                          <div className="space-y-1 text-xs">
+                            {containers.map((c: any, idx: number) => (
+                              <div key={idx} className="flex justify-between items-center text-gray-700">
+                                <span>{c.packaging_name}:</span>
+                                <span className="font-bold text-purple-700">{c.quantity} units</span>
                               </div>
                             ))}
                           </div>
+                        ) : (
+                          <p className="text-xs text-gray-400 italic">Standard recyclable packaging</p>
                         )}
-                        
-                        {/* Price Summary Footer */}
-                        <div className="p-4 bg-slate-50 border-t border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-xs">
-                          {order.special_instructions && (
-                            <div className="text-gray-600 bg-amber-50 border border-amber-200 p-2 rounded-lg text-[11px]">
-                              <strong className="text-amber-800">Note:</strong> {order.special_instructions}
+                      </div>
+                    </div>
+
+                    {/* Order Items Table */}
+                    <div className="bg-white rounded-xl border border-gray-200/80 overflow-hidden shadow-2xs">
+                      <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                        <span className="text-xs font-extrabold text-gray-700 uppercase tracking-wider">Ordered Items ({items.length})</span>
+                        <span className="text-xs text-gray-500 font-semibold">Subtotal: ₹{Number(order.subtotal || order.total_amount).toLocaleString()}</span>
+                      </div>
+                      {items.length === 0 ? (
+                        <div className="p-4 text-xs text-gray-400 italic text-center">No item details recorded for this order.</div>
+                      ) : (
+                        <div className="divide-y divide-gray-100">
+                          {items.map((item: any, idx: number) => (
+                            <div key={idx} className="p-3.5 flex items-center justify-between text-xs hover:bg-slate-50 transition-colors">
+                              <div className="space-y-0.5">
+                                <p className="font-bold text-gray-900 text-sm">{item.product_name}</p>
+                                {item.variant_name && <p className="text-gray-500 text-[11px] font-medium">{item.variant_name}</p>}
+                              </div>
+                              <div className="flex items-center gap-6 text-right">
+                                <div>
+                                  <p className="text-gray-500 font-medium">Qty</p>
+                                  <p className="font-bold text-gray-900">{item.quantity}</p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-500 font-medium">Unit Price</p>
+                                  <p className="font-semibold text-gray-700">₹{Number(item.unit_price || 0).toLocaleString()}</p>
+                                </div>
+                                <div className="min-w-[70px]">
+                                  <p className="text-gray-500 font-medium">Total</p>
+                                  <p className="font-black text-gray-900">₹{Number(item.total_price || (item.unit_price * item.quantity)).toLocaleString()}</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Price Summary Footer */}
+                      <div className="p-4 bg-slate-50 border-t border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-xs">
+                        {order.special_instructions && (
+                          <div className="text-gray-600 bg-amber-50 border border-amber-200 p-2 rounded-lg text-[11px]">
+                            <strong className="text-amber-800">Note:</strong> {order.special_instructions}
+                          </div>
+                        )}
+                        <div className="ml-auto space-y-1 text-right min-w-[200px]">
+                          {Number(order.discount_amount || 0) > 0 && (
+                            <div className="flex justify-between text-emerald-600 font-semibold">
+                              <span>Discount:</span>
+                              <span>-₹{Number(order.discount_amount).toLocaleString()}</span>
                             </div>
                           )}
-                          <div className="ml-auto space-y-1 text-right min-w-[200px]">
-                            {Number(order.discount_amount || 0) > 0 && (
-                              <div className="flex justify-between text-emerald-600 font-semibold">
-                                <span>Discount:</span>
-                                <span>-₹{Number(order.discount_amount).toLocaleString()}</span>
-                              </div>
-                            )}
-                            {Number(order.gst_amount || 0) > 0 && (
-                              <div className="flex justify-between text-gray-500">
-                                <span>GST Tax:</span>
-                                <span>₹{Number(order.gst_amount).toLocaleString()}</span>
-                              </div>
-                            )}
-                            <div className="flex justify-between text-sm font-black text-gray-900 pt-1 border-t border-gray-200">
-                              <span>Final Total:</span>
-                              <span className="text-emerald-700">₹{Number(order.total_amount || 0).toLocaleString()}</span>
+                          {Number(order.gst_amount || 0) > 0 && (
+                            <div className="flex justify-between text-gray-500">
+                              <span>GST Tax:</span>
+                              <span>₹{Number(order.gst_amount).toLocaleString()}</span>
                             </div>
+                          )}
+                          <div className="flex justify-between text-sm font-black text-gray-900 pt-1 border-t border-gray-200">
+                            <span>Final Total:</span>
+                            <span className="text-emerald-700">₹{Number(order.total_amount || 0).toLocaleString()}</span>
                           </div>
                         </div>
                       </div>
-
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
 
-          {/* Pagination Footer */}
-          {totalPages > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-gray-200/80 text-xs font-medium text-slate-600">
-              <div>
-                Showing <strong className="text-slate-900">{(currentPage - 1) * itemsPerPage + 1}</strong> to{" "}
-                <strong className="text-slate-900">{Math.min(currentPage * itemsPerPage, orders.length)}</strong> of{" "}
-                <strong className="text-slate-900">{orders.length}</strong> orders
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition-all font-bold shadow-2xs cursor-pointer"
-                >
-                  Previous
-                </button>
-                <span className="px-2 font-bold text-slate-800">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition-all font-bold shadow-2xs cursor-pointer"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
-        </>
+            );
+          })}
+        </div>
       )}
     </div>
   );
@@ -1705,152 +1570,9 @@ function ActivityLogTab({ timeline }: { timeline: any[] }) {
         </div>
       )}
     </div>
-
-      {/* SPECIAL PRICE MODAL */}
-      {isSpecialPriceModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-50 rounded-xl"><Tag size={20} className="text-emerald-600" /></div>
-                <div>
-                  <h3 className="font-bold text-slate-900 text-base">Special Pricing</h3>
-                  <p className="text-xs text-slate-500">Customer: <span className="font-semibold text-slate-700">{data?.customer?.full_name || 'Customer'}</span> &nbsp;{'·'}&nbsp; #{data?.customer?.customer_id}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                {data?.customer?.phone && data.customer.phone !== '' && (
-                  <span className="text-xs text-slate-500 flex items-center gap-1"><Phone size={12} />{data.customer.phone}</span>
-                )}
-                <button onClick={() => setIsSpecialPriceModalOpen(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"><X size={18} /></button>
-              </div>
-            </div>
-            <div className="overflow-y-auto flex-1 px-6 py-5">
-              {spLoading ? (
-                <div className="flex justify-center py-16"><div className="animate-spin w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full"></div></div>
-              ) : (
-                <>
-                  <div className="space-y-3">
-                    {spRows.map((row, idx) => {
-                      const sellingPrice = Number(row.variantData?.price || 0);
-                      const discountNum = Number(row.discount || 0);
-                      const specialPrice = sellingPrice - (sellingPrice * discountNum / 100);
-                      const saving = sellingPrice - specialPrice;
-                      return (
-                        <div key={row.rowId} className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                          <div className="flex items-start gap-3">
-                            <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center shrink-0 mt-1">{idx + 1}</div>
-                            <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                              <div>
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Product</label>
-                                <select value={row.productId} onChange={e => handleSpProductChange(row.rowId, e.target.value)} className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400">
-                                  <option value="">Select Product...</option>
-                                  {spProducts.map(p => <option key={p.product_id} value={p.product_id}>{p.name}</option>)}
-                                </select>
-                              </div>
-                              <div>
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Variant</label>
-                                <select value={row.variantId} onChange={e => handleSpVariantChange(row.rowId, e.target.value, row.variants)} disabled={!row.productId} className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 disabled:opacity-50">
-                                  <option value="">Select Variant...</option>
-                                  {row.variants.map(v => <option key={v.variant_id} value={v.variant_id}>{v.name} ({Number(v.price).toLocaleString('en-IN')})</option>)}
-                                </select>
-                              </div>
-                              <div>
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Discount (%)</label>
-                                <div className="relative">
-                                  <input type="number" min="0" max="100" step="0.01" placeholder="0" value={row.discount} onChange={e => handleSpDiscountChange(row.rowId, e.target.value)} disabled={!row.variantId} className="w-full text-xs border border-slate-200 rounded-lg pl-2.5 pr-8 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 disabled:opacity-50" />
-                                  <Percent size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                                </div>
-                              </div>
-                            </div>
-                            <button onClick={() => deleteSpecialPrice(row.rowId, row.variantId)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0 mt-1"><Trash2 size={15} /></button>
-                          </div>
-                          {row.variantData && row.discount !== '' && (
-                            <div className="mt-3 ml-9 grid grid-cols-3 gap-2 p-3 bg-white rounded-xl border border-emerald-100">
-                              <div className="text-center">
-                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Selling Price</p>
-                                <p className="font-bold text-slate-800 text-sm">Rs.{sellingPrice.toLocaleString('en-IN', {minimumFractionDigits:2})}</p>
-                              </div>
-                              <div className="text-center border-x border-slate-100">
-                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Discount</p>
-                                <p className="font-bold text-orange-500 text-sm">{discountNum}% off</p>
-                              </div>
-                              <div className="text-center">
-                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Special Price</p>
-                                <p className="font-bold text-emerald-600 text-sm">Rs.{specialPrice.toLocaleString('en-IN', {minimumFractionDigits:2})}</p>
-                              </div>
-                              {saving > 0 && (
-                                <div className="col-span-3 text-center mt-1">
-                                  <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-3 py-0.5 rounded-full">Customer saves Rs.{saving.toLocaleString('en-IN', {minimumFractionDigits:2})} per order</span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <button onClick={addSpRow} className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-slate-200 hover:border-emerald-400 text-slate-400 hover:text-emerald-600 rounded-xl text-xs font-semibold transition-all">
-                    <Plus size={14} /> Add Another Product Variant
-                  </button>
-                  {spRows.some(r => r.variantData && r.discount !== '') && (
-                    <div className="mt-5">
-                      <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Pricing Summary</h4>
-                      <div className="rounded-xl border border-slate-100 overflow-hidden">
-                        <table className="w-full text-xs">
-                          <thead className="bg-slate-50">
-                            <tr>
-                              <th className="text-left py-2.5 px-4 text-[10px] font-bold text-slate-500 uppercase">Product / Variant</th>
-                              <th className="text-right py-2.5 px-4 text-[10px] font-bold text-slate-500 uppercase">Selling Price</th>
-                              <th className="text-right py-2.5 px-4 text-[10px] font-bold text-slate-500 uppercase">Discount</th>
-                              <th className="text-right py-2.5 px-4 text-[10px] font-bold text-slate-500 uppercase">Special Price</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {spRows.filter(r => r.variantData && r.discount !== '').map((row, i) => {
-                              const sp = Number(row.variantData.price || 0);
-                              const d = Number(row.discount || 0);
-                              const fin = sp - (sp * d / 100);
-                              const prodName = spProducts.find(p => p.product_id === row.productId)?.name || 'Product';
-                              return (
-                                <tr key={row.rowId} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
-                                  <td className="py-2.5 px-4 font-semibold text-slate-800">{prodName} <span className="text-slate-400 font-normal">/ {row.variantData.name}</span></td>
-                                  <td className="py-2.5 px-4 text-right text-slate-600">Rs.{sp.toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
-                                  <td className="py-2.5 px-4 text-right text-orange-500 font-bold">{d}%</td>
-                                  <td className="py-2.5 px-4 text-right text-emerald-600 font-bold">Rs.{fin.toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
-                                </tr>
-                              );
-                            })}
-                            <tr className="bg-emerald-50 border-t border-emerald-100">
-                              <td className="py-2.5 px-4 font-bold text-slate-800">Total</td>
-                              <td className="py-2.5 px-4 text-right font-bold text-slate-800">Rs.{spRows.filter(r=>r.variantData&&r.discount!=='').reduce((s,r)=>s+Number(r.variantData.price||0),0).toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
-                              <td className="py-2.5 px-4 text-right">-</td>
-                              <td className="py-2.5 px-4 text-right font-bold text-emerald-700">Rs.{spRows.filter(r=>r.variantData&&r.discount!=='').reduce((s,r)=>{const sp=Number(r.variantData.price||0);const d=Number(r.discount||0);return s+(sp-sp*d/100);},0).toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between shrink-0">
-              <p className="text-xs text-slate-500">{spRows.filter(r => r.variantId && r.discount !== '').length} variant(s) ready to save</p>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setIsSpecialPriceModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
-                <button onClick={saveSpecialPrices} disabled={spSaving || spRows.filter(r => r.variantId && r.discount !== '').length === 0} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2">
-                  {spSaving ? <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : <Save size={15} />}
-                  Save Special Prices
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
   );
 }
+
 function getAvatarColors(name: string) {
   const char = name?.charAt(0)?.toUpperCase() || 'A';
   if (['A','B','C','D','P'].includes(char)) return 'bg-emerald-50 text-emerald-600';

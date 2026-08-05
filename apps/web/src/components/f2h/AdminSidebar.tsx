@@ -28,9 +28,11 @@ const adminNav = [
     label: "CUSTOMERS & SUBSCRIPTIONS",
     items: [
       { name: "Customers", href: "/admin/customers/allcustomers", icon: Users },
+      { name: "Special Prices", href: "/admin/customers/special-prices", icon: Tag },
       { name: "Subscriptions", href: "/admin/subscriptions/generate-orders", icon: RefreshCw },
     ],
   },
+
   {
     label: "ORDERS & DELIVERIES",
     items: [

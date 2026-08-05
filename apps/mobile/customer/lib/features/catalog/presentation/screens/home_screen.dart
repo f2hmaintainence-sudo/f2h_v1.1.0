@@ -1602,9 +1602,9 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _referralBanner() {
-    return const _HomeReferralBanner();
-  }
+  // Widget _referralBanner() {
+  //   return const _HomeReferralBanner();
+  // }
 
   Widget _buildFloatingCartBadge() {
     return BlocBuilder<CartBloc, CartState>(

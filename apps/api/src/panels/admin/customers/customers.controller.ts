@@ -79,7 +79,33 @@ export class CustomersController {
     return this.customersService.softDeleteWalletTransaction(id, adminId);
   }
 
+  // ─── SPECIAL PRICES CRUD ─────────────────────────────────────────
+  @Get('special-prices/table')
+  async getSpecialPricesTable(@Query() query: any) {
+    return this.customersService.getSpecialPricesTable(query);
+  }
+
+  @Get('special-prices/options')
+  async getSpecialPricesOptions() {
+    return this.customersService.getSpecialPricesOptions();
+  }
+
+  @Post('special-prices')
+  async saveSpecialPricesRule(@Body() body: any, @Req() req: any) {
+    const adminId = req.user?.user_id ?? 'system';
+    const customerId = body.customer_id;
+    const items = body.items || [{ product_variant_id: body.product_variant_id, discount: body.discount }];
+    return this.customersService.saveSpecialPrices(customerId, items, adminId);
+  }
+
+
+  @Delete('special-prices/:id')
+  async deleteSpecialPriceById(@Param('id') id: string) {
+    return this.customersService.deleteSpecialPriceById(id);
+  }
+
   // ─── SINGLE CUSTOMER (parameterized routes AFTER) ─────────────
+
 
   @Get(':id/portfolio')
   async getCustomerPortfolio(@Param('id') id: string) {
