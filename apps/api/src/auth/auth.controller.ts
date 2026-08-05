@@ -48,7 +48,7 @@ export class AuthController {
     const rawClientRole = req.headers['x-role'];
     const clientRole = typeof rawClientRole === 'string' ? rawClientRole.trim().toUpperCase() : '';
 
-    if (!clientRole || !['CUSTOMER', 'DELIVERY_PARTNER', 'DELIVERY_BOY', 'ADMIN'].includes(clientRole)) {
+    if (!clientRole || !['CUSTOMER', 'DELIVERY_PARTNER', 'ADMIN'].includes(clientRole)) {
       console.log(
         `[AuthController:login] Login rejected: Missing or invalid x-role header: "${rawClientRole}"`,
       );
@@ -83,13 +83,13 @@ export class AuthController {
         break;
 
       case 'DELIVERY_PARTNER':
-        // Delivery Partner App: only DELIVERY_BOY / DELIVERY_PARTNER users
-        isRoleAllowed = userRole === 'DELIVERY_BOY' || userRole === 'DELIVERY_PARTNER';
+        // Delivery Partner App: only DELIVERY_PARTNER users
+        isRoleAllowed = userRole === 'DELIVERY_PARTNER';
         break;
 
       case 'ADMIN':
-        // Admin Panel: allow all internal roles except CUSTOMER and DELIVERY_BOY / DELIVERY_PARTNER
-        isRoleAllowed = !['CUSTOMER', 'DELIVERY_BOY', 'DELIVERY_PARTNER'].includes(userRole);
+        // Admin Panel: allow all internal roles except CUSTOMER and DELIVERY_PARTNER
+        isRoleAllowed = !['CUSTOMER', 'DELIVERY_PARTNER'].includes(userRole);
         break;
     }
 

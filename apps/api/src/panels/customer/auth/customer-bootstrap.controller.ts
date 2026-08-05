@@ -111,61 +111,61 @@ export class CustomerBootstrapController {
   }
 
   private async resolveCustomer(userId: string, email?: string) {
-    // 1. Fetch user details from users table
-    const userRes = await this.Data.query('users', {
-      where: [{ column: 'user_id', operator: '=', value: userId }],
-      limit: 1,
-    });
-    let userObj = userRes?.data?.[0];
-
-    if (!userObj && email) {
-      const emailUserRes = await this.Data.query('users', {
-        where: [{ column: 'email', operator: '=', value: email.toLowerCase().trim() }],
-        limit: 1,
-      });
-      userObj = emailUserRes?.data?.[0];
-      if (userObj) {
-        userId = userObj.user_id;
-      }
-    }
-
     let customerResult = await this.Data.query('customers', {
       where: [{ column: 'customer_id', operator: '=', value: userId }],
       limit: 1,
     });
     let customer = customerResult?.data?.[0];
 
-    if (!customer && userObj) {
-      // Auto-heal: Create customer profile for user
+    if (!customer && email) {
+      customerResult = await this.Data.query('customers', {
+        where: [{ column: 'email', operator: '=', value: email }],
+        limit: 1,
+      });
+      customer = customerResult?.data?.[0];
+      if (customer) {
+        try {
+          await this.Data.update('customers', { customer_id: userId }, [{ column: 'email', operator: '=', value: email }]);
+          customer.customer_id = userId;
+        } catch (_) {}
+      }
+    }
+
+    if (!customer) {
+      // Auto-heal: If user exists in users table but not in customers table
       try {
-        const now = new Date();
-        const activeBranchRes = await this.Data.query('branches', {
-          where: [{ column: 'is_active', operator: '=', value: true }],
+        const userRes = await this.Data.query('users', {
+          where: [{ column: 'user_id', operator: '=', value: userId }],
           limit: 1,
         });
-        const activeBranchId = activeBranchRes?.data?.[0]?.branch_id || '';
-        const newCustData = {
-          customer_id: userId,
-          branch_id: activeBranchId,
-          referral_status: 'locked',
-          created_at: now,
-          updated_at: now,
-        };
-        await this.Data.insert('customers', newCustData);
-        customer = newCustData;
+        const userObj = userRes?.data?.[0];
+        if (userObj) {
+          const now = new Date();
+          const activeBranchRes = await this.Data.query('branches', {
+            where: [{ column: 'is_active', operator: '=', value: true }],
+            limit: 1,
+          });
+          const activeBranchId = activeBranchRes?.data?.[0]?.branch_id || '';
+          const newCustData = {
+            customer_id: userId,
+            first_name: userObj.first_name || userObj.user_name || (userObj.email ? userObj.email.split('@')[0] : 'Customer'),
+            last_name: userObj.last_name || '',
+            mobile: (userObj.phone || null),
+            phone: (userObj.phone || null),
+            email: userObj.email || email || null,
+            branch_id: activeBranchId,
+            created_at: now,
+            updated_at: now,
+          };
+          await this.Data.insert('customers', newCustData);
+          customer = newCustData;
+        }
       } catch (err) {
         this.Developer.error('[CustomerBootstrapController] Failed to auto-create missing customer record', err);
       }
     }
 
     if (customer) {
-      // Merge user fields for complete identity
-      customer.first_name = userObj?.first_name || userObj?.user_name || (userObj?.email ? userObj.email.split('@')[0] : 'Customer');
-      customer.last_name = userObj?.last_name || '';
-      customer.phone = userObj?.phone || null;
-      customer.mobile = userObj?.phone || null;
-      customer.email = userObj?.email || email || null;
-
       try {
         const orderCheck = await this.Data.query('orders', {
           select: ['order_id'],
@@ -177,10 +177,10 @@ export class CustomerBootstrapController {
         const computedStatus = isUnlocked ? 'active' : 'locked';
 
         if (!customer.referral_code || !customer.referral_code.trim()) {
-          const nameSeed = customer.first_name || (customer.email ? customer.email.split('@')[0] : 'USR');
+          const nameSeed = customer.first_name || customer.name || (customer.email ? customer.email.split('@')[0] : 'USR');
           const cleanName = nameSeed.replace(/[^a-zA-Z]/g, '').toUpperCase();
           const prefix = cleanName.length >= 3 ? cleanName.slice(0, 3) : (cleanName.length > 0 ? cleanName.padEnd(3, 'X') : 'USR');
-          const cleanPhone = (customer.phone || '').replace(/\D/g, '');
+          const cleanPhone = (customer.mobile || customer.phone || '').replace(/\D/g, '');
           const phoneSuffix = cleanPhone.length >= 3 ? cleanPhone.slice(-3) : Math.floor(100 + Math.random() * 900).toString();
           customer.referral_code = `F2H${prefix}${phoneSuffix}`;
         }
@@ -197,7 +197,6 @@ export class CustomerBootstrapController {
         this.Developer.error('[CustomerBootstrapController] Failed to auto-assign referral_code', err);
       }
     }
-
     if (customer && customer.referred_by) {
       try {
         const existingRef = await this.Data.query('referrals', {

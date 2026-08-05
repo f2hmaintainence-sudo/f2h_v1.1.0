@@ -5,7 +5,7 @@
 // Project     : F2H Fresh
 // File        : role-header.middleware.ts
 // Description : Maps compact request header codes to full internal values.
-//               X-Role (C/D/A) → x-role (CUSTOMER/DELIVERY_BOY/ADMIN)
+//               X-Role (C/D/A) → x-role (CUSTOMER/DELIVERY_PARTNER/ADMIN)
 //               X-Plt  (ac/ic/ad/id) → x-app-platform (android_customer etc.)
 //               X-Ver  (semver) → x-app-version
 //               X-Csrf (uuid)   → x-csrf-token

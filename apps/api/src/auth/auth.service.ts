@@ -393,7 +393,7 @@ export class AuthService {
     }
 
     // Verify OTP for registrations
-    if (roleId === 'CUSTOMER' || roleId === 'DELIVERY_PARTNER' || roleId === 'DELIVERY_BOY') {
+    if (roleId === 'CUSTOMER' || roleId === 'DELIVERY_PARTNER') {
       if (!body.verification_token) {
         throw new BadRequestException('Verification token is required');
       }
@@ -554,7 +554,7 @@ export class AuthService {
       }
 
       // Delivery Partner specific initialization
-      if (roleId === 'DELIVERY_PARTNER' || roleId === 'DELIVERY_BOY') {
+      if (roleId === 'DELIVERY_PARTNER') {
         let selectedBranchId = body.branch_id;
         const branchesRes = await this.Data.query('branches', {
           where: [{ column: 'is_active', operator: '=', value: true }],
@@ -1269,12 +1269,11 @@ export class AuthService {
         case 'CUSTOMER':
           isAllowed = uRole === 'CUSTOMER';
           break;
-        case 'DELIVERY_BOY':
         case 'DELIVERY_PARTNER':
-          isAllowed = uRole === 'DELIVERY_BOY' || uRole === 'DELIVERY_PARTNER';
+          isAllowed = uRole === 'DELIVERY_PARTNER';
           break;
         case 'ADMIN':
-          isAllowed = !['CUSTOMER', 'DELIVERY_BOY', 'DELIVERY_PARTNER'].includes(uRole);
+          isAllowed = !['CUSTOMER', 'DELIVERY_PARTNER'].includes(uRole);
           break;
         default:
           isAllowed = true;
