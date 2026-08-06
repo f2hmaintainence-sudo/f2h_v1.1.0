@@ -92,8 +92,8 @@ export class SubscriptionsTableService {
       }
 
       // Target date filter for scheduled subscriptions
-      const targetDate = query.targetDate || query.date;
-      if (targetDate) {
+      if (query.filterByTargetDate === 'true' && (query.targetDate || query.date)) {
+        const targetDate = query.targetDate || query.date;
         const dateStr = String(targetDate).slice(0, 10);
         conditions.push({
           column: 'subscriptions.start_date',

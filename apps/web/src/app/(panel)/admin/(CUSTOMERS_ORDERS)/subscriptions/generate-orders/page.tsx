@@ -165,7 +165,6 @@ export default function GenerateOrdersPage() {
         page: 1,
         limit: 100,
         search: searchQuery,
-        targetDate: selectedDate,
       };
       if (statusFilter !== 'all') {
         params['status'] = statusFilter;
@@ -190,7 +189,7 @@ export default function GenerateOrdersPage() {
     } finally {
       setLoadingSubs(false);
     }
-  }, [statusFilter, searchQuery, selectedDate]);
+  }, [statusFilter, searchQuery]);
 
   // Load metrics & tables on filter change
   useEffect(() => {
