@@ -11,12 +11,14 @@ import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
 import { DataService } from 'src/shared/database/Data.service';
 import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
+import { DatabaseService } from 'src/shared/database/Database.service';
 import { DeveloperService } from 'src/shared/logger/Developer.service';
 
 @Controller({ path: '/customer/wallet', version: '1' })
 export class WalletController {
   constructor(
     private readonly Data: DataService,
+    private readonly db: DatabaseService,
     private readonly pushNotificationService: PushNotificationService,
     private readonly developer: DeveloperService,
   ) {}
@@ -34,18 +36,16 @@ export class WalletController {
       throw new BadRequestException('Invalid topup amount');
     }
 
-    // Resolve customer
-    let customerResult = await this.Data.query('customers', {
-      where: [{ column: 'email', operator: '=', value: email }],
-      limit: 1,
-    });
-    if (!customerResult?.data?.length) {
-      customerResult = await this.Data.query('customers', {
-        where: [{ column: 'customer_id', operator: '=', value: userId }],
-        limit: 1,
-      });
-    }
-    const customer = customerResult?.data?.[0];
+    // Resolve customer via JOIN users
+    const custRows = await this.db.query(
+      `SELECT c.customer_id, c.wallet_balance
+       FROM customers c
+       JOIN users u ON u.user_id = c.customer_id
+       WHERE c.customer_id = $1 OR (u.email IS NOT NULL AND u.email = $2 AND u.email != '')
+       LIMIT 1`,
+      [userId, email || userId],
+    );
+    const customer = custRows?.[0];
     if (!customer) {
       throw new BadRequestException('Customer profile not found');
     }
@@ -146,18 +146,16 @@ export class WalletController {
     const userId = user?.user_id;
     const email = user?.email;
 
-    // Resolve customer
-    let customerResult = await this.Data.query('customers', {
-      where: [{ column: 'email', operator: '=', value: email }],
-      limit: 1,
-    });
-    if (!customerResult?.data?.length) {
-      customerResult = await this.Data.query('customers', {
-        where: [{ column: 'customer_id', operator: '=', value: userId }],
-        limit: 1,
-      });
-    }
-    const customer = customerResult?.data?.[0];
+    // Resolve customer via JOIN users
+    const custRows = await this.db.query(
+      `SELECT c.customer_id
+       FROM customers c
+       JOIN users u ON u.user_id = c.customer_id
+       WHERE c.customer_id = $1 OR (u.email IS NOT NULL AND u.email = $2 AND u.email != '')
+       LIMIT 1`,
+      [userId, email || userId],
+    );
+    const customer = custRows?.[0];
     if (!customer) {
       throw new BadRequestException('Customer profile not found');
     }

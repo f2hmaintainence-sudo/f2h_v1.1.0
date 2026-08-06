@@ -2,11 +2,13 @@ import { Controller, Get, Req, UseGuards, BadRequestException } from '@nestjs/co
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
 import { DataService } from 'src/shared/database/Data.service';
+import { DatabaseService } from 'src/shared/database/Database.service';
 
 @Controller({ path: 'customer/package', version: '1' })
 export class PackageController {
   constructor(
     private readonly Data: DataService,
+    private readonly db: DatabaseService,
   ) {}
 
   @Get('balance')
@@ -16,18 +18,16 @@ export class PackageController {
     const userId = user?.user_id;
     const email = user?.email;
 
-    // Resolve customer
-    let customerResult = await this.Data.query('customers', {
-      where: [{ column: 'email', operator: '=', value: email }],
-      limit: 1,
-    });
-    if (!customerResult?.data?.length) {
-      customerResult = await this.Data.query('customers', {
-        where: [{ column: 'customer_id', operator: '=', value: userId }],
-        limit: 1,
-      });
-    }
-    const customer = customerResult?.data?.[0];
+    // Resolve customer via JOIN users
+    const custRows = await this.db.query(
+      `SELECT c.customer_id
+       FROM customers c
+       JOIN users u ON u.user_id = c.customer_id
+       WHERE c.customer_id = $1 OR (u.email IS NOT NULL AND u.email = $2 AND u.email != '')
+       LIMIT 1`,
+      [userId, email || userId],
+    );
+    const customer = custRows?.[0];
     if (!customer) {
       throw new BadRequestException('Customer profile not found');
     }
@@ -62,18 +62,16 @@ export class PackageController {
     const userId = user?.user_id;
     const email = user?.email;
 
-    // Resolve customer
-    let customerResult = await this.Data.query('customers', {
-      where: [{ column: 'email', operator: '=', value: email }],
-      limit: 1,
-    });
-    if (!customerResult?.data?.length) {
-      customerResult = await this.Data.query('customers', {
-        where: [{ column: 'customer_id', operator: '=', value: userId }],
-        limit: 1,
-      });
-    }
-    const customer = customerResult?.data?.[0];
+    // Resolve customer via JOIN users
+    const custRows = await this.db.query(
+      `SELECT c.customer_id
+       FROM customers c
+       JOIN users u ON u.user_id = c.customer_id
+       WHERE c.customer_id = $1 OR (u.email IS NOT NULL AND u.email = $2 AND u.email != '')
+       LIMIT 1`,
+      [userId, email || userId],
+    );
+    const customer = custRows?.[0];
     if (!customer) {
       throw new BadRequestException('Customer profile not found');
     }

@@ -982,6 +982,7 @@ CREATE TABLE public.customers (
     customer_status character varying(30) DEFAULT 'active'::character varying,
     customer_type character varying(30) DEFAULT 'retail'::character varying,
     is_blocked boolean DEFAULT false,
+    subscription_number character varying(50),
     block_reason text,
     is_postpaid_enabled boolean DEFAULT false,
     postpaid_credit_limit numeric(10,2) DEFAULT 0.00,

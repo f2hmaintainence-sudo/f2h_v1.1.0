@@ -4,7 +4,6 @@ import {
   Controller,
   Delete,
   Get,
-  OnModuleInit,
   Param,
   Patch,
   Post,
@@ -26,7 +25,7 @@ const _firebaseConfigCache: Record<string, { config: any; cachedAt: number }> = 
 const FIREBASE_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 @Controller('customer')
-export class CustomerBootstrapController implements OnModuleInit {
+export class CustomerBootstrapController {
   constructor(
     private readonly Data: DataService,
     private readonly db: DatabaseService,
@@ -37,33 +36,6 @@ export class CustomerBootstrapController implements OnModuleInit {
   private columnCache: Map<string, { columns: Set<string>; cachedAt: number }> = new Map();
   private readonly COLUMN_CACHE_TTL_MS = 10 * 60 * 1000;
 
-  async onModuleInit() {
-    try {
-      await this.db.query(`
-        ALTER TABLE customers ADD COLUMN IF NOT EXISTS first_name VARCHAR(100);
-        ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_name VARCHAR(100);
-        ALTER TABLE customers ADD COLUMN IF NOT EXISTS mobile VARCHAR(20);
-        ALTER TABLE customers ADD COLUMN IF NOT EXISTS phone VARCHAR(20);
-        ALTER TABLE customers ADD COLUMN IF NOT EXISTS email VARCHAR(150);
-        ALTER TABLE customers ADD COLUMN IF NOT EXISTS gender VARCHAR(20);
-        ALTER TABLE customers ADD COLUMN IF NOT EXISTS dob DATE;
-        ALTER TABLE customers ADD COLUMN IF NOT EXISTS branch_id VARCHAR(30);
-        ALTER TABLE customers ADD COLUMN IF NOT EXISTS referral_code VARCHAR(30);
-        ALTER TABLE customers ADD COLUMN IF NOT EXISTS referral_status VARCHAR(30) DEFAULT 'unlocked';
-        ALTER TABLE customers ADD COLUMN IF NOT EXISTS first_order_completed BOOLEAN DEFAULT false;
-        
-        ALTER TABLE customer_addresses ADD COLUMN IF NOT EXISTS h3_index VARCHAR(30);
-        ALTER TABLE customer_addresses ADD COLUMN IF NOT EXISTS branch_id VARCHAR(30);
-        ALTER TABLE customer_addresses ADD COLUMN IF NOT EXISTS address_line TEXT;
-        ALTER TABLE customer_addresses ADD COLUMN IF NOT EXISTS delivery_note TEXT;
-        ALTER TABLE customer_addresses ADD COLUMN IF NOT EXISTS contact_name VARCHAR(150);
-        ALTER TABLE customer_addresses ADD COLUMN IF NOT EXISTS contact_mobile VARCHAR(20);
-      `);
-      this.Developer.log('info', '[CustomerBootstrapController] DB field check migrations verified.');
-    } catch (err: any) {
-      this.Developer.error('[CustomerBootstrapController] Error executing field check migrations', { error: err?.message || err });
-    }
-  }
 
   private async getTableColumns(tableName: string): Promise<Set<string>> {
     const cached = this.columnCache.get(tableName);
@@ -177,55 +149,72 @@ export class CustomerBootstrapController implements OnModuleInit {
   }
 
   private async resolveCustomer(userId: string, email?: string) {
-    let customerResult = await this.Data.query('customers', {
-      where: [{ column: 'customer_id', operator: '=', value: userId }],
-      limit: 1,
-    });
-    let customer = customerResult?.data?.[0];
-
-    if (!customer && email) {
-      customerResult = await this.Data.query('customers', {
-        where: [{ column: 'email', operator: '=', value: email }],
-        limit: 1,
-      });
-      customer = customerResult?.data?.[0];
-      if (customer) {
-        try {
-          await this.Data.update('customers', { customer_id: userId }, [{ column: 'email', operator: '=', value: email }]);
-          customer.customer_id = userId;
-        } catch (_) {}
-      }
-    }
+    const query = `
+      SELECT
+        c.customer_id,
+        c.customer_status,
+        c.customer_type,
+        c.is_blocked,
+        c.block_reason,
+        c.is_postpaid_enabled,
+        c.postpaid_credit_limit,
+        c.first_order_completed,
+        c.wallet_balance,
+        c.reward_points,
+        c.gender,
+        c.dob,
+        c.alternate_mobile,
+        c.notes,
+        c.branch_id,
+        c.referral_code,
+        c.referral_status,
+        c.referred_by,
+        c.created_by,
+        c.created_at,
+        c.updated_at,
+        u.first_name,
+        u.last_name,
+        u.user_name,
+        u.email,
+        u.phone,
+        u.phone AS mobile
+      FROM customers c
+      JOIN users u ON u.user_id = c.customer_id
+      WHERE c.customer_id = $1 OR (u.email IS NOT NULL AND u.email = $2 AND u.email != '')
+      LIMIT 1
+    `;
+    const rows = await this.db.query(query, [userId, email || userId]);
+    let customer = rows?.[0];
 
     if (!customer) {
-      // Auto-heal: If user exists in users table but not in customers table
+      // Auto-heal: Check if user exists in users table
       try {
-        const userRes = await this.Data.query('users', {
-          where: [{ column: 'user_id', operator: '=', value: userId }],
-          limit: 1,
-        });
-        const userObj = userRes?.data?.[0];
+        const userRows = await this.db.query(
+          `SELECT * FROM users WHERE user_id = $1 OR (email IS NOT NULL AND email = $2 AND email != '') LIMIT 1`,
+          [userId, email || userId],
+        );
+        const userObj = userRows?.[0];
         if (userObj) {
           const now = new Date();
           const activeBranchRes = await this.Data.query('branches', {
             where: [{ column: 'is_active', operator: '=', value: true }],
             limit: 1,
           });
-          const activeBranchId = activeBranchRes?.data?.[0]?.branch_id || '';
+          const activeBranchId = activeBranchRes?.data?.[0]?.branch_id || 'BRANCH_KUPPAM_01';
           const newCustData = {
-            customer_id: userId,
-            first_name: userObj.first_name || userObj.user_name || (userObj.email ? userObj.email.split('@')[0] : 'Customer'),
-            last_name: userObj.last_name || '',
-            mobile: (userObj.phone || null),
-            phone: (userObj.phone || null),
-            email: userObj.email || email || null,
+            customer_id: userObj.user_id || userId,
             branch_id: activeBranchId,
+            wallet_balance: 0,
+            customer_status: 'active',
+            customer_type: 'retail',
             created_at: now,
             updated_at: now,
           };
           const filteredNewCust = await this.filterValidFields('customers', newCustData);
           await this.Data.insert('customers', filteredNewCust);
-          customer = newCustData;
+
+          const reFetch = await this.db.query(query, [userObj.user_id || userId, userObj.email || email || userId]);
+          customer = reFetch?.[0];
         }
       } catch (err) {
         this.Developer.error('[CustomerBootstrapController] Failed to auto-create missing customer record', err);
@@ -233,50 +222,11 @@ export class CustomerBootstrapController implements OnModuleInit {
     }
 
     if (customer) {
-      const hasFirstName = customer.first_name && String(customer.first_name).trim().length > 0;
-      const hasMobile = (customer.mobile && String(customer.mobile).trim().length > 0) || (customer.phone && String(customer.phone).trim().length > 0);
-      const hasEmail = customer.email && String(customer.email).trim().length > 0;
-
-      if (!hasFirstName || !hasMobile || !hasEmail) {
-        try {
-          const userRes = await this.Data.query('users', {
-            where: [{ column: 'user_id', operator: '=', value: userId }],
-            limit: 1,
-          });
-          const userObj = userRes?.data?.[0];
-          if (userObj) {
-            const userFirstName = userObj.first_name || userObj.user_name || (userObj.email ? userObj.email.split('@')[0] : '');
-            const userLastName = userObj.last_name || '';
-            const userPhone = userObj.phone || userObj.mobile || '';
-            const userEmail = userObj.email || email || '';
-
-            const fillData: Record<string, any> = {};
-            if (!hasFirstName && userFirstName) {
-              customer.first_name = userFirstName;
-              customer.last_name = userLastName;
-              fillData.first_name = userFirstName;
-              fillData.last_name = userLastName;
-            }
-            if (!hasMobile && userPhone) {
-              customer.mobile = userPhone;
-              customer.phone = userPhone;
-              fillData.mobile = userPhone;
-              fillData.phone = userPhone;
-            }
-            if (!hasEmail && userEmail) {
-              customer.email = userEmail;
-              fillData.email = userEmail;
-            }
-
-            if (Object.keys(fillData).length > 0) {
-              fillData.updated_at = new Date();
-              const fillPayload = await this.filterValidFields('customers', fillData);
-              await this.Data.update('customers', fillPayload, [
-                { column: 'customer_id', operator: '=', value: customer.customer_id || userId },
-              ]);
-            }
-          }
-        } catch (_) {}
+      if (!customer.first_name || !customer.first_name.trim()) {
+        customer.first_name = customer.user_name || (customer.email ? customer.email.split('@')[0] : 'Customer');
+      }
+      if (!customer.mobile && customer.phone) {
+        customer.mobile = customer.phone;
       }
 
       try {
@@ -290,7 +240,7 @@ export class CustomerBootstrapController implements OnModuleInit {
         const computedStatus = isUnlocked ? 'active' : 'locked';
 
         if (!customer.referral_code || !customer.referral_code.trim()) {
-          const nameSeed = customer.first_name || customer.name || (customer.email ? customer.email.split('@')[0] : 'USR');
+          const nameSeed = customer.first_name || customer.user_name || (customer.email ? customer.email.split('@')[0] : 'USR');
           const cleanName = nameSeed.replace(/[^a-zA-Z]/g, '').toUpperCase();
           const prefix = cleanName.length >= 3 ? cleanName.slice(0, 3) : (cleanName.length > 0 ? cleanName.padEnd(3, 'X') : 'USR');
           const cleanPhone = (customer.mobile || customer.phone || '').replace(/\D/g, '');
@@ -317,6 +267,7 @@ export class CustomerBootstrapController implements OnModuleInit {
         this.Developer.error('[CustomerBootstrapController] Failed to auto-assign referral_code', err);
       }
     }
+
     if (customer && customer.referred_by) {
       try {
         const existingRef = await this.Data.query('referrals', {
@@ -324,14 +275,14 @@ export class CustomerBootstrapController implements OnModuleInit {
           limit: 1,
         });
         if (!existingRef?.data?.length) {
-          const referrerCust = await this.Data.query('customers', {
-            where: [{ column: 'customer_id', operator: '=', value: customer.referred_by }],
-            limit: 1,
-          });
-          const refCode = referrerCust?.data?.[0]?.referral_code || 'F2HREF';
+          const referrerCustRows = await this.db.query(
+            `SELECT c.referral_code FROM customers c WHERE c.customer_id = $1 LIMIT 1`,
+            [customer.referred_by],
+          );
+          const refCode = referrerCustRows?.[0]?.referral_code || 'F2HREF';
           const ts = Math.floor(Date.now() / 1000).toString(36).toUpperCase();
           const rnd = Math.floor(Math.random() * 9000 + 1000);
-          const refereeName = customer.first_name || customer.name || customer.email || 'Customer';
+          const refereeName = customer.first_name || customer.user_name || customer.email || 'Customer';
           const refereePhone = customer.phone || '';
           const referralData = await this.filterValidFields('referrals', {
             refer_id: `REF${ts}${rnd}`,

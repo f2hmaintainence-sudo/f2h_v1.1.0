@@ -28,18 +28,16 @@ export class CustomerOrderController {
     const email = user?.email;
     const userId = user?.user_id;
 
-    // 1. Resolve customer (2 queries at most, typically 1)
-    let customerResult = await this.data.query('customers', {
-      where: [{ column: 'email', operator: '=', value: email }],
-      limit: 1,
-    });
-    if (!customerResult?.data?.length) {
-      customerResult = await this.data.query('customers', {
-        where: [{ column: 'customer_id', operator: '=', value: userId }],
-        limit: 1,
-      });
-    }
-    const customer = customerResult?.data?.[0];
+    // 1. Resolve customer via JOIN users
+    const custRows = await this.db.query(
+      `SELECT c.customer_id
+       FROM customers c
+       JOIN users u ON u.user_id = c.customer_id
+       WHERE c.customer_id = $1 OR (u.email IS NOT NULL AND u.email = $2 AND u.email != '')
+       LIMIT 1`,
+      [userId, email || userId],
+    );
+    const customer = custRows?.[0];
     if (!customer) {
       return { status: true, orders: [], subscriptions: [] };
     }

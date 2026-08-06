@@ -230,72 +230,52 @@ export class CartService {
     }
 
     let email = (req as any)?.user?.email;
-    let customerResult = await this.Data.query('customers', {
-      select: [
-        'customer_id',
-        'wallet_balance',
-        'full_name',
-        'first_name',
-        'last_name',
-        'phone',
-        'branch_id',
-        'email',
-      ],
-      where: [{ column: 'customer_id', operator: '=', value: customerId }],
-      limit: 1,
-    });
-    let customer = customerResult?.data?.[0];
+    const custQuery = `
+      SELECT
+        c.customer_id,
+        c.wallet_balance,
+        c.branch_id,
+        c.is_postpaid_enabled,
+        c.postpaid_credit_limit,
+        u.first_name,
+        u.last_name,
+        u.user_name,
+        u.phone,
+        u.email
+      FROM customers c
+      JOIN users u ON u.user_id = c.customer_id
+      WHERE c.customer_id = $1 OR (u.email IS NOT NULL AND u.email = $2 AND u.email != '')
+      LIMIT 1
+    `;
+    const custRows = await this.db.query(custQuery, [customerId, email || customerId]);
+    let customer = custRows?.[0];
 
-    const userRes = await this.Data.query('users', {
-      where: [{ column: 'user_id', operator: '=', value: customerId }],
-      limit: 1,
-    });
-    const userObj = userRes?.data?.[0];
-    if (!email && userObj?.email) {
-      email = userObj.email;
-    }
-
-    if (!customer && email) {
-      customerResult = await this.Data.query('customers', {
-        where: [{ column: 'email', operator: '=', value: email }],
+    if (!customer) {
+      const userRes = await this.Data.query('users', {
+        where: [{ column: 'user_id', operator: '=', value: customerId }],
         limit: 1,
       });
-      customer = customerResult?.data?.[0];
-
-      if (customer) {
+      const userObj = userRes?.data?.[0];
+      if (userObj) {
         try {
-          await this.Data.update(
-            'customers',
-            { customer_id: customerId, updated_at: new Date() },
-            [{ column: 'email', operator: '=', value: email }],
-          );
-          customer.customer_id = customerId;
+          const now = new Date();
+          const activeBranchRes = await this.Data.query('branches', {
+            where: [{ column: 'is_active', operator: '=', value: true }],
+            limit: 1,
+          });
+          const activeBranchId = activeBranchRes?.data?.[0]?.branch_id || 'BRANCH_KUPPAM_01';
+          await this.Data.insert('customers', {
+            customer_id: customerId,
+            branch_id: activeBranchId,
+            wallet_balance: 0,
+            customer_status: 'active',
+            created_at: now,
+            updated_at: now,
+          });
+          const reFetch = await this.db.query(custQuery, [customerId, email || customerId]);
+          customer = reFetch?.[0];
         } catch (_) {}
       }
-    }
-
-    if (!customer && userObj) {
-      try {
-        const now = new Date();
-        const activeBranchRes = await this.Data.query('branches', {
-          where: [{ column: 'is_active', operator: '=', value: true }],
-          limit: 1,
-        });
-        const activeBranchId = activeBranchRes?.data?.[0]?.branch_id || 'BRANCH_KUPPAM_01';
-        customer = {
-          customer_id: customerId,
-          first_name: userObj.first_name || userObj.user_name || 'Customer',
-          last_name: userObj.last_name || '',
-          mobile: (userObj.phone || ('NO_PHONE_' + customerId)).slice(0, 20),
-          phone: (userObj.phone || ('NO_PHONE_' + customerId)).slice(0, 20),
-          email: userObj.email || email || null,
-          branch_id: activeBranchId,
-          wallet_balance: 0,
-          created_at: now,
-          updated_at: now,
-        };
-        await this.Data.insert('customers', customer);
-      } catch (_) {}
     }
 
     if (!customer) {

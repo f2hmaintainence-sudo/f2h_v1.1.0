@@ -30,16 +30,16 @@ export class ReferralRepository implements IReferralRepository {
           ELSE COALESCE(r.referred_reward_amount, r.reward_amount, 50.00)
         END as reward_amount,
         CASE 
-          WHEN r.referrer_customer_id = $1 OR r.referrer_id = $1 THEN COALESCE(c2.first_name, r.referee_name, 'Friend')
-          ELSE COALESCE(c1.first_name, 'Inviter')
+          WHEN r.referrer_customer_id = $1 OR r.referrer_id = $1 THEN COALESCE(u2.first_name, u2.user_name, r.referee_name, 'Friend')
+          ELSE COALESCE(u1.first_name, u1.user_name, 'Inviter')
         END as referee_name,
         CASE 
-          WHEN r.referrer_customer_id = $1 OR r.referrer_id = $1 THEN COALESCE(c2.phone, r.referee_phone, '')
-          ELSE COALESCE(c1.phone, '')
+          WHEN r.referrer_customer_id = $1 OR r.referrer_id = $1 THEN COALESCE(u2.phone, r.referee_phone, '')
+          ELSE COALESCE(u1.phone, '')
         END as referee_phone
       FROM referrals r
-      LEFT JOIN customers c1 ON r.referrer_customer_id = c1.customer_id OR r.referrer_id = c1.customer_id
-      LEFT JOIN customers c2 ON r.referred_customer_id = c2.customer_id
+      LEFT JOIN users u1 ON (u1.user_id = r.referrer_customer_id OR u1.user_id = r.referrer_id)
+      LEFT JOIN users u2 ON u2.user_id = r.referred_customer_id
       WHERE r.referrer_customer_id = $1 OR r.referred_customer_id = $1 OR r.referrer_id = $1
       ORDER BY r.created_at DESC
     `;

@@ -55,19 +55,25 @@ export class SubscriptionsService {
 
 
     const email = (req as any)?.user?.email;
-    let customerResult = await this.data.query('customers', {
-      select: ['customer_id', 'first_name', 'last_name', 'phone', 'email', 'wallet_balance', 'is_postpaid_enabled', 'postpaid_credit_limit', 'branch_id'],
-      where: [{ column: 'customer_id', operator: '=', value: customerId }],
-      limit: 1,
-    });
-    let customer = customerResult?.data?.[0];
-    if (!customer && email) {
-      customerResult = await this.data.query('customers', {
-        where: [{ column: 'email', operator: '=', value: email }],
-        limit: 1,
-      });
-      customer = customerResult?.data?.[0];
-    }
+    const custQuery = `
+      SELECT
+        c.customer_id,
+        c.wallet_balance,
+        c.is_postpaid_enabled,
+        c.postpaid_credit_limit,
+        c.branch_id,
+        u.first_name,
+        u.last_name,
+        u.phone,
+        u.email
+      FROM customers c
+      JOIN users u ON u.user_id = c.customer_id
+      WHERE c.customer_id = $1 OR (u.email IS NOT NULL AND u.email = $2 AND u.email != '')
+      LIMIT 1
+    `;
+    const custRows = await this.db.query(custQuery, [customerId, email || customerId]);
+    let customer = custRows?.[0];
+
     if (!customer) {
       try {
         const userRes = await this.data.query('users', {
@@ -82,23 +88,19 @@ export class SubscriptionsService {
             limit: 1,
           });
           const activeBranchId = activeBranchRes?.data?.[0]?.branch_id || 'BRANCH_KUPPAM_01';
-          customer = {
+          await this.data.insert('customers', {
             customer_id: customerId,
-            first_name: userObj.first_name || userObj.user_name || 'Customer',
-            last_name: userObj.last_name || '',
-            mobile: (userObj.phone || ('NO_PHONE_' + customerId)).slice(0, 20),
-            phone: (userObj.phone || ('NO_PHONE_' + customerId)).slice(0, 20),
-            email: userObj.email || email || null,
             branch_id: activeBranchId,
             wallet_balance: 0,
             is_postpaid_enabled: false,
             postpaid_credit_limit: 0,
             created_at: now,
             updated_at: now,
-          };
-          await this.data.insert('customers', customer);
+          });
+          const reFetch = await this.db.query(custQuery, [customerId, email || customerId]);
+          customer = reFetch?.[0];
         }
-      } catch (_) { }
+      } catch (_) {}
     }
     if (!customer) {
       this.developer.error('SubscriptionsService.checkout customer profile not found', { customerId });
@@ -640,17 +642,15 @@ export class SubscriptionsService {
   async getSubscriptions(userId: string, email: string) {
     this.developer.debug('SubscriptionsService.getSubscriptions called', { userId, email });
 
-    let customerResult = await this.data.query('customers', {
-      where: [{ column: 'email', operator: '=', value: email }],
-      limit: 1,
-    });
-    if (!customerResult?.data?.length) {
-      customerResult = await this.data.query('customers', {
-        where: [{ column: 'customer_id', operator: '=', value: userId }],
-        limit: 1,
-      });
-    }
-    const customer = customerResult?.data?.[0];
+    const custRows = await this.db.query(
+      `SELECT c.customer_id
+       FROM customers c
+       JOIN users u ON u.user_id = c.customer_id
+       WHERE c.customer_id = $1 OR (u.email IS NOT NULL AND u.email = $2 AND u.email != '')
+       LIMIT 1`,
+      [userId, email || userId],
+    );
+    const customer = custRows?.[0];
     if (!customer) {
       this.developer.debug('SubscriptionsService.getSubscriptions customer not found', { userId, email });
       return { status: true, data: [] };
