@@ -143,35 +143,35 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         const SizedBox(height: 12),
                         // Skip Button
-                        // Align(
-                        //   alignment: Alignment.topRight,
-                        //   child: Padding(
-                        //     padding: const EdgeInsets.only(right: 24.0),
-                        //     child: TextButton.icon(
-                        //       onPressed: () {
-                        //         if (widget.popOnSuccess) {
-                        //           Navigator.pop(context, false);
-                        //         } else {
-                        //           Navigator.pushAndRemoveUntil(
-                        //             context,
-                        //             MaterialPageRoute(builder: (_) => const AppShell()),
-                        //             (route) => false,
-                        //           );
-                        //         }
-                        //       },
-                        //       icon: const Icon(Icons.arrow_forward_outlined, color: Colors.white, size: 14),
-                        //       label: const Text(
-                        //         'Skip',
-                        //         style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                        //       ),
-                        //       style: TextButton.styleFrom(
-                        //         backgroundColor: Colors.white.withValues(alpha: 0.15),
-                        //         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        //         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        //       ),
-                        //     ),
-                        //   ),
-                        // ),
+                        Align(
+                          alignment: Alignment.topRight,
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 24.0),
+                            child: TextButton.icon(
+                              onPressed: () {
+                                if (widget.popOnSuccess) {
+                                  Navigator.pop(context, false);
+                                } else {
+                                  Navigator.pushAndRemoveUntil(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const AppShell()),
+                                    (route) => false,
+                                  );
+                                }
+                              },
+                              icon: const Icon(Icons.arrow_forward_outlined, color: Colors.white, size: 14),
+                              label: const Text(
+                                'Skip',
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                              style: TextButton.styleFrom(
+                                backgroundColor: Colors.white.withValues(alpha: 0.15),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              ),
+                            ),
+                          ),
+                        ),
                         if (!isKeyboardOpen) ...[
                           const SizedBox(height: 16),
                           // App Logo splat (Glassmorphic)
