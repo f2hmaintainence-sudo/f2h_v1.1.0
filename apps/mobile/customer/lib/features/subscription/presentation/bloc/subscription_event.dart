@@ -177,6 +177,7 @@ class SubscriptionCheckoutRequested extends SubscriptionEvent {
   final String paymentMethod; // 'wallet' | 'upi' | 'postpaid'
   final bool autoRenew;
   final double estimatedTotal;
+  final double? monthlyEstimate;
 
   const SubscriptionCheckoutRequested({
     required this.customerId,
@@ -195,6 +196,7 @@ class SubscriptionCheckoutRequested extends SubscriptionEvent {
     this.paymentMethod = 'wallet',
     this.autoRenew = true,
     this.estimatedTotal = 0.0,
+    this.monthlyEstimate,
   });
 
   int get quantity => (morningQty + eveningQty).clamp(1, 999);
@@ -203,6 +205,6 @@ class SubscriptionCheckoutRequested extends SubscriptionEvent {
   List<Object?> get props => [
         customerId, branchId, variantId, scheduleType, deliverySlot,
         startDate, unitPrice, customDays, morningQty, eveningQty,
-        weeklySchedule, paymentType, paymentMethod, autoRenew, estimatedTotal,
+        weeklySchedule, paymentType, paymentMethod, autoRenew, estimatedTotal, monthlyEstimate,
       ];
 }

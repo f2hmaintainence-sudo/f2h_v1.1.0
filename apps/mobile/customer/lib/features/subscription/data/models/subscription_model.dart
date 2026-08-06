@@ -544,7 +544,7 @@ class Subscription {
         final unitPrice = (items.isNotEmpty && items.first.unitPrice > 0)
             ? items.first.unitPrice
             : (pricePerDay > 0 ? pricePerDay : 0.0);
-        return (unitPrice * (totalWeeklyQty / 7)) * 30;
+        return (unitPrice * totalWeeklyQty * 52) / 12;
       }
     }
     return totalDailyCost * 30;

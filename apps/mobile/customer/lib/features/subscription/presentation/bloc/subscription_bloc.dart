@@ -122,6 +122,7 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
         paymentMethod: event.paymentMethod,
         autoRenew: event.autoRenew,
         estimatedTotal: event.estimatedTotal,
+        monthlyEstimate: event.monthlyEstimate,
       );
 
 

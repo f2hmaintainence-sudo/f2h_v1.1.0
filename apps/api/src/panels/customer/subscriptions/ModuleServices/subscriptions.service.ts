@@ -38,7 +38,7 @@ export class SubscriptionsService {
         if (decoded?.user_id || decoded?.sub) {
           customerId = decoded.user_id || decoded.sub;
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     if (customerId) {
@@ -100,7 +100,7 @@ export class SubscriptionsService {
           const reFetch = await this.db.query(custQuery, [customerId, email || customerId]);
           customer = reFetch?.[0];
         }
-      } catch (_) {}
+      } catch (_) { }
     }
     if (!customer) {
       this.developer.error('SubscriptionsService.checkout customer profile not found', { customerId });
@@ -932,7 +932,7 @@ export class SubscriptionsService {
               subscription_item_id: item.id,
               start_date: startStr,
               end_date: endStr,
-              status:'paused',
+              status: 'paused',
               reason: 'Paused by customer',
             }, { includeDeleted: true });
           }
@@ -972,12 +972,12 @@ export class SubscriptionsService {
         if (sub.status !== 'active') throw new BadRequestException('Only active subscriptions can be resumed');
 
         const pFrom = sub.pause_from_date ? String(sub.pause_from_date).slice(0, 10) : null;
-        const pTo   = sub.pause_to_date   ? String(sub.pause_to_date).slice(0, 10)   : null;
+        const pTo = sub.pause_to_date ? String(sub.pause_to_date).slice(0, 10) : null;
         if (!pFrom || !pTo) throw new BadRequestException('Subscription is not currently paused');
 
         const today = new Date();
-        const todayStr    = today.toISOString().slice(0, 10);
-        const tomorrow    = new Date(today); tomorrow.setDate(today.getDate() + 1);
+        const todayStr = today.toISOString().slice(0, 10);
+        const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
         const tomorrowStr = tomorrow.toISOString().slice(0, 10);
 
         // Find the latest active pause record
@@ -1012,8 +1012,8 @@ export class SubscriptionsService {
           if (resumeDate < tomorrowStr) throw new BadRequestException('Resume date must be tomorrow or later');
           if (resumeDate > pTo) throw new BadRequestException(`Resume date cannot be after pause end date (${pTo})`);
 
-          const resumeDay    = new Date(resumeDate + 'T00:00:00Z');
-          const dayBefore    = new Date(resumeDay); dayBefore.setUTCDate(resumeDay.getUTCDate() - 1);
+          const resumeDay = new Date(resumeDate + 'T00:00:00Z');
+          const dayBefore = new Date(resumeDay); dayBefore.setUTCDate(resumeDay.getUTCDate() - 1);
           const dayBeforeStr = dayBefore.toISOString().slice(0, 10);
           const originalPauseTo = String(activePause.end_date).slice(0, 10);
 

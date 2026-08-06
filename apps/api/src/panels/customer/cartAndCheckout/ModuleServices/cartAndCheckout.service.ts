@@ -439,7 +439,6 @@ export class CartService {
             unit_price: entry.price,
             quantity: entry.qty,
             total_price: entry.qty * entry.price,
-            final_price: entry.qty * entry.price,
             is_free: false,
             created_at: new Date(),
           },
@@ -484,8 +483,11 @@ export class CartService {
       await this.insertWalletTransactions(customerId, walletBalance, walletTransactionsToInsert);
     }
 
-    // E. Insert customer_bills and customer_bill_items ONLY for prepaid orders (never for COD or postpaid)
-    if (paymentType === 'prepaid' && !isCod && paymentMethod !== 'cod') {
+    const isPostpaidOrder = paymentType === 'postpaid' || paymentMethod === 'postpaid' || (body.payment_type || '').toLowerCase() === 'postpaid';
+    const isCodOrder = isCod || paymentMethod === 'cod' || (body.payment_method || '').toLowerCase() === 'cod';
+
+    // E. Insert customer_bills and customer_bill_items ONLY for prepaid orders (NEVER for COD or postpaid)
+    if (!isPostpaidOrder && !isCodOrder && paymentType === 'prepaid') {
       await this.insertPrepaidBillingRecords(customerId, onetimeGroups, walletTransactionsToInsert, referenceId, paymentMethod);
     }
 
@@ -575,6 +577,10 @@ export class CartService {
     paymentMethod: string = 'wallet',
     transaction?: any,
   ): Promise<void> {
+    const pm = (paymentMethod || '').toLowerCase();
+    if (pm === 'cod' || pm === 'postpaid') {
+      return;
+    }
     for (const [, group] of onetimeGroups) {
       const billId = generateId('BILL', 15);
       const today = new Date().toISOString().split('T')[0];

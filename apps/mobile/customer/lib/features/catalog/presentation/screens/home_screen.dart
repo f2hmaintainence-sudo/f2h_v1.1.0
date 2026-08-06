@@ -573,7 +573,7 @@ class _HomeScreenState extends State<HomeScreen>
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              // ── Outer ring (VIP: gold gradient, normal: none) ──────────
+              // ── Outer ring (VIP: gold gradient, normal: white) ──────────
               Container(
                 width: 38,
                 height: 38,
@@ -585,27 +585,23 @@ class _HomeScreenState extends State<HomeScreen>
                           end: Alignment.bottomRight,
                         )
                       : null,
-                  color: isVip
-                      ? null
-                      : (isAuthenticated
-                            ? const Color(0xFF16653A)
-                            : Colors.white),
+                  color: isVip ? null : Colors.white,
                   shape: BoxShape.circle,
-                  // boxShadow: [
-                  //   BoxShadow(
-                  //     color: isVip
-                  //         ? const Color(0xFFFFD700).withValues(alpha: 0.45)
-                  //         : Colors.black.withValues(alpha: 0.08),
-                  //     blurRadius: 8,
-                  //     offset: const Offset(0, 3),
-                  //   ),
-                  // ],
+                  boxShadow: [
+                    BoxShadow(
+                      color: isVip
+                          ? const Color(0xFFFFD700).withValues(alpha: 0.45)
+                          : Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
-                // ── Inner circle (VIP: white, normal: transparent) ──────
+                // ── Inner circle ─────────────────────────────────────────
                 padding: isVip ? const EdgeInsets.all(2.5) : EdgeInsets.zero,
                 child: Container(
-                  decoration: BoxDecoration(
-                    color: isVip ? Colors.white : Colors.transparent,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
                     shape: BoxShape.circle,
                   ),
                   child: Center(
@@ -617,13 +613,13 @@ class _HomeScreenState extends State<HomeScreen>
                               fontWeight: FontWeight.w900,
                               color: isVip
                                   ? const Color(0xFF133220)
-                                  : Colors.white,
+                                  : const Color(0xFF16653A),
                               height: 1.0,
                             ),
                           )
-                        : Icon(
+                        : const Icon(
                             Icons.person_outline_rounded,
-                            color: const Color(0xFF16653A),
+                            color: Color(0xFF16653A),
                             size: 20,
                           ),
                   ),

@@ -47,6 +47,7 @@ abstract class SubscriptionRepository {
     required String paymentMethod, // 'wallet' | 'upi' | 'postpaid'
     required bool autoRenew,
     required double estimatedTotal,
+    double? monthlyEstimate,
   });
 
 

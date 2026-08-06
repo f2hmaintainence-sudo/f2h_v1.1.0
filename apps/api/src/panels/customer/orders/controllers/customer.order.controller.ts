@@ -12,7 +12,7 @@ export class CustomerOrderController {
     private readonly data: DataService,
     private readonly db: DatabaseService,
     private readonly redisService: RedisService,
-  ) {}
+  ) { }
 
   // ─────────────────────────────────────────────────────────────────────────────
   // GET /customer/orders
@@ -266,7 +266,7 @@ export class CustomerOrderController {
 
       const bills: any[] = [];
 
-      // 1. Fetch from customer_bills table if table exists
+      // 1. Fetch from customer_bills table if table exists (prepaid only, exclude COD and postpaid)
       try {
         const billRows = await this.db.query(
           `SELECT bill_id, bill_type, reference_id, payment_type, payment_method,
@@ -275,6 +275,8 @@ export class CustomerOrderController {
                   paid_amount, due_amount, status, remarks, created_at
            FROM customer_bills
            WHERE customer_id = ANY($1::text[])
+             AND LOWER(COALESCE(payment_method, '')) NOT IN ('cod', 'postpaid')
+             AND LOWER(COALESCE(payment_type, '')) != 'postpaid'
            ORDER BY created_at DESC`,
           [allCustomerIds],
         );
@@ -287,14 +289,16 @@ export class CustomerOrderController {
 
       const existingRefIds = new Set(bills.map(b => b.reference_id).filter(Boolean));
 
-      // 2. Fetch orders to synthesize bills if any orders are missing from customer_bills
+      // 2. Fetch orders to synthesize bills if any prepaid orders are missing from customer_bills (exclude COD and postpaid)
       try {
         const orderRows = await this.db.query(
           `SELECT order_id, order_source, payment_status, COALESCE(payment_mode, 'wallet') AS payment_method,
                   subtotal, discount_amount, total_amount,
                   status, created_at, scheduled_date
            FROM orders
-           WHERE customer_id = ANY($1::text[]) AND deleted_at IS NULL
+           WHERE customer_id = ANY($1::text[])
+             AND deleted_at IS NULL
+             AND LOWER(COALESCE(payment_mode, '')) NOT IN ('cod', 'postpaid')
            ORDER BY created_at DESC`,
           [allCustomerIds],
         );
@@ -330,12 +334,13 @@ export class CustomerOrderController {
         console.error('getBills: Error synthesizing bills from orders table', err);
       }
 
-      // 3. Fetch subscriptions to synthesize bills if any subscriptions are missing from customer_bills
+      // 3. Fetch subscriptions to synthesize bills if any prepaid subscriptions are missing from customer_bills
       try {
         const subRows = await this.db.query(
           `SELECT subscription_id, subscription_number, payment_type, status, created_at, start_date, end_date
            FROM subscriptions
            WHERE customer_id = ANY($1::text[])
+             AND LOWER(COALESCE(payment_type, '')) != 'postpaid'
            ORDER BY created_at DESC`,
           [allCustomerIds],
         );
@@ -400,11 +405,11 @@ export class CustomerOrderController {
   // one-time order fetch
   //
   @Get(':id')
-  async getOrder(@Req() req: Request, @Param('id') orderId: string){
+  async getOrder(@Req() req: Request, @Param('id') orderId: string) {
     const user = req.user as any;
     const email = user?.email;
     const userId = user?.user_id;
-    
+
     const orderResult = await this.data.query('orders', {
       where: [
         { column: 'order_id', operator: '=', value: orderId },
@@ -412,7 +417,7 @@ export class CustomerOrderController {
       limit: 1,
     });
     const order = orderResult?.data?.[0];
-    
+
     if (!order) {
       throw new BadRequestException('Order not found');
     }
@@ -450,7 +455,7 @@ export class CustomerOrderController {
          ORDER BY oi.id, oi.order_id, oi.variant_id`,
         [orderId],
       );
-      
+
       const baseUrl = process.env.BACKEND_URL || 'http://localhost:8000';
       const mapImagePath = (imagePath: string | null) => {
         if (!imagePath) return null;
@@ -512,10 +517,10 @@ export class CustomerOrderController {
         items: enrichedItems,
         feedback: firstItemWithRating
           ? {
-              reference_id: firstItemWithRating.product_id,
-              rating: firstItemWithRating.rating,
-              feedback: firstItemWithRating.rating_feedback,
-            }
+            reference_id: firstItemWithRating.product_id,
+            rating: firstItemWithRating.rating,
+            feedback: firstItemWithRating.rating_feedback,
+          }
           : null,
       };
     } finally {
@@ -536,15 +541,10 @@ export class CustomerOrderController {
 
     // 1. Resolve customer
     let customerResult = await this.data.query('customers', {
-      where: [{ column: 'email', operator: '=', value: email }],
+      where: [{ column: 'customer_id', operator: '=', value: userId }],
       limit: 1,
     });
-    if (!customerResult?.data?.length) {
-      customerResult = await this.data.query('customers', {
-        where: [{ column: 'customer_id', operator: '=', value: userId }],
-        limit: 1,
-      });
-    }
+
     const customer = customerResult?.data?.[0];
     if (!customer) {
       throw new BadRequestException('Customer profile not found');
@@ -559,7 +559,7 @@ export class CustomerOrderController {
       limit: 1,
     });
     const order = orderResult?.data?.[0];
-    
+
     if (!order) {
       throw new BadRequestException('Order not found');
     }
@@ -579,13 +579,13 @@ export class CustomerOrderController {
     const parseFreezeTime = (cronStr: string) => {
       const parts = cronStr.trim().split(/\s+/);
       const minute = parts.length > 1 ? parseInt(parts[1], 10) : 55;
-      const hour   = parts.length > 2 ? parseInt(parts[2], 10) : 23;
+      const hour = parts.length > 2 ? parseInt(parts[2], 10) : 23;
       return { hour, minute };
     };
 
     const mFreeze = parseFreezeTime(mFreezeStr);
     const eFreeze = parseFreezeTime(eFreezeStr);
-    const nowIst  = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const nowIst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
 
     const dateStr = typeof order.scheduled_date === 'string'
       ? order.scheduled_date.split('T')[0]
@@ -606,9 +606,9 @@ export class CustomerOrderController {
     }
 
     // 5. Cancel + wallet refund in a transaction
-    const refundAmount  = Number(order.total_amount || 0);
+    const refundAmount = Number(order.total_amount || 0);
     const walletBalance = Number(customer.wallet_balance || 0);
-    const newBalance    = walletBalance + refundAmount;
+    const newBalance = walletBalance + refundAmount;
 
     if (nowIst.getTime() >= freezeLimit.getTime()) {
       throw new BadRequestException({
@@ -632,7 +632,7 @@ export class CustomerOrderController {
       const refundNumber = 'RFND-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000);
       let walletTransactionId: string | null = null;
 
-      if (order.payment_mode === 'wallet' && refundAmount > 0) {
+      if (order.payment_mode === 'wallet' || order.payment_mode === 'upi' && refundAmount > 0) {
         await this.data.update(
           'customers',
           { wallet_balance: newBalance },
@@ -672,20 +672,6 @@ export class CustomerOrderController {
           created_at: new Date(),
           updated_at: new Date(),
         }, { transaction: conn });
-      } else {
-        // Insert pending offline/manual refund record
-        const refundType = order.payment_mode === 'cod' ? 'cash' : 'upi';
-        await this.data.insert('refunds', {
-          refund_number: refundNumber,
-          customer_id: customer.customer_id,
-          order_id: order.order_id,
-          refund_amount: refundAmount,
-          refund_type: refundType,
-          status: 'pending',
-          reason: `Order Cancelled - Manual refund required for order ${order.order_id}`,
-          created_at: new Date(),
-          updated_at: new Date(),
-        }, { transaction: conn });
       }
 
       // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
@@ -693,7 +679,7 @@ export class CustomerOrderController {
       const notificationId = 'NTF-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000);
       const notifTitle = 'Order Cancelled';
       let notifMessage = `Your order #${order.order_id.substring(0, Math.min(order.order_id.length, 12))} has been successfully cancelled.`;
-      if (order.payment_mode === 'wallet' && refundAmount > 0) {
+      if (order.payment_mode === 'wallet' || order.payment_mode === 'upi' && refundAmount > 0) {
         notifMessage += ` A refund of ₹${refundAmount.toFixed(0)} has been credited to your wallet.`;
       } else if (refundAmount > 0) {
         notifMessage += ` A refund of ₹${refundAmount.toFixed(0)} is being processed via ${order.payment_mode === 'cod' ? 'Cash' : 'UPI'}.`;

@@ -994,7 +994,6 @@ CREATE TABLE public.customers (
     alternate_mobile character varying(20),
     notes text,
     branch_id character varying(30),
-    referral_code character varying(30),
     referral_status character varying(30) DEFAULT 'unlocked'::character varying,
     referred_by character varying(30),
     created_by character varying(30),
@@ -2141,13 +2140,7 @@ CREATE TABLE public.referrals (
     remarks text,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
-    referrer_id character varying(255),
-    reward_amount character varying(255),
-    referee_name character varying(255),
-    referee_phone character varying(255),
     deleted_at timestamp without time zone,
-    referrer_user_id character varying(30),
-    referred_user_id character varying(30),
     CONSTRAINT referrals_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'registered'::character varying, 'first_order'::character varying, 'rewarded'::character varying, 'cancelled'::character varying])::text[])))
 );
 

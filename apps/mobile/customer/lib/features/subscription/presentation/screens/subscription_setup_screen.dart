@@ -44,7 +44,8 @@ class SubscriptionSetupScreen extends StatefulWidget {
   });
 
   @override
-  State<SubscriptionSetupScreen> createState() => _SubscriptionSetupScreenState();
+  State<SubscriptionSetupScreen> createState() =>
+      _SubscriptionSetupScreenState();
 }
 
 class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
@@ -85,23 +86,28 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
   void initState() {
     super.initState();
     final vars = widget.product.allVariants;
-    _variant = widget.initialVariant ??
+    _variant =
+        widget.initialVariant ??
         vars.firstWhere(
           (v) => v.subscriptionPrice != null && v.subscriptionPrice! > 0,
-          orElse: () => vars.isNotEmpty ? vars.first : ProductVariant(
-            id: widget.product.id,
-            label: widget.product.unit,
-            price: widget.product.price,
-            originalPrice: widget.product.originalPrice,
-            subscriptionPrice: widget.product.subscriptionPrice,
-          ),
+          orElse: () => vars.isNotEmpty
+              ? vars.first
+              : ProductVariant(
+                  id: widget.product.id,
+                  label: widget.product.unit,
+                  price: widget.product.price,
+                  originalPrice: widget.product.originalPrice,
+                  subscriptionPrice: widget.product.subscriptionPrice,
+                ),
         );
 
     _startDate = DateTime.now().add(const Duration(days: 1));
 
     // Init weekly schedule defaults: 0 morning, 0 evening per day
     // User must explicitly set quantities for each day they want delivery
-    _weeklySchedule = {for (final d in _kDays) d: {'morning': 0, 'evening': 0}};
+    _weeklySchedule = {
+      for (final d in _kDays) d: {'morning': 0, 'evening': 0},
+    };
 
     // Load default address from session
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -130,8 +136,8 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
   /// if subscription_price is null (though this should not happen in production).
   double get _subscriptionUnitPrice =>
       (_variant.subscriptionPrice != null && _variant.subscriptionPrice! > 0)
-          ? _variant.subscriptionPrice!
-          : _variant.price;
+      ? _variant.subscriptionPrice!
+      : _variant.price;
 
   double get _normalUnitPrice => _variant.price;
 
@@ -156,9 +162,18 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     double normalTotal,
     double savings,
     double savingsPercent,
-  }) get _currentMonthEstimate {
+  })
+  get _currentMonthEstimate {
     final endOfMonth = DateTime(_startDate.year, _startDate.month + 1, 0);
-    const dayMap = {'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6, 'Sun': 7};
+    const dayMap = {
+      'Mon': 1,
+      'Tue': 2,
+      'Wed': 3,
+      'Thu': 4,
+      'Fri': 5,
+      'Sat': 6,
+      'Sun': 7,
+    };
 
     int totalDays = 0;
     int totalQty = 0;
@@ -167,7 +182,9 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       // All 7 days, same qty each
       for (final day in _kDays) {
         final wd = dayMap[day] ?? 1;
-        final cnt = calculateEstimatedDeliveryDays(_startDate, endOfMonth, [wd]);
+        final cnt = calculateEstimatedDeliveryDays(_startDate, endOfMonth, [
+          wd,
+        ]);
         totalDays += cnt;
         totalQty += cnt * (_morningQty + _eveningQty);
       }
@@ -175,8 +192,12 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       // Weekly: per-day qty
       for (final day in _kDays) {
         final wd = dayMap[day] ?? 1;
-        final cnt = calculateEstimatedDeliveryDays(_startDate, endOfMonth, [wd]);
-        final dayQty = (_weeklySchedule[day]?['morning'] ?? 0) + (_weeklySchedule[day]?['evening'] ?? 0);
+        final cnt = calculateEstimatedDeliveryDays(_startDate, endOfMonth, [
+          wd,
+        ]);
+        final dayQty =
+            (_weeklySchedule[day]?['morning'] ?? 0) +
+            (_weeklySchedule[day]?['evening'] ?? 0);
         if (cnt > 0 && dayQty > 0) {
           totalDays += cnt;
           totalQty += cnt * dayQty;
@@ -208,10 +229,19 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     double normalTotal,
     double savings,
     double savingsPercent,
-  }) get _fullMonthEstimate {
+  })
+  get _fullMonthEstimate {
     final start = DateTime(_startDate.year, _startDate.month, 1);
     final endOfMonth = DateTime(_startDate.year, _startDate.month + 1, 0);
-    const dayMap = {'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6, 'Sun': 7};
+    const dayMap = {
+      'Mon': 1,
+      'Tue': 2,
+      'Wed': 3,
+      'Thu': 4,
+      'Fri': 5,
+      'Sat': 6,
+      'Sun': 7,
+    };
 
     int totalDays = 0;
     int totalQty = 0;
@@ -227,7 +257,9 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       for (final day in _kDays) {
         final wd = dayMap[day] ?? 1;
         final cnt = calculateEstimatedDeliveryDays(start, endOfMonth, [wd]);
-        final dayQty = (_weeklySchedule[day]?['morning'] ?? 0) + (_weeklySchedule[day]?['evening'] ?? 0);
+        final dayQty =
+            (_weeklySchedule[day]?['morning'] ?? 0) +
+            (_weeklySchedule[day]?['evening'] ?? 0);
         if (cnt > 0 && dayQty > 0) {
           totalDays += cnt;
           totalQty += cnt * dayQty;
@@ -273,7 +305,9 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       setState(() => _selectedAddress = picked);
       // Sync with session so the address widget always reflects the new default
       if (picked.addressId != null) {
-        await context.read<CustomerSessionCubit>().updateDefaultAddress(picked.addressId!);
+        await context.read<CustomerSessionCubit>().updateDefaultAddress(
+          picked.addressId!,
+        );
       }
     }
   }
@@ -316,9 +350,13 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       monthlyEstimateForCreditCheck: _fullMonthEstimate.total,
       profile: context.read<CustomerSessionCubit>().state.profile,
       existingPostpaidCommitted: _calculateExistingPostpaidCommitted(),
-      onConfirm: ({required String paymentType, required String paymentMethod}) {
-        _executeCheckout(paymentType: paymentType, paymentMethod: paymentMethod);
-      },
+      onConfirm:
+          ({required String paymentType, required String paymentMethod}) {
+            _executeCheckout(
+              paymentType: paymentType,
+              paymentMethod: paymentMethod,
+            );
+          },
       onSwitchToPrepaid: () {
         setState(() => _paymentType = 'prepaid');
         _confirmSubscription();
@@ -326,15 +364,22 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     );
   }
 
-  void _executeCheckout({required String paymentType, required String paymentMethod}) {
+  void _executeCheckout({
+    required String paymentType,
+    required String paymentMethod,
+  }) {
     final session = context.read<CustomerSessionCubit>().state;
     final customerId = session.profile?.customerId ?? '';
     final addressId = _selectedAddress?.addressId ?? '';
-    final branchId = (_selectedAddress?.branchId != null && _selectedAddress!.branchId.isNotEmpty)
+    final branchId =
+        (_selectedAddress?.branchId != null &&
+            _selectedAddress!.branchId.isNotEmpty)
         ? _selectedAddress!.branchId
         : (session.branches.isNotEmpty
-            ? (session.branches.first['branch_id']?.toString() ?? session.branches.first['id']?.toString() ?? '')
-            : '');
+              ? (session.branches.first['branch_id']?.toString() ??
+                    session.branches.first['id']?.toString() ??
+                    '')
+              : '');
 
     final int morningQty;
     final int eveningQty;
@@ -342,15 +387,21 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       morningQty = _morningQty;
       eveningQty = _eveningQty;
     } else {
-      morningQty = _weeklySchedule.values.fold(0, (s, d) => s + (d['morning'] ?? 0));
-      eveningQty = _weeklySchedule.values.fold(0, (s, d) => s + (d['evening'] ?? 0));
+      morningQty = _weeklySchedule.values.fold(
+        0,
+        (s, d) => s + (d['morning'] ?? 0),
+      );
+      eveningQty = _weeklySchedule.values.fold(
+        0,
+        (s, d) => s + (d['evening'] ?? 0),
+      );
     }
 
     final deliverySlot = morningQty > 0 && eveningQty > 0
         ? 'Both'
         : morningQty > 0
-            ? 'Morning'
-            : 'Evening';
+        ? 'Morning'
+        : 'Evening';
 
     // For weekly mode: only pass days that actually have qty > 0
     final activeDays = _frequency == 'weekly'
@@ -362,42 +413,53 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
         : _kDays;
 
     context.read<SubscriptionBloc>().add(
-          SubscriptionCheckoutRequested(
-            customerId: customerId,
-            branchId: branchId,
-            addressId: addressId,
-            variantId: _variant.id,
-            scheduleType: _frequency,
-            deliverySlot: deliverySlot,
-            startDate: _startDate.toString().split(' ')[0],
-            unitPrice: _subscriptionUnitPrice,
-            customDays: activeDays,
-            morningQty: morningQty,
-            eveningQty: eveningQty,
-            weeklySchedule: _frequency == 'weekly' ? Map.from(_weeklySchedule) : {},
-            paymentType: paymentType,
-            paymentMethod: paymentMethod,
-            autoRenew: _autoRenew,
-            // For postpaid: send full-month estimate so backend credit limit
-            // check uses monthly commitment, not the partial-month charge.
-            // For prepaid: send partial-month amount for correct wallet deduction.
-            estimatedTotal: paymentType == 'postpaid'
-                ? _fullMonthEstimate.total
-                : _currentMonthEstimate.total,
-          ),
-        );
+      SubscriptionCheckoutRequested(
+        customerId: customerId,
+        branchId: branchId,
+        addressId: addressId,
+        variantId: _variant.id,
+        scheduleType: _frequency,
+        deliverySlot: deliverySlot,
+        startDate: _startDate.toString().split(' ')[0],
+        unitPrice: _subscriptionUnitPrice,
+        customDays: activeDays,
+        morningQty: morningQty,
+        eveningQty: eveningQty,
+        weeklySchedule: _frequency == 'weekly' ? Map.from(_weeklySchedule) : {},
+        paymentType: paymentType,
+        paymentMethod: paymentMethod,
+        autoRenew: _autoRenew,
+        // For postpaid: send full-month estimate so backend credit limit
+        // check uses monthly commitment, not the partial-month charge.
+        // For prepaid: send partial-month amount for correct wallet deduction.
+        estimatedTotal: paymentType == 'postpaid'
+            ? _fullMonthEstimate.total
+            : _currentMonthEstimate.total,
+        monthlyEstimate: _fullMonthEstimate.total,
+      ),
+    );
   }
 
-  void _showInsufficientWalletDialog(BuildContext context, {required double requiredAmt, required double availableAmt}) {
+  void _showInsufficientWalletDialog(
+    BuildContext context, {
+    required double requiredAmt,
+    required double availableAmt,
+  }) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: const [
-            Icon(Icons.account_balance_wallet_outlined, color: Color(0xFFDC2626)),
+            Icon(
+              Icons.account_balance_wallet_outlined,
+              color: Color(0xFFDC2626),
+            ),
             SizedBox(width: 8),
-            Text('Insufficient Wallet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              'Insufficient Wallet',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         content: Column(
@@ -417,7 +479,10 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
               ),
               child: Text(
                 'Shortfall: ₹${(requiredAmt - availableAmt).toStringAsFixed(2)}',
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFDC2626),
+                ),
               ),
             ),
           ],
@@ -430,13 +495,24 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () {
               Navigator.pop(ctx);
-              Navigator.push(ctx, MaterialPageRoute(builder: (_) => const WalletScreen()));
+              Navigator.push(
+                ctx,
+                MaterialPageRoute(builder: (_) => const WalletScreen()),
+              );
             },
-            child: const Text('Add Money', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Add Money',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -457,7 +533,8 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       listener: (context, state) {
         if (state is SubscriptionLoading) {
           setState(() => _isLoading = true);
-        } else if (state is SubscriptionActionSuccess && state.subscriptionId != null) {
+        } else if (state is SubscriptionActionSuccess &&
+            state.subscriptionId != null) {
           setState(() => _isLoading = false);
           // Navigate to success screen
           Navigator.pushReplacement(
@@ -484,14 +561,19 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
           Navigator.pop(context);
         } else if (state is SubscriptionCheckoutError) {
           setState(() => _isLoading = false);
-          if (state.errorCode == 'insufficient_wallet' || state.errorCode == 'insufficient wallet') {
+          if (state.errorCode == 'insufficient_wallet' ||
+              state.errorCode == 'insufficient wallet') {
             _showInsufficientWalletDialog(
               context,
               requiredAmt: state.required_ ?? estimate.total,
               availableAmt: state.walletBalance ?? 0.0,
             );
-          } else if (state.errorCode == 'credit_limit_exceeded' || state.errorCode == 'credit limit exceeded') {
-            F2HToast.error(context, '${state.message}. Switched to Prepaid option.');
+          } else if (state.errorCode == 'credit_limit_exceeded' ||
+              state.errorCode == 'credit limit exceeded') {
+            F2HToast.error(
+              context,
+              '${state.message}. Switched to Prepaid option.',
+            );
             setState(() => _paymentType = 'prepaid');
           } else {
             F2HToast.error(context, state.message);
@@ -519,7 +601,11 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
           ),
           centerTitle: true,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: kText),
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 18,
+              color: kText,
+            ),
             onPressed: () => Navigator.pop(context),
           ),
         ),
@@ -587,7 +673,9 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
   // ── Product Card ─────────────────────────────────────
 
   Widget _buildProductCard(Product p) {
-    final vars = p.allVariants.where((v) => v.subscriptionPrice != null && v.subscriptionPrice! > 0).toList();
+    final vars = p.allVariants
+        .where((v) => v.subscriptionPrice != null && v.subscriptionPrice! > 0)
+        .toList();
     if (vars.isEmpty) vars.addAll(p.allVariants);
 
     return _SectionCard(
@@ -628,18 +716,29 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFE8F5E9),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: const Row(
                             children: [
-                              Icon(Icons.autorenew_rounded, size: 9, color: Color(0xFF1B4332)),
+                              Icon(
+                                Icons.autorenew_rounded,
+                                size: 9,
+                                color: Color(0xFF1B4332),
+                              ),
                               SizedBox(width: 3),
                               Text(
                                 'Subscription',
-                                style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w800, color: Color(0xFF1B4332)),
+                                style: TextStyle(
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF1B4332),
+                                ),
                               ),
                             ],
                           ),
@@ -656,7 +755,12 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
             const SizedBox(height: 12),
             const Text(
               'SELECT VARIANT',
-              style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: kTextSub, letterSpacing: 0.8),
+              style: TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w900,
+                color: kTextSub,
+                letterSpacing: 0.8,
+              ),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -669,12 +773,17 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                   onTap: () => setState(() => _variant = v),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
                     decoration: BoxDecoration(
                       color: isSel ? const Color(0xFF1B4332) : Colors.white,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: isSel ? const Color(0xFF1B4332) : const Color(0xFFE0E0E0),
+                        color: isSel
+                            ? const Color(0xFF1B4332)
+                            : const Color(0xFFE0E0E0),
                         width: isSel ? 1.5 : 1.0,
                       ),
                     ),
@@ -693,7 +802,9 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
-                            color: isSel ? Colors.white70 : const Color(0xFF1B4332),
+                            color: isSel
+                                ? Colors.white70
+                                : const Color(0xFF1B4332),
                           ),
                         ),
                       ],
@@ -715,7 +826,10 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionTitle(icon: Icons.location_on_outlined, label: 'Delivery Address'),
+          const _SectionTitle(
+            icon: Icons.location_on_outlined,
+            label: 'Delivery Address',
+          ),
           const SizedBox(height: 10),
           if (_selectedAddress != null)
             Row(
@@ -736,7 +850,11 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                       const SizedBox(height: 2),
                       Text(
                         '${_selectedAddress!.name}, ${_selectedAddress!.detail}',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kText),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: kText,
+                        ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -747,7 +865,10 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                 GestureDetector(
                   onTap: _changeAddress,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: kPrimaryPl,
                       borderRadius: BorderRadius.circular(8),
@@ -755,7 +876,11 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                     ),
                     child: const Text(
                       'Change',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: kPrimary),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: kPrimary,
+                      ),
                     ),
                   ),
                 ),
@@ -775,11 +900,19 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.add_location_alt_outlined, size: 16, color: kPrimary),
+                    Icon(
+                      Icons.add_location_alt_outlined,
+                      size: 16,
+                      color: kPrimary,
+                    ),
                     SizedBox(width: 6),
                     Text(
                       'Add Delivery Address',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kPrimary),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: kPrimary,
+                      ),
                     ),
                   ],
                 ),
@@ -803,13 +936,23 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
           // ── Daily / Weekly tabs ────────────────────────
           Row(
             children: [
-              _FreqChip(label: 'Daily', value: 'daily', selected: _frequency, onTap: (v) {
-                setState(() => _frequency = v);
-              }),
+              _FreqChip(
+                label: 'Daily',
+                value: 'daily',
+                selected: _frequency,
+                onTap: (v) {
+                  setState(() => _frequency = v);
+                },
+              ),
               const SizedBox(width: 8),
-              _FreqChip(label: 'Weekly', value: 'weekly', selected: _frequency, onTap: (v) {
-                setState(() => _frequency = v);
-              }),
+              _FreqChip(
+                label: 'Weekly',
+                value: 'weekly',
+                selected: _frequency,
+                onTap: (v) {
+                  setState(() => _frequency = v);
+                },
+              ),
             ],
           ),
 
@@ -825,13 +968,29 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                 const SizedBox(width: 80),
                 Expanded(
                   child: Center(
-                    child: Text('MORNING', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: Colors.amber.shade700, letterSpacing: 0.6)),
+                    child: Text(
+                      'MORNING',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.amber.shade700,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Center(
-                    child: Text('EVENING', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: Colors.indigo.shade400, letterSpacing: 0.6)),
+                    child: Text(
+                      'EVENING',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.indigo.shade400,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -842,7 +1001,14 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
               children: [
                 const SizedBox(
                   width: 80,
-                  child: Text('Every Day', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kText)),
+                  child: Text(
+                    'Every Day',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: kText,
+                    ),
+                  ),
                 ),
                 Expanded(
                   child: _MiniQtyControl(
@@ -872,12 +1038,20 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
             if (_morningQty + _eveningQty == 0)
               Text(
                 'Set at least 1 unit (morning or evening)',
-                style: TextStyle(fontSize: 10, color: Colors.red.shade400, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.red.shade400,
+                  fontWeight: FontWeight.w600,
+                ),
               )
             else
               Text(
                 'Daily: ${_morningQty + _eveningQty} items/day · ₹${((_morningQty + _eveningQty) * _subscriptionUnitPrice).toStringAsFixed(0)}/day',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kText),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: kText,
+                ),
               ),
           ],
 
@@ -889,13 +1063,29 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                 const SizedBox(width: 80),
                 Expanded(
                   child: Center(
-                    child: Text('MORNING', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: Colors.amber.shade700, letterSpacing: 0.6)),
+                    child: Text(
+                      'MORNING',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.amber.shade700,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Center(
-                    child: Text('EVENING', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: Colors.indigo.shade400, letterSpacing: 0.6)),
+                    child: Text(
+                      'EVENING',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.indigo.shade400,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -912,7 +1102,11 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                       width: 80,
                       child: Text(
                         _dayFull(day),
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kText),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: kText,
+                        ),
                       ),
                     ),
                     Expanded(
@@ -920,7 +1114,8 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                         qty: morQty,
                         accentColor: Colors.amber.shade700,
                         onDecrement: () => setState(() {
-                          if (morQty > 0) _weeklySchedule[day]!['morning'] = morQty - 1;
+                          if (morQty > 0)
+                            _weeklySchedule[day]!['morning'] = morQty - 1;
                         }),
                         onIncrement: () => setState(() {
                           _weeklySchedule[day]!['morning'] = morQty + 1;
@@ -933,7 +1128,8 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                         qty: eveQty,
                         accentColor: Colors.indigo.shade400,
                         onDecrement: () => setState(() {
-                          if (eveQty > 0) _weeklySchedule[day]!['evening'] = eveQty - 1;
+                          if (eveQty > 0)
+                            _weeklySchedule[day]!['evening'] = eveQty - 1;
                         }),
                         onIncrement: () => setState(() {
                           _weeklySchedule[day]!['evening'] = eveQty + 1;
@@ -947,20 +1143,33 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
             const SizedBox(height: 4),
             const Divider(color: Color(0xFFE5E7EB)),
             // Weekly total summary or validation
-            Builder(builder: (_) {
-              final weekTotal = _weeklySchedule.values.fold(0, (s, d) => s + (d['morning'] ?? 0) + (d['evening'] ?? 0));
-              return weekTotal == 0
-                  ? Text(
-                      'Set at least 1 unit for any day in the week',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 10, color: Colors.red.shade400, fontWeight: FontWeight.w600),
-                    )
-                  : Text(
-                      'Weekly: $weekTotal items · ₹${(_weeklySchedule.values.fold(0.0, (s, d) => s + ((d['morning'] ?? 0) + (d['evening'] ?? 0)) * _subscriptionUnitPrice)).toStringAsFixed(0)}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kText),
-                    );
-            }),
+            Builder(
+              builder: (_) {
+                final weekTotal = _weeklySchedule.values.fold(
+                  0,
+                  (s, d) => s + (d['morning'] ?? 0) + (d['evening'] ?? 0),
+                );
+                return weekTotal == 0
+                    ? Text(
+                        'Set at least 1 unit for any day in the week',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.red.shade400,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      )
+                    : Text(
+                        'Weekly: $weekTotal items · ₹${(_weeklySchedule.values.fold(0.0, (s, d) => s + ((d['morning'] ?? 0) + (d['evening'] ?? 0)) * _subscriptionUnitPrice)).toStringAsFixed(0)}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: kText,
+                        ),
+                      );
+              },
+            ),
           ],
         ],
       ),
@@ -969,14 +1178,35 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
 
   // helper: day abbreviation to full name
   String _dayFull(String abbr) {
-    const map = {'Mon': 'Monday', 'Tue': 'Tuesday', 'Wed': 'Wednesday', 'Thu': 'Thursday', 'Fri': 'Friday', 'Sat': 'Saturday', 'Sun': 'Sunday'};
+    const map = {
+      'Mon': 'Monday',
+      'Tue': 'Tuesday',
+      'Wed': 'Wednesday',
+      'Thu': 'Thursday',
+      'Fri': 'Friday',
+      'Sat': 'Saturday',
+      'Sun': 'Sunday',
+    };
     return map[abbr] ?? abbr;
   }
 
   // ── Schedule Options (Start Date + Auto Renewal) ──────
 
   Widget _buildScheduleOptions() {
-    final monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final monthNames = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
 
     return _SectionCard(
       child: Column(
@@ -985,17 +1215,28 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
           // Start From
           Row(
             children: [
-              const Icon(Icons.play_circle_outline_rounded, size: 16, color: kPrimary),
+              const Icon(
+                Icons.play_circle_outline_rounded,
+                size: 16,
+                color: kPrimary,
+              ),
               const SizedBox(width: 6),
               const Text(
                 'Start From',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: kText),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: kText,
+                ),
               ),
               const Spacer(),
               GestureDetector(
                 onTap: _pickStartDate,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: kPrimaryPl,
                     borderRadius: BorderRadius.circular(8),
@@ -1003,7 +1244,11 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.calendar_today_rounded, size: 13, color: kPrimary),
+                      const Icon(
+                        Icons.calendar_today_rounded,
+                        size: 13,
+                        color: kPrimary,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         '${_startDate.day} ${monthNames[_startDate.month - 1]} ${_startDate.year}',
@@ -1034,7 +1279,11 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                   children: [
                     Text(
                       'Auto Renewal',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: kText),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: kText,
+                      ),
                     ),
                     Text(
                       'Subscription renews automatically each month',
@@ -1073,7 +1322,10 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionTitle(icon: Icons.payments_outlined, label: 'Payment Type'),
+          const _SectionTitle(
+            icon: Icons.payments_outlined,
+            label: 'Payment Type',
+          ),
           const SizedBox(height: 4),
           // No COD for subscriptions
           const Text(
@@ -1087,7 +1339,8 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                 child: _PaymentTypeCard(
                   label: 'Prepaid',
                   icon: Icons.payment_rounded,
-                  description: 'Pay upfront from wallet. Ensures uninterrupted delivery.',
+                  description:
+                      'Pay upfront from wallet. Ensures uninterrupted delivery.',
                   selected: _paymentType == 'prepaid',
                   isEnabled: true,
                   onTap: () => setState(() => _paymentType = 'prepaid'),
@@ -1100,8 +1353,8 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                   icon: Icons.schedule_outlined,
                   description: isPostpaidEnabled
                       ? (creditLimit > 0
-                          ? 'Pay at end of billing cycle. Limit: ₹${creditLimit.toStringAsFixed(0)}.'
-                          : 'Pay at end of billing cycle (approved accounts only).')
+                            ? 'Pay at end of billing cycle. Limit: ₹${creditLimit.toStringAsFixed(0)}.'
+                            : 'Pay at end of billing cycle (approved accounts only).')
                       : 'Postpaid facility is not activated for your account.',
                   selected: isPostpaidEnabled && _paymentType == 'postpaid',
                   isEnabled: isPostpaidEnabled,
@@ -1121,7 +1374,17 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
 
   // ── Bottom Confirm Bar ────────────────────────────────
 
-  Widget _buildBottomBar(({int days, int qty, double total, double normalTotal, double savings, double savingsPercent}) estimate) {
+  Widget _buildBottomBar(
+    ({
+      int days,
+      int qty,
+      double total,
+      double normalTotal,
+      double savings,
+      double savingsPercent,
+    })
+    estimate,
+  ) {
     final total = estimate.total;
     return Container(
       decoration: const BoxDecoration(
@@ -1165,18 +1428,28 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
               disabledBackgroundColor: const Color(0xFFE5E7EB),
               disabledForegroundColor: const Color(0xFF9CA3AF),
               padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
               elevation: 0,
             ),
             child: _isLoading
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
                   )
                 : Text(
-                    total <= 0 ? 'Set Quantity to Continue' : 'Confirm Subscription',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+                    total <= 0
+                        ? 'Set Quantity to Continue'
+                        : 'Confirm Subscription',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
           ),
         ],
@@ -1187,8 +1460,24 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
   // ── Collapsible Estimation Section ───────────────────
 
   Widget _buildEstimationSection(
-    ({int days, int qty, double total, double normalTotal, double savings, double savingsPercent}) estimate,
-    ({int days, int qty, double total, double normalTotal, double savings, double savingsPercent}) fullEst,
+    ({
+      int days,
+      int qty,
+      double total,
+      double normalTotal,
+      double savings,
+      double savingsPercent,
+    })
+    estimate,
+    ({
+      int days,
+      int qty,
+      double total,
+      double normalTotal,
+      double savings,
+      double savingsPercent,
+    })
+    fullEst,
   ) {
     return _SectionCard(
       child: Column(
@@ -1206,20 +1495,32 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                 const SizedBox(width: 6),
                 const Text(
                   'Delivery Estimations',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: kText),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    color: kText,
+                  ),
                 ),
                 const Spacer(),
                 // Summary when collapsed
                 if (!_estimateExpanded)
                   Text(
                     '~₹${estimate.total.toStringAsFixed(0)} this month',
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kPrimary),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: kPrimary,
+                    ),
                   ),
                 const SizedBox(width: 6),
                 AnimatedRotation(
                   turns: _estimateExpanded ? 0.5 : 0,
                   duration: const Duration(milliseconds: 200),
-                  child: const Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: kTextSub),
+                  child: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 20,
+                    color: kTextSub,
+                  ),
                 ),
               ],
             ),
@@ -1242,13 +1543,18 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                         const SizedBox(height: 8),
                         MonthlyEstimationCard(
                           title: 'This Month Estimate',
-                          subtitle: 'From ${_formatDate(_startDate)} to end of month',
+                          subtitle:
+                              'From ${_formatDate(_startDate)} to end of month',
                           headerIcon: Icons.calendar_view_month_rounded,
                           headerColor: const Color(0xFF1B5E20),
                           estimatedDays: estimate.days,
                           estimatedQty: estimate.qty,
-                          morningQty: _frequency == 'daily' ? _morningQty : _totalMorningQty,
-                          eveningQty: _frequency == 'daily' ? _eveningQty : _totalEveningQty,
+                          morningQty: _frequency == 'daily'
+                              ? _morningQty
+                              : _totalMorningQty,
+                          eveningQty: _frequency == 'daily'
+                              ? _eveningQty
+                              : _totalEveningQty,
                           isWeekly: _frequency == 'weekly',
                           normalPrice: _normalUnitPrice,
                           subscriptionPrice: _subscriptionUnitPrice,
@@ -1266,8 +1572,12 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                           headerColor: const Color(0xFF1565C0),
                           estimatedDays: fullEst.days,
                           estimatedQty: fullEst.qty,
-                          morningQty: _frequency == 'daily' ? _morningQty : _totalMorningQty,
-                          eveningQty: _frequency == 'daily' ? _eveningQty : _totalEveningQty,
+                          morningQty: _frequency == 'daily'
+                              ? _morningQty
+                              : _totalMorningQty,
+                          eveningQty: _frequency == 'daily'
+                              ? _eveningQty
+                              : _totalEveningQty,
                           isWeekly: _frequency == 'weekly',
                           normalPrice: _normalUnitPrice,
                           subscriptionPrice: _subscriptionUnitPrice,
@@ -1288,7 +1598,20 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
   // ── Helpers ───────────────────────────────────────────
 
   String _formatDate(DateTime d) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return '${d.day} ${months[d.month - 1]}';
   }
 }
@@ -1363,7 +1686,12 @@ class _FreqChip extends StatelessWidget {
   final String value;
   final String selected;
   final void Function(String) onTap;
-  const _FreqChip({required this.label, required this.value, required this.selected, required this.onTap});
+  const _FreqChip({
+    required this.label,
+    required this.value,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1435,10 +1763,7 @@ class _PaymentTypeCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: borderColor,
-            width: selected ? 1.5 : 1.0,
-          ),
+          border: Border.all(color: borderColor, width: selected ? 1.5 : 1.0),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1448,7 +1773,9 @@ class _PaymentTypeCard extends StatelessWidget {
                 Icon(
                   icon,
                   size: 14,
-                  color: !isEnabled ? const Color(0xFF94A3B8) : (selected ? const Color(0xFF1B4332) : kTextSub),
+                  color: !isEnabled
+                      ? const Color(0xFF94A3B8)
+                      : (selected ? const Color(0xFF1B4332) : kTextSub),
                 ),
                 const SizedBox(width: 5),
                 Expanded(
@@ -1465,7 +1792,10 @@ class _PaymentTypeCard extends StatelessWidget {
                 ),
                 if (!isEnabled) ...[
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFE2E8F0),
                       borderRadius: BorderRadius.circular(4),
@@ -1481,11 +1811,17 @@ class _PaymentTypeCard extends StatelessWidget {
                   ),
                 ] else if (isVip) ...[
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFEF3C7),
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFFF59E0B), width: 0.6),
+                      border: Border.all(
+                        color: const Color(0xFFF59E0B),
+                        width: 0.6,
+                      ),
                     ),
                     child: const Text(
                       '👑 VIP',
@@ -1499,7 +1835,11 @@ class _PaymentTypeCard extends StatelessWidget {
                   if (selected) const SizedBox(width: 4),
                 ],
                 if (selected && isEnabled)
-                  const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF1B4332)),
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    size: 14,
+                    color: Color(0xFF1B4332),
+                  ),
               ],
             ),
             const SizedBox(height: 4),

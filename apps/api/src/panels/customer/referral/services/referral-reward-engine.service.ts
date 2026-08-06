@@ -31,9 +31,12 @@ export class ReferralRewardEngineService {
     try {
       await client.query('BEGIN');
 
-      // 1. Fetch Referee Customer Profile
+      // 1. Fetch Referee Customer Profile via JOIN users
       const refereeRes = await client.query(
-        `SELECT * FROM customers WHERE customer_id = $1 OR email = $1 OR phone = $1 OR mobile = $1 LIMIT 1`,
+        `SELECT c.*, u.first_name, u.last_name, u.user_name, u.phone, u.email, u.referral_code
+         FROM customers c
+         JOIN users u ON u.user_id = c.customer_id
+         WHERE c.customer_id = $1 OR u.email = $1 OR u.phone = $1 LIMIT 1`,
         [refereeCustomerId],
       );
       const referee = refereeRes.rows?.[0];
@@ -74,7 +77,7 @@ export class ReferralRewardEngineService {
         const referId = `REF${ts}${rnd}`;
 
         const referrerRows = await client.query(
-          `SELECT referral_code FROM customers WHERE customer_id = $1 LIMIT 1`,
+          `SELECT referral_code FROM users WHERE user_id = $1 LIMIT 1`,
           [referrerId],
         );
         const refCode = referrerRows.rows?.[0]?.referral_code || 'F2HREF';
@@ -91,16 +94,14 @@ export class ReferralRewardEngineService {
         await client.query(
           `INSERT INTO referrals (
             refer_id, referrer_customer_id, referred_customer_id, referral_code,
-            referrer_reward_amount, referred_reward_amount, referrer_id, reward_amount,
-            referee_name, referee_phone,
+            referrer_reward_amount, referred_reward_amount,
             status, remarks, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $7, $8, $2, $9, $5, $6,
+          ) VALUES ($1, $2, $3, $4, $5, $6,
                     'pending', 'Referral auto-synced on order delivery', NOW(), NOW())`,
           [
-            referId, referrerId, realRefereeId, refCode, refName, refPhone,
+            referId, referrerId, realRefereeId, refCode,
             isNewDpReferrer ? 75.00 : 50.00,
             isNewDpReferrer ? 0.00 : 50.00,
-            isNewDpReferrer ? '75.00' : '50.00',
           ],
         );
 
@@ -117,7 +118,7 @@ export class ReferralRewardEngineService {
         return { status: false, message: 'No eligible referral record found or reward already processed.' };
       }
 
-      const targetReferrerId = referralRecord.referrer_customer_id || referralRecord.referrer_id || referrerId;
+      const targetReferrerId = referralRecord.referrer_customer_id || referrerId;
       if (!targetReferrerId) {
         await client.query('COMMIT');
         this.logger.warn(`REFERRAL_NOT_ELIGIBLE - Referrer ID missing for referral ${referralRecord.refer_id || referralRecord.id}`);
@@ -276,20 +277,12 @@ export class ReferralRewardEngineService {
          SET status = 'rewarded',
              referrer_reward_amount = $1,
              referred_reward_amount = $2,
-             referrer_id = COALESCE(NULLIF(referrer_id, ''), $5),
-             reward_amount = $8,
-             referee_name = COALESCE(NULLIF(referee_name, ''), $6),
-             referee_phone = COALESCE(NULLIF(referee_phone, ''), $7),
              rewarded_at = NOW(),
              updated_at = NOW()
          WHERE id = $3 OR refer_id = $4`,
         [
           referrerRewardAmount, referredRewardAmount,
           referralRecord.id, referralRecord.refer_id,
-          targetReferrerId,
-          referee.first_name || referee.name || referee.email || 'Customer',
-          referee.phone || '',
-          String(referrerRewardAmount),
         ],
       );
 

@@ -70,7 +70,7 @@ export class ProfileService {
              COALESCE(SUM(CASE WHEN referrer_reward_amount > 0 THEN referrer_reward_amount ELSE 75.00 END), 0)::numeric AS referral_earnings,
              COUNT(*)::int AS referral_count
            FROM referrals
-           WHERE (referrer_id = $1 OR referrer_customer_id = $1 OR referrer_user_id = $1)
+           WHERE referrer_customer_id = $1
              AND LOWER(status) IN ('rewarded', 'completed', 'active', 'success', 'credited')`,
           [deliveryPartnerId],
         );

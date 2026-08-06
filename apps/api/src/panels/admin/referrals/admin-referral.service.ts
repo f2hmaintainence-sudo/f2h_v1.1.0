@@ -46,7 +46,7 @@ export class AdminReferralService {
     >();
 
     for (const ref of allReferrals) {
-      const id = ref.referrer_id;
+      const id = ref.referrer_customer_id;
       if (!id) continue;
       const current = referrerMap.get(id) || {
         referrer_id: id,
@@ -55,7 +55,7 @@ export class AdminReferralService {
       };
       current.total_count += 1;
       if (ref.status === 'rewarded' || ref.status === 'completed') {
-        current.total_earnings += Number(ref.reward_amount || 50.0);
+        current.total_earnings += Number(ref.referrer_reward_amount || 50.0);
       }
       referrerMap.set(id, current);
     }
@@ -87,9 +87,8 @@ export class AdminReferralService {
       list = list.filter(
         (r: any) =>
           r.referral_code?.toLowerCase().includes(search) ||
-          r.referee_name?.toLowerCase().includes(search) ||
-          r.referee_phone?.includes(search) ||
-          r.referrer_id?.includes(search),
+          r.referrer_customer_id?.includes(search) ||
+          r.referred_customer_id?.includes(search),
       );
     }
 

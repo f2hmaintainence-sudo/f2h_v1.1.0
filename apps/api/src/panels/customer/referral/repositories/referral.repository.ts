@@ -18,7 +18,6 @@ export class ReferralRepository implements IReferralRepository {
         r.refer_id,
         r.referrer_customer_id,
         r.referred_customer_id,
-        r.referrer_id,
         r.referral_code,
         r.status,
         r.remarks,
@@ -26,21 +25,21 @@ export class ReferralRepository implements IReferralRepository {
         r.updated_at,
         r.rewarded_at,
         CASE 
-          WHEN r.referrer_customer_id = $1 OR r.referrer_id = $1 THEN COALESCE(r.referrer_reward_amount, r.reward_amount, 50.00)
-          ELSE COALESCE(r.referred_reward_amount, r.reward_amount, 50.00)
+          WHEN r.referrer_customer_id = $1 THEN COALESCE(r.referrer_reward_amount, 50.00)
+          ELSE COALESCE(r.referred_reward_amount, 50.00)
         END as reward_amount,
         CASE 
-          WHEN r.referrer_customer_id = $1 OR r.referrer_id = $1 THEN COALESCE(u2.first_name, u2.user_name, r.referee_name, 'Friend')
+          WHEN r.referrer_customer_id = $1 THEN COALESCE(u2.first_name, u2.user_name, 'Friend')
           ELSE COALESCE(u1.first_name, u1.user_name, 'Inviter')
         END as referee_name,
         CASE 
-          WHEN r.referrer_customer_id = $1 OR r.referrer_id = $1 THEN COALESCE(u2.phone, r.referee_phone, '')
+          WHEN r.referrer_customer_id = $1 THEN COALESCE(u2.phone, '')
           ELSE COALESCE(u1.phone, '')
         END as referee_phone
       FROM referrals r
-      LEFT JOIN users u1 ON (u1.user_id = r.referrer_customer_id OR u1.user_id = r.referrer_id)
+      LEFT JOIN users u1 ON u1.user_id = r.referrer_customer_id
       LEFT JOIN users u2 ON u2.user_id = r.referred_customer_id
-      WHERE r.referrer_customer_id = $1 OR r.referred_customer_id = $1 OR r.referrer_id = $1
+      WHERE r.referrer_customer_id = $1 OR r.referred_customer_id = $1
       ORDER BY r.created_at DESC
     `;
 
@@ -65,42 +64,38 @@ export class ReferralRepository implements IReferralRepository {
 
     const variations = Array.from(new Set([raw, noHyphen, withHyphen]));
 
-    // 1. Search customers table by referral_code variations
+    // 1. Search users table by referral_code variations
     for (const varCode of variations) {
-      const custRes = await this.dataService.query('customers', {
-        where: [{ column: 'referral_code', operator: '=', value: varCode }],
-        limit: 1,
-      });
-      if (custRes?.data?.length > 0) {
-        return custRes.data[0];
+      const userRes = await this.db.query(
+        `SELECT c.*, u.user_id, u.first_name, u.last_name, u.user_name, u.email, u.phone, u.referral_code
+         FROM users u
+         LEFT JOIN customers c ON c.customer_id = u.user_id
+         WHERE u.referral_code = $1 LIMIT 1`,
+        [varCode],
+      );
+      if (userRes?.[0]) {
+        return userRes[0];
       }
     }
-
-
 
     // 3. Fallback for old phone-suffix referral codes e.g. F2H-0305, F2H0305, REF0305, 0305
     const digitsOnly = raw.replace(/\D/g, '');
     if (digitsOnly.length >= 3) {
       const lastDigits = digitsOnly.length >= 4 ? digitsOnly.slice(-4) : digitsOnly;
-      const phoneMatch = await this.dataService.query('customers', {
-        where: [{ column: 'phone', operator: 'LIKE', value: `%${lastDigits}` }],
-        limit: 1,
-      });
-      let matchedCust = phoneMatch?.data?.[0];
-
-      if (!matchedCust) {
-        const mobileMatch = await this.dataService.query('customers', {
-          where: [{ column: 'mobile', operator: 'LIKE', value: `%${lastDigits}` }],
-          limit: 1,
-        });
-        matchedCust = mobileMatch?.data?.[0];
-      }
+      const phoneMatch = await this.db.query(
+        `SELECT c.*, u.user_id, u.first_name, u.last_name, u.user_name, u.email, u.phone, u.referral_code
+         FROM users u
+         LEFT JOIN customers c ON c.customer_id = u.user_id
+         WHERE u.phone LIKE $1 LIMIT 1`,
+        [`%${lastDigits}`],
+      );
+      let matchedCust = phoneMatch?.[0];
 
       if (matchedCust) {
         await this.dataService.update(
-          'customers',
+          'users',
           { referral_code: raw, updated_at: new Date() },
-          [{ column: 'customer_id', operator: '=', value: matchedCust.customer_id }]
+          [{ column: 'user_id', operator: '=', value: matchedCust.customer_id || matchedCust.user_id }]
         );
         matchedCust.referral_code = raw;
         return matchedCust;
@@ -201,8 +196,10 @@ export class ReferralRepository implements IReferralRepository {
   async getCustomerByCustomerId(customerId: string): Promise<any | null> {
     try {
       const query = `
-        SELECT * FROM customers 
-        WHERE customer_id = $1 OR email = $1 OR phone = $1
+        SELECT c.*, u.first_name, u.last_name, u.user_name, u.phone, u.email, u.referral_code
+        FROM customers c
+        JOIN users u ON u.user_id = c.customer_id
+        WHERE c.customer_id = $1 OR u.email = $1 OR u.phone = $1
         LIMIT 1
       `;
       const rows = await this.db.query(query, [customerId]);
@@ -262,8 +259,13 @@ export class ReferralRepository implements IReferralRepository {
     const code = `F2H${prefix}${phoneSuffix}`;
 
     await this.dataService.update(
+      'users',
+      { referral_code: code, updated_at: new Date() },
+      [{ column: 'user_id', operator: '=', value: cust.customer_id }]
+    );
+    await this.dataService.update(
       'customers',
-      { referral_code: code, referral_status: computedStatus, first_order_completed: isUnlocked, updated_at: new Date() },
+      { referral_status: computedStatus, first_order_completed: isUnlocked, updated_at: new Date() },
       [{ column: 'customer_id', operator: '=', value: cust.customer_id }]
     );
 

@@ -166,7 +166,6 @@ export class CustomerBootstrapController {
         c.alternate_mobile,
         c.notes,
         c.branch_id,
-        c.referral_code,
         c.referral_status,
         c.referred_by,
         c.created_by,
@@ -177,7 +176,8 @@ export class CustomerBootstrapController {
         u.user_name,
         u.email,
         u.phone,
-        u.phone AS mobile
+        u.phone AS mobile,
+        u.referral_code
       FROM customers c
       JOIN users u ON u.user_id = c.customer_id
       WHERE c.customer_id = $1 OR (u.email IS NOT NULL AND u.email = $2 AND u.email != '')
@@ -246,13 +246,22 @@ export class CustomerBootstrapController {
           const cleanPhone = (customer.mobile || customer.phone || '').replace(/\D/g, '');
           const phoneSuffix = cleanPhone.length >= 3 ? cleanPhone.slice(-3) : Math.floor(100 + Math.random() * 900).toString();
           customer.referral_code = `F2H${prefix}${phoneSuffix}`;
+
+          const userUpdatePayload = await this.filterValidFields('users', {
+            referral_code: customer.referral_code,
+            updated_at: new Date(),
+          });
+          await this.Data.update(
+            'users',
+            userUpdatePayload,
+            [{ column: 'user_id', operator: '=', value: customer.customer_id || userId }],
+          );
         }
 
         customer.referral_status = computedStatus;
         customer.first_order_completed = isUnlocked;
 
         const updatePayload = await this.filterValidFields('customers', {
-          referral_code: customer.referral_code,
           referral_status: computedStatus,
           first_order_completed: isUnlocked,
           updated_at: new Date(),
@@ -276,7 +285,7 @@ export class CustomerBootstrapController {
         });
         if (!existingRef?.data?.length) {
           const referrerCustRows = await this.db.query(
-            `SELECT c.referral_code FROM customers c WHERE c.customer_id = $1 LIMIT 1`,
+            `SELECT u.referral_code FROM users u WHERE u.user_id = $1 LIMIT 1`,
             [customer.referred_by],
           );
           const refCode = referrerCustRows?.[0]?.referral_code || 'F2HREF';
@@ -291,10 +300,6 @@ export class CustomerBootstrapController {
             referral_code: refCode,
             referrer_reward_amount: 50.00,
             referred_reward_amount: 50.00,
-            referrer_id: customer.referred_by,
-            reward_amount: '50.00',
-            referee_name: refereeName,
-            referee_phone: refereePhone,
             status: customer.first_order_completed ? 'completed' : 'pending',
             remarks: 'Referral registered - pending first delivered order',
             created_at: new Date(),

@@ -260,6 +260,7 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
     required String paymentMethod,
     required bool autoRenew,
     required double estimatedTotal,
+    double? monthlyEstimate,
   }) async {
     try {
       final List<Map<String, dynamic>> schedules;
@@ -317,7 +318,7 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
         'payment_method': paymentMethod,
         'auto_renew': autoRenew,
         'estimated_total': estimatedTotal,
-        'monthly_estimate': estimatedTotal,
+        'monthly_estimate': monthlyEstimate ?? estimatedTotal,
 
         'custom_dates': scheduleType == 'custom' ? customDays : <String>[],
         'items': [
