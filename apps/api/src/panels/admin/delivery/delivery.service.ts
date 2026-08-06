@@ -479,9 +479,20 @@ export class DeliveryManagementService {
 
       const rows = await this.db.query(sql, params);
 
+      let mapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+      try {
+        const keyRes = await this.db.query(
+          `SELECT config_data FROM api_integrations_config WHERE category = 'maps' AND is_active = true LIMIT 1`
+        );
+        if (keyRes?.[0]?.config_data?.apiKey) {
+          mapsApiKey = keyRes[0].config_data.apiKey;
+        }
+      } catch (_) {}
+
       return {
         status: true,
         data: rows,
+        mapsApiKey,
         date,
         message: 'Delivery tracking fetched',
       };

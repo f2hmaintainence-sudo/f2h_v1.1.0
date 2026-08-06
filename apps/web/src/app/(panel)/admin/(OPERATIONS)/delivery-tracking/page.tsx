@@ -7,6 +7,8 @@ import {
   AdvancedMarker,
   InfoWindow,
   Polyline,
+  useMap,
+  useMapsLibrary,
 } from "@vis.gl/react-google-maps";
 import { api } from "@/services/api.client";
 import MapErrorBoundary from "@/components/shared/MapErrorBoundary";
@@ -109,6 +111,98 @@ const DEMO_STOPS = [
   { lat: 12.7580, lng: 78.3520, area: "Krishnagiri Highway Stop" },
 ];
 
+function getPartnerDisplayName(p?: { full_name?: string; phone?: string; user_name?: string } | null): string {
+  if (!p) return "Delivery Partner";
+  if (p.full_name && p.full_name.trim()) return p.full_name.trim();
+  if (p.user_name && p.user_name.trim()) return p.user_name.trim();
+  if (p.phone && p.phone.trim()) return p.phone.trim();
+  return "Delivery Partner";
+}
+
+// ─── Google Maps Directions Road Route Component ───
+interface DirectionsRouteProps {
+  origin: { lat: number; lng: number };
+  partnerPos: { lat: number; lng: number } | null;
+  stops: { lat: number; lng: number }[];
+}
+
+function DirectionsRoute({ origin, partnerPos, stops }: DirectionsRouteProps) {
+  const map = useMap();
+  const routesLib = useMapsLibrary("routes");
+  const rendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof google === "undefined" || !google.maps || !routesLib || !map) return;
+
+    if (!rendererRef.current) {
+      rendererRef.current = new routesLib.DirectionsRenderer({
+        map,
+        suppressMarkers: true,
+        preserveViewport: true,
+        polylineOptions: {
+          strokeColor: "#2563eb", // Uber/Zomato Signature Electric Blue
+          strokeWeight: 5,
+          strokeOpacity: 0.9,
+          clickable: false,
+        },
+      });
+    }
+
+    return () => {
+      if (rendererRef.current) {
+        rendererRef.current.setMap(null);
+        rendererRef.current = null;
+      }
+    };
+  }, [routesLib, map]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof google === "undefined" || !google.maps || !routesLib || !map || !rendererRef.current) return;
+
+    const points: google.maps.LatLngLiteral[] = [];
+    if (!isNaN(origin.lat) && !isNaN(origin.lng)) {
+      points.push(origin);
+    }
+    if (partnerPos && !isNaN(partnerPos.lat) && !isNaN(partnerPos.lng)) {
+      if (Math.abs(partnerPos.lat - origin.lat) > 0.0002 || Math.abs(partnerPos.lng - origin.lng) > 0.0002) {
+        points.push(partnerPos);
+      }
+    }
+    stops.forEach(s => {
+      if (!isNaN(s.lat) && !isNaN(s.lng)) points.push(s);
+    });
+
+    if (points.length < 2) {
+      rendererRef.current.setDirections({ routes: [] } as any);
+      return;
+    }
+
+    const directionsService = new routesLib.DirectionsService();
+    const start = points[0];
+    const end = points[points.length - 1];
+    const waypoints = points.slice(1, -1).map(p => ({ location: p, stopover: true }));
+
+    directionsService.route(
+      {
+        origin: start,
+        destination: end,
+        waypoints,
+        travelMode: google.maps.TravelMode.DRIVING,
+        optimizeWaypoints: false,
+      },
+      (result, status) => {
+        if (status === google.maps.DirectionsStatus.OK && result) {
+          rendererRef.current?.setDirections(result);
+        } else {
+          console.warn("[DirectionsRoute] DirectionsService status:", status);
+        }
+      }
+    );
+  }, [routesLib, map, origin, partnerPos, stops]);
+
+  return null;
+}
+
 export default function DeliveryTrackingPage() {
   const [partners, setPartners] = useState<DeliveryPartner[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -131,6 +225,7 @@ export default function DeliveryTrackingPage() {
 
   // Simulation tick for partner GPS movement animation
   const [simTick, setSimTick] = useState(0);
+  const [mapStyle, setMapStyle] = useState<"google_roadmap" | "google_satellite" | "carto_light">("google_roadmap");
 
   const fetchTrackingData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -155,6 +250,10 @@ export default function DeliveryTrackingPage() {
       const branchesList: Branch[] = Array.isArray(branchesRes.data?.data)
         ? branchesRes.data.data
         : Array.isArray(branchesRes.data) ? branchesRes.data : [];
+
+      if (ordersRes.data?.mapsApiKey) {
+        setMapsApiKey(ordersRes.data.mapsApiKey);
+      }
 
       setPartners(partnersList);
       setOrders(ordersList);
@@ -611,6 +710,7 @@ export default function DeliveryTrackingPage() {
               const delCnt = pOrds.filter(o => o.status === "delivered").length;
               const onDuty = isPartnerOnDuty(p);
 
+              const partnerName = getPartnerDisplayName(p);
               return (
                 <button
                   key={p.delivery_partner_id}
@@ -624,11 +724,11 @@ export default function DeliveryTrackingPage() {
                   <span className={`w-7 h-7 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 ${
                     isSelected ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-800"
                   }`}>
-                    {p.full_name?.[0]?.toUpperCase() || "P"}
+                    {partnerName[0]?.toUpperCase() || "P"}
                   </span>
 
                   <div className="text-left min-w-0">
-                    <p className="truncate max-w-[120px] leading-tight text-[11px] font-extrabold">{p.full_name}</p>
+                    <p className="truncate max-w-[120px] leading-tight text-[11px] font-extrabold">{partnerName}</p>
                     <div className="flex items-center gap-1 mt-0.5">
                       <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded ${
                         isSelected ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-800 border border-emerald-200"
@@ -703,7 +803,7 @@ export default function DeliveryTrackingPage() {
               {selectedPartner && (
                 <div className="flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
                   <Navigation size={11} className="text-emerald-600" />
-                  <span>Tracking: <strong>{selectedPartner.full_name}</strong></span>
+                  <span>Tracking: <strong>{getPartnerDisplayName(selectedPartner)}</strong></span>
                 </div>
               )}
 
@@ -740,9 +840,9 @@ export default function DeliveryTrackingPage() {
           </div>
 
           {/* Google Maps Container */}
-          <div className="w-full flex-1 z-10 min-h-[400px]">
+          <div className="w-full flex-1 z-10 min-h-[400px] outline-none focus:outline-none focus-within:outline-none ring-0 [&_*]:outline-none [&_*]:focus:outline-none">
             <MapErrorBoundary fallbackMessage="Google Maps service unavailable (ApiProjectMapError). Tracking details remain active.">
-              <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || mapsApiKey || ""}>
+              <APIProvider apiKey={mapsApiKey || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""}>
               <GMap
                 defaultCenter={{ lat: activeBranch.lat, lng: activeBranch.lng }}
                 defaultZoom={14}
@@ -823,30 +923,16 @@ export default function DeliveryTrackingPage() {
                   );
                 })}
 
-                {/* Route Polyline */}
-                {(() => {
-                  const waypoints: google.maps.LatLngLiteral[] = [];
-                  if (!isNaN(activeBranch.lat) && !isNaN(activeBranch.lng)) {
-                    waypoints.push({ lat: activeBranch.lat, lng: activeBranch.lng });
-                  }
-                  if (selectedPartner && livePartnerPos) {
-                    waypoints.push({ lat: Number(livePartnerPos.lat), lng: Number(livePartnerPos.lng) });
-                  }
-                  partnerOrders.forEach(o => {
-                    if (o.lat != null && o.lng != null && !isNaN(Number(o.lat)) && !isNaN(Number(o.lng))) {
-                      waypoints.push({ lat: Number(o.lat), lng: Number(o.lng) });
-                    }
-                  });
-                  if (waypoints.length < 2) return null;
-                  return (
-                    <Polyline
-                      path={waypoints}
-                      strokeColor="#3b82f6"
-                      strokeWeight={4}
-                      strokeOpacity={0.9}
-                    />
-                  );
-                })()}
+                {/* Dynamic Google Maps Road Route */}
+                {selectedPartner && (
+                  <DirectionsRoute
+                    origin={{ lat: activeBranch.lat, lng: activeBranch.lng }}
+                    partnerPos={livePartnerPos ? { lat: Number(livePartnerPos.lat), lng: Number(livePartnerPos.lng) } : null}
+                    stops={partnerOrders
+                      .filter(o => o.lat != null && o.lng != null && !isNaN(Number(o.lat)) && !isNaN(Number(o.lng)))
+                      .map(o => ({ lat: Number(o.lat), lng: Number(o.lng) }))}
+                  />
+                )}
               </GMap>
             </APIProvider>
           </MapErrorBoundary>
@@ -954,11 +1040,11 @@ export default function DeliveryTrackingPage() {
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center border-2 border-emerald-400 shadow-xs">
-                    {selectedPartner.full_name?.[0]?.toUpperCase() || "P"}
+                    {getPartnerDisplayName(selectedPartner)[0]?.toUpperCase() || "P"}
                   </div>
                   <div>
                     <h3 className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                      {selectedPartner.full_name}
+                      {getPartnerDisplayName(selectedPartner)}
                       <span className={`w-2 h-2 rounded-full ${isPartnerOnDuty(selectedPartner) ? "bg-emerald-500" : "bg-slate-300"}`} />
                     </h3>
                     <p className="text-[10px] text-emerald-800 font-medium">📞 {selectedPartner.phone || "No contact"}</p>

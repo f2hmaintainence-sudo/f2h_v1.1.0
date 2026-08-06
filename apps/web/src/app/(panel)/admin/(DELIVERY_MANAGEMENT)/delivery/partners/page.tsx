@@ -14,7 +14,7 @@ import { getApiBaseUrl } from "@/lib/api-config";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { api } from "@/services/api.client";
 import {
-  Truck, Users, ChevronRight, Home, RefreshCw, CheckCircle2, XCircle, MapPin,
+  Truck, Users, ChevronRight, ChevronLeft, Home, RefreshCw, CheckCircle2, XCircle, MapPin,
   Phone, ShieldCheck, ShieldAlert, Eye, Loader2, Edit2, X, Search, LayoutGrid, Table as TableIcon,
   Activity, Award, UserCheck, UserX, FileText
 } from "lucide-react";
@@ -213,6 +213,9 @@ export default function DeliveryPartnersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [verificationFilter, setVerificationFilter] = useState<"all" | "verified" | "pending">("all");
 
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+
   const [branches, setBranches] = useState<any[]>([]);
   const [selectedPartnerForEdit, setSelectedPartnerForEdit] = useState<any | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
@@ -230,9 +233,13 @@ export default function DeliveryPartnersPage() {
     setLoading(true);
     try {
       const apiStatus = (filter !== "all" && filter !== "on_leave") ? filter : "";
-      const params = apiStatus ? `?status=${apiStatus}` : "";
+      const qParams = new URLSearchParams();
+      if (apiStatus) qParams.set('status', apiStatus);
+      qParams.set('page', String(page));
+      qParams.set('limit', String(pageSize));
+
       const [partnersRes, leavesRes] = await Promise.all([
-        api.get<any>(`/admin/delivery/partners${params}`),
+        api.get<any>(`/admin/delivery/partners?${qParams.toString()}`),
         api.get<any>("/admin/delivery/leave-requests")
       ]);
       if (partnersRes.data?.data) { 
@@ -245,7 +252,11 @@ export default function DeliveryPartnersPage() {
         setLeaveRequests(leavesRes.data);
       }
     } catch { } finally { setLoading(false); }
-  }, [filter]);
+  }, [filter, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filter, verificationFilter, searchQuery]);
 
   const getPartnerLeaveInfo = useCallback((partner: any) => {
     if (!partner) return null;
@@ -726,6 +737,50 @@ export default function DeliveryPartnersPage() {
           ))}
         </div>
       )}
+
+      {/* Pagination Footer */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-gray-200/90 shadow-2xs text-xs font-medium text-slate-600">
+        <div>
+          Showing <span className="font-bold text-slate-900">{filteredPartners.length}</span> partners on this page &nbsp;·&nbsp; Total <span className="font-bold text-slate-900">{total}</span> registered &nbsp;·&nbsp; Page <span className="font-bold text-slate-900">{page}</span> of <span className="font-bold text-slate-900">{Math.max(1, Math.ceil(total / pageSize))}</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="inline-flex items-center gap-1 h-8 px-3 rounded-xl border border-gray-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold shadow-2xs"
+          >
+            <ChevronLeft size={14} /> Prev
+          </button>
+
+          <div className="hidden sm:flex items-center gap-1">
+            {Array.from({ length: Math.max(1, Math.ceil(total / pageSize)) }, (_, i) => i + 1).map((pg) => (
+              <button
+                key={pg}
+                type="button"
+                onClick={() => setPage(pg)}
+                className={`h-8 w-8 rounded-xl text-xs font-bold transition-colors ${
+                  pg === page
+                    ? "bg-emerald-700 text-white border border-emerald-700 shadow-2xs"
+                    : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                {pg}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(Math.max(1, Math.ceil(total / pageSize)), p + 1))}
+            disabled={page >= Math.max(1, Math.ceil(total / pageSize))}
+            className="inline-flex items-center gap-1 h-8 px-3 rounded-xl border border-gray-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold shadow-2xs"
+          >
+            Next <ChevronRight size={14} />
+          </button>
+        </div>
+      </div>
 
       {/* KYC Verification Modal */}
       {selectedPartnerForDocs && (
