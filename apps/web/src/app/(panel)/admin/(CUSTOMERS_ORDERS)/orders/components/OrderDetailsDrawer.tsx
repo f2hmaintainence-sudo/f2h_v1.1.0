@@ -24,7 +24,7 @@ import {
   Truck,
   Repeat,
   ShoppingCart,
-  Sparkles,
+  Calendar,
 } from 'lucide-react';
 
 export interface OrderItem {
@@ -179,40 +179,25 @@ export default function OrderDetailsDrawer({
               <p className="text-xs text-slate-700 font-medium leading-relaxed">
                 {addressStr}
               </p>
-              <div className="pt-1 flex items-center gap-2">
+              <div className="pt-2 flex flex-wrap items-center gap-2 border-t border-slate-100 mt-1">
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">
                   <Clock size={11} />
                   {deliverySlot}
                 </span>
+                {order.scheduled_date && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-sky-50 text-sky-800 px-2 py-0.5 rounded border border-sky-200">
+                    <Calendar size={11} />
+                    Scheduled: {new Date(order.scheduled_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </span>
+                )}
                 {order.created_at && (
-                  <span className="text-[11px] text-slate-500 font-medium">
+                  <span className="text-[11px] text-slate-500 font-medium ml-auto">
                     Placed: {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 )}
               </div>
             </div>
           </div>
-
-          {/* Quick Status Update Bar */}
-          {onUpdateStatus && (
-            <div className="bg-emerald-50/80 p-3.5 rounded-2xl border border-emerald-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
-              <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                <Sparkles size={14} className="text-emerald-600" /> Update Order Stage:
-              </span>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {(['CONFIRMED', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED'] as const).map((st) => (
-                  <button
-                    key={st}
-                    type="button"
-                    onClick={() => onUpdateStatus(String(orderId), st)}
-                    className="px-3 py-1.5 text-xs font-bold bg-white text-emerald-800 hover:bg-emerald-700 hover:text-white border border-emerald-300 rounded-xl shadow-2xs transition-colors"
-                  >
-                    {st.replace(/_/g, ' ')}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Order Items Table */}
           <div className="space-y-3">

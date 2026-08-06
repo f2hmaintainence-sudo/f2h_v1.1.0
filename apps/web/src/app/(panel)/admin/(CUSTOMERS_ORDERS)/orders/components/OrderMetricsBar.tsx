@@ -14,7 +14,6 @@ import React from 'react';
 import {
   ShoppingCart,
   Clock,
-  Package,
   CheckCircle2,
   Truck,
   XCircle,
@@ -58,10 +57,8 @@ const STATUS_CARDS = [
   { key: 'placed', label: 'Placed', statusVal: 'PLACED', icon: Clock, bg: 'bg-sky-50 text-sky-900 border-sky-200' },
   { key: 'confirmed', label: 'Confirmed', statusVal: 'CONFIRMED', icon: CheckCircle2, bg: 'bg-teal-50 text-teal-900 border-teal-200' },
   { key: 'assigned', label: 'Assigned', statusVal: 'ASSIGNED', icon: Clock, bg: 'bg-indigo-50 text-indigo-900 border-indigo-200' },
-  { key: 'packed', label: 'Packed', statusVal: 'PACKED', icon: Package, bg: 'bg-purple-50 text-purple-900 border-purple-200' },
   { key: 'out_for_delivery', label: 'Out for Delivery', statusVal: 'OUT_FOR_DELIVERY', icon: Truck, bg: 'bg-blue-50 text-blue-900 border-blue-200' },
   { key: 'delivered', label: 'Delivered', statusVal: 'DELIVERED', icon: CheckCircle2, bg: 'bg-emerald-50 text-emerald-900 border-emerald-200' },
-  { key: 'failed', label: 'Failed', statusVal: 'FAILED', icon: XCircle, bg: 'bg-amber-50 text-amber-900 border-amber-200' },
   { key: 'cancelled', label: 'Cancelled', statusVal: 'CANCELLED', icon: XCircle, bg: 'bg-rose-50 text-rose-900 border-rose-200' },
 ] as const;
 
@@ -153,7 +150,7 @@ export default function OrderMetricsBar({
       </div>
 
       {/* Stage-by-Stage Order Status Pills */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2" style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
         {STATUS_CARDS.map(({ key, label, statusVal, icon: Icon, bg }) => {
           const isSelected = activeStatusFilter === statusVal;
           const count = summary?.[key as keyof DashboardSummary] ?? 0;
