@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  OnModuleInit,
   Param,
   Patch,
   Post,
@@ -25,13 +26,78 @@ const _firebaseConfigCache: Record<string, { config: any; cachedAt: number }> = 
 const FIREBASE_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 @Controller('customer')
-export class CustomerBootstrapController {
+export class CustomerBootstrapController implements OnModuleInit {
   constructor(
     private readonly Data: DataService,
     private readonly db: DatabaseService,
     private readonly Developer: DeveloperService,
     private readonly authService: AuthService,
   ) {}
+
+  private columnCache: Map<string, { columns: Set<string>; cachedAt: number }> = new Map();
+  private readonly COLUMN_CACHE_TTL_MS = 10 * 60 * 1000;
+
+  async onModuleInit() {
+    try {
+      await this.db.query(`
+        ALTER TABLE customers ADD COLUMN IF NOT EXISTS first_name VARCHAR(100);
+        ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_name VARCHAR(100);
+        ALTER TABLE customers ADD COLUMN IF NOT EXISTS mobile VARCHAR(20);
+        ALTER TABLE customers ADD COLUMN IF NOT EXISTS phone VARCHAR(20);
+        ALTER TABLE customers ADD COLUMN IF NOT EXISTS email VARCHAR(150);
+        ALTER TABLE customers ADD COLUMN IF NOT EXISTS gender VARCHAR(20);
+        ALTER TABLE customers ADD COLUMN IF NOT EXISTS dob DATE;
+        ALTER TABLE customers ADD COLUMN IF NOT EXISTS branch_id VARCHAR(30);
+        ALTER TABLE customers ADD COLUMN IF NOT EXISTS referral_code VARCHAR(30);
+        ALTER TABLE customers ADD COLUMN IF NOT EXISTS referral_status VARCHAR(30) DEFAULT 'unlocked';
+        ALTER TABLE customers ADD COLUMN IF NOT EXISTS first_order_completed BOOLEAN DEFAULT false;
+        
+        ALTER TABLE customer_addresses ADD COLUMN IF NOT EXISTS h3_index VARCHAR(30);
+        ALTER TABLE customer_addresses ADD COLUMN IF NOT EXISTS branch_id VARCHAR(30);
+        ALTER TABLE customer_addresses ADD COLUMN IF NOT EXISTS address_line TEXT;
+        ALTER TABLE customer_addresses ADD COLUMN IF NOT EXISTS delivery_note TEXT;
+        ALTER TABLE customer_addresses ADD COLUMN IF NOT EXISTS contact_name VARCHAR(150);
+        ALTER TABLE customer_addresses ADD COLUMN IF NOT EXISTS contact_mobile VARCHAR(20);
+      `);
+      this.Developer.log('info', '[CustomerBootstrapController] DB field check migrations verified.');
+    } catch (err: any) {
+      this.Developer.error('[CustomerBootstrapController] Error executing field check migrations', { error: err?.message || err });
+    }
+  }
+
+  private async getTableColumns(tableName: string): Promise<Set<string>> {
+    const cached = this.columnCache.get(tableName);
+    if (cached && Date.now() - cached.cachedAt < this.COLUMN_CACHE_TTL_MS) {
+      return cached.columns;
+    }
+    try {
+      const rows = await this.db.query(
+        `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1`,
+        [tableName],
+      );
+      const cols = new Set<string>((rows || []).map((r: any) => r.column_name));
+      if (cols.size > 0) {
+        this.columnCache.set(tableName, { columns: cols, cachedAt: Date.now() });
+      }
+      return cols;
+    } catch (err: any) {
+      this.Developer.error(`[CustomerBootstrapController] Failed to fetch columns for ${tableName}`, { error: err?.message || err });
+      return new Set();
+    }
+  }
+
+  private async filterValidFields(tableName: string, data: Record<string, any>): Promise<Record<string, any>> {
+    if (!data || typeof data !== 'object') return data;
+    const cols = await this.getTableColumns(tableName);
+    if (cols.size === 0) return data;
+    const filtered: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (cols.has(key)) {
+        filtered[key] = value;
+      }
+    }
+    return filtered;
+  }
 
   private normalizeAddress(addr: any) {
     if (!addr) return addr;
@@ -157,7 +223,8 @@ export class CustomerBootstrapController {
             created_at: now,
             updated_at: now,
           };
-          await this.Data.insert('customers', newCustData);
+          const filteredNewCust = await this.filterValidFields('customers', newCustData);
+          await this.Data.insert('customers', filteredNewCust);
           customer = newCustData;
         }
       } catch (err) {
@@ -166,6 +233,52 @@ export class CustomerBootstrapController {
     }
 
     if (customer) {
+      const hasFirstName = customer.first_name && String(customer.first_name).trim().length > 0;
+      const hasMobile = (customer.mobile && String(customer.mobile).trim().length > 0) || (customer.phone && String(customer.phone).trim().length > 0);
+      const hasEmail = customer.email && String(customer.email).trim().length > 0;
+
+      if (!hasFirstName || !hasMobile || !hasEmail) {
+        try {
+          const userRes = await this.Data.query('users', {
+            where: [{ column: 'user_id', operator: '=', value: userId }],
+            limit: 1,
+          });
+          const userObj = userRes?.data?.[0];
+          if (userObj) {
+            const userFirstName = userObj.first_name || userObj.user_name || (userObj.email ? userObj.email.split('@')[0] : '');
+            const userLastName = userObj.last_name || '';
+            const userPhone = userObj.phone || userObj.mobile || '';
+            const userEmail = userObj.email || email || '';
+
+            const fillData: Record<string, any> = {};
+            if (!hasFirstName && userFirstName) {
+              customer.first_name = userFirstName;
+              customer.last_name = userLastName;
+              fillData.first_name = userFirstName;
+              fillData.last_name = userLastName;
+            }
+            if (!hasMobile && userPhone) {
+              customer.mobile = userPhone;
+              customer.phone = userPhone;
+              fillData.mobile = userPhone;
+              fillData.phone = userPhone;
+            }
+            if (!hasEmail && userEmail) {
+              customer.email = userEmail;
+              fillData.email = userEmail;
+            }
+
+            if (Object.keys(fillData).length > 0) {
+              fillData.updated_at = new Date();
+              const fillPayload = await this.filterValidFields('customers', fillData);
+              await this.Data.update('customers', fillPayload, [
+                { column: 'customer_id', operator: '=', value: customer.customer_id || userId },
+              ]);
+            }
+          }
+        } catch (_) {}
+      }
+
       try {
         const orderCheck = await this.Data.query('orders', {
           select: ['order_id'],
@@ -188,9 +301,16 @@ export class CustomerBootstrapController {
         customer.referral_status = computedStatus;
         customer.first_order_completed = isUnlocked;
 
+        const updatePayload = await this.filterValidFields('customers', {
+          referral_code: customer.referral_code,
+          referral_status: computedStatus,
+          first_order_completed: isUnlocked,
+          updated_at: new Date(),
+        });
+
         await this.Data.update(
           'customers',
-          { referral_code: customer.referral_code, referral_status: computedStatus, first_order_completed: isUnlocked, updated_at: new Date() },
+          updatePayload,
           [{ column: 'customer_id', operator: '=', value: customer.customer_id || userId }],
         );
       } catch (err) {
@@ -213,7 +333,7 @@ export class CustomerBootstrapController {
           const rnd = Math.floor(Math.random() * 9000 + 1000);
           const refereeName = customer.first_name || customer.name || customer.email || 'Customer';
           const refereePhone = customer.phone || '';
-          await this.Data.insert('referrals', {
+          const referralData = await this.filterValidFields('referrals', {
             refer_id: `REF${ts}${rnd}`,
             referrer_customer_id: customer.referred_by,
             referred_customer_id: customer.customer_id,
@@ -229,6 +349,7 @@ export class CustomerBootstrapController {
             created_at: new Date(),
             updated_at: new Date(),
           });
+          await this.Data.insert('referrals', referralData);
         }
       } catch (err) {
         this.Developer.error('[CustomerBootstrapController] Failed to auto-sync referral record', err);
@@ -559,9 +680,11 @@ export class CustomerBootstrapController {
         await this.clearDefaultAddresses(customerId);
       }
 
+      const filteredUpdatePayload = await this.filterValidFields('customer_addresses', updatePayload);
+
       await this.Data.update(
         'customer_addresses',
-        updatePayload,
+        filteredUpdatePayload,
         [
           { column: 'address_id', operator: '=', value: addressId },
           { column: 'customer_id', operator: '=', value: customerId },
@@ -570,9 +693,13 @@ export class CustomerBootstrapController {
 
       if (addressData.branch_id) {
         try {
+          const filteredCustBranch = await this.filterValidFields('customers', {
+            branch_id: addressData.branch_id,
+            updated_at: new Date(),
+          });
           await this.Data.update(
             'customers',
-            { branch_id: addressData.branch_id, updated_at: new Date() },
+            filteredCustBranch,
             [{ column: 'customer_id', operator: '=', value: customerId }],
           );
         } catch (_) {}
@@ -659,15 +786,17 @@ export class CustomerBootstrapController {
     );
 
     const updatedAt = new Date();
+    const filteredCustEmail = await this.filterValidFields('customers', { email, updated_at: updatedAt });
     const updateCustomer = await this.Data.update(
       'customers',
-      { email, updated_at: updatedAt },
+      filteredCustEmail,
       [{ column: 'customer_id', operator: '=', value: existingProfile.customer_id }],
     );
 
+    const filteredUserEmail = await this.filterValidFields('users', { email, updated_at: updatedAt });
     const updateUser = await this.Data.update(
       'users',
-      { email, updated_at: updatedAt },
+      filteredUserEmail,
       [{ column: 'user_id', operator: '=', value: existingProfile.customer_id }],
     );
 
@@ -702,12 +831,13 @@ export class CustomerBootstrapController {
       first_name: String(body?.first_name ?? '').trim(),
       last_name: String(body?.last_name ?? '').trim(),
       email: String(body?.email ?? '').trim(),
-      mobile: String(body?.mobile ?? '').trim(),
+      mobile: String(body?.mobile ?? body?.phone ?? '').trim(),
+      phone: String(body?.mobile ?? body?.phone ?? '').trim(),
       dob: this.formatDateForPostgres(body?.dob),
       gender: String(body?.gender ?? '').trim(),
       updated_at: new Date(),
     };
-    if (!updateData.first_name || !updateData.mobile || !updateData.email) {
+    if (!updateData.first_name || (!updateData.mobile && !updateData.phone) || !updateData.email) {
       throw new BadRequestException('First name and mobile number are required');
     }
     const existingProfile = await this.resolveCustomer(userId, user?.email);
@@ -715,9 +845,11 @@ export class CustomerBootstrapController {
       throw new BadRequestException('Customer profile not found');
     }
 
+    const filteredCustProfile = await this.filterValidFields('customers', updateData);
+
     const updateCustomer = await this.Data.update(
       'customers',
-      updateData,
+      filteredCustProfile,
       [
         {
           column: 'customer_id',
@@ -736,9 +868,11 @@ export class CustomerBootstrapController {
       updated_at: new Date(),
     };
 
+    const filteredUserProfile = await this.filterValidFields('users', userUpdateData);
+
     const updateUser = await this.Data.update(
       'users',
-      userUpdateData,
+      filteredUserProfile,
       [
         {
           column: 'user_id',
@@ -795,13 +929,18 @@ export class CustomerBootstrapController {
       await this.clearDefaultAddresses(customerId);
     }
 
-    await this.Data.insert('customer_addresses', addressData);
+    const filteredAddressData = await this.filterValidFields('customer_addresses', addressData);
+    await this.Data.insert('customer_addresses', filteredAddressData);
 
     if (addressData.branch_id) {
       try {
+        const filteredCustBranch = await this.filterValidFields('customers', {
+          branch_id: addressData.branch_id,
+          updated_at: new Date(),
+        });
         await this.Data.update(
           'customers',
-          { branch_id: addressData.branch_id, updated_at: new Date() },
+          filteredCustBranch,
           [{ column: 'customer_id', operator: '=', value: customerId }],
         );
       } catch (_) {}
@@ -868,7 +1007,8 @@ export class CustomerBootstrapController {
         'This address is currently used by an active subscription and cannot be deleted.',
       );
     }
-    await this.Data.update('customer_addresses', { status: false }, [
+    const filteredDeletePayload = await this.filterValidFields('customer_addresses', { status: false });
+    await this.Data.update('customer_addresses', filteredDeletePayload, [
       { column: 'address_id', operator: '=', value: addressId },
       { column: 'customer_id', operator: '=', value: customerId },
     ]);

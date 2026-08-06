@@ -209,13 +209,28 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     _loadBranches();
     final address = widget.existing;
 
-    final profile = context.read<CustomerSessionCubit>().state.profile;
-    contactNameController = TextEditingController(
-      text: address?.contactName ?? (address == null ? (profile?.name ?? '') : ''),
-    );
-    contactMobileController = TextEditingController(
-      text: address?.contactMobile ?? (address == null ? (profile?.mobile ?? '') : ''),
-    );
+    final sessionCubit = context.read<CustomerSessionCubit>();
+    var profile = sessionCubit.state.profile;
+    if (profile == null) {
+      sessionCubit.bootstrap();
+    }
+
+    String initialName = address?.contactName ?? '';
+    String initialMobile = address?.contactMobile ?? '';
+
+    if (address == null && profile != null) {
+      if (initialName.isEmpty) {
+        initialName = profile.name.isNotEmpty
+            ? profile.name
+            : '${profile.firstName} ${profile.lastName}'.trim();
+      }
+      if (initialMobile.isEmpty) {
+        initialMobile = profile.mobile;
+      }
+    }
+
+    contactNameController = TextEditingController(text: initialName);
+    contactMobileController = TextEditingController(text: initialMobile);
     flatNoController = TextEditingController(text: address?.flatNo ?? '');
     floorNoController = TextEditingController(text: address?.floorNo ?? '');
     buildingNameController = TextEditingController(text: address?.buildingName ?? '');
@@ -739,9 +754,26 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
             ),
         ],
       ),
-      body: Form(
-        key: _formKey,
-        child: Column(
+      body: BlocListener<CustomerSessionCubit, CustomerSessionState>(
+        listener: (context, sessionState) {
+          if (widget.existing == null && sessionState.profile != null) {
+            final p = sessionState.profile!;
+            if (contactNameController.text.trim().isEmpty) {
+              final pName = p.name.isNotEmpty
+                  ? p.name
+                  : '${p.firstName} ${p.lastName}'.trim();
+              if (pName.isNotEmpty) {
+                contactNameController.text = pName;
+              }
+            }
+            if (contactMobileController.text.trim().isEmpty && p.mobile.isNotEmpty) {
+              contactMobileController.text = p.mobile;
+            }
+          }
+        },
+        child: Form(
+          key: _formKey,
+          child: Column(
           children: [
             // Map view container
             if (_isMapExpanded)
@@ -1045,6 +1077,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
           ],
         ),
       ),
+    ),
       bottomNavigationBar: _isMapExpanded
           ? null
           : SafeArea(

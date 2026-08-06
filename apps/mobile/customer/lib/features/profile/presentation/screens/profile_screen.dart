@@ -1013,7 +1013,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           String customerEmail = 'Fresh market essentials, delivered daily';
 
           if (profile != null) {
-            customerName = profile.name.isNotEmpty ? profile.name : 'Guest';
+            final displayName = profile.name.trim();
+            customerName = displayName.isNotEmpty
+                ? displayName
+                : (profile.firstName.trim().isNotEmpty
+                    ? profile.firstName.trim()
+                    : (profile.mobile.isNotEmpty ? profile.mobile : 'Customer'));
             customerMobile = profile.mobile;
             customerEmail = profile.email.isNotEmpty
                 ? profile.email

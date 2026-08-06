@@ -49,12 +49,27 @@ class ProfileModel {
         subNum.isNotEmpty &&
         subNum.toLowerCase() != 'null';
 
+    final rawFirstName = json['first_name']?.toString().trim() ?? '';
+    final rawLastName = json['last_name']?.toString().trim() ?? '';
+    final rawUserName = json['user_name']?.toString().trim() ?? json['name']?.toString().trim() ?? '';
+
+    String computedName = '$rawFirstName $rawLastName'.trim();
+    if (computedName.isEmpty) {
+      computedName = rawUserName;
+    }
+    if (computedName.isEmpty && json['email'] != null && json['email'].toString().contains('@')) {
+      computedName = json['email'].toString().split('@')[0];
+    }
+    if (computedName.isEmpty) {
+      computedName = (json['mobile'] ?? json['phone'])?.toString().trim() ?? '';
+    }
+
     return ProfileModel(
       customerId: json['customer_id']?.toString() ?? '',
       userId: json['customer_id']?.toString() ?? '',
-      name: '${json['first_name']?.toString() ?? ''} ${json['last_name']?.toString() ?? ''}'.trim(),
-      firstName: json['first_name']?.toString() ?? '',
-      lastName: json['last_name']?.toString() ?? '',
+      name: computedName,
+      firstName: rawFirstName.isNotEmpty ? rawFirstName : computedName,
+      lastName: rawLastName,
       gender: json['gender']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
       mobile: (json['mobile'] ?? json['phone'])?.toString() ?? '',
