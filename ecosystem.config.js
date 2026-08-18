@@ -19,7 +19,7 @@ module.exports = {
       name: 'frontend-f2hfresh',
       cwd: `${MONOREPO}/apps/web`,
       script: `${MONOREPO}/node_modules/.bin/next`,
-      args: 'dev -H 0.0.0.0 -p 5002',
+      args: 'start -H 0.0.0.0 -p 5002',
       env: {
         NODE_ENV: 'production',
         PORT: 5002,
