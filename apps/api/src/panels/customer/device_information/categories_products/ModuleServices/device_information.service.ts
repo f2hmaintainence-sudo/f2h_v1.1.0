@@ -39,14 +39,14 @@ export class DeviceInformationService {
     if (response && response.data && response.data.length > 0) {
       return {
         version: response.data[0].target_version,
-        url: 'https://dev.f2hfresh.com/appapk'
+        url: 'https://f2hfresh.com/appapk'
       };
     }
 
     // Fallback if device not found for some reason
     return {
       version: process.env.LATEST_APK_VERSION || '1.0.1+5',
-      url: 'https://dev.f2hfresh.com/appapk'
+      url: 'https://f2hfresh.com/appapk'
     };
   }
 }

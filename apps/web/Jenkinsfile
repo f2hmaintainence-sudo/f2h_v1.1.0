@@ -8,7 +8,7 @@ pipeline {
                 sh '''
                 echo "========== STARTING FRONTEND DEPLOYMENT =========="
 
-                cd /www/wwwroot/dev.f2hfresh.com/f2hfrontend
+                cd /www/wwwroot/f2hfresh.com/f2hfrontend
 
                 echo "========== FETCHING LATEST CODE =========="
                 git fetch origin main
