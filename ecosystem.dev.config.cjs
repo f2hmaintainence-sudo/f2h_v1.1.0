@@ -47,6 +47,7 @@ module.exports = {
         PORT: 5002,
         NEXT_TELEMETRY_DISABLED: '1',
         INTERNAL_API_URL: 'http://localhost:5001',
+        PATH: `${MONOREPO}/node_modules/.bin:${process.env.PATH}`,
       },
       out_file: '/home/f2hfresh/logs/pm2/frontend-out.log',
       error_file: '/home/f2hfresh/logs/pm2/frontend-err.log',
