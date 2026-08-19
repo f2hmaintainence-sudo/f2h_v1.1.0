@@ -63,7 +63,7 @@ const adminNav = [
   {
     label: "CATALOG & INVENTORY",
     items: [
-      { name: "Categories", href: "/admin/catalog/categories", icon: Layers },
+      // { name: "Categories", href: "/admin/catalog/categories", icon: Layers },
       { name: "Products", href: "/admin/catalog/products", icon: Package },
       // { name: "Offers", href: "/admin/catalog/offers", icon: Tag },
       { name: "Promotions Coupons", href: "/admin/catalog/promotions-coupons", icon: TicketPercent },

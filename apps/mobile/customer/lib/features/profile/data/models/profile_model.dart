@@ -19,6 +19,10 @@ class ProfileModel {
   final String? subscriptionNumber;
   final String? referralCode;
   final String? referralStatus;
+  /// Whether the customer has completed their first order. Gates the referral
+  /// reward — `referral_banner_widget` reads it and the field was never declared,
+  /// so the customer app did not compile.
+  final bool firstOrderCompleted;
 
   ProfileModel({
     required this.customerId,
@@ -41,6 +45,7 @@ class ProfileModel {
     this.subscriptionNumber,
     this.referralCode,
     this.referralStatus,
+    this.firstOrderCompleted = false,
   });
 
   factory ProfileModel.fromJson(Map<String, dynamic> json) {
@@ -85,6 +90,10 @@ class ProfileModel {
       subscriptionNumber: subNum == 'null' ? null : subNum,
       referralCode: json['referral_code']?.toString(),
       referralStatus: json['referral_status']?.toString(),
+      // The API sends this as a bool, 1/0, or "true" depending on the route.
+      firstOrderCompleted: json['first_order_completed'] == true ||
+          json['first_order_completed'] == 1 ||
+          json['first_order_completed']?.toString().toLowerCase() == 'true',
     );
   }
 
@@ -131,6 +140,7 @@ class ProfileModel {
       subscriptionNumber: subscriptionNumber ?? this.subscriptionNumber,
       referralCode: referralCode ?? this.referralCode,
       referralStatus: referralStatus ?? this.referralStatus,
+      firstOrderCompleted: firstOrderCompleted ?? this.firstOrderCompleted,
     );
   }
 }

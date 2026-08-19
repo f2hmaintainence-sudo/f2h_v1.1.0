@@ -30,6 +30,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Native Razorpay checkout sheet. razorpay_checkout_mobile.dart has always
+  # imported this; it was missing from the manifest, so the app did not compile.
+  razorpay_flutter: ^1.4.5
 
   google_fonts: ^6.2.1
 

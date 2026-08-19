@@ -105,7 +105,8 @@ interface CategoryOption {
   slug?: string;
 }
 
-export function cleanImageUrl(raw?: string): string {
+// Page-local: Next.js rejects any non-reserved export from a page module.
+function cleanImageUrl(raw?: string): string {
   if (!raw) return "";
   let val = raw.trim();
   const match = val.match(/src=["']([^"']+)["']/i);
@@ -116,7 +117,7 @@ export function cleanImageUrl(raw?: string): string {
   return val;
 }
 
-export function getImageSrc(raw?: string): string {
+function getImageSrc(raw?: string): string {
   const url = cleanImageUrl(raw);
   if (!url) return "";
   if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
@@ -754,13 +755,6 @@ export default function PromotionsCouponsOffersPage() {
     } catch (e: any) {
       showErrorToast(e.response?.data?.message || e.message || "Failed to update coupon");
     }
-  };
-
-  // Helper to extract clean image URL (stripping any raw HTML img tags if present)
-  const cleanImageUrl = (raw?: string) => {
-    if (!raw) return "";
-    const match = raw.match(/src=["']([^"']+)["']/i);
-    return match ? match[1] : raw.trim();
   };
 
   // Open Edit Offer Banner Modal

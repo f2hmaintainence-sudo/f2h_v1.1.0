@@ -129,7 +129,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
           style: TextStyle(
             color: kText,
             fontSize: 18,
-            fontWeight: FontWeight.w950,
+            fontWeight: FontWeight.w900,
           ),
         ),
         centerTitle: true,
