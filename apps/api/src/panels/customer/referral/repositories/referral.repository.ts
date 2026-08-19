@@ -59,6 +59,17 @@ export class ReferralRepository implements IReferralRepository {
     if (!code || !code.trim()) return null;
 
     const raw = code.trim().toUpperCase();
+
+    const generalInviteCodes = ['APP INVITE', 'APPINVITE', 'APP-INVITE', 'INVITE', 'APP', 'APP_INVITE', 'F2HREF'];
+    if (generalInviteCodes.includes(raw)) {
+      return {
+        customer_id: 'APP_INVITE_GENERAL',
+        first_name: 'F2H App Invite',
+        referral_code: 'APP INVITE',
+        referral_status: 'active',
+      };
+    }
+
     const noHyphen = raw.replace(/-/g, '');
     const withHyphen = noHyphen.startsWith('F2H') && noHyphen.length > 3 ? 'F2H-' + noHyphen.substring(3) : raw;
 

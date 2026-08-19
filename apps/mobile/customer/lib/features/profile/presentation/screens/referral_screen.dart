@@ -134,21 +134,17 @@ class _ReferralScreenState extends State<ReferralScreen>
 
   // ── WHATSAPP SHARING ──────────────────────────────────────
   Future<void> _shareOnWhatsApp() async {
-    if (_isLocked) {
-      F2HToast.error(
-        context,
-        'Complete your first delivered order to unlock Refer & Earn! 🔒',
-      );
-      return;
-    }
-
-    final message = 'Your F2H Invite is Ready\n\n'
-        'Get ₹100 on your first order!\n'
-        'Fresh farm products, delivered to your doorstep.\n\n'
-        'Invite Code: $_activeCode\n'
-        '$_referralLink\n\n'
-        'F2H — Farm To Home\n'
-        'Fresh. Smart. Rewarding. ';
+    final message = _isLocked
+        ? 'Join F2H — Farm To Home & Get ₹50 on your 1st order! 🥬🍓\n'
+          'Fresh farm products, delivered to your doorstep.\n'
+          'https://f2h.app.link/invite'
+        : 'Your F2H Invite is Ready\n\n'
+          'Get ₹50 on your first order!\n'
+          'Fresh farm products, delivered to your doorstep.\n\n'
+          'Invite Code: $_activeCode\n'
+          '$_referralLink\n\n'
+          'F2H — Farm To Home\n'
+          'Fresh. Smart. Rewarding. ';
 
     final encodedMsg = Uri.encodeComponent(message);
     final whatsappUri = Uri.parse('https://wa.me/?text=$encodedMsg');
@@ -219,15 +215,10 @@ class _ReferralScreenState extends State<ReferralScreen>
   }
 
   void _copyToClipboard(String text, String toastMsg) {
-    if (_isLocked) {
-      F2HToast.error(
-        context,
-        'Complete your first delivered order to unlock Refer & Earn! 🔒',
-      );
-      return;
-    }
-    Clipboard.setData(ClipboardData(text: text));
-    F2HToast.success(context, toastMsg);
+    final copyText = _isLocked ? 'https://f2h.app.link/invite' : text;
+    final message = _isLocked ? 'App Invite link copied to clipboard! 📋' : toastMsg;
+    Clipboard.setData(ClipboardData(text: copyText));
+    F2HToast.success(context, message);
   }
 
   // ── REWARD SUCCESS MODAL ──────────────────────────────────
@@ -572,7 +563,7 @@ class _ReferralScreenState extends State<ReferralScreen>
                         'Referral code $_activeCode copied!',
                       ),
                       icon: const Icon(Icons.copy_rounded, size: 14),
-                      label: Text(_isLocked ? 'Locked' : 'Copy'),
+                      label: Text(_isLocked ? 'Copy Link' : 'Copy'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: const Color(0xFF0A3D22),
@@ -610,7 +601,7 @@ class _ReferralScreenState extends State<ReferralScreen>
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    _isLocked ? 'https://f2h.app.link/locked 🔒' : _referralLink,
+                    _isLocked ? 'https://f2h.app.link/invite' : _referralLink,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 12,

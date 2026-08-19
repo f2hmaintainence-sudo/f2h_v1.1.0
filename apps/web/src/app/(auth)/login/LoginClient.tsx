@@ -20,7 +20,7 @@ import { api } from "../../../services/api.client"
 import { getHomeForRole } from "../../../context/AuthContext"
 import AuthFlipCard, { SOCIAL, Spinner } from "../../../components/AuthFlipCard/AuthFlipCard"
 import { useAlert } from "../../../context/AlertContext"
-import { getApiBaseUrl } from "@/lib/api-config"
+import { useGoogleSignIn } from "../../../components/auth/useGoogleSignIn"
 
 interface LoginResponse {
   message: string;
@@ -158,7 +158,7 @@ export function LoginContent() {
   const { showAlert } = useAlert()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const API_URL = getApiBaseUrl();
+  const googleSignIn = useGoogleSignIn()
 
   const identifierRef = useRef<HTMLInputElement>(null)
   const passwordRef = useRef<HTMLInputElement>(null)
@@ -208,57 +208,102 @@ export function LoginContent() {
         return
       }
 
-      const authData = data as any
-      if (authData.accessToken && typeof window !== 'undefined') {
-        localStorage.setItem("access_token", authData.accessToken)
-        if (authData.refreshToken) localStorage.setItem("refresh_token", authData.refreshToken)
-        document.cookie = `access_token=${authData.accessToken}; path=/; max-age=86400`
+      await establishSession(data)
+    } catch (err) {
+      console.error("[Login] Catch error:", err)
+      showErrorToast("Unable to connect to server. Please check your connection.", 5000)
+      setIsLoading(false)
+    }
+  }
+
+  /**
+   * Turns a successful auth response into a session and sends the user on.
+   *
+   * Shared by password login and Google Sign-In: both hit the same role gate,
+   * because this panel is admin-only and the Google endpoint will happily
+   * authenticate a customer.
+   */
+  const establishSession = async (data: LoginResponse) => {
+    const authData = data as any
+    if (authData.accessToken && typeof window !== 'undefined') {
+      localStorage.setItem("access_token", authData.accessToken)
+      if (authData.refreshToken) localStorage.setItem("refresh_token", authData.refreshToken)
+      document.cookie = `access_token=${authData.accessToken}; path=/; max-age=86400`
+    }
+
+    // Check role returned from login endpoint
+    const userRole = (data.user?.role_id || "").toUpperCase().trim()
+    if (["CUSTOMER", "DELIVERY_PARTNER", "DELIVERY_BOY"].includes(userRole)) {
+      showAlert("Login Failed", "Customers and Delivery Partners are not authorized to access the Admin Panel.", "error")
+      setIsLoading(false)
+      return
+    }
+
+    const redirectTo = searchParams.get("redirect")
+    console.log("[Login] Successful login. Redirecting to:", redirectTo || "Dashboard")
+
+    if (redirectTo) {
+      router.push(redirectTo)
+      return
+    }
+
+    // Fetch active role to redirect to the correct panel
+    console.log("[Login] Fetching user profile...")
+    const { data: me, error: meError } = await api.get<any>("/users/me")
+
+    if (meError || !me) {
+      console.error("[Login] Failed to fetch user profile after login:", meError)
+      router.push("/login") // Fallback to login if profile fetch fails
+      return
+    }
+
+    const userHasAdmin = me?.roles?.some((r: any) => (r.role_name || r.role_id || '').toUpperCase() === 'ADMIN')
+    console.log("[Login] User profile fetched. isAdmin:", userHasAdmin)
+
+    // Use active_role if set, otherwise fallback based on admin status
+    const role = (me?.active_role || (userHasAdmin ? "ADMIN" : "")).toUpperCase().trim()
+    if (["CUSTOMER", "DELIVERY_PARTNER", "DELIVERY_BOY"].includes(role)) {
+      showAlert("Login Failed", "Customers and Delivery Partners are not authorized to access the Admin Panel.", "error")
+      setIsLoading(false)
+      return
+    }
+
+    console.log("[Login] Final redirect role:", role)
+
+    const destination = getHomeForRole(role)
+    console.log("[Login] Pushing to destination:", destination)
+    router.push(destination)
+  }
+
+  /**
+   * Google Sign-In. The browser only ever holds an authorization code; the API
+   * exchanges it with the client secret and returns the same payload as a
+   * password login, so the session handling below is identical.
+   */
+  const loginWithGoogle = async () => {
+    setIsLoading(true)
+    try {
+      const code = await googleSignIn.requestCode()
+      if (!code) {
+        setIsLoading(false) // user dismissed the chooser — not an error
+        return
       }
 
-      // Check role returned from login endpoint
-      const userRole = (data.user?.role_id || "").toUpperCase().trim()
-      if (["CUSTOMER", "DELIVERY_PARTNER", "DELIVERY_BOY"].includes(userRole)) {
-        showAlert("Login Failed", "Customers and Delivery Partners are not authorized to access the Admin Panel.", "error")
+      const { data, error, status } = await api.post<LoginResponse>("/auth/google", { code })
+      if (error || !data) {
+        showAlert(
+          "Google Sign-In Failed",
+          error || (status === 401 ? "Google could not verify that account." : "Google Sign-In failed."),
+          "error",
+        )
         setIsLoading(false)
         return
       }
 
-      const redirectTo = searchParams.get("redirect")
-      console.log("[Login] Successful login. Redirecting to:", redirectTo || "Dashboard")
-
-      if (redirectTo) {
-        router.push(redirectTo)
-      } else {
-        // Fetch active role to redirect to the correct panel
-        console.log("[Login] Fetching user profile...")
-        const { data: me, error: meError } = await api.get<any>("/users/me")
-
-        if (meError || !me) {
-          console.error("[Login] Failed to fetch user profile after login:", meError)
-          router.push("/login") // Fallback to login if profile fetch fails
-          return
-        }
-
-        const userHasAdmin = me?.roles?.some((r: any) => (r.role_name || r.role_id || '').toUpperCase() === 'ADMIN')
-        console.log("[Login] User profile fetched. isAdmin:", userHasAdmin)
-
-        // Use active_role if set, otherwise fallback based on admin status
-        const role = (me?.active_role || (userHasAdmin ? "ADMIN" : "")).toUpperCase().trim()
-        if (["CUSTOMER", "DELIVERY_PARTNER", "DELIVERY_BOY"].includes(role)) {
-          showAlert("Login Failed", "Customers and Delivery Partners are not authorized to access the Admin Panel.", "error")
-          setIsLoading(false)
-          return
-        }
-
-        console.log("[Login] Final redirect role:", role)
-
-        const destination = getHomeForRole(role)
-        console.log("[Login] Pushing to destination:", destination)
-        router.push(destination)
-      }
+      await establishSession(data)
     } catch (err) {
-      console.error("[Login] Catch error:", err)
-      showErrorToast("Unable to connect to server. Please check your connection.", 5000)
+      console.error("[Login] Google sign-in error:", err)
+      showErrorToast(err instanceof Error ? err.message : "Google Sign-In failed.", 5000)
       setIsLoading(false)
     }
   }
@@ -371,13 +416,13 @@ export function LoginContent() {
             <div className="flex-1 h-px bg-gray-100" />
           </div>
 
-          {/* {SOCIAL.map(({ id, Icon }) => (
-            <button key={id} onClick={() => { window.location.href = `${API_URL}/auth/${id}` }}
-              className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-fresh-green/30 hover:-translate-y-0.5 transition-all duration-300 font-semibold text-gray-700 text-sm">
+          {googleSignIn.isConfigured && SOCIAL.map(({ id, Icon }) => (
+            <button key={id} type="button" onClick={loginWithGoogle} disabled={isLoading || googleSignIn.isPending}
+              className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-fresh-green/30 hover:-translate-y-0.5 transition-all duration-300 font-semibold text-gray-700 text-sm disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0">
               <Icon className="w-5 h-5 shrink-0" />
               Continue with Google
             </button>
-          ))} */}
+          ))}
         </div>
         <p className="mt-4 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">
           © 2026 Farm To Home

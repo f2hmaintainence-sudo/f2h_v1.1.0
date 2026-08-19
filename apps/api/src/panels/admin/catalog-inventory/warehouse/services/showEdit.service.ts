@@ -162,10 +162,19 @@ export class WarehouseShowEditService {
         throw new BadRequestException('Warehouse not found');
       }
 
+      const branchesResult = await this.dataService.query('branches', {
+        select: ['branch_id', 'branch_name'],
+        where: [{ column: 'is_active', operator: '=', value: true }],
+      });
+      const branchOptions = (branchesResult?.data || []).map((b: any) => ({
+        value: b.branch_id,
+        label: b.branch_name,
+      }));
+
       return this.formHelper.generateResponse({
         title: 'Edit Warehouse',
         submitLabel: 'Update Warehouse',
-        fields: this.showAddService.warehouseFields(),
+        fields: this.showAddService.warehouseFields(branchOptions),
         data: result.data[0],
         script: '',
       });

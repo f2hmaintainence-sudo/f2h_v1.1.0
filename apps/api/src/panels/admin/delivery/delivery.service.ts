@@ -31,7 +31,7 @@ export class DeliveryManagementService {
     private readonly redisService: RedisService,
   ) { }
 
-  private async notifyPartner(partnerId: string, title: string, messageBody: string): Promise<void> {
+  async notifyPartner(partnerId: string, title: string, messageBody: string): Promise<void> {
     try {
       const boyRows = await this.db.query(
         `SELECT delivery_partner_id FROM delivery_partners WHERE delivery_partner_id = $1 OR user_id = $1`,
@@ -271,12 +271,32 @@ export class DeliveryManagementService {
 
       // Dispatch Mobile Push & In-App notification to the partner
       if (body.is_active !== undefined) {
-        const title = 'Account Status Updated';
-        const msg = `Your account access status has been set to ${body.is_active ? 'Active' : 'Inactive'} by the Admin.`;
+        const title = body.is_active ? '🎉 Account Activated!' : 'Account Status Updated';
+        const msg = body.is_active
+          ? 'Congratulations! Your Delivery Partner account has been activated by Admin. You can now log in, accept delivery runs, and start delivering orders.'
+          : 'Your Delivery Partner account status has been set to Inactive by Admin.';
         await this.notifyPartner(partnerId, title, msg);
-      } else if (body.branch_id !== undefined || body.daily_salary !== undefined) {
+      }
+
+      if (body.branch_id !== undefined) {
+        let branchName = 'Unassigned';
+        if (body.branch_id) {
+          const branchRows = await this.db.query(
+            `SELECT branch_name FROM branches WHERE branch_id = $1 OR id::text = $1 LIMIT 1`,
+            [body.branch_id],
+          );
+          if (branchRows && branchRows.length > 0 && branchRows[0].branch_name) {
+            branchName = branchRows[0].branch_name;
+          }
+        }
+        const title = '🏢 Branch Reassigned';
+        const msg = body.branch_id
+          ? `Your assigned delivery branch has been updated to ${branchName}.`
+          : `Your assigned delivery branch has been updated by the Admin.`;
+        await this.notifyPartner(partnerId, title, msg);
+      } else if (body.daily_salary !== undefined && body.is_active === undefined) {
         const title = 'Profile Details Updated';
-        const msg = `Your assigned branch or daily salary details have been updated by the Admin.`;
+        const msg = `Your daily salary details have been updated by the Admin.`;
         await this.notifyPartner(partnerId, title, msg);
       }
 

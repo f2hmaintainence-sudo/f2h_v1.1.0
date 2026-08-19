@@ -17,13 +17,16 @@ import 'package:f2h_customer/core/config/app_config.dart';
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      // Hardcoded from google-services.json — must match exactly
+      // Hardcoded from android/app/google-services.json — must match exactly.
+      // The server-driven values in AppConfig override nothing on Android: the
+      // Firebase SDK is initialised before the config sync completes, so these
+      // have to stand on their own.
       return const FirebaseOptions(
-        apiKey: 'AIzaSyBMqFkPAenVd4rurNYLxcb17fqRN0Bm47U',
-        appId: '1:277443632535:android:a9290d2881da2d5e0b38d2',
-        messagingSenderId: '277443632535',
-        projectId: 'f2hfresh-65beb',
-        storageBucket: 'f2hfresh-65beb.firebasestorage.app',
+        apiKey: 'AIzaSyAM1WRkJSfx4PTbuIkl4w4A09mCSH777js',
+        appId: '1:842214638527:android:1800c0a5729eb74823d70a',
+        messagingSenderId: '842214638527',
+        projectId: 'f2h-fresh',
+        storageBucket: 'f2h-fresh.firebasestorage.app',
       );
     }
     // iOS / Web: use dynamically loaded AppConfig values

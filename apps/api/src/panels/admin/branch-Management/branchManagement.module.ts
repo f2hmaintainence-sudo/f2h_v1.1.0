@@ -25,9 +25,10 @@ import { StaffsrController } from './controllers/staff.controller';
 import { BranchConfigController } from './branch-config.controller';
 import { BranchConfigService } from './branch-config.service';
 import { RedisModule } from 'src/shared/redis/redis.module';
+import { DeliveryManagementModule } from '../delivery/delivery.module';
 
 @Module({
-  imports: [HelpersModule, FieldEncryptionModule, RedisModule],
+  imports: [HelpersModule, FieldEncryptionModule, RedisModule, DeliveryManagementModule],
   controllers: [
     BranchController,
     ZoneController,

@@ -121,9 +121,10 @@ export default function WarehouseListPage() {
           const q = searchQuery.toLowerCase().trim();
           const matchName = w.name?.toLowerCase().includes(q);
           const matchCode = w.code?.toLowerCase().includes(q);
+          const matchBranch = w.branch_name?.toLowerCase().includes(q);
           const matchCity = w.city?.toLowerCase().includes(q);
           const matchManager = w.manager_name?.toLowerCase().includes(q);
-          if (!matchName && !matchCode && !matchCity && !matchManager) {
+          if (!matchName && !matchCode && !matchBranch && !matchCity && !matchManager) {
             return false;
           }
         }

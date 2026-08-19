@@ -699,6 +699,14 @@ export class AuthService {
     if (!code || !code.trim()) return null;
     const cleanCode = code.trim().toUpperCase();
 
+    const generalInviteCodes = ['APP INVITE', 'APPINVITE', 'APP-INVITE', 'INVITE', 'APP', 'APP_INVITE', 'F2HREF'];
+    if (generalInviteCodes.includes(cleanCode)) {
+      return {
+        user_id: 'APP_INVITE_GENERAL',
+        customer_id: 'APP_INVITE_GENERAL',
+      };
+    }
+
     // 1. Search by referral_code in customers (only valid columns: referral_code, customer_id)
     const noHyphen = cleanCode.replace(/-/g, '');
     const withHyphen = noHyphen.startsWith('F2H') && noHyphen.length > 3 ? 'F2H-' + noHyphen.substring(3) : cleanCode;

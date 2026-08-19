@@ -11,12 +11,14 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { DatabaseService } from '../../../shared/database/Database.service';
 import { DeveloperService } from '../../../shared/logger/Developer.service';
+import { DeliveryManagementService } from '../delivery/delivery.service';
 
 @Injectable()
 export class BranchConfigService {
   constructor(
     private readonly db: DatabaseService,
     private readonly developer: DeveloperService,
+    private readonly deliveryService: DeliveryManagementService,
   ) {}
 
   // ────────────────────────────────────────────────
@@ -112,10 +114,34 @@ export class BranchConfigService {
   async allocatePartner(partnerId: string, branchId: string) {
     try {
       await this.db.query(
-        'UPDATE delivery_partners SET branch_id = $2, updated_at = NOW() WHERE id = $1',
+        'UPDATE delivery_partners SET branch_id = $2, updated_at = NOW() WHERE delivery_partner_id = $1 OR user_id = $1 OR id::text = $1',
         [partnerId, branchId],
       );
-      return { status: true, message: 'Partner allocated to branch' };
+
+      let branchName = 'Unassigned';
+      if (branchId) {
+        const branchRows = await this.db.query(
+          `SELECT branch_name FROM branches WHERE branch_id = $1 OR id::text = $1 LIMIT 1`,
+          [branchId],
+        );
+        if (branchRows && branchRows.length > 0 && branchRows[0].branch_name) {
+          branchName = branchRows[0].branch_name;
+        }
+      }
+
+      // Dispatch notification for new branch name using notifyPartner()
+      try {
+        const title = '🏢 Branch Reassigned';
+        const msg = branchId
+          ? `Your assigned delivery branch has been updated to ${branchName}.`
+          : `Your assigned delivery branch has been updated by the Admin.`;
+
+        await this.deliveryService.notifyPartner(partnerId, title, msg);
+      } catch (notifErr) {
+        this.developer.error('allocatePartner notification error', { notifErr });
+      }
+
+      return { status: true, message: `Partner allocated to ${branchName} branch` };
     } catch (error) {
       this.developer.error('allocatePartner error', { error });
       throw new InternalServerErrorException('Failed to allocate partner');

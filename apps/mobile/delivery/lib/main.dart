@@ -5,14 +5,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:f2h_delivery/app.dart';
 import 'package:f2h_delivery/firebase_options.dart';
-import 'package:f2h_delivery/core/config/app_config.dart';
 import 'package:f2h_delivery/core/di/injection.dart' as di;
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   if (!kIsWeb) {
     try {
-      if (Firebase.apps.isEmpty && AppConfig.firebaseProjectId.isNotEmpty) {
+      if (Firebase.apps.isEmpty) {
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
         );
@@ -26,7 +25,7 @@ void main() async {
   await di.init();
   
   try {
-    if (Firebase.apps.isEmpty && AppConfig.firebaseProjectId.isNotEmpty) {
+    if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );

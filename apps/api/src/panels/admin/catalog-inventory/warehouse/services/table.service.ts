@@ -71,6 +71,8 @@ export class WarehouseTableService {
           warehouse_id: ['warehouses.warehouse_id', true],
           name: ['warehouses.name', true],
           code: ['warehouses.code', true],
+          branch_id: ['warehouses.branch_id', true],
+          branch_name: ['b.branch_name', true],
           warehouse_type: ['warehouses.warehouse_type', true],
           city: ['warehouses.city', true],
           state: ['warehouses.state', true],
@@ -82,7 +84,13 @@ export class WarehouseTableService {
           is_active: ['warehouses.is_active', true],
           created_at: ['warehouses.created_at', true],
         },
-        joins: [],
+        joins: [
+          {
+            type: 'left',
+            table: 'branches b',
+            on: [['warehouses.branch_id', 'b.branch_id']],
+          },
+        ],
         conditions,
         custom: [
           {

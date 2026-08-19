@@ -17,6 +17,8 @@ export interface WarehouseItem {
   warehouse_id?: string;
   name: string;
   code?: string;
+  branch_id?: string;
+  branch_name?: string;
   warehouse_type?: string;
   city?: string;
   state?: string;
@@ -141,13 +143,18 @@ export default function WarehouseCard({
       <div className="p-4 space-y-3">
         {/* HEADER SECTION */}
         <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0 flex-1 flex items-center gap-2">
+          <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
             <h3 className="text-sm font-extrabold text-slate-900 group-hover:text-[#16a34a] transition-colors truncate">
               {warehouse.name}
             </h3>
             {warehouse.code && (
               <span className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px] font-mono font-bold text-slate-600 shrink-0">
                 {warehouse.code}
+              </span>
+            )}
+            {warehouse.branch_name && (
+              <span className="px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200/80 text-[10px] font-bold text-indigo-700 shrink-0">
+                Branch: {warehouse.branch_name}
               </span>
             )}
           </div>

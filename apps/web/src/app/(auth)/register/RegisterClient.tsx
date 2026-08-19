@@ -9,6 +9,7 @@ import { showErrorToast, showSuccessToast } from "../../../components/Toast"
 import { api } from "../../../services/api.client"
 import AuthFlipCard, { useFlip, SOCIAL, Spinner } from "../../../components/AuthFlipCard/AuthFlipCard";
 import { useAlert } from "../../../context/AlertContext"
+import { useGoogleSignIn } from "../../../components/auth/useGoogleSignIn"
 
 const OTP_LENGTH = 6
 const INP = "block w-full rounded-xl border border-gray-200 bg-white text-sm transition-all focus:border-fresh-green focus:ring-2 focus:ring-fresh-green/20 outline-none py-[7px]"
@@ -243,7 +244,7 @@ type Errors = Partial<Record<FormKey, string>>
 export function RegisterContent() {
   const { showAlert } = useAlert()
   const { flipTo } = useFlip()
-  const API_URL = process.env.NEXT_PUBLIC_API_URL
+  const googleSignIn = useGoogleSignIn()
 
   // Field refs for Enter-key focus shifting
   const mobileRef = useRef<HTMLInputElement>(null)
@@ -392,10 +393,32 @@ export function RegisterContent() {
     } finally { setIsLoading(false) }
   }, [form, otpVerified, otpVerificationToken, apiPost, flipTo, validateAll])
 
-  const handleSocialLogin = useCallback((platform: string) => {
-    const phoneParam = form.mobile ? `?phone=${encodeURIComponent(form.mobile)}` : ""
-    window.location.href = `${API_URL}/auth/${platform}${phoneParam}`
-  }, [API_URL, form.mobile])
+  /**
+   * Google Sign-Up.
+   *
+   * This used to navigate to `${API_URL}/auth/google`, which the API never
+   * exposed as a GET — the button always landed on a 404. The browser now takes
+   * an authorization code from Google and posts it to the endpoint that does
+   * exist; the API exchanges it with the client secret and returns a session.
+   *
+   * Google is the only identity here: no phone, email, or name is sent, because
+   * the API ignores client-supplied identity on this route by design.
+   */
+  const handleSocialLogin = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const code = await googleSignIn.requestCode()
+      if (!code) return // chooser dismissed
+
+      await apiPost("/auth/google", { code })
+      showSuccessToast("Signed in with Google 🎉", 3000)
+      window.location.href = "/"
+    } catch (err) {
+      showAlert("Google Sign-In Failed", err instanceof Error ? err.message : "Something went wrong", "error")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [apiPost, googleSignIn, showAlert])
 
   const pwMismatch = form.confirmPassword.length > 0 && form.password !== form.confirmPassword
 
@@ -581,9 +604,9 @@ export function RegisterContent() {
             <div className="flex-1 h-px bg-gray-100" />
           </div>
 
-          {SOCIAL.map(({ id, Icon }) => (
-            <button key={id} onClick={() => handleSocialLogin(id)}
-              className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-fresh-green/30 hover:-translate-y-0.5 transition-all duration-300 font-semibold text-gray-700 text-sm">
+          {googleSignIn.isConfigured && SOCIAL.map(({ id, Icon }) => (
+            <button key={id} type="button" onClick={handleSocialLogin} disabled={isLoading || googleSignIn.isPending}
+              className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-fresh-green/30 hover:-translate-y-0.5 transition-all duration-300 font-semibold text-gray-700 text-sm disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0">
               <Icon className="w-5 h-5 shrink-0" />
               Continue with Google
             </button>

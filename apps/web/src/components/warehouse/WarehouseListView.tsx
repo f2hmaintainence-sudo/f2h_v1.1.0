@@ -90,6 +90,11 @@ export default function WarehouseListView({
                     {warehouse.code}
                   </span>
                 )}
+                {warehouse.branch_name && (
+                  <span className="px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-[11px] font-semibold text-indigo-700">
+                    Branch: {warehouse.branch_name}
+                  </span>
+                )}
                 <span
                   className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${statusBadge.bg}`}
                 >

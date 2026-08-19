@@ -191,20 +191,25 @@ export class ApiIntegrationsService {
         }
       }
 
-      // Default fallback values from environment / safe defaults
+      // Default fallback values, used only when the table has no row. These are
+      // the `f2h-fresh` project's Android values; the retired `f2hfresh-65beb`
+      // credentials that used to sit here were removed with the project. No iOS
+      // app exists in the project yet, so iOS is left empty rather than pointed
+      // at an app id that would fail at Firebase.initializeApp.
       const firebaseConfig = dbConfigs['firebase:client'] || {
-        apiKey: process.env.FIREBASE_ANDROID_API_KEY || 'AIzaSyBMqFkPAenVd4rurNYLxcb17fqRN0Bm47U',
-        appId: process.env.FIREBASE_ANDROID_APP_ID || '1:277443632535:android:a9290d2881da2d5e0b38d2',
-        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '277443632535',
-        projectId: process.env.FIREBASE_PROJECT_ID || 'f2hfresh-65beb',
-        storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'f2hfresh-65beb.firebasestorage.app',
-        iosApiKey: process.env.FIREBASE_IOS_API_KEY || 'AIzaSyBR4Xs71YQTs8Hzlp5Ql5a15ZxD2FfzGxg',
-        iosAppId: process.env.FIREBASE_IOS_APP_ID || '1:1060833982707:ios:64708d0f2c64294ef31f86',
+        apiKey: process.env.FIREBASE_ANDROID_API_KEY || 'AIzaSyAM1WRkJSfx4PTbuIkl4w4A09mCSH777js',
+        appId: process.env.FIREBASE_ANDROID_APP_ID || '1:842214638527:android:1800c0a5729eb74823d70a',
+        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '842214638527',
+        projectId: process.env.FIREBASE_PROJECT_ID || 'f2h-fresh',
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'f2h-fresh.firebasestorage.app',
+        iosApiKey: process.env.FIREBASE_IOS_API_KEY || '',
+        iosAppId: process.env.FIREBASE_IOS_APP_ID || '',
         iosBundleId: process.env.FIREBASE_IOS_BUNDLE_ID || 'com.f2h.customer',
       };
 
       const googleOauth = dbConfigs['oauth:google'] || {
-        serverClientId: process.env.GOOGLE_SERVER_CLIENT_ID || '605526160181-00mmui7o3uuijjgvhgjjs5qbldai544g.apps.googleusercontent.com',
+        serverClientId: process.env.GOOGLE_CLIENT_ID || '',
+        webClientId: process.env.GOOGLE_CLIENT_ID || '',
       };
 
       const mapsConfig = dbConfigs['maps:google_maps'] || {
@@ -212,7 +217,7 @@ export class ApiIntegrationsService {
       };
 
       const razorpayConfig = dbConfigs['payment-gateway:razorpay'] || {
-        keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_default',
+        keyId: process.env.RAZORPAY_KEY_ID || '',
       };
 
       return {

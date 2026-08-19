@@ -339,7 +339,7 @@ export class WarehouseShowAddService {
   // =====================================================
   // WAREHOUSE FIELDS
   // =====================================================
-  warehouseFields(): FieldDef[] {
+  warehouseFields(branchOptions: any[] = []): FieldDef[] {
     return [
       {
         name: 'name',
@@ -359,6 +359,18 @@ export class WarehouseShowAddService {
         group: 'Basic Identity',
         validation: { minLength: 2, maxLength: 50 },
         placeholder: 'e.g., WH-001',
+      },
+      {
+        name: 'branch_id',
+        label: 'Belongs to Branch',
+        type: 'select',
+        required: false,
+        width: 'half',
+        group: 'Basic Identity',
+        options: [
+          { value: '', label: 'Select Branch (Optional)' },
+          ...branchOptions,
+        ],
       },
       {
         name: 'warehouse_type',

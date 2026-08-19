@@ -235,7 +235,7 @@ export class WarehouseSaveAddService {
 
       const WAREHOUSE_COLUMNS = [
 
-        'name', 'code','warehouse_type','address_line_1','address_line_2','city','state','country',
+        'name', 'code', 'warehouse_type', 'branch_id', 'address_line_1', 'address_line_2', 'city', 'state', 'country',
         'pincode','latitude','longitude','manager_name','manager_phone','manager_email','capacity','capacity_unit','temperature_type','is_active','notes',
       ];
 
