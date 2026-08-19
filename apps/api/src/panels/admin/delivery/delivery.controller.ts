@@ -299,6 +299,11 @@ export class DeliveryManagementController {
     return this.dispatchService.getRequirementDates();
   }
 
+  @Get('dispatch/requirements')
+  async getDispatchRequirements(@Query() query: any) {
+    return this.dispatchService.getDispatchRequirements(query);
+  }
+
   @Get('dispatch/summary')
   async getDispatchSummary(@Query() query: any) {
     return this.dispatchService.getDispatchSummary(query);
@@ -307,6 +312,26 @@ export class DeliveryManagementController {
   @Get('dispatch/available-variants')
   async getAvailableVariants() {
     return this.dispatchService.getAvailableVariants();
+  }
+
+  @Get('dispatch/returns')
+  async getDispatchReturns(@Query() query: any) {
+    return this.dispatchService.getDispatchReturns(query);
+  }
+
+  @Get('dispatch/history/items')
+  async getDispatchHistoryItems(@Query() query: any) {
+    return this.dispatchService.getDispatchHistoryItems(query);
+  }
+
+  @Get('dispatch/history/partners')
+  async getDispatchHistoryPartners(@Query() query: any) {
+    return this.dispatchService.getDispatchHistoryPartners(query);
+  }
+
+  @Get('dispatch/:runId/return-preview')
+  async getRunReturnPreview(@Param('runId') runId: string) {
+    return this.dispatchService.getRunReturnPreview(runId);
   }
 
   @Get('dispatch/:runId/items')

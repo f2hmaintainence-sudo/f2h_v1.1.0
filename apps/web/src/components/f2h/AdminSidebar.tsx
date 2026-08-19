@@ -12,7 +12,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ClipboardCheck, TicketPercent, CalendarCheck, Boxes, AlignLeft, TriangleAlert, Users, Package, Truck, BarChart3, Menu, X, ShoppingCart, Wallet, Settings, ClipboardList, UserCog, Shield, RefreshCw, AlertTriangle, PieChart, ChevronDown, MapPin, Banknote, LineChart, BookOpen, Box, Archive, Factory, Clipboard, Building, Building2, ArrowRightLeft, Container, CreditCard, FileText, ShieldAlert, Ticket, Percent, Gift, TrendingUp, Bell, Layers, Calendar, AlertOctagon, ShoppingBag, Clock, Orbit, Activity, IndianRupee, Target, Zap, Eye, UserCheck, BarChart, Gauge, CalendarOff, Tag, Globe } from "lucide-react";
+import { LayoutDashboard, ClipboardCheck, Receipt, TicketPercent, RotateCcw, ArrowLeftRight, CalendarCheck, Boxes, AlignLeft, TriangleAlert, Users, Package, Truck, BarChart3, Menu, X, ShoppingCart, Wallet, Settings, ClipboardList, UserCog, Shield, RefreshCw, AlertTriangle, PieChart, ChevronDown, MapPin, Banknote, LineChart, BookOpen, Box, Archive, Factory, Clipboard, Building, Building2, ArrowRightLeft, Container, CreditCard, FileText, ShieldAlert, Ticket, Percent, Gift, TrendingUp, Bell, Layers, Calendar, AlertOctagon, ShoppingBag, Clock, Orbit, Activity, IndianRupee, Target, Zap, Eye, UserCheck, BarChart, Gauge, CalendarOff, Tag, Globe } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
 const adminNav = [
@@ -89,28 +89,54 @@ const adminNav = [
       },
     ],
   },
+  // {
+  //   label: "FINANCE & REPORTS",
+  //   items: [
+  //     {
+  //       name: "Billings",
+  //       icon: Settings,
+  //       subItems: [
+  //         // { name: "Payments & Billing", href: "/admin/finance/payments", icon: CreditCard },
+  //         { name: "Billing", href: "/admin/finance/billing", icon: CreditCard },
+  //         { name: "Outstandings", href: "/admin/finance/outstandings", icon: CreditCard },
+  //       ]
+  //     },
+  //     {
+  //       name: "Wallet",
+  //       icon: Wallet,
+  //       subItems: [
+  //         { name: "Wallet Transactions", href: "/admin/finance/wallet", icon: Wallet },
+  //         { name: "Refunds", href: "/admin/finance/refunds", icon: ArrowRightLeft },
+  //       ]
+  //     },
+
+  //     { name: "Revenue Reports", href: "/admin/reports/revenue", icon: TrendingUp },
+  //   ],
+  // },
   {
     label: "FINANCE & REPORTS",
     items: [
       {
-        name: "Billings",
-        icon: Settings,
+        name: "Billing",
+        icon: Receipt,
         subItems: [
-          // { name: "Payments & Billing", href: "/admin/finance/payments", icon: CreditCard },
-          { name: "Billing", href: "/admin/finance/billing", icon: CreditCard },
-          { name: "Outstandings", href: "/admin/finance/outstandings", icon: CreditCard },
-        ]
+          { name: "Payments", href: "/admin/finance/payments", icon: CreditCard },
+          { name: "Outstandings", href: "/admin/finance/outstandings", icon: IndianRupee },
+        ],
       },
       {
         name: "Wallet",
         icon: Wallet,
         subItems: [
-          { name: "Wallet Transactions", href: "/admin/finance/wallet", icon: Wallet },
-          { name: "Refunds", href: "/admin/finance/refunds", icon: ArrowRightLeft },
-        ]
+          { name: "Wallet Transactions", href: "/admin/finance/wallet", icon: ArrowLeftRight },
+          { name: "Refunds", href: "/admin/finance/refunds", icon: RotateCcw },
+        ],
       },
-
-      { name: "Revenue Reports", href: "/admin/reports/revenue", icon: TrendingUp },
+      {
+        name: "Revenue Reports",
+        href: "/admin/reports/revenue",
+        icon: TrendingUp,
+      },
     ],
   },
   {
