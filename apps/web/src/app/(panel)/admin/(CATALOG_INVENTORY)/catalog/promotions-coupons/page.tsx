@@ -103,6 +103,164 @@ interface CategoryOption {
   slug?: string;
 }
 
+function BannerVisualPreview({
+  title,
+  discount_text,
+  description,
+  image_url,
+  banner_type,
+  cta_label,
+  background_color,
+  category_name,
+}: {
+  title: string;
+  discount_text?: string;
+  description?: string;
+  image_url?: string;
+  banner_type?: string;
+  cta_label?: string;
+  background_color?: string;
+  category_name?: string;
+}) {
+  const bg = background_color || "#16a34a";
+  const cta = cta_label || "Shop Now";
+
+  if (banner_type === "popup") {
+    return (
+      <div className="mx-auto max-w-[280px] bg-white rounded-3xl overflow-hidden shadow-xl border border-slate-200 animate-in zoom-in-95 duration-200">
+        <div style={{ backgroundColor: bg }} className="h-32 w-full flex items-center justify-center p-3 relative">
+          <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/90 text-slate-700 flex items-center justify-center text-[10px] font-bold shadow-xs">
+            ✕
+          </div>
+          {image_url ? (
+            <img src={image_url} alt="" className="max-h-24 max-w-full object-contain drop-shadow" />
+          ) : (
+            <Smartphone size={36} className="text-white/70" />
+          )}
+        </div>
+        <div className="p-4 text-center space-y-2">
+          {discount_text && (
+            <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-extrabold text-[10px] tracking-wide">
+              {discount_text.toUpperCase()}
+            </span>
+          )}
+          <h4 className="font-extrabold text-sm text-slate-900 leading-tight">{title || "Offer Headline"}</h4>
+          {description && <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">{description}</p>}
+          <div className="pt-1">
+            <button
+              type="button"
+              style={{ backgroundColor: bg }}
+              className="w-full py-2.5 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5"
+            >
+              <span>{cta}</span>
+              <ArrowRight size={13} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (banner_type === "category_slide") {
+    return (
+      <div
+        style={{ backgroundColor: bg }}
+        className="rounded-2xl p-4 text-white relative overflow-hidden flex items-center justify-between min-h-[96px] shadow-sm"
+      >
+        <div className="space-y-1.5 z-10 max-w-[65%]">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="px-2 py-0.5 rounded-md bg-black/25 text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1">
+              <FolderTree size={10} /> Category Slide
+            </span>
+            {discount_text && (
+              <span className="px-2 py-0.5 rounded-md bg-white text-slate-900 font-extrabold text-[9px]">
+                {discount_text}
+              </span>
+            )}
+          </div>
+          <h4 className="font-extrabold text-sm leading-tight line-clamp-1">{title || "Category Offer Title"}</h4>
+          <p className="text-[10px] text-white/85 line-clamp-1">
+            {description || (category_name ? `Target Category: ${category_name}` : "Targeted category promotional slide")}
+          </p>
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-white text-slate-900 px-2.5 py-1 rounded-lg mt-0.5 shadow-xs">
+            {cta} <ArrowRight size={11} />
+          </span>
+        </div>
+        <div className="z-10 w-20 h-20 shrink-0 flex items-center justify-center">
+          {image_url ? (
+            <img src={image_url} alt="" className="max-h-20 max-w-full object-contain drop-shadow" />
+          ) : (
+            <FolderTree size={36} className="text-white/60" />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (banner_type === "checkout_banner") {
+    return (
+      <div className="rounded-2xl p-3.5 bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-amber-500/10 border-2 border-dashed border-emerald-500/40 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div style={{ backgroundColor: bg }} className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-xs">
+            <Percent size={18} />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-xs text-slate-900 truncate">{title || "Checkout Promotion"}</span>
+              {discount_text && (
+                <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[9px] font-bold uppercase">
+                  {discount_text}
+                </span>
+              )}
+            </div>
+            <p className="text-[10px] text-slate-500 truncate">{description || "Applied automatically at checkout"}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          style={{ backgroundColor: bg }}
+          className="px-3 py-1.5 text-white font-bold text-[10px] rounded-lg shrink-0 shadow-xs flex items-center gap-1"
+        >
+          <span>{cta}</span>
+        </button>
+      </div>
+    );
+  }
+
+  // Default: home_carousel
+  return (
+    <div
+      style={{ backgroundColor: bg }}
+      className="rounded-2xl p-4 text-white relative overflow-hidden flex items-center justify-between min-h-[105px] shadow-sm"
+    >
+      <div className="space-y-1.5 z-10 max-w-[65%]">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="px-2 py-0.5 rounded-md bg-black/25 text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1">
+            <Tag size={10} /> Home Carousel
+          </span>
+          {discount_text && (
+            <span className="px-2 py-0.5 rounded-md bg-white text-slate-900 font-extrabold text-[9px]">
+              {discount_text}
+            </span>
+          )}
+        </div>
+        <h4 className="font-extrabold text-sm leading-snug line-clamp-1">{title || "Home Carousel Title"}</h4>
+        <p className="text-[10px] text-white/85 line-clamp-1">{description || "Discover fresh organic harvest & daily essentials"}</p>
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-white text-slate-900 px-3 py-1 rounded-lg mt-0.5 shadow-xs">
+          {cta} <ArrowRight size={11} />
+        </span>
+      </div>
+      <div className="z-10 w-24 h-24 shrink-0 flex items-center justify-center">
+        {image_url ? (
+          <img src={image_url} alt="" className="max-h-24 max-w-full object-contain drop-shadow" />
+        ) : (
+          <ImageIcon size={38} className="text-white/60" />
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function PromotionsCouponsOffersPage() {
   const [activeTab, setActiveTab] = useState<"promotions" | "coupons" | "offers">("promotions");
   const [promotions, setPromotions] = useState<Promotion[]>([]);
@@ -1466,9 +1624,10 @@ export default function PromotionsCouponsOffersPage() {
       {/* MODAL 1: CREATE PROMOTION */}
       {/* ========================================================================= */}
       {isCreatePromoOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-6 shadow-2xl border border-slate-100 my-8">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 my-auto overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#16a34a] flex items-center justify-center font-bold">
                   <Percent size={20} />
@@ -1486,7 +1645,8 @@ export default function PromotionsCouponsOffersPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreatePromo} className="space-y-4 text-xs">
+            {/* Modal Scrollable Body */}
+            <form id="create-promo-form" onSubmit={handleCreatePromo} className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2 space-y-1.5">
                   <label className="font-bold text-slate-700">Promotion Name *</label>
@@ -1635,24 +1795,26 @@ export default function PromotionsCouponsOffersPage() {
                   </label>
                 </div>
               </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsCreatePromoOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-[#16a34a] hover:bg-[#15803d] text-white font-bold rounded-xl shadow-md shadow-emerald-600/20 transition flex items-center gap-2"
-                >
-                  <Plus size={16} />
-                  Create Promotion
-                </button>
-              </div>
             </form>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-end gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsCreatePromoOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="create-promo-form"
+                className="px-5 py-2.5 bg-[#16a34a] hover:bg-[#15803d] text-white font-bold rounded-xl shadow-md shadow-emerald-600/20 transition flex items-center gap-2"
+              >
+                <Plus size={16} />
+                Create Promotion
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1661,9 +1823,10 @@ export default function PromotionsCouponsOffersPage() {
       {/* MODAL 2: CREATE COUPON CODE */}
       {/* ========================================================================= */}
       {isCreateCouponOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-6 shadow-2xl border border-slate-100 my-8">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 my-auto overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold">
                   <Ticket size={20} />
@@ -1681,7 +1844,8 @@ export default function PromotionsCouponsOffersPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateCoupon} className="space-y-4 text-xs">
+            {/* Modal Scrollable Body */}
+            <form id="create-coupon-form" onSubmit={handleCreateCoupon} className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1 text-xs">
               <div className="space-y-1.5">
                 <label className="font-bold text-slate-700">Coupon Code *</label>
                 <input
@@ -1748,35 +1912,38 @@ export default function PromotionsCouponsOffersPage() {
                   />
                 </div>
               </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateCouponOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-md shadow-teal-600/20 transition flex items-center gap-2"
-                >
-                  <Ticket size={16} />
-                  Create Coupon
-                </button>
-              </div>
             </form>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-end gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsCreateCouponOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="create-coupon-form"
+                className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-md shadow-teal-600/20 transition flex items-center gap-2"
+              >
+                <Ticket size={16} />
+                Create Coupon
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 3: CREATE OFFER BANNER (MATCHING SCREENSHOT WITH ALL FIELDS) */}
+      {/* MODAL 3: CREATE OFFER BANNER (SCREEN-FITTED WITH LIVE DYNAMIC PREVIEW) */}
       {/* ========================================================================= */}
       {isCreateOfferOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-6 shadow-2xl border border-slate-100 my-8">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 my-auto overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
                   <Tag size={20} />
@@ -1794,10 +1961,14 @@ export default function PromotionsCouponsOffersPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateOffer} className="space-y-6 text-xs">
+            {/* Modal Scrollable Body */}
+            <form id="create-offer-form" onSubmit={handleCreateOffer} className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 text-xs">
               {/* SECTION 0: BANNER PLACEMENT & TYPE */}
               <div className="space-y-3">
-                <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Banner Placement &amp; Type *</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Banner Placement &amp; Type *</span>
+                  <span className="text-[11px] font-semibold text-emerald-600 capitalize">{offerForm.banner_type.replace('_', ' ')}</span>
+                </div>
                 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   {[
@@ -1821,7 +1992,7 @@ export default function PromotionsCouponsOffersPage() {
                         }
                         className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
                           isSelected
-                            ? "bg-emerald-50/80 border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-950"
+                            ? "bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-950 shadow-xs"
                             : "bg-slate-50 hover:bg-white border-slate-200 text-slate-700"
                         }`}
                       >
@@ -1969,7 +2140,9 @@ export default function PromotionsCouponsOffersPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="font-bold text-slate-700">Redirection Category (If Category Target)</label>
+                    <label className="font-bold text-slate-700">
+                      Redirection Category {offerForm.banner_type === "category_slide" ? "(Target Slide Category *)" : "(If Category Target)"}
+                    </label>
                     <select
                       value={offerForm.category_id}
                       onChange={(e) => setOfferForm({ ...offerForm, category_id: e.target.value })}
@@ -2057,59 +2230,55 @@ export default function PromotionsCouponsOffersPage() {
                 </div>
               </div>
 
-              {/* Banner Live Preview in Modal */}
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/60 space-y-1.5">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Live Banner Card Preview:</div>
-                <div
-                  style={{ backgroundColor: offerForm.background_color }}
-                  className="p-4 rounded-2xl text-white relative overflow-hidden flex flex-col justify-between h-28 shadow-sm"
-                >
-                  <div className="space-y-0.5 relative z-10">
-                    <span className="inline-block px-2 py-0.5 rounded bg-white/20 text-[9px] font-extrabold">
-                      {offerForm.discount_text || "OFFER"}
-                    </span>
-                    <h5 className="font-bold text-xs">{offerForm.title || "Offer Title"}</h5>
-                    <p className="text-[10px] text-white/80 line-clamp-1">{offerForm.description || "Description..."}</p>
-                  </div>
-                  <div className="relative z-10 flex items-center justify-between">
-                    <span className="text-[9px] font-bold bg-white text-slate-900 px-2.5 py-1 rounded-lg">
-                      {offerForm.cta_label || "Shop Now"}
-                    </span>
-                    <span className="text-[9px] text-white/70">
-                      Order #{offerForm.display_order} · {offerForm.action_type}
-                    </span>
-                  </div>
+              {/* DYNAMIC LIVE BANNER PREVIEW ACCORDING TO TYPE */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                  <span>Live Preview ({offerForm.banner_type.replace('_', ' ')}):</span>
+                  <span className="text-[10px] text-emerald-600 font-bold">Dynamic Rendering</span>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateOfferOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-[#16a34a] hover:bg-[#15803d] text-white font-bold rounded-xl shadow-md shadow-emerald-600/20 transition flex items-center gap-2"
-                >
-                  <Plus size={16} />
-                  Save Offer
-                </button>
+                <BannerVisualPreview
+                  title={offerForm.title}
+                  discount_text={offerForm.discount_text}
+                  description={offerForm.description}
+                  image_url={offerForm.banner_image || offerForm.image_url}
+                  banner_type={offerForm.banner_type}
+                  cta_label={offerForm.cta_label}
+                  background_color={offerForm.background_color}
+                  category_name={getCategoryName(offerForm.category_id)}
+                />
               </div>
             </form>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-end gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsCreateOfferOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="create-offer-form"
+                className="px-5 py-2.5 bg-[#16a34a] hover:bg-[#15803d] text-white font-bold rounded-xl shadow-md shadow-emerald-600/20 transition flex items-center gap-2"
+              >
+                <Plus size={16} />
+                Save Offer Banner
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 3B: EDIT OFFER BANNER */}
+      {/* MODAL 3B: EDIT OFFER BANNER (SCREEN-FITTED WITH LIVE DYNAMIC PREVIEW) */}
       {/* ========================================================================= */}
       {isEditOfferOpen && editingOffer && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-6 shadow-2xl border border-slate-100 my-8">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 my-auto overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
                   <Edit3 size={20} />
@@ -2127,10 +2296,14 @@ export default function PromotionsCouponsOffersPage() {
               </button>
             </div>
 
-            <form onSubmit={handleUpdateOffer} className="space-y-6 text-xs">
+            {/* Modal Scrollable Body */}
+            <form id="edit-offer-form" onSubmit={handleUpdateOffer} className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 text-xs">
               {/* SECTION 0: BANNER PLACEMENT & TYPE */}
               <div className="space-y-3">
-                <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Banner Placement &amp; Type *</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Banner Placement &amp; Type *</span>
+                  <span className="text-[11px] font-semibold text-amber-600 capitalize">{editOfferForm.banner_type.replace('_', ' ')}</span>
+                </div>
                 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   {[
@@ -2154,7 +2327,7 @@ export default function PromotionsCouponsOffersPage() {
                         }
                         className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
                           isSelected
-                            ? "bg-amber-50/80 border-amber-500 ring-2 ring-amber-500/20 text-amber-950"
+                            ? "bg-amber-50 border-amber-500 ring-2 ring-amber-500/20 text-amber-950 shadow-xs"
                             : "bg-slate-50 hover:bg-white border-slate-200 text-slate-700"
                         }`}
                       >
@@ -2302,7 +2475,9 @@ export default function PromotionsCouponsOffersPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="font-bold text-slate-700">Redirection Category (If Category Target)</label>
+                    <label className="font-bold text-slate-700">
+                      Redirection Category {editOfferForm.banner_type === "category_slide" ? "(Target Slide Category *)" : "(If Category Target)"}
+                    </label>
                     <select
                       value={editOfferForm.category_id}
                       onChange={(e) => setEditOfferForm({ ...editOfferForm, category_id: e.target.value })}
@@ -2390,59 +2565,55 @@ export default function PromotionsCouponsOffersPage() {
                 </div>
               </div>
 
-              {/* Banner Live Preview in Modal */}
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/60 space-y-1.5">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Live Banner Card Preview:</div>
-                <div
-                  style={{ backgroundColor: editOfferForm.background_color }}
-                  className="p-4 rounded-2xl text-white relative overflow-hidden flex flex-col justify-between h-28 shadow-sm"
-                >
-                  <div className="space-y-0.5 relative z-10">
-                    <span className="inline-block px-2 py-0.5 rounded bg-white/20 text-[9px] font-extrabold">
-                      {editOfferForm.discount_text || "OFFER"}
-                    </span>
-                    <h5 className="font-bold text-xs">{editOfferForm.title || "Offer Title"}</h5>
-                    <p className="text-[10px] text-white/80 line-clamp-1">{editOfferForm.description || "Description..."}</p>
-                  </div>
-                  <div className="relative z-10 flex items-center justify-between">
-                    <span className="text-[9px] font-bold bg-white text-slate-900 px-2.5 py-1 rounded-lg">
-                      {editOfferForm.cta_label || "Shop Now"}
-                    </span>
-                    <span className="text-[9px] text-white/70">
-                      Order #{editOfferForm.display_order} · {editOfferForm.action_type}
-                    </span>
-                  </div>
+              {/* DYNAMIC LIVE BANNER PREVIEW ACCORDING TO TYPE */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                  <span>Live Preview ({editOfferForm.banner_type.replace('_', ' ')}):</span>
+                  <span className="text-[10px] text-amber-600 font-bold">Dynamic Rendering</span>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsEditOfferOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-md shadow-amber-600/20 transition flex items-center gap-2"
-                >
-                  <Check size={16} />
-                  Update Offer
-                </button>
+                <BannerVisualPreview
+                  title={editOfferForm.title}
+                  discount_text={editOfferForm.discount_text}
+                  description={editOfferForm.description}
+                  image_url={editOfferForm.banner_image || editOfferForm.image_url}
+                  banner_type={editOfferForm.banner_type}
+                  cta_label={editOfferForm.cta_label}
+                  background_color={editOfferForm.background_color}
+                  category_name={getCategoryName(editOfferForm.category_id)}
+                />
               </div>
             </form>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-end gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsEditOfferOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="edit-offer-form"
+                className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-md shadow-amber-600/20 transition flex items-center gap-2"
+              >
+                <Check size={16} />
+                Update Offer Banner
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 3C: EDIT PROMOTION */}
+      {/* MODAL 3C: EDIT PROMOTION (WITH COMPLETE RULES, FLAGS & LIMITS) */}
       {/* ========================================================================= */}
       {isEditPromoOpen && editingPromo && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-6 shadow-2xl border border-slate-100 my-8">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 my-auto overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
                   <Edit3 size={20} />
@@ -2460,9 +2631,10 @@ export default function PromotionsCouponsOffersPage() {
               </button>
             </div>
 
-            <form onSubmit={handleUpdatePromo} className="space-y-4 text-xs">
+            {/* Modal Scrollable Body */}
+            <form id="edit-promo-form" onSubmit={handleUpdatePromo} className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-1 text-xs">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+                <div className="md:col-span-2 space-y-1.5">
                   <label className="font-bold text-slate-700">Promotion Name *</label>
                   <input
                     type="text"
@@ -2470,6 +2642,17 @@ export default function PromotionsCouponsOffersPage() {
                     value={editPromoForm.name}
                     onChange={(e) => setEditPromoForm({ ...editPromoForm, name: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div className="md:col-span-2 space-y-1.5">
+                  <label className="font-bold text-slate-700">Description</label>
+                  <textarea
+                    rows={2}
+                    value={editPromoForm.description}
+                    onChange={(e) => setEditPromoForm({ ...editPromoForm, description: e.target.value })}
+                    placeholder="Brief description for customer facing banner or checkout..."
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
 
@@ -2484,22 +2667,35 @@ export default function PromotionsCouponsOffersPage() {
                     <option value="fixed_amount">Fixed Amount Discount (₹)</option>
                   </select>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
                   <label className="font-bold text-slate-700">
                     Discount Value {editPromoForm.promotion_type === "percentage" ? "(%)" : "(₹)"} *
                   </label>
                   <input
                     type="number"
-                    min="1"
+                    min="0.1"
+                    step="0.01"
                     required
                     value={editPromoForm.discount_value}
                     onChange={(e) => setEditPromoForm({ ...editPromoForm, discount_value: parseFloat(e.target.value) || 0 })}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
+
+                {editPromoForm.promotion_type === "percentage" && (
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Max Discount Amount Cap (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editPromoForm.max_discount_amount}
+                      onChange={(e) => setEditPromoForm({ ...editPromoForm, max_discount_amount: parseFloat(e.target.value) || 0 })}
+                      placeholder="e.g. 100"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-1.5">
                   <label className="font-bold text-slate-700">Min Order Amount (₹)</label>
@@ -2513,7 +2709,30 @@ export default function PromotionsCouponsOffersPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700">Status</label>
+                  <label className="font-bold text-slate-700">Usage Limit Per Customer</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editPromoForm.usage_limit_per_customer}
+                    onChange={(e) => setEditPromoForm({ ...editPromoForm, usage_limit_per_customer: parseInt(e.target.value) || 1 })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">Global Total Usage Limit</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editPromoForm.usage_limit}
+                    onChange={(e) => setEditPromoForm({ ...editPromoForm, usage_limit: parseInt(e.target.value) || 0 })}
+                    placeholder="e.g. 1000"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">Promotion Status</label>
                   <select
                     value={editPromoForm.status}
                     onChange={(e) => setEditPromoForm({ ...editPromoForm, status: e.target.value as any })}
@@ -2526,46 +2745,84 @@ export default function PromotionsCouponsOffersPage() {
                 </div>
               </div>
 
-              {editPromoForm.promotion_type === "percentage" && (
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700">Max Discount Amount Cap (₹)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={editPromoForm.max_discount_amount}
-                    onChange={(e) => setEditPromoForm({ ...editPromoForm, max_discount_amount: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
+              {/* Checkbox Promotion Rules & Flags */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-3">
+                <div className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider flex items-center justify-between">
+                  <span>Promotion Rules &amp; Flags</span>
+                  <span className="text-[10px] text-amber-700 font-bold">Eligibility Controls</span>
                 </div>
-              )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="flex items-center gap-2.5 cursor-pointer font-semibold text-slate-800 bg-white p-2.5 rounded-xl border border-slate-200 hover:border-amber-400 transition">
+                    <input
+                      type="checkbox"
+                      checked={editPromoForm.auto_apply}
+                      onChange={(e) => setEditPromoForm({ ...editPromoForm, auto_apply: e.target.checked })}
+                      className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
+                    />
+                    <span>Auto Apply at Checkout</span>
+                  </label>
 
-              <div className="space-y-1.5">
-                <label className="font-bold text-slate-700">Description</label>
-                <textarea
-                  rows={2}
-                  value={editPromoForm.description}
-                  onChange={(e) => setEditPromoForm({ ...editPromoForm, description: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                />
-              </div>
+                  <label className="flex items-center gap-2.5 cursor-pointer font-semibold text-slate-800 bg-white p-2.5 rounded-xl border border-slate-200 hover:border-amber-400 transition">
+                    <input
+                      type="checkbox"
+                      checked={editPromoForm.first_order_only}
+                      onChange={(e) => setEditPromoForm({ ...editPromoForm, first_order_only: e.target.checked })}
+                      className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
+                    />
+                    <span>First Order Only (New User)</span>
+                  </label>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsEditPromoOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-md shadow-amber-600/20 transition flex items-center gap-2"
-                >
-                  <Check size={16} />
-                  Update Promotion
-                </button>
+                  <label className="flex items-center gap-2.5 cursor-pointer font-semibold text-slate-800 bg-white p-2.5 rounded-xl border border-slate-200 hover:border-amber-400 transition">
+                    <input
+                      type="checkbox"
+                      checked={editPromoForm.apply_to_all_products}
+                      onChange={(e) => setEditPromoForm({ ...editPromoForm, apply_to_all_products: e.target.checked })}
+                      className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
+                    />
+                    <span>Apply to All Products</span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 cursor-pointer font-semibold text-slate-800 bg-white p-2.5 rounded-xl border border-slate-200 hover:border-amber-400 transition">
+                    <input
+                      type="checkbox"
+                      checked={editPromoForm.stackable}
+                      onChange={(e) => setEditPromoForm({ ...editPromoForm, stackable: e.target.checked })}
+                      className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
+                    />
+                    <span>Stackable with Coupons</span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 cursor-pointer font-semibold text-slate-800 bg-white p-2.5 rounded-xl border border-slate-200 hover:border-amber-400 transition sm:col-span-2">
+                    <input
+                      type="checkbox"
+                      checked={editPromoForm.allow_subscription_orders}
+                      onChange={(e) => setEditPromoForm({ ...editPromoForm, allow_subscription_orders: e.target.checked })}
+                      className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
+                    />
+                    <span>Allow on Subscription Orders</span>
+                  </label>
+                </div>
               </div>
             </form>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-end gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsEditPromoOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="edit-promo-form"
+                className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-md shadow-amber-600/20 transition flex items-center gap-2"
+              >
+                <Check size={16} />
+                Update Promotion
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -2574,9 +2831,10 @@ export default function PromotionsCouponsOffersPage() {
       {/* MODAL 3D: EDIT COUPON */}
       {/* ========================================================================= */}
       {isEditCouponOpen && editingCoupon && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-6 shadow-2xl border border-slate-100 my-8">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 my-auto overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
                   <Edit3 size={20} />
@@ -2594,7 +2852,8 @@ export default function PromotionsCouponsOffersPage() {
               </button>
             </div>
 
-            <form onSubmit={handleUpdateCoupon} className="space-y-4 text-xs">
+            {/* Modal Scrollable Body */}
+            <form id="edit-coupon-form" onSubmit={handleUpdateCoupon} className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1 text-xs">
               <div className="space-y-1.5">
                 <label className="font-bold text-slate-700">Coupon Code</label>
                 <input
@@ -2657,82 +2916,104 @@ export default function PromotionsCouponsOffersPage() {
                   <option value="draft">Draft</option>
                 </select>
               </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsEditCouponOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-md shadow-amber-600/20 transition flex items-center gap-2"
-                >
-                  <Check size={16} />
-                  Update Coupon
-                </button>
-              </div>
             </form>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-end gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsEditCouponOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="edit-coupon-form"
+                className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-md shadow-amber-600/20 transition flex items-center gap-2"
+              >
+                <Check size={16} />
+                Update Coupon
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 4: POPUP BANNER PREVIEW MOCKUP */}
+      {/* MODAL 4: BANNER PREVIEW MOCKUP (SCREEN-FITTED DYNAMIC VIEW BY TYPE) */}
       {/* ========================================================================= */}
       {popupPreviewModalOpen && previewOffer && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="relative bg-white rounded-3xl max-w-sm w-full overflow-hidden shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200">
-            {/* Top Close Button */}
-            <button
-              onClick={() => setPopupPreviewModalOpen(false)}
-              className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-white text-slate-800 shadow-md flex items-center justify-center hover:bg-slate-100 transition"
-            >
-              <X size={16} />
-            </button>
-
-            {/* Banner Top Image */}
-            <div
-              style={{ backgroundColor: previewOffer.background_color || "#16a34a" }}
-              className="h-48 w-full flex items-center justify-center relative p-4"
-            >
-              {previewOffer.image_url ? (
-                <img
-                  src={previewOffer.image_url}
-                  alt=""
-                  className="max-h-36 max-w-full object-contain drop-shadow-md"
-                />
-              ) : (
-                <ImageIcon size={48} className="text-white/60" />
-              )}
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 my-auto overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-[#16a34a] flex items-center justify-center font-bold">
+                  <Eye size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Banner Live Rendering</h3>
+                  <p className="text-[11px] text-slate-500 capitalize">
+                    {(previewOffer.banner_type || (previewOffer.is_popup ? "popup" : "home_carousel")).replace('_', ' ')}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPopupPreviewModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
             </div>
 
-            {/* Details & CTA */}
-            <div className="p-6 text-center space-y-3">
-              {previewOffer.discount_text && (
-                <span className="inline-block px-3 py-1 rounded-lg bg-amber-100 text-amber-900 font-extrabold text-xs tracking-wide">
-                  {previewOffer.discount_text.toUpperCase()}
-                </span>
-              )}
+            {/* Modal Scrollable Body */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1">
+              <BannerVisualPreview
+                title={previewOffer.title}
+                discount_text={previewOffer.discount_text}
+                description={previewOffer.description}
+                image_url={previewOffer.image_url}
+                banner_type={previewOffer.banner_type || (previewOffer.is_popup ? "popup" : "home_carousel")}
+                cta_label={previewOffer.cta_label}
+                background_color={previewOffer.background_color}
+                category_name={getCategoryName(previewOffer.category_id)}
+              />
 
-              <h3 className="text-lg font-black text-slate-900">{previewOffer.title}</h3>
-
-              {previewOffer.description && (
-                <p className="text-xs text-slate-500 leading-relaxed">{previewOffer.description}</p>
-              )}
-
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => setPopupPreviewModalOpen(false)}
-                  className="w-full py-3 bg-[#16a34a] hover:bg-[#15803d] text-white font-bold text-sm rounded-2xl shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-2"
-                >
-                  <span>{previewOffer.cta_label || "Shop Now"}</span>
-                  <ArrowRight size={16} />
-                </button>
+              {/* Offer Info Metadata Card */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-1.5 text-xs">
+                <div className="flex items-center justify-between text-slate-600">
+                  <span className="font-medium text-slate-500">Action Type:</span>
+                  <span className="font-bold text-slate-800">{previewOffer.action_type || "BROWSE"}</span>
+                </div>
+                {previewOffer.category_id && (
+                  <div className="flex items-center justify-between text-slate-600">
+                    <span className="font-medium text-slate-500">Target Category:</span>
+                    <span className="font-bold text-slate-800">{getCategoryName(previewOffer.category_id)}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between text-slate-600">
+                  <span className="font-medium text-slate-500">Display Order:</span>
+                  <span className="font-bold text-slate-800">#{previewOffer.display_order}</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-600">
+                  <span className="font-medium text-slate-500">Status:</span>
+                  <span className={`font-bold ${previewOffer.is_active ? "text-emerald-600" : "text-slate-400"}`}>
+                    {previewOffer.is_active ? "Active" : "Inactive"}
+                  </span>
+                </div>
               </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50/80 flex items-center justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setPopupPreviewModalOpen(false)}
+                className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition"
+              >
+                Close Preview
+              </button>
             </div>
           </div>
         </div>
@@ -2742,9 +3023,10 @@ export default function PromotionsCouponsOffersPage() {
       {/* MODAL 5: MANAGE TARGETED PRODUCTS */}
       {/* ========================================================================= */}
       {isManageProductsOpen && selectedPromoForProducts && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-6 shadow-2xl border border-slate-100 my-8">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 my-auto overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
                   <Boxes size={20} />
@@ -2764,118 +3046,122 @@ export default function PromotionsCouponsOffersPage() {
               </button>
             </div>
 
-            {/* Currently Linked Variants */}
-            <div className="space-y-2">
-              <div className="text-xs font-bold text-slate-700">Currently Linked Variants:</div>
-              {selectedPromoForProducts.targeted_products && selectedPromoForProducts.targeted_products.length > 0 ? (
-                <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-2xl p-2 bg-slate-50">
-                  {selectedPromoForProducts.targeted_products.map((tp) => (
-                    <div key={tp.variant_id} className="flex items-center justify-between p-2 hover:bg-white rounded-xl transition text-xs">
-                      <div>
-                        <div className="font-bold text-slate-900">{tp.product_name} - {tp.variant_name}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">{tp.variant_id} · ₹{tp.price}</div>
+            {/* Modal Scrollable Body */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-1 text-xs">
+              {/* Currently Linked Variants */}
+              <div className="space-y-2">
+                <div className="text-xs font-bold text-slate-700">Currently Linked Variants:</div>
+                {selectedPromoForProducts.targeted_products && selectedPromoForProducts.targeted_products.length > 0 ? (
+                  <div className="max-h-44 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-2xl p-2 bg-slate-50">
+                    {selectedPromoForProducts.targeted_products.map((tp) => (
+                      <div key={tp.variant_id} className="flex items-center justify-between p-2 hover:bg-white rounded-xl transition text-xs">
+                        <div>
+                          <div className="font-bold text-slate-900">{tp.product_name} - {tp.variant_name}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">{tp.variant_id} · ₹{tp.price}</div>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveProductFromPromo(tp.variant_id)}
+                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
+                          title="Remove Variant"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
-                      <button
-                        onClick={() => handleRemoveProductFromPromo(tp.variant_id)}
-                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
-                        title="Remove Variant"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-5 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
+                    No specific variants linked yet. All products apply if "Apply to All Products" is checked.
+                  </div>
+                )}
+              </div>
+
+              {/* Link New Variants */}
+              <div className="space-y-3 pt-3 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold text-slate-700">Add Product Variants to Promotion:</div>
+                  <div className="text-xs font-semibold text-purple-700">{selectedVariantIds.length} Selected</div>
                 </div>
-              ) : (
-                <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
-                  No specific variants linked yet.
+
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    placeholder="Search catalog products..."
+                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
                 </div>
-              )}
+
+                <div className="max-h-44 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-2xl p-2 bg-white">
+                  {catalogProducts
+                    .filter((cp) =>
+                      cp.product_name?.toLowerCase().includes(productSearch.toLowerCase()) ||
+                      cp.variant_name?.toLowerCase().includes(productSearch.toLowerCase()) ||
+                      cp.variant_id?.toLowerCase().includes(productSearch.toLowerCase())
+                    )
+                    .map((cp) => {
+                      const isSelected = selectedVariantIds.includes(cp.variant_id);
+                      const isAlreadyLinked = selectedPromoForProducts.targeted_products?.some(
+                        (tp) => tp.variant_id === cp.variant_id
+                      );
+
+                      return (
+                        <div
+                          key={cp.variant_id}
+                          onClick={() => {
+                            if (isAlreadyLinked) return;
+                            if (isSelected) {
+                              setSelectedVariantIds(selectedVariantIds.filter((id) => id !== cp.variant_id));
+                            } else {
+                              setSelectedVariantIds([...selectedVariantIds, cp.variant_id]);
+                            }
+                          }}
+                          className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition text-xs ${
+                            isAlreadyLinked
+                              ? "opacity-40 cursor-not-allowed bg-slate-50"
+                              : isSelected
+                              ? "bg-purple-50 border border-purple-200 text-purple-900"
+                              : "hover:bg-slate-50 text-slate-700"
+                          }`}
+                        >
+                          <div>
+                            <div className="font-bold">{cp.product_name} - {cp.variant_name}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">{cp.variant_id} · ₹{cp.price}</div>
+                          </div>
+                          {isAlreadyLinked ? (
+                            <span className="text-[10px] font-bold text-slate-400">Already Added</span>
+                          ) : isSelected ? (
+                            <CheckCircle2 size={16} className="text-purple-600" />
+                          ) : (
+                            <Plus size={16} className="text-slate-400" />
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
             </div>
 
-            {/* Link New Variants */}
-            <div className="space-y-3 pt-4 border-t border-slate-100">
-              <div className="flex items-center justify-between">
-                <div className="text-xs font-bold text-slate-700">Add Product Variants to Promotion:</div>
-                <div className="text-xs text-slate-500">{selectedVariantIds.length} Selected</div>
-              </div>
-
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={productSearch}
-                  onChange={(e) => setProductSearch(e.target.value)}
-                  placeholder="Search catalog products..."
-                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-
-              <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-2xl p-2 bg-white">
-                {catalogProducts
-                  .filter((cp) =>
-                    cp.product_name?.toLowerCase().includes(productSearch.toLowerCase()) ||
-                    cp.variant_name?.toLowerCase().includes(productSearch.toLowerCase()) ||
-                    cp.variant_id?.toLowerCase().includes(productSearch.toLowerCase())
-                  )
-                  .map((cp) => {
-                    const isSelected = selectedVariantIds.includes(cp.variant_id);
-                    const isAlreadyLinked = selectedPromoForProducts.targeted_products?.some(
-                      (tp) => tp.variant_id === cp.variant_id
-                    );
-
-                    return (
-                      <div
-                        key={cp.variant_id}
-                        onClick={() => {
-                          if (isAlreadyLinked) return;
-                          if (isSelected) {
-                            setSelectedVariantIds(selectedVariantIds.filter((id) => id !== cp.variant_id));
-                          } else {
-                            setSelectedVariantIds([...selectedVariantIds, cp.variant_id]);
-                          }
-                        }}
-                        className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition text-xs ${
-                          isAlreadyLinked
-                            ? "opacity-40 cursor-not-allowed bg-slate-50"
-                            : isSelected
-                            ? "bg-purple-50 border border-purple-200 text-purple-900"
-                            : "hover:bg-slate-50 text-slate-700"
-                        }`}
-                      >
-                        <div>
-                          <div className="font-bold">{cp.product_name} - {cp.variant_name}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">{cp.variant_id} · ₹{cp.price}</div>
-                        </div>
-                        {isAlreadyLinked ? (
-                          <span className="text-[10px] font-bold text-slate-400">Already Added</span>
-                        ) : isSelected ? (
-                          <CheckCircle2 size={16} className="text-purple-600" />
-                        ) : (
-                          <Plus size={16} className="text-slate-400" />
-                        )}
-                      </div>
-                    );
-                  })}
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsManageProductsOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition text-xs"
-                >
-                  Done
-                </button>
-                <button
-                  type="button"
-                  disabled={selectedVariantIds.length === 0}
-                  onClick={handleAddProductsToPromo}
-                  className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 text-white font-bold rounded-xl shadow-md shadow-purple-600/20 transition flex items-center gap-2 text-xs"
-                >
-                  <Plus size={16} />
-                  Link {selectedVariantIds.length} Variants
-                </button>
-              </div>
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-end gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsManageProductsOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition text-xs"
+              >
+                Done
+              </button>
+              <button
+                type="button"
+                disabled={selectedVariantIds.length === 0}
+                onClick={handleAddProductsToPromo}
+                className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 text-white font-bold rounded-xl shadow-md shadow-purple-600/20 transition flex items-center gap-2 text-xs"
+              >
+                <Plus size={16} />
+                Link {selectedVariantIds.length} Variants
+              </button>
             </div>
           </div>
         </div>
@@ -2885,9 +3171,10 @@ export default function PromotionsCouponsOffersPage() {
       {/* MODAL 6: VIEW REDEMPTIONS */}
       {/* ========================================================================= */}
       {isRedemptionsOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-6 shadow-2xl border border-slate-100 my-8">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 my-auto overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
                   <Users size={20} />
@@ -2905,47 +3192,51 @@ export default function PromotionsCouponsOffersPage() {
               </button>
             </div>
 
-            {loadingRedemptions ? (
-              <div className="p-12 text-center text-xs text-slate-400">Loading redemptions...</div>
-            ) : redemptionsData.length === 0 ? (
-              <div className="p-12 text-center text-xs text-slate-400">No redemptions claimed yet.</div>
-            ) : (
-              <div className="overflow-x-auto max-h-72 divide-y divide-slate-100 border border-slate-200 rounded-2xl">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold">
-                    <tr>
-                      <th className="p-3">Customer</th>
-                      <th className="p-3">Order ID</th>
-                      <th className="p-3">Discount</th>
-                      <th className="p-3 text-right">Redeemed At</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {redemptionsData.map((r, i) => (
-                      <tr key={i} className="hover:bg-slate-50/60">
-                        <td className="p-3 font-semibold text-slate-800">
-                          {r.first_name ? `${r.first_name} ${r.last_name || ""}` : r.customer_id}
-                          {r.phone && <div className="text-[10px] text-slate-400">{r.phone}</div>}
-                        </td>
-                        <td className="p-3 font-mono font-bold text-slate-900">{r.order_id}</td>
-                        <td className="p-3 font-bold text-[#16a34a]">₹{Number(r.discount_amount)}</td>
-                        <td className="p-3 text-right text-slate-400 text-[11px]">
-                          {r.redeemed_at ? new Date(r.redeemed_at).toLocaleString("en-IN") : "—"}
-                        </td>
+            {/* Modal Scrollable Body */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1">
+              {loadingRedemptions ? (
+                <div className="p-12 text-center text-xs text-slate-400">Loading redemptions...</div>
+              ) : redemptionsData.length === 0 ? (
+                <div className="p-12 text-center text-xs text-slate-400">No redemptions claimed yet.</div>
+              ) : (
+                <div className="overflow-x-auto divide-y divide-slate-100 border border-slate-200 rounded-2xl">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold">
+                      <tr>
+                        <th className="p-3">Customer</th>
+                        <th className="p-3">Order ID</th>
+                        <th className="p-3">Discount</th>
+                        <th className="p-3 text-right">Redeemed At</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {redemptionsData.map((r, i) => (
+                        <tr key={i} className="hover:bg-slate-50/60">
+                          <td className="p-3 font-semibold text-slate-800">
+                            {r.first_name ? `${r.first_name} ${r.last_name || ""}` : r.customer_id}
+                            {r.phone && <div className="text-[10px] text-slate-400">{r.phone}</div>}
+                          </td>
+                          <td className="p-3 font-mono font-bold text-slate-900">{r.order_id}</td>
+                          <td className="p-3 font-bold text-[#16a34a]">₹{Number(r.discount_amount)}</td>
+                          <td className="p-3 text-right text-slate-400 text-[11px]">
+                            {r.redeemed_at ? new Date(r.redeemed_at).toLocaleString("en-IN") : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
 
-            <div className="flex justify-end pt-2">
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/80 flex justify-end shrink-0">
               <button
                 type="button"
                 onClick={() => setIsRedemptionsOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition"
+                className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition"
               >
-                Close
+                Close Redemptions
               </button>
             </div>
           </div>
