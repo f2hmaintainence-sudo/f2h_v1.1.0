@@ -57,10 +57,6 @@ export class CartDto {
   @ValidateNested({ each: true })
   @Type(() => CartSyncItemDto)
   items: CartSyncItemDto[];
-
-  @IsOptional()
-  @IsString()
-  customer_id?: string;
 }
 
 export { CartDto as CreateCartDto };
@@ -93,8 +89,11 @@ export class CheckOutDto {
   @Type(() => OnetimeCheckoutItemDto)
   items: OnetimeCheckoutItemDto[];
 
-  @IsString()
-  @IsOptional()
+  /**
+   * Set by the controller from the authenticated token, never accepted from the
+   * client. It is not decorated, so the global ValidationPipe's whitelist strips
+   * any value a caller tries to send.
+   */
   customer_id?: string;
 
   @IsString()

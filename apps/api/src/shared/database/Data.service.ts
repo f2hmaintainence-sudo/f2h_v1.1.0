@@ -2,6 +2,7 @@ import {
   Injectable,
   Logger,
   BadRequestException,
+  InternalServerErrorException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { DatabaseService } from './Database.service';
@@ -438,11 +439,11 @@ export class DataService {
         message: 'Dynamic query executed',
       } as QueryResponse;
     } catch (error: any) {
-      console.error('[DataService] Database query error!', error);
+      // `bindings` hold real row values (password hashes, encrypted PII, wallet
+      // amounts) and are deliberately not logged.
       this.Developer.error('Database Error (shared conn)', {
         table,
-        sql,
-        bindings,
+        errorCode: error?.code,
         error: error?.message,
       });
       return {
@@ -450,7 +451,6 @@ export class DataService {
         data: [],
         message: 'Database query failed',
         query: sql,
-        bindings: bindings,
       } as unknown as QueryResponse;
     }
     // NOTE: No finally/release â€” caller manages the connection lifecycle
@@ -710,10 +710,11 @@ export class DataService {
         // bindings,
       } as QueryResponse;
     } catch (error: any) {
+      // Bound parameters are row values and are never logged — see the note on the
+      // shared-connection path above.
       this.Developer.error('Database Error', {
         table,
-        sql,
-        bindings,
+        errorCode: error?.code,
         error: error?.message,
       });
       return {
@@ -721,13 +722,19 @@ export class DataService {
         data: [],
         message: error?.message ?? 'Unexpected dynamic error',
         query: sql,
-        bindings,
       };
     } finally {
       conn?.release?.();
     }
   }
-  // 1. ADD this new method after the query() method (around line 716)
+  /**
+   * Runs `work` inside a transaction, rolling back on any thrown error.
+   *
+   * Note that the write helpers below report a failure by RETURNING
+   * `{ status: false }` rather than by throwing — so a caller must check the result
+   * of every write, or use `assertWritten()`, otherwise a failed statement inside
+   * the transaction still reaches COMMIT.
+   */
   async executeTransaction<T>(
     work: (transaction: any) => Promise<T>
   ): Promise<T> {
@@ -750,6 +757,19 @@ export class DataService {
   }
 
   // 2. REPLACE your existing insert, update, upsert, delete with these:
+
+  /**
+   * Throws when a write helper reports failure, so a statement that failed inside a
+   * transaction aborts it instead of being silently committed around.
+   */
+  assertWritten(result: any, description: string): any {
+    if (!result?.status) {
+      throw new InternalServerErrorException(
+        `${description} failed: ${result?.message ?? 'unknown database error'}`,
+      );
+    }
+    return result;
+  }
 
   async insert(
     table: string,
