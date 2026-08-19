@@ -98,6 +98,18 @@ export class DeliveryManagementController {
     return this.saveEditService.savePartner(id, body, adminId);
   }
 
+  /**
+   * Partners currently on shift.
+   *
+   * Declared above `partners/:id` on purpose — Nest matches routes in
+   * declaration order, so a literal segment registered after the parameterised
+   * one would be swallowed by it and resolve as an id lookup for "online".
+   */
+  @Get('partners/online')
+  async getOnlinePartners(@Query('branch_id') branchId?: string) {
+    return this.deliveryService.getOnlinePartners(branchId);
+  }
+
   @Get('partners/live-positions')
   async getLivePartnerPositions(@Query('branch_id') branchId?: string) {
     return this.deliveryService.getLivePartnerPositions(branchId);
@@ -179,6 +191,28 @@ export class DeliveryManagementController {
   async swapAddresses(@Body() body: any, @Req() req: any) {
     const adminId = req.user?.user_id ?? req.user?.id ?? 'system';
     return this.runService.swapAddresses({ ...body, admin_id: adminId });
+  }
+
+  @Get('runs/with-orders')
+  async getRunsWithOrders(@Query() query: any) {
+    return this.runService.getRunsWithOrders(query);
+  }
+
+  @Get('runs/eligible-targets')
+  async getEligibleTargetRuns(@Query('order_id') orderId: string) {
+    return this.runService.getEligibleTargetRuns(orderId);
+  }
+
+  @Post('runs/orders/move')
+  async moveOrderBetweenRuns(@Body() body: any, @Req() req: any) {
+    const adminId = req.user?.user_id ?? req.user?.id ?? 'system';
+    return this.runService.moveOrderBetweenRuns({ ...body, admin_id: adminId });
+  }
+
+  @Post('runs/orders/swap')
+  async swapOrdersBetweenRuns(@Body() body: any, @Req() req: any) {
+    const adminId = req.user?.user_id ?? req.user?.id ?? 'system';
+    return this.runService.swapOrdersBetweenRuns({ ...body, admin_id: adminId });
   }
 
   @Get('runs/:id')

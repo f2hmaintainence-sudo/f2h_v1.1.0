@@ -560,6 +560,140 @@ export class DeliveryManagementService {
    * ever sent a location update. Used by the admin tracking page on initial
    * load so every partner marker appears on the map before WebSocket takes over.
    */
+  /**
+   * Delivery partners who are currently online, with everything the admin needs
+   * to act on them in one payload.
+   *
+   * Kept separate from `getPartners` deliberately: that list is a roster and is
+   * paginated, whereas this is an operational view — who is on shift right now,
+   * where they are, what they are carrying, and whether they are actually
+   * supposed to be working today.
+   *
+   * The leave lookups are lateral joins rather than a second round trip so a
+   * partner who is online *while on approved leave* is visible immediately;
+   * that combination is the one worth flagging.
+   */
+  async getOnlinePartners(branchId?: string) {
+    try {
+      const params: any[] = [];
+      let branchFilter = '';
+      if (branchId) {
+        params.push(branchId);
+        branchFilter = `AND dp.branch_id = $${params.length}`;
+      }
+
+      const sql = `
+        SELECT
+          dp.delivery_partner_id AS id,
+          COALESCE(NULLIF(TRIM(dp.full_name), ''),
+                   NULLIF(TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')), ''),
+                   u.user_name, 'Delivery Partner')          AS full_name,
+          COALESCE(dp.phone, u.phone)                        AS phone,
+          COALESCE(dp.email, u.email)                        AS email,
+          dp.profile_photo_url,
+          dp.is_online, dp.is_available, dp.is_active, dp.is_verified,
+          dp.duty_status,
+          dp.current_lat, dp.current_lng, dp.last_location_at,
+          EXTRACT(EPOCH FROM (NOW() - dp.last_location_at))::int AS location_age_seconds,
+          dp.vehicle_type, dp.vehicle_number,
+          dp.average_rating, dp.total_deliveries, dp.total_runs, dp.max_daily_orders,
+          dp.branch_id, b.branch_name,
+          dp.breakdown_reason, dp.breakdown_reported_at,
+          lv.id            AS leave_id,
+          lv.leave_type    AS leave_type,
+          lv.leave_date    AS leave_from,
+          lv.end_date      AS leave_to,
+          lv.status        AS leave_status,
+          lv.half_day_shift,
+          lv.reason        AS leave_reason,
+          COALESCE(pend.pending_count, 0)::int  AS pending_leave_requests,
+          upc.next_leave_date,
+          run.run_id, run.run_status, run.slot,
+          COALESCE(run.assigned_stops, 0)::int  AS assigned_stops,
+          COALESCE(run.completed_stops, 0)::int AS completed_stops,
+          COALESCE(run.failed_stops, 0)::int    AS failed_stops
+        FROM delivery_partners dp
+        LEFT JOIN users u    ON u.user_id   = dp.delivery_partner_id
+        LEFT JOIN branches b ON b.branch_id = dp.branch_id
+        -- Approved leave covering today, if any. leave_date/end_date are DATE
+        -- columns, so a plain CURRENT_DATE comparison is correct here.
+        LEFT JOIN LATERAL (
+          SELECT l.* FROM delivery_leave_requests l
+           WHERE l.delivery_partner_id = dp.delivery_partner_id
+             AND l.deleted_at IS NULL
+             AND LOWER(l.status) = 'approved'
+             AND CURRENT_DATE BETWEEN l.leave_date AND COALESCE(l.end_date, l.leave_date)
+           ORDER BY l.leave_date DESC LIMIT 1
+        ) lv ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*) AS pending_count FROM delivery_leave_requests l
+           WHERE l.delivery_partner_id = dp.delivery_partner_id
+             AND l.deleted_at IS NULL AND LOWER(l.status) = 'pending'
+        ) pend ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT MIN(l.leave_date) AS next_leave_date FROM delivery_leave_requests l
+           WHERE l.delivery_partner_id = dp.delivery_partner_id
+             AND l.deleted_at IS NULL
+             AND LOWER(l.status) IN ('approved', 'pending')
+             AND l.leave_date > CURRENT_DATE
+        ) upc ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT r.run_id, r.status AS run_status, r.delivery_slot AS slot,
+                 r.total_addresses AS assigned_stops,
+                 r.completed_addresses AS completed_stops,
+                 r.failed_addresses AS failed_stops
+            FROM delivery_runs r
+           WHERE r.delivery_partner_id = dp.delivery_partner_id
+             AND r.run_date = CURRENT_DATE
+             AND r.deleted_at IS NULL
+           ORDER BY r.created_at DESC LIMIT 1
+        ) run ON TRUE
+        WHERE dp.deleted_at IS NULL
+          AND dp.is_online = true
+          ${branchFilter}
+        ORDER BY dp.last_location_at DESC NULLS LAST
+      `;
+
+      const rows = (await this.db.query(sql, params)) || [];
+
+      // A position that stopped updating means the app is backgrounded or the
+      // device lost signal — the partner still reads as "online" but should not
+      // be dispatched to blind.
+      const STALE_AFTER_SECONDS = 300;
+
+      const partners = rows.map((r: any) => ({
+        ...r,
+        average_rating: r.average_rating != null ? Number(r.average_rating) : null,
+        current_lat: r.current_lat != null ? Number(r.current_lat) : null,
+        current_lng: r.current_lng != null ? Number(r.current_lng) : null,
+        is_location_stale:
+          r.location_age_seconds == null ||
+          r.location_age_seconds > STALE_AFTER_SECONDS,
+        on_leave_today: Boolean(r.leave_id),
+        has_pending_leave: Number(r.pending_leave_requests) > 0,
+      }));
+
+      return {
+        status: true,
+        data: partners,
+        summary: {
+          total_online: partners.length,
+          on_duty: partners.filter((p) => p.duty_status === 'on_duty').length,
+          available: partners.filter((p) => p.is_available).length,
+          // Online despite approved leave — the case an admin needs to see.
+          online_while_on_leave: partners.filter((p) => p.on_leave_today).length,
+          with_pending_leave: partners.filter((p) => p.has_pending_leave).length,
+          stale_location: partners.filter((p) => p.is_location_stale).length,
+        },
+      };
+    } catch (error) {
+      this.developer.error('getOnlinePartners error', { error });
+      throw new InternalServerErrorException(
+        'Failed to retrieve online delivery partners',
+      );
+    }
+  }
+
   async getLivePartnerPositions(branchId?: string) {
     try {
       const params: any[] = [];

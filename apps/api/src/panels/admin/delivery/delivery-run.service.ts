@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, BadRequestException, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../../shared/database/Database.service';
 import { DeveloperService } from '../../../shared/logger/Developer.service';
 import { NotificationService } from 'src/notifications/notification.service';
@@ -1738,6 +1738,840 @@ export class DeliveryRunService {
     } catch (error) {
       this.developer.error('swapAddresses error', { error });
       throw new InternalServerErrorException('Failed to swap delivery addresses');
+    }
+  }
+
+  // ────────────────────────────────────────────────
+  // Order Swap & Move API Support
+  // ────────────────────────────────────────────────
+
+  async getEligibleTargetRuns(orderId: string) {
+    this.developer.debug('DeliveryRunService.getEligibleTargetRuns called', { orderId });
+    try {
+      const orderRes = await this.db.query(
+        `SELECT o.order_id, o.customer_id, o.customer_name, o.address_id, o.address_line,
+                o.branch_id, o.delivery_slot, o.scheduled_date, o.status,
+                o.delivery_run_id, o.delivery_partner_id, o.total_amount,
+                b.branch_name,
+                u.first_name || ' ' || u.last_name AS current_partner_name,
+                dr.run_id AS current_run_id, dr.status AS current_run_status
+         FROM orders o
+         LEFT JOIN branches b ON b.branch_id = o.branch_id
+         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = o.delivery_partner_id
+         LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
+         LEFT JOIN delivery_runs dr ON dr.run_id = o.delivery_run_id
+         WHERE o.order_id = $1 LIMIT 1`,
+        [orderId],
+      );
+
+      const order = orderRes[0];
+      if (!order) {
+        throw new BadRequestException('Order not found');
+      }
+
+      if (['delivered', 'cancelled', 'failed'].includes(order.status)) {
+        throw new BadRequestException(`Order ${orderId} has status '${order.status}' and cannot be moved or swapped`);
+      }
+
+      if (!order.delivery_run_id) {
+        throw new BadRequestException(`Order ${orderId} is not currently assigned to any delivery run`);
+      }
+
+      const scheduledDateStr = typeof order.scheduled_date === 'string'
+        ? order.scheduled_date.slice(0, 10)
+        : new Date(order.scheduled_date).toISOString().slice(0, 10);
+
+      // Find all target runs for the same branch, date, slot that are eligible
+      const runsRes = await this.db.query(
+        `SELECT dr.id, dr.run_id, dr.run_date, dr.delivery_slot, dr.status,
+                dr.branch_id, b.branch_name,
+                dr.delivery_partner_id,
+                u.first_name || ' ' || u.last_name AS partner_name,
+                dp.phone AS partner_phone,
+                dp.is_active AS partner_active,
+                dp.is_available AS partner_available,
+                dr.total_addresses,
+                (SELECT COUNT(*)::int FROM orders ord WHERE ord.delivery_run_id = dr.run_id AND ord.status NOT IN ('cancelled', 'failed')) AS current_orders_count
+         FROM delivery_runs dr
+         LEFT JOIN branches b ON b.branch_id = dr.branch_id
+         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
+         LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
+         WHERE dr.run_date = $1
+           AND dr.delivery_slot = $2
+           AND ($3::varchar IS NULL OR dr.branch_id = $3)
+           AND dr.run_id != $4
+           AND dr.status IN ('planned', 'assigned')
+           AND dr.deleted_at IS NULL
+           AND dp.is_active = true
+           AND dp.is_available = true
+           AND NOT EXISTS (
+             SELECT 1 FROM delivery_leave_requests dlr
+             WHERE dlr.delivery_partner_id = dr.delivery_partner_id
+               AND dlr.status = 'approved'
+               AND dlr.deleted_at IS NULL
+               AND dlr.leave_date <= $1::date
+               AND (dlr.end_date IS NULL OR dlr.end_date >= $1::date)
+           )
+         ORDER BY dr.run_id ASC`,
+        [scheduledDateStr, order.delivery_slot, order.branch_id, order.delivery_run_id],
+      );
+
+      // For each run, fetch its orders so admin can pick an order to swap with
+      const runsWithOrders = await Promise.all(
+        runsRes.map(async (run: any) => {
+          const runOrders = await this.db.query(
+            `SELECT o.order_id, o.customer_id, o.customer_name, o.address_id, o.address_line,
+                    o.delivery_slot, o.status, o.total_amount, o.run_sequence
+             FROM orders o
+             WHERE o.delivery_run_id = $1
+               AND o.status NOT IN ('delivered', 'cancelled', 'failed')
+             ORDER BY o.run_sequence ASC NULLS LAST, o.created_at ASC`,
+            [run.run_id],
+          );
+          return {
+            ...run,
+            orders: runOrders || [],
+          };
+        }),
+      );
+
+      return {
+        status: true,
+        data: {
+          order: {
+            ...order,
+            scheduled_date: scheduledDateStr,
+          },
+          eligible_runs: runsWithOrders,
+        },
+      };
+    } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
+      this.developer.error('getEligibleTargetRuns error', { error, orderId });
+      throw new BadRequestException(error?.message || 'Failed to fetch eligible target runs');
+    }
+  }
+
+  async moveOrderBetweenRuns(body: {
+    order_id: string;
+    target_run_id: string;
+    reason?: string;
+    admin_id?: string;
+  }) {
+    const { order_id, target_run_id, reason, admin_id } = body;
+    this.developer.debug('DeliveryRunService.moveOrderBetweenRuns called', { order_id, target_run_id });
+
+    if (!order_id || !target_run_id) {
+      throw new BadRequestException('order_id and target_run_id are required');
+    }
+
+    try {
+      return await this.db.transaction(async (client) => {
+        // 1. Lock and fetch source order
+        const orderRes = await client.query<any>(
+          `SELECT * FROM orders WHERE order_id = $1 FOR UPDATE`,
+          [order_id],
+        );
+        const order = orderRes.rows[0];
+        if (!order) throw new BadRequestException(`Order ${order_id} not found`);
+
+        if (['delivered', 'cancelled', 'failed'].includes(order.status)) {
+          throw new BadRequestException(`Order ${order_id} has status '${order.status}' and cannot be moved`);
+        }
+
+        const sourceRunId = order.delivery_run_id;
+        if (!sourceRunId) {
+          throw new BadRequestException(`Order ${order_id} is not currently assigned to any delivery run`);
+        }
+        if (sourceRunId === target_run_id) {
+          throw new BadRequestException(`Order ${order_id} is already in delivery run ${target_run_id}`);
+        }
+
+        // 2. Lock and fetch source run
+        const srcRunRes = await client.query<any>(
+          `SELECT * FROM delivery_runs WHERE run_id = $1 FOR UPDATE`,
+          [sourceRunId],
+        );
+        const sourceRun = srcRunRes.rows[0];
+        if (!sourceRun) throw new BadRequestException(`Source delivery run ${sourceRunId} not found`);
+        if (['completed', 'cancelled'].includes(sourceRun.status)) {
+          throw new BadRequestException(`Source delivery run ${sourceRunId} is ${sourceRun.status} and cannot be modified`);
+        }
+
+        // 3. Lock and fetch target run
+        const tgtRunRes = await client.query<any>(
+          `SELECT * FROM delivery_runs WHERE run_id = $1 FOR UPDATE`,
+          [target_run_id],
+        );
+        const targetRun = tgtRunRes.rows[0];
+        if (!targetRun) throw new BadRequestException(`Target delivery run ${target_run_id} not found`);
+        if (['completed', 'cancelled'].includes(targetRun.status)) {
+          throw new BadRequestException(`Target delivery run ${target_run_id} is ${targetRun.status} and cannot accept orders`);
+        }
+
+        // 4. Invariance validations: Same branch, date, slot
+        const srcDateStr = typeof sourceRun.run_date === 'string'
+          ? sourceRun.run_date.slice(0, 10)
+          : new Date(sourceRun.run_date).toISOString().slice(0, 10);
+        const tgtDateStr = typeof targetRun.run_date === 'string'
+          ? targetRun.run_date.slice(0, 10)
+          : new Date(targetRun.run_date).toISOString().slice(0, 10);
+
+        if (srcDateStr !== tgtDateStr) {
+          throw new BadRequestException(`Cannot move order across different dates (${srcDateStr} vs ${tgtDateStr})`);
+        }
+        if (sourceRun.delivery_slot !== targetRun.delivery_slot) {
+          throw new BadRequestException(`Cannot move order across different delivery slots (${sourceRun.delivery_slot} vs ${targetRun.delivery_slot})`);
+        }
+        if (sourceRun.branch_id && targetRun.branch_id && sourceRun.branch_id !== targetRun.branch_id) {
+          throw new BadRequestException(`Cannot move order across different branches (${sourceRun.branch_id} vs ${targetRun.branch_id})`);
+        }
+
+        // 5. Target partner active & leave check
+        const partnerRes = await client.query<any>(
+          `SELECT dp.delivery_partner_id, dp.is_active, dp.is_available,
+                  u.first_name || ' ' || u.last_name AS partner_name
+           FROM delivery_partners dp
+           LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
+           WHERE dp.delivery_partner_id = $1 LIMIT 1`,
+          [targetRun.delivery_partner_id],
+        );
+        const targetPartner = partnerRes.rows[0];
+        if (!targetPartner || !targetPartner.is_active || !targetPartner.is_available) {
+          throw new BadRequestException(`Target delivery partner is currently inactive or unavailable`);
+        }
+
+        // 6. Warehouse dispatch / handover check
+        const dispatchCheck = await client.query<any>(
+          `SELECT status FROM delivery_dispatch WHERE delivery_run_id = $1 LIMIT 1`,
+          [sourceRunId],
+        );
+        if (dispatchCheck.rows[0] && ['collected', 'dispatched', 'in_progress'].includes(dispatchCheck.rows[0].status)) {
+          throw new BadRequestException(
+            `Order ${order_id} belongs to run ${sourceRunId} which has already been collected/dispatched from the warehouse and cannot be reassigned.`
+          );
+        }
+
+        // 7. Update the order assignment
+        await client.query(
+          `UPDATE orders
+           SET delivery_run_id = $1,
+               delivery_partner_id = $2,
+               assignment_method = 'manual_move',
+               assigned_at = NOW(),
+               updated_at = NOW()
+           WHERE order_id = $3`,
+          [targetRun.run_id, targetRun.delivery_partner_id, order_id],
+        );
+
+        // 8. Update delivery_run_addresses for Source Run:
+        // Remove order_id from address entry in source run
+        const srcAddrRes = await client.query<any>(
+          `SELECT id, sequence_no, address_id, customer_id, order_ids
+           FROM delivery_run_addresses
+           WHERE run_id = $1 AND deleted_at IS NULL
+           ORDER BY sequence_no ASC`,
+          [sourceRunId],
+        );
+
+        for (const row of srcAddrRes.rows) {
+          let orderList: string[] = [];
+          try {
+            const parsed = typeof row.order_ids === 'string' ? JSON.parse(row.order_ids) : row.order_ids;
+            orderList = Array.isArray(parsed) ? parsed : (row.order_ids ? String(row.order_ids).split(',') : []);
+          } catch {
+            orderList = row.order_ids ? String(row.order_ids).split(',') : [];
+          }
+
+          if (orderList.includes(order_id)) {
+            const remainingOrders = orderList.filter((oid) => oid !== order_id);
+            if (remainingOrders.length === 0) {
+              // Delete stop since no orders left at this address for this run
+              await client.query(
+                `DELETE FROM delivery_run_addresses WHERE id = $1`,
+                [row.id],
+              );
+            } else {
+              // Update with remaining orders
+              await client.query(
+                `UPDATE delivery_run_addresses
+                 SET order_ids = $1, updated_at = NOW()
+                 WHERE id = $2`,
+                [JSON.stringify(remainingOrders), row.id],
+              );
+            }
+          }
+        }
+
+        // Re-sequence remaining stops for source run
+        const remainingSrcStops = await client.query<any>(
+          `SELECT id FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL ORDER BY sequence_no ASC, id ASC`,
+          [sourceRunId],
+        );
+        for (let i = 0; i < remainingSrcStops.rows.length; i++) {
+          await client.query(
+            `UPDATE delivery_run_addresses SET sequence_no = $1, updated_at = NOW() WHERE id = $2`,
+            [i + 1, remainingSrcStops.rows[i].id],
+          );
+        }
+
+        // 9. Update delivery_run_addresses for Target Run:
+        const tgtAddrRes = await client.query<any>(
+          `SELECT id, sequence_no, order_ids
+           FROM delivery_run_addresses
+           WHERE run_id = $1 AND address_id = $2 AND deleted_at IS NULL
+           LIMIT 1`,
+          [targetRun.run_id, order.address_id],
+        );
+
+        let targetSeq = 1;
+        if (tgtAddrRes.rows.length > 0) {
+          const existingTgtStop = tgtAddrRes.rows[0];
+          targetSeq = existingTgtStop.sequence_no;
+          let tgtOrderList: string[] = [];
+          try {
+            const parsed = typeof existingTgtStop.order_ids === 'string' ? JSON.parse(existingTgtStop.order_ids) : existingTgtStop.order_ids;
+            tgtOrderList = Array.isArray(parsed) ? parsed : (existingTgtStop.order_ids ? String(existingTgtStop.order_ids).split(',') : []);
+          } catch {
+            tgtOrderList = existingTgtStop.order_ids ? String(existingTgtStop.order_ids).split(',') : [];
+          }
+          if (!tgtOrderList.includes(order_id)) {
+            tgtOrderList.push(order_id);
+          }
+          await client.query(
+            `UPDATE delivery_run_addresses SET order_ids = $1, updated_at = NOW() WHERE id = $2`,
+            [JSON.stringify(tgtOrderList), existingTgtStop.id],
+          );
+        } else {
+          const maxSeqRes = await client.query<any>(
+            `SELECT COALESCE(MAX(sequence_no), 0) + 1 AS next_seq FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL`,
+            [targetRun.run_id],
+          );
+          targetSeq = Number(maxSeqRes.rows[0]?.next_seq || 1);
+          await client.query(
+            `INSERT INTO delivery_run_addresses
+               (run_id, address_id, sequence_no, customer_id, order_ids, delivery_status, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, 'pending', NOW(), NOW())`,
+            [targetRun.run_id, order.address_id, targetSeq, order.customer_id, JSON.stringify([order_id])],
+          );
+        }
+
+        await client.query(
+          `UPDATE orders SET run_sequence = $1 WHERE order_id = $2`,
+          [targetSeq, order_id],
+        );
+
+        // 10. Update total_addresses counter on both runs
+        await client.query(
+          `UPDATE delivery_runs
+           SET total_addresses = (SELECT COUNT(*)::int FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL),
+               updated_at = NOW()
+           WHERE run_id = $1`,
+          [sourceRunId],
+        );
+        await client.query(
+          `UPDATE delivery_runs
+           SET total_addresses = (SELECT COUNT(*)::int FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL),
+               updated_at = NOW()
+           WHERE run_id = $1`,
+          [targetRun.run_id],
+        );
+
+        // 11. Audit Logging
+        const operationId = `OP-MOVE-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+        await client.query(
+          `INSERT INTO delivery_logs
+             (run_id, order_id, customer_id, address_id, delivery_partner_id,
+              delivery_date, slot, event_type, from_partner_id, to_partner_id,
+              reason, performed_by, metadata, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'order_move', $8, $9, $10, $11, $12, NOW(), NOW())`,
+          [
+            targetRun.run_id,
+            order_id,
+            order.customer_id,
+            order.address_id,
+            targetRun.delivery_partner_id,
+            srcDateStr,
+            sourceRun.delivery_slot,
+            sourceRun.delivery_partner_id,
+            targetRun.delivery_partner_id,
+            reason || 'Admin manual order move',
+            admin_id || 'system',
+            JSON.stringify({
+              operation_id: operationId,
+              from_run_id: sourceRunId,
+              to_run_id: targetRun.run_id,
+              order_id,
+            }),
+          ],
+        );
+
+        // 12. Push Notifications
+        if (this.pushNotificationService) {
+          if (sourceRun.delivery_partner_id) {
+            try {
+              await this.pushNotificationService.sendNotificationToUsers(
+                [sourceRun.delivery_partner_id],
+                {
+                  title: 'Delivery Run Updated',
+                  body: `Order #${order_id} has been reassigned.`,
+                },
+              );
+            } catch (_) {}
+          }
+          if (targetRun.delivery_partner_id) {
+            try {
+              await this.pushNotificationService.sendNotificationToUsers(
+                [targetRun.delivery_partner_id],
+                {
+                  title: 'New Order Added',
+                  body: `Order #${order_id} has been added to your delivery run.`,
+                },
+              );
+            } catch (_) {}
+          }
+        }
+
+        return {
+          status: true,
+          message: `Order #${order_id} successfully moved to run ${targetRun.run_id}`,
+          data: {
+            operation_id: operationId,
+            order_id,
+            from_run_id: sourceRunId,
+            to_run_id: targetRun.run_id,
+            from_partner_id: sourceRun.delivery_partner_id,
+            to_partner_id: targetRun.delivery_partner_id,
+          },
+        };
+      });
+    } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
+      this.developer.error('moveOrderBetweenRuns error', { error, body });
+      throw new BadRequestException(error?.message || 'Failed to move order between delivery runs');
+    }
+  }
+
+  async swapOrdersBetweenRuns(body: {
+    order_a_id: string;
+    order_b_id: string;
+    reason?: string;
+    admin_id?: string;
+  }) {
+    const { order_a_id, order_b_id, reason, admin_id } = body;
+    this.developer.debug('DeliveryRunService.swapOrdersBetweenRuns called', { order_a_id, order_b_id });
+
+    if (!order_a_id || !order_b_id) {
+      throw new BadRequestException('order_a_id and order_b_id are required');
+    }
+    if (order_a_id === order_b_id) {
+      throw new BadRequestException('Cannot swap an order with itself');
+    }
+
+    try {
+      return await this.db.transaction(async (client) => {
+        // 1. Lock and fetch Order A
+        const orderARes = await client.query<any>(
+          `SELECT * FROM orders WHERE order_id = $1 FOR UPDATE`,
+          [order_a_id],
+        );
+        const orderA = orderARes.rows[0];
+        if (!orderA) throw new BadRequestException(`Order ${order_a_id} not found`);
+
+        // 2. Lock and fetch Order B
+        const orderBRes = await client.query<any>(
+          `SELECT * FROM orders WHERE order_id = $1 FOR UPDATE`,
+          [order_b_id],
+        );
+        const orderB = orderBRes.rows[0];
+        if (!orderB) throw new BadRequestException(`Order ${order_b_id} not found`);
+
+        if (['delivered', 'cancelled', 'failed'].includes(orderA.status)) {
+          throw new BadRequestException(`Order ${order_a_id} has status '${orderA.status}' and cannot be swapped`);
+        }
+        if (['delivered', 'cancelled', 'failed'].includes(orderB.status)) {
+          throw new BadRequestException(`Order ${order_b_id} has status '${orderB.status}' and cannot be swapped`);
+        }
+
+        const runAId = orderA.delivery_run_id;
+        const runBId = orderB.delivery_run_id;
+        if (!runAId || !runBId) {
+          throw new BadRequestException('Both orders must be currently assigned to delivery runs');
+        }
+        if (runAId === runBId) {
+          throw new BadRequestException('Both orders already belong to the same delivery run');
+        }
+
+        // 3. Lock and fetch Run A & Run B
+        const runARes = await client.query<any>(
+          `SELECT * FROM delivery_runs WHERE run_id = $1 FOR UPDATE`,
+          [runAId],
+        );
+        const runA = runARes.rows[0];
+        if (!runA) throw new BadRequestException(`Delivery run ${runAId} not found`);
+
+        const runBRes = await client.query<any>(
+          `SELECT * FROM delivery_runs WHERE run_id = $1 FOR UPDATE`,
+          [runBId],
+        );
+        const runB = runBRes.rows[0];
+        if (!runB) throw new BadRequestException(`Delivery run ${runBId} not found`);
+
+        if (['completed', 'cancelled'].includes(runA.status)) {
+          throw new BadRequestException(`Delivery run ${runAId} is ${runA.status} and cannot be modified`);
+        }
+        if (['completed', 'cancelled'].includes(runB.status)) {
+          throw new BadRequestException(`Delivery run ${runBId} is ${runB.status} and cannot be modified`);
+        }
+
+        // 4. Invariance validations
+        const dateAStr = typeof runA.run_date === 'string' ? runA.run_date.slice(0, 10) : new Date(runA.run_date).toISOString().slice(0, 10);
+        const dateBStr = typeof runB.run_date === 'string' ? runB.run_date.slice(0, 10) : new Date(runB.run_date).toISOString().slice(0, 10);
+
+        if (dateAStr !== dateBStr) {
+          throw new BadRequestException(`Cannot swap orders across different dates (${dateAStr} vs ${dateBStr})`);
+        }
+        if (runA.delivery_slot !== runB.delivery_slot) {
+          throw new BadRequestException(`Cannot swap orders across different delivery slots (${runA.delivery_slot} vs ${runB.delivery_slot})`);
+        }
+        if (runA.branch_id && runB.branch_id && runA.branch_id !== runB.branch_id) {
+          throw new BadRequestException(`Cannot swap orders across different branches (${runA.branch_id} vs ${runB.branch_id})`);
+        }
+
+        // 5. Active partners check
+        const partnersRes = await client.query<any>(
+          `SELECT delivery_partner_id, is_active, is_available FROM delivery_partners WHERE delivery_partner_id IN ($1, $2)`,
+          [runA.delivery_partner_id, runB.delivery_partner_id],
+        );
+        for (const p of partnersRes.rows) {
+          if (!p.is_active || !p.is_available) {
+            throw new BadRequestException(`Delivery partner ${p.delivery_partner_id} is inactive or unavailable`);
+          }
+        }
+
+        // 6. Dispatch check
+        const dCheck = await client.query<any>(
+          `SELECT delivery_run_id, status FROM delivery_dispatch WHERE delivery_run_id IN ($1, $2)`,
+          [runAId, runBId],
+        );
+        for (const d of dCheck.rows) {
+          if (['collected', 'dispatched', 'in_progress'].includes(d.status)) {
+            throw new BadRequestException(`Run ${d.delivery_run_id} has already been collected from warehouse and cannot be modified`);
+          }
+        }
+
+        // 7. Update orders: Order A -> Run B, Order B -> Run A
+        await client.query(
+          `UPDATE orders
+           SET delivery_run_id = $1,
+               delivery_partner_id = $2,
+               assignment_method = 'manual_swap',
+               assigned_at = NOW(),
+               updated_at = NOW()
+           WHERE order_id = $3`,
+          [runB.run_id, runB.delivery_partner_id, order_a_id],
+        );
+
+        await client.query(
+          `UPDATE orders
+           SET delivery_run_id = $1,
+               delivery_partner_id = $2,
+               assignment_method = 'manual_swap',
+               assigned_at = NOW(),
+               updated_at = NOW()
+           WHERE order_id = $3`,
+          [runA.run_id, runA.delivery_partner_id, order_b_id],
+        );
+
+        // 8. Adjust delivery_run_addresses for Run A (remove A, add B)
+        const srcAAddrs = await client.query<any>(
+          `SELECT id, sequence_no, address_id, customer_id, order_ids
+           FROM delivery_run_addresses
+           WHERE run_id = $1 AND deleted_at IS NULL`,
+          [runAId],
+        );
+        for (const row of srcAAddrs.rows) {
+          let orderList: string[] = [];
+          try {
+            const parsed = typeof row.order_ids === 'string' ? JSON.parse(row.order_ids) : row.order_ids;
+            orderList = Array.isArray(parsed) ? parsed : (row.order_ids ? String(row.order_ids).split(',') : []);
+          } catch {
+            orderList = row.order_ids ? String(row.order_ids).split(',') : [];
+          }
+          if (orderList.includes(order_a_id)) {
+            const remaining = orderList.filter((oid) => oid !== order_a_id);
+            if (remaining.length === 0) {
+              await client.query(`DELETE FROM delivery_run_addresses WHERE id = $1`, [row.id]);
+            } else {
+              await client.query(
+                `UPDATE delivery_run_addresses SET order_ids = $1, updated_at = NOW() WHERE id = $2`,
+                [JSON.stringify(remaining), row.id],
+              );
+            }
+          }
+        }
+
+        // Add Order B to Run A addresses
+        const tgtAAddr = await client.query<any>(
+          `SELECT id, sequence_no, order_ids FROM delivery_run_addresses WHERE run_id = $1 AND address_id = $2 AND deleted_at IS NULL LIMIT 1`,
+          [runAId, orderB.address_id],
+        );
+        let seqA = 1;
+        if (tgtAAddr.rows.length > 0) {
+          const row = tgtAAddr.rows[0];
+          seqA = row.sequence_no;
+          let oList: string[] = [];
+          try {
+            const parsed = typeof row.order_ids === 'string' ? JSON.parse(row.order_ids) : row.order_ids;
+            oList = Array.isArray(parsed) ? parsed : (row.order_ids ? String(row.order_ids).split(',') : []);
+          } catch {
+            oList = row.order_ids ? String(row.order_ids).split(',') : [];
+          }
+          if (!oList.includes(order_b_id)) oList.push(order_b_id);
+          await client.query(
+            `UPDATE delivery_run_addresses SET order_ids = $1, updated_at = NOW() WHERE id = $2`,
+            [JSON.stringify(oList), row.id],
+          );
+        } else {
+          const maxSeqA = await client.query<any>(
+            `SELECT COALESCE(MAX(sequence_no), 0) + 1 AS next_seq FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL`,
+            [runAId],
+          );
+          seqA = Number(maxSeqA.rows[0]?.next_seq || 1);
+          await client.query(
+            `INSERT INTO delivery_run_addresses
+               (run_id, address_id, sequence_no, customer_id, order_ids, delivery_status, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, 'pending', NOW(), NOW())`,
+            [runAId, orderB.address_id, seqA, orderB.customer_id, JSON.stringify([order_b_id])],
+          );
+        }
+        await client.query(`UPDATE orders SET run_sequence = $1 WHERE order_id = $2`, [seqA, order_b_id]);
+
+        // 9. Adjust delivery_run_addresses for Run B (remove B, add A)
+        const srcBAddrs = await client.query<any>(
+          `SELECT id, sequence_no, address_id, customer_id, order_ids
+           FROM delivery_run_addresses
+           WHERE run_id = $1 AND deleted_at IS NULL`,
+          [runBId],
+        );
+        for (const row of srcBAddrs.rows) {
+          let orderList: string[] = [];
+          try {
+            const parsed = typeof row.order_ids === 'string' ? JSON.parse(row.order_ids) : row.order_ids;
+            orderList = Array.isArray(parsed) ? parsed : (row.order_ids ? String(row.order_ids).split(',') : []);
+          } catch {
+            orderList = row.order_ids ? String(row.order_ids).split(',') : [];
+          }
+          if (orderList.includes(order_b_id)) {
+            const remaining = orderList.filter((oid) => oid !== order_b_id);
+            if (remaining.length === 0) {
+              await client.query(`DELETE FROM delivery_run_addresses WHERE id = $1`, [row.id]);
+            } else {
+              await client.query(
+                `UPDATE delivery_run_addresses SET order_ids = $1, updated_at = NOW() WHERE id = $2`,
+                [JSON.stringify(remaining), row.id],
+              );
+            }
+          }
+        }
+
+        // Add Order A to Run B addresses
+        const tgtBAddr = await client.query<any>(
+          `SELECT id, sequence_no, order_ids FROM delivery_run_addresses WHERE run_id = $1 AND address_id = $2 AND deleted_at IS NULL LIMIT 1`,
+          [runBId, orderA.address_id],
+        );
+        let seqB = 1;
+        if (tgtBAddr.rows.length > 0) {
+          const row = tgtBAddr.rows[0];
+          seqB = row.sequence_no;
+          let oList: string[] = [];
+          try {
+            const parsed = typeof row.order_ids === 'string' ? JSON.parse(row.order_ids) : row.order_ids;
+            oList = Array.isArray(parsed) ? parsed : (row.order_ids ? String(row.order_ids).split(',') : []);
+          } catch {
+            oList = row.order_ids ? String(row.order_ids).split(',') : [];
+          }
+          if (!oList.includes(order_a_id)) oList.push(order_a_id);
+          await client.query(
+            `UPDATE delivery_run_addresses SET order_ids = $1, updated_at = NOW() WHERE id = $2`,
+            [JSON.stringify(oList), row.id],
+          );
+        } else {
+          const maxSeqB = await client.query<any>(
+            `SELECT COALESCE(MAX(sequence_no), 0) + 1 AS next_seq FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL`,
+            [runBId],
+          );
+          seqB = Number(maxSeqB.rows[0]?.next_seq || 1);
+          await client.query(
+            `INSERT INTO delivery_run_addresses
+               (run_id, address_id, sequence_no, customer_id, order_ids, delivery_status, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, 'pending', NOW(), NOW())`,
+            [runBId, orderA.address_id, seqB, orderA.customer_id, JSON.stringify([order_a_id])],
+          );
+        }
+        await client.query(`UPDATE orders SET run_sequence = $1 WHERE order_id = $2`, [seqB, order_a_id]);
+
+        // Re-sequence and recalculate total_addresses for both runs
+        const remAStops = await client.query<any>(
+          `SELECT id FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL ORDER BY sequence_no ASC, id ASC`,
+          [runAId],
+        );
+        for (let i = 0; i < remAStops.rows.length; i++) {
+          await client.query(`UPDATE delivery_run_addresses SET sequence_no = $1 WHERE id = $2`, [i + 1, remAStops.rows[i].id]);
+        }
+        const remBStops = await client.query<any>(
+          `SELECT id FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL ORDER BY sequence_no ASC, id ASC`,
+          [runBId],
+        );
+        for (let i = 0; i < remBStops.rows.length; i++) {
+          await client.query(`UPDATE delivery_run_addresses SET sequence_no = $1 WHERE id = $2`, [i + 1, remBStops.rows[i].id]);
+        }
+
+        await client.query(
+          `UPDATE delivery_runs
+           SET total_addresses = (SELECT COUNT(*)::int FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL),
+               updated_at = NOW()
+           WHERE run_id = $1`,
+          [runAId],
+        );
+        await client.query(
+          `UPDATE delivery_runs
+           SET total_addresses = (SELECT COUNT(*)::int FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL),
+               updated_at = NOW()
+           WHERE run_id = $1`,
+          [runBId],
+        );
+
+        // 10. Audit logs linked with operation_id
+        const operationId = `OP-SWAP-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+        await client.query(
+          `INSERT INTO delivery_logs
+             (run_id, order_id, customer_id, address_id, delivery_partner_id,
+              delivery_date, slot, event_type, from_partner_id, to_partner_id,
+              reason, performed_by, metadata, created_at, updated_at)
+           VALUES
+             ($1, $2, $3, $4, $5, $6, $7, 'order_swap', $8, $9, $10, $11, $12, NOW(), NOW()),
+             ($13, $14, $15, $16, $17, $18, $19, 'order_swap', $20, $21, $22, $23, $24, NOW(), NOW())`,
+          [
+            // Order A record
+            runB.run_id, order_a_id, orderA.customer_id, orderA.address_id, runB.delivery_partner_id,
+            dateAStr, runA.delivery_slot, runA.delivery_partner_id, runB.delivery_partner_id,
+            reason || 'Admin manual order swap', admin_id || 'system',
+            JSON.stringify({ operation_id: operationId, swapped_with: order_b_id, from_run: runAId, to_run: runBId }),
+            // Order B record
+            runA.run_id, order_b_id, orderB.customer_id, orderB.address_id, runA.delivery_partner_id,
+            dateAStr, runB.delivery_slot, runB.delivery_partner_id, runA.delivery_partner_id,
+            reason || 'Admin manual order swap', admin_id || 'system',
+            JSON.stringify({ operation_id: operationId, swapped_with: order_a_id, from_run: runBId, to_run: runAId }),
+          ],
+        );
+
+        // 11. Push Notifications
+        if (this.pushNotificationService) {
+          try {
+            await this.pushNotificationService.sendNotificationToUsers(
+              [runA.delivery_partner_id],
+              { title: 'Delivery Run Updated', body: `Orders have been swapped on your run.` },
+            );
+            await this.pushNotificationService.sendNotificationToUsers(
+              [runB.delivery_partner_id],
+              { title: 'Delivery Run Updated', body: `Orders have been swapped on your run.` },
+            );
+          } catch (_) {}
+        }
+
+        return {
+          status: true,
+          message: `Orders #${order_a_id} and #${order_b_id} swapped successfully between runs ${runAId} and ${runBId}`,
+          data: {
+            operation_id: operationId,
+            order_a: { order_id: order_a_id, from_run: runAId, to_run: runBId },
+            order_b: { order_id: order_b_id, from_run: runBId, to_run: runAId },
+          },
+        };
+      });
+    } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
+      this.developer.error('swapOrdersBetweenRuns error', { error, body });
+      throw new BadRequestException(error?.message || 'Failed to swap orders between delivery runs');
+    }
+  }
+
+  async getRunsWithOrders(query: { date?: string; branch_id?: string; slot?: string; status?: string }) {
+    try {
+      const targetDate = query?.date || todayIST();
+      const conditions: string[] = ['dr.run_date = $1', 'dr.deleted_at IS NULL'];
+      const params: any[] = [targetDate];
+      let pIdx = 2;
+
+      if (query?.branch_id) {
+        conditions.push(`dr.branch_id = $${pIdx++}`);
+        params.push(query.branch_id);
+      }
+      if (query?.slot) {
+        conditions.push(`dr.delivery_slot = $${pIdx++}`);
+        params.push(query.slot);
+      }
+      if (query?.status) {
+        conditions.push(`dr.status = $${pIdx++}`);
+        params.push(query.status);
+      }
+
+      const whereClause = conditions.join(' AND ');
+
+      const sql = `
+        SELECT
+          dr.id,
+          dr.run_id,
+          dr.run_number,
+          dr.run_date,
+          dr.delivery_slot,
+          dr.status,
+          dr.branch_id,
+          b.branch_name,
+          dr.delivery_partner_id,
+          u.first_name || ' ' || u.last_name AS partner_name,
+          dp.phone AS partner_phone,
+          dp.is_active AS partner_active,
+          dr.total_addresses,
+          dr.completed_addresses,
+          dr.failed_addresses,
+          dr.created_at,
+          COALESCE(
+            (SELECT json_agg(
+              json_build_object(
+                'order_id', o.order_id,
+                'customer_id', o.customer_id,
+                'customer_name', o.customer_name,
+                'address_id', o.address_id,
+                'address_line', o.address_line,
+                'delivery_slot', o.delivery_slot,
+                'status', o.status,
+                'total_amount', o.total_amount,
+                'run_sequence', o.run_sequence,
+                'created_at', o.created_at
+              ) ORDER BY o.run_sequence ASC NULLS LAST, o.created_at ASC
+            ) FROM orders o WHERE o.delivery_run_id = dr.run_id AND o.status NOT IN ('cancelled', 'failed')),
+            '[]'::json
+          ) AS orders
+        FROM delivery_runs dr
+        LEFT JOIN branches b ON b.branch_id = dr.branch_id
+        LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
+        LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
+        WHERE ${whereClause}
+        ORDER BY dr.run_id ASC
+      `;
+
+      const rows = await this.db.query(sql, params);
+      return {
+        status: true,
+        data: Array.isArray(rows) ? rows : [],
+        message: 'Delivery runs with orders fetched successfully',
+      };
+    } catch (error: any) {
+      this.developer.error('getRunsWithOrders error', { error, query });
+      throw new InternalServerErrorException('Failed to fetch delivery runs with orders');
     }
   }
 }
