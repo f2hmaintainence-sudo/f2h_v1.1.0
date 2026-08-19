@@ -45,6 +45,8 @@ interface DispatchItem {
 interface BranchStat {
   branch_id: string | null;
   branch_name: string | null;
+  scheduled_subscriptions?: number;
+  scheduled_quantity?: number;
   subscription_orders_created: number;
   onetime_orders_confirmed: number;
   total_processed: number;
@@ -369,6 +371,14 @@ export default function GenerateOrdersPage() {
   const totalSubs = dispatchItems.reduce((acc, item) => acc + Number(item.subscription_count || 0), 0);
   const totalUniqueProducts = dispatchItems.length;
 
+  const totalScheduledSubs = branchStats.reduce(
+    (acc, item) => acc + Number(item.scheduled_subscriptions || 0),
+    0
+  );
+  const totalScheduledQty = branchStats.reduce(
+    (acc, item) => acc + Number(item.scheduled_quantity || 0),
+    0
+  );
   const totalSubOrdersCreated = branchStats.reduce(
     (acc, item) => acc + Number(item.subscription_orders_created || 0),
     0
@@ -668,26 +678,29 @@ export default function GenerateOrdersPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* BRANCH-WISE SUBSCRIPTION ORDERS CREATED BREAKDOWN */}
+      {/* BRANCH-WISE SUBSCRIPTION ORDERS & SCHEDULED DELIVERIES BREAKDOWN */}
       {/* ========================================================================= */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-5 space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 pb-3 border-b border-slate-100">
           <div>
             <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
               <Building2 className="w-5 h-5 text-emerald-600" />
-              Total Subscription Orders Created — Branch-Wise Breakdown
+              Total Subscription Orders &amp; Scheduled Deliveries — Branch-Wise Summary
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Live orders generated for <span className="font-bold text-slate-700">{selectedDate}</span> ({selectedSlot === 'morning' ? 'Morning Slot' : 'Evening Slot'}).
+              Live schedule &amp; generated orders for <span className="font-bold text-slate-700">{selectedDate}</span> ({selectedSlot === 'morning' ? 'Morning Slot' : 'Evening Slot'}).
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200">
+              Scheduled Subs: <span className="font-extrabold text-sm">{totalScheduledSubs}</span>
+            </span>
             <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200">
-              Total Sub Orders: <span className="font-extrabold text-sm">{totalSubOrdersCreated}</span>
+              Sub Orders Created: <span className="font-extrabold text-sm">{totalSubOrdersCreated}</span>
             </span>
             <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-blue-50 text-blue-800 border border-blue-200">
-              Total One-Time: <span className="font-extrabold text-sm">{totalOnetimeOrdersConfirmed}</span>
+              One-Time Orders: <span className="font-extrabold text-sm">{totalOnetimeOrdersConfirmed}</span>
             </span>
           </div>
         </div>
@@ -696,11 +709,11 @@ export default function GenerateOrdersPage() {
         {loadingBranchStats ? (
           <div className="py-10 text-center text-xs font-bold text-slate-400 flex flex-col items-center justify-center gap-2">
             <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
-            Loading branch-wise created orders...
+            Loading branch-wise schedule &amp; created orders...
           </div>
         ) : branchStats.length === 0 ? (
           <div className="py-8 text-center text-xs text-slate-400 font-semibold bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-            No orders generated yet for {selectedDate} ({selectedSlot === 'morning' ? 'Morning' : 'Evening'}). Click "Trigger Order Generation" above to process.
+            No active subscriptions or generated orders found for {selectedDate} ({selectedSlot === 'morning' ? 'Morning' : 'Evening'}).
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -708,15 +721,19 @@ export default function GenerateOrdersPage() {
               <thead>
                 <tr className="border-b border-slate-100 text-[10px] font-bold uppercase text-slate-400 bg-slate-50/50">
                   <th className="py-3 px-4">Branch Details</th>
-                  <th className="py-3 px-4 text-center">Subscription Orders Created</th>
-                  <th className="py-3 px-4 text-center">One-Time Orders Confirmed</th>
-                  <th className="py-3 px-4 text-center">Total Processed Orders</th>
+                  <th className="py-3 px-4 text-center">Scheduled Subscriptions</th>
+                  <th className="py-3 px-4 text-center">Scheduled Quantity</th>
+                  <th className="py-3 px-4 text-center">Orders Created</th>
+                  <th className="py-3 px-4 text-center">One-Time Orders</th>
+                  <th className="py-3 px-4 text-center">Status</th>
                   <th className="py-3 px-4 text-right">Quick Filter</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                 {branchStats.map((b, idx) => {
                   const isSelected = selectedBranch === b.branch_id;
+                  const isGenerated = Number(b.subscription_orders_created || 0) > 0;
+
                   return (
                     <tr
                       key={b.branch_id || `branch-${idx}`}
@@ -741,20 +758,38 @@ export default function GenerateOrdersPage() {
                       </td>
 
                       <td className="py-3.5 px-4 text-center">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-extrabold bg-amber-50 text-amber-900 border border-amber-200">
+                          {b.scheduled_subscriptions || 0} Subs
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 px-4 text-center font-bold text-slate-800 text-xs">
+                        {Number(b.scheduled_quantity || 0).toFixed(1)} Units
+                      </td>
+
+                      <td className="py-3.5 px-4 text-center">
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
                           <CheckCircle2 size={13} className="text-emerald-600" />
-                          {b.subscription_orders_created} Orders
+                          {b.subscription_orders_created || 0} Orders
                         </span>
                       </td>
 
                       <td className="py-3.5 px-4 text-center">
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-blue-100 text-blue-800 border border-blue-200">
-                          {b.onetime_orders_confirmed} Orders
+                          {b.onetime_orders_confirmed || 0} Orders
                         </span>
                       </td>
 
-                      <td className="py-3.5 px-4 text-center font-black text-slate-900 text-sm">
-                        {b.total_processed}
+                      <td className="py-3.5 px-4 text-center">
+                        {isGenerated ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                            ✓ Generated
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                            ⏱ Ready to Generate
+                          </span>
+                        )}
                       </td>
 
                       <td className="py-3.5 px-4 text-right">

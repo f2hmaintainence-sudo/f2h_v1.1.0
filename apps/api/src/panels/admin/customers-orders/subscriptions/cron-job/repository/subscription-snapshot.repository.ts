@@ -421,44 +421,76 @@ export class SubscriptionSnapshotRepository {
   ): Promise<Array<{
     branch_id: string | null;
     branch_name: string | null;
+    scheduled_subscriptions: number;
+    scheduled_quantity: number;
     subscription_orders_created: number;
     onetime_orders_confirmed: number;
     total_processed: number;
   }>> {
+    const qtyExpr = slot === 'morning' ? 'ws.m_quantity' : 'ws.e_quantity';
     const params: any[] = [date, slot];
     let branchFilter = '';
     if (branchId) {
       params.push(branchId);
-      branchFilter = `AND o.branch_id = $${params.length}`;
+      branchFilter = `AND ab.branch_id = $${params.length}`;
     }
 
     return this.db.query(
       `
+      WITH scheduled_subs AS (
+        SELECT
+          s.branch_id,
+          COUNT(DISTINCT s.subscription_id)::int AS active_subscriptions,
+          COALESCE(SUM(${qtyExpr}), 0)::numeric AS scheduled_quantity
+        FROM subscriptions s
+        INNER JOIN subscription_items si
+          ON si.subscription_id = s.subscription_id
+        INNER JOIN subscription_weekly_schedule ws
+          ON (ws.subscription_item_id = si.subscription_item_id OR ws.subscription_item_id = si.id::text)
+        WHERE s.status = 'active'
+          AND s.start_date <= $1::date
+          AND (s.end_date IS NULL OR s.end_date >= $1::date)
+          AND (
+            s.pause_from_date IS NULL
+            OR s.pause_to_date IS NULL
+            OR $1::date NOT BETWEEN s.pause_from_date AND s.pause_to_date
+          )
+          AND ws.day_of_week = EXTRACT(DOW FROM $1::date)::int
+          AND ${qtyExpr} > 0
+        GROUP BY s.branch_id
+      ),
+      created_orders AS (
+        SELECT
+          o.branch_id,
+          COUNT(*) FILTER (WHERE o.order_source = 'subscription')::int AS subscription_orders_created,
+          COUNT(*) FILTER (WHERE o.order_source != 'subscription' AND o.status = 'confirmed')::int AS onetime_orders_confirmed,
+          COUNT(*)::int AS total_processed
+        FROM orders o
+        WHERE o.scheduled_date = $1::date
+          AND o.delivery_slot = $2
+        GROUP BY o.branch_id
+      ),
+      all_branches AS (
+        SELECT b.branch_id, b.branch_name FROM branches b
+        UNION
+        SELECT DISTINCT s.branch_id, s.branch_id FROM scheduled_subs s WHERE s.branch_id IS NOT NULL
+        UNION
+        SELECT DISTINCT o.branch_id, o.branch_id FROM created_orders o WHERE o.branch_id IS NOT NULL
+      )
       SELECT
-        o.branch_id,
-        b.branch_name,
-        COUNT(*) FILTER (
-          WHERE o.order_source = 'subscription'
-            AND o.scheduled_date = $1::date
-            AND o.delivery_slot = $2
-        )::int AS subscription_orders_created,
-        COUNT(*) FILTER (
-          WHERE o.order_source != 'subscription'
-            AND o.status = 'confirmed'
-            AND o.scheduled_date = $1::date
-            AND o.delivery_slot = $2
-        )::int AS onetime_orders_confirmed,
-        COUNT(*)::int AS total_processed
-      FROM orders o
-      LEFT JOIN branches b ON b.branch_id = o.branch_id
-      WHERE o.scheduled_date = $1::date
-        AND o.delivery_slot = $2
-        AND (
-          (o.order_source = 'subscription')
-          OR (o.order_source != 'subscription' AND o.status = 'confirmed')
-        )
+        ab.branch_id,
+        COALESCE(b.branch_name, ab.branch_id, 'Master Branch') AS branch_name,
+        COALESCE(ss.active_subscriptions, 0)::int AS scheduled_subscriptions,
+        COALESCE(ss.scheduled_quantity, 0)::numeric AS scheduled_quantity,
+        COALESCE(co.subscription_orders_created, 0)::int AS subscription_orders_created,
+        COALESCE(co.onetime_orders_confirmed, 0)::int AS onetime_orders_confirmed,
+        COALESCE(co.total_processed, 0)::int AS total_processed
+      FROM all_branches ab
+      LEFT JOIN branches b ON b.branch_id = ab.branch_id
+      LEFT JOIN scheduled_subs ss ON ss.branch_id = ab.branch_id
+      LEFT JOIN created_orders co ON co.branch_id = ab.branch_id
+      WHERE (COALESCE(ss.active_subscriptions, 0) > 0 OR COALESCE(co.total_processed, 0) > 0)
         ${branchFilter}
-      GROUP BY o.branch_id, b.branch_name
       ORDER BY b.branch_name NULLS LAST
       `,
       params,
