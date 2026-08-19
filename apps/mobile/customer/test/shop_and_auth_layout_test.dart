@@ -74,6 +74,20 @@ Future<void> _pump(
   required Size size,
   double textScale = 1.0,
 }) async {
+  final captured = <FlutterErrorDetails>[];
+  final previousOnError = FlutterError.onError;
+  FlutterError.onError = (details) {
+    captured.add(details);
+    previousOnError?.call(details);
+  };
+  addTearDown(() {
+    FlutterError.onError = previousOnError;
+    for (final d in captured) {
+      // ignore: avoid_print
+      print('CAPTURED >>> ${d.exception}\n${d.context}\n${d.library}');
+    }
+  });
+
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
