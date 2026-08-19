@@ -31,7 +31,7 @@ const DEFAULT_CONTACT = {
   phone_url: "tel:+919148773591",
   whatsapp: "+91 91487 73591",
   whatsapp_url: "https://wa.me/919148773591",
-  email: "hello@f2hfresh.com",
+  email: "support@f2hfresh.com",
   address: "1st Cross, SJP Layout, Nagondanahalli, Whitefield, Bangalore – 560066",
   instagram_url: "#",
   facebook_url: "#",

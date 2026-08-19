@@ -64,11 +64,18 @@ class _DynamicSplashScreenState extends State<DynamicSplashScreen>
 
     // Step 2: Then switch to showing the splash banner image
     if (_splashImage != null) {
-      setState(() {
-        _showBanner = true;
-      });
+      if (mounted) {
+        setState(() {
+          _showBanner = true;
+        });
+      }
     }
-    // Step 3: Banner stays on screen until user taps Skip button (no auto-dismiss timer)
+
+    // Step 3: Auto-dismiss after 2.5 seconds max if user doesn't tap Skip
+    await Future.delayed(const Duration(milliseconds: 2500));
+    if (mounted && _showSplash) {
+      _fadeOutAndDismiss();
+    }
   }
 
   void _fadeOutAndDismiss() {

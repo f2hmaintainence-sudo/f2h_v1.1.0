@@ -20,7 +20,9 @@ class CustomerSessionCubit extends Cubit<CustomerSessionState> {
     emit(state.copyWith(status: CustomerSessionStatus.loading));
 
     try {
-      final session = await bootstrapApi.fetch();
+      final session = await bootstrapApi.fetch().timeout(
+        const Duration(seconds: 6),
+      );
       await cache.save(session);
       emit(session);
     } catch (e) {

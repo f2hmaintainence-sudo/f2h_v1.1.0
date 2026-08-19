@@ -13,10 +13,23 @@ const navLinks = [
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
+  const [visible, setVisible] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 20);
+    let lastScrollY = window.scrollY;
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      setScrolled(currentScrollY > 20);
+
+      if (currentScrollY > lastScrollY && currentScrollY > 80) {
+        setVisible(false);
+      } else {
+        setVisible(true);
+      }
+      lastScrollY = currentScrollY;
+    };
+
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
@@ -31,7 +44,11 @@ export function Navbar() {
 
   return (
     <>
-      <div className="fixed top-0 left-0 right-0 z-50 flex justify-center px-4 pt-4">
+      <div
+        className={`fixed top-0 left-0 right-0 z-50 flex justify-center px-4 pt-4 transition-transform duration-300 ${
+          visible || mobileOpen ? "translate-y-0" : "-translate-y-full pointer-events-none"
+        }`}
+      >
         <nav
           className={`w-full max-w-6xl rounded-full px-4 sm:px-6 lg:px-8 transition-all duration-500 ${scrolled
             ? "bg-white/75 backdrop-blur-2xl shadow-xl shadow-black/8 border border-white/60"

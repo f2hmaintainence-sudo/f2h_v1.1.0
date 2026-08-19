@@ -280,7 +280,12 @@ class AppShellState extends State<AppShell> {
     return cat;
   }
 
-  late final List<Widget> _screens;
+  List<Widget> get _screens => [
+        HomeScreen(isNavVisible: _showNav),
+        BrowseScreen(isNavVisible: _showNav),
+        const CartScreen(),
+        const SubsScreen(),
+      ];
 
   static const _tabs = [
     (Icons.home_outlined, Icons.home_rounded, 'Home'),
@@ -292,12 +297,6 @@ class AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
-    _screens = [
-      HomeScreen(isNavVisible: _showNav),
-      BrowseScreen(isNavVisible: _showNav),
-      const CartScreen(),
-      const SubsScreen(),
-    ];
     _pageController = PageController(initialPage: _i);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) VersionChecker.checkUpdates(context);
@@ -318,18 +317,22 @@ class AppShellState extends State<AppShell> {
       onNotification: (notification) {
         if (_isTransitioning) return false;
         if (notification.metrics.axis == Axis.vertical) {
+          final pixels = notification.metrics.pixels;
           if (notification is ScrollUpdateNotification) {
             final delta = notification.scrollDelta ?? 0;
-            if (delta > 1.5 && _showNav) {
+            // Hide bottom navbar when scrolling down past top padding (pixels > 30)
+            if (delta > 2.0 && pixels > 30 && _showNav) {
               setState(() => _showNav = false);
-            } else if (delta < -1.5 && !_showNav) {
+            }
+            // Show bottom navbar when scrolling up firmly or near top
+            else if ((delta < -2.0 || pixels <= 20) && !_showNav) {
               setState(() => _showNav = true);
             }
           }
-          if (notification is ScrollEndNotification &&
-              notification.metrics.pixels <= 0 &&
-              !_showNav) {
-            setState(() => _showNav = true);
+          if (notification is ScrollEndNotification) {
+            if (pixels <= 20 && !_showNav) {
+              setState(() => _showNav = true);
+            }
           }
         }
         return false;

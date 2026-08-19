@@ -41,70 +41,70 @@ const FIELD_META: {
   hint?: string;
   type?: string;
 }[] = [
-  {
-    key: "phone",
-    label: "Phone Number",
-    placeholder: "+91 91487 73591",
-    icon: <Phone className="w-4 h-4" />,
-    hint: "Displayed as the call link label (e.g. +91 91487 73591)",
-  },
-  {
-    key: "phone_url",
-    label: "Phone URL",
-    placeholder: "tel:+919148773591",
-    icon: <Phone className="w-4 h-4" />,
-    hint: "tel: link for call button — auto-generated from phone if left blank",
-  },
-  {
-    key: "whatsapp",
-    label: "WhatsApp Number",
-    placeholder: "+91 91487 73591",
-    icon: <MessageCircle className="w-4 h-4" />,
-    hint: "Displayed as WhatsApp label (can be same as phone)",
-  },
-  {
-    key: "whatsapp_url",
-    label: "WhatsApp URL",
-    placeholder: "https://wa.me/919148773591",
-    icon: <MessageCircle className="w-4 h-4" />,
-    hint: "Full wa.me link — auto-generated if left blank",
-  },
-  {
-    key: "email",
-    label: "Email Address",
-    placeholder: "hello@f2hfresh.com",
-    icon: <Mail className="w-4 h-4" />,
-    type: "email",
-  },
-  {
-    key: "address",
-    label: "Physical Address",
-    placeholder: "1st Cross, SJP Layout, Nagondanahalli, Whitefield, Bangalore – 560066",
-    icon: <MapPin className="w-4 h-4" />,
-    hint: "Shown in footer address line",
-  },
-  {
-    key: "instagram_url",
-    label: "Instagram URL",
-    placeholder: "https://instagram.com/f2hfresh",
-    icon: <Instagram className="w-4 h-4" />,
-    type: "url",
-  },
-  {
-    key: "facebook_url",
-    label: "Facebook URL",
-    placeholder: "https://facebook.com/f2hfresh",
-    icon: <Facebook className="w-4 h-4" />,
-    type: "url",
-  },
-  {
-    key: "youtube_url",
-    label: "YouTube URL",
-    placeholder: "https://youtube.com/@f2hfresh",
-    icon: <Youtube className="w-4 h-4" />,
-    type: "url",
-  },
-];
+    {
+      key: "phone",
+      label: "Phone Number",
+      placeholder: "+91 91487 73591",
+      icon: <Phone className="w-4 h-4" />,
+      hint: "Displayed as the call link label (e.g. +91 91487 73591)",
+    },
+    {
+      key: "phone_url",
+      label: "Phone URL",
+      placeholder: "tel:+919148773591",
+      icon: <Phone className="w-4 h-4" />,
+      hint: "tel: link for call button — auto-generated from phone if left blank",
+    },
+    {
+      key: "whatsapp",
+      label: "WhatsApp Number",
+      placeholder: "+91 91487 73591",
+      icon: <MessageCircle className="w-4 h-4" />,
+      hint: "Displayed as WhatsApp label (can be same as phone)",
+    },
+    {
+      key: "whatsapp_url",
+      label: "WhatsApp URL",
+      placeholder: "https://wa.me/919148773591",
+      icon: <MessageCircle className="w-4 h-4" />,
+      hint: "Full wa.me link — auto-generated if left blank",
+    },
+    {
+      key: "email",
+      label: "Email Address",
+      placeholder: "support@f2hfresh.com",
+      icon: <Mail className="w-4 h-4" />,
+      type: "email",
+    },
+    {
+      key: "address",
+      label: "Physical Address",
+      placeholder: "1st Cross, SJP Layout, Nagondanahalli, Whitefield, Bangalore – 560066",
+      icon: <MapPin className="w-4 h-4" />,
+      hint: "Shown in footer address line",
+    },
+    {
+      key: "instagram_url",
+      label: "Instagram URL",
+      placeholder: "https://instagram.com/f2hfresh",
+      icon: <Instagram className="w-4 h-4" />,
+      type: "url",
+    },
+    {
+      key: "facebook_url",
+      label: "Facebook URL",
+      placeholder: "https://facebook.com/f2hfresh",
+      icon: <Facebook className="w-4 h-4" />,
+      type: "url",
+    },
+    {
+      key: "youtube_url",
+      label: "YouTube URL",
+      placeholder: "https://youtube.com/@f2hfresh",
+      icon: <Youtube className="w-4 h-4" />,
+      type: "url",
+    },
+  ];
 
 export default function SiteSettingsPage() {
   const [form, setForm] = useState<SiteForm>(EMPTY_FORM);

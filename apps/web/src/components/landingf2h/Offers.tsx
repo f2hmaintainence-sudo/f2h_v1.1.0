@@ -31,7 +31,7 @@ const CARDS = [
     codeLabel: "FIRST ORDER",
     code: "REWARD",
     cta: "Claim now",
-    body: "Place your first order and get 50% cashback, credited straight to your F2H wallet for the next delivery.",
+    body: "Place your first milk order and get 50% cashback, credited straight to your F2H wallet for the next delivery.",
     confetti: (
       <>
         <circle cx="26" cy="30" r="3" fill="#fff" />

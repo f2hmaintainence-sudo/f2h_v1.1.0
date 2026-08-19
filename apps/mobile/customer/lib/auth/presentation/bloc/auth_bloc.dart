@@ -119,15 +119,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     emit(AuthLoading());
-    final isAuthenticated = await authRepository.checkAuthStatus();
-    if (isAuthenticated) {
-      final user = await authRepository.getCachedUser();
-      emit(
-        Authenticated(
-          user: user ?? User(userId: 'session', email: ''),
-        ),
-      );
-    } else {
+    try {
+      final isAuthenticated = await authRepository
+          .checkAuthStatus()
+          .timeout(const Duration(seconds: 5), onTimeout: () => false);
+      if (isAuthenticated) {
+        final user = await authRepository.getCachedUser();
+        emit(
+          Authenticated(
+            user: user ?? User(userId: 'session', email: ''),
+          ),
+        );
+      } else {
+        emit(const Unauthenticated());
+      }
+    } catch (_) {
       emit(const Unauthenticated());
     }
   }
