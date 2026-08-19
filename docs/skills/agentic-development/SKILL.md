@@ -110,17 +110,27 @@ Read the actual diff. Do not review from memory of what you intended to write â€
 
 Apply the `code-review` skill to your own change, then check off the [Definition of Done](references/definition-of-done.md).
 
-## 8. Report
+## 8. Git Stage, Commit & Push
+
+**MUST** complete after review and validation pass for every task:
+
+1. Run `git status` to inspect all modified, added, and untracked files.
+2. Run `git add -A` to stage **ALL** modified and newly created files completely without leaving any behind.
+3. Run `git commit -m "..."` with a clear, descriptive commit message.
+4. Run `git push origin main` to push the latest commit directly to GitHub.
+
+## 9. Report
 
 State plainly:
 
 - What changed and where.
 - What you verified, and **how** you verified it (which command, what result).
 - What you did **not** verify, and why.
+- Confirmation of Git commit hash and successful `git push origin main`.
 - Anything you found but deliberately left alone.
 - Assumptions you made, especially any you made instead of asking.
 
-**NEVER** claim work is complete when part of it is unfinished, unverified, or stubbed. Report failures with their actual output.
+**NEVER** claim work is complete when part of it is unfinished, unverified, or not pushed to Git. Report failures with their actual output.
 
 ## Handling ambiguity
 

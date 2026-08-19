@@ -54,14 +54,15 @@ Confirm:
 
 Then run the project's validation — see the `agentic-development` skill — and review the diff with the `code-review` skill.
 
-## Committing
+## Committing & Pushing
 
-**NEVER commit merely because you finished coding.** Commit when the user asks, or when the project's workflow clearly requires it. Leaving reviewable changes in the working tree is the safe default.
+**MUST commit and push upon completion of every coding task.**
 
-When committing:
+When committing & pushing:
 
-- **MUST** stage deliberately. Use explicit paths. `git add -A` and `git add .` sweep in untracked files you did not inspect — use them only after `git status` confirms exactly what they will take.
-- One logical change per commit. Do not bundle unrelated work.
+- **MUST** stage all modified and newly created files completely using `git add -A` after inspecting `git status`.
+- One logical change per commit with a clear, descriptive message.
+- **MUST** push the committed work immediately to GitHub (`git push origin main`).
 - **MUST NOT** amend, squash, or rewrite a commit that already exists on a remote without explicit permission.
 
 ### Commit messages
