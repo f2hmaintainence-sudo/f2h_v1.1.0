@@ -68,14 +68,6 @@ export class SubscriptionSnapshotRepository {
         AND ws.day_of_week = EXTRACT(DOW FROM $1::date)::int
         AND ${qtyExpr} > 0
         ${branchFilter}
-        AND NOT EXISTS (
-          SELECT 1
-          FROM orders o
-          WHERE o.subscription_id = s.subscription_id
-            AND o.scheduled_date = $1::date
-            AND o.delivery_slot = '${slot}'
-            AND o.order_source = 'subscription'
-        )
       GROUP BY
         s.branch_id,
         si.product_variant_id,
@@ -471,11 +463,13 @@ export class SubscriptionSnapshotRepository {
         GROUP BY o.branch_id
       ),
       all_branches AS (
-        SELECT b.branch_id, b.branch_name FROM branches b
-        UNION
-        SELECT DISTINCT s.branch_id, s.branch_id FROM scheduled_subs s WHERE s.branch_id IS NOT NULL
-        UNION
-        SELECT DISTINCT o.branch_id, o.branch_id FROM created_orders o WHERE o.branch_id IS NOT NULL
+        SELECT DISTINCT branch_id FROM (
+          SELECT branch_id FROM branches WHERE branch_id IS NOT NULL
+          UNION
+          SELECT branch_id FROM scheduled_subs WHERE branch_id IS NOT NULL
+          UNION
+          SELECT branch_id FROM created_orders WHERE branch_id IS NOT NULL
+        ) branch_union
       )
       SELECT
         ab.branch_id,

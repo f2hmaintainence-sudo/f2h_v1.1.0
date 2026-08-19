@@ -617,7 +617,9 @@ export default function GenerateOrdersPage() {
           <div className="grid grid-cols-3 gap-2 my-auto py-4">
             <div className="bg-emerald-50 rounded-xl p-3 text-center border border-emerald-100">
               <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide">Total Qty</span>
-              <div className="text-lg font-black text-emerald-800 mt-1">{totalQuantity.toFixed(1)}</div>
+              <div className="text-lg font-black text-emerald-800 mt-1">
+                {(totalQuantity > 0 ? totalQuantity : totalScheduledQty).toFixed(1)}
+              </div>
             </div>
             <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-100">
               <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wide">Products</span>
@@ -625,12 +627,14 @@ export default function GenerateOrdersPage() {
             </div>
             <div className="bg-amber-50 rounded-xl p-3 text-center border border-amber-100">
               <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">Active Subs</span>
-              <div className="text-lg font-black text-amber-800 mt-1">{totalSubs}</div>
+              <div className="text-lg font-black text-amber-800 mt-1">
+                {totalSubs > 0 ? totalSubs : totalScheduledSubs}
+              </div>
             </div>
           </div>
 
           <div className="text-[11px] text-slate-400 text-center font-medium">
-            * Reflects quantities of subscriptions not yet processed for this date and slot.
+            * Reflects scheduled delivery volume for {selectedDate} ({selectedSlot === 'morning' ? 'Morning' : 'Evening'}).
           </div>
         </div>
       </div>
