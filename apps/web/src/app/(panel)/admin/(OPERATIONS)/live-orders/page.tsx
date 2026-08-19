@@ -7,10 +7,11 @@ import {
   ShoppingCart, Package, Truck, CheckCircle2, Clock, AlertTriangle,
   XCircle, RefreshCw, Home, ChevronRight, Eye,
   Zap, Search, UserCheck, Calendar, MapPin, Phone,
-  Building2, Layers, X, AlertCircle, UserPlus, ChevronLeft
+  Building2, Layers, X, AlertCircle, UserPlus, ChevronLeft, FileSpreadsheet, Download
 } from "lucide-react";
 import Link from "next/link";
 import { showSuccessToast } from "@/components/Toast";
+import { downloadCSV, downloadExcel, ExportColumn } from "@/lib/exportUtils";
 
 interface OrderItem {
   id?: number;
@@ -77,6 +78,23 @@ function formatMoney(v: number | string) {
 }
 
 const ITEMS_PER_PAGE = 10;
+
+const LIVE_ORDER_EXPORT_COLUMNS: ExportColumn<Order>[] = [
+  { header: "Order ID", accessor: (order) => order.order_id },
+  { header: "Customer", accessor: (order) => order.customer_name },
+  { header: "Phone", accessor: (order) => order.contact_number },
+  { header: "Branch", accessor: (order) => order.branch_name },
+  { header: "Delivery Slot", accessor: (order) => order.delivery_slot },
+  { header: "Delivery Partner", accessor: (order) => order.partner_name },
+  { header: "Assignment", accessor: (order) => order.delivery_partner_id ? "Assigned" : "Unassigned" },
+  { header: "Items", accessor: (order) => order.items?.map((item) => `${item.product_name}${item.variant_name ? ` (${item.variant_name})` : ""} x${item.quantity}`).join("; ") },
+  { header: "Amount", accessor: (order) => Number(order.total_amount || 0) },
+  { header: "Status", accessor: (order) => order.status },
+  { header: "Source", accessor: (order) => order.order_source },
+  { header: "Scheduled Date", accessor: (order) => order.scheduled_date },
+  { header: "Created At", accessor: (order) => order.created_at },
+  { header: "Address", accessor: (order) => order.address_line },
+];
 
 export default function LiveOrdersPage() {
   const [allOrders, setAllOrders] = useState<Order[]>([]);
@@ -271,6 +289,20 @@ export default function LiveOrdersPage() {
     setCurrentPage(1);
   };
 
+  const exportLiveOrders = (format: "excel" | "csv") => {
+    if (filteredOrders.length === 0) {
+      alert("No orders match the current filters.");
+      return;
+    }
+
+    const filename = `live-orders-${selectedDate}`;
+    if (format === "excel") {
+      downloadExcel(filename, "Live Orders", LIVE_ORDER_EXPORT_COLUMNS, filteredOrders);
+    } else {
+      downloadCSV(filename, LIVE_ORDER_EXPORT_COLUMNS, filteredOrders);
+    }
+  };
+
   const tabs = [
     { id: "", label: "All Orders", count: allOrders.length },
     { id: "placed", label: "Placed", count: allOrders.filter(o => o.status === "placed").length },
@@ -331,6 +363,24 @@ export default function LiveOrdersPage() {
                 Today ({formattedToday})
               </span>
             </div>
+            <button
+              type="button"
+              onClick={() => exportLiveOrders("excel")}
+              disabled={loading || filteredOrders.length === 0}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-700 border border-emerald-700 rounded-lg text-[11px] font-bold text-white hover:bg-emerald-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              title="Export filtered orders to Excel"
+            >
+              <FileSpreadsheet size={12} /> Excel
+            </button>
+            <button
+              type="button"
+              onClick={() => exportLiveOrders("csv")}
+              disabled={loading || filteredOrders.length === 0}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              title="Export filtered orders to CSV"
+            >
+              <Download size={12} /> CSV
+            </button>
             <button
               onClick={() => fetchOrders(true)}
               disabled={refreshing}

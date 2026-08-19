@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Download,
+  FileSpreadsheet,
   Home,
   RefreshCw,
 } from 'lucide-react';
@@ -27,6 +28,7 @@ import OrderFilterBar, { OrderTypeTab, DeliverySlotFilter } from './components/O
 import OrderDetailsDrawer from './components/OrderDetailsDrawer';
 import { stripHtml } from './components/OrderDetailsDrawer';
 import OrdersTable from './components/OrdersTable';
+import { downloadCSV, downloadExcel, ExportColumn } from '@/lib/exportUtils';
 
 interface TodayOrdersClientProps {
   initialTab?: OrderTypeTab;
@@ -39,6 +41,24 @@ interface TodayOrdersClientProps {
 }
 
 const API_URL = getApiBaseUrl();
+const EXPORT_PAGE_SIZE = 1000;
+
+const ORDER_EXPORT_COLUMNS: ExportColumn<Record<string, any>>[] = [
+  { header: 'Order ID', accessor: (order) => stripHtml(order.order_id || order.id) },
+  { header: 'Customer', accessor: (order) => stripHtml(order.customer_name || order.customer_id) },
+  { header: 'Phone', accessor: (order) => stripHtml(order.customer_phone || order.contact_number || order.phone) },
+  { header: 'Order Type', accessor: (order) => stripHtml(order.order_source) },
+  { header: 'Scheduled Date', accessor: (order) => stripHtml(order.scheduled_date) },
+  { header: 'Delivery Slot', accessor: (order) => stripHtml(order.delivery_slot || order.slot) },
+  { header: 'Status', accessor: (order) => stripHtml(order.order_status || order.status) },
+  { header: 'Payment Status', accessor: (order) => stripHtml(order.payment_status) },
+  { header: 'Payment Mode', accessor: (order) => stripHtml(order.payment_mode) },
+  { header: 'Subtotal', accessor: (order) => Number(order.subtotal || 0) },
+  { header: 'Discount', accessor: (order) => Number(order.discount_amount || 0) },
+  { header: 'GST', accessor: (order) => Number(order.gst_amount || 0) },
+  { header: 'Total Amount', accessor: (order) => Number(order.total_amount || order.amount || 0) },
+  { header: 'Created At', accessor: (order) => stripHtml(order.created_at) },
+];
 
 function todayLabel() {
   return new Date().toLocaleDateString('en-IN', {
@@ -81,6 +101,7 @@ export default function TodayOrdersClient({
   const [bulkLoading, setBulkLoading]   = useState(false);
   const [bulkResult, setBulkResult]     = useState<string | null>(null);
   const [pdfLoading, setPdfLoading]     = useState(false);
+  const [exportLoading, setExportLoading] = useState<'excel' | 'csv' | null>(null);
 
   // Drawer
   const [selectedOrder, setSelectedOrder] = useState<Record<string, any> | null>(null);
@@ -246,6 +267,54 @@ export default function TodayOrdersClient({
     }
   };
 
+  const handleDataExport = async (format: 'excel' | 'csv') => {
+    setExportLoading(format);
+    try {
+      const exportUrl = new URL(`${API_URL}${endpoint}`);
+      if (activeStatusFilter) exportUrl.searchParams.set('status', activeStatusFilter);
+      if (searchQuery.trim()) exportUrl.searchParams.set('search', searchQuery.trim());
+      if (slotFilter !== 'all') exportUrl.searchParams.set('col_delivery_slot', slotFilter);
+      exportUrl.searchParams.set('limit', String(EXPORT_PAGE_SIZE));
+
+      const rows: Record<string, any>[] = [];
+      let page = 1;
+      let total = Number.POSITIVE_INFINITY;
+
+      while (rows.length < total) {
+        exportUrl.searchParams.set('page', String(page));
+        const response = await fetch(exportUrl.toString(), { credentials: 'include' });
+        if (!response.ok) throw new Error(`Export request failed with HTTP ${response.status}`);
+
+        const result = await response.json();
+        const batch = Array.isArray(result?.data)
+          ? result.data
+          : Array.isArray(result?.rows) ? result.rows : Array.isArray(result) ? result : [];
+        total = Number(result?.recordsFiltered ?? result?.total ?? result?.count ?? batch.length);
+        rows.push(...batch);
+
+        if (batch.length < EXPORT_PAGE_SIZE) break;
+        page += 1;
+      }
+
+      if (rows.length === 0) {
+        alert('No orders match the current filters.');
+        return;
+      }
+
+      const datePart = selectedDate || (fromDate && toDate ? `${fromDate}-to-${toDate}` : new Date().toISOString().slice(0, 10));
+      const filename = `orders-${datePart}`;
+      if (format === 'excel') {
+        downloadExcel(filename, 'Orders', ORDER_EXPORT_COLUMNS, rows);
+      } else {
+        downloadCSV(filename, ORDER_EXPORT_COLUMNS, rows);
+      }
+    } catch {
+      alert(`Failed to export ${format === 'excel' ? 'Excel' : 'CSV'}. Please try again.`);
+    } finally {
+      setExportLoading(null);
+    }
+  };
+
   return (
     <div className="pt-6 md:pt-8 px-4 md:px-7 pb-10 space-y-5 font-sans bg-slate-50/60 min-h-screen overflow-x-hidden">
 
@@ -274,6 +343,26 @@ export default function TodayOrdersClient({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => handleDataExport('excel')}
+            disabled={exportLoading !== null}
+            className="inline-flex items-center gap-2 h-9 px-4 bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-2xs hover:bg-emerald-800 transition-all disabled:opacity-50"
+            title="Export all orders matching the current filters to Excel"
+          >
+            <FileSpreadsheet size={15} className={exportLoading === 'excel' ? 'animate-bounce' : ''} />
+            {exportLoading === 'excel' ? 'Exporting...' : 'Excel'}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDataExport('csv')}
+            disabled={exportLoading !== null}
+            className="inline-flex items-center gap-2 h-9 px-4 bg-white text-slate-800 text-xs font-bold rounded-xl border border-gray-200 shadow-2xs hover:border-emerald-500 hover:text-emerald-700 transition-colors disabled:opacity-50"
+            title="Export all orders matching the current filters to CSV"
+          >
+            <Download size={15} className={exportLoading === 'csv' ? 'animate-bounce' : ''} />
+            {exportLoading === 'csv' ? 'Exporting...' : 'CSV'}
+          </button>
           {scope === 'today' && (
             <>
               <button

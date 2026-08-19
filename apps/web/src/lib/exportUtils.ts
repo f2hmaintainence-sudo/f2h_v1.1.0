@@ -14,6 +14,14 @@ export interface ExportColumn<T = any> {
   accessor: (row: T) => string | number | boolean | null | undefined;
 }
 
+function sanitizeSpreadsheetValue(value: unknown): string | number | boolean {
+  if (value === null || value === undefined) return '';
+  if (typeof value !== 'string') return value as number | boolean;
+
+  const cleanValue = value.replace(/<[^>]*>/g, '').trim();
+  return /^[=+@-]/.test(cleanValue) ? "'" + cleanValue : cleanValue;
+}
+
 /**
  * Downloads data as a native Microsoft Excel (.xlsx) file.
  */
@@ -26,12 +34,7 @@ export function downloadExcel<T = any>(
   const formattedRows = data.map((row) => {
     const rowObj: Record<string, any> = {};
     columns.forEach((col) => {
-      let val = col.accessor(row);
-      if (val === null || val === undefined) val = '';
-      if (typeof val === 'string') {
-        val = val.replace(/<[^>]*>/g, '').trim();
-      }
-      rowObj[col.header] = val;
+      rowObj[col.header] = sanitizeSpreadsheetValue(col.accessor(row));
     });
     return rowObj;
   });
@@ -69,7 +72,7 @@ export function downloadCSV<T = any>(
 ) {
   const escapeCsv = (val: any): string => {
     if (val === null || val === undefined) return '""';
-    const cleanStr = String(val).replace(/<[^>]*>/g, '').replace(/"/g, '""').trim();
+    const cleanStr = String(sanitizeSpreadsheetValue(val)).replace(/"/g, '""');
     return `"${cleanStr}"`;
   };
 

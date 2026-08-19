@@ -190,6 +190,20 @@ export class CartService {
     // failure after the wallet UPDATE — a constraint violation, a pool timeout, a
     // process restart — left the customer charged with no order and no ledger row.
     const result = await this.Data.executeTransaction(async (tx) => {
+      // Concurrency lock on customer to serialize checkout and prevent promotion/coupon race conditions
+      await tx.query(
+        `SELECT customer_id FROM customers WHERE customer_id = $1 FOR UPDATE`,
+        [plan.customerId],
+      );
+
+      // Concurrency lock on coupon if applied
+      if (plan.discountResolution?.summary?.coupon_id) {
+        await tx.query(
+          `SELECT coupon_id, used_count FROM coupons WHERE coupon_id = $1 FOR UPDATE`,
+          [plan.discountResolution.summary.coupon_id],
+        );
+      }
+
       let balanceBeforeDebit = plan.walletBalance;
 
       if (plan.debitWallet && plan.onetimeTotal > 0) {
