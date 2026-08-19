@@ -18,10 +18,11 @@ import {
   Users, ShoppingBag, Eye, DollarSign, ArrowRight, CheckCheck,
   Package, Boxes, Info, ToggleLeft, ToggleRight, Image as ImageIcon,
   ExternalLink, Palette, Smartphone, MonitorSmartphone, FolderTree,
-  SlidersHorizontal, CheckSquare, Upload
+  SlidersHorizontal, CheckSquare, Upload, Crop
 } from "lucide-react";
 import Link from "next/link";
 import { showSuccessToast, showErrorToast } from "@/components/Toast";
+import ImageCropperModal from "@/components/ImageCropperModal";
 
 interface Promotion {
   id: number;
@@ -299,6 +300,11 @@ export default function PromotionsCouponsOffersPage() {
   const [loadingRedemptions, setLoadingRedemptions] = useState(false);
   const [popupPreviewModalOpen, setPopupPreviewModalOpen] = useState(false);
   const [previewOffer, setPreviewOffer] = useState<OfferBanner | null>(null);
+
+  // Image Cropper Modal State
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [cropperImageSrc, setCropperImageSrc] = useState("");
+  const [cropperTarget, setCropperTarget] = useState<"create" | "edit">("create");
 
   // Form State - Create Promotion
   const [promoForm, setPromoForm] = useState({
@@ -585,6 +591,35 @@ export default function PromotionsCouponsOffersPage() {
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  // Open Image Cropper Modal with chosen image
+  const handleOpenCropper = (imageSrc: string, target: "create" | "edit") => {
+    if (!imageSrc) {
+      showErrorToast("No image selected to crop");
+      return;
+    }
+    setCropperImageSrc(imageSrc);
+    setCropperTarget(target);
+    setCropperOpen(true);
+  };
+
+  // Handle Cropped Image Result from Canvas Cropper
+  const handleCropComplete = (croppedDataUrl: string) => {
+    if (cropperTarget === "create") {
+      setOfferForm((prev) => ({
+        ...prev,
+        banner_image: croppedDataUrl,
+        image_url: prev.image_url || "cropped_banner.webp",
+      }));
+    } else {
+      setEditOfferForm((prev) => ({
+        ...prev,
+        banner_image: croppedDataUrl,
+        image_url: prev.image_url || "cropped_banner.webp",
+      }));
+    }
+    showSuccessToast("🎉 Banner image cropped successfully!");
   };
 
   // Open Edit Promotion Modal
@@ -1937,7 +1972,7 @@ export default function PromotionsCouponsOffersPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 3: CREATE OFFER BANNER (SCREEN-FITTED WITH LIVE DYNAMIC PREVIEW) */}
+      {/* MODAL 3: CREATE OFFER BANNER (WITH PREVIEW, CROP & PLACEMENT TYPE) */}
       {/* ========================================================================= */}
       {isCreateOfferOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -1963,55 +1998,8 @@ export default function PromotionsCouponsOffersPage() {
 
             {/* Modal Scrollable Body */}
             <form id="create-offer-form" onSubmit={handleCreateOffer} className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 text-xs">
-              {/* SECTION 0: BANNER PLACEMENT & TYPE */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Banner Placement &amp; Type *</span>
-                  <span className="text-[11px] font-semibold text-emerald-600 capitalize">{offerForm.banner_type.replace('_', ' ')}</span>
-                </div>
-                
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  {[
-                    { type: "home_carousel", label: "Home Carousel", desc: "Top Home Slider", icon: Tag },
-                    { type: "category_slide", label: "Category Slide", desc: "Targeted in Category", icon: FolderTree },
-                    { type: "popup", label: "App Launch Popup", desc: "Modal On App Open", icon: Smartphone },
-                    { type: "checkout_banner", label: "Checkout Promo", desc: "Cart & Pay Screens", icon: ShoppingBag },
-                  ].map((b) => {
-                    const isSelected = offerForm.banner_type === b.type;
-                    const IconComp = b.icon;
-                    return (
-                      <button
-                        key={b.type}
-                        type="button"
-                        onClick={() =>
-                          setOfferForm({
-                            ...offerForm,
-                            banner_type: b.type as any,
-                            is_popup: b.type === "popup",
-                          })
-                        }
-                        className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
-                          isSelected
-                            ? "bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-950 shadow-xs"
-                            : "bg-slate-50 hover:bg-white border-slate-200 text-slate-700"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1.5">
-                          <IconComp size={16} className={isSelected ? "text-emerald-600" : "text-slate-400"} />
-                          {isSelected && <CheckCircle2 size={14} className="text-emerald-600" />}
-                        </div>
-                        <div>
-                          <div className="font-bold text-xs">{b.label}</div>
-                          <div className="text-[10px] text-slate-400 font-medium">{b.desc}</div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
               {/* SECTION 1: OFFER DETAILS */}
-              <div className="space-y-4 pt-2 border-t border-slate-100">
+              <div className="space-y-4">
                 <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Offer Details</div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2046,16 +2034,16 @@ export default function PromotionsCouponsOffersPage() {
                     value={offerForm.description}
                     onChange={(e) => setOfferForm({ ...offerForm, description: e.target.value })}
                     placeholder="Brief summary of the promotional offer..."
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
               </div>
 
-              {/* SECTION 2: BANNER IMAGE (URL OR UPLOAD) */}
+              {/* SECTION 2: BANNER IMAGE (URL OR UPLOAD WITH CROP & PREVIEW) */}
               <div className="space-y-4 pt-2 border-t border-slate-100">
                 <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Banner Image (URL or Upload)</div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                   <div className="space-y-1.5">
                     <label className="font-bold text-slate-700">Banner Image URL (Mandatory - Min 1)</label>
                     <input
@@ -2065,43 +2053,58 @@ export default function PromotionsCouponsOffersPage() {
                       placeholder="https://images.unsplash.com/... or /uploads/..."
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
-                    <p className="text-[10px] text-slate-400">Direct image link or leave upload below</p>
+                    <p className="text-[10px] text-slate-400">Direct image link or upload &amp; crop on right</p>
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="font-bold text-slate-700">Or Upload Banner Image</label>
-                    <label className="border-2 border-dashed border-slate-200 hover:border-emerald-500 bg-slate-50 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition text-center min-h-[72px]">
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleOfferImageUpload(file, false);
-                        }}
-                      />
-                      {offerForm.banner_image ? (
-                        <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs">
-                          <CheckCircle2 size={16} />
-                          <span>Image Selected</span>
+                    {offerForm.banner_image || offerForm.image_url ? (
+                      <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-3 space-y-3 shadow-xs">
+                        <div className="h-36 w-full rounded-xl overflow-hidden bg-white border border-slate-200/60 flex items-center justify-center p-2 shadow-inner">
+                          <img
+                            src={offerForm.banner_image || offerForm.image_url}
+                            alt="Banner Upload"
+                            className="max-h-full max-w-full object-contain rounded-lg"
+                          />
+                        </div>
+                        <div className="flex items-center justify-center gap-3">
                           <button
                             type="button"
-                            onClick={(ev) => {
-                              ev.preventDefault();
-                              setOfferForm({ ...offerForm, banner_image: "" });
-                            }}
-                            className="text-red-500 hover:underline text-[10px] ml-1"
+                            onClick={() => handleOpenCropper(offerForm.banner_image || offerForm.image_url, "create")}
+                            className="px-4 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs shadow-xs transition flex items-center gap-1.5"
                           >
-                            (Remove)
+                            <Crop size={14} className="text-slate-500" />
+                            <span>Crop</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setOfferForm({ ...offerForm, banner_image: "", image_url: "" })}
+                            className="px-4 py-1.5 rounded-xl border border-red-500/80 bg-white hover:bg-red-50 text-red-600 font-bold text-xs shadow-xs transition"
+                          >
+                            Remove
                           </button>
                         </div>
-                      ) : (
-                        <div className="flex items-center gap-2 text-slate-500 font-semibold text-xs">
-                          <Upload size={16} className="text-slate-400" />
-                          <span>Click to upload / drag &amp; drop</span>
+                      </div>
+                    ) : (
+                      <label className="border-2 border-dashed border-slate-200 hover:border-emerald-500 bg-slate-50 rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer transition text-center min-h-[110px]">
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleOfferImageUpload(file, false);
+                          }}
+                        />
+                        <div className="flex flex-col items-center gap-1.5 text-slate-500 font-semibold text-xs">
+                          <div className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                            <Upload size={16} />
+                          </div>
+                          <span>Click to upload banner / drag &amp; drop</span>
+                          <span className="text-[10px] text-slate-400">PNG, JPG, WebP supported</span>
                         </div>
-                      )}
-                    </label>
+                      </label>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2230,22 +2233,76 @@ export default function PromotionsCouponsOffersPage() {
                 </div>
               </div>
 
-              {/* DYNAMIC LIVE BANNER PREVIEW ACCORDING TO TYPE */}
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2">
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
-                  <span>Live Preview ({offerForm.banner_type.replace('_', ' ')}):</span>
-                  <span className="text-[10px] text-emerald-600 font-bold">Dynamic Rendering</span>
+              {/* SECTION 5: BANNER PLACEMENT TYPE ABOVE PREVIEW */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-4 pt-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold tracking-wider text-slate-700 uppercase flex items-center gap-1.5">
+                      <SlidersHorizontal size={13} className="text-emerald-600" />
+                      Banner Placement Type *
+                    </span>
+                    <span className="text-[11px] font-bold text-emerald-700 capitalize bg-emerald-100 px-2.5 py-0.5 rounded-full">
+                      {offerForm.banner_type.replace('_', ' ')}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    {[
+                      { type: "home_carousel", label: "Home Carousel", desc: "Top Home Slider", icon: Tag },
+                      { type: "category_slide", label: "Category Slide", desc: "Targeted in Category", icon: FolderTree },
+                      { type: "popup", label: "App Launch Popup", desc: "Modal On App Open", icon: Smartphone },
+                      { type: "checkout_banner", label: "Checkout Promo", desc: "Cart & Pay Screens", icon: ShoppingBag },
+                    ].map((b) => {
+                      const isSelected = offerForm.banner_type === b.type;
+                      const IconComp = b.icon;
+                      return (
+                        <button
+                          key={b.type}
+                          type="button"
+                          onClick={() =>
+                            setOfferForm({
+                              ...offerForm,
+                              banner_type: b.type as any,
+                              is_popup: b.type === "popup",
+                            })
+                          }
+                          className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
+                            isSelected
+                              ? "bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-950 shadow-xs"
+                              : "bg-white hover:bg-slate-100 border-slate-200 text-slate-700"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1.5">
+                            <IconComp size={16} className={isSelected ? "text-emerald-600" : "text-slate-400"} />
+                            {isSelected && <CheckCircle2 size={14} className="text-emerald-600" />}
+                          </div>
+                          <div>
+                            <div className="font-bold text-xs">{b.label}</div>
+                            <div className="text-[10px] text-slate-400 font-medium">{b.desc}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <BannerVisualPreview
-                  title={offerForm.title}
-                  discount_text={offerForm.discount_text}
-                  description={offerForm.description}
-                  image_url={offerForm.banner_image || offerForm.image_url}
-                  banner_type={offerForm.banner_type}
-                  cta_label={offerForm.cta_label}
-                  background_color={offerForm.background_color}
-                  category_name={getCategoryName(offerForm.category_id)}
-                />
+
+                {/* DYNAMIC LIVE BANNER PREVIEW ACCORDING TO TYPE */}
+                <div className="space-y-1.5 pt-3 border-t border-slate-200/70">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                    <span>Live Banner Rendering:</span>
+                    <span className="text-[10px] text-emerald-600 font-bold">Realtime Dynamic Preview</span>
+                  </div>
+                  <BannerVisualPreview
+                    title={offerForm.title}
+                    discount_text={offerForm.discount_text}
+                    description={offerForm.description}
+                    image_url={offerForm.banner_image || offerForm.image_url}
+                    banner_type={offerForm.banner_type}
+                    cta_label={offerForm.cta_label}
+                    background_color={offerForm.background_color}
+                    category_name={getCategoryName(offerForm.category_id)}
+                  />
+                </div>
               </div>
             </form>
 
@@ -2272,7 +2329,7 @@ export default function PromotionsCouponsOffersPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 3B: EDIT OFFER BANNER (SCREEN-FITTED WITH LIVE DYNAMIC PREVIEW) */}
+      {/* MODAL 3B: EDIT OFFER BANNER (WITH PREVIEW, CROP & PLACEMENT TYPE) */}
       {/* ========================================================================= */}
       {isEditOfferOpen && editingOffer && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -2298,55 +2355,8 @@ export default function PromotionsCouponsOffersPage() {
 
             {/* Modal Scrollable Body */}
             <form id="edit-offer-form" onSubmit={handleUpdateOffer} className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 text-xs">
-              {/* SECTION 0: BANNER PLACEMENT & TYPE */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Banner Placement &amp; Type *</span>
-                  <span className="text-[11px] font-semibold text-amber-600 capitalize">{editOfferForm.banner_type.replace('_', ' ')}</span>
-                </div>
-                
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  {[
-                    { type: "home_carousel", label: "Home Carousel", desc: "Top Home Slider", icon: Tag },
-                    { type: "category_slide", label: "Category Slide", desc: "Targeted in Category", icon: FolderTree },
-                    { type: "popup", label: "App Launch Popup", desc: "Modal On App Open", icon: Smartphone },
-                    { type: "checkout_banner", label: "Checkout Promo", desc: "Cart & Pay Screens", icon: ShoppingBag },
-                  ].map((b) => {
-                    const isSelected = editOfferForm.banner_type === b.type;
-                    const IconComp = b.icon;
-                    return (
-                      <button
-                        key={b.type}
-                        type="button"
-                        onClick={() =>
-                          setEditOfferForm({
-                            ...editOfferForm,
-                            banner_type: b.type as any,
-                            is_popup: b.type === "popup",
-                          })
-                        }
-                        className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
-                          isSelected
-                            ? "bg-amber-50 border-amber-500 ring-2 ring-amber-500/20 text-amber-950 shadow-xs"
-                            : "bg-slate-50 hover:bg-white border-slate-200 text-slate-700"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1.5">
-                          <IconComp size={16} className={isSelected ? "text-amber-600" : "text-slate-400"} />
-                          {isSelected && <CheckCircle2 size={14} className="text-amber-600" />}
-                        </div>
-                        <div>
-                          <div className="font-bold text-xs">{b.label}</div>
-                          <div className="text-[10px] text-slate-400 font-medium">{b.desc}</div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
               {/* SECTION 1: OFFER DETAILS */}
-              <div className="space-y-4 pt-2 border-t border-slate-100">
+              <div className="space-y-4">
                 <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Offer Details</div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2386,11 +2396,11 @@ export default function PromotionsCouponsOffersPage() {
                 </div>
               </div>
 
-              {/* SECTION 2: BANNER IMAGE (URL OR UPLOAD) */}
+              {/* SECTION 2: BANNER IMAGE (URL OR UPLOAD WITH CROP & PREVIEW) */}
               <div className="space-y-4 pt-2 border-t border-slate-100">
                 <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Banner Image (URL or Upload)</div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                   <div className="space-y-1.5">
                     <label className="font-bold text-slate-700">Banner Image URL (Mandatory - Min 1)</label>
                     <input
@@ -2400,43 +2410,58 @@ export default function PromotionsCouponsOffersPage() {
                       placeholder="https://images.unsplash.com/... or /uploads/..."
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
-                    <p className="text-[10px] text-slate-400">Direct image link or leave upload below</p>
+                    <p className="text-[10px] text-slate-400">Direct image link or upload &amp; crop on right</p>
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="font-bold text-slate-700">Or Upload Banner Image</label>
-                    <label className="border-2 border-dashed border-slate-200 hover:border-amber-500 bg-slate-50 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition text-center min-h-[72px]">
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleOfferImageUpload(file, true);
-                        }}
-                      />
-                      {editOfferForm.banner_image ? (
-                        <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs">
-                          <CheckCircle2 size={16} />
-                          <span>New Image Selected</span>
+                    {editOfferForm.banner_image || editOfferForm.image_url ? (
+                      <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-3 space-y-3 shadow-xs">
+                        <div className="h-36 w-full rounded-xl overflow-hidden bg-white border border-slate-200/60 flex items-center justify-center p-2 shadow-inner">
+                          <img
+                            src={editOfferForm.banner_image || editOfferForm.image_url}
+                            alt="Banner Upload"
+                            className="max-h-full max-w-full object-contain rounded-lg"
+                          />
+                        </div>
+                        <div className="flex items-center justify-center gap-3">
                           <button
                             type="button"
-                            onClick={(ev) => {
-                              ev.preventDefault();
-                              setEditOfferForm({ ...editOfferForm, banner_image: "" });
-                            }}
-                            className="text-red-500 hover:underline text-[10px] ml-1"
+                            onClick={() => handleOpenCropper(editOfferForm.banner_image || editOfferForm.image_url, "edit")}
+                            className="px-4 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs shadow-xs transition flex items-center gap-1.5"
                           >
-                            (Remove)
+                            <Crop size={14} className="text-slate-500" />
+                            <span>Crop</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditOfferForm({ ...editOfferForm, banner_image: "", image_url: "" })}
+                            className="px-4 py-1.5 rounded-xl border border-red-500/80 bg-white hover:bg-red-50 text-red-600 font-bold text-xs shadow-xs transition"
+                          >
+                            Remove
                           </button>
                         </div>
-                      ) : (
-                        <div className="flex items-center gap-2 text-slate-500 font-semibold text-xs">
-                          <Upload size={16} className="text-slate-400" />
-                          <span>Click to upload new image</span>
+                      </div>
+                    ) : (
+                      <label className="border-2 border-dashed border-slate-200 hover:border-amber-500 bg-slate-50 rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer transition text-center min-h-[110px]">
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleOfferImageUpload(file, true);
+                          }}
+                        />
+                        <div className="flex flex-col items-center gap-1.5 text-slate-500 font-semibold text-xs">
+                          <div className="w-9 h-9 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
+                            <Upload size={16} />
+                          </div>
+                          <span>Click to upload new banner / drag &amp; drop</span>
+                          <span className="text-[10px] text-slate-400">PNG, JPG, WebP supported</span>
                         </div>
-                      )}
-                    </label>
+                      </label>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2565,22 +2590,76 @@ export default function PromotionsCouponsOffersPage() {
                 </div>
               </div>
 
-              {/* DYNAMIC LIVE BANNER PREVIEW ACCORDING TO TYPE */}
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2">
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
-                  <span>Live Preview ({editOfferForm.banner_type.replace('_', ' ')}):</span>
-                  <span className="text-[10px] text-amber-600 font-bold">Dynamic Rendering</span>
+              {/* SECTION 5: BANNER PLACEMENT TYPE ABOVE PREVIEW */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-4 pt-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold tracking-wider text-slate-700 uppercase flex items-center gap-1.5">
+                      <SlidersHorizontal size={13} className="text-amber-600" />
+                      Banner Placement Type *
+                    </span>
+                    <span className="text-[11px] font-bold text-amber-700 capitalize bg-amber-100 px-2.5 py-0.5 rounded-full">
+                      {editOfferForm.banner_type.replace('_', ' ')}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    {[
+                      { type: "home_carousel", label: "Home Carousel", desc: "Top Home Slider", icon: Tag },
+                      { type: "category_slide", label: "Category Slide", desc: "Targeted in Category", icon: FolderTree },
+                      { type: "popup", label: "App Launch Popup", desc: "Modal On App Open", icon: Smartphone },
+                      { type: "checkout_banner", label: "Checkout Promo", desc: "Cart & Pay Screens", icon: ShoppingBag },
+                    ].map((b) => {
+                      const isSelected = editOfferForm.banner_type === b.type;
+                      const IconComp = b.icon;
+                      return (
+                        <button
+                          key={b.type}
+                          type="button"
+                          onClick={() =>
+                            setEditOfferForm({
+                              ...editOfferForm,
+                              banner_type: b.type as any,
+                              is_popup: b.type === "popup",
+                            })
+                          }
+                          className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
+                            isSelected
+                              ? "bg-amber-50 border-amber-500 ring-2 ring-amber-500/20 text-amber-950 shadow-xs"
+                              : "bg-white hover:bg-slate-100 border-slate-200 text-slate-700"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1.5">
+                            <IconComp size={16} className={isSelected ? "text-amber-600" : "text-slate-400"} />
+                            {isSelected && <CheckCircle2 size={14} className="text-amber-600" />}
+                          </div>
+                          <div>
+                            <div className="font-bold text-xs">{b.label}</div>
+                            <div className="text-[10px] text-slate-400 font-medium">{b.desc}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <BannerVisualPreview
-                  title={editOfferForm.title}
-                  discount_text={editOfferForm.discount_text}
-                  description={editOfferForm.description}
-                  image_url={editOfferForm.banner_image || editOfferForm.image_url}
-                  banner_type={editOfferForm.banner_type}
-                  cta_label={editOfferForm.cta_label}
-                  background_color={editOfferForm.background_color}
-                  category_name={getCategoryName(editOfferForm.category_id)}
-                />
+
+                {/* DYNAMIC LIVE BANNER PREVIEW ACCORDING TO TYPE */}
+                <div className="space-y-1.5 pt-3 border-t border-slate-200/70">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                    <span>Live Banner Rendering:</span>
+                    <span className="text-[10px] text-amber-600 font-bold">Realtime Dynamic Preview</span>
+                  </div>
+                  <BannerVisualPreview
+                    title={editOfferForm.title}
+                    discount_text={editOfferForm.discount_text}
+                    description={editOfferForm.description}
+                    image_url={editOfferForm.banner_image || editOfferForm.image_url}
+                    banner_type={editOfferForm.banner_type}
+                    cta_label={editOfferForm.cta_label}
+                    background_color={editOfferForm.background_color}
+                    category_name={getCategoryName(editOfferForm.category_id)}
+                  />
+                </div>
               </div>
             </form>
 
@@ -3242,6 +3321,16 @@ export default function PromotionsCouponsOffersPage() {
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 7: IMAGE CROPPER MODAL (FREE & RATIO BASED) */}
+      {/* ========================================================================= */}
+      <ImageCropperModal
+        isOpen={cropperOpen}
+        imageUrl={cropperImageSrc}
+        onClose={() => setCropperOpen(false)}
+        onCropComplete={handleCropComplete}
+      />
     </div>
   );
 }
