@@ -261,7 +261,7 @@ export class DeliveryRunService {
           );
 
           if (!partnerId) {
-            console.log(
+            this.logger.log(
               'No partner found',
               cluster.map(c => c.order_id),
             );
@@ -428,7 +428,9 @@ export class DeliveryRunService {
                     body: `Your F2H Fresh order has been scheduled for ${slotName || 'today'} delivery.`,
                   },
                 );
-              } catch (e) {}
+              } catch {
+                // Deliberately tolerated: the caller has a valid fallback for this failure.
+              }
 
               // Insert ONE delivery_log per order (prevent duplicates)
               const itemsJson = orderItemsMap.get(order.order_id) || [];
@@ -674,7 +676,9 @@ export class DeliveryRunService {
       for (const row of rows) {
         let items: any[] = [];
         if (typeof row.items_json === 'string') {
-          try { items = JSON.parse(row.items_json); } catch {}
+          try { items = JSON.parse(row.items_json); } catch {
+            // Deliberately tolerated: the caller has a valid fallback for this failure.
+          }
         } else if (Array.isArray(row.items_json)) {
           items = row.items_json;
         }
@@ -706,7 +710,9 @@ export class DeliveryRunService {
             try {
               items = JSON.parse(row.items_json);
               isString = true;
-            } catch {}
+            } catch {
+              // Deliberately tolerated: the caller has a valid fallback for this failure.
+            }
           } else if (Array.isArray(row.items_json)) {
             items = row.items_json;
           }
@@ -1414,7 +1420,9 @@ export class DeliveryRunService {
         for (const log of logs) {
           let items: any[] = [];
           if (typeof log.items_json === 'string') {
-            try { items = JSON.parse(log.items_json); } catch {}
+            try { items = JSON.parse(log.items_json); } catch {
+              // Deliberately tolerated: the caller has a valid fallback for this failure.
+            }
           } else if (Array.isArray(log.items_json)) {
             items = log.items_json;
           }

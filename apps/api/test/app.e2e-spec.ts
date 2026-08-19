@@ -1,25 +1,49 @@
+import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 
-describe('AppController (e2e)', () => {
-  let app: INestApplication<App>;
+const TEST_DB = process.env.TEST_DB_DATABASE;
+const describeIfTestDb = TEST_DB ? describe : describe.skip;
 
-  beforeEach(async () => {
+describeIfTestDb('API root', () => {
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    process.env.DB_DATABASE = TEST_DB;
+    process.env.ENABLE_CRON = 'false';
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix('api');
+    app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
   });
 
-  it('/ (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
+  afterAll(async () => {
+    await app?.close();
+  });
+
+  it('answers with liveness only', async () => {
+    const res = await request(app.getHttpServer()).get('/api/v1/').expect(200);
+    expect(res.body).toMatchObject({ status: 'ok', service: 'f2h-api' });
+  });
+
+  /**
+   * The root route used to run a Redis benchmark whose payload embedded
+   * `SELECT user_id, email, password FROM users` — every account's bcrypt hash,
+   * unauthenticated. This asserts the response can never carry credentials again.
+   */
+  it('never returns user credentials', async () => {
+    const res = await request(app.getHttpServer()).get('/api/v1/').expect(200);
+    const body = JSON.stringify(res.body);
+
+    expect(body).not.toMatch(/password/i);
+    expect(body).not.toMatch(/\$2[aby]\$/); // a bcrypt hash prefix
+    expect(body).not.toMatch(/@/); // no email addresses
   });
 });

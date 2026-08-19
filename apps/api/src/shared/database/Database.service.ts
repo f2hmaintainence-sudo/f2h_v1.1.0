@@ -200,9 +200,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
       return result.rows as T[];
     } catch (error) {
+      // `params` are the actual bound row values — password hashes, encrypted PII,
+      // wallet amounts. The statement text is enough to locate the failure.
       this.logger.error('Query failed', {
         sql: normalizedSql.substring(0, 200),
-        params,
+        errorCode: (error as { code?: string })?.code,
       });
       throw error;
     }

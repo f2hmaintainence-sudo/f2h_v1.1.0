@@ -10,6 +10,7 @@ import {
   Get,
   Query,
   UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
 import { Response, Request } from 'express';
 import { AuthService, parseDurationToSeconds } from './auth.service';
@@ -25,6 +26,8 @@ import { DatabaseService } from 'src/shared/database/Database.service';
 
 @Controller({ path: 'auth', version: '1' })
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
     private readonly authService: AuthService,
     private readonly jwtService: JwtService,
@@ -51,13 +54,13 @@ export class AuthController {
     const clientRole = typeof rawClientRole === 'string' ? rawClientRole.trim().toUpperCase() : '';
 
     if (!clientRole || !['CUSTOMER', 'DELIVERY_PARTNER', 'ADMIN'].includes(clientRole)) {
-      console.log(
+      this.logger.log(
         `[AuthController:login] Login rejected: Missing or invalid x-role header: "${rawClientRole}"`,
       );
       throw new UnauthorizedException('Missing or invalid x-role header');
     }
 
-    console.log(
+    this.logger.log(
       `[AuthController:login] Attempting login with identifier: ${body.identifier}, clientRole: ${clientRole}`,
     );
 
@@ -96,7 +99,7 @@ export class AuthController {
     }
 
     if (!isRoleAllowed) {
-      console.log(
+      this.logger.log(
         `[AuthController:login] Client Role: ${clientRole}, Resolved User Role: ${userRole}, Result: FAILED - Unauthorized role`,
       );
       throw new UnauthorizedException(`Unauthorized role for ${clientRole} application`);

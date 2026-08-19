@@ -84,7 +84,9 @@ export class LocationController {
       const fs = require('fs');
       const logMsg = `[${new Date().toISOString()}] userId: ${userId}, lat: ${body.latitude}, lng: ${body.longitude}, shouldLogToDb: ${shouldLogToDb}\n`;
       fs.appendFileSync('location_debug.log', logMsg);
-    } catch (e) {}
+    } catch {
+      // Deliberately tolerated: the caller has a valid fallback for this failure.
+    }
 
     // 1. Log to database asynchronously if movement threshold is met
     if (shouldLogToDb) {

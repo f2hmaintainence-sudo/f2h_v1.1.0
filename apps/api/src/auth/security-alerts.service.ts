@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable,
+  Logger,
+} from '@nestjs/common';
 import { MailService } from 'src/mail/mail.service';
 import { AuditLoggerService } from './audit-logger.service';
 
@@ -8,6 +10,8 @@ import { AuditLoggerService } from './audit-logger.service';
  */
 @Injectable()
 export class SecurityAlertsService {
+  private readonly logger = new Logger(SecurityAlertsService.name);
+
   constructor(
     private readonly mailService: MailService,
     private readonly auditLogger: AuditLoggerService,
@@ -25,7 +29,7 @@ export class SecurityAlertsService {
   }): Promise<void> {
     const { email, phone, attemptNumber, ipAddress } = data;
 
-    console.log(
+    this.logger.log(
       `[SecurityAlerts] Sending failed OTP attempt alert to ${email}`,
     );
 
@@ -102,7 +106,7 @@ export class SecurityAlertsService {
   }): Promise<void> {
     const { email, userId, ipAddress, reason } = data;
 
-    console.log(`[SecurityAlerts] Sending account locked alert to ${email}`);
+    this.logger.log(`[SecurityAlerts] Sending account locked alert to ${email}`);
 
     const reasonText =
       reason === 'LOGIN_ATTEMPTS'
@@ -192,7 +196,7 @@ export class SecurityAlertsService {
   }): Promise<void> {
     const { email, ipAddress } = data;
 
-    console.log(
+    this.logger.log(
       `[SecurityAlerts] Sending password change confirmation to ${email}`,
     );
 
@@ -276,7 +280,7 @@ export class SecurityAlertsService {
   }): Promise<void> {
     const { email, deviceName, ipAddress, location } = data;
 
-    console.log(`[SecurityAlerts] Sending suspicious login alert to ${email}`);
+    this.logger.log(`[SecurityAlerts] Sending suspicious login alert to ${email}`);
 
     const html = `
       <!DOCTYPE html>
@@ -362,7 +366,7 @@ export class SecurityAlertsService {
   }): Promise<void> {
     const { email, provider, ipAddress } = data;
 
-    console.log(`[SecurityAlerts] Sending OAuth login alert to ${email}`);
+    this.logger.log(`[SecurityAlerts] Sending OAuth login alert to ${email}`);
 
     const providerName =
       {
@@ -451,7 +455,7 @@ export class SecurityAlertsService {
   }): Promise<void> {
     const { email, action, changedBy } = data;
 
-    console.log(`[SecurityAlerts] Sending permission change alert to ${email}`);
+    this.logger.log(`[SecurityAlerts] Sending permission change alert to ${email}`);
 
     const actionText =
       {

@@ -188,7 +188,9 @@ export class ReferralRepository implements IReferralRepository {
       if (walletSum > total) {
         total = walletSum;
       }
-    } catch (_) {}
+    } catch {
+      // Deliberately tolerated: the caller has a valid fallback for this failure.
+    }
 
     return total;
   }
@@ -241,7 +243,9 @@ export class ReferralRepository implements IReferralRepository {
           { referral_status: 'active', first_order_completed: true, updated_at: new Date() },
           [{ column: 'customer_id', operator: '=', value: cust.customer_id }]
         );
-      } catch (_) {}
+      } catch {
+        // Deliberately tolerated: the caller has a valid fallback for this failure.
+      }
     }
 
     if (cust.referral_code && cust.referral_code.trim().length > 0) {

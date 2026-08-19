@@ -10,6 +10,7 @@ import {
   ConflictException,
   InternalServerErrorException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import {
   RedisService,
@@ -57,6 +58,8 @@ export function parseDurationToSeconds(value: string): number {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly DataBase: DatabaseService,
@@ -987,7 +990,7 @@ export class AuthService {
     const matchesPhone = storedPhone && storedPhone === normalizedContact;
 
     if (!matchesEmail && !matchesPhone) {
-      console.log(
+      this.logger.log(
         `[AuthService:consumeVerifiedOtp] Verification token mismatch. Stored email: "${storedEmail}", stored phone: "${storedPhone}", expected contact: "${normalizedContact}"`,
       );
       throw new BadRequestException('Verification token does not match contact');

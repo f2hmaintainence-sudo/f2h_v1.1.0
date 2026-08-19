@@ -1,0 +1,123 @@
+name: CI
+
+# Gates that stop the defects fixed in this pass from coming back:
+#   - a committed secret          (gitleaks)
+#   - a type error reaching prod  (tsc --noEmit, now that ignoreBuildErrors is gone)
+#   - a raw console.log or an unexplained empty catch (eslint, error-level rules)
+#   - a regression in authorization or the money path (jest, incl. a real Postgres)
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks needs history to scan a push range
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  api:
+    name: API — types, lint, tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: f2h_user
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: f2h_fresh_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 10s
+          --health-timeout 5s --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: f2h_fresh_test
+      DB_USERNAME: f2h_user
+      DB_PASSWORD: ci_password
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
+      JWT_SECRET: ci_only_jwt_secret_at_least_32_chars_long
+      ENCRYPTION_SECRET: ci_only_encryption_secret_32_chars_min
+      CORS_ORIGINS: http://localhost:3000
+      ENABLE_CRON: 'false'
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit -p tsconfig.json
+        working-directory: apps/api
+
+      - name: Lint
+        run: npx eslint "src/**/*.ts"
+        working-directory: apps/api
+
+      - name: Unit tests
+        run: npx jest
+        working-directory: apps/api
+
+      - name: Migration dry run
+        run: npx ts-node -r tsconfig-paths/register src/scripts/run-migration.ts
+        working-directory: apps/api
+
+      # The authorization matrix and the checkout money tests need a real database:
+      # they are transaction and constraint tests, and a mock cannot express those.
+      - name: Apply migrations to the test database
+        run: npx ts-node -r tsconfig-paths/register src/scripts/run-migration.ts --yes
+        working-directory: apps/api
+
+      - name: E2E tests
+        run: npx jest --config ./test/jest-e2e.json --forceExit --runInBand
+        working-directory: apps/api
+        env:
+          TEST_DB_DATABASE: f2h_fresh_test
+
+  web:
+    name: Web — types, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # next.config.ts no longer sets typescript.ignoreBuildErrors, so this is a
+      # real gate rather than a formality.
+      - name: Type check
+        run: npx tsc --noEmit
+        working-directory: apps/web
+
+      - name: Build
+        run: npm run build
+        working-directory: apps/web
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:5001

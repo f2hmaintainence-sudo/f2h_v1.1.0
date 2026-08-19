@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Post, UseGuards, Req, BadRequestException, Param } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards, Req, BadRequestException, Param,
+  Logger,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
 import { DataService } from 'src/shared/database/Data.service';
@@ -8,6 +10,8 @@ import { RedisService } from 'src/shared/redis/redis.service';
 @Controller({ path: 'customer/orders', version: '1' })
 @UseGuards(AuthGuard('jwt'))
 export class CustomerOrderController {
+  private readonly logger = new Logger(CustomerOrderController.name);
+
   constructor(
     private readonly data: DataService,
     private readonly db: DatabaseService,
@@ -651,7 +655,7 @@ export class CustomerOrderController {
           created_by: 'system',
           created_at: new Date(),
         }, { transaction: conn });
-        console.log('Wallet transaction insert result', txInsert);
+        this.logger.log('Wallet transaction insert result', txInsert);
         if (txInsert && txInsert.status && txInsert.id) {
           walletTransactionId = txInsert.id;
         }

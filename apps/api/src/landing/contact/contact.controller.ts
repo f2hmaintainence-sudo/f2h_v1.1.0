@@ -4,6 +4,7 @@ import {
   Body,
   BadRequestException,
   Req,
+  Logger,
 } from '@nestjs/common';
 import { Request } from 'express';
 import * as nodemailer from 'nodemailer';
@@ -18,13 +19,15 @@ interface RecaptchaResponse {
 }
 @Controller({ path: 'contact', version: '1' })
 export class ContactController {
+  private readonly logger = new Logger(ContactController.name);
+
   constructor(private readonly dataService: DataService) {}
 
   @Public()
   @Post()
   async submit(@Body() body: ContactDto, @Req() req: Request) {
     try {
-      console.log('Received contact form submission:', body);
+      this.logger.log('Received contact form submission:', body);
 
       // Verify reCAPTCHA
       const verify = await fetch(

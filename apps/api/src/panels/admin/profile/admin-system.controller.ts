@@ -1,4 +1,6 @@
-import { Controller, Get, Post, Patch, Query, Body, Param, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Query, Body, Param, Req, UseGuards,
+  Logger,
+} from '@nestjs/common';
 import { AdminSystemService } from './admin-system.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
@@ -7,6 +9,8 @@ import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 @Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/system', version: '1' })
 export class AdminSystemController {
+  private readonly logger = new Logger(AdminSystemController.name);
+
   constructor(private readonly systemService: AdminSystemService) {}
 
   // ── Admin Users ──
@@ -47,9 +51,9 @@ export class AdminSystemController {
 
   @Post('notifications')
   async createNotificationSetting(@Body() body: any, @Req() req: any) {
-    console.log('[AdminSystemController] 📥 createNotificationSetting endpoint called, req.user:', req.user);
+    this.logger.log('[AdminSystemController] 📥 createNotificationSetting endpoint called, req.user:', req.user);
     const adminId = req.user?.user_id ?? req.user?.id ?? 'system';
-    console.log('[AdminSystemController] Resolved adminId:', adminId);
+    this.logger.log('[AdminSystemController] Resolved adminId:', adminId);
     return this.systemService.createNotificationSetting(body, adminId);
   }
 
@@ -57,9 +61,9 @@ export class AdminSystemController {
   async updateNotificationSetting(
     @Param('id') id: string, @Body() body: any, @Req() req: any,
   ) {
-    console.log('[AdminSystemController] 📥 updateNotificationSetting endpoint called, req.user:', req.user);
+    this.logger.log('[AdminSystemController] 📥 updateNotificationSetting endpoint called, req.user:', req.user);
     const adminId = req.user?.user_id ?? req.user?.id ?? 'system';
-    console.log('[AdminSystemController] login user id:', adminId);
+    this.logger.log('[AdminSystemController] login user id:', adminId);
     return this.systemService.updateNotificationSetting(id, body, adminId);
   }
 

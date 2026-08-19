@@ -1,0 +1,17 @@
+# gitleaks configuration.
+#
+# The repository previously carried working JWT, session, and encryption keys in
+# docker-compose.yml, plus a hardcoded release-upload secret in app.controller.ts.
+# Those values are published and must be treated as compromised regardless of what
+# this scanner reports today — this config is here to stop the next one.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Template and example files that intentionally contain key NAMES only"
+paths = [
+  '''apps/api/\.env\.example''',
+  '''apps/api/\.env\.pgbouncer\.example''',
+  '''\.gitleaks\.toml''',
+]

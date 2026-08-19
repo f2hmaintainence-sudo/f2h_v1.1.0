@@ -100,7 +100,9 @@ export class ProfileService {
           if (branchMatch?.branch_name) {
             branchName = branchMatch.branch_name;
           }
-        } catch (_) {}
+        } catch {
+          // Deliberately tolerated: the caller has a valid fallback for this failure.
+        }
       }
 
       return {

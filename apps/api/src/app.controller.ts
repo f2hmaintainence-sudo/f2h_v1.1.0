@@ -44,7 +44,7 @@ export class AppController {
 
   @Public()
   @Get()
-  getHello(): any {
+  getHello() {
     return this.appService.getHello();
   }
 

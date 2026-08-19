@@ -39,7 +39,7 @@ export class SubscriptionSnapshotCron {
     const targetDate = this.snapshotService.getIstDate(1); // Next day
     const slot = 'morning' as const;
 
-    console.log(
+    this.logger.log(
       `[CRON] Starting Morning Order Processing for ${targetDate}`,
     );
 
@@ -49,7 +49,7 @@ export class SubscriptionSnapshotCron {
         slot,
         'cron',
       );
-      console.log(
+      this.logger.log(
         `[CRON] Morning processing done: ` +
         `sub_orders=${result.subscriptionOrdersCreated} ` +
         `sub_items=${result.subscriptionItemsInserted} ` +
@@ -80,7 +80,7 @@ export class SubscriptionSnapshotCron {
         recipientIds: adminUserIds,
         senderId: 'system',
       });
-      console.log('notifications=========',notification);
+      this.logger.log('notifications=========',notification);
 
       this.developerService.info('Morning cron completion notification sent successfully', {
         status: 'success',
@@ -111,7 +111,7 @@ export class SubscriptionSnapshotCron {
     const targetDate = this.snapshotService.getIstDate(0); // Same day
     const slot = 'evening' as const;
 
-    console.log(
+    this.logger.log(
       `[CRON] Starting Evening Order Processing for ${targetDate}`,
     );
 
@@ -121,7 +121,7 @@ export class SubscriptionSnapshotCron {
         slot,
         'cron',
       );
-      console.log(
+      this.logger.log(
         `[CRON] Evening processing done: ` +
         `sub_orders=${result.subscriptionOrdersCreated} ` +
         `sub_items=${result.subscriptionItemsInserted} ` +

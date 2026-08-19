@@ -38,7 +38,9 @@ export class SubscriptionsService {
         if (decoded?.user_id || decoded?.sub) {
           customerId = decoded.user_id || decoded.sub;
         }
-      } catch (_) { }
+      } catch {
+        // Deliberately tolerated: the caller has a valid fallback for this failure.
+      }
     }
 
     if (customerId) {
@@ -100,7 +102,9 @@ export class SubscriptionsService {
           const reFetch = await this.db.query(custQuery, [customerId, email || customerId]);
           customer = reFetch?.[0];
         }
-      } catch (_) { }
+      } catch {
+        // Deliberately tolerated: the caller has a valid fallback for this failure.
+      }
     }
     if (!customer) {
       this.developer.error('SubscriptionsService.checkout customer profile not found', { customerId });

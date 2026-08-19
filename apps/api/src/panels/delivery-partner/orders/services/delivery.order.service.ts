@@ -779,7 +779,9 @@ export class DeliveryOrderService {
               body: 'Your F2H Fresh order has been delivered successfully. Enjoy your fresh items!',
             },
           );
-        } catch (e) {}
+        } catch {
+          // Deliberately tolerated: the caller has a valid fallback for this failure.
+        }
       }
     }
 

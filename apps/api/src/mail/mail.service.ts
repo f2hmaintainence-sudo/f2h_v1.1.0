@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable,
+  Logger,
+} from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import {
   forgotPasswordOtpTemplate,
@@ -9,6 +11,8 @@ import {
 
 @Injectable()
 export class MailService {
+  private readonly logger = new Logger(MailService.name);
+
   private transporter: nodemailer.Transporter;
 
   constructor() {
@@ -60,7 +64,7 @@ export class MailService {
     text?: string;
   }) {
     try {
-      console.log(`[MailService] Sending email to ${options.to}...`);
+      this.logger.log(`[MailService] Sending email to ${options.to}...`);
       const info = await this.transporter.sendMail({
         from: `"f2hfresh.com Security" <${process.env.INFO_MAIL_USERNAME}>`,
         to: options.to,
@@ -68,7 +72,7 @@ export class MailService {
         text: options.text || '',
         html: options.html,
       });
-      console.log(
+      this.logger.log(
         '[MailService] Email sent successfully. Message ID:',
         info.messageId,
       );

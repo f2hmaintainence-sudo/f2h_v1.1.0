@@ -310,59 +310,56 @@ class QuantityCounter extends StatelessWidget {
   Widget build(BuildContext context) {
     if (isLoading) {
       return Container(
-        width: width ?? 68,
-        height: 28,
+        width: width ?? 92,
+        height: 34,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: kBorderLt),
+          color: kPrimary.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: const SizedBox(
-          width: 14,
-          height: 14,
+          width: 15,
+          height: 15,
           child: CircularProgressIndicator(
-            strokeWidth: 1.5,
-            valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
+            strokeWidth: 1.8,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
           ),
         ),
       );
     }
 
     return Container(
-      height: 28,
-      width: width,
+      height: 34,
+      width: width ?? 92,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: kBorderLt),
+        color: kPrimary,
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
-        mainAxisSize: width == null ? MainAxisSize.min : MainAxisSize.max,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           GestureDetector(
             onTap: onDecrement,
             behavior: HitTestBehavior.opaque,
             child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8),
-              child: Icon(Icons.remove, color: kTextMid, size: 14),
+              padding: EdgeInsets.symmetric(horizontal: 10),
+              child: Icon(Icons.remove_rounded, color: Colors.white, size: 16),
             ),
           ),
           Text(
             '$quantity',
             style: const TextStyle(
-              fontSize: 12,
+              fontSize: 13.5,
               fontWeight: FontWeight.w800,
-              color: kText,
+              color: Colors.white,
             ),
           ),
           GestureDetector(
             onTap: onIncrement,
             behavior: HitTestBehavior.opaque,
             child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8),
-              child: Icon(Icons.add, color: kPrimary, size: 14),
+              padding: EdgeInsets.symmetric(horizontal: 10),
+              child: Icon(Icons.add_rounded, color: Colors.white, size: 16),
             ),
           ),
         ],
@@ -386,7 +383,7 @@ class SectionCard extends StatelessWidget {
     super.key,
     required this.child,
     this.padding,
-    this.borderRadius = 20,
+    this.borderRadius = 16,
   });
 
   @override
@@ -396,7 +393,14 @@ class SectionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: kSurface,
         borderRadius: BorderRadius.circular(borderRadius),
-        border: Border.all(color: kBorder),
+        border: Border.all(color: const Color(0xFFEDF1EE), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.035),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: child,
     );

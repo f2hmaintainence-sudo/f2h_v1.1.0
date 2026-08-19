@@ -15,6 +15,7 @@ declare namespace NodeJS {
 }
 
 declare namespace globalThis {
+  // eslint-disable-next-line no-var -- an ambient global declaration requires `var`
   var process: NodeJS.Process;
 }
 

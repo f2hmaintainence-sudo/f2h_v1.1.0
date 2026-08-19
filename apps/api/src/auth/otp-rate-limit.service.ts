@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable,
+  Logger,
+} from '@nestjs/common';
 import { RedisService } from 'src/shared/redis/redis.service';
 import { DataService } from 'src/shared/database/Data.service';
 import { CACHE_KEYS, CACHE_TTL } from 'src/shared/redis/cache.constants';
@@ -17,6 +19,8 @@ import { CACHE_KEYS, CACHE_TTL } from 'src/shared/redis/cache.constants';
  */
 @Injectable()
 export class OtpRateLimitService {
+  private readonly logger = new Logger(OtpRateLimitService.name);
+
   private readonly FREE_ATTEMPTS = 1000; // DEV: was 3
   private readonly DAILY_LIMIT = 10000; // DEV: was 15
 
@@ -134,7 +138,7 @@ export class OtpRateLimitService {
           limitState.locked_until = new Date(
             Date.now() + tier.duration * 1000,
           ).toISOString();
-          console.log(
+          this.logger.log(
             `[OTP Rate Limit] Phone ${phone_normalized} locked for ${tier.label} after ${tier.threshold} attempts`,
           );
         }
@@ -207,7 +211,7 @@ export class OtpRateLimitService {
             CACHE_TTL.ONE_DAY,
           );
 
-          console.log(
+          this.logger.log(
             `[OTP Rate Limit] Phone ${phone_normalized} locked for 30 minutes due to ${verifyState.failures} failed verifications`,
           );
         }
@@ -245,7 +249,7 @@ export class OtpRateLimitService {
       await this.redisService.forget(redisKey);
       await this.redisService.forget(verifyKey);
       // Don't reset daily key - it's meant to persist for 24 hours
-      console.log(
+      this.logger.log(
         `[OTP Rate Limit] Reset limits for phone ${phone_normalized}`,
       );
     } catch (error) {

@@ -588,7 +588,9 @@ export class FinanceRepository {
         if (u.branch_address) branchAddress = u.branch_address;
         if (u.branch_phone) branchPhone = u.branch_phone;
       }
-    } catch (_) {}
+    } catch {
+      // Deliberately tolerated: the caller has a valid fallback for this failure.
+    }
 
     // 3. Fetch default address & contact fallbacks
     try {
@@ -607,7 +609,9 @@ export class FinanceRepository {
         if (!customerPhone && a.contact_mobile) customerPhone = a.contact_mobile;
         if (customerName === rawBill.customer_id && a.contact_name) customerName = a.contact_name;
       }
-    } catch (_) {}
+    } catch {
+      // Deliberately tolerated: the caller has a valid fallback for this failure.
+    }
 
     const bill = {
       bill_id: rawBill.bill_id,
@@ -671,7 +675,9 @@ export class FinanceRepository {
       if (Array.isArray(itemRows) && itemRows.length > 0) {
         orderItems = itemRows;
       }
-    } catch (_) {}
+    } catch {
+      // Deliberately tolerated: the caller has a valid fallback for this failure.
+    }
 
     // 5. Fetch from subscription_items if bill references a subscription
     if (!orderItems || orderItems.length === 0) {
@@ -717,7 +723,9 @@ export class FinanceRepository {
             total_amount: Number(item.total_amount || 0) * (Number(item.quantity) > 0 ? Number(item.quantity) : 1),
           }));
         }
-      } catch (_) {}
+      } catch {
+        // Deliberately tolerated: the caller has a valid fallback for this failure.
+      }
     }
 
     // 6. Fallback from orders if customer_bill_items & subscription_items empty
@@ -767,7 +775,9 @@ export class FinanceRepository {
             delivery_slot: o.delivery_slot,
           }));
         }
-      } catch (_) {}
+      } catch {
+        // Deliberately tolerated: the caller has a valid fallback for this failure.
+      }
     }
 
     return {

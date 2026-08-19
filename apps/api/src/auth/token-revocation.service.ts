@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable,
+  Logger,
+} from '@nestjs/common';
 import { RedisService } from 'src/shared/redis/redis.service';
 import { CACHE_KEYS } from 'src/shared/redis/cache.constants';
 
@@ -9,6 +11,8 @@ import { CACHE_KEYS } from 'src/shared/redis/cache.constants';
  */
 @Injectable()
 export class TokenRevocationService {
+  private readonly logger = new Logger(TokenRevocationService.name);
+
   // In-memory fallback for development (will migrate to Redis)
   private revokedTokens = new Map<string, number>();
 
@@ -37,7 +41,7 @@ export class TokenRevocationService {
       // Also store in memory for development
       this.revokedTokens.set(jti, Date.now() + ttl * 1000);
 
-      console.log(
+      this.logger.log(
         `[TokenRevocation] Token revoked: ${jti.substring(0, 8)}... (TTL: ${ttl}s)`,
       );
     } catch (error) {
@@ -110,7 +114,7 @@ export class TokenRevocationService {
     }
 
     if (cleaned > 0) {
-      console.log(
+      this.logger.log(
         `[TokenRevocation] Cleaned up ${cleaned} expired tokens from memory`,
       );
     }

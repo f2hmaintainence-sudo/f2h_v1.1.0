@@ -1,21 +1,32 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../../app.dart';
-import 'package:f2h_customer/theme/app_colors.dart';
-import '../../data/models/product_model.dart';
-import '../widgets/product_tile.dart';
-import 'cart_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../bloc/catalog_bloc.dart';
-import '../bloc/catalog_state.dart';
-import '../bloc/catalog_event.dart';
-import '../bloc/cart/cart_bloc.dart';
-import '../bloc/cart/cart_state.dart';
+
+import '../../../../app.dart';
 import '../../../../core/widgets/custom_button.dart';
+import '../../../../core/widgets/floating_cart_bar.dart';
+import '../../data/models/product_model.dart';
+import '../bloc/catalog_bloc.dart';
+import '../bloc/catalog_event.dart';
+import '../bloc/catalog_state.dart';
+import '../widgets/product_grid_card.dart';
+import 'package:f2h_customer/theme/app_colors.dart';
 
 // ══════════════════════════════════════════════════════════
-//  BROWSE SCREEN — Blinkit-style top chips + sidebar + grid
+//  SHOP SCREEN — category rail + 2-column product grid
+//
+//  The rail steps aside while a search is active so results
+//  get the full width.
 // ══════════════════════════════════════════════════════════
+
+/// Space kept clear at the bottom of scrollable content for the app shell's
+/// navigation bar and the floating cart pill.
+const double _kBottomInset = 104;
+
+/// How far above the navigation bar the floating cart pill sits.
+const double _kCartBarLift = 72;
 
 class BrowseScreen extends StatefulWidget {
   final String? initialCategory;
@@ -34,7 +45,8 @@ class _BrowseState extends State<BrowseScreen> {
   late String _cat;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
-  final bool _isLoading = false;
+
+  bool get _isSearching => _searchQuery.trim().isNotEmpty;
 
   @override
   void initState() {
@@ -70,24 +82,19 @@ class _BrowseState extends State<BrowseScreen> {
   void _selectCat(String name, String id) {
     if (_cat == name) return;
     HapticFeedback.selectionClick();
-    setState(() {
-      _cat = name;
-    });
+    setState(() => _cat = name);
 
     // Dispatch bloc event to load products from backend
     context.read<CatalogBloc>().add(LoadProductsByCategory(id));
   }
 
   List<Product> _getFilteredProducts(List<Product> sourceProducts) {
-    final list = sourceProducts;
-    return list.where((p) {
-      final q = _searchQuery.toLowerCase();
-      final matchSearch =
-          q.isEmpty ||
-          p.name.toLowerCase().contains(q) ||
+    final q = _searchQuery.toLowerCase().trim();
+    if (q.isEmpty) return sourceProducts;
+    return sourceProducts.where((p) {
+      return p.name.toLowerCase().contains(q) ||
           p.vendor.toLowerCase().contains(q) ||
           p.category.toLowerCase().contains(q);
-      return matchSearch;
     }).toList();
   }
 
@@ -108,165 +115,167 @@ class _BrowseState extends State<BrowseScreen> {
         _selectCat(pending, catId);
       });
     }
+
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        shadowColor: const Color(0x14000000),
-        leadingWidth: Navigator.canPop(context) ? 48 : 0,
-        leading: Navigator.canPop(context)
-            ? IconButton(
-                icon: const Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  size: 18,
-                  color: kText,
-                ),
-                onPressed: () => Navigator.pop(context),
-              )
-            : null,
-        title: Padding(
-          padding: EdgeInsets.only(
-            left: Navigator.canPop(context) ? 0 : 16,
-            right: 12,
-          ),
-          child: Container(
-            height: 42,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFAFBF9),
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(
-                color: kPrimary.withValues(alpha: 0.12),
-                width: 1.0,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: kPrimary.withValues(alpha: 0.03),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                const SizedBox(width: 12),
-                const Icon(
-                  Icons.search_rounded,
-                  color: kPrimary,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    style: const TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
-                      color: kText,
-                    ),
-                    onTapOutside: (_) => FocusScope.of(context).unfocus(),
-                    decoration: const InputDecoration(
-                      hintText: 'Search milk, ghee, paneer…',
-                      hintStyle: TextStyle(color: kTextSub, fontSize: 13.5),
-                      border: InputBorder.none,
-                      isDense: true,
-                    ),
-                  ),
-                ),
-                if (_searchQuery.isNotEmpty)
-                  GestureDetector(
-                    onTap: () => _searchController.clear(),
-                    child: const Padding(
-                      padding: EdgeInsets.all(8),
-                      child: Icon(Icons.close_rounded, size: 16, color: kTextSub),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        titleSpacing: 0,
-        actions: const [
-          CartBtn(),
-          SizedBox(width: 16),
-        ],
-      ),
+      appBar: _buildSearchBar(),
       body: Stack(
         children: [
           Row(
             children: [
-              _buildSidebar(),
-              Expanded(
-                child: BlocBuilder<CatalogBloc, CatalogState>(
-                  builder: (context, state) {
-                    List<Product> products = [];
-                    if (state is CatalogLoaded) {
-                      products = state.filteredProducts;
-                    }
-                    final filtered = _getFilteredProducts(products);
-
-                    final isLoading =
-                        (state is CatalogLoading) ||
-                        (state is CatalogLoaded && state.isFiltering);
-
-                    if (isLoading) {
-                      return GridView.builder(
-                        padding: const EdgeInsets.fromLTRB(8, 10, 8, 90),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 1,
-                              mainAxisSpacing: 10,
-                              crossAxisSpacing: 10,
-                              childAspectRatio: 2.3,
-                            ),
-                        itemCount: 6,
-                        itemBuilder: (_, _) => const _SkeletonCard(),
-                      );
-                    }
-
-                    if (filtered.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.search_off_outlined,
-                              size: 40,
-                              color: kMuted,
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              _searchQuery.isEmpty
-                                  ? 'No products in this category'
-                                  : 'No results for "$_searchQuery"',
-                              style: const TextStyle(
-                                color: kMuted,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-
-                    return ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(8, 10, 8, 90),
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (_, i) => RepaintBoundary(
-                        child: ProductCardV(filtered[i], isBrowse: true),
-                      ),
-                    );
-                  },
-                ),
-              ),
+              // Hidden while searching so results span the full width.
+              if (!_isSearching) _buildSidebar(),
+              Expanded(child: _buildGrid()),
             ],
+          ),
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: _kCartBarLift,
+            child: FloatingCartBar(),
           ),
         ],
       ),
+    );
+  }
+
+  // ── SEARCH BAR ──────────────────────────────────────────────
+  PreferredSizeWidget _buildSearchBar() {
+    final canPop = Navigator.canPop(context);
+    return AppBar(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      toolbarHeight: 68,
+      leadingWidth: canPop ? 44 : 0,
+      leading: canPop
+          ? IconButton(
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 18,
+                color: kText,
+              ),
+              onPressed: () => Navigator.pop(context),
+            )
+          : null,
+      titleSpacing: 0,
+      title: Padding(
+        padding: EdgeInsets.only(left: canPop ? 0 : 16, right: 12),
+        child: Container(
+          height: 50,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE6ECE8), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                margin: const EdgeInsets.only(left: 4),
+                decoration: BoxDecoration(
+                  color: kPrimaryPl.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.search_rounded,
+                  color: kPrimary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: kText,
+                  ),
+                  onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                  decoration: const InputDecoration(
+                    hintText: 'Search milk, ghee, paneer…',
+                    hintStyle: TextStyle(
+                      color: Color(0xFF9AA5A0),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w400,
+                    ),
+                    border: InputBorder.none,
+                    isDense: true,
+                  ),
+                ),
+              ),
+              if (_isSearching)
+                GestureDetector(
+                  onTap: () => _searchController.clear(),
+                  child: const Padding(
+                    padding: EdgeInsets.all(10),
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 18,
+                      color: kTextSub,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: const [CartBtn(), SizedBox(width: 16)],
+    );
+  }
+
+  // ── PRODUCT GRID ────────────────────────────────────────────
+  Widget _buildGrid() {
+    return BlocBuilder<CatalogBloc, CatalogState>(
+      builder: (context, state) {
+        final products = state is CatalogLoaded ? state.filteredProducts : <Product>[];
+        final filtered = _getFilteredProducts(products);
+
+        final isLoading =
+            (state is CatalogLoading) ||
+            (state is CatalogLoaded && state.isFiltering);
+
+        if (filtered.isEmpty && !isLoading) {
+          return _EmptyResults(query: _searchQuery.trim());
+        }
+
+        return LayoutBuilder(
+          builder: (context, constraints) => GridView.builder(
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, _kBottomInset),
+            gridDelegate: _gridDelegate(constraints.maxWidth),
+            itemCount: isLoading ? 6 : filtered.length,
+            itemBuilder: (_, i) => isLoading
+                ? const _SkeletonCard()
+                : RepaintBoundary(child: ProductGridCard(filtered[i])),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Derives the cell height from the real card width so the artwork keeps a
+  /// usable share of the card even on narrow screens.
+  SliverGridDelegate _gridDelegate(double availableWidth) {
+    const horizontalPadding = 20.0;
+    const crossAxisSpacing = 12.0;
+    final cardWidth =
+        (availableWidth - horizontalPadding - crossAxisSpacing) / 2;
+    final extent = math.max(cardWidth / kProductGridAspectRatio, 292.0);
+
+    return SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: 2,
+      mainAxisSpacing: 12,
+      crossAxisSpacing: crossAxisSpacing,
+      mainAxisExtent: extent,
     );
   }
 
@@ -287,107 +296,60 @@ class _BrowseState extends State<BrowseScreen> {
     });
 
     return Container(
-      width: 86,
-      decoration: const BoxDecoration(
-        color: Color(0xFFF4F6F8),
-      ),
+      width: 84,
+      decoration: const BoxDecoration(color: Color(0xFFF1F4F6)),
       child: isLoadingState
           ? const Center(child: CircularProgressIndicator(color: kPrimary))
           : ListView.builder(
-              padding: const EdgeInsets.only(top: 6, bottom: 90),
+              padding: const EdgeInsets.only(top: 8, bottom: _kBottomInset),
               itemCount: categories.length,
               itemBuilder: (context, i) {
                 final cat = categories[i];
                 final catName = cat['name'] as String? ?? '';
                 final catId = cat['category_id']?.toString() ?? 'All';
-                final isSelected = catName == _cat;
                 return _SidebarItem(
                   cat: cat,
-                  isSelected: isSelected,
+                  isSelected: catName == _cat,
                   onTap: () => _selectCat(catName, catId),
                 );
               },
             ),
     );
   }
+}
 
-  // ── CART BADGE ───────────────────────────────────────────────
-  Widget _buildFloatingCartBadge() {
-    return BlocBuilder<CartBloc, CartState>(
-      builder: (context, state) {
-        final items = context.read<CartBloc>().currentItems;
-        int total = 0;
-        total = items.fold(0, (sum, item) {
-          if (item.purchaseType == 'subscription') {
-            final schedSum = item.schedules?.fold(0, (s, sched) => s + sched.mQuantity + sched.eQuantity) ?? 0;
-            return sum + (schedSum > 0 ? schedSum : 1);
-          }
-          return sum + (item.quantity ?? 1);
-        });
-        return AnimatedScale(
-          scale: total > 0 ? 1.0 : 0.0,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.elasticOut,
-          child: GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CartScreen()),
-              );
-            },
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFE5A93B), Color(0xFFC78A1D)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFE5A93B).withValues(alpha: 0.35),
-                        blurRadius: 12,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.shopping_cart_outlined,
-                    color: Colors.white,
-                    size: 26,
-                  ),
-                ),
-                Positioned(
-                  top: -2,
-                  right: -2,
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: kAccent,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: Text(
-                      '$total',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF1A1000),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+// ══════════════════════════════════════════════════════════
+//  EMPTY STATE
+// ══════════════════════════════════════════════════════════
+
+class _EmptyResults extends StatelessWidget {
+  final String query;
+  const _EmptyResults({required this.query});
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, _kBottomInset),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.search_off_outlined, size: 44, color: kMuted),
+          const SizedBox(height: 12),
+          Text(
+            query.isEmpty
+                ? 'No products in this category'
+                : 'No results for "$query"',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: kMuted,
+              fontWeight: FontWeight.w600,
+              fontSize: 13.5,
             ),
           ),
-        );
-      },
-    );
-  }
+        ],
+      ),
+    ),
+  );
 }
 
 // ══════════════════════════════════════════════════════════
@@ -416,7 +378,7 @@ class _SidebarItem extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeInOut,
         width: double.infinity,
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
         decoration: BoxDecoration(
           color: isSelected ? Colors.white : Colors.transparent,
@@ -424,9 +386,9 @@ class _SidebarItem extends StatelessWidget {
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
                   ),
                 ]
               : null,
@@ -441,34 +403,26 @@ class _SidebarItem extends StatelessWidget {
               curve: Curves.easeOutBack,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                width: 46,
-                height: 46,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   color: isAll
                       ? (isSelected ? kPrimary : const Color(0xFFFAFBF9))
                       : Colors.white,
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: isSelected
-                        ? kPrimary
-                        : const Color(0xFFEBEFF0),
+                    color: isSelected ? kPrimary : const Color(0xFFEBEFF0),
                     width: isSelected ? 1.5 : 1.0,
                   ),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: kPrimary.withValues(alpha: 0.08),
-                            blurRadius: 6,
-                            offset: const Offset(0, 3),
-                          ),
-                        ]
-                      : [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.02),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                  boxShadow: [
+                    BoxShadow(
+                      color: isSelected
+                          ? kPrimary.withValues(alpha: 0.10)
+                          : Colors.black.withValues(alpha: 0.02),
+                      blurRadius: isSelected ? 8 : 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: isAll
                     ? Center(
@@ -479,36 +433,36 @@ class _SidebarItem extends StatelessWidget {
                         ),
                       )
                     : (imagePath != null && imagePath.isNotEmpty
-                        ? ClipOval(
-                            child: Padding(
-                              padding: const EdgeInsets.all(1),
-                              child: buildProductImage(
-                                catName,
-                                imageAsset: imagePath,
-                                fit: BoxFit.contain,
+                          ? ClipOval(
+                              child: Padding(
+                                padding: const EdgeInsets.all(2),
+                                child: buildProductImage(
+                                  catName,
+                                  imageAsset: imagePath,
+                                  fit: BoxFit.contain,
+                                ),
                               ),
-                            ),
-                          )
-                        : const Center(
-                            child: Icon(
-                              Icons.shopping_bag_outlined,
-                              color: kPrimary,
-                              size: 20,
-                            ),
-                          )),
+                            )
+                          : const Center(
+                              child: Icon(
+                                Icons.shopping_bag_outlined,
+                                color: kPrimary,
+                                size: 20,
+                              ),
+                            )),
               ),
             ),
             const SizedBox(height: 6),
             // ── Label ────────────────────────────
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 2),
               child: Text(
                 catName,
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 10.5,
                   fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                   color: isSelected ? kPrimary : kText,
                   height: 1.2,
@@ -523,7 +477,7 @@ class _SidebarItem extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════
-//  SKELETON SHIMMER CARD — pulsing placeholder
+//  SKELETON SHIMMER CARD — pulsing grid placeholder
 // ══════════════════════════════════════════════════════════
 class _SkeletonCard extends StatefulWidget {
   const _SkeletonCard();
@@ -555,76 +509,53 @@ class _SkeletonCardState extends State<_SkeletonCard>
     super.dispose();
   }
 
+  Widget _bar(double height, double width) => Container(
+    height: height,
+    width: width,
+    decoration: BoxDecoration(
+      color: const Color(0xFFF0F2F1),
+      borderRadius: BorderRadius.circular(4),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _anim,
       child: Container(
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFF0F0F0)),
+          border: Border.all(color: const Color(0xFFEDF1EE)),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 104,
-              height: double.infinity,
-              decoration: const BoxDecoration(
-                color: Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  bottomLeft: Radius.circular(16),
+            _bar(14, 54),
+            const SizedBox(height: 10),
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F7F6),
+                  borderRadius: BorderRadius.circular(10),
                 ),
               ),
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      height: 12,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0F0F0),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      height: 10,
-                      width: 60,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5F5F5),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    const Spacer(),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          height: 14,
-                          width: 50,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEEEEEE),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        Container(
-                          height: 28,
-                          width: 60,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFAFBF9),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+            const SizedBox(height: 10),
+            _bar(12, double.infinity),
+            const SizedBox(height: 6),
+            _bar(10, 60),
+            const SizedBox(height: 10),
+            _bar(16, 70),
+            const SizedBox(height: 10),
+            Container(
+              height: 42,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F2F1),
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
           ],

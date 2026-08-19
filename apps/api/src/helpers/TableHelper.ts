@@ -1003,7 +1003,12 @@ export class TableHelper {
     }
 
     try {
-      // Safe eval using Function constructor (no global scope access)
+      // The expression has already been checked against /^[\d\s+\-*\/().]+$/, so it
+      // can only contain digits, whitespace, and arithmetic operators — no
+      // identifiers, no property access, no call syntax. The Function constructor
+      // also has no access to the enclosing scope. Worst case is a malformed
+      // expression, which the catch below handles.
+      // eslint-disable-next-line @typescript-eslint/no-implied-eval
       const result = new Function(`return (${resolved})`)();
       return String(result);
     } catch (e: any) {

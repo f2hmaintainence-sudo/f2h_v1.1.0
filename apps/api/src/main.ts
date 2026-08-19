@@ -11,7 +11,7 @@
 // ============================================================================
 
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
 import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
@@ -283,6 +283,6 @@ async function bootstrap() {
 
   const port = env.PORT || env.Backend_Port || 5001;
   await app.listen(port, '0.0.0.0');
-  console.log(`Server running on http://0.0.0.0:${port}`);
+  new Logger('Bootstrap').log(`Server running on http://0.0.0.0:${port}`);
 }
 bootstrap();

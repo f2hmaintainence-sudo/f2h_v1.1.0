@@ -1,4 +1,6 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { DeveloperService } from './shared/logger/Developer.service';
 import { DataService } from './shared/database/Data.service';
 import { RedisService } from './shared/redis/redis.service';
@@ -37,6 +39,8 @@ if (!admin.apps.length) {
 
 @Injectable()
 export class AppService {
+  private readonly logger = new Logger(AppService.name);
+
   private readonly messaging = admin.messaging();
 
   constructor(
@@ -73,7 +77,7 @@ export class AppService {
       .map((u: any) => u.fcm_token)
       .filter((t: string) => !!t && t.length > 0);
 
-    console.log(`[FCM Notification] Found ${tokenList.length} tokens in the database to send updates to:`, tokenList);
+    this.logger.log(`[FCM Notification] Found ${tokenList.length} tokens in the database to send updates to:`, tokenList);
 
     const title = 'New Update Available! 🚀';
     const body = 'A new update with improvements has been applied. Restart your app to see the changes!';
@@ -130,7 +134,7 @@ export class AppService {
           }
         });
       }
-      console.log('responseeeeee', response);
+      this.logger.log('responseeeeee', response);
       return response;
     } catch (error) {
       this.developerService.error('Multicast error:', error);
@@ -138,122 +142,19 @@ export class AppService {
     }
   }
 
-  async getHello(): Promise<any> {
-    const RUNS = 10;
-
-    const allUsersResult = await this.Data.query('users', {
-      select: ['user_id', 'email', 'password'],
-    });
-    // const notificationRes = await this.triggerNotification();
-    // console.log('notificationRes', notificationRes);
-    // this.developerService.info('Notification result:', notificationRes);
-
-    const testUser = {
-      userID: '9999',
-      name: 'Benchmark User',
-      mobile: '+91-98765-99999',
-      address: 'Test City, TC',
-    };
-
-    const results: any = { runs: RUNS };
-
-    // ════════════════════════════════════════
-    //  BENCHMARK: CREATE
-    // ════════════════════════════════════════
-    let tJson = 0;
-    let tHash = 0;
-
-    for (let i = 0; i < RUNS; i++) {
-      const startJson = performance.now();
-      await this.redisService.store(
-        `user:bench:${i}`,
-        JSON.stringify(testUser),
-      );
-      tJson += performance.now() - startJson;
-
-      const startHash = performance.now();
-      await this.redisService.hset(`user:hash:bench:${i}`, testUser);
-      tHash += performance.now() - startHash;
-    }
-
-    results.create = {
-      result: { allUsersResult },
-      json: { totalMs: tJson.toFixed(3), avgMs: (tJson / RUNS).toFixed(3) },
-      hash: { totalMs: tHash.toFixed(3), avgMs: (tHash / RUNS).toFixed(3) },
-      winner: this.winner((tJson / RUNS).toString(), (tHash / RUNS).toString()),
-    };
-
-    // ════════════════════════════════════════
-    //  BENCHMARK: READ SINGLE FIELD
-    // ════════════════════════════════════════
-    tJson = 0;
-    tHash = 0;
-
-    for (let i = 0; i < RUNS; i++) {
-      const startJson = performance.now();
-      const raw = await this.redisService.fetch(`user:bench:${i}`);
-      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-      const _nameJson = parsed?.name;
-      tJson += performance.now() - startJson;
-
-      const startHash = performance.now();
-      await this.redisService.hget(`user:hash:bench:${i}`, 'name');
-      tHash += performance.now() - startHash;
-    }
-
-    results.readSingleField = {
-      json: { totalMs: tJson.toFixed(3), avgMs: (tJson / RUNS).toFixed(3) },
-      hash: { totalMs: tHash.toFixed(3), avgMs: (tHash / RUNS).toFixed(3) },
-      winner: this.winner((tJson / RUNS).toString(), (tHash / RUNS).toString()),
-    };
-
-    // ════════════════════════════════════════
-    //  BENCHMARK: UPDATE SINGLE FIELD
-    // ════════════════════════════════════════
-    tJson = 0;
-    tHash = 0;
-
-    for (let i = 0; i < RUNS; i++) {
-      const startJson = performance.now();
-      const raw = await this.redisService.fetch(`user:bench:${i}`);
-      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-      parsed.name = 'Partially Updated';
-      await this.redisService.store(`user:bench:${i}`, JSON.stringify(parsed));
-      tJson += performance.now() - startJson;
-
-      const startHash = performance.now();
-      await this.redisService.hset(`user:hash:bench:${i}`, {
-        name: 'Partially Updated',
-      });
-      tHash += performance.now() - startHash;
-    }
-
-    results.updateSingleField = {
-      json: { totalMs: tJson.toFixed(3), avgMs: (tJson / RUNS).toFixed(3) },
-      hash: { totalMs: tHash.toFixed(3), avgMs: (tHash / RUNS).toFixed(3) },
-      winner: this.winner((tJson / RUNS).toString(), (tHash / RUNS).toString()),
-    };
-
-    // ════════════════════════════════════════
-    //  CLEANUP / DELETE
-    // ════════════════════════════════════════
-    for (let i = 0; i < RUNS; i++) {
-      await this.redisService.delete(`user:bench:${i}`);
-      await this.redisService.delete(`user:hash:bench:${i}`);
-    }
-    const categories = await this.service.getCategories();
-    console.log('categories', categories);
+  /**
+   * API root. Returns liveness only.
+   *
+   * This used to run a Redis JSON-vs-hash benchmark and return, among the timings,
+   * `SELECT user_id, email, password FROM users` — every account's address and
+   * bcrypt hash — from an unauthenticated route. The benchmark was scratch work; it
+   * is gone rather than gated, because nothing here should ever read credentials.
+   */
+  getHello(): { status: string; service: string; time: string } {
     return {
-      success: true,
-      benchmark: results,
-      categories: categories.data
-      // userData: allUsersResult
+      status: 'ok',
+      service: 'f2h-api',
+      time: new Date().toISOString(),
     };
-  }
-
-  private winner(jsonAvg: string, hashAvg: string): string {
-    return parseFloat(jsonAvg) < parseFloat(hashAvg)
-      ? '🏆 JSON (String) is faster'
-      : '🏆 Hash is faster';
   }
 }

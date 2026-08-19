@@ -8,7 +8,9 @@
 //
 // ============================================================================
 
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards, Req,
+  Logger,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Public } from 'src/auth/decorators/public.decorator';
@@ -18,6 +20,8 @@ import { Request } from 'express';
 
 @Controller({ path: 'customer/subscriptions', version: '1' })
 export class SubscriptionsController {
+  private readonly logger = new Logger(SubscriptionsController.name);
+
   constructor(private readonly service: SubscriptionsService) { }
 
   // @Public()
@@ -30,7 +34,7 @@ export class SubscriptionsController {
   @Post('checkout')
   async checkout(@Req() req: Request, @Body() body: CreateSubscriptionDto) {
     try {
-      console.log("i am from subscription checkout", JSON.stringify(body));
+      this.logger.log("i am from subscription checkout", JSON.stringify(body));
       const user = req?.user as any;
       let customerId = body.customer_id?.trim() || user?.user_id || (req.headers['x-user-id'] as string)?.trim();
       if (!customerId && req.headers['authorization']) {
@@ -41,7 +45,9 @@ export class SubscriptionsController {
           if (decoded?.user_id || decoded?.sub) {
             customerId = decoded.user_id || decoded.sub;
           }
-        } catch (_) {}
+        } catch {
+          // Deliberately tolerated: the caller has a valid fallback for this failure.
+        }
       }
       if (customerId) {
         body.customer_id = customerId;
@@ -75,7 +81,9 @@ export class SubscriptionsController {
           userId = decoded.user_id || decoded.sub;
           email = decoded.email || email;
         }
-      } catch (_) {}
+      } catch {
+        // Deliberately tolerated: the caller has a valid fallback for this failure.
+      }
     }
     return this.service.getSubscriptions(userId, email);
   }

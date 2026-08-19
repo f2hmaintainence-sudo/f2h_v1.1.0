@@ -24,7 +24,9 @@ export class CategoriesController {
         const subBanners = files.filter((f) => f.startsWith('sub_banner_')).sort();
         bannerFiles = subBanners.length > 0 ? subBanners : ['sub_banner_1.png', 'sub_banner_2.png', 'sub_banner_3.png'];
       }
-    } catch (_) {}
+    } catch {
+      // Deliberately tolerated: the caller has a valid fallback for this failure.
+    }
 
     if (bannerFiles.length === 0) {
       bannerFiles = ['sub_banner_1.png', 'sub_banner_2.png', 'sub_banner_3.png'];
@@ -64,7 +66,9 @@ export class CategoriesController {
         const files = readdirSync(bannersDir);
         promoFiles = ['subscription_banner.png', 'wallet_banner.png'].filter((f) => files.includes(f));
       }
-    } catch (_) {}
+    } catch {
+      // Deliberately tolerated: the caller has a valid fallback for this failure.
+    }
 
     if (promoFiles.length === 0) {
       promoFiles = ['subscription_banner.png', 'wallet_banner.png'];

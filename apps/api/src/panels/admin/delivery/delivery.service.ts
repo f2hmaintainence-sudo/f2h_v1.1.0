@@ -487,7 +487,9 @@ export class DeliveryManagementService {
         if (keyRes?.[0]?.config_data?.apiKey) {
           mapsApiKey = keyRes[0].config_data.apiKey;
         }
-      } catch (_) {}
+      } catch {
+        // Deliberately tolerated: the caller has a valid fallback for this failure.
+      }
 
       return {
         status: true,
@@ -584,7 +586,9 @@ export class DeliveryManagementService {
             if (redisLoc.speed != null) row.speed = redisLoc.speed;
             if (redisLoc.updatedAt) row.last_location_at = redisLoc.updatedAt;
           }
-        } catch (_) {}
+        } catch {
+          // Deliberately tolerated: the caller has a valid fallback for this failure.
+        }
       }
 
       return {

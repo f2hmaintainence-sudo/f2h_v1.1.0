@@ -2,6 +2,7 @@ import {
   Injectable,
   BadRequestException,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { FormHelper } from '../../../../../helpers/FormHelper';
 import { DataService } from '../../../../../shared/database/Data.service';
@@ -14,6 +15,8 @@ import { LocalStorageService } from '../../../../../shared/services/storage.serv
 
 @Injectable()
 export class CatalogSaveAddService {
+  private readonly logger = new Logger(CatalogSaveAddService.name);
+
   constructor(
     private readonly formHelper: FormHelper,
     private readonly dataService: DataService,
@@ -749,7 +752,7 @@ export class CatalogSaveAddService {
 
   async saveCategory(body: any, adminId: string) {
     try {
-      console.log('insertData', body);
+      this.logger.log('insertData', body);
       // 1. Fetch categories for dynamic parent dropdown
       const categoriesResult = await this.dataService.query('categories', {
         select: ['id', 'name'],
@@ -894,7 +897,7 @@ export class CatalogSaveAddService {
 
       insertData.created_by = adminId;
       insertData.updated_by = adminId;
-      console.log('insertData', insertData);
+      this.logger.log('insertData', insertData);
       // 8. Insert
       const result = await this.dataService.insert('categories', insertData);
 

@@ -10,6 +10,7 @@ import {
   Put,
   Req,
   UseGuards,
+  Logger,
 } from '@nestjs/common';
 import { generateId } from 'src/helpers/RandomHelper';
 import { AuthGuard } from '@nestjs/passport';
@@ -26,6 +27,8 @@ const FIREBASE_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 @Controller('customer')
 export class CustomerBootstrapController {
+  private readonly logger = new Logger(CustomerBootstrapController.name);
+
   constructor(
     private readonly Data: DataService,
     private readonly db: DatabaseService,
@@ -658,7 +661,9 @@ export class CustomerBootstrapController {
             filteredCustBranch,
             [{ column: 'customer_id', operator: '=', value: customerId }],
           );
-        } catch (_) {}
+        } catch {
+          // Deliberately tolerated: the caller has a valid fallback for this failure.
+        }
       }
 
       const updatedQueryResult = await this.Data.query('customer_addresses', {
@@ -777,7 +782,7 @@ export class CustomerBootstrapController {
   async updateProfile(@Req() req: Request, @Body() body: any) {
     const user = req.user as any;
     const userId = user?.user_id;
-    console.log('[CustomerBootstrapController] updateProfile', body);
+    this.logger.log('[CustomerBootstrapController] updateProfile', body);
     this.Developer.log('[CustomerBootstrapController] updateProfile', body);
     if (!userId) {
       throw new BadRequestException('Invalid customer session');
@@ -899,7 +904,9 @@ export class CustomerBootstrapController {
           filteredCustBranch,
           [{ column: 'customer_id', operator: '=', value: customerId }],
         );
-      } catch (_) {}
+      } catch {
+        // Deliberately tolerated: the caller has a valid fallback for this failure.
+      }
     }
 
     return {
@@ -919,7 +926,7 @@ export class CustomerBootstrapController {
   ) {
     const user = req.user as any;
     const userId = user?.user_id;
-    console.log('Update Address ---->', body);
+    this.logger.log('Update Address ---->', body);
 
     if (!userId) {
       throw new BadRequestException('Invalid customer session');

@@ -1,4 +1,6 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable, Optional,
+  Logger,
+} from '@nestjs/common';
 import { DatabaseService } from '../database/Database.service';
 import { DeveloperService } from '../logger/Developer.service';
 
@@ -15,6 +17,8 @@ export interface CalculatedPrice {
 
 @Injectable()
 export class PricingService {
+  private readonly logger = new Logger(PricingService.name);
+
   constructor(
     private readonly db: DatabaseService,
     @Optional() private readonly developer?: DeveloperService,
@@ -29,16 +33,16 @@ export class PricingService {
 
     // STEP 1a: Validate customerId
     if (!customerId) {
-      console.log('[PRICING FLOW] STEP 1a: No customerId provided -> returning empty map (no special prices)');
+      this.logger.log('[PRICING FLOW] STEP 1a: No customerId provided -> returning empty map (no special prices)');
       this.developer?.debug('[PricingService] getSpecialPricesMap called without customerId', { customerId: null });
       return specialPricesMap;
     }
 
-    console.log(`[PRICING FLOW] STEP 1a: CustomerId received = "${customerId}"`);
+    this.logger.log(`[PRICING FLOW] STEP 1a: CustomerId received = "${customerId}"`);
 
     try {
       // STEP 1b: Query DB for this customer's special price rules
-      console.log(`[PRICING FLOW] STEP 1b: Querying customer_special_prices for customer "${customerId}"...`);
+      this.logger.log(`[PRICING FLOW] STEP 1b: Querying customer_special_prices for customer "${customerId}"...`);
       this.developer?.debug('[PricingService] Fetching special prices for customer', { customerId });
 
       const res: any = await this.db.query(
@@ -58,21 +62,21 @@ export class PricingService {
 
       // STEP 1c: Build map from DB rows
       if (rows.length === 0) {
-        console.log(`[PRICING FLOW] STEP 1c: No special price rules found in DB for customer "${customerId}"`);
+        this.logger.log(`[PRICING FLOW] STEP 1c: No special price rules found in DB for customer "${customerId}"`);
       } else {
-        console.log(`[PRICING FLOW] STEP 1c: Found ${rows.length} rule(s) in DB for customer "${customerId}"`);
+        this.logger.log(`[PRICING FLOW] STEP 1c: Found ${rows.length} rule(s) in DB for customer "${customerId}"`);
         for (const row of rows) {
           const variantId = row.product_variant_id;
           const specialPrice = Number(row.special_price || 0);
           if (variantId && specialPrice > 0) {
             specialPricesMap.set(variantId, specialPrice);
-            console.log(`[PRICING FLOW]          -> variantId="${variantId}", special_price=Rs.${specialPrice}`);
+            this.logger.log(`[PRICING FLOW]          -> variantId="${variantId}", special_price=Rs.${specialPrice}`);
           }
         }
       }
 
       const mapEntries = Array.from(specialPricesMap.entries()).map(([vId, sp]) => `${vId}:Rs.${sp}`);
-      console.log(`[PRICING FLOW] STEP 1c: Special prices map built = [${mapEntries.join(', ') || 'empty'}]`);
+      this.logger.log(`[PRICING FLOW] STEP 1c: Special prices map built = [${mapEntries.join(', ') || 'empty'}]`);
       this.developer?.debug('[PricingService] Special prices loaded', {
         customerId,
         count: specialPricesMap.size,
@@ -122,7 +126,7 @@ export class PricingService {
         has_special_price: true,
       };
 
-      console.log(
+      this.logger.log(
         `[PRICING FLOW] STEP 2: SPECIAL PRICE applied to variant "${variantId}" | ` +
         `MRP=Rs.${originalPrice} | One-time=Rs.${price} (unchanged) | ` +
         `Sub=Rs.${subscriptionPrice} -> Direct Special Price=Rs.${finalSubPrice} | ` +
@@ -158,16 +162,16 @@ export class PricingService {
   async applyPricingToProductList(customerId: string | null, products: any[]): Promise<any[]> {
     if (!products || products.length === 0) return [];
 
-    console.log(`[PRICING FLOW] =============================================`);
-    console.log(`[PRICING FLOW] START applyPricingToProductList`);
-    console.log(`[PRICING FLOW]   customerId   : "${customerId}"`);
-    console.log(`[PRICING FLOW]   productCount : ${products.length}`);
+    this.logger.log(`[PRICING FLOW] =============================================`);
+    this.logger.log(`[PRICING FLOW] START applyPricingToProductList`);
+    this.logger.log(`[PRICING FLOW]   customerId   : "${customerId}"`);
+    this.logger.log(`[PRICING FLOW]   productCount : ${products.length}`);
     this.developer?.debug('[PricingService] applyPricingToProductList started', { customerId, productCount: products.length });
 
     // STEP 1 & 1b: Load special prices map
     const specialPricesMap = await this.getSpecialPricesMap(customerId);
 
-    console.log(`[PRICING FLOW] STEP 3: Iterating ${products.length} variant(s) to apply pricing...`);
+    this.logger.log(`[PRICING FLOW] STEP 3: Iterating ${products.length} variant(s) to apply pricing...`);
     let specialPricesAppliedCount = 0;
     let standardPricingCount = 0;
 
@@ -195,10 +199,10 @@ export class PricingService {
     });
 
     // STEP 4: Log result summary — this data gets serialized to JSON and sent to the app
-    console.log(`[PRICING FLOW] STEP 4: Pricing complete`);
-    console.log(`[PRICING FLOW]   -> ${specialPricesAppliedCount} variant(s) received SPECIAL subscription price`);
-    console.log(`[PRICING FLOW]   -> ${standardPricingCount} variant(s) received standard price`);
-    console.log(`[PRICING FLOW] =============================================`);
+    this.logger.log(`[PRICING FLOW] STEP 4: Pricing complete`);
+    this.logger.log(`[PRICING FLOW]   -> ${specialPricesAppliedCount} variant(s) received SPECIAL subscription price`);
+    this.logger.log(`[PRICING FLOW]   -> ${standardPricingCount} variant(s) received standard price`);
+    this.logger.log(`[PRICING FLOW] =============================================`);
     this.developer?.debug('[PricingService] applyPricingToProductList finished', { customerId, specialPricesAppliedCount });
 
     return result;

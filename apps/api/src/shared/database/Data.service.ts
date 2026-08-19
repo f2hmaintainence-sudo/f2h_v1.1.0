@@ -1007,7 +1007,7 @@ export class DataService {
           key,
         };
 
-      case 'upsert':
+      case 'upsert': {
         const { update, data } = params.upsert ?? {};
         // this.Developer.error('MULTIPLE_WRITE_OPERATIONS_DETECTED', {
         //   providedOps,
@@ -1019,6 +1019,7 @@ export class DataService {
           key,
           updateData: update ?? data ?? {},
         };
+      }
       case 'delete':
         return {
           op: WriteOperationType.DELETE,

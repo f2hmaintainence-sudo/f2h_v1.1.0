@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable,
+  Logger,
+} from '@nestjs/common';
 import * as crypto from 'crypto';
 import { DataService } from 'src/shared/database/Data.service';
 import { MailService } from 'src/mail/mail.service';
@@ -16,6 +18,8 @@ import { AuditLoggerService } from './audit-logger.service';
  */
 @Injectable()
 export class DeviceFingerprintService {
+  private readonly logger = new Logger(DeviceFingerprintService.name);
+
   private readonly MAX_DEVICES_PER_USER = 10; // hard safety cap
 
   constructor(
@@ -149,7 +153,7 @@ export class DeviceFingerprintService {
     const { userId, deviceId, deviceName, userAgent, ipAddress, fingerprint } =
       data;
 
-    console.log(
+    this.logger.log(
       `[DeviceFingerprint:registerDevice] START - userId: ${userId}, deviceId: ${deviceId?.substring(0, 8)}...`,
     );
 
@@ -174,7 +178,7 @@ export class DeviceFingerprintService {
       }
 
       // Check if device already exists
-      console.log(
+      this.logger.log(
         `[DeviceFingerprint] Querying existing device for user ${userId}`,
       );
       const existingResult = await this.Data.query('user_devices', {
@@ -185,7 +189,7 @@ export class DeviceFingerprintService {
         ],
       });
 
-      console.log(
+      this.logger.log(
         `[DeviceFingerprint] Query result:`,
         existingResult?.data?.length > 0 ? 'Device found' : 'Device not found',
       );
@@ -194,7 +198,7 @@ export class DeviceFingerprintService {
 
       if (existingDevice) {
         // Update last used timestamp
-        console.log(
+        this.logger.log(
           `[DeviceFingerprint] Updating existing device ID: ${existingDevice.id}`,
         );
         const updateResult = await this.Data.update(
@@ -208,7 +212,7 @@ export class DeviceFingerprintService {
           [{ column: 'id', operator: '=', value: existingDevice.id }],
         );
 
-        console.log(
+        this.logger.log(
           `[DeviceFingerprint] ✅ Updated existing device ${deviceId.substring(0, 8)}... for user ${userId}`,
         );
         return {
@@ -219,7 +223,7 @@ export class DeviceFingerprintService {
       }
 
       // 🔍 Check total device count for this user (including inactive devices)
-      console.log(
+      this.logger.log(
         `[DeviceFingerprint] Checking total device count for user ${userId}`,
       );
       const userDevicesResult = await this.Data.query('user_devices', {
@@ -230,12 +234,12 @@ export class DeviceFingerprintService {
       const totalDeviceCount = userDevicesResult?.data?.length || 0;
       const isInitialDevice = totalDeviceCount === 0; // First device for this user
 
-      console.log(
+      this.logger.log(
         `[DeviceFingerprint] Total devices for user: ${totalDeviceCount}, isInitialDevice: ${isInitialDevice}`,
       );
 
       // Check active device limit
-      console.log(
+      this.logger.log(
         `[DeviceFingerprint] Checking active device count for user ${userId}`,
       );
       const activeDevicesResult = await this.Data.query('user_devices', {
@@ -247,13 +251,13 @@ export class DeviceFingerprintService {
       });
 
       const activeDeviceCount = activeDevicesResult?.data?.length || 0;
-      console.log(
+      this.logger.log(
         `[DeviceFingerprint] Current active devices: ${activeDeviceCount}/${allowedMaxLogins}`,
       );
 
       if (activeDeviceCount >= allowedMaxLogins) {
         // Auto-revoke oldest active device (make room)
-        console.log(
+        this.logger.log(
           `[DeviceFingerprint] Device limit reached, revoking oldest device...`,
         );
         await this.revokeOldestDevice(userId);
@@ -261,10 +265,10 @@ export class DeviceFingerprintService {
 
       // Parse user agent for device info
       const parsed = this.parseUserAgent(userAgent);
-      console.log(`[DeviceFingerprint] Parsed user agent:`, parsed);
+      this.logger.log(`[DeviceFingerprint] Parsed user agent:`, parsed);
 
       // Create new device record
-      console.log(
+      this.logger.log(
         `[DeviceFingerprint] Creating NEW device record for user ${userId}`,
       );
       const insertResult = await this.Data.query('user_devices', {
@@ -286,16 +290,16 @@ export class DeviceFingerprintService {
       });
 
       const deviceRecordId = insertResult?.data?.insertId;
-      console.log(
+      this.logger.log(
         `[DeviceFingerprint] ✅ REGISTERED NEW device - recordId: ${deviceRecordId}, deviceId: ${deviceId.substring(0, 8)}... for user ${userId}`,
       );
 
       if (isInitialDevice) {
-        console.log(
+        this.logger.log(
           `[DeviceFingerprint] 🎉 This is the INITIAL DEVICE for user ${userId} - no emails will be sent`,
         );
       } else {
-        console.log(
+        this.logger.log(
           `[DeviceFingerprint] ⚠️ This is a NEW DEVICE for user ${userId} - security emails will be sent`,
         );
       }
@@ -440,7 +444,7 @@ export class DeviceFingerprintService {
         severity: 'MEDIUM',
       });
 
-      console.log(`[DeviceFingerprint] Sent new device alert to ${email}`);
+      this.logger.log(`[DeviceFingerprint] Sent new device alert to ${email}`);
     } catch (error) {
       console.error(
         '[DeviceFingerprint] Error sending new device alert:',
@@ -482,7 +486,7 @@ export class DeviceFingerprintService {
         ],
       );
 
-      console.log(
+      this.logger.log(
         `[DeviceFingerprint] Revoked device ${deviceRecordId} for user ${userId}`,
       );
 
@@ -520,7 +524,7 @@ export class DeviceFingerprintService {
 
       if (oldestDevice) {
         await this.revokeDevice(userId, oldestDevice.id);
-        console.log(
+        this.logger.log(
           `[DeviceFingerprint] Auto-revoked oldest device for user ${userId}`,
         );
       }
