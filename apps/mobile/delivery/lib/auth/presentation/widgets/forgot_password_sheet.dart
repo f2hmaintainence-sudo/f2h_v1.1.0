@@ -6,6 +6,7 @@ import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/auth/domain/repositories/auth_repository.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/auth/presentation/widgets/auth_kit.dart';
+import 'package:f2h_delivery/core/api/api_error.dart';
 
 class ForgotPasswordSheet extends StatefulWidget {
   const ForgotPasswordSheet({super.key});
@@ -103,8 +104,8 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
       _startCountdown();
       _showSnack('OTP sent to $identifier ✅');
     } on DioException catch (e) {
-      final msg = e.response?.data is Map ? e.response?.data['message'] : null;
-      final errorStr = msg?.toString() ?? 'User does not exist';
+      final msg = apiErrorMessage(e, '');
+      final errorStr = msg.isNotEmpty ? msg : 'User does not exist';
       if (mounted) setState(() => _errorMessage = errorStr);
       _showSnack(errorStr, isError: true);
     } catch (e) {
@@ -136,8 +137,8 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
       });
       _showSnack('OTP Verified successfully! ✅');
     } on DioException catch (e) {
-      final msg = e.response?.data is Map ? e.response?.data['message'] : null;
-      _showSnack(msg?.toString() ?? e.message ?? 'Invalid OTP', isError: true);
+      final msg = apiErrorMessage(e, '');
+      _showSnack(msg.isNotEmpty ? msg : 'Invalid OTP', isError: true);
     } catch (e) {
       _showSnack('Failed to verify OTP: $e', isError: true);
     } finally {
@@ -177,8 +178,8 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
       _showSnack('Password reset successful! Please login with your new password.');
       if (mounted) Navigator.pop(context);
     } on DioException catch (e) {
-      final msg = e.response?.data is Map ? e.response?.data['message'] : null;
-      _showSnack(msg?.toString() ?? e.message ?? 'Failed to reset password', isError: true);
+      final msg = apiErrorMessage(e, '');
+      _showSnack(msg.isNotEmpty ? msg : 'Failed to reset password', isError: true);
     } catch (e) {
       _showSnack('Failed to reset password: $e', isError: true);
     } finally {

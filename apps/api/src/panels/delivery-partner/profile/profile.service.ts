@@ -569,7 +569,13 @@ export class ProfileService {
       const result = await this.db.query(
         `SELECT
            dr.delivery_partner_id,
-           db.full_name,
+           -- Was \`db.full_name\`: no such alias exists, so every request to
+           -- this endpoint failed with "missing FROM-clause entry for table db".
+           dp.full_name,
+           -- Selected because the mapper below falls back to them when a
+           -- partner row has no full_name; they were referenced but never read.
+           u.first_name,
+           u.last_name,
            COUNT(DISTINCT dr.run_date) AS active_days,
            SUM(dr.completed_addresses) AS total_completed,
            SUM(dr.total_addresses) AS total_assigned,
@@ -585,7 +591,7 @@ export class ProfileService {
          WHERE EXTRACT(YEAR FROM dr.run_date) = $1
            AND EXTRACT(MONTH FROM dr.run_date) = $2
            AND dr.status NOT IN ('cancelled')
-         GROUP BY dr.delivery_partner_id, u.first_name, u.last_name
+         GROUP BY dr.delivery_partner_id, dp.full_name, u.first_name, u.last_name
          ORDER BY total_completed DESC, delivery_rate DESC`,
         [year, month],
       );

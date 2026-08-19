@@ -105,6 +105,28 @@ interface CategoryOption {
   slug?: string;
 }
 
+export function cleanImageUrl(raw?: string): string {
+  if (!raw) return "";
+  let val = raw.trim();
+  const match = val.match(/src=["']([^"']+)["']/i);
+  if (match) {
+    val = match[1];
+  }
+  val = val.replace(/<[^>]*>?/gm, "").trim();
+  return val;
+}
+
+export function getImageSrc(raw?: string): string {
+  const url = cleanImageUrl(raw);
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+    return url;
+  }
+  let path = url.startsWith("/") ? url : `/${url}`;
+  if (!path.startsWith("/uploads/")) path = `/uploads${path}`;
+  return path;
+}
+
 function BannerVisualPreview({
   title,
   discount_text,
@@ -126,18 +148,26 @@ function BannerVisualPreview({
 }) {
   const bg = background_color || "#16a34a";
   const cta = cta_label || "Shop Now";
+  const cleanSrc = getImageSrc(image_url);
 
   if (banner_type === "popup") {
     return (
-      <div className="mx-auto max-w-[280px] bg-white rounded-3xl overflow-hidden shadow-xl border border-slate-200 animate-in zoom-in-95 duration-200">
-        <div style={{ backgroundColor: bg }} className="h-32 w-full flex items-center justify-center p-3 relative">
-          <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/90 text-slate-700 flex items-center justify-center text-[10px] font-bold shadow-xs">
+      <div className="mx-auto max-w-[320px] w-full bg-white rounded-3xl overflow-hidden shadow-xl border border-slate-200 animate-in zoom-in-95 duration-200">
+        <div style={{ backgroundColor: bg }} className="min-h-[140px] max-h-[220px] w-full flex items-center justify-center p-3 relative overflow-hidden">
+          <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/90 text-slate-700 flex items-center justify-center text-[10px] font-bold shadow-xs z-20">
             ✕
           </div>
-          {image_url ? (
-            <img src={image_url} alt="" className="max-h-24 max-w-full object-contain drop-shadow" />
+          {cleanSrc ? (
+            <img
+              src={cleanSrc}
+              alt=""
+              className="max-h-[190px] w-auto max-w-full object-contain drop-shadow-md rounded-lg"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = "none";
+              }}
+            />
           ) : (
-            <Smartphone size={36} className="text-white/70" />
+            <Smartphone size={40} className="text-white/70" />
           )}
         </div>
         <div className="p-4 text-center space-y-2">
@@ -146,7 +176,7 @@ function BannerVisualPreview({
               {discount_text.toUpperCase()}
             </span>
           )}
-          <h4 className="font-extrabold text-sm text-slate-900 leading-tight">{title || "Offer Headline"}</h4>
+          <h4 className="font-extrabold text-sm sm:text-base text-slate-900 leading-tight">{title || "Offer Headline"}</h4>
           {description && <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">{description}</p>}
           <div className="pt-1">
             <button
@@ -167,9 +197,9 @@ function BannerVisualPreview({
     return (
       <div
         style={{ backgroundColor: bg }}
-        className="rounded-2xl p-4 text-white relative overflow-hidden flex items-center justify-between min-h-[96px] shadow-sm"
+        className="rounded-2xl p-4 text-white relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-3 min-h-[110px] shadow-sm transition-all"
       >
-        <div className="space-y-1.5 z-10 max-w-[65%]">
+        <div className="space-y-1.5 z-10 flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="px-2 py-0.5 rounded-md bg-black/25 text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1">
               <FolderTree size={10} /> Category Slide
@@ -180,48 +210,72 @@ function BannerVisualPreview({
               </span>
             )}
           </div>
-          <h4 className="font-extrabold text-sm leading-tight line-clamp-1">{title || "Category Offer Title"}</h4>
-          <p className="text-[10px] text-white/85 line-clamp-1">
+          <h4 className="font-extrabold text-sm sm:text-base leading-tight break-words">{title || "Category Offer Title"}</h4>
+          <p className="text-[10px] text-white/85 line-clamp-2">
             {description || (category_name ? `Target Category: ${category_name}` : "Targeted category promotional slide")}
           </p>
-          <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-white text-slate-900 px-2.5 py-1 rounded-lg mt-0.5 shadow-xs">
-            {cta} <ArrowRight size={11} />
-          </span>
+          <div className="pt-0.5">
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-white text-slate-900 px-2.5 py-1 rounded-lg shadow-xs">
+              {cta} <ArrowRight size={11} />
+            </span>
+          </div>
         </div>
-        <div className="z-10 w-20 h-20 shrink-0 flex items-center justify-center">
-          {image_url ? (
-            <img src={image_url} alt="" className="max-h-20 max-w-full object-contain drop-shadow" />
-          ) : (
+        {cleanSrc ? (
+          <div className="z-10 w-full sm:w-auto shrink-0 flex items-center justify-center max-h-[150px] max-w-[220px]">
+            <img
+              src={cleanSrc}
+              alt={title || "Category Slide"}
+              className="max-h-[130px] w-auto max-w-full rounded-xl object-contain drop-shadow-md"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = "none";
+              }}
+            />
+          </div>
+        ) : (
+          <div className="z-10 w-20 h-20 shrink-0 flex items-center justify-center">
             <FolderTree size={36} className="text-white/60" />
-          )}
-        </div>
+          </div>
+        )}
       </div>
     );
   }
 
   if (banner_type === "checkout_banner") {
     return (
-      <div className="rounded-2xl p-3.5 bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-amber-500/10 border-2 border-dashed border-emerald-500/40 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div style={{ backgroundColor: bg }} className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-xs">
-            <Percent size={18} />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-xs text-slate-900 truncate">{title || "Checkout Promotion"}</span>
+      <div className="rounded-2xl p-3.5 bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-amber-500/10 border-2 border-dashed border-emerald-500/40 flex flex-col sm:flex-row items-center justify-between gap-3 min-h-[70px]">
+        <div className="flex items-center gap-3 min-w-0 w-full sm:w-auto">
+          {cleanSrc ? (
+            <div className="w-12 h-12 rounded-xl shrink-0 overflow-hidden flex items-center justify-center bg-white shadow-xs border border-slate-100">
+              <img
+                src={cleanSrc}
+                alt=""
+                className="max-h-11 max-w-11 object-contain"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = "none";
+                }}
+              />
+            </div>
+          ) : (
+            <div style={{ backgroundColor: bg }} className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-xs">
+              <Percent size={18} />
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-extrabold text-xs text-slate-900">{title || "Checkout Promotion"}</span>
               {discount_text && (
                 <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[9px] font-bold uppercase">
                   {discount_text}
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-slate-500 truncate">{description || "Applied automatically at checkout"}</p>
+            <p className="text-[10px] text-slate-500 line-clamp-1">{description || "Applied automatically at checkout"}</p>
           </div>
         </div>
         <button
           type="button"
           style={{ backgroundColor: bg }}
-          className="px-3 py-1.5 text-white font-bold text-[10px] rounded-lg shrink-0 shadow-xs flex items-center gap-1"
+          className="px-3.5 py-1.5 text-white font-bold text-[10px] rounded-lg shrink-0 shadow-xs flex items-center gap-1 w-full sm:w-auto justify-center"
         >
           <span>{cta}</span>
         </button>
@@ -233,9 +287,9 @@ function BannerVisualPreview({
   return (
     <div
       style={{ backgroundColor: bg }}
-      className="rounded-2xl p-4 text-white relative overflow-hidden flex items-center justify-between min-h-[105px] shadow-sm"
+      className="rounded-2xl p-4 text-white relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-4 min-h-[120px] shadow-sm transition-all"
     >
-      <div className="space-y-1.5 z-10 max-w-[65%]">
+      <div className="space-y-2 z-10 flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="px-2 py-0.5 rounded-md bg-black/25 text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1">
             <Tag size={10} /> Home Carousel
@@ -246,19 +300,30 @@ function BannerVisualPreview({
             </span>
           )}
         </div>
-        <h4 className="font-extrabold text-sm leading-snug line-clamp-1">{title || "Home Carousel Title"}</h4>
-        <p className="text-[10px] text-white/85 line-clamp-1">{description || "Discover fresh organic harvest & daily essentials"}</p>
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-white text-slate-900 px-3 py-1 rounded-lg mt-0.5 shadow-xs">
-          {cta} <ArrowRight size={11} />
-        </span>
+        <h4 className="font-extrabold text-sm sm:text-base leading-snug break-words">{title || "Home Carousel Title"}</h4>
+        <p className="text-[11px] text-white/85 line-clamp-2">{description || "Discover fresh organic harvest & daily essentials"}</p>
+        <div className="pt-1">
+          <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-white text-slate-900 px-3 py-1.5 rounded-xl shadow-xs">
+            {cta} <ArrowRight size={12} />
+          </span>
+        </div>
       </div>
-      <div className="z-10 w-24 h-24 shrink-0 flex items-center justify-center">
-        {image_url ? (
-          <img src={image_url} alt="" className="max-h-24 max-w-full object-contain drop-shadow" />
-        ) : (
-          <ImageIcon size={38} className="text-white/60" />
-        )}
-      </div>
+      {cleanSrc ? (
+        <div className="z-10 w-full sm:w-auto shrink-0 flex items-center justify-center max-h-[180px] max-w-[280px]">
+          <img
+            src={cleanSrc}
+            alt={title || "Banner Preview"}
+            className="max-h-[160px] w-auto max-w-full rounded-xl object-contain drop-shadow-md"
+            onError={(e) => {
+              (e.target as HTMLElement).style.display = "none";
+            }}
+          />
+        </div>
+      ) : (
+        <div className="z-10 w-24 h-24 shrink-0 flex items-center justify-center">
+          <ImageIcon size={40} className="text-white/60" />
+        </div>
+      )}
     </div>
   );
 }
@@ -1468,16 +1533,19 @@ export default function PromotionsCouponsOffersPage() {
                       </div>
 
                       {/* Image Preview Thumbnail */}
-                      {offer.image_url && (
-                        <img
-                          src={offer.image_url}
-                          alt={offer.title}
-                          className="w-18 h-18 object-contain absolute right-2 bottom-2 drop-shadow-md z-0 opacity-90 group-hover:scale-105 transition"
-                          onError={(e) => {
-                            (e.target as any).style.display = "none";
-                          }}
-                        />
-                      )}
+                      {(() => {
+                        const src = getImageSrc(offer.image_url);
+                        return src ? (
+                          <img
+                            src={src}
+                            alt={offer.title}
+                            className="w-20 h-20 object-contain absolute right-2 bottom-2 drop-shadow-md z-0 opacity-90 group-hover:scale-105 transition rounded-lg"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        ) : null;
+                      })()}
                     </div>
                   );
                 })}
@@ -1508,6 +1576,7 @@ export default function PromotionsCouponsOffersPage() {
                   ) : (
                     filteredOffers.map((o) => {
                       const isPopup = Boolean(o.is_popup || o.banner_type === "popup");
+                      const cleanTableSrc = getImageSrc(o.image_url);
 
                       return (
                         <tr key={o.id} className="hover:bg-slate-50/60 transition">
@@ -1515,10 +1584,17 @@ export default function PromotionsCouponsOffersPage() {
                             <div className="flex items-center gap-3">
                               <div
                                 style={{ backgroundColor: o.background_color || "#16a34a" }}
-                                className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 overflow-hidden shadow-xs"
+                                className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 overflow-hidden shadow-xs relative"
                               >
-                                {o.image_url ? (
-                                  <img src={o.image_url} alt="" className="w-10 h-10 object-contain" />
+                                {cleanTableSrc ? (
+                                  <img
+                                    src={cleanTableSrc}
+                                    alt={o.title || "Banner"}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      (e.target as HTMLElement).style.display = "none";
+                                    }}
+                                  />
                                 ) : (
                                   <ImageIcon size={18} />
                                 )}

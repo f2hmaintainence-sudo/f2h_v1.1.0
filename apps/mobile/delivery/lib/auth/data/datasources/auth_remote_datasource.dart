@@ -4,6 +4,7 @@ import 'package:f2h_delivery/core/api/api_endpoints.dart';
 import 'package:f2h_delivery/auth/data/models/user_model.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:f2h_delivery/core/api/api_error.dart';
 
 abstract class AuthRemoteDataSource {
   Future<UserModel> login(String identifier, String password);
@@ -162,7 +163,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         );
       }
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Connection error';
+      throw apiErrorMessage(e, 'Connection error');
     }
   }
 

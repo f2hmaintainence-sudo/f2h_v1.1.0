@@ -7,6 +7,7 @@ import 'package:f2h_delivery/features/orders/domain/repositories/orders_reposito
 import 'package:f2h_delivery/features/orders/data/datasources/orders_remote_datasource.dart';
 import 'package:f2h_delivery/features/orders/data/models/pickup_item_model.dart';
 import 'package:f2h_delivery/features/orders/data/models/handover_model.dart';
+import 'package:f2h_delivery/core/api/api_error.dart';
 class OrdersRepositoryImpl implements OrdersRepository {
   final DioClient _dioClient;
   final OrdersRemoteDataSource _remoteDataSource;
@@ -320,7 +321,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
       print('Error during handover in repository: $e');
       return HandoverResult(
         success: false,
-        message: e is DioException ? (e.response?.data['message'] ?? e.message ?? e.toString()) : e.toString(),
+        message: e is DioException ? apiErrorMessage(e, e.message ?? e.toString()) : e.toString(),
         status: '',
         emptyBottlesReturned: 0,
         returnedItems: [],
@@ -330,7 +331,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
 
   Exception _handleDioError(dynamic e, String defaultMessage) {
     if (e is DioException) {
-      final serverMessage = e.response?.data['message'] ?? e.response?.data['error'];
+      final serverMessage = apiErrorMessage(e, '');
       if (serverMessage != null) {
         return Exception(serverMessage);
       }

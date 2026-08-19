@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:f2h_delivery/core/api/dio_client.dart';
 import 'package:f2h_delivery/core/api/api_endpoints.dart';
 import 'package:f2h_delivery/features/orders/data/models/pickup_item_model.dart';
+import 'package:f2h_delivery/core/api/api_error.dart';
 
 class OrdersRemoteDataSource {
   final DioClient dioClient;
@@ -76,7 +77,7 @@ class OrdersRemoteDataSource {
         } else if (statusCode == 500) {
           message = 'Server error. Please try again later.';
         } else {
-          message = error.response?.data['message'] ?? 'Request failed.';
+          message = apiErrorMessage(error, 'Request failed.');
         }
         break;
       case DioExceptionType.cancel:

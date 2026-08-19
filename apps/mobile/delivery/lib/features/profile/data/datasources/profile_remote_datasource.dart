@@ -6,6 +6,7 @@ import 'package:f2h_delivery/features/profile/data/profile_model.dart';
 import 'package:f2h_delivery/features/profile/data/models/document_model.dart';
 import 'package:f2h_delivery/features/profile/data/models/vehicle_model.dart';
 import 'package:f2h_delivery/features/profile/data/models/bank_account_model.dart';
+import 'package:f2h_delivery/core/api/api_error.dart';
 
 abstract class ProfileRemoteDataSource {
   Future<ProfileModel> fetchPersonalInfo();
@@ -83,7 +84,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       final response = await dioClient.dio.get(ApiEndpoints.profilePersonal);
       return ProfileModel.fromJson(response.data);
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to fetch personal info';
+      throw apiErrorMessage(e, 'Failed to fetch personal info');
     }
   }
 
@@ -92,7 +93,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     try {
       await dioClient.dio.patch(ApiEndpoints.profilePersonal, data: data);
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to update personal info';
+      throw apiErrorMessage(e, 'Failed to update personal info');
     }
   }
 
@@ -111,7 +112,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       );
       return response.data['url'] ?? '';
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to upload profile photo';
+      throw apiErrorMessage(e, 'Failed to upload profile photo');
     }
   }
 
@@ -122,7 +123,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       final List list = response.data as List;
       return list.map((json) => DocumentModel.fromJson(json)).toList();
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to fetch documents';
+      throw apiErrorMessage(e, 'Failed to fetch documents');
     }
   }
 
@@ -149,7 +150,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       final formData = FormData.fromMap(map);
       await dioClient.dio.post(ApiEndpoints.profileDocs, data: formData);
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to add document';
+      throw apiErrorMessage(e, 'Failed to add document');
     }
   }
 
@@ -180,7 +181,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
         data: formData,
       );
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to update document';
+      throw apiErrorMessage(e, 'Failed to update document');
     }
   }
 
@@ -189,7 +190,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     try {
       await dioClient.dio.delete(ApiEndpoints.profileDocItem(id));
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to delete document';
+      throw apiErrorMessage(e, 'Failed to delete document');
     }
   }
 
@@ -200,7 +201,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       final List list = response.data as List;
       return list.map((json) => VehicleModel.fromJson(json)).toList();
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to fetch vehicles';
+      throw apiErrorMessage(e, 'Failed to fetch vehicles');
     }
   }
 
@@ -234,7 +235,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       final formData = FormData.fromMap(map);
       await dioClient.dio.post(ApiEndpoints.profileVehicles, data: formData);
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to add vehicle';
+      throw apiErrorMessage(e, 'Failed to add vehicle');
     }
   }
 
@@ -272,7 +273,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
         data: formData,
       );
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to update vehicle';
+      throw apiErrorMessage(e, 'Failed to update vehicle');
     }
   }
 
@@ -281,7 +282,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     try {
       await dioClient.dio.delete(ApiEndpoints.profileVehicleItem(id));
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to delete vehicle';
+      throw apiErrorMessage(e, 'Failed to delete vehicle');
     }
   }
 
@@ -292,7 +293,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       final List list = response.data as List;
       return list.map((json) => BankAccountModel.fromJson(json)).toList();
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to fetch bank accounts';
+      throw apiErrorMessage(e, 'Failed to fetch bank accounts');
     }
   }
 
@@ -312,7 +313,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       final formData = FormData.fromMap(map);
       await dioClient.dio.post(ApiEndpoints.profileBank, data: formData);
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to add bank account';
+      throw apiErrorMessage(e, 'Failed to add bank account');
     }
   }
 
@@ -336,7 +337,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
         data: formData,
       );
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to update bank account';
+      throw apiErrorMessage(e, 'Failed to update bank account');
     }
   }
 
@@ -345,7 +346,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     try {
       await dioClient.dio.delete(ApiEndpoints.profileBankItem(id));
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to delete bank account';
+      throw apiErrorMessage(e, 'Failed to delete bank account');
     }
   }
 
@@ -355,7 +356,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       final response = await dioClient.dio.get(ApiEndpoints.profilePrefs);
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to fetch preferences';
+      throw apiErrorMessage(e, 'Failed to fetch preferences');
     }
   }
 
@@ -370,7 +371,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       );
       return response.data['preferences'] as Map<String, dynamic>;
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to update preferences';
+      throw apiErrorMessage(e, 'Failed to update preferences');
     }
   }
 
@@ -380,7 +381,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       final response = await dioClient.dio.get(ApiEndpoints.profileActivity);
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to fetch activity';
+      throw apiErrorMessage(e, 'Failed to fetch activity');
     }
   }
 
@@ -400,7 +401,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
         },
       );
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to change password';
+      throw apiErrorMessage(e, 'Failed to change password');
     }
   }
 
@@ -409,7 +410,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     try {
       await dioClient.dio.post(ApiEndpoints.profileLogoutAll);
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to logout from all devices';
+      throw apiErrorMessage(e, 'Failed to logout from all devices');
     }
   }
 
@@ -422,7 +423,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       );
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to fetch attendance';
+      throw apiErrorMessage(e, 'Failed to fetch attendance');
     }
   }
 
@@ -435,7 +436,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       );
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to fetch attendance details';
+      throw apiErrorMessage(e, 'Failed to fetch attendance details');
     }
   }
 
@@ -448,7 +449,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       );
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to fetch leaderboard';
+      throw apiErrorMessage(e, 'Failed to fetch leaderboard');
     }
   }
 
@@ -462,7 +463,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       }
       return [];
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to fetch leave requests';
+      throw apiErrorMessage(e, 'Failed to fetch leave requests');
     }
   }
 
@@ -471,7 +472,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     try {
       await dioClient.dio.post(ApiEndpoints.profileLeaveRequests, data: data);
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to submit leave request';
+      throw apiErrorMessage(e, 'Failed to submit leave request');
     }
   }
 
@@ -480,7 +481,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     try {
       await dioClient.dio.delete(ApiEndpoints.profileLeaveRequestItem(id));
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Failed to cancel leave request';
+      throw apiErrorMessage(e, 'Failed to cancel leave request');
     }
   }
 }
