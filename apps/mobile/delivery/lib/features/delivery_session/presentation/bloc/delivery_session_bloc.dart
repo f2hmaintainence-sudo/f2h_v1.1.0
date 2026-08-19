@@ -318,12 +318,21 @@ class DeliverySessionBloc
       return;
     }
     try {
-      final success = await _ordersRepo.confirmPickup(runId);
+      // The items must carry product_variant_id, which the modal's display
+      // model does not have — so they are read from the pickup endpoint, the
+      // same source the pickup-selection screen uses.
+      final pickup = await _ordersRepo.getPickupItems();
+      final success = await _ordersRepo.confirmPickup(
+        runId: runId,
+        items: pickup.items,
+      );
       if (!success) {
         event.onError?.call('Warehouse pickup could not be confirmed.');
         return;
       }
-      add(StartRunEvent(runId));
+      // The API already moves the run to in_progress; reload so the session
+      // reflects that rather than dispatching a second start.
+      add(ReloadSessionEvent());
       event.onSuccess?.call();
     } catch (e) {
       event.onError?.call(e.toString());

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 part of 'delivery_session_bloc.dart';
 
 abstract class DeliverySessionEvent {}
@@ -64,7 +63,7 @@ class StartRunEvent extends DeliverySessionEvent {
 /// declared — so the delivery app did not compile. The callbacks mirror the
 /// modal's existing expectations rather than inventing a new contract.
 class ConfirmWarehousePickupEvent extends DeliverySessionEvent {
-  final VoidCallback? onSuccess;
+  final void Function()? onSuccess;
   final void Function(String error)? onError;
 
   ConfirmWarehousePickupEvent({this.onSuccess, this.onError});

@@ -227,12 +227,16 @@ class DeliveryOrderItem {
   final int quantity;
   final String unit;
   final double price;
+  /// Thumbnail for the basket ledger. Optional: the delivery payload omits it
+  /// for items that have no image on the product record.
+  final String? productImage;
 
   const DeliveryOrderItem({
     required this.productName,
     required this.quantity,
     required this.unit,
     required this.price,
+    this.productImage,
   });
 
   factory DeliveryOrderItem.fromJson(Map<String, dynamic> json) {
@@ -241,6 +245,8 @@ class DeliveryOrderItem {
       quantity: _toInt(json['quantity'], 1),
       unit: json['unit']?.toString() ?? '',
       price: _toDouble(json['price']),
+      productImage: json['product_image']?.toString() ??
+          json['image_url']?.toString(),
     );
   }
 }
