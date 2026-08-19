@@ -21,16 +21,20 @@ services:
       - DB_HOST=f2hfresh.com
       - DB_PORT=5432
       - DB_DATABASE=f2h_fresh
-      - DB_USERNAME=f2h_user
-      - DB_PASSWORD=f2h_password
+      - DB_USERNAME=${DB_USERNAME:?DB_USERNAME is required}
+      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
       - BACKEND_URL=http://localhost:5001
       - APP_URL=http://localhost:3000
-      - JWT_SECRET=f2hfresh_super_secret_jwt_key_32chars_min_length!
-      - SESSION_SECRET=f2hfresh_super_secret_session_key_32chars!
-      - ENCRYPTION_SECRET=f2hfresh_super_secret_enc_key_32chars_min_length!
-      - DATA_ENCRYPTION_KEY=f2hfresh_super_secret_data_key_32chars_min_length!
-      - GOOGLE_CLIENT_ID=dummy_google_client_id_dev
-      - GOOGLE_CLIENT_SECRET=dummy_google_client_secret_dev
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+      # Secrets are read from an untracked .env — see .env.example. They used to be
+      # literals here, which meant working JWT/session/encryption keys were published
+      # in git. Rotate anything that ever used the old values.
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET is required}
+      - ENCRYPTION_SECRET=${ENCRYPTION_SECRET:?ENCRYPTION_SECRET is required}
+      - DATA_ENCRYPTION_KEY=${DATA_ENCRYPTION_KEY:?DATA_ENCRYPTION_KEY is required}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     env_file:
