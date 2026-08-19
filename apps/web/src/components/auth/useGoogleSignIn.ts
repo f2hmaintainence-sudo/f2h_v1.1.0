@@ -13,6 +13,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { getClientConfig, useClientConfig } from "@/lib/client-config"
 
 const GIS_SRC = "https://accounts.google.com/gsi/client"
 
@@ -76,7 +77,7 @@ function loadGis(): Promise<void> {
 export interface UseGoogleSignIn {
   /** Opens the Google chooser. Resolves to the authorization code, or null if dismissed. */
   requestCode: () => Promise<string | null>
-  /** False when NEXT_PUBLIC_GOOGLE_CLIENT_ID is unset — hide the button rather than fail on click. */
+  /** False when no OAuth client is configured — hide the button rather than fail on click. */
   isConfigured: boolean
   /** True while the popup is open. */
   isPending: boolean
@@ -90,7 +91,10 @@ export interface UseGoogleSignIn {
  * issues its code against.
  */
 export function useGoogleSignIn(): UseGoogleSignIn {
-  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? ""
+  // The client id comes from `api_integrations_config` (oauth:google) via the
+  // API, so rotating the OAuth client is an admin edit, not a rebuild. The
+  // build-time value is only a first-paint fallback.
+  const { googleClientId: clientId } = useClientConfig()
   const [isPending, setIsPending] = useState(false)
   const mounted = useRef(true)
 
@@ -108,7 +112,11 @@ export function useGoogleSignIn(): UseGoogleSignIn {
   }, [clientId])
 
   const requestCode = useCallback(async (): Promise<string | null> => {
-    if (!clientId) throw new Error("Google Sign-In is not configured")
+    // Re-read rather than trusting the render-time value: a click that lands
+    // before the config fetch resolves would otherwise use a stale client id.
+    const { googleClientId } = await getClientConfig()
+    const activeClientId = googleClientId || clientId
+    if (!activeClientId) throw new Error("Google Sign-In is not configured")
 
     await loadGis()
     const oauth2 = window.google?.accounts?.oauth2
@@ -118,7 +126,7 @@ export function useGoogleSignIn(): UseGoogleSignIn {
     try {
       return await new Promise<string | null>((resolve, reject) => {
         const client = oauth2.initCodeClient({
-          client_id: clientId,
+          client_id: activeClientId,
           scope: "openid email profile",
           ux_mode: "popup",
           callback: (response) => {

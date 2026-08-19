@@ -6,6 +6,7 @@ import 'package:f2h_customer/features/notifications/presentation/bloc/notificati
 import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_event.dart';
 import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_state.dart';
 import 'package:f2h_customer/core/widgets/scrolling_items_loader.dart';
+import 'package:f2h_customer/features/subscription/presentation/screens/my_subscriptions_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -386,8 +387,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       },
       child: GestureDetector(
         onTap: () {
-          if (item.isUnread) {
+          final isUnread = item.isUnread;
+          if (isUnread) {
             context.read<NotificationsBloc>().add(MarkAsRead(item.id));
+          }
+          final isPostpaidNotif = item.title.toLowerCase().contains('postpaid') ||
+              item.message.toLowerCase().contains('postpaid');
+          if (isPostpaidNotif && isUnread) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const SubsScreen(showConfetti: true),
+              ),
+            );
           }
         },
         child: Container(

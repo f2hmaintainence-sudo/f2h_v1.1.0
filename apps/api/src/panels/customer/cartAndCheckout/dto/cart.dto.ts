@@ -108,4 +108,8 @@ export class CheckOutDto {
   @IsOptional()
   @IsIn(['prepaid', 'postpaid'])
   payment_type?: 'prepaid' | 'postpaid';
+
+  @IsString()
+  @IsOptional()
+  coupon_code?: string;
 }

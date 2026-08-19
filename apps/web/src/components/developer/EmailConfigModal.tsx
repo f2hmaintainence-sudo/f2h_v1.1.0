@@ -11,6 +11,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+
+/** Ports each encryption mode actually speaks. `None` keeps whatever is typed. */
+const ENCRYPTION_PORTS: Record<string, string> = {
+  "SSL/TLS": "465",
+  STARTTLS: "587",
+};
 import { X, Mail, RotateCw } from "lucide-react";
 
 interface EmailConfigModalProps {
@@ -31,8 +37,8 @@ export function EmailConfigModal({
     config_key: "",
     name: "",
     smtp_host: "",
-    smtp_port: "587",
-    encryption_type: "STARTTLS",
+    smtp_port: "465",
+    encryption_type: "SSL/TLS",
     smtp_user: "",
     smtp_pass: "",
     sender_display_name: "",
@@ -47,8 +53,8 @@ export function EmailConfigModal({
         config_key: initialData.config_key || "",
         name: initialData.name || "",
         smtp_host: cfg.smtp_host || "",
-        smtp_port: cfg.smtp_port || "587",
-        encryption_type: cfg.encryption_type || "STARTTLS",
+        smtp_port: cfg.smtp_port || "465",
+        encryption_type: cfg.encryption_type || "SSL/TLS",
         smtp_user: cfg.smtp_user || "",
         smtp_pass: cfg.smtp_pass || "",
         sender_display_name: cfg.sender_display_name || "",
@@ -60,8 +66,8 @@ export function EmailConfigModal({
         config_key: "",
         name: "",
         smtp_host: "",
-        smtp_port: "587",
-        encryption_type: "STARTTLS",
+        smtp_port: "465",
+        encryption_type: "SSL/TLS",
         smtp_user: "",
         smtp_pass: "",
         sender_display_name: "",
@@ -180,11 +186,22 @@ export function EmailConfigModal({
               </label>
               <select
                 value={formData.encryption_type}
-                onChange={(e) => setFormData({ ...formData, encryption_type: e.target.value })}
+                onChange={(e) => {
+                  // The port and the encryption mode are not independent: 465 is
+                  // implicit TLS and 587 is STARTTLS. Moving them together stops
+                  // the pair drifting into a combination that cannot connect.
+                  const encryption_type = e.target.value;
+                  const port = ENCRYPTION_PORTS[encryption_type];
+                  setFormData({
+                    ...formData,
+                    encryption_type,
+                    ...(port ? { smtp_port: port } : {}),
+                  });
+                }}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#16a34a]/20 focus:border-[#16a34a] text-slate-800 bg-slate-50/30"
               >
-                <option value="STARTTLS">STARTTLS</option>
                 <option value="SSL/TLS">SSL/TLS</option>
+                <option value="STARTTLS">STARTTLS</option>
                 <option value="None">None</option>
               </select>
             </div>

@@ -5,6 +5,7 @@ import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/theme/app_theme.dart';
 import 'package:f2h_customer/core/widgets/animations.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
+import 'package:f2h_customer/core/widgets/popup_banner_widget.dart';
 
 import 'package:f2h_customer/features/catalog/presentation/screens/home_screen.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_screen.dart'; // Contains BrowseScreen
@@ -63,23 +64,18 @@ class F2HApp extends StatelessWidget {
             if (state is Authenticated) {
               context.read<CustomerSessionCubit>().bootstrap();
             } else if (state is Unauthenticated || state is AuthFailure) {
+              // Clear session cubit on logout so re-login always starts fresh
+              context.read<CustomerSessionCubit>().clear(clearToken: false);
               context.read<CartBloc>().add(ClearCartEvent());
             }
           },
           child: BlocBuilder<AuthBloc, AuthState>(
+            buildWhen: (previous, current) {
+              // Skip intermediate AuthLoading rebuilds — the login screen handles its own loading UI
+              if (current is AuthLoading) return false;
+              return true;
+            },
             builder: (context, state) {
-              // Still checking auth status — show nothing (splash is still visible)
-              if (state is AuthInitial || state is AuthLoading) {
-                return const Scaffold(
-                  backgroundColor: Colors.white,
-                  body: Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF0C831F),
-                      strokeWidth: 2.5,
-                    ),
-                  ),
-                );
-              }
               if (state is Authenticated) {
                 return const CustomerSessionGate();
               }
@@ -251,6 +247,8 @@ class AppShellState extends State<AppShell> {
   bool _isTransitioning = false;
 
   bool get isNavVisible => _showNav;
+  bool get isHomeScreen => _i == 0;
+  int get currentTab => _i;
 
   void setTab(int index, {String? category}) {
     if (category != null) {
@@ -263,6 +261,13 @@ class AppShellState extends State<AppShell> {
       _isTransitioning = true;
     });
     _pageController.jumpToPage(index);
+    if (index == 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          PopupBannerWidget.onReturnedToHomeScreen(context);
+        }
+      });
+    }
     Future.delayed(const Duration(milliseconds: 300), () {
       if (mounted) {
         setState(() {

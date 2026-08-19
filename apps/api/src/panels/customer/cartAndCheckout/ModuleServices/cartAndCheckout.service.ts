@@ -15,6 +15,7 @@ import { NotificationService } from 'src/notifications/notification.service';
 
 import { FirstOrderDetectorService } from '../../referral/services/first-order-detector.service';
 import { ReferralRewardEngineService } from '../../referral/services/referral-reward-engine.service';
+import { DiscountEngineService } from 'src/shared/services/discount-engine.service';
 
 @Injectable()
 export class CartService {
@@ -26,6 +27,7 @@ export class CartService {
     private readonly notificationService: NotificationService,
     private readonly firstOrderDetector: FirstOrderDetectorService,
     private readonly referralRewardEngine: ReferralRewardEngineService,
+    private readonly discountEngine: DiscountEngineService,
   ) { }
 
   async syncCart(body: CartDto, customerId: string) {
@@ -232,7 +234,7 @@ export class CartService {
         createdOrderIds.push(orderId);
 
         const gstAmount = 0;
-        const totalAmount = group.subtotal + gstAmount;
+        const totalAmount = group.totalAmount + gstAmount;
 
         const orderInsert = await this.Data.insert(
           'orders',
@@ -250,7 +252,7 @@ export class CartService {
             scheduled_date: group.deliveryDate,
             status: 'placed',
             subtotal: group.subtotal,
-            discount_amount: 0,
+            discount_amount: group.discountAmount,
             gst_amount: gstAmount,
             total_amount: totalAmount,
             payment_mode:
@@ -280,15 +282,16 @@ export class CartService {
             'order_items',
             {
               order_id: orderId,
-              // `order_items` keys the variant as `variant_id`. The insert also
-              // carried a `product_variant_id` column that does not exist, so every
-              // one-time checkout failed here — after the wallet had already been
-              // debited and the order row written, because there was no transaction.
               variant_id: entry.item.product_variant_id,
               product_name: entry.productName,
               unit_price: entry.price,
+              original_price: entry.originalPrice,
               quantity: entry.qty,
-              total_price: entry.qty * entry.price,
+              promotion_id: entry.promotionId,
+              coupon_id: entry.couponId,
+              discount_amount: entry.discountAmount * entry.qty,
+              coupon_amount: entry.couponAmount * entry.qty,
+              total_price: entry.lineTotal,
               is_free: false,
               created_at: new Date(),
             },
@@ -301,6 +304,44 @@ export class CartService {
             );
           }
         }
+
+        // Record redemptions inside transaction
+        const groupItemResults = group.items.map((entry) => ({
+          variant_id: entry.item.product_variant_id,
+          original_price: entry.originalPrice,
+          unit_price: entry.price,
+          promotion_id: entry.promotionId,
+          coupon_id: entry.couponId,
+          discount_amount: entry.discountAmount,
+          coupon_amount: entry.couponAmount,
+          final_price: entry.finalPrice,
+          item_line_total: entry.lineTotal,
+        }));
+        const groupItemsList = group.items.map((entry) => ({
+          variant_id: entry.item.product_variant_id,
+          quantity: entry.qty,
+        }));
+
+        let couponPromoId: string | null = null;
+        if (plan.discountResolution?.summary?.coupon_id && plan.couponCode) {
+          couponPromoId = await this.discountEngine.getCouponPromotionId(plan.couponCode);
+        }
+
+        const groupCouponDiscount = group.items.reduce(
+          (sum, entry) => sum + entry.couponAmount * entry.qty,
+          0,
+        );
+
+        await this.discountEngine.recordRedemptions(
+          tx,
+          orderId,
+          plan.customerId,
+          groupItemResults,
+          groupItemsList,
+          plan.discountResolution?.summary?.coupon_id || null,
+          couponPromoId,
+          groupCouponDiscount,
+        );
 
         walletTransactionsToInsert.push({
           amount: totalAmount,
@@ -370,6 +411,9 @@ export class CartService {
       status: result.referenceId ? 'success' : 'failed',
       id: `#F2H-${result.referenceId}`,
       address: plan.addressLine,
+      discount_amount: plan.groups.reduce((s, g) => s + g.discountAmount, 0),
+      total_amount: plan.onetimeTotal,
+      coupon_summary: plan.discountResolution?.summary || null,
     };
   }
 
@@ -419,7 +463,7 @@ export class CartService {
     );
     const variantRows = variantIds.length
       ? await this.db.query(
-          `SELECT pv.variant_id, pv.price, p.name AS product_name
+          `SELECT pv.variant_id, pv.price, pv.original_price, p.name AS product_name
              FROM product_variants pv
              LEFT JOIN products p ON pv.product_id = p.product_id
             WHERE pv.variant_id = ANY($1)`,
@@ -447,17 +491,52 @@ export class CartService {
       );
     }
 
+    // Resolve discounts & coupons for one-time checkout
+    const discountItems = itemsToCheckout.map((item) => {
+      const row = variantById.get(item.product_variant_id);
+      const onetimeItem = item as OnetimeCheckoutItemDto;
+      const qty = onetimeItem.onetime_details?.quantity || item.quantity || 1;
+      const price = Number(row?.price || 0);
+      const origPrice = Number(row?.original_price || price);
+      return {
+        variant_id: item.product_variant_id,
+        unit_price: price,
+        original_price: origPrice,
+        quantity: qty,
+      };
+    });
+
+    const discountResolution = await this.discountEngine.resolveDiscounts({
+      customer_id: customerId,
+      order_source: 'one-time',
+      coupon_code: body.coupon_code || null,
+      items: discountItems,
+    });
+
+    const discountByVariantId = new Map(
+      discountResolution.item_results.map((r) => [r.variant_id, r]),
+    );
+
     type OnetimeEntry = {
       item: OnetimeCheckoutItemDto;
       price: number;
+      originalPrice: number;
       qty: number;
       productName: string;
+      promotionId: string | null;
+      couponId: string | null;
+      discountAmount: number;
+      couponAmount: number;
+      finalPrice: number;
+      lineTotal: number;
     };
     type OnetimeGroup = {
       deliveryDate: string;
       deliverySlot: string;
       items: OnetimeEntry[];
       subtotal: number;
+      discountAmount: number;
+      totalAmount: number;
     };
 
     const paymentMethod = body.payment_method || 'wallet';
@@ -468,9 +547,16 @@ export class CartService {
     for (const item of itemsToCheckout) {
       const row = variantById.get(item.product_variant_id);
       const price = Number(row.price);
+      const originalPrice = Number(row.original_price || price);
       const productName = row.product_name || 'Product';
       const onetimeItem = item as OnetimeCheckoutItemDto;
       const qty = onetimeItem.onetime_details?.quantity || 1;
+
+      const disc = discountByVariantId.get(item.product_variant_id);
+      const unitDiscount = disc?.discount_amount || 0;
+      const unitCoupon = disc?.coupon_amount || 0;
+      const finalPrice = Math.max(0, price - unitDiscount - unitCoupon);
+      const lineTotal = finalPrice * qty;
 
       const deliveryDate =
         onetimeItem.onetime_details?.delivery_date ||
@@ -484,15 +570,31 @@ export class CartService {
           deliverySlot,
           items: [],
           subtotal: 0,
+          discountAmount: 0,
+          totalAmount: 0,
         });
       }
       const group = groupsByKey.get(groupKey)!;
-      group.items.push({ item: onetimeItem, price, qty, productName });
+      group.items.push({
+        item: onetimeItem,
+        price,
+        originalPrice,
+        qty,
+        productName,
+        promotionId: disc?.promotion_id || null,
+        couponId: disc?.coupon_id || null,
+        discountAmount: unitDiscount,
+        couponAmount: unitCoupon,
+        finalPrice,
+        lineTotal,
+      });
       group.subtotal += price * qty;
+      group.discountAmount += (unitDiscount + unitCoupon) * qty;
+      group.totalAmount += lineTotal;
     }
 
     const groups = Array.from(groupsByKey.values());
-    const onetimeTotal = groups.reduce((sum, group) => sum + group.subtotal, 0);
+    const onetimeTotal = groups.reduce((sum, group) => sum + group.totalAmount, 0);
     const walletBalance = Number(customer.wallet_balance || 0);
 
     const isPostpaidOrder =
@@ -515,6 +617,8 @@ export class CartService {
       paymentMethod,
       paymentType,
       isCod,
+      couponCode: body.coupon_code || null,
+      discountResolution,
       debitWallet: paymentMethod === 'wallet' && !isCod && paymentType === 'prepaid',
       createPrepaidBills: !isPostpaidOrder && !isCod && paymentType === 'prepaid',
     };
@@ -872,5 +976,24 @@ export class CartService {
     } catch (err) {
       this.developer.error('broadcastNewOrderToLiveOrders error', { err });
     }
+  }
+
+  async validateCoupon(customerId: string, couponCode: string, subtotal: number) {
+    if (!couponCode) {
+      throw new BadRequestException('Coupon code is required');
+    }
+    return this.discountEngine.validateCouponCode(couponCode.trim(), customerId, subtotal || 0);
+  }
+
+  async previewDiscounts(customerId: string, body: CheckOutDto) {
+    body.customer_id = customerId;
+    const plan = await this.buildCheckoutPlan(body);
+    return {
+      subtotal: plan.groups.reduce((s, g) => s + g.subtotal, 0),
+      discount_amount: plan.groups.reduce((s, g) => s + g.discountAmount, 0),
+      total_amount: plan.onetimeTotal,
+      coupon_summary: plan.discountResolution?.summary || null,
+      groups: plan.groups,
+    };
   }
 }

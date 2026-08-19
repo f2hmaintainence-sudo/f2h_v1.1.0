@@ -1700,8 +1700,6 @@ CREATE TABLE public.order_items (
     is_free boolean DEFAULT false NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     final_price numeric(10,2) GENERATED ALWAYS AS (GREATEST((((unit_price * quantity) - discount_amount) - coupon_amount), (0)::numeric)) STORED,
-    product_variant_id character varying(50),
-    product_name character varying(150),
     total_price numeric(10,2) DEFAULT 0,
     status character varying(50) DEFAULT 'placed'::character varying,
     updated_at timestamp with time zone DEFAULT now(),

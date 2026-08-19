@@ -12,9 +12,10 @@ import { PushNotificationService } from 'src/shared/pushNotifications/pushNotifi
 import { NotificationModule } from 'src/notifications/notification.module';
 
 import { ReferralModule } from '../referral/referral.module';
+import { DiscountEngineModule } from 'src/shared/services/discount-engine.module';
 
 @Module({
-  imports: [ConfigModule, NotificationModule, ReferralModule],
+  imports: [ConfigModule, NotificationModule, ReferralModule, DiscountEngineModule],
   controllers: [CartController],
   providers: [DatabaseService, DataService, DeveloperService, CartService, PricingService, PushNotificationService],
   exports: [CartService, PricingService],

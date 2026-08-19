@@ -35,8 +35,13 @@ class AppConfig {
   static String firebaseIosAppId = '';
   static String firebaseIosBundleId = '';
 
-  static String googleServerClientId = '';
-  static String googleMapsApiKey = '';
+  // Seeded with the live values rather than left blank. These are refreshed
+  // from /device/client-config on every sync, but that lands *after* the first
+  // frame — an empty client id here made the first Google sign-in of a fresh
+  // install fail with 'Google did not return a sign-in token'.
+  static String googleServerClientId =
+      '842214638527-0hdom5v6ab9aum1jrn86treomqqhmm7m.apps.googleusercontent.com';
+  static String googleMapsApiKey = 'AIzaSyDPzNGpuT5QHHdCmlKAogNkDJj1e34urbs';
 
   static double maxDeliveryRadiusKm = 15.0;
   static int gpsPingIntervalSeconds = 30;

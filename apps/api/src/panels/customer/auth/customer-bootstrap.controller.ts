@@ -155,7 +155,7 @@ export class CustomerBootstrapController {
     const query = `
       SELECT
         c.customer_id,
-        c.customer_status,
+        c.is_active AS customer_status,
         c.customer_type,
         c.is_blocked,
         c.block_reason,
@@ -208,7 +208,7 @@ export class CustomerBootstrapController {
             customer_id: userObj.user_id || userId,
             branch_id: activeBranchId,
             wallet_balance: 0,
-            customer_status: 'active',
+            is_active: true,
             customer_type: 'retail',
             created_at: now,
             updated_at: now,

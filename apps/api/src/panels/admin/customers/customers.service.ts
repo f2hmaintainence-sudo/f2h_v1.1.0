@@ -62,7 +62,7 @@ export class CustomersService {
 
       if (status) {
         params.push(status);
-        whereClauses.push(`c.customer_status = $${params.length}`);
+        whereClauses.push(`c.is_active = $${params.length}`);
       }
 
       if (branchId) {
@@ -164,7 +164,7 @@ export class CustomersService {
           c.gender,
           c.dob,
           u.profile_image_url as profile_image,
-          c.customer_status,
+          c.is_active as customer_status,
           c.customer_type,
           COALESCE(c.wallet_balance, 0)::numeric as wallet_balance,
           COALESCE(c.reward_points, 0)::int as reward_points,

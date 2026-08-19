@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -32,15 +34,44 @@ class OtpScreen extends StatefulWidget {
   State<OtpScreen> createState() => _OtpScreenState();
 }
 
+/// Must match `RESEND_COOLDOWN_SECONDS` in the API's OtpRateLimitService. The
+/// server rejects an early resend outright; this only stops the user from
+/// spending a request to find that out.
+const int _kResendCooldownSeconds = 60;
+
 class _OtpScreenState extends State<OtpScreen> {
   final TextEditingController _otpController = TextEditingController();
   bool _isVerifying = false;
   bool _isResending = false;
 
+  Timer? _cooldownTimer;
+  int _cooldownRemaining = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // A code was sent to get to this screen, so the window is already open.
+    _startResendCooldown();
+  }
+
   @override
   void dispose() {
+    _cooldownTimer?.cancel();
     _otpController.dispose();
     super.dispose();
+  }
+
+  void _startResendCooldown() {
+    _cooldownTimer?.cancel();
+    setState(() => _cooldownRemaining = _kResendCooldownSeconds);
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() => _cooldownRemaining--);
+      if (_cooldownRemaining <= 0) timer.cancel();
+    });
   }
 
   void _toast(String message, {Color? background}) {
@@ -98,6 +129,7 @@ class _OtpScreenState extends State<OtpScreen> {
         userName: widget.userName,
       );
       if (!mounted) return;
+      _startResendCooldown();
       _toast('New OTP sent to ${widget.email}');
     } catch (e) {
       if (!mounted) return;
@@ -145,9 +177,13 @@ class _OtpScreenState extends State<OtpScreen> {
                 child: AuthTextLink(
                   label: _isResending
                       ? 'Sending…'
-                      : "Didn't receive it? Resend OTP",
+                      : _cooldownRemaining > 0
+                          ? 'Resend OTP in ${_cooldownRemaining}s'
+                          : "Didn't receive it? Resend OTP",
                   alignment: Alignment.center,
-                  onTap: _isResending ? () {} : _resendOtp,
+                  onTap: _isResending || _cooldownRemaining > 0
+                      ? () {}
+                      : _resendOtp,
                 ),
               ),
               const SizedBox(height: 12),

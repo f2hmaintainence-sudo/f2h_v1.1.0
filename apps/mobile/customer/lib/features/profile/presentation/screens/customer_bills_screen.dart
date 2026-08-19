@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
@@ -446,6 +447,62 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              // Action buttons row
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => showModalBottomSheet<void>(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (_) => TaxInvoicePreviewSheet(bill: bill),
+                      ),
+                      icon: const Icon(Icons.receipt_long_outlined, size: 16, color: Color(0xFF16653A)),
+                      label: const Text(
+                        'View Invoice',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF16653A),
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFDCFCE7), width: 1.5),
+                        backgroundColor: const Color(0xFFF0FDF4),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                  if (dueAmount > 0) ...[
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const WalletScreen()),
+                        ),
+                        icon: const Icon(Icons.payment_rounded, size: 16, color: Colors.white),
+                        label: Text(
+                          'Pay ₹${dueAmount.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFDC2626),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ],
@@ -967,46 +1024,80 @@ class BillDetailSheet extends StatelessWidget {
             ),
           ),
 
-          // Pay action button if due > 0
-          if (due > 0) ...[
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const WalletScreen(),
+          // Bottom action buttons: PDF Download + Pay Due
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final pdfUrl = ApiEndpoints.receiptPdf(billId);
+                    final uri = Uri.parse(pdfUrl);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  },
+                  icon: const Icon(Icons.picture_as_pdf_rounded, size: 18, color: Color(0xFF16653A)),
+                  label: const Text(
+                    'DOWNLOAD PDF',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF16653A),
                     ),
-                  );
-                },
-                icon: const Icon(
-                  Icons.account_balance_wallet_rounded,
-                  size: 18,
-                  color: Colors.white,
-                ),
-                label: Text(
-                  'PAY DUE AMOUNT (₹${due.toStringAsFixed(0)})',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
                   ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFDC2626),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF16A34A), width: 1.5),
+                    backgroundColor: const Color(0xFFF0FDF4),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
               ),
-            ),
-          ],
+              if (due > 0) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const WalletScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(
+                      Icons.account_balance_wallet_rounded,
+                      size: 18,
+                      color: Colors.white,
+                    ),
+                    label: Text(
+                      'PAY DUE (₹${due.toStringAsFixed(0)})',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFDC2626),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ],
       ),
     );
   }
 }
+
+typedef TaxInvoicePreviewSheet = BillDetailSheet;

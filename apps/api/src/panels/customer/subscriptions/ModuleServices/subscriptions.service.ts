@@ -15,6 +15,17 @@ import { MailService } from 'src/mail/mail.service';
 const DEFAULT_BRANCH_ID = 'ALL';
 const DEFAULT_ADDRESS_ID = 'ADDR_DEFAULT';
 
+function calcMonthEndDate(startDate?: string): string {
+  if (!startDate) return '';
+  const d = new Date(startDate);
+  if (isNaN(d.getTime())) return startDate;
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0));
+  const yyyy = lastDay.getUTCFullYear();
+  const mm = String(lastDay.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(lastDay.getUTCDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 @Injectable()
 export class SubscriptionsService {
   constructor(
@@ -261,7 +272,7 @@ export class SubscriptionsService {
 
       const billId = `BILL_${Date.now().toString(36).toUpperCase()}`;
       const startDateStr = body.start_date;
-      const endDateStr = body.end_date || startDateStr;
+      const endDateStr = body.end_date || calcMonthEndDate(startDateStr);
 
       await this.data.insert('customer_bills', {
         bill_id: billId,
@@ -484,7 +495,7 @@ export class SubscriptionsService {
           body.payment_type,
           dbScheduleType === 'custom_dates' ? 'custom' : 'monthly',
           body.start_date,
-          body.end_date || null,
+          body.end_date || calcMonthEndDate(body.start_date) || null,
           body.auto_renew,
           body.auto_renew ? 3 : 0,
           body.notes || 'Created from customer subscription form',

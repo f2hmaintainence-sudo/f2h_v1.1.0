@@ -21,17 +21,42 @@ import { CACHE_KEYS, CACHE_TTL } from 'src/shared/redis/cache.constants';
 export class OtpRateLimitService {
   private readonly logger = new Logger(OtpRateLimitService.name);
 
-  private readonly FREE_ATTEMPTS = 1000; // DEV: was 3
-  private readonly DAILY_LIMIT = 10000; // DEV: was 15
+  // These were raised to 1000/10000 with 1-second lockouts under a "DEV" comment,
+  // which disabled the limiter outright in production. They are back to the values
+  // the class documentation above describes. To loosen them locally, set
+  // OTP_RATE_LIMIT_RELAXED=true rather than editing these numbers.
+  private readonly relaxed = process.env.OTP_RATE_LIMIT_RELAXED === 'true';
 
-  // Exponential backoff tiers (DEV: thresholds raised, durations reduced to 1s)
-  private readonly LOCKOUT_TIERS = [
-    { threshold: 1000, duration: 1, label: '1 second' },
-    { threshold: 2000, duration: 1, label: '1 second' },
-    { threshold: 3000, duration: 1, label: '1 second' },
-    { threshold: 4000, duration: 1, label: '1 second' },
-    { threshold: 5000, duration: 1, label: '1 second' },
-  ];
+  private get DAILY_LIMIT(): number {
+    return this.relaxed ? 10000 : 15;
+  }
+
+  /**
+   * Shortest gap between two sends to the same address. This is the debounce:
+   * the throttler caps bursts per IP, but without this one address can be
+   * re-requested as fast as the UI allows from any number of IPs.
+   */
+  private get RESEND_COOLDOWN_SECONDS(): number {
+    return this.relaxed ? 1 : 60;
+  }
+
+  /** The cooldown clients should count down from after a successful send. */
+  get resendCooldownSeconds(): number {
+    return this.RESEND_COOLDOWN_SECONDS;
+  }
+
+  // Exponential backoff, applied once attempts reach each threshold.
+  private get LOCKOUT_TIERS(): Array<{ threshold: number; duration: number; label: string }> {
+    if (this.relaxed) {
+      return [{ threshold: 1000, duration: 1, label: '1 second' }];
+    }
+    return [
+      { threshold: 3, duration: 5 * 60, label: '5 minutes' },
+      { threshold: 6, duration: 30 * 60, label: '30 minutes' },
+      { threshold: 9, duration: 60 * 60, label: '1 hour' },
+      { threshold: 12, duration: 24 * 60 * 60, label: '24 hours' },
+    ];
+  }
 
   constructor(
     private readonly redisService: RedisService,
@@ -64,6 +89,19 @@ export class OtpRateLimitService {
           allowed: false,
           reason: `Daily OTP limit (${this.DAILY_LIMIT}) exceeded. Please try again tomorrow.`,
           remainingTime: remainingSeconds || 0,
+        };
+      }
+
+      // Debounce: refuse a resend that arrives inside the cooldown window. The
+      // remaining TTL is returned so the client can show an accurate countdown
+      // instead of guessing.
+      const cooldownKey = CACHE_KEYS.OTP_RESEND_COOLDOWN(phone_normalized);
+      const cooldownRemaining = await this.redisService.ttl(cooldownKey);
+      if (cooldownRemaining && cooldownRemaining > 0) {
+        return {
+          allowed: false,
+          reason: `Please wait ${cooldownRemaining} second${cooldownRemaining === 1 ? '' : 's'} before requesting another OTP.`,
+          remainingTime: cooldownRemaining,
         };
       }
 
@@ -146,6 +184,14 @@ export class OtpRateLimitService {
 
       // Store in Redis with 24-hour TTL
       await this.redisService.put(redisKey, limitState, CACHE_TTL.ONE_DAY);
+
+      // Open the debounce window. Keyed on the address, so it holds regardless of
+      // which IP or client the next request comes from.
+      await this.redisService.put(
+        CACHE_KEYS.OTP_RESEND_COOLDOWN(phone_normalized),
+        1,
+        this.RESEND_COOLDOWN_SECONDS,
+      );
 
       // Increment daily counter with 24-hour TTL
       const dailyCountRaw = await this.redisService.fetch<any>(dailyKey);
@@ -248,6 +294,7 @@ export class OtpRateLimitService {
     try {
       await this.redisService.forget(redisKey);
       await this.redisService.forget(verifyKey);
+      await this.redisService.forget(CACHE_KEYS.OTP_RESEND_COOLDOWN(phone_normalized));
       // Don't reset daily key - it's meant to persist for 24 hours
       this.logger.log(
         `[OTP Rate Limit] Reset limits for phone ${phone_normalized}`,

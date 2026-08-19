@@ -36,9 +36,10 @@ export default function StandaloneReceiptPage() {
     setLoading(true);
     setErrorMsg(null);
 
-    // Call API (works from /bills/receipt/:id, /customer/bills/:id/receipt, or /admin/finance/receipt/:id)
-    api.get<any>(`/admin/finance/receipt/${rawId}`)
+    // Call API (works from /receipt/:id, /bills/receipt/:id, /customer/bills/:id/receipt, or /admin/finance/receipt/:id)
+    api.get<any>(`/receipt/${rawId}`)
       .catch(() => api.get<any>(`/bills/receipt/${rawId}`))
+      .catch(() => api.get<any>(`/admin/finance/receipt/${rawId}`))
       .then((res) => {
         if (res.data?.status && res.data?.data) {
           setData(res.data.data);

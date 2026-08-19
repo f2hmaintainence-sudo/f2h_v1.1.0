@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:dio/dio.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
-import 'package:f2h_delivery/core/api/api_endpoints.dart';
-import 'package:f2h_delivery/core/api/dio_client.dart';
+import 'package:f2h_delivery/auth/domain/repositories/auth_repository.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/auth/presentation/widgets/auth_kit.dart';
 
@@ -94,13 +93,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
       _errorMessage = null;
     });
     try {
-      final dioClient = sl<DioClient>();
-      await dioClient.fetchCsrfToken().timeout(const Duration(seconds: 3), onTimeout: () {});
-
-      await dioClient.dio.post(
-        ApiEndpoints.forgotPassword,
-        data: isEmail ? {'email': identifier} : {'phone': identifier},
-      );
+      await sl<AuthRepository>().requestPasswordResetOtp(identifier);
 
       if (!mounted) return;
       setState(() {
@@ -132,23 +125,10 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
 
     setState(() => _isLoading = true);
     try {
-      final dioClient = sl<DioClient>();
-      await dioClient.fetchCsrfToken().timeout(const Duration(seconds: 3), onTimeout: () {});
-
-      final identifier = _emailCtrl.text.trim();
-      final isEmail = RegExp(r'^[\w.-]+@[\w-]+\.\w+$').hasMatch(identifier);
-
-      final response = await dioClient.dio.post(
-        ApiEndpoints.verifyEmailOtp,
-        data: {
-          if (isEmail) 'email': identifier else 'phone': identifier,
-          'otp': otp,
-          'purpose': 'forgot_password',
-        },
+      _verificationToken = await sl<AuthRepository>().verifyPasswordResetOtp(
+        identifier: _emailCtrl.text.trim(),
+        otp: otp,
       );
-
-      final resData = Map<String, dynamic>.from(response.data as Map? ?? {});
-      _verificationToken = resData['verification_token']?.toString();
 
       if (!mounted) return;
       setState(() {
@@ -170,7 +150,6 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
     final confirm = _confirmPasswordCtrl.text;
     final otp = _otpCtrl.map((c) => c.text).join();
     final identifier = _emailCtrl.text.trim();
-    final isEmail = RegExp(r'^[\w.-]+@[\w-]+\.\w+$').hasMatch(identifier);
 
     if (pass.isEmpty || confirm.isEmpty) {
       _showSnack('Please enter and confirm your password', isError: true);
@@ -187,18 +166,12 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
 
     setState(() => _isLoading = true);
     try {
-      final dioClient = sl<DioClient>();
-      await dioClient.fetchCsrfToken().timeout(const Duration(seconds: 3), onTimeout: () {});
-
-      await dioClient.dio.post(
-        ApiEndpoints.resetPassword,
-        data: {
-          if (isEmail) 'email': identifier else 'phone': identifier,
-          'identifier': identifier,
-          'token': _verificationToken ?? otp,
-          'otp': otp,
-          'newPassword': pass,
-        },
+      await sl<AuthRepository>().resetPassword(
+        identifier: identifier,
+        // The OTP is the fallback only if the verify step somehow returned no
+        // token; the API accepts either as proof.
+        token: _verificationToken ?? otp,
+        newPassword: pass,
       );
 
       _showSnack('Password reset successful! Please login with your new password.');

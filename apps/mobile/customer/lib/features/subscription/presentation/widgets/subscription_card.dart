@@ -396,6 +396,15 @@ Widget _buildSubCardDaysWidget(Subscription s) {
   final dayQtys = s.getSelectedDayQuantities();
   if (dayQtys.isEmpty) return const SizedBox.shrink();
 
+  const morningColor = Color(0xFF14532D); // Dark green
+  const eveningColor = Color(0xFF16A34A); // Light green
+
+  final isSevenDays = dayQtys.length == 7;
+  final first = dayQtys.first;
+  final isAllSameSlots = isSevenDays &&
+      dayQtys.every((dq) =>
+          dq.morningQty == first.morningQty && dq.eveningQty == first.eveningQty);
+
   return Container(
     margin: const EdgeInsets.only(top: 8),
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -426,41 +435,121 @@ Widget _buildSubCardDaysWidget(Subscription s) {
           ],
         ),
         const SizedBox(height: 5),
-        Wrap(
-          spacing: 5,
-          runSpacing: 5,
-          children: dayQtys.map((dq) {
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
-              ),
-              child: RichText(
-                text: TextSpan(
-                  style: const TextStyle(fontSize: 10.5, color: kText),
-                  children: [
-                    TextSpan(
-                      text: '${dq.dayName} ',
+        if (isAllSameSlots)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Daily  ',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: kText,
+                  ),
+                ),
+                if (first.morningQty > 0) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'M: ${first.morningQty}',
                       style: const TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        color: morningColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                if (first.eveningQty > 0) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: eveningColor.withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      'E: ${first.eveningQty}',
+                      style: const TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        color: eveningColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          )
+        else
+          Wrap(
+            spacing: 5,
+            runSpacing: 5,
+            children: dayQtys.map((dq) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${dq.dayName} ',
+                      style: const TextStyle(
+                        fontSize: 10.5,
                         fontWeight: FontWeight.w600,
                         color: kTextSub,
                       ),
                     ),
-                    TextSpan(
-                      text: '${dq.quantity}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        color: kPrimary,
+                    if (dq.morningQty > 0) ...[
+                      Text(
+                        'M:${dq.morningQty} ',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: morningColor,
+                        ),
                       ),
-                    ),
+                    ],
+                    if (dq.eveningQty > 0) ...[
+                      Text(
+                        'E:${dq.eveningQty}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: eveningColor,
+                        ),
+                      ),
+                    ],
+                    if (dq.morningQty == 0 && dq.eveningQty == 0)
+                      Text(
+                        '${dq.quantity}',
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w900,
+                          color: kPrimary,
+                        ),
+                      ),
                   ],
                 ),
-              ),
-            );
-          }).toList(),
-        ),
+              );
+            }).toList(),
+          ),
       ],
     ),
   );

@@ -166,6 +166,21 @@ export class DeliveryManagementController {
     return this.runService.getPartnerRunSummary(date);
   }
 
+  @Get('runs/partner-addresses')
+  async getPartnerAddressesForSwap(
+    @Query('partner_a') partnerA: string,
+    @Query('partner_b') partnerB: string,
+    @Query('date') date?: string,
+  ) {
+    return this.runService.getPartnerAddressesForSwap(partnerA, partnerB, date);
+  }
+
+  @Post('runs/swap-addresses')
+  async swapAddresses(@Body() body: any, @Req() req: any) {
+    const adminId = req.user?.user_id ?? req.user?.id ?? 'system';
+    return this.runService.swapAddresses({ ...body, admin_id: adminId });
+  }
+
   @Get('runs/:id')
   async getRunDetails(@Param('id') id: string) {
     return this.runService.getRunDetails(id);

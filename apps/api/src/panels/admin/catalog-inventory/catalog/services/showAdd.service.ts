@@ -497,6 +497,44 @@ export class CatalogShowAddService {
   }
 
   async getOffersForm(): Promise<FormResponse> {
+    const [catRes, prodRes] = await Promise.all([
+      this.dataService.query('categories', {
+        select: ['category_id', 'name'],
+        where: [
+          { column: 'deleted_at', operator: 'IS', value: null },
+          { column: 'is_active', operator: '=', value: true },
+        ],
+        orderBy: 'name',
+        orderDirection: 'ASC',
+      }),
+      this.dataService.query('products', {
+        select: ['product_id', 'name'],
+        where: [
+          { column: 'deleted_at', operator: 'IS', value: null },
+          { column: 'is_active', operator: '=', value: true },
+        ],
+        orderBy: 'name',
+        orderDirection: 'ASC',
+        limit: 100,
+      }),
+    ]);
+
+    const categoryOptions = [
+      { value: '', label: '— Select Category —' },
+      ...(catRes.data || []).map((c: any) => ({
+        value: String(c.category_id),
+        label: c.name,
+      })),
+    ];
+
+    const productOptions = [
+      { value: '', label: '— Select Product —' },
+      ...(prodRes.data || []).map((p: any) => ({
+        value: String(p.product_id),
+        label: p.name,
+      })),
+    ];
+
     const fields: FieldDef[] = [
       {
         name: 'title',
@@ -514,6 +552,15 @@ export class CatalogShowAddService {
         required: false,
         placeholder: 'e.g. 30% OFF or FREE Shipping',
         width: 'half',
+        group: 'Offer Details',
+      },
+      {
+        name: 'description',
+        label: 'Description',
+        type: 'textarea',
+        required: false,
+        placeholder: 'Brief summary of the promotional offer...',
+        width: 'full',
         group: 'Offer Details',
       },
       {
@@ -540,27 +587,36 @@ export class CatalogShowAddService {
         cropHeight: 675,
       },
       {
-        name: 'description',
-        label: 'Description',
-        type: 'textarea',
-        required: false,
-        placeholder: 'Brief summary of the promotional offer...',
-        width: 'full',
-        group: 'Offer Details',
-      },
-      {
         name: 'action_type',
         label: 'Action Target Type',
         type: 'select',
         required: true,
         width: 'half',
-        group: 'Navigation & CTA',
+        group: 'Navigation & CTA Redirection',
         options: [
-          { value: 'CATEGORY', label: 'Store Category' },
-          { value: 'PRODUCT', label: 'Single Product' },
+          { value: 'CATEGORY', label: 'Store Category (Redirection)' },
+          { value: 'PRODUCT', label: 'Single Product (Redirection)' },
           { value: 'EXTERNAL', label: 'External Web Link' },
         ],
         defaultValue: 'CATEGORY',
+      },
+      {
+        name: 'category_id',
+        label: 'Redirection Category (If Category Target)',
+        type: 'select',
+        required: false,
+        width: 'half',
+        group: 'Navigation & CTA Redirection',
+        options: categoryOptions,
+      },
+      {
+        name: 'action_value',
+        label: 'Redirection Product (If Product Target)',
+        type: 'select',
+        required: false,
+        width: 'half',
+        group: 'Navigation & CTA Redirection',
+        options: productOptions,
       },
       {
         name: 'cta_label',
@@ -569,7 +625,7 @@ export class CatalogShowAddService {
         required: true,
         placeholder: 'Shop Now',
         width: 'half',
-        group: 'Navigation & CTA',
+        group: 'Navigation & CTA Redirection',
         defaultValue: 'Shop Now',
       },
       {

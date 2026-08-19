@@ -10,6 +10,7 @@ import {
   ConflictException,
   InternalServerErrorException,
   NotFoundException,
+  ServiceUnavailableException,
   Logger,
 } from '@nestjs/common';
 import {
@@ -80,9 +81,61 @@ export class AuthService {
     private readonly configService: ConfigService,
   ) { }
 
-  /*===============================================================================================
-    Login & Validation Flow:
-   ================================================================================================*/
+  /**
+   * Checks is_active in the satellite table corresponding to which app (clientRole) the user is logging into.
+   * - CUSTOMER app  → customers table        (customer_id = userId)
+   * - DELIVERY app  → delivery_partners table  (delivery_partner_id = userId)
+   * - ADMIN panel   → management_staff table   (user_id = userId)
+   */
+  async checkSatelliteIsActive(userId: string, clientRole: string): Promise<boolean> {
+    const appRole = (clientRole || '').toUpperCase().trim();
+
+    try {
+      if (appRole === 'CUSTOMER') {
+        // Customer app: check customers table
+        const rows = await this.DataBase.query(
+          `SELECT is_active FROM customers WHERE customer_id = $1 LIMIT 1`,
+          [userId],
+        );
+        if (rows && rows.length > 0) {
+          const val = rows[0].is_active;
+          if (val === false || val === 0 || val === 'false') return false;
+        }
+        return true;
+      }
+
+      if (['DELIVERY_PARTNER', 'DELIVERY_BOY', 'DELIVERY', 'D'].includes(appRole)) {
+        // Delivery app: check delivery_partners table
+        const rows = await this.DataBase.query(
+          `SELECT is_active FROM delivery_partners WHERE delivery_partner_id = $1 LIMIT 1`,
+          [userId],
+        );
+        if (rows && rows.length > 0) {
+          const val = rows[0].is_active;
+          if (val === false || val === 0 || val === 'false') return false;
+        }
+        return true;
+      }
+
+      if (appRole === 'ADMIN') {
+        // Admin panel: check management_staff table
+        const rows = await this.DataBase.query(
+          `SELECT is_active FROM management_staff WHERE user_id = $1 LIMIT 1`,
+          [userId],
+        );
+        if (rows && rows.length > 0) {
+          const val = rows[0].is_active;
+          if (val === false || val === 0 || val === 'false') return false;
+        }
+        return true;
+      }
+
+      return true;
+    } catch (e) {
+      this.developer.error('Error checking satellite is_active status:', e);
+      return true;
+    }
+  }
 
   async validateUser(
     identifier: string,
@@ -839,23 +892,33 @@ export class AuthService {
     const redisKey = CACHE_KEYS.AUTH_MOBILE_OTP(identifier);
     await this.redisService.put(redisKey, otp, CACHE_TTL.FIFTEEN_MINUTES);
 
-    this.developer.debug(`[AuthService] Generated OTP for ${identifier}: ${otp}`);
+    // Opens the resend cooldown and advances the lockout tiers. Without this the
+    // limiter read state that nothing ever wrote, so it never triggered.
+    await this.otpRateLimitService.recordRequestAttempt(identifier);
 
     if (email) {
-      this.mailService.sendRegistrationOtp(email, otp).catch((err) => {
+      // Awaited, not fire-and-forget: the previous version reported "OTP sent"
+      // even when SMTP rejected the credentials, so a misconfigured mailbox was
+      // indistinguishable from a delivered code.
+      try {
+        await this.mailService.sendRegistrationOtp(email, otp);
+      } catch (err) {
         this.developer.error(`Failed to send registration OTP email to ${email}`, { err });
-      });
+        throw new ServiceUnavailableException(
+          'We could not send the verification email right now. Please try again shortly.',
+        );
+      }
       return {
         message: 'OTP sent to your email',
         ttl: CACHE_TTL.FIFTEEN_MINUTES,
-        otp, // Return for debug
+        resend_available_in: this.otpRateLimitService.resendCooldownSeconds,
       };
     }
 
     return {
       message: 'OTP sent to your phone',
       ttl: CACHE_TTL.FIFTEEN_MINUTES,
-      otp, // Return for debug
+      resend_available_in: this.otpRateLimitService.resendCooldownSeconds,
     };
   }
 
@@ -870,8 +933,14 @@ export class AuthService {
     const storedOtp = await this.redisService.fetch(redisKey);
 
     if (!storedOtp || String(storedOtp) !== otp) {
+      // Recorded so repeated wrong guesses trip the 5-failure lockout. Nothing
+      // was counting these before, which left the code brute-forceable within
+      // its 15-minute window.
+      await this.otpRateLimitService.recordVerificationAttempt(identifier, false, ip);
       throw new UnauthorizedException('Invalid OTP');
     }
+
+    await this.otpRateLimitService.recordVerificationAttempt(identifier, true, ip);
 
     let user: any = null;
     if (phone) {
@@ -947,8 +1016,14 @@ export class AuthService {
         email: email || null,
         role_id: 'CUSTOMER',
       };
-    } else if (incomingFcmToken) {
-      await this.updateFcmToken(user.user_id, incomingFcmToken);
+    } else {
+      const isSatelliteActive = await this.checkSatelliteIsActive(user.user_id, user.role_id || 'CUSTOMER');
+      if (!isSatelliteActive) {
+        throw new UnauthorizedException('Your account is inactive. Please contact support.');
+      }
+      if (incomingFcmToken) {
+        await this.updateFcmToken(user.user_id, incomingFcmToken);
+      }
     }
 
     const verificationToken = crypto.randomBytes(32).toString('hex');
@@ -964,6 +1039,7 @@ export class AuthService {
     );
 
     await this.redisService.forget(redisKey);
+    await this.otpRateLimitService.resetLimits(identifier);
 
     return {
       message: 'OTP verified successfully',
@@ -1371,20 +1447,28 @@ export class AuthService {
     const redisKey = CACHE_KEYS.AUTH_MOBILE_OTP(targetKey);
     await this.redisService.put(redisKey, otp, CACHE_TTL.FIFTEEN_MINUTES);
 
-    this.developer.debug(`[AuthService:forgotPassword] Generated OTP for ${targetKey}: ${otp}`);
+    await this.otpRateLimitService.recordRequestAttempt(targetKey);
 
     if (user.email) {
-      this.mailService.sendForgotPasswordOtp(user.email, otp).catch((err) => {
+      try {
+        await this.mailService.sendForgotPasswordOtp(user.email, otp);
+      } catch (err) {
         this.developer.error(`Failed to send forgot password OTP email to ${user.email}`, { err });
-      });
+        throw new ServiceUnavailableException(
+          'We could not send the reset email right now. Please try again shortly.',
+        );
+      }
     }
 
+    // The OTP is deliberately absent from this response. It used to be included
+    // "for debug", which let anyone request a reset code for any account and read
+    // it straight out of the HTTP response.
     return {
       message: user.email
         ? 'Password reset OTP sent to your email'
         : 'Password reset OTP sent to your phone',
       ttl: CACHE_TTL.FIFTEEN_MINUTES,
-      otp,
+      resend_available_in: this.otpRateLimitService.resendCooldownSeconds,
     };
   }
 
@@ -1555,6 +1639,11 @@ export class AuthService {
       }
 
       user = { user_id: userId, email: email.toLowerCase().trim(), role_id: roleId };
+    } else {
+      const isSatelliteActive = await this.checkSatelliteIsActive(user.user_id, user.role_id || 'CUSTOMER');
+      if (!isSatelliteActive) {
+        throw new UnauthorizedException('Your account is inactive. Please contact support.');
+      }
     }
 
     if (options.fcmToken) {

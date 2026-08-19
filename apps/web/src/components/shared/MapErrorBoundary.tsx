@@ -46,7 +46,7 @@ export class MapErrorBoundary extends Component<Props, State> {
           </div>
           <h4 className="text-sm font-bold text-slate-800">Map Service Unavailable</h4>
           <p className="text-xs text-slate-500 max-w-sm mt-1 leading-relaxed">
-            {this.props.fallbackMessage || 'Google Maps failed to load. Please verify NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in your environment configuration.'}
+            {this.props.fallbackMessage || 'Google Maps failed to load. Check the key under Admin → Developer → API Integrations → Maps.'}
           </p>
           <button
             type="button"

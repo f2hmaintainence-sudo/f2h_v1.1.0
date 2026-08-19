@@ -22,7 +22,8 @@
     "seed:delivery-run-demo": "ts-node -r tsconfig-paths/register src/scripts/seed-delivery-run-demo.ts",
     "seed:kuppam": "ts-node -r tsconfig-paths/register src/scripts/seed-kuppam.ts",
     "db:migrate": "ts-node -r tsconfig-paths/register src/scripts/run-migration.ts",
-    "seed:firebase-admin": "ts-node -r tsconfig-paths/register src/scripts/seed-firebase-admin.ts"
+    "seed:firebase-admin": "ts-node -r tsconfig-paths/register src/scripts/seed-firebase-admin.ts",
+    "seed:integration-secrets": "ts-node -r tsconfig-paths/register src/scripts/seed-integration-secrets.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1060.0",

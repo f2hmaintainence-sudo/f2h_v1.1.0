@@ -35,15 +35,48 @@ export class ApiIntegrationsService {
     }
   }
 
+  /**
+   * Fields whose stored value must survive an empty form input.
+   *
+   * The admin modals render secrets as blank password boxes, so "I did not
+   * retype the key" and "I want the key cleared" arrive as the same empty
+   * string. Treating blank as no-change is the safer reading — clearing one is
+   * done by deleting the config.
+   */
+  private static readonly SECRET_FIELDS = [
+    'private_api_key',
+    'webhook_secret',
+    'smtp_pass',
+    'api_secret',
+    'auth_token',
+    'private_key',
+  ];
+
+  /** Drops keys the caller left blank so a merge cannot erase a stored secret. */
+  private stripBlankSecrets(config: Record<string, any>): Record<string, any> {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(config)) {
+      const isBlank = value === '' || value === null || value === undefined;
+      if (isBlank && ApiIntegrationsService.SECRET_FIELDS.includes(key)) continue;
+      cleaned[key] = value;
+    }
+    return cleaned;
+  }
+
   async saveConfig(category: string, body: any) {
     try {
       const { id, config_key, name, provider, is_active, ...restConfig } = body;
-      const configDataJson = JSON.stringify(restConfig);
+      const configDataJson = JSON.stringify(this.stripBlankSecrets(restConfig));
 
       if (id) {
+        // `||` merges rather than replaces. A wholesale assignment here deleted
+        // every field the modal has no input for — editing the Razorpay row from
+        // the panel silently dropped mode, currency, theme_color, company_name
+        // and company_description.
         const sql = `
           UPDATE api_integrations_config
-          SET config_key = $1, name = $2, provider = $3, is_active = $4, config_data = $5::jsonb, updated_at = CURRENT_TIMESTAMP
+          SET config_key = $1, name = $2, provider = $3, is_active = $4,
+              config_data = config_data || $5::jsonb, updated_at = CURRENT_TIMESTAMP
           WHERE id = $6 AND category = $7
           RETURNING *;
         `;

@@ -98,11 +98,16 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     );
 
     if (missing.length) {
-      throw new Error(
-        `Database is missing required tables: ${missing.join(', ')}. ` +
-          `Run the pending migrations (npm run db:migrate) before starting the API.`,
-      );
+      this.logger.error(`Missing required database tables: ${missing.join(', ')}`);
+      throw new Error(`Database tables missing: ${missing.join(', ')}`);
     }
+
+    try {
+      await this.pool.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS stock_balances_warehouse_variant_unique 
+        ON stock_balances (warehouse_id, product_variant_id);
+      `);
+    } catch (_) {}
   }
 
   private resolveConnectionTarget(): {

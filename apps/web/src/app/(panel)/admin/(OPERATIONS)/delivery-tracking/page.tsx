@@ -22,6 +22,7 @@ import {
 import Link from "next/link";
 import { showSuccessToast } from "@/components/Toast";
 import { io } from "socket.io-client";
+import { useClientConfig } from "@/lib/client-config";
 
 interface DeliveryPartner {
   delivery_partner_id: string;
@@ -287,6 +288,8 @@ export default function DeliveryTrackingPage() {
   const [partnerPositions, setPartnerPositions] = useState<
     Record<string, { lat: number; lng: number; battery?: number; speed?: number; timestamp: string }>
   >({});
+  // The orders response carries a per-request key; this is the standing one.
+  const clientConfig = useClientConfig();
   const [mapsApiKey, setMapsApiKey] = useState<string>("");
 
   // Fetch initial live positions
@@ -849,7 +852,7 @@ export default function DeliveryTrackingPage() {
           {/* Google Maps Container */}
           <div className="w-full flex-1 z-10 min-h-[400px] outline-none focus:outline-none focus-within:outline-none ring-0 [&_*]:outline-none [&_*]:focus:outline-none">
             <MapErrorBoundary fallbackMessage="Google Maps service unavailable (ApiProjectMapError). Tracking details remain active.">
-              <APIProvider apiKey={mapsApiKey || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""}>
+              <APIProvider apiKey={mapsApiKey || clientConfig.googleMapsApiKey}>
               <GMap
                 defaultCenter={{ lat: activeBranch.lat, lng: activeBranch.lng }}
                 defaultZoom={14}

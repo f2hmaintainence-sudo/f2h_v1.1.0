@@ -724,7 +724,7 @@ export class ProfileService {
       const endDate = dto.end_date ? new Date(dto.end_date) : startDate;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       if (startDate <= today) {
         throw new BadRequestException('Leave date must be a future date');
       }

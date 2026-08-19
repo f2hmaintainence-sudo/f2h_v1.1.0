@@ -9,8 +9,7 @@ import {
   Circle,
 } from '@vis.gl/react-google-maps';
 import MapErrorBoundary from '../shared/MapErrorBoundary';
-
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+import { useClientConfig } from '@/lib/client-config';
 
 interface LivePartnerLocation {
   delivery_partner_id: string;
@@ -40,6 +39,8 @@ export default function SectorMap({
   livePartners = [],
   emptyMessage = 'No location set for this branch hub',
 }: BranchMapProps) {
+  // Called before the early return below — hooks may not sit behind a branch.
+  const { googleMapsApiKey } = useClientConfig();
   const hasCenter = typeof centerLat === 'number' && typeof centerLng === 'number';
   const defaultCenter = { lat: 12.9716, lng: 77.5946 };
   const center = hasCenter ? { lat: centerLat, lng: centerLng } : defaultCenter;
@@ -58,7 +59,7 @@ export default function SectorMap({
   return (
     <div className="relative rounded-xl overflow-hidden border border-slate-200 shadow-sm" style={{ height }}>
       <MapErrorBoundary fallbackMessage="Google Maps API key error. Branch coverage metrics remain operational.">
-        <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
+        <APIProvider apiKey={googleMapsApiKey}>
           <Map
             defaultCenter={center}
             defaultZoom={13}

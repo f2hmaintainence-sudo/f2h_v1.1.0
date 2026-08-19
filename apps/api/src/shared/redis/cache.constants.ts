@@ -49,6 +49,8 @@ export const CACHE_KEYS = {
   OTP_RATE_LIMIT: (phone: string) => `otp_rate_limit_${phone}`,
   OTP_DAILY_LIMIT: (phone: string) => `otp_daily_limit_${phone}`,
   OTP_VERIFY_ATTEMPTS: (phone: string) => `otp_verify_attempts_${phone}`,
+  /** Presence means a send happened recently; the TTL is the remaining cooldown. */
+  OTP_RESEND_COOLDOWN: (phone: string) => `otp_resend_cooldown_${phone}`,
 
   // User Data
   USER_PROFILE: (userId: string | number) => `user:profile:${userId}`,

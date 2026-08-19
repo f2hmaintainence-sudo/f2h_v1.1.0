@@ -100,8 +100,9 @@ class ApiEndpoints {
   static const String cartSync = '$_customer/cart-sync';
   static const String cartItems = '$_customer/cart-items';
   static const String cartData = cartItems;
-  static const String checkout = '$_customer/checkout/payment';
   static const String customerBills = '$_customer/orders/bills';
+  static String receipt(String id) => '/receipt/$id';
+  static String receiptPdf(String id) => '$host/api/v1/receipt/pdf/$id';
 
   // Referrals  →  /api/v1/customer/referrals/…
   static const String customerReferrals = '$_customer/referrals/dashboard';

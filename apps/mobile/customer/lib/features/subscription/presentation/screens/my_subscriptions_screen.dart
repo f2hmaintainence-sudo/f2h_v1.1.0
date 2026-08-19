@@ -24,7 +24,8 @@ import 'package:f2h_customer/core/widgets/scrolling_items_loader.dart';
 // ══════════════════════════════════════════════════════════
 
 class SubsScreen extends StatefulWidget {
-  const SubsScreen({super.key});
+  final bool showConfetti;
+  const SubsScreen({super.key, this.showConfetti = false});
 
   @override
   State<SubsScreen> createState() => _SubsScreenState();
@@ -34,6 +35,7 @@ class _SubsScreenState extends State<SubsScreen> {
   late List<Subscription> _subscriptions;
   DateTime? vacationStart;
   DateTime? vacationEnd;
+
   @override
   void initState() {
     super.initState();
@@ -565,6 +567,9 @@ class _SubsScreenState extends State<SubsScreen> {
       builder: (context, sessionState) {
         final isPostpaidEnabled = sessionState.profile?.isPostpaidEnabled ?? false;
         final creditLimit = sessionState.profile?.postpaidCreditLimit ?? 0.0;
+        final usedLimit = _subscriptions
+            .where((s) => s.isActive && s.paymentType == 'postpaid')
+            .fold<double>(0, (sum, s) => sum + s.totalMonthlyCost);
 
         return LayoutBuilder(
           builder: (context, constraints) {
@@ -651,10 +656,10 @@ class _SubsScreenState extends State<SubsScreen> {
                                   alignment: Alignment.centerLeft,
                                   child: Text(
                                     isPostpaidEnabled
-                                        ? '₹${creditLimit.toStringAsFixed(2)}'
+                                        ? '₹${creditLimit.toStringAsFixed(0)} · Used: ₹${usedLimit.toStringAsFixed(0)}'
                                         : 'Not Enabled',
                                     style: TextStyle(
-                                      fontSize: isCompact ? 17 : 20,
+                                      fontSize: isCompact ? 15 : 18,
                                       color: Colors.white,
                                       fontWeight: FontWeight.w900,
                                       letterSpacing: -0.2,

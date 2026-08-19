@@ -12,8 +12,7 @@ import {
 } from '@vis.gl/react-google-maps';
 import MapErrorBoundary from './MapErrorBoundary';
 import { Search, Loader2, MapPin } from 'lucide-react';
-
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+import { useClientConfig } from '@/lib/client-config';
 export type ShapeType = 'hexagon' | 'circle' | 'square';
 
 interface ExistingBranch {
@@ -301,6 +300,7 @@ export default function MapPicker({
   selectedShape,
   onShapeChange,
 }: MapPickerProps) {
+  const { googleMapsApiKey } = useClientConfig();
   const defaultCenter = { lat: 12.9716, lng: 77.5946 }; // Bangalore
   const center = lat && lng ? { lat, lng } : defaultCenter;
 
@@ -359,7 +359,7 @@ export default function MapPicker({
       {/* Interactive Map View */}
       <div className="relative w-full flex-1 min-h-[280px] rounded-2xl overflow-hidden border border-slate-200 shadow-xs">
         <MapErrorBoundary fallbackMessage="Google Maps API Key Error (ApiProjectMapError). Use the Latitude/Longitude fields above to configure hub coordinates.">
-          <APIProvider apiKey={GOOGLE_MAPS_API_KEY} libraries={['places']}>
+          <APIProvider apiKey={googleMapsApiKey} libraries={['places']}>
             <Map
               defaultCenter={center}
               defaultZoom={lat && lng ? 13 : 11}

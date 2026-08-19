@@ -70,11 +70,16 @@ export class MailService {
       data.encryption_type || process.env.INFO_MAIL_ENCRYPTION || 'STARTTLS',
     ).toUpperCase();
     const user = data.smtp_user || process.env.INFO_MAIL_USERNAME || '';
+    const port = Number(data.smtp_port || process.env.INFO_MAIL_PORT || 587);
 
     return {
       host: data.smtp_host || process.env.INFO_MAIL_HOST || '',
-      port: Number(data.smtp_port || process.env.INFO_MAIL_PORT || 587),
-      secure: encryption === 'SSL' || encryption === 'TLS',
+      port,
+      // `secure` means implicit TLS — encrypted from the first byte, which is
+      // what port 465 speaks. STARTTLS (587) connects in the clear and upgrades,
+      // handled by `requireTLS` below; setting `secure` there makes it hang.
+      // The admin dropdown stores "SSL/TLS", older rows and env used "SSL".
+      secure: encryption.startsWith('SSL') || port === 465,
       user,
       pass: data.smtp_pass || process.env.INFO_MAIL_PASSWORD || '',
       fromAddress: data.from_address || user,

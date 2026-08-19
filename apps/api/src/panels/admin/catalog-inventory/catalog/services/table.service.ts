@@ -472,7 +472,7 @@ export class CatalogTableService {
           columns: extractFilters(query).columns,
           sort: query.sortBy
             ? { [query.sortBy]: query.sortDir || 'ASC' }
-            : { 'product_banner.display_order': 'ASC' },
+            : { display_order: 'ASC' },
           pagination: {
             type: 'offset',
             page: parseInt(query.page) || 1,

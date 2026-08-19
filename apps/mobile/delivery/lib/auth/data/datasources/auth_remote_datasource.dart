@@ -4,7 +4,6 @@ import 'package:f2h_delivery/core/api/api_endpoints.dart';
 import 'package:f2h_delivery/auth/data/models/user_model.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart';
 
 abstract class AuthRemoteDataSource {
   Future<UserModel> login(String identifier, String password);
@@ -24,6 +23,22 @@ abstract class AuthRemoteDataSource {
   /// Both fields are forwarded because platforms differ in what they can
   /// produce; the API verifies whichever one it receives.
   Future<UserModel> signInWithGoogle({String? idToken, String? serverAuthCode});
+
+  /// Sends a password-reset OTP to whichever channel [identifier] names.
+  Future<void> requestPasswordResetOtp(String identifier);
+
+  /// Confirms an OTP and returns the single-use token the reset step needs.
+  Future<String> verifyPasswordResetOtp({
+    required String identifier,
+    required String otp,
+  });
+
+  Future<void> resetPassword({
+    required String identifier,
+    required String token,
+    required String newPassword,
+  });
+
   Future<void> logout();
 }
 
@@ -46,7 +61,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           'identifier': identifier,
           'password': password,
           'fcm_token': fcmToken,
-          'role': 'DELIVERY_PARTNER',
+          // No `role` here on purpose: AuthController reads the role strictly
+          // from the x-role header (DioClient sends X-role: D) and ignores the
+          // body, so a value here only looks authoritative without being so.
         },
       );
 
@@ -55,6 +72,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         final userData = Map<String, dynamic>.from(response.data['user'] as Map);
         userData['accessToken']  = response.data['accessToken'];
         userData['refreshToken'] = response.data['refreshToken'];
+        dioClient.setAuthToken(response.data['accessToken']?.toString());
         return UserModel.fromJson(userData);
       } else {
         throw DioException(
@@ -171,7 +189,17 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        return UserModel.fromJson(response.data['user']);
+        // The tokens sit at the top level, not inside `user`. Reading only the
+        // nested map left UserModel.token null, so AuthRepositoryImpl skipped
+        // TokenStorage.saveTokens entirely — Google sign-in reported success
+        // and then behaved as if nobody had logged in.
+        final userData = Map<String, dynamic>.from(
+          response.data['user'] as Map? ?? {},
+        );
+        userData['accessToken'] = response.data['accessToken'];
+        userData['refreshToken'] = response.data['refreshToken'];
+        dioClient.setAuthToken(response.data['accessToken']?.toString());
+        return UserModel.fromJson(userData);
       } else {
         throw DioException(
           requestOptions: response.requestOptions,
@@ -180,7 +208,77 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         );
       }
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Connection error';
+      // `e.response?.data['message']` threw a second, uncatchable error whenever
+      // the body was not a Map (an HTML error page, or no response at all).
+      throw _extractError(e, 'Google sign-in failed');
+    }
+  }
+
+  /// `identifier` may be an email or a phone number; the API accepts either and
+  /// decides which channel to use, so the client does not need to guess.
+  Map<String, dynamic> _identifierPayload(String identifier) {
+    final trimmed = identifier.trim();
+    final isEmail = RegExp(r'^[\w.+-]+@[\w-]+\.[\w.-]+$').hasMatch(trimmed);
+    return isEmail ? {'email': trimmed} : {'phone': trimmed};
+  }
+
+  @override
+  Future<void> requestPasswordResetOtp(String identifier) async {
+    await dioClient.fetchCsrfToken();
+    try {
+      await dioClient.dio.post(
+        ApiEndpoints.forgotPassword,
+        data: _identifierPayload(identifier),
+      );
+    } on DioException catch (e) {
+      throw _extractError(e, 'Unable to send the reset OTP');
+    }
+  }
+
+  @override
+  Future<String> verifyPasswordResetOtp({
+    required String identifier,
+    required String otp,
+  }) async {
+    await dioClient.fetchCsrfToken();
+    try {
+      final response = await dioClient.dio.post(
+        ApiEndpoints.verifyEmailOtp,
+        data: {
+          ..._identifierPayload(identifier),
+          'otp': otp,
+          'purpose': 'forgot_password',
+        },
+      );
+      final data = Map<String, dynamic>.from(response.data as Map? ?? {});
+      final token = data['verification_token']?.toString() ?? '';
+      if (token.isEmpty) {
+        throw 'OTP verified, but no verification token was returned';
+      }
+      return token;
+    } on DioException catch (e) {
+      throw _extractError(e, 'OTP verification failed');
+    }
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String identifier,
+    required String token,
+    required String newPassword,
+  }) async {
+    await dioClient.fetchCsrfToken();
+    try {
+      await dioClient.dio.post(
+        ApiEndpoints.resetPassword,
+        data: {
+          ..._identifierPayload(identifier),
+          'token': token,
+          'newPassword': newPassword,
+        },
+      );
+    } on DioException catch (e) {
+      throw _extractError(e, 'Unable to reset the password');
     }
   }
 

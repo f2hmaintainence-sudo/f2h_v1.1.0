@@ -1472,5 +1472,274 @@ export class DeliveryRunService {
       this.developer.error('syncDispatchRequirementsForDate error', { error, date: dateStr });
     }
   }
+
+  // ────────────────────────────────────────────────
+  // Get Partner Addresses For Swap
+  // ────────────────────────────────────────────────
+  async getPartnerAddressesForSwap(partnerAId: string, partnerBId: string, date?: string) {
+    try {
+      const targetDate = date || todayIST();
+      const partnerIds = [partnerAId, partnerBId];
+
+      const sql = `
+        SELECT
+          dr.delivery_partner_id AS partner_id,
+          dr.run_id,
+          dr.delivery_slot,
+          dr.status AS run_status,
+          dra.id AS dra_id,
+          dra.address_id,
+          dra.sequence_no,
+          dra.delivery_status,
+          COALESCE(ca.address_line1 || ' ' || COALESCE(ca.address_line2, ''), ca.landmark, 'Customer Address') AS address_line,
+          ca.contact_name,
+          ca.contact_mobile,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''), c.name, u.user_name, 'Customer') AS customer_name,
+          (
+            SELECT COUNT(*)::int FROM orders o
+            WHERE o.delivery_run_id = dr.run_id
+              AND o.address_id = dra.address_id
+              AND o.deleted_at IS NULL
+          ) AS order_count,
+          (
+            SELECT json_agg(json_build_object(
+              'order_id', o.order_id,
+              'total_amount', o.total_amount,
+              'status', o.status
+            )) FROM orders o
+            WHERE o.delivery_run_id = dr.run_id
+              AND o.address_id = dra.address_id
+              AND o.deleted_at IS NULL
+          ) AS orders
+        FROM delivery_runs dr
+        JOIN delivery_run_addresses dra ON dra.run_id = dr.run_id AND dra.deleted_at IS NULL
+        LEFT JOIN customer_addresses ca ON ca.address_id = dra.address_id
+        LEFT JOIN customers c ON c.customer_id = dra.customer_id
+        LEFT JOIN users u ON u.user_id = dra.customer_id
+        WHERE dr.run_date = $1
+          AND dr.delivery_partner_id = ANY($2)
+          AND dr.deleted_at IS NULL
+          AND dr.status NOT IN ('completed', 'cancelled')
+        ORDER BY dr.delivery_partner_id, dra.sequence_no ASC
+      `;
+
+      const rows = await this.db.query(sql, [targetDate, partnerIds]);
+
+      const grouped: Record<string, { run_id: string; slot: string; run_status: string; addresses: any[] }> = {};
+      for (const pid of partnerIds) {
+        grouped[pid] = { run_id: '', slot: '', run_status: '', addresses: [] };
+      }
+      for (const row of rows) {
+        const pid = row.partner_id;
+        if (grouped[pid]) {
+          if (!grouped[pid].run_id) {
+            grouped[pid].run_id = row.run_id;
+            grouped[pid].slot = row.delivery_slot;
+            grouped[pid].run_status = row.run_status;
+          }
+          grouped[pid].addresses.push({
+            dra_id: row.dra_id,
+            address_id: row.address_id,
+            sequence_no: row.sequence_no,
+            delivery_status: row.delivery_status,
+            address_line: row.address_line,
+            contact_name: row.contact_name,
+            contact_mobile: row.contact_mobile,
+            customer_name: row.customer_name,
+            order_count: row.order_count || 0,
+            orders: row.orders || [],
+          });
+        }
+      }
+
+      return {
+        status: true,
+        data: {
+          partner_a: { partner_id: partnerAId, ...grouped[partnerAId] },
+          partner_b: { partner_id: partnerBId, ...grouped[partnerBId] },
+          date: targetDate,
+        },
+        message: 'Partner addresses fetched for swap',
+      };
+    } catch (error) {
+      this.developer.error('getPartnerAddressesForSwap error', { error });
+      throw new InternalServerErrorException('Failed to fetch partner addresses');
+    }
+  }
+
+  // ────────────────────────────────────────────────
+  // Swap Addresses Between Two Delivery Runs
+  // ────────────────────────────────────────────────
+  async swapAddresses(body: {
+    partner_a_id: string;
+    partner_b_id: string;
+    date?: string;
+    swaps: Array<{
+      address_id: string;
+      from_run_id: string;
+      to_run_id: string;
+      order_ids: string[];
+      to_partner_id: string;
+    }>;
+    admin_id?: string;
+  }) {
+    try {
+      const { swaps, admin_id } = body;
+      if (!swaps || swaps.length === 0) {
+        return { status: false, message: 'No swaps provided' };
+      }
+
+      const affectedRunIds = new Set<string>();
+      const partnerCreatedRuns = new Map<string, string>();
+
+      for (const swap of swaps) {
+        const { address_id, from_run_id, order_ids, to_partner_id } = swap;
+        let targetRunId = (swap.to_run_id || '').trim();
+        if (targetRunId === '--') targetRunId = '';
+
+        if (from_run_id) {
+          affectedRunIds.add(from_run_id);
+        }
+
+        // If target partner has no run_id specified or it's invalid, find or create a new delivery run
+        if (!targetRunId && to_partner_id) {
+          if (partnerCreatedRuns.has(to_partner_id)) {
+            targetRunId = partnerCreatedRuns.get(to_partner_id)!;
+          } else {
+            let runDate = body.date || todayIST();
+            let deliverySlot = 'morning';
+            let branchId: string | null = null;
+
+            if (from_run_id) {
+              const [fromRun] = await this.db.query(
+                `SELECT run_date, delivery_slot, branch_id FROM delivery_runs WHERE run_id = $1 LIMIT 1`,
+                [from_run_id],
+              );
+              if (fromRun) {
+                if (fromRun.run_date) {
+                  runDate = typeof fromRun.run_date === 'string'
+                    ? fromRun.run_date.split('T')[0]
+                    : new Date(fromRun.run_date).toISOString().split('T')[0];
+                }
+                if (fromRun.delivery_slot) deliverySlot = fromRun.delivery_slot;
+                if (fromRun.branch_id) branchId = fromRun.branch_id;
+              }
+            }
+
+            const existingRuns = await this.db.query(
+              `SELECT run_id FROM delivery_runs
+               WHERE delivery_partner_id = $1
+                 AND run_date = $2
+                 AND delivery_slot = $3
+                 AND status NOT IN ('completed', 'cancelled')
+                 AND deleted_at IS NULL
+               ORDER BY created_at DESC LIMIT 1`,
+              [to_partner_id, runDate, deliverySlot],
+            );
+
+            if (existingRuns && existingRuns.length > 0 && existingRuns[0].run_id) {
+              targetRunId = existingRuns[0].run_id;
+            } else {
+              const dateStr = runDate.replace(/-/g, '');
+              const slotPrefix = (deliverySlot || 'MOR').substring(0, 3).toUpperCase();
+              const nextRes = await this.db.query(
+                `SELECT COALESCE(MAX(CAST(SPLIT_PART(run_id, '-', 4) AS INTEGER)), 0) + 1 AS next_no
+                 FROM delivery_runs
+                 WHERE run_date = $1 AND delivery_slot = $2`,
+                [runDate, deliverySlot],
+              );
+              const nextNo = Number(nextRes?.[0]?.next_no ?? 1);
+              targetRunId = `RUN-${dateStr}-${slotPrefix}-${String(nextNo).padStart(3, '0')}`;
+
+              await this.db.query(
+                `INSERT INTO delivery_runs
+                   (run_id, delivery_partner_id, branch_id, run_date, delivery_slot,
+                    status, assignment_method, total_addresses, assigned_by)
+                 VALUES ($1, $2, $3, $4, $5, 'assigned', 'manual', 0, $6)`,
+                [targetRunId, to_partner_id, branchId, runDate, deliverySlot, admin_id || 'system'],
+              );
+            }
+            partnerCreatedRuns.set(to_partner_id, targetRunId);
+          }
+        }
+
+        if (targetRunId) {
+          affectedRunIds.add(targetRunId);
+
+          const updateRes = await this.db.query(
+            `UPDATE delivery_run_addresses
+               SET run_id = $1, updated_at = NOW()
+             WHERE run_id = $2 AND address_id = $3 AND deleted_at IS NULL`,
+            [targetRunId, from_run_id, address_id],
+          );
+
+          if ((updateRes as any)?.rowCount === 0 || (Array.isArray(updateRes) && updateRes.length === 0)) {
+            let customerId = 'UNKNOWN';
+            if (order_ids && order_ids.length > 0) {
+              const cRes = await this.db.query(`SELECT customer_id FROM orders WHERE order_id = $1 LIMIT 1`, [order_ids[0]]);
+              if (cRes?.[0]?.customer_id) customerId = cRes[0].customer_id;
+            }
+
+            await this.db.query(
+              `INSERT INTO delivery_run_addresses
+                 (run_id, address_id, sequence_no, customer_id, order_ids)
+               VALUES
+                 ($1, $2, (SELECT COALESCE(MAX(sequence_no), 0) + 1 FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL), $3, $4)`,
+              [targetRunId, address_id, customerId, order_ids ? order_ids.join(',') : null],
+            );
+          }
+
+          if (order_ids && order_ids.length > 0) {
+            await this.db.query(
+              `UPDATE orders
+                 SET delivery_partner_id = $1,
+                     delivery_run_id = $2,
+                     assignment_method = 'manual',
+                     updated_at = NOW()
+               WHERE order_id = ANY($3)`,
+              [to_partner_id, targetRunId, order_ids],
+            );
+          }
+        }
+      }
+
+      for (const runId of affectedRunIds) {
+        if (!runId) continue;
+        await this.db.query(
+          `UPDATE delivery_runs
+             SET total_addresses = (
+               SELECT COUNT(*)::int FROM delivery_run_addresses
+               WHERE run_id = $1 AND deleted_at IS NULL
+             ),
+             updated_at = NOW()
+           WHERE run_id = $1`,
+          [runId],
+        );
+      }
+
+      const partnerIds = [...new Set([body.partner_a_id, body.partner_b_id])].filter(Boolean);
+      for (const pid of partnerIds) {
+        try {
+          await this.pushNotificationService.sendNotificationToUsers(
+            [pid],
+            {
+              title: 'Delivery Run Updated 🔄',
+              body: 'Your delivery run addresses have been updated by the admin.',
+            },
+          );
+        } catch (_) {}
+      }
+
+      return {
+        status: true,
+        message: `${swaps.length} address swap(s) applied successfully`,
+        data: { swaps_applied: swaps.length },
+      };
+    } catch (error) {
+      this.developer.error('swapAddresses error', { error });
+      throw new InternalServerErrorException('Failed to swap delivery addresses');
+    }
+  }
 }
+
 

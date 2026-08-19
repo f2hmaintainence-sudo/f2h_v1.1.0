@@ -134,7 +134,13 @@ class ApiClient {
       // Don't redirect if we're on public pages (no auth required)
       if (typeof window !== 'undefined') {
         const publicPages = ['/', '/login', '/register', '/forgot-password', '/reset-password'];
-        const isPublicPage = publicPages.includes(window.location.pathname) || window.location.pathname.startsWith('/landing');
+        const isPublicPage =
+          publicPages.includes(window.location.pathname) ||
+          window.location.pathname.startsWith('/landing') ||
+          window.location.pathname.startsWith('/receipt') ||
+          window.location.pathname.startsWith('/invoice') ||
+          window.location.pathname.startsWith('/billing') ||
+          window.location.pathname.startsWith('/download');
         if (!isPublicPage) {
           window.location.href = '/login';
         }

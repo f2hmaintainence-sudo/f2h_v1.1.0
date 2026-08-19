@@ -14,6 +14,20 @@ abstract class AuthRepository {
     String? referralCode,
   });
   Future<User> signInWithGoogle();
+
+  /// Password reset, in the order the UI walks through it:
+  /// request an OTP, exchange it for a single-use token, then set the password.
+  Future<void> requestPasswordResetOtp(String identifier);
+  Future<String> verifyPasswordResetOtp({
+    required String identifier,
+    required String otp,
+  });
+  Future<void> resetPassword({
+    required String identifier,
+    required String token,
+    required String newPassword,
+  });
+
   Future<void> logout();
   Future<User?> checkAuthStatus();
 }

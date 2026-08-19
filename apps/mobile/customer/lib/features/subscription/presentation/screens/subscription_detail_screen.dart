@@ -763,9 +763,15 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                     ),
             );
 
+            final contactInfo = [
+              if (defaultAddress.contactName.isNotEmpty) defaultAddress.contactName,
+              if (defaultAddress.contactMobile.isNotEmpty) defaultAddress.contactMobile,
+            ].join(' · ');
+
             final addressString = defaultAddress.id == null
                 ? 'No saved address'
                 : [
+                    if (contactInfo.isNotEmpty) contactInfo,
                     if (defaultAddress.flatNo.isNotEmpty) defaultAddress.flatNo,
                     if (defaultAddress.buildingName.isNotEmpty) defaultAddress.buildingName,
                     if (defaultAddress.street.isNotEmpty) defaultAddress.street,

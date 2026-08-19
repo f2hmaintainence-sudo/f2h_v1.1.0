@@ -270,7 +270,7 @@ export class CustomerOrderController {
 
       const bills: any[] = [];
 
-      // 1. Fetch from customer_bills table if table exists (prepaid only, exclude COD and postpaid)
+      // 1. Fetch from customer_bills table (strictly subscription bills only)
       try {
         const billRows = await this.db.query(
           `SELECT bill_id, bill_type, reference_id, payment_type, payment_method,
@@ -279,119 +279,74 @@ export class CustomerOrderController {
                   paid_amount, due_amount, status, remarks, created_at
            FROM customer_bills
            WHERE customer_id = ANY($1::text[])
-             AND LOWER(COALESCE(payment_method, '')) NOT IN ('cod', 'postpaid')
-             AND LOWER(COALESCE(payment_type, '')) != 'postpaid'
+             AND (
+               LOWER(bill_type) = 'subscription' 
+               OR reference_id LIKE 'SUB%' 
+               OR reference_id LIKE 'MSH%' 
+               OR remarks ILIKE '%subscription%'
+             )
+             AND (reference_id NOT LIKE 'Ord%' AND reference_id NOT LIKE 'ORD%')
            ORDER BY created_at DESC`,
           [allCustomerIds],
         );
         if (billRows && billRows.length > 0) {
-          bills.push(...billRows);
+          bills.push(...billRows.map((r: any) => ({
+            ...r,
+            bill_type: 'subscription',
+          })));
         }
       } catch (err) {
         console.error('getBills: Error querying customer_bills table', err);
       }
 
-      const existingRefIds = new Set(bills.map(b => b.reference_id).filter(Boolean));
-
-      // 2. Fetch orders to synthesize bills if any prepaid orders are missing from customer_bills (exclude COD and postpaid)
+      // 2. Fetch item descriptions from subscription_items for all subscription bills
       try {
-        const orderRows = await this.db.query(
-          `SELECT order_id, order_source, payment_status, COALESCE(payment_mode, 'wallet') AS payment_method,
-                  subtotal, discount_amount, total_amount,
-                  status, created_at, scheduled_date
-           FROM orders
-           WHERE customer_id = ANY($1::text[])
-             AND deleted_at IS NULL
-             AND LOWER(COALESCE(payment_mode, '')) NOT IN ('cod', 'postpaid')
-           ORDER BY created_at DESC`,
-          [allCustomerIds],
-        );
+        const subIds = bills
+          .map(b => b.reference_id || b.bill_id)
+          .filter(id => typeof id === 'string' && (id.startsWith('SUB_') || id.startsWith('MSH') || id.startsWith('BILL_MSH')));
+        
+        if (subIds.length > 0) {
+          const subItemRows = await this.db.query(
+            `SELECT si.subscription_id,
+                    COALESCE(
+                      NULLIF(TRIM(CONCAT(p.name, ' - ', pv.name)), ' - '),
+                      p.name,
+                      pv.name,
+                      'Subscription Item'
+                    ) AS item_name,
+                    COALESCE(p.name, '') AS product_name,
+                    COALESCE(pv.name, '') AS variant_name,
+                    1 AS quantity,
+                    COALESCE(si.final_price, si.unit_price, 0) AS unit_price,
+                    COALESCE(si.final_price, si.unit_price, 0) AS total_amount
+             FROM public.subscription_items si
+             LEFT JOIN public.product_variants pv ON pv.variant_id = si.product_variant_id
+             LEFT JOIN public.products p ON p.product_id = pv.product_id
+             WHERE (si.subscription_id = ANY($1::text[]) OR ('SUB_' || si.subscription_id) = ANY($1::text[]))
+               AND si.deleted_at IS NULL`,
+            [subIds],
+          );
 
-        if (orderRows && orderRows.length > 0) {
-          for (const ord of orderRows) {
-            if (!existingRefIds.has(ord.order_id)) {
-              const isPaid = (ord.payment_status || '').toLowerCase() === 'paid' || (ord.status || '').toLowerCase() === 'delivered';
-              const total = Number(ord.total_amount || 0);
-              bills.push({
-                bill_id: `BILL_${ord.order_id}`,
-                bill_type: ord.order_source === 'subscription' ? 'subscription' : 'order',
-                reference_id: ord.order_id,
-                payment_type: 'prepaid',
-                payment_method: ord.payment_method || 'wallet',
-                billing_from: ord.scheduled_date || ord.created_at,
-                billing_to: ord.scheduled_date || ord.created_at,
-                due_date: ord.created_at,
-                subtotal: Number(ord.subtotal || total),
-                discount_amount: Number(ord.discount_amount || 0),
-                tax_amount: 0,
-                total_amount: total,
-                paid_amount: isPaid ? total : 0,
-                due_amount: isPaid ? 0 : total,
-                status: isPaid ? 'paid' : (ord.payment_status || 'pending'),
-                remarks: `Order checkout (${ord.order_id})`,
-                created_at: ord.created_at,
-              });
+          if (subItemRows && subItemRows.length > 0) {
+            const subItemsMap = new Map<string, any[]>();
+            for (const r of subItemRows) {
+              const list = subItemsMap.get(r.subscription_id) || [];
+              list.push(r);
+              subItemsMap.set(r.subscription_id, list);
             }
-          }
-        }
-      } catch (err) {
-        console.error('getBills: Error synthesizing bills from orders table', err);
-      }
 
-      // 3. Fetch subscriptions to synthesize bills if any prepaid subscriptions are missing from customer_bills
-      try {
-        const subRows = await this.db.query(
-          `SELECT subscription_id, subscription_number, payment_type, status, created_at, start_date, end_date
-           FROM subscriptions
-           WHERE customer_id = ANY($1::text[])
-             AND LOWER(COALESCE(payment_type, '')) != 'postpaid'
-           ORDER BY created_at DESC`,
-          [allCustomerIds],
-        );
-
-        if (subRows && subRows.length > 0) {
-          for (const sub of subRows) {
-            const subId = sub.subscription_id;
-            if (!existingRefIds.has(subId) && !existingRefIds.has(sub.subscription_number)) {
-              const itemRows = await this.db.query(
-                `SELECT unit_price, final_price, default_m_quantity, default_e_quantity
-                 FROM subscription_items
-                 WHERE subscription_id = $1`,
-                [subId],
-              );
-              let total = 0;
-              if (itemRows && itemRows.length > 0) {
-                for (const item of itemRows) {
-                  const price = Number(item.final_price || item.unit_price || 0);
-                  const qty = (Number(item.default_m_quantity || 0) + Number(item.default_e_quantity || 0)) || 1;
-                  total += price * qty;
-                }
+            for (const bill of bills) {
+              const refId = bill.reference_id || bill.bill_id;
+              const matched = subItemsMap.get(refId) || subItemsMap.get(String(refId).replace(/^BILL_/, ''));
+              if (matched && matched.length > 0) {
+                bill.items = matched;
+                bill.item_name = matched.map(m => m.item_name).join(', ');
               }
-              const isPaid = (sub.payment_type || '').toLowerCase() === 'prepaid';
-              bills.push({
-                bill_id: `BILL_${sub.subscription_number || subId}`,
-                bill_type: 'subscription',
-                reference_id: subId,
-                payment_type: sub.payment_type || 'prepaid',
-                payment_method: 'wallet',
-                billing_from: sub.start_date || sub.created_at,
-                billing_to: sub.end_date || sub.start_date || sub.created_at,
-                due_date: sub.created_at,
-                subtotal: total,
-                discount_amount: 0,
-                tax_amount: 0,
-                total_amount: total,
-                paid_amount: isPaid ? total : 0,
-                due_amount: isPaid ? 0 : total,
-                status: isPaid ? 'paid' : 'due',
-                remarks: `Subscription (${sub.subscription_number || subId})`,
-                created_at: sub.created_at,
-              });
             }
           }
         }
       } catch (err) {
-        console.error('getBills: Error synthesizing bills from subscriptions table', err);
+        console.error('getBills: Error enriching subscription items', err);
       }
 
       // Sort combined by created_at DESC

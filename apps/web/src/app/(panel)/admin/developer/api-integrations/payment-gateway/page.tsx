@@ -26,6 +26,17 @@ import {
 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/components/Toast";
 
+/**
+ * Shows enough of a key to tell one from another without printing it. A bare
+ * "Configured" made a rotation invisible — the card looked identical before and
+ * after, which reads as the save having failed.
+ */
+function maskKey(value?: string): string {
+  if (!value) return "N/A";
+  if (value.length <= 10) return `${value.slice(0, 2)}${"\u2022".repeat(6)}`;
+  return `${value.slice(0, 8)}${"\u2022".repeat(8)}${value.slice(-4)}`;
+}
+
 export default function PaymentGatewayIntegrationsPage() {
   const [configs, setConfigs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -268,8 +279,20 @@ export default function PaymentGatewayIntegrationsPage() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400 font-sans">Public Key:</span>
-                      <span className="font-semibold text-slate-700 truncate max-w-[150px]">
-                        {data.public_api_key ? "Configured" : "N/A"}
+                      <span className="font-semibold text-slate-700 truncate max-w-[170px]">
+                        {maskKey(data.public_api_key)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 font-sans">Secret Key:</span>
+                      <span className="font-semibold text-slate-700 truncate max-w-[170px]">
+                        {maskKey(data.private_api_key)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 font-sans">Mode:</span>
+                      <span className="font-semibold text-slate-700 uppercase">
+                        {data.mode || "N/A"}
                       </span>
                     </div>
                   </div>

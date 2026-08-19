@@ -37,7 +37,7 @@ import {
 @Controller({ path: ['delivery-partner/profile', 'DeliveryPartner/profile'], version: '1' })
 @UseGuards(AuthGuard('jwt'))
 export class ProfileController {
-  constructor(private readonly profileService: ProfileService) {}
+  constructor(private readonly profileService: ProfileService) { }
 
   @Get('personal')
   async getPersonalInfo(@Req() req: Request) {

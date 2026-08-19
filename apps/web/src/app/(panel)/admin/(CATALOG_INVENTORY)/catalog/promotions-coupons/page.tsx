@@ -18,7 +18,7 @@ import {
   Users, ShoppingBag, Eye, DollarSign, ArrowRight, CheckCheck,
   Package, Boxes, Info, ToggleLeft, ToggleRight, Image as ImageIcon,
   ExternalLink, Palette, Smartphone, MonitorSmartphone, FolderTree,
-  SlidersHorizontal, CheckSquare
+  SlidersHorizontal, CheckSquare, Upload
 } from "lucide-react";
 import Link from "next/link";
 import { showSuccessToast, showErrorToast } from "@/components/Toast";
@@ -122,6 +122,17 @@ export default function PromotionsCouponsOffersPage() {
   const [isCreatePromoOpen, setIsCreatePromoOpen] = useState(false);
   const [isCreateCouponOpen, setIsCreateCouponOpen] = useState(false);
   const [isCreateOfferOpen, setIsCreateOfferOpen] = useState(false);
+
+  // Edit Modals state
+  const [isEditPromoOpen, setIsEditPromoOpen] = useState(false);
+  const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
+
+  const [isEditCouponOpen, setIsEditCouponOpen] = useState(false);
+  const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
+
+  const [isEditOfferOpen, setIsEditOfferOpen] = useState(false);
+  const [editingOffer, setEditingOffer] = useState<OfferBanner | null>(null);
+
   const [isManageProductsOpen, setIsManageProductsOpen] = useState(false);
   const [selectedPromoForProducts, setSelectedPromoForProducts] = useState<Promotion | null>(null);
   const [isRedemptionsOpen, setIsRedemptionsOpen] = useState(false);
@@ -151,6 +162,9 @@ export default function PromotionsCouponsOffersPage() {
     end_at: "",
   });
 
+  // Form State - Edit Promotion
+  const [editPromoForm, setEditPromoForm] = useState({ ...promoForm });
+
   // Form State - Create Coupon
   const [couponForm, setCouponForm] = useState({
     code: "",
@@ -164,22 +178,29 @@ export default function PromotionsCouponsOffersPage() {
     end_at: "",
   });
 
-  // Form State - Create Offer Banner (with Category & Popup Support)
+  // Form State - Edit Coupon
+  const [editCouponForm, setEditCouponForm] = useState({ ...couponForm });
+
+  // Form State - Create Offer Banner (with Category, Product & Popup Support)
   const [offerForm, setOfferForm] = useState({
     title: "",
     discount_text: "FLAT 50% OFF",
     description: "",
     image_url: "https://f2hfresh.com/uploads/app_assets/images/milk_bottle.png",
+    banner_image: "",
     banner_type: "home_carousel" as "home_carousel" | "category_slide" | "popup",
     category_id: "",
     is_popup: false,
     action_type: "CATEGORY",
     action_value: "",
-    cta_label: "USE CODE: WELCOME50",
+    cta_label: "Shop Now",
     background_color: "#16a34a",
-    display_order: 1,
+    display_order: 0,
     is_active: true,
   });
+
+  // Form State - Edit Offer Banner
+  const [editOfferForm, setEditOfferForm] = useState({ ...offerForm });
 
   // Product Selection for Target Modal
   const [selectedVariantIds, setSelectedVariantIds] = useState<string[]>([]);
@@ -383,6 +404,178 @@ export default function PromotionsCouponsOffersPage() {
     }
   };
 
+  // Handle banner image file upload (converts to base64)
+  const handleOfferImageUpload = (file: File, isEdit = false) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      if (isEdit) {
+        setEditOfferForm((prev) => ({ ...prev, banner_image: base64, image_url: prev.image_url || file.name }));
+      } else {
+        setOfferForm((prev) => ({ ...prev, banner_image: base64, image_url: prev.image_url || file.name }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Open Edit Promotion Modal
+  const openEditPromo = (p: Promotion) => {
+    setEditingPromo(p);
+    setEditPromoForm({
+      name: p.name || "",
+      description: p.description || "",
+      promotion_type: p.promotion_type || "percentage",
+      discount_value: p.discount_value || 0,
+      max_discount_amount: p.max_discount_amount || 0,
+      minimum_order_amount: p.minimum_order_amount || 0,
+      status: (p.status as any) || "active",
+      first_order_only: Boolean(p.first_order_only),
+      auto_apply: Boolean(p.auto_apply),
+      stackable: Boolean(p.stackable),
+      apply_to_all_products: Boolean(p.apply_to_all_products),
+      allow_subscription_orders: Boolean(p.allow_subscription_orders),
+      usage_limit: p.usage_limit || 0,
+      usage_limit_per_customer: p.usage_limit_per_customer || 1,
+      start_at: p.start_at ? p.start_at.substring(0, 10) : "",
+      end_at: p.end_at ? p.end_at.substring(0, 10) : "",
+    });
+    setIsEditPromoOpen(true);
+  };
+
+  // Submit Update Promotion
+  const handleUpdatePromo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPromo) return;
+    if (!editPromoForm.name.trim()) {
+      showErrorToast("Please enter a promotion name");
+      return;
+    }
+    try {
+      await api.put(`/v1/admin/promotions-coupons/promotions/${editingPromo.promotion_id}`, {
+        name: editPromoForm.name.trim(),
+        description: editPromoForm.description.trim() || undefined,
+        promotion_type: editPromoForm.promotion_type,
+        discount_value: Number(editPromoForm.discount_value),
+        max_discount_amount:
+          editPromoForm.promotion_type === "percentage" && editPromoForm.max_discount_amount
+            ? Number(editPromoForm.max_discount_amount)
+            : undefined,
+        minimum_order_amount: Number(editPromoForm.minimum_order_amount) || 0,
+        status: editPromoForm.status,
+        first_order_only: editPromoForm.first_order_only,
+        auto_apply: editPromoForm.auto_apply,
+        stackable: editPromoForm.stackable,
+        apply_to_all_products: editPromoForm.apply_to_all_products,
+        allow_subscription_orders: editPromoForm.allow_subscription_orders,
+        usage_limit: editPromoForm.usage_limit ? Number(editPromoForm.usage_limit) : undefined,
+        usage_limit_per_customer: Number(editPromoForm.usage_limit_per_customer) || 1,
+        start_at: editPromoForm.start_at || undefined,
+        end_at: editPromoForm.end_at || undefined,
+      });
+      showSuccessToast("Promotion updated successfully!");
+      setIsEditPromoOpen(false);
+      fetchData();
+    } catch (e: any) {
+      showErrorToast(e.response?.data?.message || e.message || "Failed to update promotion");
+    }
+  };
+
+  // Open Edit Coupon Modal
+  const openEditCoupon = (c: Coupon) => {
+    setEditingCoupon(c);
+    setEditCouponForm({
+      code: c.code || "",
+      name: c.name || "",
+      description: c.description || "",
+      promotion_id: c.promotion_id || "",
+      status: (c.status as any) || "active",
+      usage_limit: c.usage_limit || 0,
+      usage_limit_per_customer: c.usage_limit_per_customer || 1,
+      start_at: c.start_at ? c.start_at.substring(0, 10) : "",
+      end_at: c.end_at ? c.end_at.substring(0, 10) : "",
+    });
+    setIsEditCouponOpen(true);
+  };
+
+  // Submit Update Coupon
+  const handleUpdateCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCoupon) return;
+    try {
+      await api.put(`/v1/admin/promotions-coupons/coupons/${editingCoupon.coupon_id}`, {
+        name: editCouponForm.name.trim() || undefined,
+        description: editCouponForm.description.trim() || undefined,
+        promotion_id: editCouponForm.promotion_id,
+        status: editCouponForm.status,
+        usage_limit: editCouponForm.usage_limit ? Number(editCouponForm.usage_limit) : undefined,
+        usage_limit_per_customer: Number(editCouponForm.usage_limit_per_customer) || 1,
+        start_at: editCouponForm.start_at || undefined,
+        end_at: editCouponForm.end_at || undefined,
+      });
+      showSuccessToast(`Coupon "${editingCoupon.code}" updated successfully!`);
+      setIsEditCouponOpen(false);
+      fetchData();
+    } catch (e: any) {
+      showErrorToast(e.response?.data?.message || e.message || "Failed to update coupon");
+    }
+  };
+
+  // Open Edit Offer Banner Modal
+  const openEditOffer = (o: OfferBanner) => {
+    setEditingOffer(o);
+    setEditOfferForm({
+      title: o.title || "",
+      discount_text: o.discount_text || "",
+      description: o.description || "",
+      image_url: o.image_url || "",
+      banner_image: "",
+      banner_type: (o.banner_type as any) || "home_carousel",
+      category_id: o.category_id || "",
+      is_popup: Boolean(o.is_popup || o.banner_type === "popup"),
+      action_type: o.action_type || "CATEGORY",
+      action_value: o.action_value || "",
+      cta_label: o.cta_label || "Shop Now",
+      background_color: o.background_color || "#16a34a",
+      display_order: o.display_order ?? 0,
+      is_active: o.is_active ?? true,
+    });
+    setIsEditOfferOpen(true);
+  };
+
+  // Submit Update Offer Banner
+  const handleUpdateOffer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingOffer) return;
+    if (!editOfferForm.title.trim()) {
+      showErrorToast("Please enter an offer banner title");
+      return;
+    }
+    try {
+      await api.post(`/admin/catalog/offers/${editingOffer.id}/saveEdit`, {
+        title: editOfferForm.title.trim(),
+        discount_text: editOfferForm.discount_text.trim() || null,
+        description: editOfferForm.description.trim() || null,
+        image_url: editOfferForm.image_url.trim() || undefined,
+        banner_image: editOfferForm.banner_image || undefined,
+        banner_type: editOfferForm.banner_type,
+        category_id: editOfferForm.action_type === "CATEGORY" ? editOfferForm.category_id : editOfferForm.category_id || null,
+        action_type: editOfferForm.action_type,
+        action_value: editOfferForm.action_type === "CATEGORY" ? editOfferForm.category_id : editOfferForm.action_value,
+        is_popup: editOfferForm.is_popup || editOfferForm.banner_type === "popup",
+        cta_label: editOfferForm.cta_label.trim() || "Shop Now",
+        background_color: editOfferForm.background_color || "#16a34a",
+        display_order: Number(editOfferForm.display_order) || 0,
+        is_active: editOfferForm.is_active,
+      });
+      showSuccessToast("Offer banner updated successfully!");
+      setIsEditOfferOpen(false);
+      fetchData();
+    } catch (e: any) {
+      showErrorToast(e.response?.data?.message || e.message || "Failed to update offer banner");
+    }
+  };
+
   // Submit Create Offer Banner (with Category & Popup Type)
   const handleCreateOffer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -390,8 +583,8 @@ export default function PromotionsCouponsOffersPage() {
       showErrorToast("Please enter an offer banner title");
       return;
     }
-    if (!offerForm.image_url.trim()) {
-      showErrorToast("Please provide an image URL for the banner");
+    if (!offerForm.image_url.trim() && !offerForm.banner_image) {
+      showErrorToast("Please provide an image URL or upload an image for the banner");
       return;
     }
 
@@ -400,15 +593,16 @@ export default function PromotionsCouponsOffersPage() {
         title: offerForm.title.trim(),
         discount_text: offerForm.discount_text.trim() || null,
         description: offerForm.description.trim() || null,
-        image_url: offerForm.image_url.trim(),
+        image_url: offerForm.image_url.trim() || "banner_upload",
+        banner_image: offerForm.banner_image || undefined,
         banner_type: offerForm.banner_type,
-        category_id: offerForm.banner_type === "category_slide" ? offerForm.category_id : null,
+        category_id: offerForm.action_type === "CATEGORY" ? offerForm.category_id : offerForm.category_id || null,
         is_popup: offerForm.is_popup || offerForm.banner_type === "popup",
         action_type: offerForm.action_type,
-        action_value: offerForm.action_value || (offerForm.banner_type === "category_slide" ? offerForm.category_id : null),
+        action_value: offerForm.action_type === "CATEGORY" ? offerForm.category_id : offerForm.action_value,
         cta_label: offerForm.cta_label.trim() || "Shop Now",
         background_color: offerForm.background_color || "#16a34a",
-        display_order: Number(offerForm.display_order) || 1,
+        display_order: Number(offerForm.display_order) || 0,
         is_active: offerForm.is_active,
       });
 
@@ -848,10 +1042,12 @@ export default function PromotionsCouponsOffersPage() {
                             </button>
                           )}
                           <button
-                            onClick={() => togglePromoStatus(p.promotion_id, p.status)}
-                            className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold hover:bg-slate-100 transition"
+                            onClick={() => openEditPromo(p)}
+                            title="Edit Promotion"
+                            className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1"
                           >
-                            {p.status === "active" ? "Pause" : "Activate"}
+                            <Edit3 size={13} />
+                            Edit
                           </button>
                           <button
                             onClick={() => deletePromotion(p.promotion_id, p.name)}
@@ -947,10 +1143,12 @@ export default function PromotionsCouponsOffersPage() {
                             <Users size={14} />
                           </button>
                           <button
-                            onClick={() => toggleCouponStatus(c.coupon_id, c.status)}
-                            className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold hover:bg-slate-100 transition"
+                            onClick={() => openEditCoupon(c)}
+                            title="Edit Coupon"
+                            className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1"
                           >
-                            {c.status === "active" ? "Pause" : "Activate"}
+                            <Edit3 size={13} />
+                            Edit
                           </button>
                           <button
                             onClick={() => deleteCoupon(c.coupon_id, c.code)}
@@ -1227,10 +1425,12 @@ export default function PromotionsCouponsOffersPage() {
                                 <Eye size={14} />
                               </button>
                               <button
-                                onClick={() => toggleOfferStatus(o.id, o.is_active)}
-                                className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold hover:bg-slate-100 transition"
+                                onClick={() => openEditOffer(o)}
+                                title="Edit Offer Banner"
+                                className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1"
                               >
-                                {o.is_active ? "Deactivate" : "Activate"}
+                                <Edit3 size={13} />
+                                Edit
                               </button>
                               <button
                                 onClick={() => deleteOffer(o.id, o.title)}
@@ -1561,19 +1761,19 @@ export default function PromotionsCouponsOffersPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 3: CREATE OFFER BANNER (WITH CATEGORY & POPUP SUPPORT) */}
+      {/* MODAL 3: CREATE OFFER BANNER (MATCHING SCREENSHOT WITH ALL FIELDS) */}
       {/* ========================================================================= */}
       {isCreateOfferOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-6 shadow-2xl border border-slate-100 my-8">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-6 shadow-2xl border border-slate-100 my-8">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
                   <Tag size={20} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">Create New Offer / Slide / Popup Banner</h3>
-                  <p className="text-xs text-slate-500">Configure top carousel, category slides, or launch popups</p>
+                  <h3 className="text-base font-bold text-slate-900">Create Offer Banner</h3>
+                  <p className="text-xs text-slate-500">Configure promotional top banners, category redirection &amp; popups</p>
                 </div>
               </div>
               <button
@@ -1584,173 +1784,231 @@ export default function PromotionsCouponsOffersPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateOffer} className="space-y-4 text-xs">
-              {/* Placement Selector */}
-              <div className="space-y-1.5">
-                <label className="font-bold text-slate-700">Banner Placement &amp; Type *</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setOfferForm({ ...offerForm, banner_type: "home_carousel", is_popup: false })}
-                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center gap-1 ${
-                      offerForm.banner_type === "home_carousel" && !offerForm.is_popup
-                        ? "border-indigo-600 bg-indigo-50 text-indigo-900 font-extrabold"
-                        : "border-slate-200 bg-slate-50 text-slate-600"
-                    }`}
-                  >
-                    <Tag size={16} />
-                    <span>Home Carousel</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setOfferForm({ ...offerForm, banner_type: "category_slide", is_popup: false })}
-                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center gap-1 ${
-                      offerForm.banner_type === "category_slide"
-                        ? "border-purple-600 bg-purple-50 text-purple-900 font-extrabold"
-                        : "border-slate-200 bg-slate-50 text-slate-600"
-                    }`}
-                  >
-                    <FolderTree size={16} />
-                    <span>Category Slide</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setOfferForm({ ...offerForm, banner_type: "popup", is_popup: true })}
-                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center gap-1 ${
-                      offerForm.is_popup || offerForm.banner_type === "popup"
-                        ? "border-rose-600 bg-rose-50 text-rose-900 font-extrabold"
-                        : "border-slate-200 bg-slate-50 text-slate-600"
-                    }`}
-                  >
-                    <Smartphone size={16} />
-                    <span>Launch Popup</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Target Category Selector if Category Slide */}
-              {offerForm.banner_type === "category_slide" && (
-                <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-2xl space-y-1.5">
-                  <label className="font-bold text-purple-900 flex items-center gap-1.5">
-                    <FolderTree size={14} />
-                    Target Category for Slide *
-                  </label>
-                  <select
-                    required
-                    value={offerForm.category_id}
-                    onChange={(e) => setOfferForm({ ...offerForm, category_id: e.target.value })}
-                    className="w-full px-3 py-2 bg-white border border-purple-200 rounded-xl text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    {categories.map((c) => (
-                      <option key={c.category_id} value={c.category_id}>
-                        {c.name} ({c.category_id})
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[10px] text-purple-700">
-                    This slide will be displayed to customers when viewing this specific product category.
-                  </p>
-                </div>
-              )}
-
-              <div className="space-y-1.5">
-                <label className="font-bold text-slate-700">Offer Title *</label>
-                <input
-                  type="text"
-                  required
-                  value={offerForm.title}
-                  onChange={(e) => setOfferForm({ ...offerForm, title: e.target.value })}
-                  placeholder="e.g. First Milk Order 50% Off"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700">Discount Tag</label>
-                  <input
-                    type="text"
-                    value={offerForm.discount_text}
-                    onChange={(e) => setOfferForm({ ...offerForm, discount_text: e.target.value })}
-                    placeholder="e.g. FLAT 50% OFF"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700">CTA Button Label</label>
-                  <input
-                    type="text"
-                    value={offerForm.cta_label}
-                    onChange={(e) => setOfferForm({ ...offerForm, cta_label: e.target.value })}
-                    placeholder="e.g. USE CODE: WELCOME50"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-bold text-slate-700">Description / Subtitle</label>
-                <textarea
-                  rows={2}
-                  value={offerForm.description}
-                  onChange={(e) => setOfferForm({ ...offerForm, description: e.target.value })}
-                  placeholder="Delivered fresh from farm to home every morning."
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-bold text-slate-700">Banner Image URL *</label>
-                <input
-                  type="text"
-                  required
-                  value={offerForm.image_url}
-                  onChange={(e) => setOfferForm({ ...offerForm, image_url: e.target.value })}
-                  placeholder="https://f2hfresh.com/uploads/app_assets/images/milk_bottle.png"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700">Theme Color</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={offerForm.background_color}
-                      onChange={(e) => setOfferForm({ ...offerForm, background_color: e.target.value })}
-                      className="w-10 h-10 rounded-xl border border-slate-200 cursor-pointer p-1 bg-slate-50"
-                    />
+            <form onSubmit={handleCreateOffer} className="space-y-6 text-xs">
+              {/* SECTION 1: OFFER DETAILS */}
+              <div className="space-y-4">
+                <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Offer Details</div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Banner Title *</label>
                     <input
                       type="text"
-                      value={offerForm.background_color}
-                      onChange={(e) => setOfferForm({ ...offerForm, background_color: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono text-xs"
+                      required
+                      value={offerForm.title}
+                      onChange={(e) => setOfferForm({ ...offerForm, title: e.target.value })}
+                      placeholder="e.g. Fresh Organic Harvest Sale"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Discount / Badge Text</label>
+                    <input
+                      type="text"
+                      value={offerForm.discount_text}
+                      onChange={(e) => setOfferForm({ ...offerForm, discount_text: e.target.value })}
+                      placeholder="e.g. 30% OFF or FREE Shipping"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700">Display Order</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={offerForm.display_order}
-                    onChange={(e) => setOfferForm({ ...offerForm, display_order: parseInt(e.target.value) || 1 })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  <label className="font-bold text-slate-700">Description</label>
+                  <textarea
+                    rows={2}
+                    value={offerForm.description}
+                    onChange={(e) => setOfferForm({ ...offerForm, description: e.target.value })}
+                    placeholder="Brief summary of the promotional offer..."
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
               </div>
 
+              {/* SECTION 2: BANNER IMAGE (URL OR UPLOAD) */}
+              <div className="space-y-4 pt-2 border-t border-slate-100">
+                <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Banner Image (URL or Upload)</div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Banner Image URL (Mandatory - Min 1)</label>
+                    <input
+                      type="text"
+                      value={offerForm.image_url}
+                      onChange={(e) => setOfferForm({ ...offerForm, image_url: e.target.value })}
+                      placeholder="https://images.unsplash.com/... or /uploads/..."
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <p className="text-[10px] text-slate-400">Direct image link or leave upload below</p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Or Upload Banner Image</label>
+                    <label className="border-2 border-dashed border-slate-200 hover:border-emerald-500 bg-slate-50 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition text-center min-h-[72px]">
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleOfferImageUpload(file, false);
+                        }}
+                      />
+                      {offerForm.banner_image ? (
+                        <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs">
+                          <CheckCircle2 size={16} />
+                          <span>Image Selected</span>
+                          <button
+                            type="button"
+                            onClick={(ev) => {
+                              ev.preventDefault();
+                              setOfferForm({ ...offerForm, banner_image: "" });
+                            }}
+                            className="text-red-500 hover:underline text-[10px] ml-1"
+                          >
+                            (Remove)
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-slate-500 font-semibold text-xs">
+                          <Upload size={16} className="text-slate-400" />
+                          <span>Click to upload / drag &amp; drop</span>
+                        </div>
+                      )}
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: NAVIGATION & CTA REDIRECTION */}
+              <div className="space-y-4 pt-2 border-t border-slate-100">
+                <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Navigation &amp; CTA Redirection</div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Action Target Type *</label>
+                    <select
+                      value={offerForm.action_type}
+                      onChange={(e) => setOfferForm({ ...offerForm, action_type: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="CATEGORY">Store Category (Redirection)</option>
+                      <option value="PRODUCT">Single Product (Redirection)</option>
+                      <option value="EXTERNAL">External Web Link</option>
+                      <option value="BROWSE">None / General Browse</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Button Label *</label>
+                    <input
+                      type="text"
+                      required
+                      value={offerForm.cta_label}
+                      onChange={(e) => setOfferForm({ ...offerForm, cta_label: e.target.value })}
+                      placeholder="Shop Now"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Redirection Category (If Category Target)</label>
+                    <select
+                      value={offerForm.category_id}
+                      onChange={(e) => setOfferForm({ ...offerForm, category_id: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="">— Select Category —</option>
+                      {categories.map((c) => (
+                        <option key={c.category_id} value={c.category_id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Redirection Product (If Product Target)</label>
+                    <select
+                      value={offerForm.action_value}
+                      onChange={(e) => setOfferForm({ ...offerForm, action_value: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="">— Select Product —</option>
+                      {catalogProducts.map((p) => (
+                        <option key={p.variant_id} value={p.product_id || p.variant_id}>
+                          {p.product_name} - {p.variant_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 4: STYLING & ORDERING */}
+              <div className="space-y-4 pt-2 border-t border-slate-100">
+                <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Styling &amp; Ordering</div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Banner Accent Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={offerForm.background_color}
+                        onChange={(e) => setOfferForm({ ...offerForm, background_color: e.target.value })}
+                        className="w-9 h-9 rounded-xl border border-slate-200 cursor-pointer p-1 bg-slate-50 shrink-0"
+                      />
+                      <input
+                        type="text"
+                        value={offerForm.background_color}
+                        onChange={(e) => setOfferForm({ ...offerForm, background_color: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Display Sequence Order</label>
+                    <input
+                      type="number"
+                      value={offerForm.display_order}
+                      onChange={(e) => setOfferForm({ ...offerForm, display_order: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700 block">Active Status</label>
+                    <button
+                      type="button"
+                      onClick={() => setOfferForm({ ...offerForm, is_active: !offerForm.is_active })}
+                      className={`w-full py-2.5 px-4 rounded-xl border font-bold flex items-center justify-between transition ${
+                        offerForm.is_active
+                          ? "bg-emerald-50 border-emerald-300 text-emerald-800"
+                          : "bg-slate-50 border-slate-200 text-slate-500"
+                      }`}
+                    >
+                      <span>{offerForm.is_active ? "Active" : "Inactive"}</span>
+                      {offerForm.is_active ? (
+                        <ToggleRight size={22} className="text-[#16a34a]" />
+                      ) : (
+                        <ToggleLeft size={22} className="text-slate-400" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               {/* Banner Live Preview in Modal */}
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/60 space-y-1.5">
-                <div className="text-[10px] font-bold text-slate-500 uppercase">Banner Card Preview:</div>
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/60 space-y-1.5">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Live Banner Card Preview:</div>
                 <div
                   style={{ backgroundColor: offerForm.background_color }}
-                  className="p-4 rounded-2xl text-white relative overflow-hidden flex flex-col justify-between h-28"
+                  className="p-4 rounded-2xl text-white relative overflow-hidden flex flex-col justify-between h-28 shadow-sm"
                 >
                   <div className="space-y-0.5 relative z-10">
                     <span className="inline-block px-2 py-0.5 rounded bg-white/20 text-[9px] font-extrabold">
@@ -1759,9 +2017,12 @@ export default function PromotionsCouponsOffersPage() {
                     <h5 className="font-bold text-xs">{offerForm.title || "Offer Title"}</h5>
                     <p className="text-[10px] text-white/80 line-clamp-1">{offerForm.description || "Description..."}</p>
                   </div>
-                  <div className="relative z-10">
-                    <span className="text-[9px] font-bold bg-white text-slate-900 px-2 py-0.5 rounded">
+                  <div className="relative z-10 flex items-center justify-between">
+                    <span className="text-[9px] font-bold bg-white text-slate-900 px-2.5 py-1 rounded-lg">
                       {offerForm.cta_label || "Shop Now"}
+                    </span>
+                    <span className="text-[9px] text-white/70">
+                      Order #{offerForm.display_order} · {offerForm.action_type}
                     </span>
                   </div>
                 </div>
@@ -1777,10 +2038,542 @@ export default function PromotionsCouponsOffersPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md shadow-indigo-600/20 transition flex items-center gap-2"
+                  className="px-5 py-2.5 bg-[#16a34a] hover:bg-[#15803d] text-white font-bold rounded-xl shadow-md shadow-emerald-600/20 transition flex items-center gap-2"
                 >
                   <Plus size={16} />
-                  Create Offer Banner
+                  Save Offer
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 3B: EDIT OFFER BANNER */}
+      {/* ========================================================================= */}
+      {isEditOfferOpen && editingOffer && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-6 shadow-2xl border border-slate-100 my-8">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                  <Edit3 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Edit Offer Banner</h3>
+                  <p className="text-xs text-slate-500">Update banner details, navigation targets, accent styling, and sequence order</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsEditOfferOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateOffer} className="space-y-6 text-xs">
+              {/* SECTION 1: OFFER DETAILS */}
+              <div className="space-y-4">
+                <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Offer Details</div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Banner Title *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editOfferForm.title}
+                      onChange={(e) => setEditOfferForm({ ...editOfferForm, title: e.target.value })}
+                      placeholder="e.g. Fresh Organic Harvest Sale"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Discount / Badge Text</label>
+                    <input
+                      type="text"
+                      value={editOfferForm.discount_text}
+                      onChange={(e) => setEditOfferForm({ ...editOfferForm, discount_text: e.target.value })}
+                      placeholder="e.g. 30% OFF or FREE Shipping"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">Description</label>
+                  <textarea
+                    rows={2}
+                    value={editOfferForm.description}
+                    onChange={(e) => setEditOfferForm({ ...editOfferForm, description: e.target.value })}
+                    placeholder="Brief summary of the promotional offer..."
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+
+              {/* SECTION 2: BANNER IMAGE (URL OR UPLOAD) */}
+              <div className="space-y-4 pt-2 border-t border-slate-100">
+                <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Banner Image (URL or Upload)</div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Banner Image URL (Mandatory - Min 1)</label>
+                    <input
+                      type="text"
+                      value={editOfferForm.image_url}
+                      onChange={(e) => setEditOfferForm({ ...editOfferForm, image_url: e.target.value })}
+                      placeholder="https://images.unsplash.com/... or /uploads/..."
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                    <p className="text-[10px] text-slate-400">Direct image link or leave upload below</p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Or Upload Banner Image</label>
+                    <label className="border-2 border-dashed border-slate-200 hover:border-amber-500 bg-slate-50 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition text-center min-h-[72px]">
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleOfferImageUpload(file, true);
+                        }}
+                      />
+                      {editOfferForm.banner_image ? (
+                        <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs">
+                          <CheckCircle2 size={16} />
+                          <span>New Image Selected</span>
+                          <button
+                            type="button"
+                            onClick={(ev) => {
+                              ev.preventDefault();
+                              setEditOfferForm({ ...editOfferForm, banner_image: "" });
+                            }}
+                            className="text-red-500 hover:underline text-[10px] ml-1"
+                          >
+                            (Remove)
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-slate-500 font-semibold text-xs">
+                          <Upload size={16} className="text-slate-400" />
+                          <span>Click to upload new image</span>
+                        </div>
+                      )}
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: NAVIGATION & CTA REDIRECTION */}
+              <div className="space-y-4 pt-2 border-t border-slate-100">
+                <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Navigation &amp; CTA Redirection</div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Action Target Type *</label>
+                    <select
+                      value={editOfferForm.action_type}
+                      onChange={(e) => setEditOfferForm({ ...editOfferForm, action_type: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    >
+                      <option value="CATEGORY">Store Category (Redirection)</option>
+                      <option value="PRODUCT">Single Product (Redirection)</option>
+                      <option value="EXTERNAL">External Web Link</option>
+                      <option value="BROWSE">None / General Browse</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Button Label *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editOfferForm.cta_label}
+                      onChange={(e) => setEditOfferForm({ ...editOfferForm, cta_label: e.target.value })}
+                      placeholder="Shop Now"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Redirection Category (If Category Target)</label>
+                    <select
+                      value={editOfferForm.category_id}
+                      onChange={(e) => setEditOfferForm({ ...editOfferForm, category_id: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    >
+                      <option value="">— Select Category —</option>
+                      {categories.map((c) => (
+                        <option key={c.category_id} value={c.category_id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Redirection Product (If Product Target)</label>
+                    <select
+                      value={editOfferForm.action_value}
+                      onChange={(e) => setEditOfferForm({ ...editOfferForm, action_value: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    >
+                      <option value="">— Select Product —</option>
+                      {catalogProducts.map((p) => (
+                        <option key={p.variant_id} value={p.product_id || p.variant_id}>
+                          {p.product_name} - {p.variant_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 4: STYLING & ORDERING */}
+              <div className="space-y-4 pt-2 border-t border-slate-100">
+                <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Styling &amp; Ordering</div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Banner Accent Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={editOfferForm.background_color}
+                        onChange={(e) => setEditOfferForm({ ...editOfferForm, background_color: e.target.value })}
+                        className="w-9 h-9 rounded-xl border border-slate-200 cursor-pointer p-1 bg-slate-50 shrink-0"
+                      />
+                      <input
+                        type="text"
+                        value={editOfferForm.background_color}
+                        onChange={(e) => setEditOfferForm({ ...editOfferForm, background_color: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Display Sequence Order</label>
+                    <input
+                      type="number"
+                      value={editOfferForm.display_order}
+                      onChange={(e) => setEditOfferForm({ ...editOfferForm, display_order: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700 block">Active Status</label>
+                    <button
+                      type="button"
+                      onClick={() => setEditOfferForm({ ...editOfferForm, is_active: !editOfferForm.is_active })}
+                      className={`w-full py-2.5 px-4 rounded-xl border font-bold flex items-center justify-between transition ${
+                        editOfferForm.is_active
+                          ? "bg-emerald-50 border-emerald-300 text-emerald-800"
+                          : "bg-slate-50 border-slate-200 text-slate-500"
+                      }`}
+                    >
+                      <span>{editOfferForm.is_active ? "Active" : "Inactive"}</span>
+                      {editOfferForm.is_active ? (
+                        <ToggleRight size={22} className="text-[#16a34a]" />
+                      ) : (
+                        <ToggleLeft size={22} className="text-slate-400" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Banner Live Preview in Modal */}
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/60 space-y-1.5">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Live Banner Card Preview:</div>
+                <div
+                  style={{ backgroundColor: editOfferForm.background_color }}
+                  className="p-4 rounded-2xl text-white relative overflow-hidden flex flex-col justify-between h-28 shadow-sm"
+                >
+                  <div className="space-y-0.5 relative z-10">
+                    <span className="inline-block px-2 py-0.5 rounded bg-white/20 text-[9px] font-extrabold">
+                      {editOfferForm.discount_text || "OFFER"}
+                    </span>
+                    <h5 className="font-bold text-xs">{editOfferForm.title || "Offer Title"}</h5>
+                    <p className="text-[10px] text-white/80 line-clamp-1">{editOfferForm.description || "Description..."}</p>
+                  </div>
+                  <div className="relative z-10 flex items-center justify-between">
+                    <span className="text-[9px] font-bold bg-white text-slate-900 px-2.5 py-1 rounded-lg">
+                      {editOfferForm.cta_label || "Shop Now"}
+                    </span>
+                    <span className="text-[9px] text-white/70">
+                      Order #{editOfferForm.display_order} · {editOfferForm.action_type}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEditOfferOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-md shadow-amber-600/20 transition flex items-center gap-2"
+                >
+                  <Check size={16} />
+                  Update Offer
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 3C: EDIT PROMOTION */}
+      {/* ========================================================================= */}
+      {isEditPromoOpen && editingPromo && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-6 shadow-2xl border border-slate-100 my-8">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                  <Edit3 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Edit Promotion</h3>
+                  <p className="text-xs text-slate-500">Update discount engine rules, limits &amp; status for {editingPromo.name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsEditPromoOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdatePromo} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">Promotion Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editPromoForm.name}
+                    onChange={(e) => setEditPromoForm({ ...editPromoForm, name: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">Discount Type *</label>
+                  <select
+                    value={editPromoForm.promotion_type}
+                    onChange={(e) => setEditPromoForm({ ...editPromoForm, promotion_type: e.target.value as any })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="percentage">Percentage Discount (%)</option>
+                    <option value="fixed_amount">Fixed Amount Discount (₹)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">
+                    Discount Value {editPromoForm.promotion_type === "percentage" ? "(%)" : "(₹)"} *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={editPromoForm.discount_value}
+                    onChange={(e) => setEditPromoForm({ ...editPromoForm, discount_value: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">Min Order Amount (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editPromoForm.minimum_order_amount}
+                    onChange={(e) => setEditPromoForm({ ...editPromoForm, minimum_order_amount: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">Status</label>
+                  <select
+                    value={editPromoForm.status}
+                    onChange={(e) => setEditPromoForm({ ...editPromoForm, status: e.target.value as any })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="active">Active</option>
+                    <option value="paused">Paused</option>
+                    <option value="draft">Draft</option>
+                  </select>
+                </div>
+              </div>
+
+              {editPromoForm.promotion_type === "percentage" && (
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">Max Discount Amount Cap (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editPromoForm.max_discount_amount}
+                    onChange={(e) => setEditPromoForm({ ...editPromoForm, max_discount_amount: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700">Description</label>
+                <textarea
+                  rows={2}
+                  value={editPromoForm.description}
+                  onChange={(e) => setEditPromoForm({ ...editPromoForm, description: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEditPromoOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-md shadow-amber-600/20 transition flex items-center gap-2"
+                >
+                  <Check size={16} />
+                  Update Promotion
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 3D: EDIT COUPON */}
+      {/* ========================================================================= */}
+      {isEditCouponOpen && editingCoupon && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-6 shadow-2xl border border-slate-100 my-8">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                  <Edit3 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Edit Coupon Code</h3>
+                  <p className="text-xs text-slate-500">Update code settings for {editingCoupon.code}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsEditCouponOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateCoupon} className="space-y-4 text-xs">
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700">Coupon Code</label>
+                <input
+                  type="text"
+                  disabled
+                  value={editCouponForm.code}
+                  className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-600 font-mono font-bold uppercase cursor-not-allowed"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700">Linked Promotion *</label>
+                <select
+                  required
+                  value={editCouponForm.promotion_id}
+                  onChange={(e) => setEditCouponForm({ ...editCouponForm, promotion_id: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  {promotions.map((p) => (
+                    <option key={p.promotion_id} value={p.promotion_id}>
+                      {p.name} ({p.promotion_type === "percentage" ? `${p.discount_value}%` : `₹${p.discount_value}`})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">Usage Limit (Total)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editCouponForm.usage_limit}
+                    onChange={(e) => setEditCouponForm({ ...editCouponForm, usage_limit: parseInt(e.target.value) || 0 })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">Per Customer Limit</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editCouponForm.usage_limit_per_customer}
+                    onChange={(e) => setEditCouponForm({ ...editCouponForm, usage_limit_per_customer: parseInt(e.target.value) || 1 })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700">Status</label>
+                <select
+                  value={editCouponForm.status}
+                  onChange={(e) => setEditCouponForm({ ...editCouponForm, status: e.target.value as any })}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="active">Active</option>
+                  <option value="paused">Paused</option>
+                  <option value="draft">Draft</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEditCouponOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-md shadow-amber-600/20 transition flex items-center gap-2"
+                >
+                  <Check size={16} />
+                  Update Coupon
                 </button>
               </div>
             </form>

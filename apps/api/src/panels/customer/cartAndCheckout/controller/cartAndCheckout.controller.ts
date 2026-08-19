@@ -28,4 +28,16 @@ export class CartController {
     body.customer_id = (req.user as any)?.user_id;
     return this.cartService.checkout(body, req);
   }
+
+  @Post('/coupon/validate')
+  async validateCoupon(@Req() req: Request, @Body() body: { coupon_code: string; subtotal?: number }) {
+    const customerId = (req.user as any)?.user_id;
+    return this.cartService.validateCoupon(customerId, body.coupon_code, Number(body.subtotal || 0));
+  }
+
+  @Post('/checkout/preview-discounts')
+  async previewDiscounts(@Req() req: Request, @Body() body: CheckOutDto) {
+    const customerId = (req.user as any)?.user_id;
+    return this.cartService.previewDiscounts(customerId, body);
+  }
 }

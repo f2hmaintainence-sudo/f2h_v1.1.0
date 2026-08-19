@@ -926,16 +926,18 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
   // ── Frequency Section ─────────────────────────────────
 
   Widget _buildFrequencySection() {
+    const morningColor = Color(0xFF14532D); // Dark green
+    const eveningColor = Color(0xFF16A34A); // Light green
+
     return _SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionTitle(icon: Icons.repeat_rounded, label: 'Frequency'),
-          const SizedBox(height: 10),
-
-          // ── Daily / Weekly tabs ────────────────────────
+          // ── Frequency title and Daily/Weekly buttons in a single row ──
           Row(
             children: [
+              const _SectionTitle(icon: Icons.repeat_rounded, label: 'Frequency'),
+              const Spacer(),
               _FreqChip(
                 label: 'Daily',
                 value: 'daily',
@@ -963,9 +965,9 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
           // ── DAILY: single shared morning + evening qty ─
           if (_frequency == 'daily') ...[
             // Header
-            Row(
+            const Row(
               children: [
-                const SizedBox(width: 80),
+                SizedBox(width: 80),
                 Expanded(
                   child: Center(
                     child: Text(
@@ -973,13 +975,13 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                       style: TextStyle(
                         fontSize: 9.5,
                         fontWeight: FontWeight.w900,
-                        color: Colors.amber.shade700,
+                        color: morningColor,
                         letterSpacing: 0.6,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Expanded(
                   child: Center(
                     child: Text(
@@ -987,7 +989,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                       style: TextStyle(
                         fontSize: 9.5,
                         fontWeight: FontWeight.w900,
-                        color: Colors.indigo.shade400,
+                        color: eveningColor,
                         letterSpacing: 0.6,
                       ),
                     ),
@@ -1013,7 +1015,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                 Expanded(
                   child: _MiniQtyControl(
                     qty: _morningQty,
-                    accentColor: Colors.amber.shade700,
+                    accentColor: morningColor,
                     onDecrement: () => setState(() {
                       if (_morningQty > 0) _morningQty--;
                     }),
@@ -1024,7 +1026,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                 Expanded(
                   child: _MiniQtyControl(
                     qty: _eveningQty,
-                    accentColor: Colors.indigo.shade400,
+                    accentColor: eveningColor,
                     onDecrement: () => setState(() {
                       if (_eveningQty > 0) _eveningQty--;
                     }),
@@ -1058,9 +1060,9 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
           // ── WEEKLY: individual per-day qty controls ────
           if (_frequency == 'weekly') ...[
             // Header
-            Row(
+            const Row(
               children: [
-                const SizedBox(width: 80),
+                SizedBox(width: 80),
                 Expanded(
                   child: Center(
                     child: Text(
@@ -1068,13 +1070,13 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                       style: TextStyle(
                         fontSize: 9.5,
                         fontWeight: FontWeight.w900,
-                        color: Colors.amber.shade700,
+                        color: morningColor,
                         letterSpacing: 0.6,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Expanded(
                   child: Center(
                     child: Text(
@@ -1082,7 +1084,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                       style: TextStyle(
                         fontSize: 9.5,
                         fontWeight: FontWeight.w900,
-                        color: Colors.indigo.shade400,
+                        color: eveningColor,
                         letterSpacing: 0.6,
                       ),
                     ),
@@ -1112,7 +1114,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                     Expanded(
                       child: _MiniQtyControl(
                         qty: morQty,
-                        accentColor: Colors.amber.shade700,
+                        accentColor: morningColor,
                         onDecrement: () => setState(() {
                           if (morQty > 0)
                             _weeklySchedule[day]!['morning'] = morQty - 1;
@@ -1126,7 +1128,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                     Expanded(
                       child: _MiniQtyControl(
                         qty: eveQty,
-                        accentColor: Colors.indigo.shade400,
+                        accentColor: eveningColor,
                         onDecrement: () => setState(() {
                           if (eveQty > 0)
                             _weeklySchedule[day]!['evening'] = eveQty - 1;

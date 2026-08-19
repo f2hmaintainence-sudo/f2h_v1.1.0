@@ -24,6 +24,13 @@ const PUBLIC_ROUTES = [
   '/delete-account',
 ];
 
+const PUBLIC_PREFIXES = [
+  '/receipt',
+  '/invoice',
+  '/billing',
+  '/download',
+];
+
 // Panel routes use client-side auth guard (AuthProvider + /users/me)
 const PANEL_PREFIXES = ['/admin', '/delivery', '/customer'];
 
@@ -45,8 +52,8 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
   
-  // Allow public routes without auth
-  if (PUBLIC_ROUTES.includes(pathname)) {
+  // Allow public routes and prefixes without auth
+  if (PUBLIC_ROUTES.includes(pathname) || PUBLIC_PREFIXES.some(prefix => pathname.startsWith(prefix))) {
     return NextResponse.next();
   }
 

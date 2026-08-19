@@ -88,12 +88,15 @@ async function bootstrap() {
   // Security headers middleware
   app.use(
     helmet({
+      crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'"],
-          scriptSrc: ["'self'"],
-          imgSrc: ["'self'", 'data:', 'https:', 'http:'],
+          styleSrc: ["'self'", "'unsafe-inline'", 'https://accounts.google.com'],
+          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://accounts.google.com', 'https://checkout.razorpay.com'],
+          imgSrc: ["'self'", 'data:', 'https:', 'http:', 'https://*.googleusercontent.com'],
+          frameSrc: ["'self'", 'https://accounts.google.com', 'https://api.razorpay.com', 'https://checkout.razorpay.com'],
+          connectSrc: ["'self'", 'https://accounts.google.com', 'https://*.googleapis.com', 'https://*.razorpay.com'],
           frameAncestors: ["'none'"],
         },
       },
