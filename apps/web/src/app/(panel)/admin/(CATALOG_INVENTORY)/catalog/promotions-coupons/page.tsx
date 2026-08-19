@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { showSuccessToast, showErrorToast } from "@/components/Toast";
+import { SkeletonImageUploader } from "@/components/Table Generator/SkeletonForm";
+import "@/components/Table Generator/SkeletonForm.css";
 
 interface Promotion {
   id: number;
@@ -2039,13 +2041,13 @@ export default function PromotionsCouponsOffersPage() {
                 </div>
               </div>
 
-              {/* SECTION 2: BANNER IMAGE (URL OR UPLOAD) */}
+              {/* SECTION 2: BANNER IMAGE (URL OR UPLOAD WITH SKELETON IMAGE UPLOADER & CROPPER) */}
               <div className="space-y-4 pt-2 border-t border-slate-100">
                 <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Banner Image (URL or Upload)</div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                   <div className="space-y-1.5">
-                    <label className="font-bold text-slate-700">Banner Image URL (Mandatory - Min 1)</label>
+                    <label className="font-bold text-slate-700">Banner Image URL</label>
                     <input
                       type="text"
                       value={offerForm.image_url}
@@ -2053,43 +2055,28 @@ export default function PromotionsCouponsOffersPage() {
                       placeholder="https://images.unsplash.com/... or /uploads/..."
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
-                    <p className="text-[10px] text-slate-400">Direct image link or leave upload below</p>
+                    <p className="text-[10px] text-slate-400">Direct image link or upload &amp; crop on the right</p>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="font-bold text-slate-700">Or Upload Banner Image</label>
-                    <label className="border-2 border-dashed border-slate-200 hover:border-emerald-500 bg-slate-50 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition text-center min-h-[72px]">
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleOfferImageUpload(file, false);
-                        }}
-                      />
-                      {offerForm.banner_image ? (
-                        <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs">
-                          <CheckCircle2 size={16} />
-                          <span>Image Selected</span>
-                          <button
-                            type="button"
-                            onClick={(ev) => {
-                              ev.preventDefault();
-                              setOfferForm({ ...offerForm, banner_image: "" });
-                            }}
-                            className="text-red-500 hover:underline text-[10px] ml-1"
-                          >
-                            (Remove)
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 text-slate-500 font-semibold text-xs">
-                          <Upload size={16} className="text-slate-400" />
-                          <span>Click to upload / drag &amp; drop</span>
-                        </div>
-                      )}
-                    </label>
+                    <label className="font-bold text-slate-700">Upload &amp; Crop Banner Image</label>
+                    <SkeletonImageUploader
+                      value={offerForm.banner_image || offerForm.image_url}
+                      onChange={(val) => {
+                        const src = typeof val === "string" ? val : (val[0] || "");
+                        setOfferForm((prev) => ({
+                          ...prev,
+                          banner_image: src,
+                          image_url: prev.image_url || "banner_image.webp",
+                        }));
+                      }}
+                      crop={true}
+                      aspectRatio={
+                        offerForm.banner_type === "home_carousel" ? 16 / 9 :
+                        offerForm.banner_type === "category_slide" ? 4 / 3 :
+                        offerForm.banner_type === "popup" ? 4 / 5 : 16 / 9
+                      }
+                    />
                   </div>
                 </div>
               </div>
@@ -2372,13 +2359,13 @@ export default function PromotionsCouponsOffersPage() {
                 </div>
               </div>
 
-              {/* SECTION 2: BANNER IMAGE (URL OR UPLOAD) */}
+              {/* SECTION 2: BANNER IMAGE (URL OR UPLOAD WITH SKELETON IMAGE UPLOADER & CROPPER) */}
               <div className="space-y-4 pt-2 border-t border-slate-100">
                 <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Banner Image (URL or Upload)</div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                   <div className="space-y-1.5">
-                    <label className="font-bold text-slate-700">Banner Image URL (Mandatory - Min 1)</label>
+                    <label className="font-bold text-slate-700">Banner Image URL</label>
                     <input
                       type="text"
                       value={editOfferForm.image_url}
@@ -2386,43 +2373,28 @@ export default function PromotionsCouponsOffersPage() {
                       placeholder="https://images.unsplash.com/... or /uploads/..."
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
-                    <p className="text-[10px] text-slate-400">Direct image link or leave upload below</p>
+                    <p className="text-[10px] text-slate-400">Direct image link or upload &amp; crop on the right</p>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="font-bold text-slate-700">Or Upload Banner Image</label>
-                    <label className="border-2 border-dashed border-slate-200 hover:border-amber-500 bg-slate-50 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition text-center min-h-[72px]">
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleOfferImageUpload(file, true);
-                        }}
-                      />
-                      {editOfferForm.banner_image ? (
-                        <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs">
-                          <CheckCircle2 size={16} />
-                          <span>New Image Selected</span>
-                          <button
-                            type="button"
-                            onClick={(ev) => {
-                              ev.preventDefault();
-                              setEditOfferForm({ ...editOfferForm, banner_image: "" });
-                            }}
-                            className="text-red-500 hover:underline text-[10px] ml-1"
-                          >
-                            (Remove)
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 text-slate-500 font-semibold text-xs">
-                          <Upload size={16} className="text-slate-400" />
-                          <span>Click to upload new image</span>
-                        </div>
-                      )}
-                    </label>
+                    <label className="font-bold text-slate-700">Upload &amp; Crop Banner Image</label>
+                    <SkeletonImageUploader
+                      value={editOfferForm.banner_image || editOfferForm.image_url}
+                      onChange={(val) => {
+                        const src = typeof val === "string" ? val : (val[0] || "");
+                        setEditOfferForm((prev) => ({
+                          ...prev,
+                          banner_image: src,
+                          image_url: prev.image_url || "banner_image.webp",
+                        }));
+                      }}
+                      crop={true}
+                      aspectRatio={
+                        editOfferForm.banner_type === "home_carousel" ? 16 / 9 :
+                        editOfferForm.banner_type === "category_slide" ? 4 / 3 :
+                        editOfferForm.banner_type === "popup" ? 4 / 5 : 16 / 9
+                      }
+                    />
                   </div>
                 </div>
               </div>

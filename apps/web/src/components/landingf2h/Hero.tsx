@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, Transition } from "framer-motion";
-import { F2H_PUBLIC } from "@/constants/f2hPublicAssets";
+import { F2H_PUBLIC, F2H_CUSTOMER_PLAYSTORE_URL } from "@/constants/f2hPublicAssets";
 import { ContactUsEnquiryForm } from "./ContactUsEnquiryForm.client";
 const fadeUp = (delay = 0) => ({
   initial: { opacity: 0, y: 28 },
@@ -125,7 +125,7 @@ export function Hero() {
             >
               <button
                 type="button"
-                onClick={() => window.open("https://play.google.com/store/apps/details?id=in.swiggy.android", "_blank")}
+                onClick={() => window.open(F2H_CUSTOMER_PLAYSTORE_URL, "_blank")}
                 className="group flex items-center justify-center gap-2 px-8 py-3.5 rounded-full bg-[#c8922a] text-white font-bold text-[1.05rem] shadow-[0_4px_20px_rgba(200,146,42,0.45)] hover:bg-[#b5811f] hover:shadow-[0_6px_24px_rgba(200,146,42,0.6)] hover:scale-[1.03] active:scale-[0.98] transition-all duration-200"
               >
                 Get Fresh Farm Milk
@@ -134,7 +134,7 @@ export function Hero() {
 
               <button
                 type="button"
-                onClick={() => window.open("https://play.google.com/store/apps/details?id=in.swiggy.android", "_blank")}
+                onClick={() => window.open(F2H_CUSTOMER_PLAYSTORE_URL, "_blank")}
                 className="flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-full bg-white border border-[#0d3d1a]/20 text-[#0d3d1a] font-semibold text-[1.05rem] hover:bg-gray-50 hover:border-[#0d3d1a]/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 shadow-sm"
               >
                 <svg

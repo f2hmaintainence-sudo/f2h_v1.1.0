@@ -211,6 +211,606 @@ const getCroppedBase64WithRotation = (
   });
 };
 
+// ─── Exported SkeletonImageUploader Component ────────────────
+export interface SkeletonImageUploaderProps {
+  value?: string | string[];
+  onChange: (val: string | string[]) => void;
+  aspectRatio?: number;
+  cropWidth?: number;
+  cropHeight?: number;
+  crop?: boolean;
+  multiple?: boolean;
+  accept?: string;
+  disabled?: boolean;
+  apiBaseUrl?: string;
+  className?: string;
+}
+
+export function SkeletonImageUploader({
+  value,
+  onChange,
+  aspectRatio = 1,
+  cropWidth = 800,
+  cropHeight = 800,
+  crop = true,
+  multiple = false,
+  accept = 'image/*',
+  disabled = false,
+  apiBaseUrl,
+  className = '',
+}: SkeletonImageUploaderProps) {
+  const [cropModal, setCropModal] = useState<{
+    isOpen: boolean;
+    src: string;
+    rawSrc?: string;
+    zoom: number;
+    panX: number;
+    panY: number;
+    rotate: number;
+  }>({
+    isOpen: false,
+    src: '',
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+    rotate: 0,
+  });
+
+  const [cropBox, setCropBox] = useState<{ x: number; y: number; w: number; h: number }>({
+    x: 50,
+    y: 50,
+    w: 220,
+    h: 220,
+  });
+  const [selectedCropRatio, setSelectedCropRatio] = useState<string>('free');
+  const [activeHandle, setActiveHandle] = useState<string | null>(null);
+  const [dragStartBox, setDragStartBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+
+  const [cropDrag, setCropDrag] = useState<{
+    isDragging: boolean;
+    startX: number;
+    startY: number;
+    initialPanX: number;
+    initialPanY: number;
+  }>({ isDragging: false, startX: 0, startY: 0, initialPanX: 0, initialPanY: 0 });
+
+  const cropContainerRef = React.useRef<HTMLDivElement | null>(null);
+
+  const applyCropRatio = (ratioId: string) => {
+    setSelectedCropRatio(ratioId);
+    if (ratioId === 'free') return;
+    const targetRatio = RATIO_PRESETS.find((r) => r.id === ratioId)?.ratio;
+    if (!targetRatio) return;
+
+    let w = 240;
+    let h = 240;
+    if (targetRatio >= 1) {
+      w = 260;
+      h = Math.min(260, Math.round(w / targetRatio));
+    } else {
+      h = 260;
+      w = Math.min(260, Math.round(h * targetRatio));
+    }
+    const x = Math.max(10, Math.round((320 - w) / 2));
+    const y = Math.max(10, Math.round((320 - h) / 2));
+    setCropBox({ x, y, w, h });
+  };
+
+  const handleRotate = (dir: 'left' | 'right') => {
+    setCropModal((prev) => ({
+      ...prev,
+      rotate: dir === 'left' ? (prev.rotate - 90 + 360) % 360 : (prev.rotate + 90) % 360,
+    }));
+  };
+
+  const handleHandleMouseDown = (handle: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (handle === 'move') {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      if (x < 0 || x > rect.width || y < 0 || y > rect.height) {
+        setCropDrag({
+          isDragging: true,
+          startX: e.clientX,
+          startY: e.clientY,
+          initialPanX: cropModal.panX,
+          initialPanY: cropModal.panY,
+        });
+        setActiveHandle(null);
+        return;
+      }
+    }
+    setActiveHandle(handle);
+    setDragStartBox({ ...cropBox });
+    setCropDrag({
+      isDragging: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      initialPanX: cropModal.panX,
+      initialPanY: cropModal.panY,
+    });
+  };
+
+  const handleHandleTouchStart = (handle: string, e: React.TouchEvent) => {
+    if (!e.touches[0]) return;
+    e.stopPropagation();
+    const touch = e.touches[0];
+    if (handle === 'move') {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = touch.clientX - rect.left;
+      const y = touch.clientY - rect.top;
+      if (x < 0 || x > rect.width || y < 0 || y > rect.height) {
+        setCropDrag({
+          isDragging: true,
+          startX: touch.clientX,
+          startY: touch.clientY,
+          initialPanX: cropModal.panX,
+          initialPanY: cropModal.panY,
+        });
+        setActiveHandle(null);
+        return;
+      }
+    }
+    setActiveHandle(handle);
+    setDragStartBox({ ...cropBox });
+    setCropDrag({
+      isDragging: true,
+      startX: touch.clientX,
+      startY: touch.clientY,
+      initialPanX: cropModal.panX,
+      initialPanY: cropModal.panY,
+    });
+  };
+
+  const handleCropMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setCropDrag({
+      isDragging: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      initialPanX: cropModal.panX,
+      initialPanY: cropModal.panY,
+    });
+  };
+
+  const handleCropTouchStart = (e: React.TouchEvent) => {
+    if (!e.touches[0]) return;
+    setCropDrag({
+      isDragging: true,
+      startX: e.touches[0].clientX,
+      startY: e.touches[0].clientY,
+      initialPanX: cropModal.panX,
+      initialPanY: cropModal.panY,
+    });
+  };
+
+  const handleCropMouseMove = useCallback((e: MouseEvent) => {
+    if (!cropDrag.isDragging) return;
+    const dx = e.clientX - cropDrag.startX;
+    const dy = e.clientY - cropDrag.startY;
+
+    if (activeHandle && dragStartBox) {
+      setCropBox(() => {
+        let { x, y, w, h } = dragStartBox;
+        const containerSize = 320;
+        const minSize = 40;
+
+        if (activeHandle === 'move') {
+          x = Math.max(0, Math.min(containerSize - w, x + dx));
+          y = Math.max(0, Math.min(containerSize - h, y + dy));
+          return { x, y, w, h };
+        }
+
+        if (activeHandle.includes('r')) {
+          w = Math.max(minSize, Math.min(containerSize - x, dragStartBox.w + dx));
+        }
+        if (activeHandle.includes('b')) {
+          h = Math.max(minSize, Math.min(containerSize - y, dragStartBox.h + dy));
+        }
+        if (activeHandle.includes('l')) {
+          const maxLeft = dragStartBox.x + dragStartBox.w - minSize;
+          const newX = Math.max(0, Math.min(maxLeft, dragStartBox.x + dx));
+          w = dragStartBox.w - (newX - dragStartBox.x);
+          x = newX;
+        }
+        if (activeHandle.includes('t')) {
+          const maxTop = dragStartBox.y + dragStartBox.h - minSize;
+          const newY = Math.max(0, Math.min(maxTop, dragStartBox.y + dy));
+          h = dragStartBox.h - (newY - dragStartBox.y);
+          y = newY;
+        }
+
+        return { x, y, w, h };
+      });
+    } else {
+      setCropModal((prev) => ({
+        ...prev,
+        panX: cropDrag.initialPanX + dx,
+        panY: cropDrag.initialPanY + dy,
+      }));
+    }
+  }, [cropDrag, activeHandle, dragStartBox]);
+
+  const handleCropTouchMove = useCallback((e: TouchEvent) => {
+    if (!cropDrag.isDragging || !e.touches[0]) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - cropDrag.startX;
+    const dy = touch.clientY - cropDrag.startY;
+
+    if (activeHandle && dragStartBox) {
+      setCropBox(() => {
+        let { x, y, w, h } = dragStartBox;
+        const containerSize = 320;
+        const minSize = 40;
+
+        if (activeHandle === 'move') {
+          x = Math.max(0, Math.min(containerSize - w, x + dx));
+          y = Math.max(0, Math.min(containerSize - h, y + dy));
+          return { x, y, w, h };
+        }
+
+        if (activeHandle.includes('r')) {
+          w = Math.max(minSize, Math.min(containerSize - x, dragStartBox.w + dx));
+        }
+        if (activeHandle.includes('b')) {
+          h = Math.max(minSize, Math.min(containerSize - y, dragStartBox.h + dy));
+        }
+        if (activeHandle.includes('l')) {
+          const maxLeft = dragStartBox.x + dragStartBox.w - minSize;
+          const newX = Math.max(0, Math.min(maxLeft, dragStartBox.x + dx));
+          w = dragStartBox.w - (newX - dragStartBox.x);
+          x = newX;
+        }
+        if (activeHandle.includes('t')) {
+          const maxTop = dragStartBox.y + dragStartBox.h - minSize;
+          const newY = Math.max(0, Math.min(maxTop, dragStartBox.y + dy));
+          h = dragStartBox.h - (newY - dragStartBox.y);
+          y = newY;
+        }
+
+        return { x, y, w, h };
+      });
+    } else {
+      setCropModal((prev) => ({
+        ...prev,
+        panX: cropDrag.initialPanX + dx,
+        panY: cropDrag.initialPanY + dy,
+      }));
+    }
+  }, [cropDrag, activeHandle, dragStartBox]);
+
+  const handleCropMouseUp = useCallback(() => {
+    setCropDrag((prev) => ({ ...prev, isDragging: false }));
+    setActiveHandle(null);
+    setDragStartBox(null);
+  }, []);
+
+  useEffect(() => {
+    if (cropDrag.isDragging) {
+      window.addEventListener('mousemove', handleCropMouseMove);
+      window.addEventListener('mouseup', handleCropMouseUp);
+      window.addEventListener('touchmove', handleCropTouchMove, { passive: false });
+      window.addEventListener('touchend', handleCropMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleCropMouseMove);
+      window.removeEventListener('mouseup', handleCropMouseUp);
+      window.removeEventListener('touchmove', handleCropTouchMove);
+      window.removeEventListener('touchend', handleCropMouseUp);
+    };
+  }, [cropDrag.isDragging, handleCropMouseMove, handleCropMouseUp, handleCropTouchMove]);
+
+  // Set up wheel listener for zooming inside modal
+  const setCropContainerRef = useCallback((el: HTMLDivElement | null) => {
+    cropContainerRef.current = el;
+    if (el) {
+      const handleWheel = (e: WheelEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setCropModal((prev) => ({
+          ...prev,
+          zoom: Math.max(0.2, Math.min(5, prev.zoom + (e.deltaY < 0 ? 0.1 : -0.1))),
+        }));
+      };
+      el.addEventListener('wheel', handleWheel, { passive: false });
+    }
+  }, []);
+
+  const handleApplyCrop = async () => {
+    const cropped = await getCroppedBase64WithRotation(
+      cropModal.src,
+      cropModal.zoom,
+      cropModal.panX,
+      cropModal.panY,
+      cropModal.rotate,
+      cropWidth,
+      cropHeight,
+      cropBox
+    );
+
+    if (multiple) {
+      const currentArr = Array.isArray(value) ? value : value ? [value] : [];
+      onChange([...currentArr, cropped]);
+    } else {
+      onChange(cropped);
+    }
+    setCropModal((prev) => ({ ...prev, isOpen: false }));
+  };
+
+  let previews: string[] = [];
+  if (multiple) {
+    const raw = Array.isArray(value) ? value : value ? [value] : [];
+    previews = ([] as any[]).concat(...raw).filter((v: any) => v && typeof v === 'string' && v.trim() !== '') as string[];
+  } else {
+    if (value && typeof value === 'string' && value.trim() !== '') {
+      previews = [value];
+    }
+  }
+
+  return (
+    <div className={`skf-file-wrap ${className}`}>
+      <div className="skf-multiple-previews" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        {previews.map((previewSrc, idx) => {
+          let fullUrl = previewSrc;
+          if (previewSrc && !previewSrc.startsWith('http') && !previewSrc.startsWith('data:')) {
+            const apiBase = apiBaseUrl || getApiBaseUrl();
+            const rootHost = apiBase.replace(/\/api(?:\/v\d+)?\/?$/, '');
+            let path = previewSrc.startsWith('/') ? previewSrc : `/${previewSrc}`;
+            if (!path.startsWith('/uploads/')) path = `/uploads${path}`;
+            fullUrl = `${rootHost}${path}`;
+          }
+
+          return (
+            <div key={idx} className="skf-image-editor" style={{ width: multiple ? '150px' : '100%' }}>
+              <div
+                className="skf-crop-preview"
+                style={{
+                  aspectRatio: aspectRatio || 1,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  width: '100%',
+                }}
+              >
+                <img
+                  src={fullUrl}
+                  alt="Preview"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              </div>
+              <div className="skf-crop-controls">
+                {!multiple && crop && (
+                  <button
+                    type="button"
+                    className="skf-reset-crop"
+                    onClick={() => {
+                      setCropModal({
+                        isOpen: true,
+                        src: previewSrc,
+                        rawSrc: previewSrc,
+                        zoom: 1,
+                        panX: 0,
+                        panY: 0,
+                        rotate: 0,
+                      });
+                      setSelectedCropRatio('free');
+                      setCropBox({ x: 50, y: 50, w: 220, h: 220 });
+                    }}
+                  >
+                    Crop
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="skf-reset-crop"
+                  style={{ borderColor: '#ef4444', color: '#ef4444' }}
+                  onClick={() => {
+                    if (multiple) {
+                      const newArr = [...previews];
+                      newArr.splice(idx, 1);
+                      onChange(newArr);
+                    } else {
+                      onChange('');
+                    }
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          );
+        })}
+
+        {(!previews.length || multiple) && (
+          <label className="skf-file-picker" style={{ width: multiple && previews.length ? '150px' : '100%', alignSelf: 'stretch' }}>
+            <UploadCloud size={32} style={{ color: '#94a3b8', marginBottom: '4px' }} />
+            <span style={{ textAlign: 'center' }}>{multiple && previews.length ? '+ Add Image' : 'Click to upload image'}</span>
+            <input
+              type="file"
+              accept={accept}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const src = reader.result as string;
+                  if (crop) {
+                    setCropModal({
+                      isOpen: true,
+                      src,
+                      rawSrc: src,
+                      zoom: 1,
+                      panX: 0,
+                      panY: 0,
+                      rotate: 0,
+                    });
+                    setSelectedCropRatio('free');
+                    setCropBox({ x: 50, y: 50, w: 220, h: 220 });
+                  } else {
+                    if (multiple) {
+                      const currentArr = Array.isArray(value) ? value : value ? [value] : [];
+                      onChange([...currentArr, src]);
+                    } else {
+                      onChange(src);
+                    }
+                  }
+                };
+                reader.readAsDataURL(file);
+                e.target.value = '';
+              }}
+              disabled={disabled}
+            />
+          </label>
+        )}
+      </div>
+
+      {/* ── Image Crop & Rotate Modal ── */}
+      {cropModal.isOpen && (
+        <div className="skf-crop-modal-overlay">
+          <div className="skf-crop-modal" style={{ maxWidth: '540px' }}>
+            <div className="skf-crop-modal-header">
+              <h3 className="skf-crop-modal-title">Image Crop &amp; Rotate</h3>
+              <button
+                type="button"
+                className="skf-close-btn"
+                onClick={() => setCropModal((prev) => ({ ...prev, isOpen: false }))}
+                style={{ padding: 0 }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Aspect Ratio Presets */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', overflowX: 'auto' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginRight: '4px', whiteSpace: 'nowrap' }}>Aspect Ratio:</span>
+              {RATIO_PRESETS.map((preset) => {
+                const isSelected = selectedCropRatio === preset.id;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => applyCropRatio(preset.id)}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      border: isSelected ? '1px solid #16a34a' : '1px solid #cbd5e1',
+                      background: isSelected ? '#16a34a' : '#ffffff',
+                      color: isSelected ? '#ffffff' : '#334155',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {preset.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="skf-crop-modal-body">
+              <div
+                ref={setCropContainerRef}
+                className="skf-crop-container-outer"
+                onMouseDown={handleCropMouseDown}
+                onTouchStart={handleCropTouchStart}
+                style={{
+                  cursor: cropDrag.isDragging ? 'grabbing' : 'grab',
+                }}
+              >
+                <img
+                  src={cropModal.src}
+                  alt="Crop Source"
+                  draggable="false"
+                  className="skf-crop-image-under"
+                  style={{
+                    transform: `translate(${cropModal.panX}px, ${cropModal.panY}px) scale(${cropModal.zoom}) rotate(${cropModal.rotate}deg)`,
+                    transformOrigin: 'center',
+                    transition: cropDrag.isDragging ? 'none' : 'transform 0.1s ease-out',
+                  }}
+                />
+
+                <div
+                  className="skf-crop-window-overlay"
+                  style={{
+                    left: `${cropBox.x}px`,
+                    top: `${cropBox.y}px`,
+                    width: `${cropBox.w}px`,
+                    height: `${cropBox.h}px`,
+                    transform: 'none',
+                    borderRadius: '8px',
+                    pointerEvents: 'auto',
+                    cursor: activeHandle === 'move' ? 'grabbing' : 'grab',
+                  }}
+                  onMouseDown={(e) => handleHandleMouseDown('move', e)}
+                  onTouchStart={(e) => handleHandleTouchStart('move', e)}
+                >
+                  <div className="skf-crop-window-grid" />
+
+                  <span className="skf-crop-handle skf-crop-handle-tl" onMouseDown={(e) => handleHandleMouseDown('tl', e)} onTouchStart={(e) => handleHandleTouchStart('tl', e)} style={{ cursor: 'nwse-resize', pointerEvents: 'auto' }} />
+                  <span className="skf-crop-handle skf-crop-handle-tr" onMouseDown={(e) => handleHandleMouseDown('tr', e)} onTouchStart={(e) => handleHandleTouchStart('tr', e)} style={{ cursor: 'nesw-resize', pointerEvents: 'auto' }} />
+                  <span className="skf-crop-handle skf-crop-handle-bl" onMouseDown={(e) => handleHandleMouseDown('bl', e)} onTouchStart={(e) => handleHandleTouchStart('bl', e)} style={{ cursor: 'nesw-resize', pointerEvents: 'auto' }} />
+                  <span className="skf-crop-handle skf-crop-handle-br" onMouseDown={(e) => handleHandleMouseDown('br', e)} onTouchStart={(e) => handleHandleTouchStart('br', e)} style={{ cursor: 'nwse-resize', pointerEvents: 'auto' }} />
+                  <span className="skf-crop-handle skf-crop-handle-t" onMouseDown={(e) => handleHandleMouseDown('t', e)} onTouchStart={(e) => handleHandleTouchStart('t', e)} style={{ cursor: 'ns-resize', pointerEvents: 'auto' }} />
+                  <span className="skf-crop-handle skf-crop-handle-b" onMouseDown={(e) => handleHandleMouseDown('b', e)} onTouchStart={(e) => handleHandleTouchStart('b', e)} style={{ cursor: 'ns-resize', pointerEvents: 'auto' }} />
+                  <span className="skf-crop-handle skf-crop-handle-l" onMouseDown={(e) => handleHandleMouseDown('l', e)} onTouchStart={(e) => handleHandleTouchStart('l', e)} style={{ cursor: 'ew-resize', pointerEvents: 'auto' }} />
+                  <span className="skf-crop-handle skf-crop-handle-r" onMouseDown={(e) => handleHandleMouseDown('r', e)} onTouchStart={(e) => handleHandleTouchStart('r', e)} style={{ cursor: 'ew-resize', pointerEvents: 'auto' }} />
+                </div>
+              </div>
+              <div className="text-xs text-gray-500 mt-3 text-center">
+                Drag image to reposition, or crop window to adjust. Scroll to zoom.
+              </div>
+            </div>
+
+            <div className="skf-crop-modal-footer">
+              <div className="skf-crop-actions-left">
+                <button
+                  type="button"
+                  title="Rotate Left"
+                  className="skf-crop-btn-icon"
+                  onClick={() => handleRotate('left')}
+                >
+                  <RotateCcw size={16} />
+                </button>
+                <button
+                  type="button"
+                  title="Rotate Right"
+                  className="skf-crop-btn-icon"
+                  onClick={() => handleRotate('right')}
+                >
+                  <RotateCw size={16} />
+                </button>
+              </div>
+
+              <div className="skf-crop-actions-right">
+                <button
+                  type="button"
+                  className="skf-btn skf-btn-cancel"
+                  style={{ padding: '8px 16px', fontSize: '13px' }}
+                  onClick={() => setCropModal((prev) => ({ ...prev, isOpen: false }))}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="skf-btn skf-btn-submit"
+                  style={{ padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  onClick={handleApplyCrop}
+                >
+                  <Check size={14} />
+                  Apply
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Component ───────────────────────────────────────────────
 
 export default function SkeletonForm({
@@ -1182,158 +1782,20 @@ export default function SkeletonForm({
         break;
 
       case 'file': {
-        const isMultiple = !!field.multiple;
-        let previews: string[] = [];
-
-        if (isMultiple) {
-          const raw = Array.isArray(formData[field.name])
-            ? formData[field.name]
-            : formData[field.name]
-            ? [formData[field.name]]
-            : [];
-          // Flatten one level (in case of nested arrays), filter to non-empty strings only
-          previews = ([] as any[])
-            .concat(...raw)
-            .filter((v: any) => v && typeof v === 'string' && v.trim() !== '') as string[];
-        } else {
-          const fileState = fileStates[field.name];
-          const singleSrc = fileState?.src || formData[field.name] || '';
-          if (singleSrc && typeof singleSrc === 'string') previews = [singleSrc];
-        }
-
         input = (
-          <div className={`skf-file-wrap${errorClass}`}>
-            <div className="skf-multiple-previews" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              {previews.map((previewSrc, idx) => {
-                // previewSrc is guaranteed to be a non-empty string at this point
-                let fullUrl = previewSrc;
-                if (previewSrc && !previewSrc.startsWith('http') && !previewSrc.startsWith('data:')) {
-                  const apiBase = apiBaseUrl || getApiBaseUrl();
-                  const rootHost = apiBase.replace(/\/api(?:\/v\d+)?\/?$/, '');
-                  let path = previewSrc.startsWith('/') ? previewSrc : `/${previewSrc}`;
-                  if (!path.startsWith('/uploads/')) path = `/uploads${path}`;
-                  fullUrl = `${rootHost}${path}`;
-                }
-
-                return (
-                  <div key={idx} className="skf-image-editor" style={{ width: isMultiple ? '150px' : '100%' }}>
-                    <div
-                      className="skf-crop-preview"
-                      style={{
-                        aspectRatio: field.aspectRatio || 1,
-                        position: 'relative',
-                        overflow: 'hidden',
-                        width: '100%'
-                      }}
-                    >
-                      <img
-                        src={fullUrl}
-                        alt="Preview"
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                    </div>
-                    <div className="skf-crop-controls">
-                      {!isMultiple && field.crop && (
-                        <button
-                          type="button"
-                          className="skf-reset-crop"
-                          onClick={() => {
-                            const raw = fileStates[field.name]?.rawSrc || previewSrc;
-                            if (raw) {
-                              setCropModal({
-                                isOpen: true,
-                                fieldName: field.name,
-                                src: raw,
-                                zoom: fileStates[field.name]?.zoom || 1,
-                                panX: fileStates[field.name]?.panX || 0,
-                                panY: fileStates[field.name]?.panY || 0,
-                                rotate: 0,
-                                aspectRatio: field.aspectRatio || 1,
-                                cropWidth: field.cropWidth || 800,
-                                cropHeight: field.cropHeight || 800,
-                                isMultiple: false,
-                              });
-                            }
-                          }}
-                        >
-                          Crop
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="skf-reset-crop"
-                        style={{ borderColor: '#ef4444', color: '#ef4444' }}
-                        onClick={() => {
-                          if (isMultiple) {
-                            const newArray = [...previews];
-                            newArray.splice(idx, 1);
-                            handleChange(field.name, newArray);
-                          } else {
-                            setFileStates((prev) => {
-                              const copy = { ...prev };
-                              delete copy[field.name];
-                              return copy;
-                            });
-                            handleChange(field.name, '');
-                          }
-                        }}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-              {(!previews.length || isMultiple) && (
-                <label className="skf-file-picker" style={{ width: isMultiple && previews.length ? '150px' : '100%', alignSelf: 'stretch' }}>
-                  <UploadCloud size={32} style={{ color: '#94a3b8', marginBottom: '4px' }} />
-                  <span style={{ textAlign: 'center' }}>{isMultiple && previews.length ? '+ Add Image' : 'Click to upload image'}</span>
-                  <input
-                    type="file"
-                    accept={field.accept || 'image/*'}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        const src = reader.result as string;
-                        setCropModal({
-                          isOpen: true,
-                          fieldName: field.name,
-                          src,
-                          zoom: 1,
-                          panX: 0,
-                          panY: 0,
-                          rotate: 0,
-                          aspectRatio: field.aspectRatio || 1,
-                          cropWidth: field.cropWidth || 800,
-                          cropHeight: field.cropHeight || 800,
-                          isMultiple: isMultiple,
-                        });
-                        if (!isMultiple) {
-                          setFileStates((prev) => ({
-                            ...prev,
-                            [field.name]: {
-                              src: '',
-                              rawSrc: src,
-                              zoom: 1,
-                              panX: 0,
-                              panY: 0,
-                              isNew: true,
-                            },
-                          }));
-                        }
-                      };
-                      reader.readAsDataURL(file);
-                      // Reset file input so same file can be selected again
-                      e.target.value = '';
-                    }}
-                    disabled={field.disabled}
-                  />
-                </label>
-              )}
-            </div>
-          </div>
+          <SkeletonImageUploader
+            value={formData[field.name]}
+            onChange={(val) => handleChange(field.name, val)}
+            aspectRatio={field.aspectRatio}
+            cropWidth={field.cropWidth}
+            cropHeight={field.cropHeight}
+            crop={field.crop}
+            multiple={field.multiple}
+            accept={field.accept}
+            disabled={field.disabled}
+            apiBaseUrl={apiBaseUrl}
+            className={errorClass}
+          />
         );
         break;
       }
@@ -1531,149 +1993,6 @@ export default function SkeletonForm({
           </div>
         )}
       </div>
-
-      {/* ── Image Crop & Rotate Modal (Free & Ratio-Based) ── */}
-      {cropModal.isOpen && (
-        <div className="skf-crop-modal-overlay">
-          <div className="skf-crop-modal" style={{ maxWidth: '540px' }}>
-            <div className="skf-crop-modal-header">
-              <h3 className="skf-crop-modal-title">Image Crop &amp; Rotate</h3>
-              <button
-                type="button"
-                className="skf-close-btn"
-                onClick={() => setCropModal((prev) => ({ ...prev, isOpen: false }))}
-                style={{ padding: 0 }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Aspect Ratio Presets */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', overflowX: 'auto' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginRight: '4px', whiteSpace: 'nowrap' }}>Aspect Ratio:</span>
-              {RATIO_PRESETS.map((preset) => {
-                const isSelected = selectedCropRatio === preset.id;
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => applyCropRatio(preset.id)}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      border: isSelected ? '1px solid #16a34a' : '1px solid #cbd5e1',
-                      background: isSelected ? '#16a34a' : '#ffffff',
-                      color: isSelected ? '#ffffff' : '#334155',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {preset.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="skf-crop-modal-body">
-              <div
-                ref={setCropContainerRef}
-                className="skf-crop-container-outer"
-                onMouseDown={handleCropMouseDown}
-                onTouchStart={handleCropTouchStart}
-                style={{
-                  cursor: cropDrag.isDragging ? 'grabbing' : 'grab',
-                }}
-              >
-                <img
-                  src={cropModal.src}
-                  alt="Crop Source"
-                  draggable="false"
-                  className="skf-crop-image-under"
-                  style={{
-                    transform: `translate(${cropModal.panX}px, ${cropModal.panY}px) scale(${cropModal.zoom}) rotate(${cropModal.rotate}deg)`,
-                    transformOrigin: 'center',
-                    transition: cropDrag.isDragging ? 'none' : 'transform 0.1s ease-out',
-                  }}
-                />
-
-                <div
-                  className="skf-crop-window-overlay"
-                  style={{
-                    left: `${cropBox.x}px`,
-                    top: `${cropBox.y}px`,
-                    width: `${cropBox.w}px`,
-                    height: `${cropBox.h}px`,
-                    transform: 'none',
-                    borderRadius: '8px',
-                    pointerEvents: 'auto',
-                    cursor: activeHandle === 'move' ? 'grabbing' : 'grab',
-                  }}
-                  onMouseDown={(e) => handleHandleMouseDown('move', e)}
-                  onTouchStart={(e) => handleHandleTouchStart('move', e)}
-                >
-                  <div className="skf-crop-window-grid" />
-
-                  <span className="skf-crop-handle skf-crop-handle-tl" onMouseDown={(e) => handleHandleMouseDown('tl', e)} onTouchStart={(e) => handleHandleTouchStart('tl', e)} style={{ cursor: 'nwse-resize', pointerEvents: 'auto' }} />
-                  <span className="skf-crop-handle skf-crop-handle-tr" onMouseDown={(e) => handleHandleMouseDown('tr', e)} onTouchStart={(e) => handleHandleTouchStart('tr', e)} style={{ cursor: 'nesw-resize', pointerEvents: 'auto' }} />
-                  <span className="skf-crop-handle skf-crop-handle-bl" onMouseDown={(e) => handleHandleMouseDown('bl', e)} onTouchStart={(e) => handleHandleTouchStart('bl', e)} style={{ cursor: 'nesw-resize', pointerEvents: 'auto' }} />
-                  <span className="skf-crop-handle skf-crop-handle-br" onMouseDown={(e) => handleHandleMouseDown('br', e)} onTouchStart={(e) => handleHandleTouchStart('br', e)} style={{ cursor: 'nwse-resize', pointerEvents: 'auto' }} />
-                  <span className="skf-crop-handle skf-crop-handle-t" onMouseDown={(e) => handleHandleMouseDown('t', e)} onTouchStart={(e) => handleHandleTouchStart('t', e)} style={{ cursor: 'ns-resize', pointerEvents: 'auto' }} />
-                  <span className="skf-crop-handle skf-crop-handle-b" onMouseDown={(e) => handleHandleMouseDown('b', e)} onTouchStart={(e) => handleHandleTouchStart('b', e)} style={{ cursor: 'ns-resize', pointerEvents: 'auto' }} />
-                  <span className="skf-crop-handle skf-crop-handle-l" onMouseDown={(e) => handleHandleMouseDown('l', e)} onTouchStart={(e) => handleHandleTouchStart('l', e)} style={{ cursor: 'ew-resize', pointerEvents: 'auto' }} />
-                  <span className="skf-crop-handle skf-crop-handle-r" onMouseDown={(e) => handleHandleMouseDown('r', e)} onTouchStart={(e) => handleHandleTouchStart('r', e)} style={{ cursor: 'ew-resize', pointerEvents: 'auto' }} />
-                </div>
-              </div>
-              <div className="text-xs text-gray-500 mt-3 text-center">
-                Drag image to reposition, or crop window to adjust. Scroll to zoom.
-              </div>
-            </div>
-
-            <div className="skf-crop-modal-footer">
-              <div className="skf-crop-actions-left">
-                <button
-                  type="button"
-                  title="Rotate Left"
-                  className="skf-crop-btn-icon"
-                  onClick={() => handleRotate('left')}
-                >
-                  <RotateCcw size={16} />
-                </button>
-                <button
-                  type="button"
-                  title="Rotate Right"
-                  className="skf-crop-btn-icon"
-                  onClick={() => handleRotate('right')}
-                >
-                  <RotateCw size={16} />
-                </button>
-              </div>
-
-              <div className="skf-crop-actions-right">
-                <button
-                  type="button"
-                  className="skf-btn skf-btn-cancel"
-                  style={{ padding: '8px 16px', fontSize: '13px' }}
-                  onClick={() => setCropModal((prev) => ({ ...prev, isOpen: false }))}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="skf-btn skf-btn-submit"
-                  style={{ padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                  onClick={handleApplyCrop}
-                >
-                  <Check size={14} />
-                  Apply
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

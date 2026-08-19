@@ -7,8 +7,6 @@ import 'package:f2h_delivery/core/utils/app_snackbar.dart';
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/delivery_confirmation_sheet.dart';
-import 'package:f2h_delivery/features/orders/presentation/bloc/pickup_bloc.dart';
-import 'package:f2h_delivery/features/orders/data/models/pickup_item_model.dart';
 import 'package:f2h_delivery/features/orders/domain/repositories/orders_repository.dart';
 import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/services/mock_data_service.dart';

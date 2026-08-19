@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { FaWallet, FaCrown, FaCalendarCheck } from "react-icons/fa6";
+import { F2H_CUSTOMER_PLAYSTORE_URL } from "@/constants/f2hPublicAssets";
 
 /* ─── shared micro-components ─────────────────────────────────────────────── */
 const BrandIcon = () => (
@@ -476,7 +477,7 @@ export function Offers() {
                         <button
                           type="button"
                           className="f2h-voucher__cta"
-                          onClick={() => window.open("https://play.google.com/store/apps/details?id=in.swiggy.android", "_blank")}
+                          onClick={() => window.open(F2H_CUSTOMER_PLAYSTORE_URL, "_blank")}
                         >
                           {cta}
                           <ArrowRight />
@@ -515,7 +516,7 @@ export function Offers() {
                         className={`f2h-voucher__cta f2h-voucher-back__cta ${theme}`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          window.open("https://play.google.com/store/apps/details?id=in.swiggy.android", "_blank");
+                          window.open(F2H_CUSTOMER_PLAYSTORE_URL, "_blank");
                         }}
                       >
                         {cta} on App

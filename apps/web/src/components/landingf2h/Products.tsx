@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Sprout, Truck, Recycle } from "lucide-react";
+import { F2H_CUSTOMER_PLAYSTORE_URL } from "@/constants/f2hPublicAssets";
 
 // ─── Asset map ────────────────────────────────────────────────────────────────
 const ASSETS = {
@@ -273,7 +274,7 @@ export function Products() {
                   >
                     <button
                       type="button"
-                      onClick={() => window.open("https://play.google.com/store/apps/details?id=in.swiggy.android", "_blank")}
+                      onClick={() => window.open(F2H_CUSTOMER_PLAYSTORE_URL, "_blank")}
                       className="w-full text-[11px] font-bold tracking-wide rounded-xl
                         bg-[#0d3d1a] text-[#f5c842] py-1.5
                         hover:bg-[#1a6b2e] transition-colors"

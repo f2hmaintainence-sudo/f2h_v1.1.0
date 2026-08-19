@@ -78,6 +78,23 @@ class ApiEndpoints {
   static const String profileChangePass = '/delivery-partner/profile/security/change-password';
   static const String profileLogoutAll  = '/delivery-partner/profile/security/logout-all';
   static const String profileAttendance = '/delivery-partner/profile/attendance';
+  /// Referral wallet for the partner. Backed by
+  /// GET /delivery-partner/profile/referrals.
+  static const String profileReferrals  = '/delivery-partner/profile/referrals';
+
+  // ---------------------------------------------------------------------------
+  // Delivery Basket & Returnable Containers
+  // ---------------------------------------------------------------------------
+  // These routes have existed on the API since the basket controller shipped,
+  // but the constants were never added — so every call site referencing them
+  // failed to compile and the features were dead.
+  static const String basketActive        = '/delivery-partner/basket/active';
+  static const String basketSummary       = '/delivery-partner/basket/summary';
+  static const String basketReconcile     = '/delivery-partner/basket/reconcile';
+  static const String returnToHub         = '/delivery-partner/basket/products/return-hub';
+  static const String containerSummary    = '/delivery-partner/basket/containers/summary';
+  static const String submitHubContainers = '/delivery-partner/basket/containers/submit-hub';
+  static const String submitAllContainers = '/delivery-partner/basket/containers/submit-all';
   static const String profileAttendanceDayDetails = '/delivery-partner/profile/attendance/day-details';
   static const String profileLeaderboard = '/delivery-partner/profile/leaderboard';
 
