@@ -280,8 +280,11 @@ export class CartService {
             'order_items',
             {
               order_id: orderId,
+              // `order_items` keys the variant as `variant_id`. The insert also
+              // carried a `product_variant_id` column that does not exist, so every
+              // one-time checkout failed here — after the wallet had already been
+              // debited and the order row written, because there was no transaction.
               variant_id: entry.item.product_variant_id,
-              product_variant_id: entry.item.product_variant_id,
               product_name: entry.productName,
               unit_price: entry.price,
               quantity: entry.qty,
