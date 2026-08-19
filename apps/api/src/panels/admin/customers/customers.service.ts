@@ -630,13 +630,12 @@ export class CustomersService {
       const specialPricesRes = await this.databaseService.query(
         `SELECT csp.id, csp.customer_id, csp.product_variant_id, csp.discount,
                 csp.created_at, csp.updated_at,
-                pv.name AS variant_name, pv.price AS selling_price, COALESCE(pv.original_price, pv.price) AS actual_price,
+                pv.name AS variant_name,
+                COALESCE(pv.original_price, pv.price) AS original_price,
+                pv.price AS selling_price,
+                COALESCE(pv.subscription_price, pv.price) AS subscription_price,
                 p.name AS product_name, p.product_id,
-                CASE 
-                  WHEN csp.discount > 0 AND csp.discount <= 100 THEN ROUND(pv.price * (1 - (csp.discount / 100.0)), 2)
-                  WHEN csp.discount > 100 THEN GREATEST(0, pv.price - csp.discount)
-                  ELSE pv.price
-                END AS special_price
+                ROUND(COALESCE(pv.subscription_price, pv.price) * (1 - (csp.discount / 100.0)), 2) AS final_subscription_price
          FROM customer_special_prices csp
          JOIN product_variants pv ON pv.variant_id = csp.product_variant_id
          JOIN products p ON p.product_id = pv.product_id
@@ -792,13 +791,24 @@ export class CustomersService {
               total_spend: Number(p.total_spend),
             })),
           },
-          special_prices: (specialPricesRes || []).map((r: any) => ({
-            ...r,
-            selling_price: Number(r.selling_price || 0),
-            actual_price: Number(r.actual_price || 0),
-            discount: Number(r.discount || 0),
-            special_price: Number(r.special_price || 0),
-          })),
+          special_prices: (specialPricesRes || []).map((r: any) => {
+            const originalPrice = Number(r.original_price || 0);
+            const subscriptionPrice = Number(r.subscription_price || 0);
+            const finalSubPrice = Number(r.final_subscription_price || 0);
+            const discount = Number(r.discount || 0);
+            const overallSavingsPct = originalPrice > 0
+              ? parseFloat((((originalPrice - finalSubPrice) / originalPrice) * 100).toFixed(2))
+              : 0;
+            return {
+              ...r,
+              original_price: originalPrice,
+              selling_price: Number(r.selling_price || 0),
+              subscription_price: subscriptionPrice,
+              discount: discount,
+              final_subscription_price: finalSubPrice,
+              overall_savings_pct: overallSavingsPct,
+            };
+          }),
           smart_insights: insights,
           activity_timeline: timelineEvents,
         },
@@ -1834,14 +1844,12 @@ export class CustomersService {
       const rows = await this.databaseService.query(
         `SELECT csp.id, csp.customer_id, csp.product_variant_id, csp.discount,
                 csp.created_at, csp.updated_at,
-                pv.name AS variant_name, pv.price AS selling_price,
-                COALESCE(pv.original_price, pv.price) AS actual_price,
+                pv.name AS variant_name,
+                COALESCE(pv.original_price, pv.price) AS original_price,
+                pv.price AS selling_price,
+                COALESCE(pv.subscription_price, pv.price) AS subscription_price,
                 p.name AS product_name, p.product_id,
-                CASE 
-                  WHEN csp.discount > 0 AND csp.discount <= 100 THEN ROUND(pv.price * (1 - (csp.discount / 100.0)), 2)
-                  WHEN csp.discount > 100 THEN GREATEST(0, pv.price - csp.discount)
-                  ELSE pv.price
-                END AS special_price
+                ROUND(COALESCE(pv.subscription_price, pv.price) * (1 - (csp.discount / 100.0)), 2) AS final_subscription_price
          FROM customer_special_prices csp
          JOIN product_variants pv ON pv.variant_id = csp.product_variant_id
          JOIN products p ON p.product_id = pv.product_id
@@ -1851,13 +1859,24 @@ export class CustomersService {
       );
       return {
         status: true,
-        data: rows.map((r: any) => ({
-          ...r,
-          actual_price: Number(r.actual_price || 0),
-          selling_price: Number(r.selling_price || 0),
-          discount: Number(r.discount || 0),
-          special_price: Number(r.special_price || 0),
-        })),
+        data: rows.map((r: any) => {
+          const subPrice = Number(r.subscription_price || 0);
+          const finalSubPrice = Number(r.final_subscription_price || 0);
+          const originalPrice = Number(r.original_price || 0);
+          const discount = Number(r.discount || 0);
+          const overallSavingsPct = originalPrice > 0
+            ? parseFloat(((( originalPrice - finalSubPrice) / originalPrice) * 100).toFixed(2))
+            : 0;
+          return {
+            ...r,
+            original_price: originalPrice,
+            selling_price: Number(r.selling_price || 0),
+            subscription_price: subPrice,
+            discount: discount,
+            final_subscription_price: finalSubPrice,
+            overall_savings_pct: overallSavingsPct,
+          };
+        }),
       };
     } catch (error) {
       this.developer.error('getSpecialPrices error', { error });
@@ -1868,7 +1887,7 @@ export class CustomersService {
 
   async saveSpecialPrices(
     customerId: string,
-    items: Array<{ product_variant_id: string; discount: number }>,
+    items: Array<{ product_variant_id: string; final_subscription_price?: number; discount?: number; variant_id?: string }>,
     adminId: string,
   ) {
     try {
@@ -1876,17 +1895,70 @@ export class CustomersService {
         throw new BadRequestException('No items provided');
       }
       for (const item of items) {
-        const discount = Number(item.discount ?? 0);
-        if (discount < 0 || discount > 100) {
-          throw new BadRequestException(`Discount must be between 0 and 100 — got ${discount}`);
+        const variantId = item.product_variant_id || item.variant_id;
+        if (!variantId) {
+          throw new BadRequestException('Product variant ID is required');
         }
-        // Upsert: insert or update on conflict
+
+        // Fetch the current subscription_price and selling price for this variant
+        const variantRows = await this.databaseService.query(
+          `SELECT COALESCE(subscription_price, price) AS subscription_price, price, original_price 
+           FROM product_variants WHERE variant_id = $1`,
+          [variantId],
+        );
+        if (!variantRows || variantRows.length === 0) {
+          throw new BadRequestException(`Variant not found: ${variantId}`);
+        }
+        const subscriptionPrice = Number(variantRows[0].subscription_price || variantRows[0].price || 0);
+
+        let discount: number;
+
+        if (item.final_subscription_price !== undefined && item.final_subscription_price !== null) {
+          const finalPrice = Number(item.final_subscription_price);
+
+          if (finalPrice < 0) {
+            throw new BadRequestException(`Final subscription price cannot be negative`);
+          }
+          if (finalPrice > subscriptionPrice && subscriptionPrice > 0) {
+            throw new BadRequestException(
+              `Final subscription price (₹${finalPrice}) cannot exceed subscription price (₹${subscriptionPrice})`,
+            );
+          }
+
+          if (finalPrice === subscriptionPrice) {
+            discount = 0;
+          } else if (finalPrice === 0) {
+            discount = 100;
+          } else {
+            // Formula: ((subscription_price - final_subscription_price) / subscription_price) * 100
+            discount = subscriptionPrice > 0
+              ? parseFloat((((subscriptionPrice - finalPrice) / subscriptionPrice) * 100).toFixed(2))
+              : 0;
+          }
+        } else {
+          // Legacy: direct discount percentage provided
+          discount = Number(item.discount ?? 0);
+        }
+
+        if (discount < 0 || discount > 100) {
+          throw new BadRequestException(`Calculated discount out of range: ${discount}`);
+        }
+
+        const calculatedFinalPrice = subscriptionPrice > 0
+          ? parseFloat((subscriptionPrice * (1 - (discount / 100.0))).toFixed(2))
+          : 0;
+
+        // Upsert: store discount_percentage as single source of truth
         await this.databaseService.query(
-          `INSERT INTO customer_special_prices (customer_id, product_variant_id, discount, created_at, updated_at)
-           VALUES ($1, $2, $3, NOW(), NOW())
+          `INSERT INTO customer_special_prices (customer_id, product_variant_id, discount, discount_percentage, special_price, created_at, updated_at)
+           VALUES ($1, $2, $3, $3, $4, NOW(), NOW())
            ON CONFLICT (customer_id, product_variant_id)
-           DO UPDATE SET discount = EXCLUDED.discount, updated_at = NOW(), deleted_at = NULL`,
-          [customerId, item.product_variant_id, discount],
+           DO UPDATE SET discount = EXCLUDED.discount,
+                         discount_percentage = EXCLUDED.discount_percentage,
+                         special_price = EXCLUDED.special_price,
+                         updated_at = NOW(),
+                         deleted_at = NULL`,
+          [customerId, variantId, discount, calculatedFinalPrice],
         );
       }
       return { status: true, message: `Special prices saved for ${items.length} variant(s)` };
@@ -1943,14 +2015,11 @@ export class CustomersService {
           pv.name AS variant_name,
           pv.product_id,
           p.name AS product_name,
-          COALESCE(pv.original_price, pv.price) AS actual_price,
+          COALESCE(pv.original_price, pv.price) AS original_price,
           pv.price AS selling_price,
-          csp.discount,
-          CASE 
-            WHEN csp.discount > 0 AND csp.discount <= 100 THEN ROUND(pv.price * (1 - (csp.discount / 100.0)), 2)
-            WHEN csp.discount > 100 THEN GREATEST(0, pv.price - csp.discount)
-            ELSE pv.price
-          END AS special_price,
+          COALESCE(pv.subscription_price, pv.price) AS subscription_price,
+          COALESCE(csp.discount_percentage, csp.discount, 0) AS discount,
+          ROUND(COALESCE(pv.subscription_price, pv.price) * (1 - (COALESCE(csp.discount_percentage, csp.discount, 0) / 100.0)), 2) AS final_subscription_price,
           csp.created_at,
           csp.updated_at
         FROM customer_special_prices csp
@@ -1965,7 +2034,7 @@ export class CustomersService {
 
       const totalRules = rows.length;
       const uniqueCustomers = new Set(rows.map((r: any) => r.customer_id)).size;
-      const avgDiscount = totalRules > 0 
+      const avgDiscount = totalRules > 0
         ? (rows.reduce((acc: number, r: any) => acc + Number(r.discount || 0), 0) / totalRules).toFixed(1)
         : '0';
 
@@ -1976,23 +2045,34 @@ export class CustomersService {
           unique_customers: uniqueCustomers,
           avg_discount: avgDiscount,
         },
-        data: rows.map((r: any) => ({
-          id: r.id,
-          customer_id: r.customer_id,
-          customer_name: r.customer_name || 'Customer',
-          customer_email: r.customer_email,
-          customer_phone: r.customer_phone,
-          product_id: r.product_id,
-          product_name: r.product_name,
-          product_variant_id: r.product_variant_id,
-          variant_name: r.variant_name,
-          actual_price: Number(r.actual_price || 0),
-          selling_price: Number(r.selling_price || 0),
-          discount: Number(r.discount || 0),
-          special_price: Number(r.special_price || 0),
-          created_at: r.created_at,
-          updated_at: r.updated_at,
-        })),
+        data: rows.map((r: any) => {
+          const originalPrice = Number(r.original_price || 0);
+          const subscriptionPrice = Number(r.subscription_price || 0);
+          const finalSubPrice = Number(r.final_subscription_price || 0);
+          const discount = Number(r.discount || 0);
+          const overallSavingsPct = originalPrice > 0
+            ? parseFloat((((originalPrice - finalSubPrice) / originalPrice) * 100).toFixed(2))
+            : 0;
+          return {
+            id: r.id,
+            customer_id: r.customer_id,
+            customer_name: r.customer_name || 'Customer',
+            customer_email: r.customer_email,
+            customer_phone: r.customer_phone,
+            product_id: r.product_id,
+            product_name: r.product_name,
+            product_variant_id: r.product_variant_id,
+            variant_name: r.variant_name,
+            original_price: originalPrice,
+            selling_price: Number(r.selling_price || 0),
+            subscription_price: subscriptionPrice,
+            discount: discount,
+            final_subscription_price: finalSubPrice,
+            overall_savings_pct: overallSavingsPct,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+          };
+        }),
       };
     } catch (error) {
       this.developer.error('getSpecialPricesTable error', { error });

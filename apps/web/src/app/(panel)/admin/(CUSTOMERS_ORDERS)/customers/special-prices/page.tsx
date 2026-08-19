@@ -33,10 +33,12 @@ interface SpecialPriceItem {
   product_name: string;
   product_variant_id: string;
   variant_name: string;
-  actual_price: number;
+  original_price: number;
   selling_price: number;
-  discount: number;
-  special_price: number;
+  subscription_price: number;
+  discount: number;              // stored discount_percentage
+  final_subscription_price: number;
+  overall_savings_pct: number;
   created_at: string;
   updated_at: string;
 }
@@ -309,25 +311,26 @@ export default function CustomerSpecialPricesPage() {
             <thead className="bg-slate-100/80 text-slate-500 text-xs uppercase tracking-wider border-b border-gray-200 font-bold">
               <tr>
                 <th className="py-3.5 px-4">Customer / Product & Variant</th>
-                <th className="py-3.5 px-4 text-right">Actual Price</th>
-                <th className="py-3.5 px-4 text-right">Standard Selling</th>
+                <th className="py-3.5 px-4 text-right">Original Price</th>
+                <th className="py-3.5 px-4 text-right">Selling Price</th>
+                <th className="py-3.5 px-4 text-right">Sub Price</th>
+                <th className="py-3.5 px-4 text-right">Final Sub Price</th>
                 <th className="py-3.5 px-4 text-center">Overall Savings</th>
-                <th className="py-3.5 px-4 text-center">Special Discount (%)</th>
-                <th className="py-3.5 px-4 text-right">Special Price</th>
+                <th className="py-3.5 px-4 text-center">Special Discount</th>
                 <th className="py-3.5 px-4 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto text-emerald-600 mb-2" />
                     Loading special prices master table...
                   </td>
                 </tr>
               ) : customerGroups.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
                     <Tag className="w-8 h-8 mx-auto text-slate-300 mb-2" />
                     No special prices configured yet. Click &quot;Add Special Price&quot; to create rules.
                   </td>
@@ -344,7 +347,7 @@ export default function CustomerSpecialPricesPage() {
                         onClick={() => toggleCustomerExpand(group.customer_id)}
                         className="bg-slate-50/90 font-bold border-t border-b border-slate-200 hover:bg-emerald-50/40 cursor-pointer transition-colors"
                       >
-                        <td colSpan={5} className="py-3 px-4">
+                        <td colSpan={6} className="py-3 px-4">
                           <div className="flex items-center gap-3">
                             <button
                               type="button"
@@ -390,8 +393,8 @@ export default function CustomerSpecialPricesPage() {
                       {/* Nested Product Variant Rows */}
                       {!isCollapsed &&
                         group.rules.map((rule) => {
-                          const actual = rule.actual_price || rule.selling_price;
-                          const overallPct = actual > 0 ? (((actual - rule.special_price) / actual) * 100).toFixed(1) : '0';
+                          const overallPct = rule.overall_savings_pct ?? 0;
+                          const specialDiscount = rule.discount ?? 0;
 
                           return (
                             <tr key={rule.id} className="hover:bg-slate-50/70 transition-colors bg-white">
@@ -408,29 +411,33 @@ export default function CustomerSpecialPricesPage() {
                               </td>
 
                               <td className="py-3 px-4 text-right font-medium text-slate-400 line-through">
-                                ₹{rule.actual_price.toFixed(2)}
+                                ₹{(rule.original_price ?? 0).toFixed(2)}
                               </td>
 
                               <td className="py-3 px-4 text-right font-semibold text-slate-800">
                                 ₹{rule.selling_price.toFixed(2)}
                               </td>
 
+                              <td className="py-3 px-4 text-right font-semibold text-sky-700">
+                                ₹{(rule.subscription_price ?? rule.selling_price).toFixed(2)}
+                              </td>
+
+                              <td className="py-3 px-4 text-right">
+                                <span className="text-sm font-extrabold text-emerald-700 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                  ₹{(rule.final_subscription_price ?? 0).toFixed(2)}
+                                </span>
+                              </td>
+
                               <td className="py-3 px-4 text-center font-bold text-purple-700">
                                 <span className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded-md border border-purple-100 text-xs">
-                                  {overallPct}% OFF
+                                  {overallPct.toFixed(2)}% OFF
                                 </span>
                               </td>
 
                               <td className="py-3 px-4 text-center">
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
                                   <TrendingDown className="w-3.5 h-3.5 text-amber-600" />
-                                  {rule.discount}% OFF
-                                </span>
-                              </td>
-
-                              <td className="py-3 px-4 text-right">
-                                <span className="text-sm font-extrabold text-emerald-700 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-lg">
-                                  ₹{rule.special_price.toFixed(2)}
+                                  {specialDiscount.toFixed(2)}% OFF
                                 </span>
                               </td>
 

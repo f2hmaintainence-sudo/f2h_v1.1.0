@@ -96,7 +96,13 @@ export class CustomersController {
   async saveSpecialPricesRule(@Body() body: any, @Req() req: any) {
     const adminId = req.user?.user_id ?? 'system';
     const customerId = body.customer_id;
-    const items = body.items || [{ product_variant_id: body.product_variant_id, discount: body.discount }];
+    const items = body.items || [
+      {
+        product_variant_id: body.product_variant_id || body.variant_id,
+        final_subscription_price: body.final_subscription_price,
+        discount: body.discount,
+      },
+    ];
     return this.customersService.saveSpecialPrices(customerId, items, adminId);
   }
 
@@ -300,11 +306,18 @@ export class CustomersController {
   @Post(':id/special-prices')
   async saveSpecialPrices(
     @Param('id') id: string,
-    @Body() body: { items: Array<{ product_variant_id: string; discount: number }> },
+    @Body() body: any,
     @Req() req: any,
   ) {
     const adminId = req.user?.user_id ?? 'system';
-    return this.customersService.saveSpecialPrices(id, body.items, adminId);
+    const items = body.items || [
+      {
+        product_variant_id: body.product_variant_id || body.variant_id,
+        final_subscription_price: body.final_subscription_price,
+        discount: body.discount,
+      },
+    ];
+    return this.customersService.saveSpecialPrices(id, items, adminId);
   }
 
   @Delete(':id/special-prices/:variantId')

@@ -44,7 +44,9 @@ export class PricingService {
       this.developer?.debug('[PricingService] Fetching special prices for customer', { customerId });
 
       const res: any = await this.db.query(
-        `SELECT csp.product_variant_id, csp.special_price 
+        `SELECT csp.product_variant_id, 
+                COALESCE(csp.discount_percentage, csp.discount, 0) AS discount_percentage,
+                csp.special_price 
          FROM customer_special_prices csp
          LEFT JOIN customers c ON (c.customer_id = csp.customer_id OR c.id = csp.customer_id OR c.user_id = csp.customer_id)
          LEFT JOIN users u ON (u.user_id = csp.customer_id OR u.user_id = c.user_id)
@@ -56,7 +58,8 @@ export class PricingService {
            OR c.customer_id = $1 
            OR u.user_id = $1
          )
-           AND csp.deleted_at IS NULL AND csp.special_price > 0`,
+           AND csp.deleted_at IS NULL 
+           AND (csp.discount_percentage > 0 OR csp.discount > 0 OR csp.special_price > 0)`,
         [customerId],
       );
       const rows = Array.isArray(res) ? res : (res?.rows || []);
@@ -68,15 +71,15 @@ export class PricingService {
         console.log(`[PRICING FLOW] STEP 1c: ✅ Found ${rows.length} rule(s) in DB for customer "${customerId}"`);
         for (const row of rows) {
           const variantId = row.product_variant_id;
-          const specialPrice = Number(row.special_price || 0);
-          if (variantId && specialPrice > 0) {
-            specialPricesMap.set(variantId, specialPrice);
-            console.log(`[PRICING FLOW]          → variantId="${variantId}", special_price=₹${specialPrice}`);
+          const discountPct = Number(row.discount_percentage || 0);
+          if (variantId && discountPct > 0) {
+            specialPricesMap.set(variantId, discountPct);
+            console.log(`[PRICING FLOW]          → variantId="${variantId}", discount_percentage=${discountPct}%`);
           }
         }
       }
 
-      const mapEntries = Array.from(specialPricesMap.entries()).map(([vId, sp]) => `${vId}:₹${sp}`);
+      const mapEntries = Array.from(specialPricesMap.entries()).map(([vId, disc]) => `${vId}:${disc}%`);
       console.log(`[PRICING FLOW] STEP 1c: 🗺️  Special prices map built: [${mapEntries.join(', ') || 'empty'}]`);
       this.developer?.debug('[PricingService] Special prices loaded', {
         customerId,
@@ -92,11 +95,11 @@ export class PricingService {
   }
 
   /**
-   * Calculates pricing breakdown for a single variant and special price.
+   * Calculates pricing breakdown for a single variant dynamically from stored discount.
    *
-   * WORKFLOW STEP 2: Apply special price directly to get final_subscription_price.
+   * WORKFLOW STEP 2: Apply special discount directly to get final_subscription_price.
    */
-  calculateVariantPrice(variant: any, specialPriceInput: number = 0): CalculatedPrice {
+  calculateVariantPrice(variant: any, discountPercentageInput: number = 0): CalculatedPrice {
     const variantId = variant?.variant_id || variant?.id || 'unknown';
     const price = Number(variant?.price || 0);
     const rawOriginalPrice = variant?.original_price != null ? Number(variant.original_price) : 0;
@@ -107,21 +110,23 @@ export class PricingService {
     const isSubscribable = variant?.is_subscribable === true || variant?.is_subscribable === 1;
     const subscriptionPrice = (isSubscribable && rawSubPrice > 0) ? rawSubPrice : price;
 
-    const specialPrice = Number(specialPriceInput || 0);
+    const storedDiscount = Number(discountPercentageInput || 0);
 
     // ── STEP 2: Calculate prices ─────────────────────────────────────────────
-    if (specialPrice > 0 && isSubscribable && rawSubPrice > 0) {
-      // Special price directly overrides subscription price — never one-time price
+    if (storedDiscount > 0 && isSubscribable && rawSubPrice > 0) {
+      // Special discount dynamically overrides subscription price — never one-time price
       const finalPrice = price; // one-time price stays unchanged
-      const finalSubPrice = Math.max(0, specialPrice);
+      const finalSubPrice = Math.max(
+        0,
+        Math.round(subscriptionPrice * (1 - (storedDiscount / 100.0)) * 100) / 100,
+      );
       const discountAmount = Math.max(0, Math.round((subscriptionPrice - finalSubPrice) * 100) / 100);
-      const discountPercentage = subscriptionPrice > 0 ? Math.round(((subscriptionPrice - finalSubPrice) / subscriptionPrice) * 100) : 0;
 
       const result: CalculatedPrice = {
         original_price: originalPrice,
         price: price,
         subscription_price: subscriptionPrice,
-        discount_percentage: discountPercentage,
+        discount_percentage: storedDiscount,
         discount_amount: discountAmount,
         final_price: finalPrice,
         final_subscription_price: finalSubPrice,
@@ -132,12 +137,12 @@ export class PricingService {
         `[PRICING FLOW] STEP 2: 🏷️  SPECIAL PRICE applied to variant "${variantId}"\n` +
         `             MRP           : ₹${originalPrice}\n` +
         `             One-time price: ₹${price} (unchanged)\n` +
-        `             Sub price     : ₹${subscriptionPrice} → Special Price: ₹${finalSubPrice}\n` +
+        `             Sub price     : ₹${subscriptionPrice} → Discount: ${storedDiscount}% → Dynamic Special Price: ₹${finalSubPrice}\n` +
         `             has_special_price: true\n` +
         `             → Sending to app: { final_price: ${finalPrice}, final_subscription_price: ${finalSubPrice} }`
       );
       this.developer?.debug('[PricingService] Special subscription price applied to variant', {
-        variantId, specialPrice: finalSubPrice, discountPercentage, discountAmount,
+        variantId, discountPercentage: storedDiscount, discountAmount,
         price, finalPrice, subscriptionPrice, finalSubPrice,
       });
 
@@ -146,10 +151,10 @@ export class PricingService {
       // No special price — return standard pricing
       const finalSubPrice = isSubscribable && rawSubPrice > 0 ? subscriptionPrice : price;
 
-      if (specialPrice > 0) {
-        // specialPrice was provided but variant is NOT subscribable or has no sub price
+      if (storedDiscount > 0) {
+        // discount was provided but variant is NOT subscribable or has no sub price
         console.log(
-          `[PRICING FLOW] STEP 2: ⚠️  Special price ₹${specialPrice} found for variant "${variantId}" but NOT applied:\n` +
+          `[PRICING FLOW] STEP 2: ⚠️  Special discount ${storedDiscount}% found for variant "${variantId}" but NOT applied:\n` +
           `             isSubscribable=${isSubscribable}, rawSubPrice=${rawSubPrice}\n` +
           `             → Returning standard prices (no special price)`
         );

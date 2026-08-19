@@ -46,7 +46,9 @@ export class PricingService {
       this.developer?.debug('[PricingService] Fetching special prices for customer', { customerId });
 
       const res: any = await this.db.query(
-        `SELECT csp.product_variant_id, csp.special_price 
+        `SELECT csp.product_variant_id, 
+                COALESCE(csp.discount_percentage, csp.discount, 0) AS discount_percentage,
+                csp.special_price 
          FROM customer_special_prices csp
          LEFT JOIN customers c ON (c.customer_id = csp.customer_id)
          LEFT JOIN users u ON (u.user_id = csp.customer_id)
@@ -55,34 +57,35 @@ export class PricingService {
            OR c.customer_id = $1 
            OR u.user_id = $1
          )
-           AND csp.deleted_at IS NULL AND csp.special_price > 0`,
+           AND csp.deleted_at IS NULL 
+           AND (csp.discount_percentage > 0 OR csp.discount > 0 OR csp.special_price > 0)`,
         [customerId],
       );
       const rows = Array.isArray(res) ? res : (res?.rows || []);
 
-      // STEP 1c: Build map from DB rows
+      // STEP 1c: Build map from DB rows (Map<variantId, discount_percentage>)
       if (rows.length === 0) {
         this.logger.log(`[PRICING FLOW] STEP 1c: No special price rules found in DB for customer "${customerId}"`);
       } else {
         this.logger.log(`[PRICING FLOW] STEP 1c: Found ${rows.length} rule(s) in DB for customer "${customerId}"`);
         for (const row of rows) {
           const variantId = row.product_variant_id;
-          const specialPrice = Number(row.special_price || 0);
-          if (variantId && specialPrice > 0) {
-            specialPricesMap.set(variantId, specialPrice);
-            this.logger.log(`[PRICING FLOW]          -> variantId="${variantId}", special_price=Rs.${specialPrice}`);
+          const discountPct = Number(row.discount_percentage || 0);
+          if (variantId && discountPct > 0) {
+            specialPricesMap.set(variantId, discountPct);
+            this.logger.log(`[PRICING FLOW]          -> variantId="${variantId}", discount_percentage=${discountPct}%`);
           }
         }
       }
 
-      const mapEntries = Array.from(specialPricesMap.entries()).map(([vId, sp]) => `${vId}:Rs.${sp}`);
+      const mapEntries = Array.from(specialPricesMap.entries()).map(([vId, disc]) => `${vId}:${disc}%`);
       this.logger.log(`[PRICING FLOW] STEP 1c: Special prices map built = [${mapEntries.join(', ') || 'empty'}]`);
       this.developer?.debug('[PricingService] Special prices loaded', {
         customerId,
         count: specialPricesMap.size,
         entries: mapEntries,
       });
-    } catch (e) {
+    } catch (e: any) {
       console.error(`[PRICING FLOW] STEP 1 ERROR: Failed to fetch special prices for customer "${customerId}":`, e?.message || e);
       this.developer?.error('[PricingService] Error fetching customer special prices', { customerId, error: e?.message || e });
     }
@@ -91,10 +94,10 @@ export class PricingService {
   }
 
   /**
-   * WORKFLOW STEP 2 — Calculate final prices for a single variant.
-   * Special price applies directly to final_subscription_price.
+   * WORKFLOW STEP 2 — Calculate final prices for a single variant dynamically from stored discount.
+   * Special discount applies dynamically to final_subscription_price.
    */
-  calculateVariantPrice(variant: any, specialPrice: number = 0): CalculatedPrice {
+  calculateVariantPrice(variant: any, discountPercentage: number = 0): CalculatedPrice {
     const variantId = variant?.variant_id || variant?.id || 'unknown';
     const price = Number(variant?.price || 0);
     const rawOriginalPrice = variant?.original_price != null ? Number(variant.original_price) : 0;
@@ -104,22 +107,22 @@ export class PricingService {
     const isSubscribable = variant?.is_subscribable !== false && variant?.is_subscribable !== 0 && (rawSubPrice > 0 || variant?.is_subscribable === true || variant?.is_subscribable === 1);
     const subscriptionPrice = (isSubscribable && rawSubPrice > 0) ? rawSubPrice : price;
 
-    const storedSpecialPrice = Number(specialPrice || 0);
+    const storedDiscount = Number(discountPercentage || 0);
 
-    if (storedSpecialPrice > 0) {
-      // Stored special price applies directly as final subscription price
+    if (storedDiscount > 0) {
+      // Stored discount percentage applies dynamically to subscription_price
       const finalPrice = price; // one-time price is NEVER modified
-      const finalSubPrice = storedSpecialPrice;
-      const discountAmount = subscriptionPrice > storedSpecialPrice ? Math.round((subscriptionPrice - storedSpecialPrice) * 100) / 100 : 0;
-      const discountPercentage = subscriptionPrice > 0 && subscriptionPrice > storedSpecialPrice
-        ? Math.round(((subscriptionPrice - storedSpecialPrice) / subscriptionPrice) * 100 * 100) / 100
-        : 0;
+      const finalSubPrice = Math.max(
+        0,
+        Math.round(subscriptionPrice * (1 - (storedDiscount / 100.0)) * 100) / 100,
+      );
+      const discountAmount = Math.max(0, Math.round((subscriptionPrice - finalSubPrice) * 100) / 100);
 
       const result: CalculatedPrice = {
         original_price: originalPrice,
         price: price,
         subscription_price: subscriptionPrice,
-        discount_percentage: discountPercentage,
+        discount_percentage: storedDiscount,
         discount_amount: discountAmount,
         final_price: finalPrice,
         final_subscription_price: finalSubPrice,
@@ -129,11 +132,11 @@ export class PricingService {
       this.logger.log(
         `[PRICING FLOW] STEP 2: SPECIAL PRICE applied to variant "${variantId}" | ` +
         `MRP=Rs.${originalPrice} | One-time=Rs.${price} (unchanged) | ` +
-        `Sub=Rs.${subscriptionPrice} -> Direct Special Price=Rs.${finalSubPrice} | ` +
+        `Sub=Rs.${subscriptionPrice} -> Discount=${storedDiscount}% -> Dynamic Special Price=Rs.${finalSubPrice} | ` +
         `has_special_price=true | -> API sends: { final_price: ${finalPrice}, final_subscription_price: ${finalSubPrice} }`
       );
-      this.developer?.debug('[PricingService] Special price applied directly to variant', {
-        variantId, specialPrice: storedSpecialPrice, discountPercentage, discountAmount,
+      this.developer?.debug('[PricingService] Special price applied dynamically to variant', {
+        variantId, discountPercentage: storedDiscount, discountAmount,
         price, finalPrice, subscriptionPrice, finalSubPrice,
       });
 
