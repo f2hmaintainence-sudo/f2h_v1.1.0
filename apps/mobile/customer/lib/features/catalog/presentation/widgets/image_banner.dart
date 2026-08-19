@@ -118,7 +118,7 @@ class _ImageBannerState extends State<ImageBanner> {
 
     if (route == 'subscribe' || imageUrl.contains('sub_banner_1') || id.contains('sub-banner-1')) {
       final shellState = context.findAncestorStateOfType<AppShellState>();
-      shellState?.setTab(3); // Redirect to Subscription tab
+      shellState?.setTab(2); // Redirect to Subscription tab
     } else if (route == 'refer' || imageUrl.contains('sub_banner_2') || id.contains('sub-banner-2')) {
       Navigator.push(
         context,

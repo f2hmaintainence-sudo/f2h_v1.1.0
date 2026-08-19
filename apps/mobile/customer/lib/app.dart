@@ -8,7 +8,6 @@ import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 
 import 'package:f2h_customer/features/catalog/presentation/screens/home_screen.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_screen.dart'; // Contains BrowseScreen
-import 'package:f2h_customer/features/catalog/presentation/screens/cart_screen.dart';
 import 'package:f2h_customer/features/subscription/presentation/screens/my_subscriptions_screen.dart'; // Contains SubsScreen
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/core/di/injection.dart';
@@ -23,7 +22,6 @@ import 'package:f2h_customer/features/subscription/presentation/bloc/subscriptio
 import 'package:f2h_customer/features/subscription/presentation/bloc/subscription_state.dart';
 import 'package:f2h_customer/features/subscription/presentation/bloc/subscription_event.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_bloc.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_state.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_event.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/checkout/checkout_bloc.dart';
 import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_bloc.dart';
@@ -370,6 +368,186 @@ class AppShellState extends State<AppShell> {
             }
           });
         },
+      ),
+    ),
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+//  BOTTOM NAVIGATION — Home / Shop / Subscribe
+//
+//  The cart is reachable from the shop header and the floating
+//  "View cart" pill, so it does not occupy a tab of its own.
+// ══════════════════════════════════════════════════════════
+
+class _BottomNav extends StatelessWidget {
+  final List<(IconData, IconData, String)> tabs;
+  final int activeIndex;
+  final ValueChanged<int> onSelect;
+
+  const _BottomNav({
+    required this.tabs,
+    required this.activeIndex,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
+      builder: (context, sessionState) {
+        final isVip = sessionState.profile?.isMember == true;
+        final activeColor = isVip ? const Color(0xFFB8860B) : kPrimary;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: kSurface,
+            border: Border(
+              top: BorderSide(
+                color: isVip ? const Color(0xFFFFD700) : kBorderLt,
+                width: isVip ? 1.5 : 1.0,
+              ),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: List.generate(tabs.length, (i) {
+                  final tab = tabs[i];
+                  return Expanded(
+                    child: _NavItem(
+                      icon: tab.$1,
+                      activeIcon: tab.$2,
+                      label: tab.$3,
+                      isActive: i == activeIndex,
+                      activeColor: activeColor,
+                      badge: i == 2 ? const _SubscriptionBadgeCount() : null,
+                      onTap: () => onSelect(i),
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  final bool isActive;
+  final Color activeColor;
+  final Widget? badge;
+  final VoidCallback onTap;
+
+  const _NavItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+    required this.isActive,
+    required this.activeColor,
+    required this.onTap,
+    this.badge,
+  });
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    behavior: HitTestBehavior.opaque,
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      color: Colors.transparent,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedScale(
+            scale: isActive ? 1.15 : 1.0,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutBack,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isActive ? activeColor : Colors.transparent,
+                shape: BoxShape.circle,
+              ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(
+                    isActive ? activeIcon : icon,
+                    color: isActive ? Colors.white : kTextSub,
+                    size: 20,
+                  ),
+                  if (badge != null)
+                    Positioned(top: -4, right: -4, child: badge!),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 3),
+          AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 200),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+              color: isActive ? activeColor : kTextSub,
+              letterSpacing: 0.1,
+            ),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.visible,
+              softWrap: false,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Red pip carrying the number of active or paused subscriptions.
+class _SubscriptionBadgeCount extends StatelessWidget {
+  const _SubscriptionBadgeCount();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<SubscriptionBloc, SubscriptionState>(
+      builder: (context, state) {
+        var count = 0;
+        if (state is SubscriptionLoaded) {
+          count = state.subscriptions.where((s) {
+            final status = s.status.toLowerCase();
+            return status == 'active' || status == 'paused';
+          }).length;
+        }
+        if (count == 0) return const SizedBox.shrink();
+        return _CountPip(count: count);
+      },
+    );
+  }
+}
+
+class _CountPip extends StatelessWidget {
+  final int count;
+  const _CountPip({required this.count});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(3),
+    decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+    child: Text(
+      count > 99 ? '99+' : '$count',
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 7,
+        fontWeight: FontWeight.w900,
       ),
     ),
   );

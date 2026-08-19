@@ -116,7 +116,7 @@ class _PromoBannerState extends State<PromoBanner> {
     } else {
       // Default to subscribe tab (tab 3 in AppShell)
       final shellState = context.findAncestorStateOfType<AppShellState>();
-      shellState?.setTab(3);
+      shellState?.setTab(2);
     }
   }
 
