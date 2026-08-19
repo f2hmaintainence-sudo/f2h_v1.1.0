@@ -6,6 +6,7 @@ import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/core/api/api_endpoints.dart';
 import 'package:f2h_delivery/core/api/dio_client.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
+import 'package:f2h_delivery/auth/presentation/widgets/auth_kit.dart';
 
 class ForgotPasswordSheet extends StatefulWidget {
   const ForgotPasswordSheet({super.key});
@@ -22,8 +23,6 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
   final List<TextEditingController> _otpCtrl = List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _otpFocus = List.generate(6, (_) => FocusNode());
 
-  bool _obscurePass = true;
-  bool _obscureConfirm = true;
   bool _isLoading = false;
   String? _verificationToken;
   String? _errorMessage;
@@ -98,12 +97,10 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
       final dioClient = sl<DioClient>();
       await dioClient.fetchCsrfToken().timeout(const Duration(seconds: 3), onTimeout: () {});
 
-      final response = await dioClient.dio.post(
+      await dioClient.dio.post(
         ApiEndpoints.forgotPassword,
         data: isEmail ? {'email': identifier} : {'phone': identifier},
       );
-
-      final resData = Map<String, dynamic>.from(response.data as Map? ?? {});
 
       if (!mounted) return;
       setState(() {
@@ -221,10 +218,10 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return Container(
       decoration: const BoxDecoration(
-        color: kBg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      padding: EdgeInsets.fromLTRB(20, 16, 20, bottomInset + 24),
+      padding: EdgeInsets.fromLTRB(24, 16, 24, bottomInset + 28),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -247,7 +244,12 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
                 : _step == 1
                     ? 'Verify OTP'
                     : 'Reset Password',
-            style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w700, color: kText),
+            style: GoogleFonts.poppins(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: kAuthInk,
+              letterSpacing: -0.5,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
@@ -257,10 +259,21 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
                 : _step == 1
                     ? 'Enter the 6-digit OTP sent to ${_emailCtrl.text}'
                     : 'Set a secure new password for your account.',
-            style: GoogleFonts.poppins(fontSize: 13, color: kTextSub),
+            style: GoogleFonts.poppins(fontSize: 13.5, color: kAuthSubtitle, height: 1.4),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          Center(
+            child: Container(
+              width: 56,
+              height: 3.5,
+              decoration: BoxDecoration(
+                color: kPrimaryMid,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+          ),
+          const SizedBox(height: 26),
           if (_step == 0) _buildEmailInput(),
           if (_step == 1) _buildOtpInput(),
           if (_step == 2) _buildPasswordInput(),
@@ -273,27 +286,16 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          decoration: BoxDecoration(
-            color: kBgDeep,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _errorMessage != null ? kRed : kBorder, width: _errorMessage != null ? 1.5 : 1.0),
-          ),
-          child: TextField(
-            controller: _emailCtrl,
-            onChanged: (_) {
-              if (_errorMessage != null) setState(() => _errorMessage = null);
-            },
-            keyboardType: TextInputType.emailAddress,
-            style: GoogleFonts.poppins(color: kText, fontSize: 15, fontWeight: FontWeight.w500),
-            decoration: InputDecoration(
-              prefixIcon: const Icon(Icons.alternate_email_rounded, color: kMuted, size: 20),
-              hintText: 'Enter email or phone number',
-              hintStyle: GoogleFonts.poppins(color: kMuted, fontSize: 14),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            ),
-          ),
+        DeliveryAuthField(
+          controller: _emailCtrl,
+          hint: 'Enter email or phone number',
+          icon: Icons.alternate_email_rounded,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.done,
+          onChanged: (_) {
+            if (_errorMessage != null) setState(() => _errorMessage = null);
+          },
+          onSubmitted: (_) => _sendOtp(),
         ),
         if (_errorMessage != null) ...[
           const SizedBox(height: 12),
@@ -319,20 +321,10 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
           ),
         ],
         const SizedBox(height: 24),
-        SizedBox(
-          height: 54,
-          child: ElevatedButton(
-            onPressed: _isLoading ? null : _sendOtp,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kPrimary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              elevation: 0,
-            ),
-            child: _isLoading
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                : Text('Send OTP', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600)),
-          ),
+        DeliveryPrimaryButton(
+          label: 'Send OTP',
+          loading: _isLoading,
+          onTap: _isLoading ? null : _sendOtp,
         ),
       ],
     );
@@ -349,9 +341,9 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: kBgDeep,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kBorder),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: kAuthLine, width: 1.4),
               ),
               child: Center(
                 child: TextField(
@@ -389,20 +381,10 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
           ),
         ),
         const SizedBox(height: 24),
-        SizedBox(
-          height: 54,
-          child: ElevatedButton(
-            onPressed: _isLoading ? null : _verifyOtp,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kPrimary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              elevation: 0,
-            ),
-            child: _isLoading
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                : Text('Verify OTP', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600)),
-          ),
+        DeliveryPrimaryButton(
+          label: 'Verify OTP',
+          loading: _isLoading,
+          onTap: _isLoading ? null : _verifyOtp,
         ),
       ],
     );
@@ -412,60 +394,26 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          decoration: BoxDecoration(color: kBgDeep, borderRadius: BorderRadius.circular(14), border: Border.all(color: kBorder)),
-          child: TextField(
-            controller: _passwordCtrl,
-            obscureText: _obscurePass,
-            style: GoogleFonts.poppins(color: kText, fontSize: 15, fontWeight: FontWeight.w500),
-            decoration: InputDecoration(
-              prefixIcon: const Icon(Icons.lock_outline_rounded, color: kMuted, size: 20),
-              suffixIcon: IconButton(
-                icon: Icon(_obscurePass ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: kMuted, size: 20),
-                onPressed: () => setState(() => _obscurePass = !_obscurePass),
-              ),
-              hintText: 'New Password',
-              hintStyle: GoogleFonts.poppins(color: kMuted, fontSize: 14),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            ),
-          ),
+        DeliveryAuthField(
+          controller: _passwordCtrl,
+          hint: 'New Password',
+          icon: Icons.lock_outline_rounded,
+          isPassword: true,
         ),
-        const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(color: kBgDeep, borderRadius: BorderRadius.circular(14), border: Border.all(color: kBorder)),
-          child: TextField(
-            controller: _confirmPasswordCtrl,
-            obscureText: _obscureConfirm,
-            style: GoogleFonts.poppins(color: kText, fontSize: 15, fontWeight: FontWeight.w500),
-            decoration: InputDecoration(
-              prefixIcon: const Icon(Icons.lock_outline_rounded, color: kMuted, size: 20),
-              suffixIcon: IconButton(
-                icon: Icon(_obscureConfirm ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: kMuted, size: 20),
-                onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
-              ),
-              hintText: 'Confirm Password',
-              hintStyle: GoogleFonts.poppins(color: kMuted, fontSize: 14),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            ),
-          ),
+        const SizedBox(height: 22),
+        DeliveryAuthField(
+          controller: _confirmPasswordCtrl,
+          hint: 'Confirm Password',
+          icon: Icons.lock_outline_rounded,
+          isPassword: true,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _resetPassword(),
         ),
         const SizedBox(height: 24),
-        SizedBox(
-          height: 54,
-          child: ElevatedButton(
-            onPressed: _isLoading ? null : _resetPassword,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kPrimary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              elevation: 0,
-            ),
-            child: _isLoading
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                : Text('Reset Password', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600)),
-          ),
+        DeliveryPrimaryButton(
+          label: 'Reset Password',
+          loading: _isLoading,
+          onTap: _isLoading ? null : _resetPassword,
         ),
       ],
     );

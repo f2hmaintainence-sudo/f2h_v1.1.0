@@ -21,9 +21,11 @@ function getTurbopackRoot(): string {
 const internalApiUrl = process.env.INTERNAL_API_URL || 'http://localhost:5001';
 
 const nextConfig: NextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // `typescript.ignoreBuildErrors` used to be true here, so `next build` succeeded
+  // regardless of type errors across ~50k lines of TSX. Removing it surfaced real
+  // defects: query parameters silently dropped by the API client, success toasts
+  // shown on failed saves, and fields missing from response interfaces. Keep the
+  // build gated — run `npx tsc --noEmit` before adding a suppression.
   images: {
     formats: ["image/avif", "image/webp"],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],

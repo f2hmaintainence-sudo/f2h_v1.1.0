@@ -48,6 +48,9 @@ interface DeliveryPartner {
   full_name: string;
   phone?: string;
   is_available?: boolean;
+  // Partners are grouped by branch in the assignment dropdown.
+  branch_id?: string;
+  branch_name?: string;
 }
 
 const statusConfig: Record<string, { icon: any; color: string; bgColor: string; borderColor: string; label: string }> = {

@@ -148,7 +148,7 @@ export default function GenerateOrdersPage() {
   // Fetch subscription summary stats
   const fetchSubStats = useCallback(async () => {
     try {
-      const res = await api.get('/subscriptions/subscriptions/summary');
+      const res = await api.get<any>('/subscriptions/subscriptions/summary');
       if (res.data?.status && res.data?.data) {
         setSubSummary(res.data.data);
       }
@@ -170,7 +170,7 @@ export default function GenerateOrdersPage() {
         params['status'] = statusFilter;
         params['filters[0]'] = statusFilter;
       }
-      const res = await api.get('/subscriptions/subscriptions/table', { params });
+      const res = await api.get<any>('/subscriptions/subscriptions/table', { params });
       if (res.data) {
         let list: any[] = [];
         if (Array.isArray(res.data.data?.data)) {

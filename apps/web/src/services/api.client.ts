@@ -34,11 +34,35 @@ export interface RequestConfig extends Omit<RequestInit, 'body'> {
   retryOn429?: boolean;
   maxRetries?: number;
   body?: unknown;
+  /**
+   * Query parameters appended to the URL. Several pages already passed this and it
+   * was silently dropped — the requests went out with no filters at all.
+   * `undefined`, `null`, and empty-string values are omitted.
+   */
+  params?: Record<string, string | number | boolean | undefined | null>;
 }
 
 type RequestInterceptor = (config: RequestConfig & { url: string }) => Promise<RequestConfig & { url: string }>;
 type ResponseInterceptor = (response: Response, config: RequestConfig & { url: string }) => Promise<Response>;
 type ErrorInterceptor = (error: Error, config: RequestConfig & { url: string }) => Promise<never>;
+
+/** Appends query parameters, skipping values that carry no information. */
+function buildUrl(
+  url: string,
+  params?: Record<string, string | number | boolean | undefined | null>,
+): string {
+  if (!params) return url;
+
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === '') continue;
+    search.append(key, String(value));
+  }
+
+  const query = search.toString();
+  if (!query) return url;
+  return url.includes('?') ? `${url}&${query}` : `${url}?${query}`;
+}
 
 class ApiClient {
   private baseURL: string;
@@ -203,7 +227,10 @@ class ApiClient {
    */
   private async executeRequest(endpoint: string, options: RequestConfig = {}): Promise<Response> {
     const baseUrl = this.getBaseUrl();
-    const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
+    const url = buildUrl(
+      endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`,
+      options.params,
+    );
 
     // Build config
     let config: RequestConfig & { url: string } = {
@@ -222,9 +249,11 @@ class ApiClient {
       config = await interceptor(config);
     }
 
-    // Serialize body if object
+    // Serialize body if object. `params` is already folded into the URL and is not
+    // a RequestInit field, so it is stripped here.
+    const { params: _params, ...fetchable } = config;
     const fetchConfig: RequestInit = {
-      ...config,
+      ...fetchable,
       body: config.body ? JSON.stringify(config.body) : undefined,
     };
 

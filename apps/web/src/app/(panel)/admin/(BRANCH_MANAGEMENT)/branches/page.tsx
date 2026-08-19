@@ -29,6 +29,7 @@ interface Branch {
   delivery_radius_km?: number | null;
   buffer_zone?: number | null;
   allow_buffer_order?: boolean | null;
+  hex_shape?: BranchHexShape;
 }
 
 type FormState = {
@@ -42,6 +43,7 @@ type FormState = {
   buffer_zone: number;
   allow_buffer_order: boolean;
   is_active: boolean;
+  hex_shape: BranchHexShape;
 };
 
 export default function BranchesPage() {
@@ -57,6 +59,7 @@ export default function BranchesPage() {
   const emptyForm: FormState = {
     branch_name: '', branch_code: '', city: '', state: '',
     lat: null, lng: null, delivery_radius_km: 5, buffer_zone: 0, allow_buffer_order: false, is_active: true,
+    hex_shape: 'hexagon',
   };
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -228,6 +231,7 @@ export default function BranchesPage() {
       buffer_zone: Number(branch.buffer_zone) || 0,
       allow_buffer_order: !!branch.allow_buffer_order,
       is_active: branch.is_active,
+      hex_shape: normalizeHexShape(branch.hex_shape),
     });
     setError('');
     setMode('edit');

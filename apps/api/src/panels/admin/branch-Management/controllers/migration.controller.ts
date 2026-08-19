@@ -11,6 +11,7 @@ import {
 import { DatabaseService } from '../../../../shared/database/Database.service';
 import { DeveloperService } from '../../../../shared/logger/Developer.service';
 import { DeliveryRouteCron } from '../services/delivery-route.cron';
+import { RedisService } from 'src/shared/redis/redis.service';
 import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
 // ═══════════════════════════════════════════════════════════════
@@ -47,8 +48,10 @@ interface MigrationJob {
   completedAt?: Date;
 }
 
-// In-memory job store (use Redis/Bull in production for multi-instance)
-const migrationJobs = new Map<string, MigrationJob>();
+const MIGRATION_JOB_KEY = (jobId: string) => `migration_job_${jobId}`;
+// Long enough for an operator to come back and read the outcome, short enough that
+// finished jobs do not accumulate in Redis forever.
+const MIGRATION_JOB_TTL_SECONDS = 24 * 60 * 60;
 
 @Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'zone/admin', version: '1' })
@@ -57,6 +60,7 @@ export class MigrationController {
     private readonly db: DatabaseService,
     private readonly developer: DeveloperService,
     private readonly cronService: DeliveryRouteCron,
+    private readonly redis: RedisService,
   ) {}
 
   // ═══════════════════════════════════════════════════════════════
@@ -68,14 +72,18 @@ export class MigrationController {
   @Post('migrate/seed-customer-sectors')
   async seedCustomerSectors(@Body() body: { branch_id?: string }) {
     try {
-      // Count total customers to process
-      const whereClause = body.branch_id
-        ? `WHERE address_lat IS NOT NULL AND address_lng IS NOT NULL AND address_hex IS NULL AND branch_id = '${body.branch_id}'`
-        : `WHERE address_lat IS NOT NULL AND address_lng IS NOT NULL AND address_hex IS NULL`;
+      // `branch_id` used to be interpolated directly into this WHERE clause, which
+      // made an admin-supplied string part of the SQL text. It is a bound parameter
+      // now, and the clause is a constant.
+      const whereClause = `WHERE address_lat IS NOT NULL
+                             AND address_lng IS NOT NULL
+                             AND address_hex IS NULL
+                             AND ($1::varchar IS NULL OR branch_id = $1::varchar)`;
+      const whereParams = [body.branch_id ?? null];
 
       const countResult = await this.db.query(
         `SELECT COUNT(*)::int AS total FROM customers ${whereClause}`,
-        [],
+        whereParams,
       );
       const total: number = countResult?.[0]?.total || 0;
 
@@ -98,12 +106,13 @@ export class MigrationController {
         errors: [],
         startedAt: new Date(),
       };
-      migrationJobs.set(jobId, job);
+      await this._saveJob(job);
 
       // Run async (fire and forget — no await)
-      this._runSeedJob(job, whereClause).catch((err) => {
+      this._runSeedJob(job, whereClause, whereParams).catch(async (err) => {
         job.status = 'failed';
         job.errors.push(String(err));
+        await this._saveJob(job);
         this.developer.error('seedCustomerSectors job failed', { err });
       });
 
@@ -119,9 +128,35 @@ export class MigrationController {
     }
   }
 
+  /**
+   * Job state lives in Redis rather than a module-level Map. In memory it vanished
+   * on restart, and with more than one API instance a client polling
+   * `/migrate/status/:jobId` would hit a process that never ran the job and get a
+   * 400. (Running the work itself on a BullMQ queue is the fuller fix; this makes
+   * the status readable from any instance today.)
+   */
+  private async _saveJob(job: MigrationJob): Promise<void> {
+    await this.redis.put(
+      MIGRATION_JOB_KEY(job.jobId),
+      JSON.stringify(job),
+      MIGRATION_JOB_TTL_SECONDS,
+    );
+  }
+
+  private async _loadJob(jobId: string): Promise<MigrationJob | null> {
+    const raw = await this.redis.fetch<MigrationJob>(MIGRATION_JOB_KEY(jobId));
+    if (!raw) return null;
+    return typeof raw === 'string' ? JSON.parse(raw) : raw;
+  }
+
   // ── Internal: runs the actual seeding in batches of 100 ──
-  private async _runSeedJob(job: MigrationJob, whereClause: string): Promise<void> {
+  private async _runSeedJob(
+    job: MigrationJob,
+    whereClause: string,
+    whereParams: any[],
+  ): Promise<void> {
     job.status = 'running';
+    await this._saveJob(job);
     const BATCH_SIZE = 100;
     let offset = 0;
 
@@ -131,7 +166,7 @@ export class MigrationController {
          FROM customers
          ${whereClause}
          LIMIT ${BATCH_SIZE} OFFSET ${offset}`,
-        [],
+        whereParams,
       );
 
       if (!customers?.length) break;
@@ -170,10 +205,13 @@ export class MigrationController {
       }
 
       offset += BATCH_SIZE;
+      // Publish progress after each batch so a poller sees movement.
+      await this._saveJob(job);
     }
 
     job.status = 'done';
     job.completedAt = new Date();
+    await this._saveJob(job);
   }
 
   // ── Compute H3-like address hex for a lat/lng ──
@@ -199,7 +237,7 @@ export class MigrationController {
 
   @Get('migrate/status/:jobId')
   async getMigrationStatus(@Param('jobId') jobId: string) {
-    const job = migrationJobs.get(jobId);
+    const job = await this._loadJob(jobId);
     if (!job) {
       throw new BadRequestException(`Job ${jobId} not found`);
     }
@@ -220,7 +258,7 @@ export class MigrationController {
         errorCount: job.errors.length,
         startedAt: job.startedAt,
         completedAt: job.completedAt,
-        elapsedMs: Date.now() - job.startedAt.getTime(),
+        elapsedMs: Date.now() - new Date(job.startedAt).getTime(),
       },
     };
   }

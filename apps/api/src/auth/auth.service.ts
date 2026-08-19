@@ -754,7 +754,14 @@ export class AuthService {
       };
       try {
         await this.Data.insert('customers', custData);
-      } catch (_) { }
+      } catch (error) {
+        // The caller only needs the referral code back; a duplicate customer row is
+        // the expected failure here. Anything else should still be visible.
+        this.developer.warn('Customer row creation during referral setup failed', {
+          customerId: newCustId,
+          error,
+        });
+      }
       return custData;
     }
 

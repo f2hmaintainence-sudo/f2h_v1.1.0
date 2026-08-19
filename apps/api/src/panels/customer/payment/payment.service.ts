@@ -600,7 +600,11 @@ export class CustomerPaymentService {
           body: `Your bill ${billId} of ₹${amount.toFixed(0)} has been paid successfully.`,
         },
       );
-    } catch (_) {}
+    } catch (error) {
+      // Best-effort: the payment is already committed, and a failed push must not
+      // fail the request. Logged so a persistent FCM outage is still visible.
+      this.developer.warn('Bill payment push notification failed', { billId, error });
+    }
 
     return {
       status: true,
@@ -1143,7 +1147,10 @@ export class CustomerPaymentService {
           body: `Your subscription bill ${billId} of ₹${amountToPay} has been paid successfully from your wallet.`,
         },
       );
-    } catch (_) {}
+    } catch (error) {
+      // Best-effort, as above: the wallet has already been debited.
+      this.developer.warn('Subscription bill push notification failed', { billId, error });
+    }
 
     return {
       status: true,

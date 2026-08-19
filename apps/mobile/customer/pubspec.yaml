@@ -95,6 +95,8 @@ flutter:
 
   assets:
     - shorebird.yaml
+    - assets/icon/
+    - assets/icons/
 
 
   # To add custom fonts to your application, add a fonts section here,

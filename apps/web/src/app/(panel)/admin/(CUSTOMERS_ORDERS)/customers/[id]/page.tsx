@@ -1530,7 +1530,7 @@ function RevenueTrendsTab({ revenueAnalytics }: { revenueAnalytics: any }) {
                 <RechartsTooltip 
                   cursor={{ fill: '#f8fafc' }}
                   contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', fontSize: '12px', fontWeight: 'bold' }}
-                  formatter={(val: number) => [`₹${val.toLocaleString()}`, 'Revenue']}
+                  formatter={(val) => [`₹${Number(val ?? 0).toLocaleString()}`, 'Revenue']}
                 />
                 <Bar dataKey="revenue" fill="#10b981" radius={[6, 6, 0, 0]} barSize={36} />
               </BarChart>

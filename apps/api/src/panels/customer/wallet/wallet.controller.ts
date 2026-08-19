@@ -3,12 +3,11 @@ import {
   Post,
   Get,
   Body,
-  UseGuards,
   Req,
   BadRequestException,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
+import { WalletTopupDto } from './dto/wallet.dto';
 import { DataService } from 'src/shared/database/Data.service';
 import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
 import { DatabaseService } from 'src/shared/database/Database.service';
@@ -24,65 +23,77 @@ export class WalletController {
   ) {}
 
   @Post('topup')
-  @UseGuards(AuthGuard('jwt'))
-  async walletTopup(@Req() req: Request, @Body() body: any) {
-    const user = req.user as any;
-    const userId = user?.user_id;
-    const email = user?.email;
-
+  async walletTopup(@Req() req: Request, @Body() body: WalletTopupDto) {
+    const userId = (req.user as any)?.user_id;
     const amount = Number(body.amount || 0);
 
-    if (amount <= 0) {
+    if (!userId) {
+      throw new BadRequestException('Authenticated customer is required');
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
       throw new BadRequestException('Invalid topup amount');
     }
 
-    // Resolve customer via JOIN users
+    // Look the customer up strictly by id. The previous query also matched on the
+    // token's email with `LIMIT 1` and no ORDER BY, so it could return a different
+    // customer entirely — and then credit that customer's wallet.
     const custRows = await this.db.query(
       `SELECT c.customer_id, c.wallet_balance
-       FROM customers c
-       JOIN users u ON u.user_id = c.customer_id
-       WHERE c.customer_id = $1 OR (u.email IS NOT NULL AND u.email = $2 AND u.email != '')
-       LIMIT 1`,
-      [userId, email || userId],
+         FROM customers c
+        WHERE c.customer_id = $1
+        LIMIT 1`,
+      [userId],
     );
     const customer = custRows?.[0];
     if (!customer) {
       throw new BadRequestException('Customer profile not found');
     }
 
-    const currentBalance = Number(customer?.wallet_balance || 0);
-    const newBalance = currentBalance + amount;
+    // Credit and ledger entry commit together, and the credit is a single atomic
+    // statement. The previous version read the balance, added in JS, wrote it back,
+    // then wrote the ledger row separately — so two concurrent top-ups lost one
+    // credit, and a failure between the two steps left money with no ledger trail.
+    // There was also a second UPDATE keyed on `email` that overwrote `customer_id`
+    // on whatever row matched, with its error swallowed.
+    const newBalance = await this.Data.executeTransaction(async (tx) => {
+      const [rows] = await tx.query(
+        `UPDATE customers
+            SET wallet_balance = wallet_balance + $1,
+                updated_at = NOW()
+          WHERE customer_id = $2
+      RETURNING wallet_balance`,
+        [amount, customer.customer_id],
+      );
 
-    await this.Data.update(
-      'customers',
-      { wallet_balance: newBalance, updated_at: new Date() },
-      [{ column: 'customer_id', operator: '=', value: customer.customer_id }],
-    );
-    if (email) {
-      try {
-        await this.Data.update(
-          'customers',
-          { wallet_balance: newBalance, customer_id: userId, updated_at: new Date() },
-          [{ column: 'email', operator: '=', value: email }],
-        );
-      } catch (_) {}
-    }
+      if (!rows?.length) {
+        throw new BadRequestException('Customer profile not found');
+      }
+      const balanceAfter = Number(rows[0].wallet_balance);
 
-    // ponytail: compact ID to fit VARCHAR(20) column constraint
-    const ts = Math.floor(Date.now() / 1000).toString(36);
-    const rnd = Math.floor(Math.random() * 9000 + 1000);
-    const txId = `WT${ts}${rnd}`;
-    await this.Data.insert('customer_wallet_transactions', {
-      transaction_id: txId,
-      customer_id: customer.customer_id,
-      transaction_type: 'credit',
-      amount: amount,
-      balance_after: newBalance,
-      reference_type: 'topup',
-      reference_id: txId,
-      remarks: 'Wallet Topup',
-      created_by: customer.customer_id,
-      created_at: new Date(),
+      const ts = Math.floor(Date.now() / 1000).toString(36);
+      const rnd = Math.floor(Math.random() * 9000 + 1000);
+
+      this.Data.assertWritten(
+        await this.Data.insert(
+          'customer_wallet_transactions',
+          {
+            transaction_id: `WT${ts}${rnd}`,
+            customer_id: customer.customer_id,
+            transaction_type: 'credit',
+            amount,
+            balance_after: balanceAfter,
+            reference_type: 'topup',
+            reference_id: `WT${ts}${rnd}`,
+            remarks: 'Wallet Topup',
+            created_by: customer.customer_id,
+            created_at: new Date(),
+          },
+          { transaction: tx },
+        ),
+        'Wallet topup ledger entry',
+      );
+
+      return balanceAfter;
     });
 
     try {
@@ -113,8 +124,13 @@ export class WalletController {
         created_at: new Date(),
         updated_at: new Date(),
       });
-    } catch (notifErr) {
-      // Notification failure must not block wallet credit
+    } catch (error) {
+      // Best-effort: the credit is already committed, so a notification failure
+      // must not fail the request — but it should not be invisible either.
+      this.developer.warn('Wallet topup notification insert failed', {
+        customerId: customer.customer_id,
+        error,
+      });
     }
 
     try {
@@ -140,20 +156,17 @@ export class WalletController {
   }
 
   @Get('transactions')
-  @UseGuards(AuthGuard('jwt'))
   async getWalletTransactions(@Req() req: Request) {
-    const user = req.user as any;
-    const userId = user?.user_id;
-    const email = user?.email;
+    const userId = (req.user as any)?.user_id;
 
-    // Resolve customer via JOIN users
+    // By id only — matching on the token's email could return another customer's
+    // profile and expose their wallet history.
     const custRows = await this.db.query(
       `SELECT c.customer_id
-       FROM customers c
-       JOIN users u ON u.user_id = c.customer_id
-       WHERE c.customer_id = $1 OR (u.email IS NOT NULL AND u.email = $2 AND u.email != '')
-       LIMIT 1`,
-      [userId, email || userId],
+         FROM customers c
+        WHERE c.customer_id = $1
+        LIMIT 1`,
+      [userId],
     );
     const customer = custRows?.[0];
     if (!customer) {

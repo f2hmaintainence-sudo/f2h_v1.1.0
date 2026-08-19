@@ -64,22 +64,22 @@ export default function EmailIntegrationsPage() {
           `/admin/developer/api-integrations/email/${formData.id}`,
           formData
         );
-        if (res.status) {
+        if (!res.error) {
           showSuccessToast("Email SMTP configuration updated successfully");
           fetchConfigs();
         } else {
-          showErrorToast(res.message || "Failed to update configuration");
+          showErrorToast(res.error || "Failed to update configuration");
         }
       } else {
         const res = await api.post(
           "/admin/developer/api-integrations/email",
           formData
         );
-        if (res.status) {
+        if (!res.error) {
           showSuccessToast("Email SMTP configuration saved successfully");
           fetchConfigs();
         } else {
-          showErrorToast(res.message || "Failed to save configuration");
+          showErrorToast(res.error || "Failed to save configuration");
         }
       }
     } catch (err: any) {
@@ -94,11 +94,11 @@ export default function EmailIntegrationsPage() {
       const res = await api.delete(
         `/admin/developer/api-integrations/email/${id}`
       );
-      if (res.status) {
+      if (!res.error) {
         showSuccessToast("Configuration deleted successfully");
         fetchConfigs();
       } else {
-        showErrorToast(res.message || "Failed to delete configuration");
+        showErrorToast(res.error || "Failed to delete configuration");
       }
     } catch (err: any) {
       showErrorToast(err?.message || "Failed to delete configuration");
@@ -114,7 +114,7 @@ export default function EmailIntegrationsPage() {
           is_active: !config.is_active,
         }
       );
-      if (res.status) {
+      if (!res.error) {
         showSuccessToast(
           `Configuration ${!config.is_active ? "activated" : "deactivated"}`
         );

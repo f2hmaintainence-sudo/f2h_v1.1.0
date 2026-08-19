@@ -383,15 +383,15 @@ export default function ZonesPage() {
           <div className="w-[35%] flex flex-col overflow-y-auto bg-gray-50/30">
             {/* Map */}
             <div className="p-3">
+              {/* SectorMap draws the branch centre, delivery radius, and buffer
+                  ring — it does not render sectors, so selection happens in the
+                  sector list on the left. The sectors/selectedSector/onSectorClick
+                  props passed here previously were silently discarded. */}
               <SectorMap
-                sectors={sectors}
-                sectorCount={selectedBranch?.sector_count || sectors.length || 3}
                 centerLat={Number(selectedBranch?.lat)}
                 centerLng={Number(selectedBranch?.lng)}
                 radiusKm={Number(selectedBranch?.delivery_radius_km) || 5}
                 bufferZoneKm={Number(selectedBranch?.buffer_zone) || 0}
-                selectedSector={selectedSector}
-                onSectorClick={loadSectorRoutes}
                 height="280px"
               />
             </div>

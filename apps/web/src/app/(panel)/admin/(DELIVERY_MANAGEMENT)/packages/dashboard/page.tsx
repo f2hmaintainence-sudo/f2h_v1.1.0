@@ -109,11 +109,11 @@ export default function ContainersPage() {
   // Fetch Warehouses for Dynamic Dropdown
   const fetchWarehouses = useCallback(async () => {
     try {
-      const res = await api.get('/admin/warehouses/active/list');
+      const res = await api.get<any>('/admin/warehouses/active/list');
       if (res.data && res.data.data) {
         setWarehousesList(res.data.data);
       } else {
-        const tableRes = await api.get('/admin/warehouses/table');
+        const tableRes = await api.get<any>('/admin/warehouses/table');
         if (tableRes.data && tableRes.data.data) {
           setWarehousesList(tableRes.data.data);
         }
@@ -144,7 +144,7 @@ export default function ContainersPage() {
   // Fetch Package Dashboard Summary
   const fetchDashboardSummary = useCallback(async () => {
     try {
-      const res = await api.get('/admin/package/dashboard');
+      const res = await api.get<any>('/admin/package/dashboard');
       if (res.data?.data?.summary) {
         setDashboardSummary(res.data.data.summary);
       }
@@ -157,7 +157,7 @@ export default function ContainersPage() {
   const loadBalances = useCallback(async (s = search, p = page) => {
     setLoadingBalances(true);
     try {
-      const res = await api.get('/admin/package/pending', {
+      const res = await api.get<any>('/admin/package/pending', {
         params: { search: s, page: p, limit },
       });
       const data = res.data || {};
@@ -179,7 +179,7 @@ export default function ContainersPage() {
 
   const onSearchBalances = (v: string) => {
     setSearch(v);
-    clearTimeout(searchRef.current);
+    if (searchRef.current) clearTimeout(searchRef.current);
     searchRef.current = setTimeout(() => { setPage(1); loadBalances(v, 1); }, 400);
   };
 
@@ -257,7 +257,7 @@ export default function ContainersPage() {
     if (!adjusting) return;
     setSavingAdjust(true);
     try {
-      const res = await api.post('/admin/package/adjust', {
+      const res = await api.post<any>('/admin/package/adjust', {
         customer_id: adjusting.row.customer_id,
         container_type_id: adjusting.row.container_type_id,
         action: adjusting.action,

@@ -220,7 +220,15 @@ export class OrdersService {
               await this.firstOrderDetector.detectAndMarkFirstOrder(ord.customer_id, ord.order_id);
               await this.firstOrderDetector.unlockReferralCode(ord.customer_id);
               await this.referralRewardEngine.processReferralReward(ord.customer_id, ord.order_id);
-            } catch (_) {}
+            } catch (error) {
+              // One customer's referral failing must not stop the batch, but a
+              // reward that never lands is a money problem — record which order.
+              this.developer.error('Referral reward processing failed for order', {
+                orderId: ord.order_id,
+                customerId: ord.customer_id,
+                error,
+              });
+            }
           }
         }
       }

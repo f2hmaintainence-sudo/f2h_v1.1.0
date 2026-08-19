@@ -80,22 +80,22 @@ export default function SmsIntegrationsPage() {
           `/admin/developer/api-integrations/sms/${formData.id}`,
           formData
         );
-        if (res.status) {
+        if (!res.error) {
           showSuccessToast("SMS configuration updated successfully");
           fetchData();
         } else {
-          showErrorToast(res.message || "Failed to update configuration");
+          showErrorToast(res.error || "Failed to update configuration");
         }
       } else {
         const res = await api.post(
           "/admin/developer/api-integrations/sms",
           formData
         );
-        if (res.status) {
+        if (!res.error) {
           showSuccessToast("SMS configuration saved successfully");
           fetchData();
         } else {
-          showErrorToast(res.message || "Failed to save configuration");
+          showErrorToast(res.error || "Failed to save configuration");
         }
       }
     } catch (err: any) {
@@ -111,11 +111,11 @@ export default function SmsIntegrationsPage() {
       const res = await api.delete(
         `/admin/developer/api-integrations/sms/${id}`
       );
-      if (res.status) {
+      if (!res.error) {
         showSuccessToast("SMS configuration deleted");
         fetchData();
       } else {
-        showErrorToast(res.message || "Failed to delete configuration");
+        showErrorToast(res.error || "Failed to delete configuration");
       }
     } catch (err: any) {
       showErrorToast(err?.message || "Failed to delete configuration");
@@ -130,22 +130,22 @@ export default function SmsIntegrationsPage() {
           `/admin/developer/api-integrations/sms/templates/${formData.id}`,
           formData
         );
-        if (res.status) {
+        if (!res.error) {
           showSuccessToast("SMS template updated successfully");
           fetchData();
         } else {
-          showErrorToast(res.message || "Failed to update template");
+          showErrorToast(res.error || "Failed to update template");
         }
       } else {
         const res = await api.post(
           "/admin/developer/api-integrations/sms/templates",
           formData
         );
-        if (res.status) {
+        if (!res.error) {
           showSuccessToast("SMS template created successfully");
           fetchData();
         } else {
-          showErrorToast(res.message || "Failed to create template");
+          showErrorToast(res.error || "Failed to create template");
         }
       }
     } catch (err: any) {
@@ -160,11 +160,11 @@ export default function SmsIntegrationsPage() {
       const res = await api.delete(
         `/admin/developer/api-integrations/sms/templates/${id}`
       );
-      if (res.status) {
+      if (!res.error) {
         showSuccessToast("SMS template deleted");
         fetchData();
       } else {
-        showErrorToast(res.message || "Failed to delete template");
+        showErrorToast(res.error || "Failed to delete template");
       }
     } catch (err: any) {
       showErrorToast(err?.message || "Failed to delete template");

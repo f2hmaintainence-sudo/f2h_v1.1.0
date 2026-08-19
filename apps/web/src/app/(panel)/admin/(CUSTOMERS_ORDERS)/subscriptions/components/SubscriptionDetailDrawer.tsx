@@ -49,8 +49,8 @@ export default function SubscriptionDetailDrawer({
     setActionSuccess('');
     try {
       const [resView, resItems] = await Promise.all([
-        api.get(`/subscriptions/subscriptions/${id}/view`).catch(() => null),
-        api.get(`/subscriptions/subscriptions/${id}/items`).catch(() => null),
+        api.get<any>(`/subscriptions/subscriptions/${id}/view`).catch(() => null),
+        api.get<any>(`/subscriptions/subscriptions/${id}/items`).catch(() => null),
       ]);
 
       // View details parsing

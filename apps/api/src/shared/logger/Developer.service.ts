@@ -4,6 +4,56 @@ import * as winston from 'winston';
 import * as fs from 'fs';
 import * as path from 'path';
 
+/**
+ * Keys whose values must never reach a log file. The login handler used to
+ * `console.log` the whole request body — including the plaintext password — into a
+ * PM2 log, so redaction is enforced here rather than trusted to every call site.
+ */
+const REDACTED_KEYS = new Set([
+  'password',
+  'newpassword',
+  'oldpassword',
+  'confirmpassword',
+  'password_hash',
+  'token',
+  'access_token',
+  'accesstoken',
+  'refresh_token',
+  'refreshtoken',
+  'id_token',
+  'jwt',
+  'otp',
+  'secret',
+  'client_secret',
+  'authorization',
+  'cookie',
+  'api_key',
+  'apikey',
+  'fcm_token',
+  'bindings',
+]);
+
+const REDACTED = '[REDACTED]';
+
+/** Recursively replaces sensitive values. Cycles and deep nesting are bounded. */
+function redactSensitive(value: any, depth = 0, seen = new WeakSet()): any {
+  if (depth > 6 || value === null || typeof value !== 'object') return value;
+  if (seen.has(value)) return '[Circular]';
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    return value.map((item) => redactSensitive(item, depth + 1, seen));
+  }
+
+  const out: Record<string, any> = {};
+  for (const [key, item] of Object.entries(value)) {
+    out[key] = REDACTED_KEYS.has(key.toLowerCase())
+      ? REDACTED
+      : redactSensitive(item, depth + 1, seen);
+  }
+  return out;
+}
+
 @Injectable()
 export class DeveloperService {
   private logger: winston.Logger;
@@ -22,8 +72,10 @@ export class DeveloperService {
       .map((level: string) => level.trim().toLowerCase())
       .filter(Boolean);
 
+    // Default outside the source tree: the previous default ('src/logs.log') put a
+    // growing, unrotated log file inside the deployed application source.
     const configuredPath =
-      this.config.get<string>('LOG_FILE') || 'src/logs.log';
+      this.config.get<string>('LOG_FILE') || 'logs/app.log';
     this.logFilePath = path.resolve(process.cwd(), configuredPath);
     const logDir = path.dirname(this.logFilePath);
 
@@ -73,7 +125,7 @@ export class DeveloperService {
 
     this.logger.log({
       level: effectiveLevel,
-      message: this.normalizeMessage(message),
+      message: this.normalizeMessage(redactSensitive(message)),
       context: effectiveContext,
       stack: message instanceof Error ? message.stack : undefined,
     });
@@ -120,7 +172,7 @@ export class DeveloperService {
       return {};
     }
 
-    return { ...context };
+    return redactSensitive({ ...context }) as Record<string, any>;
   }
 
   private safeStringify(value: any): string {

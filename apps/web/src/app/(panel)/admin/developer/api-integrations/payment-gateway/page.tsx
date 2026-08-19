@@ -66,22 +66,22 @@ export default function PaymentGatewayIntegrationsPage() {
           `/admin/developer/api-integrations/payment-gateway/${formData.id}`,
           formData
         );
-        if (res.status) {
+        if (!res.error) {
           showSuccessToast("Payment Gateway configuration updated successfully");
           fetchConfigs();
         } else {
-          showErrorToast(res.message || "Failed to update configuration");
+          showErrorToast(res.error || "Failed to update configuration");
         }
       } else {
         const res = await api.post(
           "/admin/developer/api-integrations/payment-gateway",
           formData
         );
-        if (res.status) {
+        if (!res.error) {
           showSuccessToast("Payment Gateway configuration saved successfully");
           fetchConfigs();
         } else {
-          showErrorToast(res.message || "Failed to save configuration");
+          showErrorToast(res.error || "Failed to save configuration");
         }
       }
     } catch (err: any) {
@@ -100,11 +100,11 @@ export default function PaymentGatewayIntegrationsPage() {
       const res = await api.delete(
         `/admin/developer/api-integrations/payment-gateway/${id}`
       );
-      if (res.status) {
+      if (!res.error) {
         showSuccessToast("Configuration deleted successfully");
         fetchConfigs();
       } else {
-        showErrorToast(res.message || "Failed to delete configuration");
+        showErrorToast(res.error || "Failed to delete configuration");
       }
     } catch (err: any) {
       showErrorToast(err?.message || "Failed to delete configuration");
@@ -120,7 +120,7 @@ export default function PaymentGatewayIntegrationsPage() {
           is_active: !config.is_active,
         }
       );
-      if (res.status) {
+      if (!res.error) {
         showSuccessToast(
           `Configuration ${!config.is_active ? "activated" : "deactivated"}`
         );

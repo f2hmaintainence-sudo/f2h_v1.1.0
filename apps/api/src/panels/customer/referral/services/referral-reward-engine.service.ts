@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataService } from '../../../../shared/database/Data.service';
 import { DatabaseService } from '../../../../shared/database/Database.service';
+import { DeveloperService } from 'src/shared/logger/Developer.service';
 
 @Injectable()
 export class ReferralRewardEngineService {
@@ -9,6 +10,7 @@ export class ReferralRewardEngineService {
   constructor(
     private readonly dataService: DataService,
     private readonly db: DatabaseService,
+    private readonly developer: DeveloperService,
   ) {}
 
   /**
@@ -221,7 +223,14 @@ export class ReferralRewardEngineService {
              VALUES ($1, $2, $3, $4, $5)`,
             [notifId1, targetReferrerId, 'unread', now, now],
           );
-        } catch (_) {}
+        } catch (error) {
+          // The reward itself is already recorded in this transaction; failing to
+          // notify must not undo it. Logged so silent notification loss is visible.
+          this.developer.warn('Referrer reward notification insert failed', {
+            targetReferrerId,
+            error,
+          });
+        }
       }
 
       // ── B. Credit Referee ──────────────────────────────────────────────────────
@@ -313,7 +322,13 @@ export class ReferralRewardEngineService {
            VALUES ($1, $2, $3, $4, $5)`,
           [notifId2, realRefereeId, 'unread', now, now],
         );
-      } catch (_) {}
+      } catch (error) {
+        // Best-effort, as above.
+        this.developer.warn('Referee reward notification insert failed', {
+          realRefereeId,
+          error,
+        });
+      }
 
       await client.query('COMMIT');
 

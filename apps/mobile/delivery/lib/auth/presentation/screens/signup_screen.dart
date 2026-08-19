@@ -12,10 +12,10 @@ import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_event.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_state.dart';
-import 'package:f2h_delivery/features/onboarding/presentation/screens/welcome_intro_screen.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:f2h_delivery/app.dart';
 import 'package:f2h_delivery/auth/presentation/screens/login_screen.dart';
+import 'package:f2h_delivery/auth/presentation/widgets/auth_kit.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -47,7 +47,6 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
   bool _canResend = false;
 
   // Animations
-  late AnimationController _bgAnim;
   late AnimationController _stepAnim;
   late AnimationController _iconAnim;
 
@@ -58,7 +57,6 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
     ));
-    _bgAnim = AnimationController(vsync: this, duration: const Duration(seconds: 8))..repeat();
     _stepAnim = AnimationController(vsync: this, duration: const Duration(milliseconds: 400));
     _iconAnim = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))
       ..repeat(reverse: true);
@@ -82,7 +80,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
     for (var f in _otpFocus) {
       f.dispose();
     }
-    _bgAnim.dispose(); _stepAnim.dispose(); _iconAnim.dispose();
+    _stepAnim.dispose(); _iconAnim.dispose();
     super.dispose();
   }
 
@@ -297,11 +295,11 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
         }
       },
       child: Scaffold(
-        backgroundColor: kBg,
+        backgroundColor: Colors.white,
         body: Stack(
           children: [
-            // Animated background
-            _AnimatedBg(controller: _bgAnim),
+            // Decorated canvas shared with the login screen
+            const DeliveryAuthBackdrop(),
 
             SafeArea(
               child: Column(
@@ -435,24 +433,31 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
         ),
         const SizedBox(height: 28),
 
-        Center(
-          child: GestureDetector(
-            onTap: () => Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const LoginScreen()),
-            ),
-            child: RichText(
-              text: TextSpan(
-                text: 'Already have an account? ',
-                style: GoogleFonts.poppins(color: kTextSub, fontSize: 14),
-                children: [
-                  TextSpan(
-                    text: 'Sign In',
-                    style: GoogleFonts.poppins(color: kPrimaryMid, fontWeight: FontWeight.w700),
-                  ),
-                ],
-              ),
-            ),
+        const DeliveryAuthDivider(),
+        const SizedBox(height: 22),
+
+        BlocBuilder<AuthBloc, AuthState>(
+          builder: (context, state) {
+            final busy = _isLoading || state is AuthLoading;
+            return DeliveryGoogleButton(
+              label: 'Sign up with Google',
+              onTap: busy
+                  ? null
+                  : () {
+                      FocusScope.of(context).unfocus();
+                      context.read<AuthBloc>().add(GoogleSignInRequested());
+                    },
+            );
+          },
+        ),
+        const SizedBox(height: 30),
+
+        DeliveryAuthFooter(
+          question: 'Already have an account?',
+          action: 'Sign In',
+          onTap: () => Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
           ),
         ),
         const SizedBox(height: 40),
@@ -778,7 +783,7 @@ class _OtpBoxState extends State<_OtpBox> {
   }
 }
 
-// ─── Light Input Field ─────────────────────────────────────────────────────────
+// ─── Underlined Input Field — matches the login screen ────────────────────────
 class _LightField extends StatefulWidget {
   final TextEditingController controller;
   final String hint;
@@ -809,156 +814,87 @@ class _LightFieldState extends State<_LightField> {
   Widget build(BuildContext context) {
     return Focus(
       onFocusChange: (f) => setState(() => _focused = f),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        decoration: BoxDecoration(
-          color: _focused ? kPrimaryPl.withValues(alpha: 0.25) : kSurface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: _focused ? kPrimaryLt : kBorder,
-            width: _focused ? 1.5 : 1,
-          ),
-          boxShadow: _focused
-              ? [BoxShadow(color: kPrimaryLt.withValues(alpha: 0.12), blurRadius: 12)]
-              : [BoxShadow(color: kPrimary.withValues(alpha: 0.04), blurRadius: 6)],
-        ),
-        child: TextField(
-          controller: widget.controller,
-          keyboardType: widget.keyboard,
-          obscureText: widget.obscure,
-          onChanged: widget.onChanged,
-          style: GoogleFonts.poppins(color: kText, fontSize: 15, fontWeight: FontWeight.w500),
-          decoration: InputDecoration(
-            prefixIcon: Icon(
-              widget.icon,
-              color: _focused ? kPrimaryMid : kMuted,
-              size: 20,
-            ),
-            hintText: widget.hint,
-            hintStyle: GoogleFonts.poppins(color: kMuted, fontSize: 14),
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            suffixIcon: widget.onToggleObscure != null
-                ? IconButton(
-                    icon: Icon(
-                      widget.obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                      color: kMuted,
-                      size: 20,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                widget.icon,
+                size: 22,
+                color: _focused ? kPrimary : kPrimaryMid.withValues(alpha: 0.8),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: TextField(
+                  controller: widget.controller,
+                  keyboardType: widget.keyboard,
+                  obscureText: widget.obscure,
+                  onChanged: widget.onChanged,
+                  onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                  style: GoogleFonts.poppins(
+                    color: kAuthInk,
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: widget.hint,
+                    hintStyle: GoogleFonts.poppins(
+                      color: kAuthHint,
+                      fontSize: 15.5,
                     ),
-                    onPressed: widget.onToggleObscure,
-                  )
-                : null,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ),
+              if (widget.onToggleObscure != null)
+                IconButton(
+                  splashRadius: 20,
+                  icon: Icon(
+                    widget.obscure
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    color: kAuthHint,
+                    size: 21,
+                  ),
+                  onPressed: widget.onToggleObscure,
+                ),
+            ],
           ),
-        ),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            height: _focused ? 1.8 : 1.2,
+            color: _focused ? kPrimary : kAuthLine,
+          ),
+        ],
       ),
     );
   }
 }
 
-// ─── Green CTA Button ─────────────────────────────────────────────────────────
-class _GreenButton extends StatefulWidget {
+// ─── Green CTA Button — pill, matches the login screen ────────────────────────
+class _GreenButton extends StatelessWidget {
   final String label;
   final IconData icon;
   final bool loading;
   final VoidCallback? onTap;
-  const _GreenButton({required this.label, required this.icon, required this.loading, this.onTap});
+  const _GreenButton({
+    required this.label,
+    required this.icon,
+    required this.loading,
+    this.onTap,
+  });
 
   @override
-  State<_GreenButton> createState() => _GreenButtonState();
+  Widget build(BuildContext context) => DeliveryPrimaryButton(
+    label: label,
+    icon: icon,
+    loading: loading,
+    onTap: onTap,
+  );
 }
 
-class _GreenButtonState extends State<_GreenButton> {
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) { setState(() => _pressed = false); widget.onTap?.call(); },
-      onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.96 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        child: Container(
-          height: 58,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: widget.loading ? [kBorder, kBorder] : [kPrimaryMid, kPrimary],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: widget.loading ? [] : [
-              BoxShadow(color: kPrimary.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 8)),
-            ],
-          ),
-          child: Center(
-            child: widget.loading
-                ? const SizedBox(width: 22, height: 22,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(widget.label,
-                          style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600,
-                              color: Colors.white, letterSpacing: 0.3)),
-                      const SizedBox(width: 8),
-                      Icon(widget.icon, color: kAccent, size: 20),
-                    ],
-                  ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Animated Background ──────────────────────────────────────────────────────
-class _AnimatedBg extends StatelessWidget {
-  final AnimationController controller;
-  const _AnimatedBg({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (_, _) {
-        final t = controller.value;
-        final y = math.sin(t * math.pi * 2) * 50;
-        final x = math.cos(t * math.pi * 1.5) * 35;
-        return Stack(
-          children: [
-            Positioned(
-              top: -100 + y,
-              left: -60 + x,
-              child: Container(
-                width: 340, height: 340,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(colors: [
-                    kPrimaryPl.withValues(alpha: 0.45),
-                    Colors.transparent,
-                  ]),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: -80 - y * 0.5,
-              right: -60 - x * 0.5,
-              child: Container(
-                width: 260, height: 260,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(colors: [
-                    kAccentLt.withValues(alpha: 0.35),
-                    Colors.transparent,
-                  ]),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}

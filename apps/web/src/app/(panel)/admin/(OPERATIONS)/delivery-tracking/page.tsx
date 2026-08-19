@@ -25,7 +25,13 @@ import { io } from "socket.io-client";
 
 interface DeliveryPartner {
   delivery_partner_id: string;
+  // The API also returns the underlying account id and the row id; live GPS lookups
+  // key on all three because location pings may arrive under any of them.
+  user_id?: string;
+  id?: string;
   full_name: string;
+  current_lat?: number | string;
+  current_lng?: number | string;
   phone?: string;
   vehicle_type?: string;
   is_available?: boolean;
@@ -55,6 +61,7 @@ interface OrderItem {
 interface Order {
   order_id: string;
   customer_id?: string;
+  address_id?: string;
   customer_name: string;
   status: string;
   total_amount: number | string;

@@ -5,6 +5,7 @@ describe('ReferralRewardEngineService', () => {
   let mockDataService: any;
   let mockDatabaseService: any;
   let mockClient: any;
+  let mockDeveloperService: any;
 
   beforeEach(() => {
     mockClient = {
@@ -18,10 +19,17 @@ describe('ReferralRewardEngineService', () => {
     mockDatabaseService = {
       getClient: jest.fn().mockResolvedValue(mockClient),
     };
+    mockDeveloperService = {
+      warn: jest.fn(),
+      error: jest.fn(),
+      info: jest.fn(),
+      debug: jest.fn(),
+    };
 
     service = new ReferralRewardEngineService(
       mockDataService as any,
       mockDatabaseService as any,
+      mockDeveloperService as any,
     );
   });
 

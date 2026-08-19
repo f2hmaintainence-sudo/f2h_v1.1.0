@@ -7,7 +7,18 @@ build/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Secrets — never commit an environment file or a compose override that carries one.
 .env
+.env.*
+!.env.example
+docker-compose.override.yml
+
+# Application logs. `src/logs.log` in particular was written by a debug handler that
+# appended failed SQL and its bound parameters into the source tree.
+*.log
+apps/api/logs/
+apps/api/src/logs.log
 
 # Flutter / Dart
 .dart_tool/

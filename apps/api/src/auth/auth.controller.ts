@@ -375,7 +375,11 @@ export class AuthController {
       try {
         const decoded = this.jwtService.decode(accessToken) as any;
         userId = decoded?.sub || decoded?.user_id;
-      } catch (_) { }
+      } catch {
+        // A token that will not decode simply means "not authenticated" here; the
+        // caller already handles userId being null.
+        userId = null;
+      }
     }
     if (userId) {
       await this.authService.updateFcmToken(userId, token);

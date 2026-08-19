@@ -283,14 +283,12 @@ class AppShellState extends State<AppShell> {
   List<Widget> get _screens => [
         HomeScreen(isNavVisible: _showNav),
         BrowseScreen(isNavVisible: _showNav),
-        const CartScreen(),
         const SubsScreen(),
       ];
 
   static const _tabs = [
     (Icons.home_outlined, Icons.home_rounded, 'Home'),
-    (Icons.grid_view_outlined, Icons.grid_view_rounded, 'Menu'),
-    (Icons.shopping_cart_outlined, Icons.shopping_cart_rounded, 'Cart'),
+    (Icons.grid_view_outlined, Icons.grid_view_rounded, 'Shop'),
     (Icons.calendar_today_outlined, Icons.calendar_today_rounded, 'Subscribe'),
   ];
 
