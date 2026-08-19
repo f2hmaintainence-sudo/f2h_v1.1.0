@@ -4,7 +4,7 @@ description: Use when working in a Flutter or Dart application - building widget
 compatibility: For Flutter and Dart projects. Verify version-specific APIs against the project's pubspec.lock and the Flutter documentation for that version.
 metadata:
   category: framework
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Flutter
@@ -39,6 +39,37 @@ Test files                       <source>_test.dart
 ```
 
 `order_repository.dart` contains `OrderRepository`. That mismatch between file case and class case is **correct** and MUST NOT be "fixed". Full detail is in the `naming-conventions` skill and its ecosystem reference.
+
+## This workspace (apps/mobile)
+
+Two Flutter apps — `customer` and `delivery` — that ship as **web PWAs**, not store builds:
+
+```
+lib/
+  main.dart  app.dart  firebase_options.dart
+  core/      api  auth  cache  config  di  errors  guards  network  payments
+             services  session  utils  widgets          cross-feature infrastructure
+  features/<feature>/presentation/{screens,bloc}/        address catalog orders
+                                                        profile subscription wallet …
+  theme/
+```
+
+- State is **`flutter_bloc`** (blocs and cubits). Do not introduce Provider, Riverpod, or GetX
+  alongside it — one state mechanism per app. See `clean-code` on relocating complexity.
+- A feature MUST NOT import from another feature's `presentation/`. Shared behavior moves to
+  `core/`; session and auth state is read from the session cubit in `core/session/`, not re-derived.
+- HTTP goes through the `core/network` and `core/api` layer, which owns base URL, auth headers, and
+  error mapping. **NEVER** construct a bare `http`/`dio` client inside a screen or bloc.
+- Build and deploy are separate from the git push:
+
+```
+npm run build:customer-web     # flutter build web --release --pwa-strategy=none
+npm run deploy:customer-web    # builds, then copies to customer.f2hfresh.com
+npm run deploy:partner-web     # partner.f2hfresh.com
+```
+
+  A mobile change is **not** deployed by pushing to `main`. Say so explicitly when reporting the
+  work — see `git-workflow`.
 
 ## Widget structure
 

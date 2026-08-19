@@ -5,14 +5,26 @@ import {
   Body,
   Param,
   Query,
+  Req,
   Res,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { FinanceService } from './services/finance.service';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
-@Controller({ path: ['admin/finance', 'admin/postpaid-bills', 'customer/bills', 'bills'], version: '1' })
+/**
+ * Admin finance surface: outstanding balances, payment reports, and bill settlement.
+ *
+ * This controller previously also answered on `customer/bills` and `bills` with no
+ * guard at all, which made every subscriber's outstanding balance and every invoice
+ * PDF readable — and `POST outstandings/:id/pay` callable — without credentials.
+ * The customer-facing receipt routes now live in `CustomerBillsController` below,
+ * where they are scoped to the caller.
+ */
+@Controller({ path: ['admin/finance', 'admin/postpaid-bills'], version: '1' })
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 export class FinanceController {
   constructor(private readonly service: FinanceService) {}
 
@@ -68,13 +80,25 @@ export class FinanceController {
   }
 }
 
-@Controller({ path: 'receipt', version: '1' })
-export class ReceiptController {
+/**
+ * Receipts a customer may read. Every lookup is filtered by the customer id on the
+ * token, so an authenticated customer can only fetch their own invoices. Admins
+ * reach the same data through `FinanceController` without the scope.
+ */
+@Controller({ path: ['customer/bills', 'bills', 'receipt'], version: '1' })
+export class CustomerBillsController {
   constructor(private readonly service: FinanceService) {}
 
-  @Get(['pdf/:id', ':id/pdf'])
-  async getReceiptPdf(@Param('id') id: string, @Res() res: Response) {
-    const { buffer, filename } = await this.service.getBillReceiptPdf(id);
+  @Get(['receipt/:id/pdf', ':id/pdf', 'pdf/:id'])
+  async getOwnReceiptPdf(
+    @Param('id') id: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.service.getBillReceiptPdf(
+      id,
+      (req.user as any)?.user_id,
+    );
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${filename}"`,
@@ -83,8 +107,8 @@ export class ReceiptController {
     return res.end(buffer);
   }
 
-  @Get(':id')
-  async getReceipt(@Param('id') id: string) {
-    return await this.service.getBillReceipt(id);
+  @Get(['receipt/:id', ':id/receipt', ':id'])
+  async getOwnReceipt(@Param('id') id: string, @Req() req: Request) {
+    return await this.service.getBillReceipt(id, (req.user as any)?.user_id);
   }
 }

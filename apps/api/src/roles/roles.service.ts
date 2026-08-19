@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service';
+import { Injectable, Logger } from '@nestjs/common';
+import { DatabaseService } from '../shared/database/Database.service';
 
 export interface UserRole {
   id: number;
@@ -28,6 +28,8 @@ export interface UserWithRoles {
 
 @Injectable()
 export class RolesService {
+  private readonly logger = new Logger(RolesService.name);
+
   constructor(private readonly db: DatabaseService) {}
 
   /**
@@ -40,39 +42,38 @@ export class RolesService {
     try {
       const userResult = await this.db.query(
         `SELECT user_id, first_name, last_name, user_name, email, created_at, updated_at
-       FROM users
-       WHERE user_id = ? AND deleted_at IS NULL`,
+           FROM users
+          WHERE user_id = $1 AND deleted_at IS NULL`,
         [userId],
       );
 
-      if (!userResult || userResult.length === 0) {
-        console.warn(`[RolesService] User ${userId} not found`);
+      const user = userResult?.[0];
+      if (!user) {
+        this.logger.warn(`User ${userId} not found`);
         return null;
       }
-      const user = userResult[0];
-      const rolesResult = await this.db.query(
-        `SELECT 
-            r.role_id,
-            r.name,
-            ra.is_active,
-            ra.valid_until
-                FROM users ra
-                INNER JOIN roles r 
-                    ON ra.role_id = r.role_id
-                WHERE ra.user_id = ?
-                    AND ra.is_active = 1
-                    AND r.is_active = 1
-                    AND ra.deleted_at IS NULL`,
+
+      // Roles come from two places: explicit grants in `role_assignments` (staff) and
+      // the account's own `users.role_id` (every customer). Reading only one of them
+      // misses whole categories of user.
+      const roles = await this.db.query<UserRole>(
+        `SELECT DISTINCT r.role_id, r.name, r.description, r.is_system_role, r.is_active
+           FROM roles r
+          WHERE r.is_active = 1
+            AND (
+              r.role_id IN (
+                SELECT ra.role_id FROM role_assignments ra
+                 WHERE ra.user_id = $1 AND ra.is_active = 1 AND ra.deleted_at IS NULL
+              )
+              OR r.role_id = (SELECT u.role_id FROM users u WHERE u.user_id = $1)
+            )`,
         [userId],
       );
-      const roles = rolesResult || [];
-      const isAdmin = roles.some(
+
+      const isAdmin = (roles ?? []).some(
         (r) => r.role_id && r.role_id.toUpperCase() === 'ADMIN',
       );
-      console.log(
-        `[RolesService] User ${userId} has ${roles.length} roles, is_admin: ${isAdmin}`,
-        roles.map((r) => r.role_id),
-      );
+
       return {
         user_id: user.user_id,
         first_name: user.first_name,
@@ -81,13 +82,12 @@ export class RolesService {
         email: user.email,
         created_at: user.created_at,
         updated_at: user.updated_at,
-        roles,
+        roles: roles ?? [],
         is_admin: isAdmin,
       };
     } catch (error) {
-      console.error(
-        `[RolesService] Error fetching user with roles for ${userId}:`,
-        error,
+      this.logger.error(
+        `Error fetching user with roles for ${userId}: ${(error as Error).message}`,
       );
       return null;
     }

@@ -203,6 +203,32 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.put(key, value, ttl);
   }
 
+  /**
+   * Atomically claims `key` for `ttlSeconds`. Returns false if someone already holds
+   * it. Used to make sure only one API instance runs a given scheduled job.
+   *
+   * Unlike put(), a Redis failure here returns false rather than swallowing the
+   * error: not being able to prove exclusivity must mean "do not run".
+   */
+  async acquireLock(key: string, ttlSeconds: number): Promise<boolean> {
+    try {
+      if (!this.redis) return false;
+      const result = await this.redis.set(
+        this.prefixKey(key),
+        String(Date.now()),
+        'EX',
+        ttlSeconds,
+        'NX',
+      );
+      return result === 'OK';
+    } catch (error) {
+      this.logger.error(
+        `Error acquiring lock "${key}": ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return false;
+    }
+  }
+
   /*===============================================================================================
        fetch the data from redis and parse it with json parse
      ================================================================================================*/

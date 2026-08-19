@@ -274,7 +274,7 @@ export class CartService {
           });
           const reFetch = await this.db.query(custQuery, [customerId, email || customerId]);
           customer = reFetch?.[0];
-        } catch (_) {}
+        } catch (_) { }
       }
     }
 
@@ -309,7 +309,7 @@ export class CartService {
           ? JSON.parse(cartRow.cart_data)
           : cartRow.cart_data || []
         : [];
-    } catch (_) {}
+    } catch (_) { }
 
     // 2. Create set of checkout item variantIds
     const checkoutSet = new Set(
@@ -476,7 +476,7 @@ export class CartService {
           updated_at: new Date(),
         },
       );
-    } catch (_) {}
+    } catch (_) { }
 
     // D. Insert wallet ledger entries (ONLY for prepaid wallet orders)
     if (paymentMethod === 'wallet' && !isCod && paymentType === 'prepaid') {
@@ -613,7 +613,7 @@ export class CartService {
             updated_at: new Date(),
           },
         );
-      } catch (_) {}
+      } catch (_) { }
 
       for (const entry of group.items) {
         const itemTotal = entry.price * entry.qty;
@@ -633,7 +633,7 @@ export class CartService {
               created_at: new Date(),
             },
           );
-        } catch (_) {}
+        } catch (_) { }
       }
     }
   }

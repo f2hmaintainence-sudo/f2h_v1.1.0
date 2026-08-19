@@ -3,7 +3,7 @@ name: architecture
 description: Use when deciding how code should be organized into layers, modules, or services, and which way dependencies may point. Covers separation of concerns, dependency direction and inversion, keeping domain logic out of UI and controllers, containing data-access code, module boundaries, and avoiding god modules and circular dependencies. Triggers on "where should this logic live", "how should I structure this", adding a new module or service, introducing an interface or abstraction layer, or any change that spans presentation, business logic, and storage. Also use when reviewing whether a change fits the existing architecture, or when tempted to introduce a layered or hexagonal architecture into a project that does not already have one. Not for file and directory placement - use project-structure for that.
 metadata:
   category: foundation
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Architecture
@@ -23,6 +23,26 @@ Answer these before deciding anything:
 - Do modules depend on each other, or only on shared lower layers?
 
 The architecture you find outranks the architecture you would have chosen. Follow it unless it causes a concrete technical problem, and say so if you deviate.
+
+## This workspace
+
+The API is organized by **audience panel**, and that is the boundary that matters:
+
+```
+panels/admin   panels/customer   panels/delivery-partner      may not depend on each other
+                          ↓
+                      shared/                                  may not depend on any panel
+                          ↓
+        database · redis · auth · config (infrastructure)
+```
+
+- A panel MUST NOT import from a sibling panel. When two panels need the same logic, it moves down
+  into `apps/api/src/shared/` — it never moves sideways.
+- `shared/` MUST NOT import from a panel. If a shared service needs panel-specific behavior, the
+  panel passes it in; the dependency points inward, never back out.
+- The three panels serve different clients with different authorization models. Two panels needing
+  "the same" endpoint is usually two contracts that happen to look alike today — see the duplication
+  rules in `clean-code` before merging them.
 
 ## Choosing an architecture (new projects or new subsystems only)
 

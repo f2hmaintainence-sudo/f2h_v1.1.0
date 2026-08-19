@@ -13,7 +13,9 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../auth/jwt-auth.guard';
 import { BasketService } from '../../delivery-partner/orders/services/basket.service';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/delivery/baskets', version: '1' })
 @UseGuards(JwtAuthGuard)
 export class AdminBasketController {

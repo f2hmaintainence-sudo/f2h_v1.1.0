@@ -9,6 +9,7 @@ import { Request } from 'express';
 import * as nodemailer from 'nodemailer';
 import { ContactDto } from './dto/contact.dto';
 import { DataService } from '../../shared/database/Data.service';
+import { Public } from 'src/auth/decorators/public.decorator';
 interface RecaptchaResponse {
   success: boolean;
   challenge_ts?: string;
@@ -19,6 +20,7 @@ interface RecaptchaResponse {
 export class ContactController {
   constructor(private readonly dataService: DataService) {}
 
+  @Public()
   @Post()
   async submit(@Body() body: ContactDto, @Req() req: Request) {
     try {

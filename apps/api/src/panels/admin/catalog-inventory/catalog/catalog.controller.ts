@@ -7,8 +7,10 @@ import { CatalogSaveEditService } from './services/saveEdit.service';
 import { CatalogSubscriptionConfigService } from './services/subscriptionConfig.service';
 import { AuthService } from 'src/panels/admin/auth/auth.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
 @UseGuards(JwtAuthGuard)
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/catalog', version: '1' })
 export class CatalogController {
   constructor(

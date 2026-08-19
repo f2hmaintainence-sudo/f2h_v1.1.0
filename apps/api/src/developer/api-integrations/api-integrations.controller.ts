@@ -11,7 +11,9 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards } from '@nestjs/common';
 import { ApiIntegrationsService } from './api-integrations.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/developer/api-integrations', version: '1' })
 @UseGuards(JwtAuthGuard)
 export class ApiIntegrationsController {

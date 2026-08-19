@@ -1,7 +1,9 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AdminReferralService } from './admin-referral.service';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller('admin/referrals')
 @UseGuards(AuthGuard('jwt'))
 export class AdminReferralController {

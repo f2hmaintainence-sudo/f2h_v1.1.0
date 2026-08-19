@@ -14,6 +14,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { CustomerPaymentService } from './payment.service';
 import { DeveloperService } from 'src/shared/logger/Developer.service';
+import { CronLockService } from 'src/shared/scheduling/cron-lock.service';
 
 @Injectable()
 export class PaymentReconciliationCron {
@@ -22,11 +23,15 @@ export class PaymentReconciliationCron {
   constructor(
     private readonly paymentService: CustomerPaymentService,
     private readonly developer: DeveloperService,
+    private readonly cronLock: CronLockService,
   ) {}
 
   /** Every 10 minutes. */
   @Cron('0 */10 * * * *', { timeZone: 'Asia/Kolkata' })
   async sweepStrandedPayments(): Promise<void> {
+    // Only one instance may run this tick — see CronLockService.
+    if (!(await this.cronLock.acquire('sweepStrandedPayments', 300))) return;
+
     try {
       const { swept } = await this.paymentService.reconcileStrandedOrderPayments();
       if (swept > 0) {

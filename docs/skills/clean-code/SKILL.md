@@ -3,7 +3,7 @@ name: clean-code
 description: Use while writing or editing the body of any function, class, component, or module. Covers function size and single responsibility, cohesion and coupling, when duplication should and should not be removed, when an abstraction is premature, explicit dependencies over hidden ones, readable control flow and early returns, avoiding deep nesting, type safety without escape hatches, magic values, hidden side effects, dead code, PostgreSQL parameter binding ($1, $2), database single source of truth joins, kebab-case API routes, and comments that explain why rather than what. Triggers on writing a new function or component, editing existing logic, "clean this up", "make this readable", reviewing naming, or deciding whether to extract a helper, a base class, or a shared abstraction. Not for casing or file-naming conventions (naming-conventions), file placement (project-structure), or layering (architecture).
 metadata:
   category: foundation
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # Clean Code
@@ -29,6 +29,10 @@ All clean code in this codebase MUST comply with the following core project conv
 
 3. **Deployment & Process Verification**:
    - **MUST** test workspace build (`npm run build:api`, `npm run build:web`) and verify PM2 process health (`pm2 status`) before pushing updates.
+
+These three are restated here because they constrain code you are writing right now. Their owners
+hold the full rule and the exceptions: routes → `api-design`, SQL and schema → `database`, the build
+gate → `git-workflow`. When one changes, it changes there first.
 
 ---
 

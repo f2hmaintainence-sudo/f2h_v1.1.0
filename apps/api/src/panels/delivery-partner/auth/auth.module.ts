@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
-import { DatabaseModule } from 'src/database/database.module';
 import { RedisModule } from 'src/shared/redis/redis.module';
 import { RolesModule } from 'src/roles/roles.module';
 import { AuthService } from './auth.service';
@@ -35,7 +34,6 @@ import { PushNotificationService } from 'src/shared/pushNotifications/pushNotifi
       inject: [ConfigService],
     }),
     NotificationModule,
-    DatabaseModule,
     RedisModule,
     RolesModule,
     AuthModule,

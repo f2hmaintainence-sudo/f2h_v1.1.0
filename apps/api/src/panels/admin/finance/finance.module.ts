@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { FinanceController, ReceiptController } from './finance.controller';
+import { FinanceController, CustomerBillsController } from './finance.controller';
 import { FinanceService } from './services/finance.service';
 import { FinanceRepository } from './repository/finance.repository';
 import { NotificationModule } from 'src/notifications/notification.module';
@@ -11,7 +11,7 @@ import { DeveloperService } from 'src/shared/logger/Developer.service';
 
 @Module({
   imports: [NotificationModule, AdminAuthModule],
-  controllers: [FinanceController, ReceiptController],
+  controllers: [FinanceController, CustomerBillsController],
   providers: [
     FinanceService,
     FinanceRepository,

@@ -110,9 +110,20 @@ export class FinanceService {
     };
   }
 
-  async getBillReceipt(id: string): Promise<any> {
+  /**
+   * @param requesterCustomerId when set, the receipt must belong to this customer.
+   *   Admin callers pass `undefined`; customer-facing routes always pass the id from
+   *   the token, so a customer cannot read another customer's invoice by guessing
+   *   a bill id.
+   */
+  async getBillReceipt(id: string, requesterCustomerId?: string): Promise<any> {
     const data = await this.repository.getBillReceipt(id);
     if (!data) {
+      throw new NotFoundException(`Invoice receipt ${id} not found.`);
+    }
+    if (requesterCustomerId && data.bill?.customer_id !== requesterCustomerId) {
+      // Reported as "not found" rather than "forbidden" so the response does not
+      // confirm that a bill with this id exists.
       throw new NotFoundException(`Invoice receipt ${id} not found.`);
     }
     return {
@@ -121,8 +132,11 @@ export class FinanceService {
     };
   }
 
-  async getBillReceiptPdf(id: string): Promise<{ buffer: Buffer; filename: string }> {
-    const res = await this.getBillReceipt(id);
+  async getBillReceiptPdf(
+    id: string,
+    requesterCustomerId?: string,
+  ): Promise<{ buffer: Buffer; filename: string }> {
+    const res = await this.getBillReceipt(id, requesterCustomerId);
     const { bill, items } = res.data;
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports

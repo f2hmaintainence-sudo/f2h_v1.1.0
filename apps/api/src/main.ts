@@ -63,9 +63,24 @@ async function bootstrap() {
     roleMiddleware.use(req, res, next),
   );
 
-  // ── Increase payload size limits to allow base64 image uploads ──────────────
-  app.use(json({ limit: '50mb' }));
-  app.use(urlencoded({ extended: true, limit: '50mb' }));
+  // ── Payload size limits ────────────────────────────────────────────────────
+  // JSON parsing is synchronous, so a global 50 MB ceiling let a handful of large
+  // posts to any route (including /auth/login) block the event loop. Routes that
+  // genuinely carry base64 images get their own, larger limit below; everything
+  // else is capped at 1 MB.
+  const LARGE_BODY_ROUTES = [
+    '/api/v1/admin/catalog',
+    '/api/v1/admin/profile',
+    '/api/v1/zone/delivery',
+    '/api/v1/delivery-partner/profile',
+    '/api/v1/DeliveryPartner/profile',
+  ];
+  for (const route of LARGE_BODY_ROUTES) {
+    app.use(route, json({ limit: '15mb' }));
+    app.use(route, urlencoded({ extended: true, limit: '15mb' }));
+  }
+  app.use(json({ limit: '1mb' }));
+  app.use(urlencoded({ extended: true, limit: '1mb' }));
 
   // Essential for Throttler to see correct IP (especially on localhost/proxies)
   app.getHttpAdapter().getInstance().set('trust proxy', 'loopback');
@@ -217,14 +232,32 @@ async function bootstrap() {
   passport.serializeUser((user: any, done: any) => done(null, user));
   passport.deserializeUser((user: any, done: any) => done(null, user));
 
+  // Explicit whitelist from CORS_ORIGINS. The previous callback allowed every
+  // origin while sending credentials, so any site a logged-in admin visited could
+  // issue authenticated cross-origin requests and read the responses.
+  const allowedOrigins = (env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((value: string) => value.trim())
+    .filter(Boolean);
+
+  if (env.NODE_ENV !== 'production' && allowedOrigins.length === 0) {
+    // Local development convenience only — never reached in production, where an
+    // empty whitelist means "no browser origin is allowed" rather than "all are".
+    allowedOrigins.push(
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://127.0.0.1:3000',
+    );
+  }
+
   app.enableCors({
     origin: (origin, callback) => {
-      // Allow mobile apps (no origin), localhost, and local network
-      if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1') || origin.startsWith('http://192.168.')) {
+      // No Origin header = a native mobile app or a server-side call, not a browser
+      // cross-site request, so there is nothing for CORS to protect against.
+      if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-      // In production, add domain whitelist here
-      return callback(null, true);
+      return callback(new Error(`Origin not allowed by CORS: ${origin}`));
     },
     methods: 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
     // Compact header names (X-Role, X-Plt, X-Ver, X-Csrf) + standard headers

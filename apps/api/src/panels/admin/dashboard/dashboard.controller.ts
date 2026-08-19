@@ -1,6 +1,8 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/dashboard', version: '1' })
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}

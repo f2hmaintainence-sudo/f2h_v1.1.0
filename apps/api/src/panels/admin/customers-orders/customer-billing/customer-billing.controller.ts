@@ -1,3 +1,4 @@
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 import {
   Controller,
   Post,
@@ -18,6 +19,7 @@ import {
 /**
  * Requirement 7: Create a single API endpoint: POST /postpaid-bills/generate
  */
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'postpaid-bills', version: '1' })
 export class CustomerBillingApiController {
   constructor(private readonly service: CustomerBillingService) {}
@@ -37,6 +39,7 @@ export class CustomerBillingApiController {
 /**
  * Admin panel controllers for UI management & endpoints
  */
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/postpaid-bills', version: '1' })
 export class CustomerBillingAdminController {
   constructor(private readonly service: CustomerBillingService) {}

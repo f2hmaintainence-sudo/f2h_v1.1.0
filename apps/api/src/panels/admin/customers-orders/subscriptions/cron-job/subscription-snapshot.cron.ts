@@ -6,6 +6,7 @@ import { AuthService } from 'src/panels/admin/auth/auth.service';
 import { DeveloperService } from '../../../../../shared/logger/Developer.service';
 
 import { DatabaseService } from '../../../../../shared/database/Database.service';
+import { CronLockService } from 'src/shared/scheduling/cron-lock.service';
 
 @Injectable()
 export class SubscriptionSnapshotCron {
@@ -17,6 +18,7 @@ export class SubscriptionSnapshotCron {
     private readonly authServices: AuthService,
     private readonly developerService: DeveloperService,
     private readonly db: DatabaseService,
+    private readonly cronLock: CronLockService,
   ) { }
 
   /**
@@ -31,6 +33,9 @@ export class SubscriptionSnapshotCron {
     timeZone: 'Asia/Kolkata',
   })
   async handleMorningOrderProcessing(): Promise<void> {
+    // Only one instance may run this tick — see CronLockService.
+    if (!(await this.cronLock.acquire('handleMorningOrderProcessing', 3600))) return;
+
     const targetDate = this.snapshotService.getIstDate(1); // Next day
     const slot = 'morning' as const;
 
@@ -100,6 +105,9 @@ export class SubscriptionSnapshotCron {
     timeZone: 'Asia/Kolkata',
   })
   async handleEveningOrderProcessing(): Promise<void> {
+    // Only one instance may run this tick — see CronLockService.
+    if (!(await this.cronLock.acquire('handleEveningOrderProcessing', 3600))) return;
+
     const targetDate = this.snapshotService.getIstDate(0); // Same day
     const slot = 'evening' as const;
 

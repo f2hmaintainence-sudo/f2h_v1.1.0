@@ -10,8 +10,10 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { RefundCandidatesService } from './refund-candidates.service';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
 @UseGuards(JwtAuthGuard)
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'subscriptions/refund-candidates', version: '1' })
 export class RefundCandidatesController {
   constructor(private readonly service: RefundCandidatesService) {}

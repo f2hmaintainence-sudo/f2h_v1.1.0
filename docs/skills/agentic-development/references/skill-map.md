@@ -61,6 +61,8 @@ frameworks/laravel    "use a Form Request and $request->validated()"      framew
 
 A generic skill may say *that* something must happen (validate at the boundary). The framework skill says *how* it happens in that framework. Neither restates the other.
 
+The one deliberate exception is the project-conventions layer: a workspace rule may be restated in a skill it constrains, **provided the restatement names its owner**. See *Workspace-specific rules* below.
+
 ## Ownership boundaries
 
 Deliberately non-overlapping. When a topic appears in two skills, the owner sets the rule and the other refers to it.
@@ -92,6 +94,21 @@ Deliberately non-overlapping. When a topic appears in two skills, the owner sets
 | Reviewing a completed diff | `code-review` | Whether the change is ready |
 | Framework-imposed structure, APIs, and idioms | `frameworks/<name>` | Anything the framework dictates |
 
+## Workspace-specific rules
+
+Three rules are particular to this repository rather than to engineering in general. Each has one
+owner; other skills reference it. If you find one restated somewhere without a pointer to its owner,
+that copy is the one to fix.
+
+| Rule | Owner | Restated for context in |
+|---|---|---|
+| Route paths are lowercase `kebab-case`; legacy PascalCase survives only as a secondary array alias | `api-design` | `clean-code`, `frameworks/nestjs`, `naming-conventions` |
+| `users` owns identity; satellite tables `JOIN` it; PostgreSQL `$1` placeholders only | `database` | `clean-code`, `frameworks/nestjs`, `backend-engineering` |
+| Build both workspaces and check PM2 before pushing to `main` | `git-workflow` | `frameworks/nestjs`, `devops-docker-cicd` |
+
+The layered map still applies: these sit at the **project conventions** layer, so they override the
+generic and framework layers above them.
+
 ## Framework skills
 
 Load the one matching the detected ecosystem. Detect from the manifest and lockfile, never from habit.
@@ -112,6 +129,11 @@ Combinations are normal and expected: a Next.js project loads `nextjs` **and** `
 `frameworks/golang` covers a language rather than a framework. It sits here because Go's conventions — module layout, error wrapping, context propagation — are ecosystem-specific in the same way a framework's are.
 
 For an ecosystem with no framework skill, apply the generic skills plus the language's own style authority, and detect conventions from the repository.
+
+In this workspace the detection resolves to `nestjs` (`apps/api`), `nextjs` and `react` (`apps/web`),
+and `flutter` (`apps/mobile/*`). Those four are the only framework skills linked into
+`.claude/skills`; `laravel`, `django`, `fastapi`, and `golang` remain in `docs/skills` unlinked.
+`scripts/sync-skills.sh` re-derives this from the manifests — do not hand-edit the links.
 
 ## Conflict resolution
 

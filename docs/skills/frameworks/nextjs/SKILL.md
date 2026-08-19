@@ -4,7 +4,7 @@ description: Use when working in a Next.js application - adding routes, pages, l
 compatibility: For Next.js applications. Routing, caching, and file-convention behavior is strongly version-dependent - verify against the project's installed version.
 metadata:
   category: framework
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Next.js
@@ -28,6 +28,31 @@ One rename to be aware of: **`middleware.ts` is deprecated and renamed to `proxy
 - **Organization strategy**: are project files inside `app/`, in root-level folders, or split per route segment? Next.js is unopinionated here, so the existing choice is authoritative.
 - **Data fetching pattern**: server components fetching directly, route handlers, server actions, or a client-side library.
 - **Existing `proxy.ts` / `middleware.ts`**, and what it matches.
+
+## This workspace (apps/web)
+
+Next.js 16 with the App Router, React 19, served in production by PM2 (`frontend-f2hfresh` runs
+`next` from the root `node_modules/.bin`, not a standalone build).
+
+```
+apps/web/src/
+  app/(landing)/   public marketing pages
+  app/(auth)/      sign-in and registration
+  app/(panel)/     authenticated operator surfaces (admin, branch, inventory, developer)
+  app/appapk/      static download route
+  proxy.ts         edge proxy — Next 16's rename of middleware.ts
+  components/  hooks/  context/  services/  lib/  types/  constants/
+```
+
+- Route groups in parentheses **do not appear in the URL** — `(panel)/admin/...` serves `/admin/...`.
+  Use them to attach a different `layout.tsx`, never to shorten a path.
+- A page belongs in the group whose layout and auth posture it shares. A public page placed under
+  `(panel)` inherits the authenticated shell; that is a routing bug, not a styling one.
+- Components are grouped by surface under `src/components/` (`landingf2h/`, `admin/`, `inventory/`,
+  `shared/`). Anything used by two surfaces moves to `shared/`.
+- The API is a separate deployable. Call it over HTTP through `src/services/`; **NEVER** import from
+  `apps/api` by relative path.
+- Build gate: `npm run build:web` from the repo root. See `git-workflow`.
 
 ## Reserved file conventions
 

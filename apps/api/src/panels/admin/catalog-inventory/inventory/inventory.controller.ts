@@ -7,8 +7,10 @@ import { InventorySaveEditService } from './services/saveEdit.service';
 import { InventoryReportsService } from './services/inventory-reports.service';
 import { InventoryDashboardService } from './services/inventory-dashboard.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
 @UseGuards(JwtAuthGuard)
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/inventory', version: '1' })
 export class InventoryController {
   constructor(

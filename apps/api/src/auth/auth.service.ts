@@ -1,5 +1,7 @@
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import type { SignOptions } from 'jsonwebtoken';
 import {
   Injectable,
   UnauthorizedException,
@@ -31,6 +33,28 @@ import { DatabaseService } from 'src/shared/database/Database.service';
 import { DeveloperService } from 'src/shared/logger/Developer.service';
 import { FieldEncryptionService } from 'src/encryption/field-encryption.service';
 
+/**
+ * Converts a `jsonwebtoken` style duration ('15m', '30d', '3600') to seconds, so the
+ * Redis session registry can be given exactly the refresh token's lifetime instead of
+ * a hardcoded constant that drifts from it.
+ */
+export function parseDurationToSeconds(value: string): number {
+  const match = /^(\d+)\s*([smhdw]?)$/i.exec(String(value).trim());
+  if (!match) {
+    throw new Error(`Unsupported token duration: ${value}`);
+  }
+  const amount = Number(match[1]);
+  const unit = (match[2] || 's').toLowerCase();
+  const multiplier: Record<string, number> = {
+    s: 1,
+    m: 60,
+    h: 3600,
+    d: 86400,
+    w: 604800,
+  };
+  return amount * multiplier[unit];
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -49,6 +73,7 @@ export class AuthService {
     private readonly notificationService: NotificationService,
     private readonly fieldEncryption: FieldEncryptionService,
     private readonly developer: DeveloperService,
+    private readonly configService: ConfigService,
   ) { }
 
   /*===============================================================================================
@@ -1070,8 +1095,16 @@ export class AuthService {
     const accessJti = crypto.randomUUID();
     const refreshJti = crypto.randomUUID();
 
-    const accessTokenExpiry = '100y';
-    const refreshTokenExpiry = '100y';
+    const accessTokenExpiry = this.configService.get<string>(
+      'JWT_ACCESS_EXPIRES_IN',
+      '15m',
+    ) as SignOptions['expiresIn'];
+    const refreshTokenExpiry = this.configService.get<string>(
+      'JWT_REFRESH_EXPIRES_IN',
+      '30d',
+    ) as SignOptions['expiresIn'];
+    const refreshTokenLifetimeSeconds = parseDurationToSeconds(String(refreshTokenExpiry));
+    const accessTokenLifetimeSeconds = parseDurationToSeconds(String(accessTokenExpiry));
 
     const accessToken = this.jwtService.sign(
       {
@@ -1101,8 +1134,6 @@ export class AuthService {
     // Save session in Redis
     try {
       const now = Date.now();
-      const hundredYearsMs = 100 * 365 * 24 * 60 * 60 * 1000;
-      const hundredYearsSeconds = 100 * 365 * 24 * 60 * 60;
 
       const existing = await this.redisService.fetch(userPrefix);
       const sessionData = existing
@@ -1117,17 +1148,21 @@ export class AuthService {
         refreshJti,
         createdAt: now,
         lastUsed: now,
-        accessTokenExpiresAt: now + hundredYearsMs,
-        refreshTokenExpiresAt: now + hundredYearsMs,
+        accessTokenExpiresAt: now + accessTokenLifetimeSeconds * 1000,
+        refreshTokenExpiresAt: now + refreshTokenLifetimeSeconds * 1000,
       });
 
-      // Keep active sessions (up to 100 active sessions per user)
-      sessionData.sessions = sessionData.sessions.slice(-100);
+      // Drop sessions whose refresh token has already expired, then cap the list.
+      sessionData.sessions = sessionData.sessions
+        .filter((session: any) => (session.refreshTokenExpiresAt ?? 0) > now)
+        .slice(-100);
 
+      // The registry outlives the longest refresh token by a small margin and no
+      // more: a 100-year TTL made every leaked token a permanent credential.
       await this.redisService.put(
         userPrefix,
         JSON.stringify(sessionData),
-        hundredYearsSeconds,
+        refreshTokenLifetimeSeconds,
       );
 
       await this.storeDeviceSession({
@@ -1187,7 +1222,9 @@ export class AuthService {
           await this.redisService.put(
             userPrefix,
             JSON.stringify(parsed),
-            100 * 365 * 24 * 60 * 60,
+            parseDurationToSeconds(
+              this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '30d'),
+            ),
           );
         }
       }

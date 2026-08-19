@@ -15,6 +15,7 @@ import { DatabaseService } from 'src/shared/database/Database.service';
 import { NotificationGateway } from 'src/notifications/notification.gateway';
 import { FieldEncryptionService } from 'src/encryption/field-encryption.service';
 import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
 function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
@@ -27,6 +28,7 @@ function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): 
   return R * c;
 }
 
+@Roles(ROLE.DELIVERY_PARTNER, ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'delivery-partner/location', version: '1' })
 export class LocationController {
   constructor(

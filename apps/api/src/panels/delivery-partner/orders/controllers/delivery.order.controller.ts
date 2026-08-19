@@ -22,7 +22,9 @@ import { memoryStorage } from 'multer';
 import * as path from 'path';
 import * as fs from 'fs';
 import { DeliveryOrderService } from '../services/delivery.order.service';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
+@Roles(ROLE.DELIVERY_PARTNER, ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'delivery/orders', version: '1' })
 @UseGuards(JwtAuthGuard)
 export class DeliveryOrderController {

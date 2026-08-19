@@ -1,4 +1,7 @@
-import { Controller, Get, Post, Headers, Param, Req, Query, UnauthorizedException, BadRequestException, UseInterceptors, UploadedFile, Body } from '@nestjs/common';
+import { Controller, Get, Post, Headers, Param, Req, Query, UnauthorizedException, BadRequestException, InternalServerErrorException, UseInterceptors, UploadedFile, Body } from '@nestjs/common';
+import { timingSafeEqual } from 'crypto';
+import { Public } from './auth/decorators/public.decorator';
+import { Roles, ROLE } from './auth/decorators/roles.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -6,6 +9,30 @@ import { AppService } from './app.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { DatabaseService } from './shared/database/Database.service';
+
+/** Only these two platforms may receive an uploaded release. */
+const APK_PLATFORMS = {
+  android_customer: 'customer',
+  android_delivery: 'delivery',
+} as const;
+
+const MAX_APK_BYTES = 200 * 1024 * 1024;
+
+/**
+ * Compares a webhook secret in constant time and refuses to run at all when the
+ * secret is not configured. The previous code fell back to a literal committed in
+ * this file, so an unset environment variable silently restored a published value.
+ */
+function assertWebhookSecret(provided: string | undefined, expected: string | undefined) {
+  if (!expected) {
+    throw new InternalServerErrorException('Webhook secret is not configured');
+  }
+  const a = Buffer.from(provided ?? '');
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    throw new UnauthorizedException('Invalid or missing webhook secret');
+  }
+}
 
 @Controller({ version: '1' })
 export class AppController {
@@ -15,11 +42,13 @@ export class AppController {
     private readonly db: DatabaseService,
   ) { }
 
+  @Public()
   @Get()
   getHello(): any {
     return this.appService.getHello();
   }
 
+  @Public()
   @Get('app-version')
   getAppVersion() {
     return {
@@ -28,6 +57,7 @@ export class AppController {
     };
   }
 
+  @Public()
   @Get('device/client-config')
   async getClientConfig(@Req() req: any, @Query('role') queryRole?: string, @Query('app') queryApp?: string) {
     try {
@@ -128,6 +158,7 @@ export class AppController {
     }
   }
 
+  @Public()
   @Get('api/app-version/:appType')
   async getPublicAppVersion(@Param('appType') appType: string) {
     const platform = appType === 'delivery' ? 'android_delivery' : 'android_customer';
@@ -157,6 +188,7 @@ export class AppController {
     };
   }
 
+  @Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
   @Post('test-queue')
   async testQueue() {
     const job = await this.defaultQueue.add('test-job', {
@@ -166,20 +198,22 @@ export class AppController {
     return { message: 'Job added to queue', jobId: job.id };
   }
 
+  @Public()
   @Post('webhook/app-update')
-  async triggerAppUpdate(
-    @Headers('x-update-secret') secret: string,
-  ) {
-    // Basic protection to prevent unauthorized triggers
-    if (secret !== 'F2H_SECURE_UPDATE_WEBHOOK_SECRET_123') {
-      throw new UnauthorizedException('Invalid secret');
-    }
-
+  async triggerAppUpdate(@Headers('x-update-secret') secret: string) {
+    assertWebhookSecret(secret, process.env.F2H_APP_UPDATE_WEBHOOK_SECRET);
     return await this.appService.triggerAppUpdateNotification();
   }
 
+  @Public()
   @Post('webhook/upload-release')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: MAX_APK_BYTES },
+      fileFilter: (_req, file, cb) =>
+        cb(null, file.mimetype === 'application/vnd.android.package-archive'),
+    }),
+  )
   async uploadRelease(
     @UploadedFile() file: any,
     @Headers('x-cicd-secret') secret: string,
@@ -191,13 +225,19 @@ export class AppController {
     @Body('updateMessage') updateMessage?: string,
     @Body('releaseNotes') releaseNotes?: string,
   ) {
-    const configSecret = process.env.F2H_CI_CD_UPLOAD_SECRET || 'F2H_SECURE_UPDATE_WEBHOOK_SECRET_123';
-    if (!secret || secret !== configSecret) {
-      throw new UnauthorizedException('Invalid or missing CI/CD webhook secret');
+    assertWebhookSecret(secret, process.env.F2H_CI_CD_UPLOAD_SECRET);
+
+    // The platform is looked up in a whitelist rather than derived by string
+    // surgery. `platform.replace('android_', '')` let a value like
+    // '../../../apps/web/public' escape the upload root, and the resulting file is
+    // what the public /download pages hand to customers as a signed-looking APK.
+    const appFolder = APK_PLATFORMS[platform as keyof typeof APK_PLATFORMS];
+    if (!appFolder) {
+      throw new BadRequestException(`Unknown platform: ${platform}`);
     }
-    if (!file) throw new BadRequestException('No file provided');
-    if (!platform || !version) {
-      throw new BadRequestException('platform and version are required parameters');
+    if (!file) throw new BadRequestException('No file provided (or it was not an APK)');
+    if (!version || !/^\d+\.\d+\.\d+(\+\d+)?$/.test(version)) {
+      throw new BadRequestException('version must look like 1.0.2+9');
     }
 
     let buildNum = 1;
@@ -206,7 +246,6 @@ export class AppController {
       buildNum = parseInt(parts[1], 10) || 1;
     }
 
-    const appFolder = platform.replace('android_', ''); // 'customer' or 'delivery'
     const uploadDir = path.join(__dirname, '..', 'uploads', 'downloads', appFolder);
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
@@ -283,6 +322,7 @@ export class AppController {
     };
   }
 
+  @Public()
   @Get('app/check-version')
   async checkVersion(
     @Headers('x-app-platform') platform: string,
@@ -369,92 +409,4 @@ export class AppController {
     return 0;
   }
 
-  // ─── In-memory build job tracker ──────────────────────────────────────────
-  private buildJobs: Map<string, {
-    jobId: string;
-    appId: string;
-    action: string;
-    status: 'pending' | 'running' | 'success' | 'error';
-    startedAt: Date;
-    completedAt?: Date;
-    output?: string;
-    error?: string;
-  }> = new Map();
-
-  @Post('app/rebuild')
-  async triggerAppRebuild(@Body() body: { appId: string; action?: string }) {
-    const appId = (body?.appId || '').toLowerCase().trim();
-    const action = (body?.action || 'rebuild').toLowerCase().trim();
-    let command = '';
-
-    if (action === 'clean') {
-      if (appId === 'customer') {
-        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/customer && /opt/flutter/bin/flutter clean && /opt/flutter/bin/flutter pub get`;
-      } else if (appId === 'partner' || appId === 'delivery') {
-        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/delivery && /opt/flutter/bin/flutter clean && /opt/flutter/bin/flutter pub get`;
-      } else {
-        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/web && rm -rf .next node_modules/.cache`;
-      }
-    } else if (action === 'run' || action === 'reload') {
-      if (appId === 'customer') {
-        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/customer && /opt/flutter/bin/flutter build web --profile --no-pub && rsync -avz --delete build/web/ /home/f2hfresh-customer/htdocs/customer.f2hfresh.com/`;
-      } else if (appId === 'partner' || appId === 'delivery') {
-        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/delivery && /opt/flutter/bin/flutter build web --profile --no-pub && rsync -avz --delete build/web/ /home/f2hfresh-partner/htdocs/partner.f2hfresh.com/`;
-      } else {
-        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/web && pm2 restart frontend-f2hfresh`;
-      }
-    } else {
-      if (appId === 'customer') {
-        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/customer && /opt/flutter/bin/flutter build web --profile --no-pub && rsync -avz --delete build/web/ /home/f2hfresh-customer/htdocs/customer.f2hfresh.com/`;
-      } else if (appId === 'partner' || appId === 'delivery') {
-        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/delivery && /opt/flutter/bin/flutter build web --profile --no-pub && rsync -avz --delete build/web/ /home/f2hfresh-partner/htdocs/partner.f2hfresh.com/`;
-      } else if (appId === 'admin') {
-        command = `cd /home/f2hfresh/htdocs/f2hfresh.com/apps/web && npm run build && pm2 restart frontend-f2hfresh`;
-      } else {
-        throw new BadRequestException('Invalid appId');
-      }
-    }
-
-    // Create a unique job ID
-    const jobId = `${appId}-${action}-${Date.now()}`;
-    const job = { jobId, appId, action, status: 'running' as const, startedAt: new Date() };
-    this.buildJobs.set(jobId, job);
-
-    // Evict jobs older than 30 minutes to prevent memory leak
-    const cutoff = Date.now() - 30 * 60 * 1000;
-    for (const [id, j] of this.buildJobs.entries()) {
-      if (j.startedAt.getTime() < cutoff) this.buildJobs.delete(id);
-    }
-
-    const { exec } = await import('child_process');
-    exec(command, { maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
-      if (error) {
-        console.error(`[AppRebuild:${action}] Error building ${appId}:`, stderr || error.message);
-        this.buildJobs.set(jobId, { ...job, status: 'error', completedAt: new Date(), error: stderr || error.message, output: stdout });
-      } else {
-        console.log(`[AppRebuild:${action}] Successfully executed for ${appId}`);
-        this.buildJobs.set(jobId, { ...job, status: 'success', completedAt: new Date(), output: stdout || 'Build completed cleanly.' });
-      }
-    });
-
-    return { success: true, jobId, message: `${appId} (${action}) build started.` };
-  }
-
-  @Get('app/rebuild/status/:jobId')
-  async getBuildJobStatus(@Param('jobId') jobId: string) {
-    const job = this.buildJobs.get(jobId);
-    if (!job) {
-      return { status: 'not_found', message: 'Job not found or expired.' };
-    }
-    return {
-      jobId: job.jobId,
-      appId: job.appId,
-      action: job.action,
-      status: job.status,
-      startedAt: job.startedAt,
-      completedAt: job.completedAt,
-      output: job.output,
-      error: job.error,
-    };
-  }
 }

@@ -1048,6 +1048,8 @@ interface WriteResult {
   message: string;
 }
 
+const writeOperationLogger = new Logger('DataService.write');
+
 export async function handleWriteOperation(
   op: 'insert' | 'update' | 'upsert' | 'delete' | 'softDelete',
   conn: PoolConnection,
@@ -1153,7 +1155,12 @@ export async function handleWriteOperation(
       try {
         [result] = await conn.query(sql, bindings);
       } catch (err: any) {
-        require('fs').appendFileSync('src/logs.log', `\n[DEBUG SQL] SQL: ${sql} \n[DEBUG BINDINGS] ${JSON.stringify(bindings)}\n`);
+        // Bindings are real row values (password hashes, PII, wallet amounts) — they
+        // are deliberately not logged. The table and driver error code are enough to
+        // locate a failure without writing customer data to disk.
+        writeOperationLogger.error(
+          `Update query failed on ${table} (${err?.code ?? 'unknown'}): ${err?.message}`,
+        );
         throw err;
       }
       return {

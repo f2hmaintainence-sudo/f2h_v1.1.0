@@ -1,7 +1,9 @@
 import { Controller, Get, Post, Param, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { AnalyticsService } from './analytics.service';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/analytics', version: '1' })
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}

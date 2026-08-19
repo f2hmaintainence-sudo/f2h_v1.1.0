@@ -12,14 +12,16 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Response, Request } from 'express';
-import { AuthService } from './auth.service';
+import { AuthService, parseDurationToSeconds } from './auth.service';
 import { JwtService } from '@nestjs/jwt';
 import { RedisService } from 'src/shared/redis/redis.service';
 import { DeviceFingerprintService } from './device-fingerprint.service';
 import { AuditLoggerService } from './audit-logger.service';
 import { RegisterDto, LoginDto, SendOtpDto, VerifyOtpDto } from './dto/auth.dto';
 import { Public } from './decorators/public.decorator';
-import { DatabaseService } from 'src/database/database.service';
+import { Roles, ROLE } from './decorators/roles.decorator';
+import { Throttle } from '@nestjs/throttler';
+import { DatabaseService } from 'src/shared/database/Database.service';
 
 @Controller({ path: 'auth', version: '1' })
 export class AuthController {
@@ -34,6 +36,7 @@ export class AuthController {
 
   @Public()
   @Post('login')
+  @Throttle({ short: { limit: 10, ttl: 60_000 }, medium: { limit: 30, ttl: 900_000 } })
   @HttpCode(HttpStatus.OK)
   async login(
     @Body() body: LoginDto,
@@ -41,9 +44,6 @@ export class AuthController {
     @Req() req: Request,
   ) {
 
-    console.log(
-      `Body===========================>`,body
-    );
     const ip = req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
     const userAgent = req.headers['user-agent'] || 'unknown';
     // 1. Extract x-role strictly from header (ignore any role sent in request body)
@@ -218,6 +218,7 @@ export class AuthController {
 
   @Public()
   @Post('forgot-password')
+  @Throttle({ short: { limit: 5, ttl: 60_000 }, medium: { limit: 20, ttl: 900_000 } })
   @HttpCode(HttpStatus.OK)
   async forgotPassword(
     @Body() body: { email?: string; phone?: string; identifier?: string },
@@ -231,6 +232,7 @@ export class AuthController {
 
   @Public()
   @Post('forgot-password-sms')
+  @Throttle({ short: { limit: 5, ttl: 60_000 }, medium: { limit: 20, ttl: 900_000 } })
   @HttpCode(HttpStatus.OK)
   async forgotPasswordSms(
     @Body() body: { phone?: string; identifier?: string },
@@ -244,6 +246,7 @@ export class AuthController {
 
   @Public()
   @Post('reset-password')
+  @Throttle({ short: { limit: 5, ttl: 60_000 }, medium: { limit: 20, ttl: 900_000 } })
   @HttpCode(HttpStatus.OK)
   async resetPassword(
     @Body()
@@ -262,6 +265,7 @@ export class AuthController {
 
   @Public()
   @Post('send-otp')
+  @Throttle({ short: { limit: 5, ttl: 60_000 }, medium: { limit: 20, ttl: 900_000 } })
   @HttpCode(HttpStatus.OK)
   async sendOtp(@Body() body: SendOtpDto & { purpose?: string }, @Req() req: Request) {
     if (body.purpose === 'forgot_password') {
@@ -275,6 +279,7 @@ export class AuthController {
 
   @Public()
   @Post('send-email-otp')
+  @Throttle({ short: { limit: 5, ttl: 60_000 }, medium: { limit: 20, ttl: 900_000 } })
   @HttpCode(HttpStatus.OK)
   async sendEmailOtp(
     @Body() body: { email?: string; phone?: string; purpose?: string },
@@ -291,6 +296,7 @@ export class AuthController {
 
   @Public()
   @Post('verify-otp')
+  @Throttle({ short: { limit: 5, ttl: 60_000 }, medium: { limit: 20, ttl: 900_000 } })
   @HttpCode(HttpStatus.OK)
   async verifyOtp(@Body() body: VerifyOtpDto, @Req() req: Request) {
     const ip = req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
@@ -299,6 +305,7 @@ export class AuthController {
 
   @Public()
   @Post('verify-email-otp')
+  @Throttle({ short: { limit: 5, ttl: 60_000 }, medium: { limit: 20, ttl: 900_000 } })
   @HttpCode(HttpStatus.OK)
   async verifyEmailOtp(@Body() body: { email?: string; phone?: string; otp: string; purpose?: string }, @Req() req: Request) {
     const ip = req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
@@ -384,6 +391,7 @@ export class AuthController {
   }
 
   @Get('get-users-by-role')
+  @Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
   async getUsersByRole(@Query('role') role: string) {
     return this.authService.getUsersByRole(role);
@@ -444,13 +452,6 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async getPublicSiteSettings() {
     try {
-      await this.db.query(`
-        CREATE TABLE IF NOT EXISTS site_settings (
-          key   VARCHAR(120) PRIMARY KEY,
-          value TEXT NOT NULL DEFAULT '',
-          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-      `, []);
       const rows: { key: string; value: string }[] = await this.db.query(
         'SELECT key, value FROM site_settings ORDER BY key ASC', []
       );
@@ -466,16 +467,22 @@ export class AuthController {
 
   private setCookies(res: Response, accessToken: string, refreshToken: string) {
     const isProduction = process.env.NODE_ENV === 'production';
-    const hundredYearsMs = 100 * 365 * 24 * 60 * 60 * 1000;
+    // Cookie lifetimes track the tokens they carry. A 100-year cookie kept a leaked
+    // session alive on the client long after the token itself should have died.
+    const accessMaxAge =
+      parseDurationToSeconds(process.env.JWT_ACCESS_EXPIRES_IN || '15m') * 1000;
+    const refreshMaxAge =
+      parseDurationToSeconds(process.env.JWT_REFRESH_EXPIRES_IN || '30d') * 1000;
+
     res.cookie('access_token', accessToken, {
-      maxAge: hundredYearsMs,
+      maxAge: accessMaxAge,
       httpOnly: true,
       secure: isProduction,
       sameSite: 'lax',
       path: '/',
     });
     res.cookie('refresh_token', refreshToken, {
-      maxAge: hundredYearsMs,
+      maxAge: refreshMaxAge,
       httpOnly: true,
       secure: isProduction,
       sameSite: 'lax',

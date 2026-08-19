@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import type { SignOptions } from 'jsonwebtoken';
 import { PassportModule } from '@nestjs/passport';
 import { RedisModule } from 'src/shared/redis/redis.module';
-import { DatabaseModule } from 'src/database/database.module';
 import { NotificationModule } from 'src/notifications/notification.module';
 import { EncryptionService } from './encryption.service';
 import { TokenRevocationService } from './token-revocation.service';
@@ -23,7 +23,6 @@ import { JwtStrategy } from './jwt.strategy';
   imports: [
     ConfigModule,
     RedisModule,
-    DatabaseModule,
     NotificationModule,
     FieldEncryptionModule,
     PassportModule.register({ session: false }),
@@ -35,7 +34,15 @@ import { JwtStrategy } from './jwt.strategy';
         }
         return {
           secret,
-          signOptions: { expiresIn: '100y' },
+          // Short-lived by default. A long-lived access token cannot be revoked
+          // except through the Redis session registry, so the token's own expiry
+          // has to be the primary control. Refresh tokens carry the long life.
+          signOptions: {
+            expiresIn: configService.get<string>(
+              'JWT_ACCESS_EXPIRES_IN',
+              '15m',
+            ) as SignOptions['expiresIn'],
+          },
         };
       },
       inject: [ConfigService],

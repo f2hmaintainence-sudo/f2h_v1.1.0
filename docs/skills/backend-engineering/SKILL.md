@@ -3,7 +3,7 @@ name: backend-engineering
 description: Use when building or changing server-side application code - services, handlers, use cases, background jobs, workers, schedulers, queue consumers, and integrations with external systems. Covers service boundaries and where logic belongs, request validation and authorization placement, transaction boundaries in service code, error taxonomy and failure handling, logging metrics and tracing, background job design, concurrency and idempotency, caching and invalidation, retries with backoff, timeouts, and degrading gracefully when a dependency fails. Triggers on "add a service or handler", "add a background job", "call this external API", "add caching", "this endpoint is slow", or handling a failure from a downstream system. Framework-agnostic - follow whatever the project already uses.
 metadata:
   category: domain
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Backend Engineering
@@ -122,6 +122,20 @@ Whether to cache, and the four questions to answer first, are owned by the `perf
 - **Validate configuration at startup and fail immediately** if something required is missing or malformed. A service that starts and fails on the first request is much harder to diagnose.
 - Secrets come from the project's secret mechanism, never from source. See the `security` skill.
 - No environment-specific branching (`if (env === 'production')`) in business logic — express the difference as configuration values.
+
+## This workspace
+
+- Service methods receive an already-authenticated caller id from the controller and **MUST**
+  re-scope every query to it (`WHERE profile.id = $1`), rather than trusting a body field. Route
+  guards do not cover object-level access — see `security`.
+- Data access is raw SQL through `DatabaseService` (a `pg` pool). Transaction boundaries therefore
+  sit in the service, held explicitly with a client checked out of the pool — **NEVER** spread a
+  multi-statement business operation across separate pool queries and call it atomic.
+- Identity fields come from `users` via an explicit `JOIN`; satellite tables carry domain fields
+  only. The `database` skill owns that rule and the `$1` placeholder rule.
+- A `try { … } catch (error) { log; throw error; }` wrapper that adds no context is noise. Either
+  attach the context the caller lacks (which record, which operation) or let it propagate — see
+  `clean-code`.
 
 ## Related skills
 

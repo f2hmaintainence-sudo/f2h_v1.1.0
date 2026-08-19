@@ -28,7 +28,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         },
         ExtractJwt.fromAuthHeaderAsBearerToken(),
       ]),
-      ignoreExpiration: true,
+      // Expiry is enforced. Ignoring it made every issued token permanent, since
+      // nothing else in the request path checks `exp`.
+      ignoreExpiration: false,
       secretOrKey: (() => {
         const secret = configService.get<string>('JWT_SECRET');
         if (!secret)
@@ -83,16 +85,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           throw new UnauthorizedException('Token has been revoked');
         }
 
-        if (!matchedSession.accessTokenExpiresAt && payload.exp) {
-          matchedSession.accessTokenExpiresAt = payload.exp * 1000;
-          matchedSession.refreshTokenExpiresAt =
-            matchedSession.createdAt + 100 * 365 * 24 * 60 * 60 * 1000;
-          await this.redisService.put(
-            userPrefix,
-            JSON.stringify(parsed),
-            100 * 365 * 24 * 60 * 60,
-          );
-        }
       } catch (parseError) {
         console.error('[JwtStrategy] Failed to parse session data:', parseError);
         throw new UnauthorizedException('Invalid token state');
@@ -141,12 +133,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
     }
 
+    // `role` is what the token claimed at login. It is exposed for logging and for
+    // handlers that want a hint, but authorization decisions go through RolesGuard,
+    // which re-reads role_assignments — a claim cannot outlive a revoked grant.
     return {
       user_id: user.user_id,
       email: user.email,
       jti: jti,
       type: tokenType,
       device_id: deviceId || null,
+      role: (payload?.role ?? user.role_id ?? null) || null,
     };
   }
 }

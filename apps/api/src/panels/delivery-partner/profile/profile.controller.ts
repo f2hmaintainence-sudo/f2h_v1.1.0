@@ -1,3 +1,4 @@
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 import {
   Controller,
   Get,
@@ -32,6 +33,7 @@ import {
   CreateLeaveRequestDto,
 } from './dto/profile.dto';
 
+@Roles(ROLE.DELIVERY_PARTNER, ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: ['delivery-partner/profile', 'DeliveryPartner/profile'], version: '1' })
 @UseGuards(AuthGuard('jwt'))
 export class ProfileController {

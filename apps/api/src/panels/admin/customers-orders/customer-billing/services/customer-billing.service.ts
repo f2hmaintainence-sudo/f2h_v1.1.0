@@ -13,6 +13,7 @@ import {
 import { NotificationService } from 'src/notifications/notification.service';
 import { AuthService } from 'src/panels/admin/auth/auth.service';
 import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
+import { CronLockService } from 'src/shared/scheduling/cron-lock.service';
 
 @Injectable()
 export class CustomerBillingService {
@@ -23,6 +24,7 @@ export class CustomerBillingService {
     private readonly notificationService: NotificationService,
     private readonly authServices: AuthService,
     private readonly pushNotificationService: PushNotificationService,
+    private readonly cronLock: CronLockService,
   ) { }
 
   /**
@@ -30,6 +32,9 @@ export class CustomerBillingService {
    */
   @Cron('0 5 0 1 * *')
   async handleMonthlyCron() {
+    // Only one instance may run this tick — see CronLockService.
+    if (!(await this.cronLock.acquire('handleMonthlyCron', 3600))) return;
+
     this.logger.log('Executing automated monthly cron job for postpaid bills (@Cron 0 5 0 1 * *)...');
     try {
       const res = await this.runMonthlyBatchBilling({});
@@ -45,6 +50,9 @@ export class CustomerBillingService {
    */
   @Cron('0 9 * * *')
   async handlePostpaidRemindersCron() {
+    // Only one instance may run this tick — see CronLockService.
+    if (!(await this.cronLock.acquire('handlePostpaidRemindersCron', 3600))) return;
+
     this.logger.log('Executing daily 9 AM cron for Postpaid Bill Push Notification Reminders (7D, 3D, 1D)...');
     try {
       const pendingBills = await this.repository.findPendingPostpaidBills();

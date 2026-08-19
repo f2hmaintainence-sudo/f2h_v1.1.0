@@ -4,7 +4,7 @@ description: Use when writing or changing container images, compose files, CI pi
 compatibility: Container and CI tooling changes frequently. Verify syntax and security guidance against the documentation for the versions the project actually uses.
 metadata:
   category: domain
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # DevOps, Docker and CI/CD
@@ -57,6 +57,29 @@ Rules:
 - A secret, key, token, or credential — in an `ENV`, an `ARG`, a `COPY`ed file, or a `RUN` command. **Every layer is retrievable from the final image**, so a secret removed in a later layer is still present. Use the builder's secret mount, or inject at run time.
 - A local `.env` file, private key, or cloud credential file.
 - `COPY . .` in a runtime stage without a `.dockerignore`.
+
+## This workspace
+
+Production runs under **PM2 on a single server**, not containers. `docker-compose.yml` exists for
+local `api` / `web` / `redis`; changing it does not change what production runs.
+
+```
+ecosystem.config.js       api-f2hfresh (apps/api → dist/src/main.js)
+                          frontend-f2hfresh (apps/web → next)
+ecosystem.dev.config.cjs  the dev-mode equivalent
+.github/workflows/deploy.yml
+```
+
+- The deploy workflow fires on a push to `main` or `dev`, SSHes to the server, and runs
+  `deploy-f2hfresh.sh`. **It builds nothing and runs no tests** — CI is a delivery trigger, not a
+  gate. The build gate is local; see `git-workflow`.
+- A change to a PM2 `script`, `cwd`, `PATH`, or env block takes effect only after
+  `pm2 reload ecosystem.config.js`. Confirm with `pm2 status` and `pm2 logs <app> --lines 50`
+  rather than assuming.
+- Because there is no pipeline gate, **NEVER** push a change to `main` you have not built locally.
+  A broken build reaches production directly.
+- Keep `docker-compose.yml` and `ecosystem.config.js` in step on env-var names, or local behavior
+  diverges from production in ways that only show up after deploy.
 
 ## Environment separation
 

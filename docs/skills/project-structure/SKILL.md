@@ -3,7 +3,7 @@ name: project-structure
 description: Use before creating any new file, directory, or module, and when deciding where existing code should be moved. Covers recognizing structure the framework imposes rather than leaves to you, inferring a repository's organizational pattern from its existing files, choosing between layer-based and feature-based placement, limiting nesting depth, and avoiding dumping-ground directories such as utils, helpers, common, misc, shared, and temp. Triggers on "where should this file go", "create a new component/module/service", adding a directory, splitting a large file, or organizing a new feature. Also use when a change would introduce a top-level directory or a second home for something that already has one. Not for layering and dependency rules (architecture) or for what a file is called (naming-conventions).
 metadata:
   category: foundation
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Project Structure
@@ -21,6 +21,30 @@ metadata:
 5. **Only then create the file**, named the way its neighbors are named.
 
 **NEVER** create a new top-level directory without a stated reason. Top-level structure is a project-wide decision, not a side effect of one change.
+
+## This workspace
+
+`f2h-monorepo` is an npm-workspaces monorepo. Four deployable apps, one lockfile, one `node_modules`
+at the root:
+
+```
+apps/api/              NestJS 11 — src/panels/{admin,customer,delivery-partner}/, src/shared/
+apps/web/              Next.js 16 App Router — src/app/{(landing),(auth),(panel)}/
+apps/mobile/customer/  Flutter — lib/{app,core,features,theme}/
+apps/mobile/delivery/  Flutter
+docs/skills/           this rulebook
+scripts/               workspace tooling
+ecosystem.config.js    PM2 process definitions (api-f2hfresh, frontend-f2hfresh)
+```
+
+- A new API feature goes under the **panel that owns its audience**, not at `src/` root. Code two
+  panels need goes in `apps/api/src/shared/`.
+- A new web route goes inside the matching App Router **route group** — the parentheses are grouping
+  only and do not appear in the URL.
+- **NEVER** import across app boundaries by relative path (`../../api/src/...`). Apps communicate
+  over HTTP; shared types are duplicated deliberately or published as a workspace package.
+- Dependencies install at the root. Add a package to the workspace that uses it
+  (`npm install -w apps/api <pkg>`), never to the root manifest. See `dependency-management`.
 
 ## Framework-imposed structure comes first
 

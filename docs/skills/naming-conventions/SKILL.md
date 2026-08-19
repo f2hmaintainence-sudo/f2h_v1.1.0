@@ -3,7 +3,7 @@ name: naming-conventions
 description: Use before naming or renaming any file, directory, class, function, variable, constant, database table, or column. Resolves naming by ecosystem rather than by personal preference - detect the language and framework first, then apply that ecosystem's standard, then the repository's established pattern. Covers PHP and PSR/PER, Laravel, TypeScript and JavaScript, Node.js, NestJS, React, Next.js, Dart and Flutter, and SQL identifiers, and explains how to decide when the project contradicts the ecosystem default. Load whenever a new file is created, a symbol is named, a rename is proposed, or a review questions a name. Prevents applying one language's file-naming style to another, such as kebab-case filenames in a PHP or Dart project.
 metadata:
   category: foundation
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Naming Conventions
@@ -75,6 +75,28 @@ user_service.ts      snake_case      uncommon; usually a port from another ecosy
 **MUST** determine which one the repository uses and follow it. **NEVER** introduce a second style. Mixed file-naming styles in one directory are a defect, and on case-insensitive filesystems they cause import failures that only appear in CI.
 
 A frequent and acceptable hybrid: `PascalCase` for files whose default export is a component or class, `kebab-case` for everything else. If the repository does this, follow it exactly rather than "correcting" it.
+
+## This workspace
+
+Each app has already chosen a style. **MUST** follow the one for the app being edited; there is no
+workspace-wide answer.
+
+| Where | Style | Example |
+|---|---|---|
+| `apps/api` files | `kebab-case` with a role suffix | `profile.controller.ts`, `profile.service.ts`, `dto/profile.dto.ts` |
+| `apps/web` components | `PascalCase` | `MapPicker.tsx`, `Breadcrumbs.tsx` |
+| `apps/web` hooks | `camelCase`, `use` prefix | `useOrderSocket.ts` |
+| `apps/mobile/*` | `snake_case` (Dart standard) | `customer_session_cubit.dart` |
+| Route paths | lowercase `kebab-case` | `delivery-partner/profile` |
+| Database columns | `snake_case` | `first_name`, `wallet_balance` |
+| API response fields | `snake_case` | `branch_name`, `referral_code` |
+
+The API returns `snake_case` because rows are spread from `pg` straight into the response. That is
+now the contract — **MUST** keep it, and **MUST NOT** camelCase a field in one new endpoint. The
+`api-design` skill owns the wire contract; changing it is a versioned, deliberate migration, not a
+per-endpoint choice.
+
+Route casing is a hard rule with an owner: see `api-design`.
 
 ## Naming across a boundary
 

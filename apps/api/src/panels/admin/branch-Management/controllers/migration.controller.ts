@@ -11,6 +11,7 @@ import {
 import { DatabaseService } from '../../../../shared/database/Database.service';
 import { DeveloperService } from '../../../../shared/logger/Developer.service';
 import { DeliveryRouteCron } from '../services/delivery-route.cron';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
 // ═══════════════════════════════════════════════════════════════
 // MigrationController — One-time admin utilities
@@ -49,6 +50,7 @@ interface MigrationJob {
 // In-memory job store (use Redis/Bull in production for multi-instance)
 const migrationJobs = new Map<string, MigrationJob>();
 
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'zone/admin', version: '1' })
 export class MigrationController {
   constructor(

@@ -1,7 +1,9 @@
 import { Controller, Get, Post, Put, Body, Query, Req, UseGuards } from '@nestjs/common';
 import { ProfileService } from './profile.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/profile', version: '1' })
 @UseGuards(JwtAuthGuard)
 export class ProfileController {

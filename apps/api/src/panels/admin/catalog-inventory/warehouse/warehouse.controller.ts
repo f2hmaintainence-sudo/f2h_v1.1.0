@@ -6,8 +6,10 @@ import { WarehouseShowEditService } from './services/showEdit.service';
 import { WarehouseSaveEditService } from './services/saveEdit.service';
 import { WarehouseDispatchService } from './services/warehouse-dispatch.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
 @UseGuards(JwtAuthGuard)
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/warehouses', version: '1' })
 export class WarehouseController {
   constructor(

@@ -9,8 +9,10 @@ import { DeliverySaveEditService } from './services/saveEdit.service';
 import { DeliveryLeaveTableService } from './services/table.service';
 import { DeliveryLeaveShowEditService, DeliveryLeaveSaveEditService } from './services/leave-edit.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
 @UseGuards(JwtAuthGuard)
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/delivery', version: '1' })
 export class DeliveryManagementController {
   constructor(

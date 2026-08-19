@@ -3,7 +3,7 @@ name: security
 description: Use when handling untrusted input, credentials, authentication, authorization, file paths, outbound requests, database queries, shell commands, or anything a user can influence. Covers secret handling, authentication and authorization enforcement, input validation and output encoding, injection classes (SQL, command, path traversal, SSRF, XSS, CSRF), sensitive data in logs and errors, least privilege, insecure defaults, and vulnerable dependencies. Triggers on adding or changing a login, session, token, permission check, upload, redirect, query, admin route, or integration; on any request to store or read a key, password, or API token; and whenever a change would remove, weaken, or bypass an existing security control. Also use as a review pass over a diff that touches user-supplied data.
 metadata:
   category: domain
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Security
@@ -27,6 +27,17 @@ Security rules are not negotiable against convenience, deadline, style, or simpl
 - In examples, tests, and documentation, use obviously fake values (`sk_test_example`, `REPLACE_ME`). Never use a real-looking key, even a revoked one.
 - Anything that reaches a browser, mobile binary, or public repository is **public**. There is no such thing as a client-side secret — including in build-time environment variables that get inlined into bundles.
 - **If a secret has been committed:** stop and tell the user immediately. It MUST be rotated — removing it from the code or rewriting history does not undo the exposure.
+
+## Secrets in this workspace
+
+- Configuration comes from the environment through `ConfigService`. A `configService.get()` call
+  **MUST NOT** carry a real credential as its fallback default — `get('DB_PASSWORD', 'hunter2')`
+  puts a working production password in git history and makes a missing variable fail silently
+  instead of loudly. Supply no default for a secret, and fail startup when it is absent.
+- `.env`, PM2 ecosystem files, and `docker-compose.yml` all carry credentials. **NEVER** commit real
+  values in them; commit the variable names and document them.
+- Deployment secrets (`SERVER_HOST`, `SERVER_SSH_KEY`) live in GitHub Actions secrets. A workflow
+  MUST NOT echo them into logs.
 
 ## Authentication and authorization
 

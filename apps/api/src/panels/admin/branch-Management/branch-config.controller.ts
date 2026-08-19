@@ -1,6 +1,8 @@
 import { Controller, Get, Post, Patch, Query, Body, Param } from '@nestjs/common';
 import { BranchConfigService } from './branch-config.service';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/branch-config', version: '1' })
 export class BranchConfigController {
   constructor(private readonly configService: BranchConfigService) {}

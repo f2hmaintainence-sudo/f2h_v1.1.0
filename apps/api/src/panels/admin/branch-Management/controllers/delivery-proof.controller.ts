@@ -7,6 +7,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { DeliveryProofService } from '../services/delivery-proof.service';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
 // ═══════════════════════════════════════════════════════════════
 // DeliveryProofController — Phase 6
@@ -24,6 +25,7 @@ import { DeliveryProofService } from '../services/delivery-proof.service';
 //   GET  /zone/delivery/branch/:branchId?date=YYYY-MM-DD → branch summary
 // ═══════════════════════════════════════════════════════════════
 
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'zone/delivery', version: '1' })
 export class DeliveryProofController {
   constructor(private readonly proofService: DeliveryProofService) {}

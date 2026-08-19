@@ -6,8 +6,10 @@ import { ProductionShowEditService } from './services/showEdit.service';
 import { ProductionSaveEditService } from './services/saveEdit.service';
 import { BatchProductionService } from './services/batch-production.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
 @UseGuards(JwtAuthGuard)
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/production', version: '1' })
 export class ProductionController {
   constructor(

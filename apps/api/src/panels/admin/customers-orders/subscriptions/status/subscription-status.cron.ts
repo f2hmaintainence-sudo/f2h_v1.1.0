@@ -4,6 +4,7 @@ import { SubscriptionStatusService } from './subscription-status.service';
 import { NotificationService } from '../../../../../notifications/notification.service';
 import { AuthService } from '../../../../admin/auth/auth.service';
 import { DeveloperService } from '../../../../../shared/logger/Developer.service';
+import { CronLockService } from 'src/shared/scheduling/cron-lock.service';
 
 @Injectable()
 export class SubscriptionStatusCron {
@@ -14,6 +15,7 @@ export class SubscriptionStatusCron {
     private readonly notificationService: NotificationService,
     private readonly authServices: AuthService,
     private readonly developer: DeveloperService,
+    private readonly cronLock: CronLockService,
   ) {}
 
   /**
@@ -34,6 +36,9 @@ export class SubscriptionStatusCron {
     timeZone: 'Asia/Kolkata',
   })
   async handleSubscriptionStatusProcessing(): Promise<void> {
+    // Only one instance may run this tick — see CronLockService.
+    if (!(await this.cronLock.acquire('handleSubscriptionStatusProcessing', 3600))) return;
+
     this.logger.log('[CRON] Starting Subscription Status Processing...');
 
     try {

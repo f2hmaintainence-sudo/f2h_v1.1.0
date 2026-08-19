@@ -1,6 +1,5 @@
 {
   "entries": [
-    { "path": "skills" },
-    { "path": "../docs/skills" }
+    { "path": "skills" }
   ]
 }

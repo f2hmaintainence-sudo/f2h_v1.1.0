@@ -4,21 +4,21 @@ import { NotificationGateway } from './notification.gateway';
 import { NotificationController } from './notification.controller';
 import { NotificationService } from './notification.service';
 import { RedisModule } from '../shared/redis/redis.module';
-import { DatabaseModule } from '../database/database.module';
 import { DataService } from '../shared/database/Data.service';
 import { DatabaseService } from '../shared/database/Database.service';
 import { DeveloperService } from '../shared/logger/Developer.service';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { RoleResolverService } from '../auth/role-resolver.service';
 
 @Module({
-  imports: [JwtModule, RedisModule, DatabaseModule, EventEmitterModule],
+  imports: [JwtModule, RedisModule, EventEmitterModule],
   controllers: [NotificationController],
   providers: [
     NotificationGateway,
     NotificationService,
-    
-    
-    DeveloperService],
+    RoleResolverService,
+    DeveloperService,
+  ],
   exports: [NotificationGateway, NotificationService],
 })
 export class NotificationModule {}

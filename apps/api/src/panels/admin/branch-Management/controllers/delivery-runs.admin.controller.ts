@@ -7,7 +7,9 @@ import {
 } from '@nestjs/common';
 import { DatabaseService } from 'src/shared/database/Database.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/delivery-runs', version: '1' })
 @UseGuards(JwtAuthGuard)
 export class DeliveryRunsAdminController {

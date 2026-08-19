@@ -63,110 +63,45 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     });
 
     await this.verifyConnectionWithRetry();
-    await this.createRequiredTables();
+    await this.assertRequiredTablesExist();
   }
 
-  private static isTablesCreated = false;
+  /**
+   * Tables this process cannot function without. They used to be CREATEd here at
+   * boot, guarded only by a per-process static flag — which meant every instance
+   * raced on startup, the runtime DB role needed CREATE privileges in production,
+   * and (because of IF NOT EXISTS) any later change to their shape silently never
+   * applied. Their definitions now live in
+   * `src/panels/admin/migrations/007_dispatch_tables_and_management_staff.sql`.
+   *
+   * Verification is safe; mutation is not. Booting against a database that has not
+   * been migrated fails loudly instead of quietly repairing itself.
+   */
+  private static readonly REQUIRED_TABLES = [
+    'dispatch_requirements',
+    'dispatch_balances',
+    'management_staff',
+  ];
 
-  private async createRequiredTables() {
-    if (DatabaseService.isTablesCreated) return;
-    DatabaseService.isTablesCreated = true;
-    try {
-      this.logger.log('Ensuring dispatch_requirements and dispatch_balances tables exist...');
-      
-      await this.pool.query(`
-        CREATE TABLE IF NOT EXISTS dispatch_requirements (
-            id BIGSERIAL PRIMARY KEY,
-            run_id VARCHAR(30) NOT NULL REFERENCES delivery_runs(run_id) ON DELETE CASCADE,
-            run_date DATE NOT NULL,
-            delivery_slot VARCHAR(30) NOT NULL,
-            delivery_partner_id VARCHAR(30) NOT NULL REFERENCES delivery_partners(delivery_partner_id) ON DELETE CASCADE,
-            product_variant_id VARCHAR(30) NOT NULL,
-            required_quantity NUMERIC(10,2) NOT NULL DEFAULT 0,
-            unit VARCHAR(20) DEFAULT 'pcs',
-            created_at TIMESTAMPTZ DEFAULT NOW(),
-            updated_at TIMESTAMPTZ DEFAULT NOW(),
-            UNIQUE(run_id, product_variant_id)
-        );
-      `);
+  private async assertRequiredTablesExist() {
+    const { rows } = await this.pool.query<{ table_name: string }>(
+      `SELECT table_name
+         FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = ANY($1)`,
+      [DatabaseService.REQUIRED_TABLES],
+    );
 
-      await this.pool.query(`
-        CREATE INDEX IF NOT EXISTS idx_dispatch_requirements_date ON dispatch_requirements(run_date);
-      `);
-      await this.pool.query(`
-        CREATE INDEX IF NOT EXISTS idx_dispatch_requirements_run ON dispatch_requirements(run_id);
-      `);
-      await this.pool.query(`
-        CREATE INDEX IF NOT EXISTS idx_dispatch_requirements_boy ON dispatch_requirements(delivery_partner_id);
-      `);
+    const present = new Set(rows.map((row) => row.table_name));
+    const missing = DatabaseService.REQUIRED_TABLES.filter(
+      (table) => !present.has(table),
+    );
 
-      await this.pool.query(`
-        CREATE TABLE IF NOT EXISTS dispatch_balances (
-            id BIGSERIAL PRIMARY KEY,
-            delivery_partner_id VARCHAR(30) NOT NULL REFERENCES delivery_partners(delivery_partner_id) ON DELETE CASCADE,
-            product_variant_id VARCHAR(30) NOT NULL,
-            run_date DATE NOT NULL,
-            delivery_slot VARCHAR(30) NOT NULL,
-            dispatched_qty NUMERIC(10,2) NOT NULL DEFAULT 0,
-            delivered_qty NUMERIC(10,2) NOT NULL DEFAULT 0,
-            returned_qty NUMERIC(10,2) NOT NULL DEFAULT 0,
-            damaged_qty NUMERIC(10,2) NOT NULL DEFAULT 0,
-            balance_qty NUMERIC(10,2) NOT NULL DEFAULT 0,
-            created_at TIMESTAMPTZ DEFAULT NOW(),
-            updated_at TIMESTAMPTZ DEFAULT NOW(),
-            UNIQUE(delivery_partner_id, product_variant_id, run_date, delivery_slot)
-        );
-      `);
-
-      await this.pool.query(`
-        CREATE INDEX IF NOT EXISTS idx_dispatch_balances_boy_date ON dispatch_balances(delivery_partner_id, run_date);
-      `);
-
-      await this.pool.query(`
-        CREATE TABLE IF NOT EXISTS management_staff (
-            id BIGSERIAL PRIMARY KEY,
-            management_id VARCHAR(30) UNIQUE,
-            user_id VARCHAR(30) NOT NULL,
-            branch_id VARCHAR(30),
-            role_id VARCHAR(30) DEFAULT 'ADMIN',
-            user_name VARCHAR(50),
-            department VARCHAR(100),
-            designation VARCHAR(100),
-            is_active BOOLEAN DEFAULT true,
-            bio TEXT,
-            gender VARCHAR(20),
-            date_of_birth DATE,
-            marital_status VARCHAR(30),
-            phone VARCHAR(20),
-            alt_phone VARCHAR(20),
-            address_line1 VARCHAR(100),
-            address_line2 VARCHAR(100),
-            city VARCHAR(50),
-            state VARCHAR(50),
-            postal_code VARCHAR(20),
-            education VARCHAR(100),
-            created_at TIMESTAMPTZ DEFAULT NOW(),
-            updated_at TIMESTAMPTZ DEFAULT NOW()
-        );
-        CREATE INDEX IF NOT EXISTS idx_mgmt_staff_user ON management_staff(user_id);
-      `);
-
-      await this.pool.query(`
-        ALTER TABLE product_banner ADD COLUMN IF NOT EXISTS description TEXT;
-        ALTER TABLE product_banner ADD COLUMN IF NOT EXISTS background_color VARCHAR(50);
-        ALTER TABLE product_banner ALTER COLUMN created_by TYPE VARCHAR(50) USING created_by::text;
-        ALTER TABLE product_banner ALTER COLUMN updated_by TYPE VARCHAR(50) USING updated_by::text;
-        
-        ALTER TABLE delivery_partners ADD COLUMN IF NOT EXISTS emergency_contact VARCHAR(150);
-        ALTER TABLE delivery_partners ADD COLUMN IF NOT EXISTS emergency_contact_number VARCHAR(20);
-        ALTER TABLE delivery_partners ADD COLUMN IF NOT EXISTS date_of_birth DATE;
-        ALTER TABLE delivery_partners ADD COLUMN IF NOT EXISTS gender VARCHAR(20);
-        ALTER TABLE delivery_partners ADD COLUMN IF NOT EXISTS residential_address TEXT;
-      `);
-
-      this.logger.log('dispatch_requirements, dispatch_balances, and delivery_partners profile columns verified.');
-    } catch (err) {
-      this.logger.error('Failed to create required tables dispatch_requirements or dispatch_balances', err);
+    if (missing.length) {
+      throw new Error(
+        `Database is missing required tables: ${missing.join(', ')}. ` +
+          `Run the pending migrations (npm run db:migrate) before starting the API.`,
+      );
     }
   }
 

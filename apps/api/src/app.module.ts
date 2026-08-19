@@ -1,7 +1,11 @@
 
 import { CustomThrottlerGuard } from './throttler/custom-throttler.guard';
-import { ThrottlerGuard } from '@nestjs/throttler'
 import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { RolesGuard } from './auth/guards/roles.guard';
+import { RoleResolverService } from './auth/role-resolver.service';
+import { CsrfGuard } from './csrf/csrf.guard';
+import { AuthModule } from './auth/auth.module';
 import { UserHelperModule } from './helpers/UserHelper.module'
 import { Module, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
 import { AdminAuthModule } from './panels/admin/auth/auth.module';
@@ -42,6 +46,7 @@ import { DeliveryOrdersModule } from './panels/delivery-partner/orders/orders.mo
 import { CustomerOrdersModule } from './panels/customer/orders/orders.module';
 import { CartAndCheckoutModule } from './panels/customer/cartAndCheckout/cartAndCheckout.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { SchedulingModule } from './shared/scheduling/scheduling.module';
 import { SubscriptionSnapshotModule } from './panels/admin/customers-orders/subscriptions/cron-job/subscription-snapshot.module';
 import { SubscriptionStatusModule } from './panels/admin/customers-orders/subscriptions/status/subscription-status.module';
 import { PackageModule } from './panels/admin/logistics-vendors/package/package.module';
@@ -82,10 +87,14 @@ import { CustomerAppAssetsModule } from './panels/customer/app_assets/app_assets
         },
       }),
     }),
-    ScheduleModule.forRoot(),
+    // Scheduled jobs can be turned off per process (ENABLE_CRON=false), so the
+    // workers can eventually run as their own PM2 app while the API scales out.
+    ...(process.env.ENABLE_CRON === 'false' ? [] : [ScheduleModule.forRoot()]),
+    SchedulingModule,
     QueueModule,
 
     FieldEncryptionModule,
+    AuthModule,
     AdminAuthModule,
     CustomerAuthModule,
     DeliveryPartnerAuthModule,
@@ -128,21 +137,20 @@ import { CustomerAppAssetsModule } from './panels/customer/app_assets/app_assets
     SupportTicketsModule,
     ReferralModule,
     AdminReferralModule,
+    // Two tiers only. A third 'bruteForce' tier of 100/hour was declared here, and
+    // because every named tier applies to every route it would have capped the whole
+    // API at 100 requests an hour once the guard's bypass was removed. Brute-force
+    // protection now lives on the auth routes as explicit @Throttle() ceilings.
     ThrottlerModule.forRoot([
       {
         name: 'short',
         ttl: 60000,
-        limit: 200,
+        limit: 300,
       },
       {
         name: 'medium',
         ttl: 900000,
-        limit: 2000,
-      },
-      {
-        name: 'bruteForce',
-        ttl: 3600000,
-        limit: 100,
+        limit: 3000,
       },
     ]),
   ],
@@ -154,6 +162,22 @@ import { CustomerAppAssetsModule } from './panels/customer/app_assets/app_assets
     CsrfService,
     AppService,
     DeveloperService,
+    RoleResolverService,
+    // Guard order is registration order. Authentication is the default and routes
+    // opt out with @Public(); previously 17 controllers — including admin finance
+    // and orders — simply had no guard at all, so forgetting one meant exposing it.
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: CsrfGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: CustomThrottlerGuard,

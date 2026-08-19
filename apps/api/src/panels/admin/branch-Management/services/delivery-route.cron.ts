@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { DatabaseService } from '../../../../shared/database/Database.service';
 import { DeveloperService } from '../../../../shared/logger/Developer.service';
 import { RouteService } from './route.service';
+import { CronLockService } from 'src/shared/scheduling/cron-lock.service';
 
 // ═══════════════════════════════════════════════════════════════
 // DeliveryRouteCron — Phase 7
@@ -30,12 +31,16 @@ export class DeliveryRouteCron {
     private readonly db: DatabaseService,
     private readonly developer: DeveloperService,
     private readonly routeService: RouteService,
+    private readonly cronLock: CronLockService,
   ) {}
 
   // ─── Morning: runs at 12:00 AM IST ─────────────────────────
   // Cron: second=0, minute=0, hour=0 → midnight
   @Cron('0 0 0 * * *', { timeZone: 'Asia/Kolkata' })
   async handleMorningDeliverySetup(): Promise<void> {
+    // Only one instance may run this tick — see CronLockService.
+    if (!(await this.cronLock.acquire('handleMorningDeliverySetup', 3600))) return;
+
     this.logger.log('[CRON] Morning delivery setup started (12:00 AM IST)');
     try {
       const date = new Date().toISOString().split('T')[0];
@@ -50,6 +55,9 @@ export class DeliveryRouteCron {
   // Cron: second=0, minute=0, hour=12 → noon
   @Cron('0 0 12 * * *', { timeZone: 'Asia/Kolkata' })
   async handleEveningDeliverySetup(): Promise<void> {
+    // Only one instance may run this tick — see CronLockService.
+    if (!(await this.cronLock.acquire('handleEveningDeliverySetup', 3600))) return;
+
     this.logger.log('[CRON] Evening delivery setup started (12:00 PM IST)');
     try {
       const date = new Date().toISOString().split('T')[0];

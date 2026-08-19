@@ -1,3 +1,4 @@
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 import {
   Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Req, UseGuards, Version,
 } from '@nestjs/common';
@@ -14,6 +15,7 @@ import {
 } from './promotions-coupons.dto';
 
 @UseGuards(JwtAuthGuard)
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/promotions-coupons', version: '1' })
 export class PromotionsCouponsController {
   constructor(private readonly svc: PromotionsCouponsService) {}

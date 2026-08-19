@@ -10,8 +10,10 @@ import {
 } from '@nestjs/common';
 import { ContainersService } from './containers.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
 @UseGuards(JwtAuthGuard)
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/catalog/containers', version: '1' })
 export class ContainersController {
   constructor(private readonly containersService: ContainersService) {}

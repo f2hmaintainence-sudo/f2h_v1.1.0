@@ -9,9 +9,10 @@ import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { ConfigService } from '@nestjs/config';
 import { NotificationService } from './notification.service';
-import { DatabaseService } from '../database/database.service';
+import { DatabaseService } from '../shared/database/Database.service';
 import { RedisService } from '../redis/redis.service';
 import * as jwt from 'jsonwebtoken';
+import { RoleResolverService } from 'src/auth/role-resolver.service';
 
 interface NotificationPayload {
   message: string;
@@ -52,6 +53,7 @@ export class NotificationGateway
     private configService: ConfigService,
     private notificationService: NotificationService,
     private databaseService: DatabaseService,
+    private readonly roleResolver: RoleResolverService,
     private redisService: RedisService,
   ) {}
 
@@ -345,17 +347,18 @@ export class NotificationGateway
     this.userSockets.get(userId)!.add(client.id);
     client.join(this.getUserRoom(userId));
 
-    // Allow admin clients to self-join the GPS tracking room
-    client.on('join_admin_tracking', () => {
-      client.join('admin_tracking');
-      this.logger.log(`[GPS] Admin ${userId} (${client.id}) joined admin_tracking room`);
-    });
+    // The admin rooms carry live GPS for every delivery partner and the whole order
+    // book. They used to be self-join: any authenticated customer could emit
+    // 'join_admin_tracking' and receive staff location telemetry continuously.
+    // Membership is now decided here, from the role the database reports.
+    const roles = await this.roleResolver.resolveRoles(userId);
+    (client as any).roles = roles;
 
-    // Allow admin clients to self-join the live orders room
-    client.on('join_admin_live_orders', () => {
+    if (roles.includes('ADMIN') || roles.includes('SUPER_ADMIN')) {
+      client.join('admin_tracking');
       client.join('admin_live_orders');
-      this.logger.log(`[LiveOrders] Admin ${userId} (${client.id}) joined admin_live_orders room`);
-    });
+      this.logger.log(`Admin ${userId} (${client.id}) joined the admin rooms`);
+    }
 
     const socketCount = this.userSockets.get(userId)!.size;
     this.logger.log(

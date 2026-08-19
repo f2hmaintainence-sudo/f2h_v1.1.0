@@ -4,7 +4,7 @@ description: Use when writing or changing React components, hooks, context, or c
 compatibility: For React applications. Verify version-specific APIs against the project's installed React version.
 metadata:
   category: framework
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # React
@@ -36,6 +36,18 @@ In a React 18 project, `forwardRef` and `<Context.Provider>` remain correct. **F
 - State management: local state, context, or a library. Do not introduce a second one.
 - Data fetching: a library, server components, or hand-rolled effects.
 - File and component naming, and whether components live one-per-file or grouped.
+
+## This workspace (apps/web)
+
+React 19 inside Next.js 16. **The `nextjs` skill wins on any conflict** — especially on the server
+and client boundary, data fetching, and routing. Load both.
+
+- Components live under `src/components/<surface>/`; hooks in `src/hooks/`; cross-tree state in
+  `src/context/`. Data access goes through `src/services/`, never `fetch` inline in a component.
+- Default to server components. Add `'use client'` only for a component that genuinely needs state,
+  effects, or browser APIs, and push it as far down the tree as it will go.
+- React 19 makes several manual memoizations unnecessary. Measure before adding `useMemo` or
+  `useCallback` — see the `performance` skill.
 
 ## Composition over configuration
 

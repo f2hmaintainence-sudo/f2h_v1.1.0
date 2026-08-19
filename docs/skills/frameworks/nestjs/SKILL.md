@@ -4,7 +4,7 @@ description: Use when working in a NestJS application - adding or changing modul
 compatibility: For NestJS applications. Verify version-specific behavior against the project's package-lock and the NestJS documentation for that major version.
 metadata:
   category: framework
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # NestJS
@@ -24,6 +24,63 @@ Verified against NestJS 11.x (latest `@nestjs/core` 11.1.29) on 2026-08-11.
 - `main.ts` — global pipes, filters, interceptors, prefix, versioning, CORS. **These are already applied; do not duplicate them per controller.**
 - `app.module.ts` — configuration loading, global modules, database wiring.
 - Two or three existing modules near your change: their controller, service, DTOs, and spec.
+
+## This workspace (apps/api)
+
+NestJS 11 on Express, in the `f2h-monorepo` npm workspace. The generic rules above hold; these are
+the choices this API has already made, and a new module MUST match them.
+
+**Structure is panel-first, not feature-first at the root.** Every request-facing module lives under
+the panel that owns its audience:
+
+```
+apps/api/src/
+  panels/admin/…            operator-facing modules
+  panels/customer/…         customer app modules
+  panels/delivery-partner/  partner app modules
+    profile/profile.controller.ts   .service.ts   dto/profile.dto.ts
+    orders/controllers/  orders/services/         (split once a feature outgrows one file pair)
+  shared/                   cross-panel providers: database, payments, queue, redis, services
+  auth/ database/ redis/ common/ config/          root-level infrastructure
+```
+
+A panel module MUST NOT import from another panel. Anything two panels need moves to `shared/` —
+that is what the directory is for. See the `architecture` skill for the dependency rule.
+
+**Routing.** Controllers are versioned and kebab-cased, with legacy PascalCase kept only as a
+secondary alias so existing clients keep working:
+
+```typescript
+@Controller({ path: ['delivery-partner/profile', 'DeliveryPartner/profile'], version: '1' })
+@UseGuards(AuthGuard('jwt'))
+export class ProfileController {}
+```
+
+The kebab-case path is **always first** — it is the canonical one. Do not add a new alias for a new
+endpoint; aliases exist to retire, not to grow. The `api-design` skill owns this rule.
+
+**Data access is raw SQL through `DatabaseService`, not an ORM.** `prisma` and `mysql2` appear in
+`package.json` but the panels do not use them; a `pg` `Pool` wrapped by
+`src/database/database.service.ts` is the only path in use.
+
+- **MUST** use PostgreSQL positional placeholders (`$1`, `$2`). Never `?`, never string
+  concatenation into SQL.
+- **MUST** join identity through `users`: `JOIN users u ON u.user_id = profile.id`. Satellite tables
+  (`customers`, `delivery_partners`) hold domain fields only. The `database` skill owns this rule.
+- **NEVER** introduce Prisma, TypeORM, or a second pool for one module. A second data-access path
+  splits transaction handling and connection limits. If an ORM is genuinely wanted, that is a
+  workspace decision, not a per-feature one.
+
+**Request identity.** Routes guarded by `AuthGuard('jwt')` receive the JWT payload on `req.user`.
+Reach for a typed request interface rather than `(req.user as any).user_id` — the cast is the
+`clean-code` escape-hatch rule, and it silently survives a payload rename.
+
+**Validation gate.** From the repo root, before pushing:
+
+```
+npm run build:api      # tsc must pass
+pm2 status             # api-f2hfresh must be online
+```
 
 ## Module structure
 
@@ -131,6 +188,12 @@ npm run test:e2e
 | Config missing at runtime rather than startup | Validate config on boot |
 | External call inside an open transaction | After commit |
 | Only unit tests for a validated, guarded endpoint | Add an end-to-end test |
+| PascalCase route path, or a new legacy alias | kebab-case only, canonical path first |
+| `?` placeholder or interpolated SQL string | `$1`, `$2` positional parameters |
+| Identity columns selected from `customers`/`delivery_partners` | `JOIN users u ON u.user_id = profile.id` |
+| `(req.user as any).user_id` | A typed authenticated-request interface |
+| A panel module importing from another panel | Move the shared concept to `src/shared/` |
+| A second ORM or pool added for one module | The existing `DatabaseService` pool |
 
 ## Related skills
 

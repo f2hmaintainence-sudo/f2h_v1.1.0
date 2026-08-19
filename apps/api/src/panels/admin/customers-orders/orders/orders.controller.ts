@@ -2,7 +2,9 @@ import { Controller, Get, Param, Patch, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { OrdersService } from './orders.service';
 import { OrdersTableService } from './services/table.service';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/orders', version: '1' })
 export class OrdersController {
   constructor(

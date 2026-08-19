@@ -15,7 +15,7 @@ import { generateId } from 'src/helpers/RandomHelper';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
 import { DataService } from 'src/shared/database/Data.service';
-import { DatabaseService } from 'src/database/database.service';
+import { DatabaseService } from 'src/shared/database/Database.service';
 import { DeveloperService } from 'src/shared/logger/Developer.service';
 import { AuthService } from './auth.service';
 const COORDINATE_EPSILON = 0.0000001;

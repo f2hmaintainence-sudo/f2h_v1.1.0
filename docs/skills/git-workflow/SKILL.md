@@ -3,7 +3,7 @@ name: git-workflow
 description: Use before, during, and after any change to a git repository, and whenever a git command would modify repository state. Covers checking status and branch before editing, keeping changes focused, inspecting the diff before finishing, writing commit messages, branch naming, and the destructive operations that require explicit permission - reset, checkout over local edits, clean, force push, history rewrite, stash drop, branch deletion. Triggers on "commit this", "create a branch", "what changed", "push", "rebase", "revert", "undo", "merge", "resolve conflicts", or any request that would discard, rewrite, or publish work. Also use to check for secrets and unintended files before a change leaves the working tree.
 metadata:
   category: process
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Git Workflow
@@ -53,6 +53,29 @@ Confirm:
 - No generated or dependency files were added.
 
 Then run the project's validation — see the `agentic-development` skill — and review the diff with the `code-review` skill.
+
+## The workspace validation gate
+
+**MUST** pass before pushing to `main`. Run from the repo root, and read the output rather than
+just the exit code:
+
+```
+npm run build:api      # tsc for apps/api — must pass
+npm run build:web      # next build for apps/web — must pass
+pm2 status             # api-f2hfresh and frontend-f2hfresh must be online
+```
+
+Build both workspaces even when the change touched only one — `apps/web` consumes API types, and a
+change on either side can break the other. A push to `main` or `dev` triggers the deploy workflow in
+`.github/workflows/deploy.yml`, which SSHes to the server and runs `deploy-f2hfresh.sh`. There is no
+build step in CI to catch what you did not: **the gate above is the only build verification before
+production.**
+
+If a build fails, fix it or stop. **NEVER** push past a failing build, and never report a task
+complete on the strength of a build you did not run. See the `agentic-development` skill.
+
+Flutter apps deploy separately (`npm run deploy:customer-web`, `npm run deploy:partner-web`) and are
+not covered by the git push — say so explicitly when a mobile change is part of the work.
 
 ## Committing & Pushing
 

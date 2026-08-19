@@ -10,7 +10,9 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { SubscriptionSnapshotService } from './services/subscription-snapshot.service';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/orders/dispatch', version: '1' })
 export class DispatchController {
   private readonly logger = new Logger(DispatchController.name);

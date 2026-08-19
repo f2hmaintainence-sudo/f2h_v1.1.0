@@ -17,8 +17,10 @@ import { SubscriptionsShowEditService } from './services/showEdit.service';
 import { SubscriptionsTableService } from './services/table.service';
 import { SubscriptionStatusService } from './status/subscription-status.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
 @UseGuards(JwtAuthGuard)
+@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'subscriptions', version: '1' })
 export class SubscriptionsController {
   constructor(
