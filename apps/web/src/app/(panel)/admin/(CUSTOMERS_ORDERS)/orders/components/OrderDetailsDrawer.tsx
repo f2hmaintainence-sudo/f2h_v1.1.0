@@ -83,14 +83,14 @@ function getItemDiscount(item: OrderItem): number {
 }
 
 function getItemTotal(item: OrderItem): number {
-  if (item.total_price !== null && item.total_price !== undefined) {
-    return toAmount(item.total_price);
-  }
+  const totalPrice = toAmount(item.total_price);
+  const calculatedTotal = Math.max(0, getItemSubtotal(item) - getItemDiscount(item));
+  if (totalPrice > 0 || item.is_free || calculatedTotal === 0) return totalPrice;
 
   const finalPrice = toAmount(item.final_price);
   if (finalPrice > 0 || item.is_free) return finalPrice;
 
-  return Math.max(0, getItemSubtotal(item) - getItemDiscount(item));
+  return calculatedTotal;
 }
 
 function getLightStatusBadge(statusRaw: unknown) {

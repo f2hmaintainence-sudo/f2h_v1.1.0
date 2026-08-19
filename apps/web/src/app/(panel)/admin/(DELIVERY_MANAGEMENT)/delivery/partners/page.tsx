@@ -22,7 +22,6 @@ import Link from "next/link";
 import { showSuccessToast } from "@/components/Toast";
 import "@/components/Table Generator/SkeletonForm.css";
 import SkeletonForm from "@/components/Table Generator/SkeletonForm";
-import OnlinePartnersPanel from "@/components/delivery/OnlinePartnersPanel";
 
 // --- Helpers ---
 const getImageUrl = (pathString?: string): string | null => {
@@ -206,7 +205,6 @@ VehicleCard.displayName = "VehicleCard";
 // Main Formal Delivery Partners Page
 // -----------------------------------------------------------------------------
 export default function DeliveryPartnersPage() {
-  const [activeSection, setActiveSection] = useState<"online" | "all">("online");
   const [partners, setPartners] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -454,53 +452,8 @@ export default function DeliveryPartnersPage() {
         </div>
       </div>
 
-      {/* ── Top-level Section Navigation Tabs ── */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
-        <button
-          type="button"
-          onClick={() => setActiveSection("online")}
-          className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2.5 ${
-            activeSection === "online"
-              ? "bg-slate-900 text-white shadow-md shadow-slate-900/10"
-              : "bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/80 shadow-2xs"
-          }`}
-        >
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-          </span>
-          <span>Live Online Delivery Partners</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveSection("all")}
-          className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2.5 ${
-            activeSection === "all"
-              ? "bg-slate-900 text-white shadow-md shadow-slate-900/10"
-              : "bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/80 shadow-2xs"
-          }`}
-        >
-          <Users size={14} className={activeSection === "all" ? "text-emerald-400" : "text-slate-400"} />
-          <span>All Registered Delivery Partners</span>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
-            activeSection === "all" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"
-          }`}>
-            {metrics.total}
-          </span>
-        </button>
-      </div>
-
-      {/* ── SECTION 1: LIVE ONLINE PARTNERS ── */}
-      {activeSection === "online" && (
-        <OnlinePartnersPanel />
-      )}
-
-      {/* ── SECTION 2: ALL REGISTERED FLEET ── */}
-      {activeSection === "all" && (
-        <div className="space-y-6 animate-in fade-in duration-300">
-          {/* ── Executive Fleet Summary Cards ── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+      {/* ── Executive Fleet Summary Cards ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             {/* Total Fleet */}
             <div className="bg-white rounded-2xl p-4 border border-gray-200/90 shadow-2xs space-y-1">
               <div className="flex items-center justify-between text-xs font-bold text-slate-600 uppercase tracking-wider">
@@ -828,8 +781,6 @@ export default function DeliveryPartnersPage() {
               </button>
             </div>
           </div>
-        </div>
-      )}
 
       {/* KYC Verification Modal */}
       {selectedPartnerForDocs && (

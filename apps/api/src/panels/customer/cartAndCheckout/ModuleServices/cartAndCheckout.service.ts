@@ -971,7 +971,7 @@ export class CartService {
                   'total_price', oi.total_price,
                   'is_free', oi.is_free,
                   'final_price', COALESCE(
-                    oi.total_price,
+                    NULLIF(oi.total_price, 0),
                     NULLIF(oi.final_price, 0),
                     GREATEST(
                       oi.unit_price * oi.quantity

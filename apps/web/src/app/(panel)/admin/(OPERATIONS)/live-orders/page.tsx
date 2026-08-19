@@ -19,7 +19,11 @@ interface OrderItem {
   variant_name?: string;
   quantity: number;
   unit_price: number;
+  discount_amount?: number | string;
+  coupon_amount?: number | string;
+  total_price?: number | string;
   final_price: number;
+  is_free?: boolean;
 }
 
 interface Order {
@@ -28,6 +32,9 @@ interface Order {
   customer_name: string;
   status: string;
   total_amount: number | string;
+  subtotal?: number | string;
+  discount_amount?: number | string;
+  gst_amount?: number | string;
   delivery_slot: string;
   address_line: string;
   contact_number: string;
@@ -75,6 +82,30 @@ function todayIST(): string {
 
 function formatMoney(v: number | string) {
   return "₹" + Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function toAmount(value: unknown): number {
+  const amount = Number(value ?? 0);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+function getItemSubtotal(item: OrderItem): number {
+  return toAmount(item.unit_price) * toAmount(item.quantity || 1);
+}
+
+function getItemDiscount(item: OrderItem): number {
+  return toAmount(item.discount_amount) + toAmount(item.coupon_amount);
+}
+
+function getItemTotal(item: OrderItem): number {
+  const totalPrice = toAmount(item.total_price);
+  const calculatedTotal = Math.max(0, getItemSubtotal(item) - getItemDiscount(item));
+  if (totalPrice > 0 || item.is_free || calculatedTotal === 0) return totalPrice;
+
+  const finalPrice = toAmount(item.final_price);
+  if (finalPrice > 0 || item.is_free) return finalPrice;
+
+  return calculatedTotal;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -319,6 +350,24 @@ export default function LiveOrdersPage() {
     const d = new Date();
     return d.toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" });
   }, []);
+
+  const detailPricing = useMemo(() => {
+    const items = detailOrder?.items ?? [];
+    const itemSubtotal = items.reduce((sum, item) => sum + getItemSubtotal(item), 0);
+    const promotionDiscount = items.reduce((sum, item) => sum + toAmount(item.discount_amount), 0);
+    const couponDiscount = items.reduce((sum, item) => sum + toAmount(item.coupon_amount), 0);
+    const storedDiscount = toAmount(detailOrder?.discount_amount);
+
+    return {
+      subtotal: detailOrder?.subtotal === null || detailOrder?.subtotal === undefined
+        ? itemSubtotal
+        : toAmount(detailOrder.subtotal),
+      promotionDiscount,
+      couponDiscount,
+      otherDiscount: Math.max(0, storedDiscount - promotionDiscount - couponDiscount),
+      gst: toAmount(detailOrder?.gst_amount),
+    };
+  }, [detailOrder]);
 
   return (
     <div className="space-y-4 p-3 md:p-5 max-w-[1400px] mx-auto">
@@ -935,6 +984,7 @@ export default function LiveOrdersPage() {
                           <th className="px-3 py-2">Variant</th>
                           <th className="px-3 py-2 text-center">Qty</th>
                           <th className="px-3 py-2 text-right">Unit</th>
+                          <th className="px-3 py-2 text-right">Discount</th>
                           <th className="px-3 py-2 text-right">Total</th>
                         </tr>
                       </thead>
@@ -945,13 +995,44 @@ export default function LiveOrdersPage() {
                             <td className="px-3 py-2 text-slate-500 text-[10px]">{item.variant_name || "Default"}</td>
                             <td className="px-3 py-2 text-center font-bold text-slate-700">{item.quantity}</td>
                             <td className="px-3 py-2 text-right text-slate-600">{formatMoney(item.unit_price)}</td>
-                            <td className="px-3 py-2 text-right font-bold text-emerald-700">{formatMoney(item.final_price)}</td>
+                            <td className="px-3 py-2 text-right text-rose-600">
+                              {getItemDiscount(item) > 0 ? `-${formatMoney(getItemDiscount(item))}` : "—"}
+                            </td>
+                            <td className="px-3 py-2 text-right font-bold text-emerald-700">{formatMoney(getItemTotal(item))}</td>
                           </tr>
                         ))}
                       </tbody>
                       <tfoot>
+                        <tr className="bg-slate-50 border-t border-slate-100">
+                          <td colSpan={5} className="px-3 pt-2 text-right text-[10px] font-bold text-slate-600">Items Subtotal:</td>
+                          <td className="px-3 pt-2 text-right font-bold text-slate-800 text-[11px]">{formatMoney(detailPricing.subtotal)}</td>
+                        </tr>
+                        {detailPricing.promotionDiscount > 0 && (
+                          <tr className="bg-slate-50">
+                            <td colSpan={5} className="px-3 py-1 text-right text-[10px] font-bold text-rose-600">Promotion Discount:</td>
+                            <td className="px-3 py-1 text-right font-bold text-rose-600 text-[11px]">-{formatMoney(detailPricing.promotionDiscount)}</td>
+                          </tr>
+                        )}
+                        {detailPricing.couponDiscount > 0 && (
+                          <tr className="bg-slate-50">
+                            <td colSpan={5} className="px-3 py-1 text-right text-[10px] font-bold text-rose-600">Coupon Discount:</td>
+                            <td className="px-3 py-1 text-right font-bold text-rose-600 text-[11px]">-{formatMoney(detailPricing.couponDiscount)}</td>
+                          </tr>
+                        )}
+                        {detailPricing.otherDiscount > 0 && (
+                          <tr className="bg-slate-50">
+                            <td colSpan={5} className="px-3 py-1 text-right text-[10px] font-bold text-rose-600">Other Discount:</td>
+                            <td className="px-3 py-1 text-right font-bold text-rose-600 text-[11px]">-{formatMoney(detailPricing.otherDiscount)}</td>
+                          </tr>
+                        )}
+                        {detailPricing.gst > 0 && (
+                          <tr className="bg-slate-50">
+                            <td colSpan={5} className="px-3 py-1 text-right text-[10px] font-bold text-slate-600">GST:</td>
+                            <td className="px-3 py-1 text-right font-bold text-slate-700 text-[11px]">+{formatMoney(detailPricing.gst)}</td>
+                          </tr>
+                        )}
                         <tr className="bg-emerald-50 border-t border-emerald-100">
-                          <td colSpan={4} className="px-3 py-2 text-right text-[10px] font-black text-slate-700">Total Amount:</td>
+                          <td colSpan={5} className="px-3 py-2 text-right text-[10px] font-black text-slate-700">Total Amount:</td>
                           <td className="px-3 py-2 text-right font-black text-emerald-700 text-xs">{formatMoney(detailOrder.total_amount)}</td>
                         </tr>
                       </tfoot>

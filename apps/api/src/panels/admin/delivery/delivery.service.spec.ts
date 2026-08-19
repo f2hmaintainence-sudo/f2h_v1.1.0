@@ -22,6 +22,7 @@ describe('DeliveryManagementService tracking detail contract', () => {
     expect(trackingSql).toContain("'discount_amount', oi.discount_amount");
     expect(trackingSql).toContain("'coupon_amount', oi.coupon_amount");
     expect(trackingSql).toContain("'total_price', oi.total_price");
+    expect(trackingSql).toContain('NULLIF(oi.total_price, 0)');
     expect(trackingSql).toContain('o.discount_amount');
   });
 });
