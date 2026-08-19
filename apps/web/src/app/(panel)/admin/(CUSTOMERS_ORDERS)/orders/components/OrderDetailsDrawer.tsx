@@ -37,6 +37,7 @@ export interface OrderItem {
   unit_price?: string | number;
   discount_amount?: string | number;
   coupon_amount?: string | number;
+  total_price?: string | number;
   final_price?: string | number;
   is_free?: boolean;
   quantity?: string | number;
@@ -66,6 +67,30 @@ function formatMoney(value: unknown) {
     currency: 'INR',
     maximumFractionDigits: 2,
   });
+}
+
+function toAmount(value: unknown): number {
+  const amount = Number(value ?? 0);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+function getItemSubtotal(item: OrderItem): number {
+  return toAmount(item.unit_price) * toAmount(item.quantity ?? 1);
+}
+
+function getItemDiscount(item: OrderItem): number {
+  return toAmount(item.discount_amount) + toAmount(item.coupon_amount);
+}
+
+function getItemTotal(item: OrderItem): number {
+  if (item.total_price !== null && item.total_price !== undefined) {
+    return toAmount(item.total_price);
+  }
+
+  const finalPrice = toAmount(item.final_price);
+  if (finalPrice > 0 || item.is_free) return finalPrice;
+
+  return Math.max(0, getItemSubtotal(item) - getItemDiscount(item));
 }
 
 function getLightStatusBadge(statusRaw: unknown) {
@@ -109,11 +134,18 @@ export default function OrderDetailsDrawer({
 
   const statusInfo = getLightStatusBadge(order.order_status || order.status);
   const StatusIcon = statusInfo.icon;
-  const itemTotal = items.reduce((sum, item) => sum + Number(item.final_price ?? 0), 0);
+  const itemSubtotal = items.reduce((sum, item) => sum + getItemSubtotal(item), 0);
+  const promotionDiscount = items.reduce((sum, item) => sum + toAmount(item.discount_amount), 0);
+  const couponDiscount = items.reduce((sum, item) => sum + toAmount(item.coupon_amount), 0);
+  const storedDiscount = toAmount(order.discount_amount);
+  const otherDiscount = Math.max(0, storedDiscount - promotionDiscount - couponDiscount);
+  const subtotal = order.subtotal === null || order.subtotal === undefined
+    ? itemSubtotal
+    : toAmount(order.subtotal);
 
   const customerName = stripHtml(order.customer_name || order.customer_id || 'Guest Customer');
   const customerPhone = stripHtml(order.customer_phone || order.phone || order.contact_number || '');
-  const addressStr = stripHtml(order.delivery_address || order.address || order.area || order.pincode || 'Address not specified');
+  const addressStr = stripHtml(order.delivery_address || order.address_line || order.address || order.area || order.pincode || 'Address not specified');
   const deliverySlot = stripHtml(order.delivery_slot || order.slot || 'Standard Slot');
 
   return (
@@ -251,10 +283,19 @@ export default function OrderDetailsDrawer({
                           {formatMoney(item.unit_price)}
                         </td>
                         <td className="px-3.5 py-2.5 text-right font-medium text-rose-600">
-                          {Number(item.discount_amount) > 0 ? `-${formatMoney(item.discount_amount)}` : '-'}
+                          {getItemDiscount(item) > 0 ? (
+                            <span className="inline-flex flex-col items-end">
+                              <span>-{formatMoney(getItemDiscount(item))}</span>
+                              {toAmount(item.coupon_amount) > 0 && (
+                                <span className="text-[9px] text-slate-400">
+                                  Promo {formatMoney(item.discount_amount)} + Coupon {formatMoney(item.coupon_amount)}
+                                </span>
+                              )}
+                            </span>
+                          ) : '-'}
                         </td>
                         <td className="px-3.5 py-2.5 text-right font-bold text-emerald-700">
-                          {formatMoney(item.final_price)}
+                          {formatMoney(getItemTotal(item))}
                         </td>
                       </tr>
                     ))}
@@ -268,9 +309,33 @@ export default function OrderDetailsDrawer({
           <div className="bg-emerald-50/80 border border-emerald-200 p-4 rounded-2xl space-y-2 shadow-2xs">
             <div className="flex justify-between text-xs text-slate-600 font-semibold">
               <span>Items Subtotal:</span>
-              <span className="font-bold text-slate-900">{formatMoney(itemTotal)}</span>
+              <span className="font-bold text-slate-900">{formatMoney(subtotal)}</span>
             </div>
-            {order.total_amount && (
+            {promotionDiscount > 0 && (
+              <div className="flex justify-between text-xs font-semibold text-rose-700">
+                <span>Promotion Discount:</span>
+                <span>-{formatMoney(promotionDiscount)}</span>
+              </div>
+            )}
+            {couponDiscount > 0 && (
+              <div className="flex justify-between text-xs font-semibold text-rose-700">
+                <span>Coupon Discount:</span>
+                <span>-{formatMoney(couponDiscount)}</span>
+              </div>
+            )}
+            {otherDiscount > 0 && (
+              <div className="flex justify-between text-xs font-semibold text-rose-700">
+                <span>Other Discount:</span>
+                <span>-{formatMoney(otherDiscount)}</span>
+              </div>
+            )}
+            {toAmount(order.gst_amount) > 0 && (
+              <div className="flex justify-between text-xs font-semibold text-slate-600">
+                <span>GST:</span>
+                <span>+{formatMoney(order.gst_amount)}</span>
+              </div>
+            )}
+            {order.total_amount !== null && order.total_amount !== undefined && (
               <div className="flex justify-between text-sm font-extrabold border-t border-emerald-200/90 pt-2 text-emerald-900">
                 <span>Grand Total:</span>
                 <span className="text-base text-emerald-700">{formatMoney(order.total_amount)}</span>

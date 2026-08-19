@@ -944,6 +944,9 @@ export class CartService {
           o.delivery_slot,
           o.address_line,
           o.contact_number,
+          o.subtotal,
+          o.discount_amount,
+          o.gst_amount,
           o.total_amount,
           o.delivery_partner_id,
           o.assignment_method,
@@ -963,7 +966,20 @@ export class CartService {
                   'variant_name', pv.name,
                   'quantity', oi.quantity,
                   'unit_price', oi.unit_price,
-                  'final_price', COALESCE(oi.final_price, oi.total_price, oi.unit_price * oi.quantity)
+                  'discount_amount', oi.discount_amount,
+                  'coupon_amount', oi.coupon_amount,
+                  'total_price', oi.total_price,
+                  'is_free', oi.is_free,
+                  'final_price', COALESCE(
+                    oi.total_price,
+                    NULLIF(oi.final_price, 0),
+                    GREATEST(
+                      oi.unit_price * oi.quantity
+                        - COALESCE(oi.discount_amount, 0)
+                        - COALESCE(oi.coupon_amount, 0),
+                      0
+                    )
+                  )
                 )
               )
               FROM order_items oi

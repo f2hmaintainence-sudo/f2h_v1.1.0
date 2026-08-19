@@ -176,13 +176,30 @@ export default function TodayOrdersClient({
     const orderId = encodeURIComponent(String(rawOrderId));
     setLoadingItems(true);
 
-    fetch(`${API_URL}/admin/orders/${orderId}/items`, { credentials: 'include' })
-      .then((r) => r.json())
-      .then((result) => {
-        if (result.status) setItems(Array.isArray(result.data) ? result.data : []);
-        else setItemsError(result.message || 'Failed to load order items');
+    Promise.all([
+      fetch(`${API_URL}/admin/orders/${orderId}/view`, { credentials: 'include' }),
+      fetch(`${API_URL}/admin/orders/${orderId}/items`, { credentials: 'include' }),
+    ])
+      .then(async ([detailResponse, itemsResponse]) => {
+        if (!detailResponse.ok || !itemsResponse.ok) {
+          throw new Error('Failed to load complete order details');
+        }
+
+        const [detailResult, itemsResult] = await Promise.all([
+          detailResponse.json(),
+          itemsResponse.json(),
+        ]);
+
+        if (detailResult.status && detailResult.data) {
+          setSelectedOrder((current) => current ? { ...current, ...detailResult.data } : detailResult.data);
+        }
+        if (itemsResult.status) {
+          setItems(Array.isArray(itemsResult.data) ? itemsResult.data : []);
+        } else {
+          setItemsError(itemsResult.message || 'Failed to load order items');
+        }
       })
-      .catch(() => setItemsError('Failed to load order items'))
+      .catch(() => setItemsError('Failed to load complete order details'))
       .finally(() => setLoadingItems(false));
   }, []);
 

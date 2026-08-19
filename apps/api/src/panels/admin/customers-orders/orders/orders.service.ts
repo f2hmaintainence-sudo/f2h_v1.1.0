@@ -71,6 +71,7 @@ export class OrdersService {
         'order_items.coupon_id',
         'order_items.discount_amount',
         'order_items.coupon_amount',
+        'order_items.total_price',
         'order_items.final_price',
         'order_items.is_free',
         'order_items.created_at',

@@ -22,6 +22,7 @@ import Link from "next/link";
 import { showSuccessToast } from "@/components/Toast";
 import "@/components/Table Generator/SkeletonForm.css";
 import SkeletonForm from "@/components/Table Generator/SkeletonForm";
+import OnlinePartnersPanel from "@/components/delivery/OnlinePartnersPanel";
 
 // --- Helpers ---
 const getImageUrl = (pathString?: string): string | null => {
@@ -205,6 +206,7 @@ VehicleCard.displayName = "VehicleCard";
 // Main Formal Delivery Partners Page
 // -----------------------------------------------------------------------------
 export default function DeliveryPartnersPage() {
+  const [activeSection, setActiveSection] = useState<"online" | "all">("online");
   const [partners, setPartners] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -452,335 +454,382 @@ export default function DeliveryPartnersPage() {
         </div>
       </div>
 
-      {/* ── Executive Fleet Summary Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {/* Total Fleet */}
-        <div className="bg-white rounded-2xl p-4 border border-gray-200/90 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-600 uppercase tracking-wider">
-            <span className="flex items-center gap-1.5">
-              <Users size={15} className="text-emerald-600" /> Registered Fleet
-            </span>
-            <span className="text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full border border-slate-200 font-mono">
-              Total
-            </span>
-          </div>
-          <p className="text-2xl font-extrabold text-slate-900 pt-1">{metrics.total}</p>
-          <p className="text-[11px] text-gray-500 font-medium">All onboarded delivery personnel</p>
-        </div>
+      {/* ── Top-level Section Navigation Tabs ── */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+        <button
+          type="button"
+          onClick={() => setActiveSection("online")}
+          className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2.5 ${
+            activeSection === "online"
+              ? "bg-slate-900 text-white shadow-md shadow-slate-900/10"
+              : "bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/80 shadow-2xs"
+          }`}
+        >
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+          </span>
+          <span>Live Online Delivery Partners</span>
+        </button>
 
-        {/* Active On-Duty */}
-        <div className="bg-white rounded-2xl p-4 border border-gray-200/90 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-xs font-bold text-emerald-800 uppercase tracking-wider">
-            <span className="flex items-center gap-1.5">
-              <UserCheck size={15} className="text-emerald-600" /> Active On-Duty
-            </span>
-            <span className="text-[11px] bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200 font-bold flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Active
-            </span>
-          </div>
-          <p className="text-2xl font-extrabold text-emerald-700 pt-1">{metrics.active}</p>
-          <p className="text-[11px] text-gray-500 font-medium">Currently online for fulfillment</p>
-        </div>
-
-        {/* KYC Compliance Rate */}
-        <div className="bg-white rounded-2xl p-4 border border-gray-200/90 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-xs font-bold text-teal-800 uppercase tracking-wider">
-            <span className="flex items-center gap-1.5">
-              <ShieldCheck size={15} className="text-teal-600" /> KYC Compliance
-            </span>
-            <span className="text-[11px] bg-teal-50 text-teal-800 px-2 py-0.5 rounded-full border border-teal-200 font-bold">
-              {metrics.complianceRate}% Rate
-            </span>
-          </div>
-          <p className="text-2xl font-extrabold text-slate-900 pt-1">{metrics.verified} <span className="text-xs text-slate-400 font-normal">/ {metrics.total} verified</span></p>
-          <p className="text-[11px] text-gray-500 font-medium">Identity & vehicle document verified</p>
-        </div>
-
-        {/* Today Completed Deliveries */}
-        <div className="bg-white rounded-2xl p-4 border border-gray-200/90 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-xs font-bold text-sky-800 uppercase tracking-wider">
-            <span className="flex items-center gap-1.5">
-              <Award size={15} className="text-sky-600" /> Today Deliveries
-            </span>
-            <span className="text-[11px] bg-sky-50 text-sky-800 px-2 py-0.5 rounded-full border border-sky-200 font-bold">
-              Completed
-            </span>
-          </div>
-          <p className="text-2xl font-extrabold text-sky-700 pt-1">{metrics.totalDelivered}</p>
-          <p className="text-[11px] text-gray-500 font-medium">Successfully delivered today</p>
-        </div>
+        <button
+          type="button"
+          onClick={() => setActiveSection("all")}
+          className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2.5 ${
+            activeSection === "all"
+              ? "bg-slate-900 text-white shadow-md shadow-slate-900/10"
+              : "bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/80 shadow-2xs"
+          }`}
+        >
+          <Users size={14} className={activeSection === "all" ? "text-emerald-400" : "text-slate-400"} />
+          <span>All Registered Delivery Partners</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+            activeSection === "all" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"
+          }`}>
+            {metrics.total}
+          </span>
+        </button>
       </div>
 
-      {/* ── Corporate Filter & View Mode Control Toolbar ── */}
-      <div className="bg-white rounded-2xl p-3 border border-gray-200/90 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-3">
-        {/* Left: View Mode Switcher & Status Filter */}
-        <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
-          {/* View Switcher */}
-          <div className="inline-flex h-9 rounded-xl bg-gray-100/90 p-1 border border-gray-200/80 items-center">
-            <button
-              type="button"
-              onClick={() => setViewMode("table")}
-              className={`inline-flex items-center gap-1.5 h-7 px-3 text-xs font-semibold rounded-lg transition-all ${
-                viewMode === "table"
-                  ? "bg-white text-emerald-800 shadow-2xs border border-gray-200 font-bold"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              <TableIcon size={14} /> Executive Table
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("grid")}
-              className={`inline-flex items-center gap-1.5 h-7 px-3 text-xs font-semibold rounded-lg transition-all ${
-                viewMode === "grid"
-                  ? "bg-white text-emerald-800 shadow-2xs border border-gray-200 font-bold"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              <LayoutGrid size={14} /> Cards Grid
-            </button>
-          </div>
-
-          {/* Status Tabs */}
-          <div className="inline-flex h-9 rounded-xl bg-gray-100/90 p-1 border border-gray-200/80 items-center">
-            {(["all", "active", "inactive", "on_leave"] as const).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFilter(f)}
-                className={`h-7 px-3 text-xs font-semibold capitalize rounded-lg transition-all ${
-                  filter === f
-                    ? "bg-emerald-700 text-white shadow-2xs font-bold"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                {f === "on_leave" ? "On Leave" : f}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Right: Search Input & Verification Filter */}
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          {/* Search Box */}
-          <div className="relative flex-1 md:w-64 h-9">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search Partner Name, Phone, Hub..."
-              className="w-full h-9 pl-9 pr-3 bg-gray-50 text-xs font-medium text-gray-800 placeholder-gray-400 border border-gray-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 transition-all"
-            />
-          </div>
-
-          {/* Verification Dropdown */}
-          <div className="inline-flex h-9 rounded-xl bg-gray-100/90 border border-gray-200 p-1 items-center">
-            <button
-              type="button"
-              onClick={() => setVerificationFilter("all")}
-              className={`h-7 px-2.5 text-xs font-semibold rounded-lg transition-all ${
-                verificationFilter === "all" ? "bg-white text-slate-900 shadow-2xs font-bold border border-gray-200" : "text-gray-500"
-              }`}
-            >
-              All Docs
-            </button>
-            <button
-              type="button"
-              onClick={() => setVerificationFilter("verified")}
-              className={`h-7 px-2.5 text-xs font-semibold rounded-lg transition-all ${
-                verificationFilter === "verified" ? "bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs font-bold" : "text-emerald-700"
-              }`}
-            >
-              Verified
-            </button>
-            <button
-              type="button"
-              onClick={() => setVerificationFilter("pending")}
-              className={`h-7 px-2.5 text-xs font-semibold rounded-lg transition-all ${
-                verificationFilter === "pending" ? "bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs font-bold" : "text-amber-700"
-              }`}
-            >
-              Pending
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Main View Container ── */}
-      {loading ? (
-        <div className="flex justify-center py-16"><Loader2 size={32} className="text-emerald-600 animate-spin" /></div>
-      ) : filteredPartners.length === 0 ? (
-        <div className="bg-white rounded-2xl p-12 text-center border border-gray-200 text-slate-400 space-y-2">
-          <Users size={40} className="mx-auto text-slate-300" />
-          <p className="text-sm font-semibold text-slate-700">No delivery partners found</p>
-          <p className="text-xs text-slate-400">Try refining your search or filter parameters.</p>
-        </div>
-      ) : viewMode === "table" ? (
-        /* Formal Corporate Executive Table View */
-        <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-100/90 text-slate-700 uppercase text-[10px] font-bold border-b border-gray-200">
-                <tr>
-                  <th className="px-4 py-3.5">Delivery Partner</th>
-                  <th className="px-4 py-3.5">Assigned Hub / Branch</th>
-                  <th className="px-4 py-3.5 text-center">Shift Status</th>
-                  <th className="px-4 py-3.5 text-center">KYC Verification</th>
-                  <th className="px-4 py-3.5 text-center">Assigned Today</th>
-                  <th className="px-4 py-3.5 text-center">Delivered Today</th>
-                  <th className="px-4 py-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 bg-white font-medium">
-                {filteredPartners.map((p) => {
-                  const partnerId = p.delivery_partner_id || p.id;
-                  const initial = (p.full_name || "D")[0].toUpperCase();
-
-                  return (
-                    <tr key={partnerId} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-4 py-3">
-                        <Link href={`/admin/delivery/partners/${partnerId}`} className="flex items-center gap-3 group/link">
-                          <div className={`w-9 h-9 shrink-0 rounded-xl font-extrabold flex items-center justify-center text-xs text-white shadow-2xs ${p.is_active ? "bg-gradient-to-br from-emerald-600 to-teal-700" : "bg-slate-400"}`}>
-                            {initial}
-                          </div>
-                          <div>
-                            <p className="font-extrabold text-slate-900 group-hover/link:text-emerald-700 transition-colors">{p.full_name || "Delivery Partner"}</p>
-                            <p className="text-[11px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
-                              <Phone size={10} className="text-slate-400" /> {p.phone || "N/A"}
-                            </p>
-                          </div>
-                        </Link>
-                      </td>
-
-                      <td className="px-4 py-3 text-slate-700">
-                        <div className="flex items-center gap-1 font-semibold">
-                          <MapPin size={12} className="text-slate-400" />
-                          <span>{p.branch_name || p.branch_id || "Main Hub"}</span>
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-3 text-center">
-                        {(() => {
-                          const leave = getPartnerLeaveInfo(p);
-                          if (leave) {
-                            const isHalfDay = leave.leave_type === 'half_day';
-                            const shift = leave.half_day_shift;
-                            const shiftLabel = shift ? (shift.charAt(0).toUpperCase() + shift.slice(1)) : '';
-                            const pillLabel = isHalfDay ? `Leave (${shiftLabel || 'Shift'})` : 'On Leave';
-
-                            return (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 animate-pulse animate-duration-1000">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                {pillLabel}
-                              </span>
-                            );
-                          }
-                          return (
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold ${
-                              p.is_active ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-slate-100 text-slate-600 border border-slate-200"
-                            }`}>
-                              {p.is_active && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
-                              {p.is_active ? "Active" : "Inactive"}
-                            </span>
-                          );
-                        })()}
-                      </td>
-
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenDocsModal(p)}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold border transition-colors ${
-                            p.is_verified
-                              ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
-                              : "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100 animate-pulse"
-                          }`}
-                        >
-                          {p.is_verified ? <ShieldCheck size={13} className="text-emerald-600" /> : <ShieldAlert size={13} className="text-amber-600" />}
-                          <span>{p.is_verified ? "Verified Docs" : "Review Docs"}</span>
-                        </button>
-                      </td>
-
-                      <td className="px-4 py-3 text-center font-bold text-slate-900">
-                        {p.today_assigned ?? 0}
-                      </td>
-
-                      <td className="px-4 py-3 text-center font-extrabold text-emerald-700">
-                        {p.today_delivered ?? 0}
-                      </td>
-
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditModal(p)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-600 hover:text-white font-bold text-[11px] transition-colors shadow-2xs"
-                            title="Edit Partner Profile & Salary"
-                          >
-                            <Edit2 size={11} /> <span>Edit</span>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : (
-        /* Executive Cards Grid View */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredPartners.map((p) => (
-            <PartnerCard key={p.delivery_partner_id || p.id} partner={p} leaveInfo={getPartnerLeaveInfo(p)} onOpenEditModal={handleOpenEditModal} onOpenDocsModal={handleOpenDocsModal} />
-          ))}
-        </div>
+      {/* ── SECTION 1: LIVE ONLINE PARTNERS ── */}
+      {activeSection === "online" && (
+        <OnlinePartnersPanel />
       )}
 
-      {/* Pagination Footer */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-gray-200/90 shadow-2xs text-xs font-medium text-slate-600">
-        <div>
-          Showing <span className="font-bold text-slate-900">{filteredPartners.length}</span> partners on this page &nbsp;·&nbsp; Total <span className="font-bold text-slate-900">{total}</span> registered &nbsp;·&nbsp; Page <span className="font-bold text-slate-900">{page}</span> of <span className="font-bold text-slate-900">{Math.max(1, Math.ceil(total / pageSize))}</span>
-        </div>
+      {/* ── SECTION 2: ALL REGISTERED FLEET ── */}
+      {activeSection === "all" && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* ── Executive Fleet Summary Cards ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            {/* Total Fleet */}
+            <div className="bg-white rounded-2xl p-4 border border-gray-200/90 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-600 uppercase tracking-wider">
+                <span className="flex items-center gap-1.5">
+                  <Users size={15} className="text-emerald-600" /> Registered Fleet
+                </span>
+                <span className="text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full border border-slate-200 font-mono">
+                  Total
+                </span>
+              </div>
+              <p className="text-2xl font-extrabold text-slate-900 pt-1">{metrics.total}</p>
+              <p className="text-[11px] text-gray-500 font-medium">All onboarded delivery personnel</p>
+            </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="inline-flex items-center gap-1 h-8 px-3 rounded-xl border border-gray-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold shadow-2xs"
-          >
-            <ChevronLeft size={14} /> Prev
-          </button>
+            {/* Active On-Duty */}
+            <div className="bg-white rounded-2xl p-4 border border-gray-200/90 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between text-xs font-bold text-emerald-800 uppercase tracking-wider">
+                <span className="flex items-center gap-1.5">
+                  <UserCheck size={15} className="text-emerald-600" /> Active On-Duty
+                </span>
+                <span className="text-[11px] bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200 font-bold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Active
+                </span>
+              </div>
+              <p className="text-2xl font-extrabold text-emerald-700 pt-1">{metrics.active}</p>
+              <p className="text-[11px] text-gray-500 font-medium">Currently online for fulfillment</p>
+            </div>
 
-          <div className="hidden sm:flex items-center gap-1">
-            {Array.from({ length: Math.max(1, Math.ceil(total / pageSize)) }, (_, i) => i + 1).map((pg) => (
-              <button
-                key={pg}
-                type="button"
-                onClick={() => setPage(pg)}
-                className={`h-8 w-8 rounded-xl text-xs font-bold transition-colors ${
-                  pg === page
-                    ? "bg-emerald-700 text-white border border-emerald-700 shadow-2xs"
-                    : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
-                }`}
-              >
-                {pg}
-              </button>
-            ))}
+            {/* KYC Compliance Rate */}
+            <div className="bg-white rounded-2xl p-4 border border-gray-200/90 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between text-xs font-bold text-teal-800 uppercase tracking-wider">
+                <span className="flex items-center gap-1.5">
+                  <ShieldCheck size={15} className="text-teal-600" /> KYC Compliance
+                </span>
+                <span className="text-[11px] bg-teal-50 text-teal-800 px-2 py-0.5 rounded-full border border-teal-200 font-bold">
+                  {metrics.complianceRate}% Rate
+                </span>
+              </div>
+              <p className="text-2xl font-extrabold text-slate-900 pt-1">{metrics.verified} <span className="text-xs text-slate-400 font-normal">/ {metrics.total} verified</span></p>
+              <p className="text-[11px] text-gray-500 font-medium">Identity & vehicle document verified</p>
+            </div>
+
+            {/* Today Completed Deliveries */}
+            <div className="bg-white rounded-2xl p-4 border border-gray-200/90 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between text-xs font-bold text-sky-800 uppercase tracking-wider">
+                <span className="flex items-center gap-1.5">
+                  <Award size={15} className="text-sky-600" /> Today Deliveries
+                </span>
+                <span className="text-[11px] bg-sky-50 text-sky-800 px-2 py-0.5 rounded-full border border-sky-200 font-bold">
+                  Completed
+                </span>
+              </div>
+              <p className="text-2xl font-extrabold text-sky-700 pt-1">{metrics.totalDelivered}</p>
+              <p className="text-[11px] text-gray-500 font-medium">Successfully delivered today</p>
+            </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setPage((p) => Math.min(Math.max(1, Math.ceil(total / pageSize)), p + 1))}
-            disabled={page >= Math.max(1, Math.ceil(total / pageSize))}
-            className="inline-flex items-center gap-1 h-8 px-3 rounded-xl border border-gray-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold shadow-2xs"
-          >
-            Next <ChevronRight size={14} />
-          </button>
+          {/* ── Corporate Filter & View Mode Control Toolbar ── */}
+          <div className="bg-white rounded-2xl p-3 border border-gray-200/90 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-3">
+            {/* Left: View Mode Switcher & Status Filter */}
+            <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
+              {/* View Switcher */}
+              <div className="inline-flex h-9 rounded-xl bg-gray-100/90 p-1 border border-gray-200/80 items-center">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("table")}
+                  className={`inline-flex items-center gap-1.5 h-7 px-3 text-xs font-semibold rounded-lg transition-all ${
+                    viewMode === "table"
+                      ? "bg-white text-emerald-800 shadow-2xs border border-gray-200 font-bold"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  <TableIcon size={14} /> Executive Table
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("grid")}
+                  className={`inline-flex items-center gap-1.5 h-7 px-3 text-xs font-semibold rounded-lg transition-all ${
+                    viewMode === "grid"
+                      ? "bg-white text-emerald-800 shadow-2xs border border-gray-200 font-bold"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  <LayoutGrid size={14} /> Cards Grid
+                </button>
+              </div>
+
+              {/* Status Tabs */}
+              <div className="inline-flex h-9 rounded-xl bg-gray-100/90 p-1 border border-gray-200/80 items-center">
+                {(["all", "active", "inactive", "on_leave"] as const).map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setFilter(f)}
+                    className={`h-7 px-3 text-xs font-semibold capitalize rounded-lg transition-all ${
+                      filter === f
+                        ? "bg-emerald-700 text-white shadow-2xs font-bold"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    {f === "on_leave" ? "On Leave" : f}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Right: Search Input & Verification Filter */}
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              {/* Search Box */}
+              <div className="relative flex-1 md:w-64 h-9">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search Partner Name, Phone, Hub..."
+                  className="w-full h-9 pl-9 pr-3 bg-gray-50 text-xs font-medium text-gray-800 placeholder-gray-400 border border-gray-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 transition-all"
+                />
+              </div>
+
+              {/* Verification Dropdown */}
+              <div className="inline-flex h-9 rounded-xl bg-gray-100/90 border border-gray-200 p-1 items-center">
+                <button
+                  type="button"
+                  onClick={() => setVerificationFilter("all")}
+                  className={`h-7 px-2.5 text-xs font-semibold rounded-lg transition-all ${
+                    verificationFilter === "all" ? "bg-white text-slate-900 shadow-2xs font-bold border border-gray-200" : "text-gray-500"
+                  }`}
+                >
+                  All Docs
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVerificationFilter("verified")}
+                  className={`h-7 px-2.5 text-xs font-semibold rounded-lg transition-all ${
+                    verificationFilter === "verified" ? "bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs font-bold" : "text-emerald-700"
+                  }`}
+                >
+                  Verified
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVerificationFilter("pending")}
+                  className={`h-7 px-2.5 text-xs font-semibold rounded-lg transition-all ${
+                    verificationFilter === "pending" ? "bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs font-bold" : "text-amber-700"
+                  }`}
+                >
+                  Pending
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Main View Container ── */}
+          {loading ? (
+            <div className="flex justify-center py-16"><Loader2 size={32} className="text-emerald-600 animate-spin" /></div>
+          ) : filteredPartners.length === 0 ? (
+            <div className="bg-white rounded-2xl p-12 text-center border border-gray-200 text-slate-400 space-y-2">
+              <Users size={40} className="mx-auto text-slate-300" />
+              <p className="text-sm font-semibold text-slate-700">No delivery partners found</p>
+              <p className="text-xs text-slate-400">Try refining your search or filter parameters.</p>
+            </div>
+          ) : viewMode === "table" ? (
+            /* Formal Corporate Executive Table View */
+            <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-100/90 text-slate-700 uppercase text-[10px] font-bold border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-3.5">Delivery Partner</th>
+                      <th className="px-4 py-3.5">Assigned Hub / Branch</th>
+                      <th className="px-4 py-3.5 text-center">Shift Status</th>
+                      <th className="px-4 py-3.5 text-center">KYC Verification</th>
+                      <th className="px-4 py-3.5 text-center">Assigned Today</th>
+                      <th className="px-4 py-3.5 text-center">Delivered Today</th>
+                      <th className="px-4 py-3.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white font-medium">
+                    {filteredPartners.map((p) => {
+                      const partnerId = p.delivery_partner_id || p.id;
+                      const initial = (p.full_name || "D")[0].toUpperCase();
+
+                      return (
+                        <tr key={partnerId} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-4 py-3">
+                            <Link href={`/admin/delivery/partners/${partnerId}`} className="flex items-center gap-3 group/link">
+                              <div className={`w-9 h-9 shrink-0 rounded-xl font-extrabold flex items-center justify-center text-xs text-white shadow-2xs ${p.is_active ? "bg-gradient-to-br from-emerald-600 to-teal-700" : "bg-slate-400"}`}>
+                                {initial}
+                              </div>
+                              <div>
+                                <p className="font-extrabold text-slate-900 group-hover/link:text-emerald-700 transition-colors">{p.full_name || "Delivery Partner"}</p>
+                                <p className="text-[11px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
+                                  <Phone size={10} className="text-slate-400" /> {p.phone || "N/A"}
+                                </p>
+                              </div>
+                            </Link>
+                          </td>
+
+                          <td className="px-4 py-3 text-slate-700">
+                            <div className="flex items-center gap-1 font-semibold">
+                              <MapPin size={12} className="text-slate-400" />
+                              <span>{p.branch_name || p.branch_id || "Main Hub"}</span>
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-3 text-center">
+                            {(() => {
+                              const leave = getPartnerLeaveInfo(p);
+                              if (leave) {
+                                const isHalfDay = leave.leave_type === 'half_day';
+                                const shift = leave.half_day_shift;
+                                const shiftLabel = shift ? (shift.charAt(0).toUpperCase() + shift.slice(1)) : '';
+                                const pillLabel = isHalfDay ? `Leave (${shiftLabel || 'Shift'})` : 'On Leave';
+
+                                return (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 animate-pulse animate-duration-1000">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                    {pillLabel}
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold ${
+                                  p.is_active ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-slate-100 text-slate-600 border border-slate-200"
+                                }`}>
+                                  {p.is_active && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                                  {p.is_active ? "Active" : "Inactive"}
+                                </span>
+                              );
+                            })()}
+                          </td>
+
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDocsModal(p)}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold border transition-colors ${
+                                p.is_verified
+                                  ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
+                                  : "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100 animate-pulse"
+                              }`}
+                            >
+                              {p.is_verified ? <ShieldCheck size={13} className="text-emerald-600" /> : <ShieldAlert size={13} className="text-amber-600" />}
+                              <span>{p.is_verified ? "Verified Docs" : "Review Docs"}</span>
+                            </button>
+                          </td>
+
+                          <td className="px-4 py-3 text-center font-bold text-slate-900">
+                            {p.today_assigned ?? 0}
+                          </td>
+
+                          <td className="px-4 py-3 text-center font-extrabold text-emerald-700">
+                            {p.today_delivered ?? 0}
+                          </td>
+
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditModal(p)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-600 hover:text-white font-bold text-[11px] transition-colors shadow-2xs"
+                                title="Edit Partner Profile & Salary"
+                              >
+                                <Edit2 size={11} /> <span>Edit</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            /* Executive Cards Grid View */
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredPartners.map((p) => (
+                <PartnerCard key={p.delivery_partner_id || p.id} partner={p} leaveInfo={getPartnerLeaveInfo(p)} onOpenEditModal={handleOpenEditModal} onOpenDocsModal={handleOpenDocsModal} />
+              ))}
+            </div>
+          )}
+
+          {/* Pagination Footer */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-gray-200/90 shadow-2xs text-xs font-medium text-slate-600">
+            <div>
+              Showing <span className="font-bold text-slate-900">{filteredPartners.length}</span> partners on this page &nbsp;·&nbsp; Total <span className="font-bold text-slate-900">{total}</span> registered &nbsp;·&nbsp; Page <span className="font-bold text-slate-900">{page}</span> of <span className="font-bold text-slate-900">{Math.max(1, Math.ceil(total / pageSize))}</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="inline-flex items-center gap-1 h-8 px-3 rounded-xl border border-gray-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold shadow-2xs"
+              >
+                <ChevronLeft size={14} /> Prev
+              </button>
+
+              <div className="hidden sm:flex items-center gap-1">
+                {Array.from({ length: Math.max(1, Math.ceil(total / pageSize)) }, (_, i) => i + 1).map((pg) => (
+                  <button
+                    key={pg}
+                    type="button"
+                    onClick={() => setPage(pg)}
+                    className={`h-8 w-8 rounded-xl text-xs font-bold transition-colors ${
+                      pg === page
+                        ? "bg-emerald-700 text-white border border-emerald-700 shadow-2xs"
+                        : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    {pg}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(Math.max(1, Math.ceil(total / pageSize)), p + 1))}
+                disabled={page >= Math.max(1, Math.ceil(total / pageSize))}
+                className="inline-flex items-center gap-1 h-8 px-3 rounded-xl border border-gray-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold shadow-2xs"
+              >
+                Next <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* KYC Verification Modal */}
       {selectedPartnerForDocs && (

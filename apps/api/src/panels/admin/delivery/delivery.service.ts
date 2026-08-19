@@ -444,6 +444,9 @@ export class DeliveryManagementService {
           o.delivery_slot,
           o.address_line,
           o.contact_number,
+          o.subtotal,
+          o.discount_amount,
+          o.gst_amount,
           o.total_amount,
           o.delivery_partner_id,
           o.assignment_method,
@@ -461,11 +464,24 @@ export class DeliveryManagementService {
               SELECT json_agg(
                 json_build_object(
                   'id', oi.id,
-                  'product_name', COALESCE(p.name, 'Fresh Item'),
+                  'product_name', COALESCE(p.name, oi.product_name, 'Fresh Item'),
                   'variant_name', pv.name,
                   'quantity', oi.quantity,
                   'unit_price', oi.unit_price,
-                  'final_price', COALESCE(oi.final_price, oi.unit_price * oi.quantity)
+                  'discount_amount', oi.discount_amount,
+                  'coupon_amount', oi.coupon_amount,
+                  'total_price', oi.total_price,
+                  'is_free', oi.is_free,
+                  'final_price', COALESCE(
+                    oi.total_price,
+                    NULLIF(oi.final_price, 0),
+                    GREATEST(
+                      oi.unit_price * oi.quantity
+                        - COALESCE(oi.discount_amount, 0)
+                        - COALESCE(oi.coupon_amount, 0),
+                      0
+                    )
+                  )
                 )
               )
               FROM order_items oi
@@ -597,6 +613,8 @@ export class DeliveryManagementService {
           EXTRACT(EPOCH FROM (NOW() - dp.last_location_at))::int AS location_age_seconds,
           dp.vehicle_type, dp.vehicle_number,
           dp.average_rating, dp.total_deliveries, dp.total_runs, dp.max_daily_orders,
+          dp.salary_type, dp.monthly_fixed_salary, dp.per_order_commission, dp.fuel_allowance_daily,
+          dp.joining_date, dp.driving_license_number,
           dp.branch_id, b.branch_name,
           dp.breakdown_reason, dp.breakdown_reported_at,
           lv.id            AS leave_id,
@@ -607,6 +625,8 @@ export class DeliveryManagementService {
           lv.half_day_shift,
           lv.reason        AS leave_reason,
           COALESCE(pend.pending_count, 0)::int  AS pending_leave_requests,
+          COALESCE(pend_list.pending_leaves, '[]'::json) AS pending_leaves,
+          COALESCE(upc_list.upcoming_leaves, '[]'::json) AS upcoming_leaves,
           upc.next_leave_date,
           run.run_id, run.run_status, run.slot,
           COALESCE(run.assigned_stops, 0)::int  AS assigned_stops,
@@ -615,8 +635,7 @@ export class DeliveryManagementService {
         FROM delivery_partners dp
         LEFT JOIN users u    ON u.user_id   = dp.delivery_partner_id
         LEFT JOIN branches b ON b.branch_id = dp.branch_id
-        -- Approved leave covering today, if any. leave_date/end_date are DATE
-        -- columns, so a plain CURRENT_DATE comparison is correct here.
+        -- Approved leave covering today, if any
         LEFT JOIN LATERAL (
           SELECT l.* FROM delivery_leave_requests l
            WHERE l.delivery_partner_id = dp.delivery_partner_id
@@ -625,11 +644,54 @@ export class DeliveryManagementService {
              AND CURRENT_DATE BETWEEN l.leave_date AND COALESCE(l.end_date, l.leave_date)
            ORDER BY l.leave_date DESC LIMIT 1
         ) lv ON TRUE
+        -- Count of pending leave requests
         LEFT JOIN LATERAL (
           SELECT COUNT(*) AS pending_count FROM delivery_leave_requests l
            WHERE l.delivery_partner_id = dp.delivery_partner_id
              AND l.deleted_at IS NULL AND LOWER(l.status) = 'pending'
         ) pend ON TRUE
+        -- List of pending leave requests
+        LEFT JOIN LATERAL (
+          SELECT COALESCE(
+            json_agg(
+              json_build_object(
+                'id', l.id,
+                'leave_date', l.leave_date,
+                'end_date', l.end_date,
+                'leave_type', l.leave_type,
+                'half_day_shift', l.half_day_shift,
+                'reason', l.reason,
+                'created_at', l.created_at
+              ) ORDER BY l.leave_date ASC
+            ),
+            '[]'::json
+          ) AS pending_leaves
+          FROM delivery_leave_requests l
+          WHERE l.delivery_partner_id = dp.delivery_partner_id
+            AND l.deleted_at IS NULL
+            AND LOWER(l.status) = 'pending'
+        ) pend_list ON TRUE
+        -- List of upcoming approved leave requests
+        LEFT JOIN LATERAL (
+          SELECT COALESCE(
+            json_agg(
+              json_build_object(
+                'id', l.id,
+                'leave_date', l.leave_date,
+                'end_date', l.end_date,
+                'leave_type', l.leave_type,
+                'half_day_shift', l.half_day_shift,
+                'reason', l.reason
+              ) ORDER BY l.leave_date ASC
+            ),
+            '[]'::json
+          ) AS upcoming_leaves
+          FROM delivery_leave_requests l
+          WHERE l.delivery_partner_id = dp.delivery_partner_id
+            AND l.deleted_at IS NULL
+            AND LOWER(l.status) = 'approved'
+            AND l.leave_date > CURRENT_DATE
+        ) upc_list ON TRUE
         LEFT JOIN LATERAL (
           SELECT MIN(l.leave_date) AS next_leave_date FROM delivery_leave_requests l
            WHERE l.delivery_partner_id = dp.delivery_partner_id
@@ -656,21 +718,34 @@ export class DeliveryManagementService {
 
       const rows = (await this.db.query(sql, params)) || [];
 
-      // A position that stopped updating means the app is backgrounded or the
-      // device lost signal — the partner still reads as "online" but should not
-      // be dispatched to blind.
       const STALE_AFTER_SECONDS = 300;
 
       const partners = rows.map((r: any) => ({
         ...r,
         average_rating: r.average_rating != null ? Number(r.average_rating) : null,
+        monthly_fixed_salary: r.monthly_fixed_salary != null ? Number(r.monthly_fixed_salary) : null,
+        per_order_commission: r.per_order_commission != null ? Number(r.per_order_commission) : null,
+        fuel_allowance_daily: r.fuel_allowance_daily != null ? Number(r.fuel_allowance_daily) : null,
         current_lat: r.current_lat != null ? Number(r.current_lat) : null,
         current_lng: r.current_lng != null ? Number(r.current_lng) : null,
         is_location_stale:
           r.location_age_seconds == null ||
           r.location_age_seconds > STALE_AFTER_SECONDS,
         on_leave_today: Boolean(r.leave_id),
+        today_leave_details: r.leave_id
+          ? {
+              id: r.leave_id,
+              leave_type: r.leave_type,
+              leave_from: r.leave_from,
+              leave_to: r.leave_to,
+              half_day_shift: r.half_day_shift,
+              reason: r.leave_reason,
+              status: r.leave_status,
+            }
+          : null,
         has_pending_leave: Number(r.pending_leave_requests) > 0,
+        pending_leaves: Array.isArray(r.pending_leaves) ? r.pending_leaves : [],
+        upcoming_leaves: Array.isArray(r.upcoming_leaves) ? r.upcoming_leaves : [],
       }));
 
       return {
@@ -680,7 +755,6 @@ export class DeliveryManagementService {
           total_online: partners.length,
           on_duty: partners.filter((p) => p.duty_status === 'on_duty').length,
           available: partners.filter((p) => p.is_available).length,
-          // Online despite approved leave — the case an admin needs to see.
           online_while_on_leave: partners.filter((p) => p.on_leave_today).length,
           with_pending_leave: partners.filter((p) => p.has_pending_leave).length,
           stale_location: partners.filter((p) => p.is_location_stale).length,
