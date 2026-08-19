@@ -27,6 +27,7 @@ import 'package:f2h_delivery/services/mock_data_service.dart';
 import 'package:f2h_delivery/core/widgets/image_source_dialog.dart';
 import 'crop_photo_screen.dart';
 import 'package:f2h_delivery/features/profile/presentation/screens/notifications_screen.dart';
+import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -133,11 +134,7 @@ class ProfileScreen extends StatelessWidget {
             if (state is ProfileError) {
               return Scaffold(
                 backgroundColor: kBg,
-                appBar: AppBar(
-                  backgroundColor: kSurface,
-                  elevation: 0,
-                  title: const Text('Profile', style: TextStyle(color: kText, fontWeight: FontWeight.bold)),
-                ),
+                appBar: F2hAppBar(title: 'Profile'),
                 body: Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),

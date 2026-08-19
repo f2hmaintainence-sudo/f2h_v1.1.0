@@ -7,6 +7,7 @@ import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/core/api/dio_client.dart';
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
+import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 
 class ReportIssueScreen extends StatefulWidget {
   final DeliveryOrderModel? order;
@@ -180,17 +181,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kBg,
-      appBar: AppBar(
-        backgroundColor: kSurface,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: kText, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Report Issue',
-          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: kText),
-        ),
-      ),
+      appBar: F2hAppBar(title: 'Report Issue'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

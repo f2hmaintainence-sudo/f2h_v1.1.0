@@ -6,6 +6,7 @@ import 'package:f2h_delivery/features/profile/presentation/bloc/profile_event.da
 import 'package:f2h_delivery/features/profile/presentation/bloc/profile_state.dart';
 import 'package:f2h_delivery/features/profile/presentation/widgets/section_card.dart';
 import 'package:f2h_delivery/features/profile/presentation/widgets/info_tile.dart';
+import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 
 class ActivityScreen extends StatelessWidget {
   const ActivityScreen({super.key});
@@ -14,15 +15,7 @@ class ActivityScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kBg,
-      appBar: AppBar(
-        backgroundColor: kPrimary,
-        foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text('Activity Logs', style: TextStyle(fontWeight: FontWeight.bold)),
-      ),
+      appBar: F2hAppBar(title: 'Activity Logs'),
       body: BlocBuilder<ProfileBloc, ProfileState>(
         builder: (context, state) {
           if (state is ProfileLoading) {

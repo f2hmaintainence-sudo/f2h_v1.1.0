@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_event.dart';
+import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -237,12 +238,8 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
 
         return Scaffold(
       backgroundColor: kBg,
-      appBar: AppBar(
-        backgroundColor: kSurface,
-        title: const Text(
-          'Stops Ledger',
-          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: kText),
-        ),
+      appBar: F2hAppBar(
+        title: 'Stops Ledger',
         actions: [
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: kDanger, size: 20),

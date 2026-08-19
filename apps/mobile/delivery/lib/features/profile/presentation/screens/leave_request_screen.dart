@@ -4,6 +4,7 @@ import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:f2h_delivery/features/profile/presentation/bloc/profile_event.dart';
 import 'package:f2h_delivery/features/profile/presentation/bloc/profile_state.dart';
+import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 
 class LeaveRequestScreen extends StatefulWidget {
   const LeaveRequestScreen({super.key});
@@ -280,15 +281,9 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen>
 
         return Scaffold(
           backgroundColor: kBg,
-          appBar: AppBar(
-            backgroundColor: kPrimary,
-            elevation: 0,
-            title: const Text(
-              'Leave Requests',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-            iconTheme: const IconThemeData(color: Colors.white),
-            bottom: TabBar(
+          appBar: F2hAppBar(
+        title: 'Leave Requests',
+        bottom: TabBar(
               controller: _tabController,
               indicatorColor: kAccent,
               indicatorWeight: 3,
@@ -300,7 +295,7 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen>
                 Tab(text: '🕑 History'),
               ],
             ),
-          ),
+      ),
           body: TabBarView(
             controller: _tabController,
             children: [

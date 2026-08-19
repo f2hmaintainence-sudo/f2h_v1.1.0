@@ -9,6 +9,7 @@ import 'package:f2h_delivery/features/delivery_session/presentation/bloc/deliver
 import 'package:f2h_delivery/features/orders/presentation/bloc/pickup_bloc.dart';
 import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/services/mock_data_service.dart';
+import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 
 class PickupSelectionScreen extends StatefulWidget {
   final PickupResponse response;
@@ -172,18 +173,7 @@ class _PickupSelectionScreenState extends State<PickupSelectionScreen> {
 
     return Scaffold(
       backgroundColor: kBg,
-      appBar: AppBar(
-        backgroundColor: kSurface,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: kText),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Warehouse Collection',
-          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: kText),
-        ),
-      ),
+      appBar: F2hAppBar(title: 'Warehouse Collection'),
       body: Column(
         children: [
           // Summary Banner

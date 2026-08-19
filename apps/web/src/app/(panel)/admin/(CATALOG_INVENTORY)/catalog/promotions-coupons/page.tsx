@@ -18,7 +18,7 @@ import {
   Users, ShoppingBag, Eye, DollarSign, ArrowRight, CheckCheck,
   Package, Boxes, Info, ToggleLeft, ToggleRight, Image as ImageIcon,
   ExternalLink, Palette, Smartphone, MonitorSmartphone, FolderTree,
-  SlidersHorizontal, CheckSquare, Upload, Crop, RotateCw, Maximize, Move
+  SlidersHorizontal, CheckSquare, Upload
 } from "lucide-react";
 import Link from "next/link";
 import { showSuccessToast, showErrorToast } from "@/components/Toast";
@@ -261,374 +261,6 @@ function BannerVisualPreview({
   );
 }
 
-// ─── Inline Banner Image Cropper Modal ──────────────────────
-const BANNER_RATIO_PRESETS: { id: "free" | "16:9" | "4:3" | "1:1" | "21:9" | "3:2"; label: string; ratio?: number }[] = [
-  { id: "free", label: "Free Crop" },
-  { id: "16:9", label: "16:9", ratio: 16 / 9 },
-  { id: "4:3", label: "4:3", ratio: 4 / 3 },
-  { id: "1:1", label: "1:1 Square", ratio: 1 },
-  { id: "21:9", label: "21:9 Ultra", ratio: 21 / 9 },
-  { id: "3:2", label: "3:2", ratio: 3 / 2 },
-];
-
-function BannerCropperModal({
-  isOpen,
-  imageUrl,
-  onClose,
-  onCropComplete,
-}: {
-  isOpen: boolean;
-  imageUrl: string;
-  onClose: () => void;
-  onCropComplete: (croppedDataUrl: string) => void;
-}) {
-  const [selectedRatio, setSelectedRatio] = useState<"free" | "16:9" | "4:3" | "1:1" | "21:9" | "3:2">("16:9");
-  const [rotation, setRotation] = useState<number>(0);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const imageRef = React.useRef<HTMLImageElement>(null);
-
-  const [crop, setCrop] = useState<{ x: number; y: number; w: number; h: number }>({
-    x: 0.05,
-    y: 0.05,
-    w: 0.9,
-    h: 0.9,
-  });
-
-  const dragRef = React.useRef<{
-    mode: "move" | "nw" | "ne" | "sw" | "se" | "n" | "s" | "e" | "w" | null;
-    startX: number;
-    startY: number;
-    startCrop: { x: number; y: number; w: number; h: number };
-    rectWidth: number;
-    rectHeight: number;
-  }>({
-    mode: null,
-    startX: 0,
-    startY: 0,
-    startCrop: { x: 0, y: 0, w: 0, h: 0 },
-    rectWidth: 0,
-    rectHeight: 0,
-  });
-
-  const applyRatioCrop = React.useCallback(
-    (ratioId: "free" | "16:9" | "4:3" | "1:1" | "21:9" | "3:2") => {
-      setSelectedRatio(ratioId);
-      if (!imageRef.current) return;
-
-      const imgWidth = imageRef.current.clientWidth;
-      const imgHeight = imageRef.current.clientHeight;
-      if (!imgWidth || !imgHeight) return;
-
-      if (ratioId === "free") {
-        setCrop({ x: 0.05, y: 0.05, w: 0.9, h: 0.9 });
-        return;
-      }
-
-      const targetRatio = BANNER_RATIO_PRESETS.find((r) => r.id === ratioId)?.ratio || 16 / 9;
-      const imageDisplayRatio = imgWidth / imgHeight;
-
-      let w = 0.85;
-      let h = 0.85;
-
-      if (targetRatio > imageDisplayRatio) {
-        w = 0.9;
-        const targetHeightPx = (w * imgWidth) / targetRatio;
-        h = Math.min(0.95, targetHeightPx / imgHeight);
-      } else {
-        h = 0.85;
-        const targetWidthPx = h * imgHeight * targetRatio;
-        w = Math.min(0.95, targetWidthPx / imgWidth);
-      }
-
-      const x = (1 - w) / 2;
-      const y = (1 - h) / 2;
-      setCrop({ x: Math.max(0, x), y: Math.max(0, y), w, h });
-    },
-    []
-  );
-
-  React.useEffect(() => {
-    if (isOpen) {
-      setImageLoaded(false);
-      setRotation(0);
-    }
-  }, [isOpen, imageUrl]);
-
-  const handlePointerDown = (
-    e: React.PointerEvent,
-    mode: "move" | "nw" | "ne" | "sw" | "se" | "n" | "s" | "e" | "w"
-  ) => {
-    e.stopPropagation();
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-
-    if (!imageRef.current) return;
-    const rect = imageRef.current.getBoundingClientRect();
-
-    dragRef.current = {
-      mode,
-      startX: e.clientX,
-      startY: e.clientY,
-      startCrop: { ...crop },
-      rectWidth: rect.width,
-      rectHeight: rect.height,
-    };
-  };
-
-  const handlePointerMove = (e: React.PointerEvent) => {
-    const { mode, startX, startY, startCrop, rectWidth, rectHeight } = dragRef.current;
-    if (!mode || !rectWidth || !rectHeight) return;
-
-    const deltaX = (e.clientX - startX) / rectWidth;
-    const deltaY = (e.clientY - startY) / rectHeight;
-
-    let newCrop = { ...startCrop };
-    const activeRatio = BANNER_RATIO_PRESETS.find((r) => r.id === selectedRatio)?.ratio;
-
-    if (mode === "move") {
-      newCrop.x = Math.min(Math.max(0, startCrop.x + deltaX), 1 - startCrop.w);
-      newCrop.y = Math.min(Math.max(0, startCrop.y + deltaY), 1 - startCrop.h);
-    } else {
-      if (mode.includes("e")) {
-        newCrop.w = Math.min(Math.max(0.1, startCrop.w + deltaX), 1 - startCrop.x);
-      }
-      if (mode.includes("s")) {
-        newCrop.h = Math.min(Math.max(0.1, startCrop.h + deltaY), 1 - startCrop.y);
-      }
-      if (mode.includes("w")) {
-        const potentialW = Math.max(0.1, startCrop.w - deltaX);
-        if (startCrop.x + startCrop.w - potentialW >= 0) {
-          newCrop.w = potentialW;
-          newCrop.x = startCrop.x + startCrop.w - potentialW;
-        }
-      }
-      if (mode.includes("n")) {
-        const potentialH = Math.max(0.1, startCrop.h - deltaY);
-        if (startCrop.y + startCrop.h - potentialH >= 0) {
-          newCrop.h = potentialH;
-          newCrop.y = startCrop.y + startCrop.h - potentialH;
-        }
-      }
-
-      if (activeRatio && activeRatio > 0 && imageRef.current) {
-        const imgRatio = rectWidth / rectHeight;
-        const currentBoxRatio = (newCrop.w * imgRatio) / newCrop.h;
-        if (Math.abs(currentBoxRatio - activeRatio) > 0.01) {
-          const adjustedH = (newCrop.w * imgRatio) / activeRatio;
-          if (newCrop.y + adjustedH <= 1) {
-            newCrop.h = adjustedH;
-          } else {
-            newCrop.h = 1 - newCrop.y;
-            newCrop.w = (newCrop.h * activeRatio) / imgRatio;
-          }
-        }
-      }
-    }
-
-    setCrop(newCrop);
-  };
-
-  const handlePointerUp = (e: React.PointerEvent) => {
-    if (dragRef.current.mode) {
-      try {
-        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-      } catch (_) {}
-      dragRef.current.mode = null;
-    }
-  };
-
-  const handleApplyCrop = () => {
-    if (!imageRef.current) return;
-
-    const naturalImg = new Image();
-    naturalImg.crossOrigin = "anonymous";
-    naturalImg.onload = () => {
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      const natW = naturalImg.naturalWidth;
-      const natH = naturalImg.naturalHeight;
-
-      const cropX = Math.round(crop.x * natW);
-      const cropY = Math.round(crop.y * natH);
-      const cropW = Math.round(crop.w * natW);
-      const cropH = Math.round(crop.h * natH);
-
-      const isRotated90or270 = rotation % 180 !== 0;
-      canvas.width = isRotated90or270 ? cropH : cropW;
-      canvas.height = isRotated90or270 ? cropW : cropH;
-
-      ctx.save();
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate((rotation * Math.PI) / 180);
-
-      const drawW = isRotated90or270 ? canvas.height : canvas.width;
-      const drawH = isRotated90or270 ? canvas.width : canvas.height;
-
-      ctx.drawImage(naturalImg, cropX, cropY, cropW, cropH, -drawW / 2, -drawH / 2, drawW, drawH);
-      ctx.restore();
-
-      const croppedDataUrl = canvas.toDataURL("image/webp", 0.92);
-      onCropComplete(croppedDataUrl);
-      onClose();
-    };
-    naturalImg.src = imageUrl;
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-60 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-100 my-auto overflow-hidden">
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-              <Crop size={20} />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-900">Crop &amp; Adjust Banner Image</h3>
-              <p className="text-xs text-slate-500">Select free crop or standard aspect ratios for mobile &amp; web placement</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition">
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Aspect Ratio Selector */}
-        <div className="p-3 sm:px-6 bg-slate-50 border-b border-slate-100 flex items-center gap-2 overflow-x-auto shrink-0">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap mr-1 flex items-center gap-1">
-            <Maximize size={12} /> Aspect Ratio:
-          </span>
-          {BANNER_RATIO_PRESETS.map((opt) => {
-            const isSelected = selectedRatio === opt.id;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => applyRatioCrop(opt.id)}
-                className={`px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap transition flex items-center gap-1.5 ${
-                  isSelected
-                    ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/30 ring-2 ring-emerald-600/20"
-                    : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/80"
-                }`}
-              >
-                {isSelected && <CheckCircle2 size={13} />}
-                <span>{opt.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Canvas Area */}
-        <div
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          className="relative flex-1 bg-slate-900 flex items-center justify-center p-4 sm:p-6 overflow-hidden select-none min-h-[340px]"
-        >
-          {imageUrl && (
-            <div className="relative inline-block max-h-[50vh] max-w-full">
-              <img
-                ref={imageRef}
-                src={imageUrl}
-                alt="Crop Target"
-                onLoad={() => {
-                  setImageLoaded(true);
-                  applyRatioCrop(selectedRatio);
-                }}
-                style={{
-                  transform: `rotate(${rotation}deg)`,
-                  transformOrigin: "center center",
-                  maxHeight: "50vh",
-                  maxWidth: "100%",
-                  objectFit: "contain",
-                  display: "block",
-                }}
-                className="pointer-events-none rounded-lg shadow-lg"
-              />
-
-              {imageLoaded && (
-                <div
-                  style={{
-                    left: `${crop.x * 100}%`,
-                    top: `${crop.y * 100}%`,
-                    width: `${crop.w * 100}%`,
-                    height: `${crop.h * 100}%`,
-                  }}
-                  onPointerDown={(e) => handlePointerDown(e, "move")}
-                  className="absolute cursor-move border-2 border-white/95 rounded-sm shadow-[0_0_0_9999px_rgba(0,0,0,0.65)] z-20"
-                >
-                  <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none opacity-40">
-                    <div className="border-r border-b border-white/70" />
-                    <div className="border-r border-b border-white/70" />
-                    <div className="border-b border-white/70" />
-                    <div className="border-r border-b border-white/70" />
-                    <div className="border-r border-b border-white/70" />
-                    <div className="border-b border-white/70" />
-                    <div className="border-r border-b border-white/70" />
-                    <div className="border-r border-b border-white/70" />
-                    <div />
-                  </div>
-
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-60">
-                    <div className="p-1.5 rounded-full bg-black/40 text-white">
-                      <Move size={16} />
-                    </div>
-                  </div>
-
-                  <div onPointerDown={(e) => handlePointerDown(e, "nw")} className="absolute -top-2 -left-2 w-4 h-4 bg-white border-2 border-emerald-600 rounded-xs cursor-nwse-resize shadow-md hover:scale-125 transition-transform" />
-                  <div onPointerDown={(e) => handlePointerDown(e, "ne")} className="absolute -top-2 -right-2 w-4 h-4 bg-white border-2 border-emerald-600 rounded-xs cursor-nesw-resize shadow-md hover:scale-125 transition-transform" />
-                  <div onPointerDown={(e) => handlePointerDown(e, "sw")} className="absolute -bottom-2 -left-2 w-4 h-4 bg-white border-2 border-emerald-600 rounded-xs cursor-nesw-resize shadow-md hover:scale-125 transition-transform" />
-                  <div onPointerDown={(e) => handlePointerDown(e, "se")} className="absolute -bottom-2 -right-2 w-4 h-4 bg-white border-2 border-emerald-600 rounded-xs cursor-nwse-resize shadow-md hover:scale-125 transition-transform" />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 sm:p-5 border-t border-slate-100 bg-white flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={() => setRotation((prev) => (prev + 90) % 360)}
-              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition flex items-center gap-1.5"
-            >
-              <RotateCw size={14} />
-              <span>Rotate 90°</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setRotation(0);
-                applyRatioCrop(selectedRatio);
-              }}
-              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition flex items-center gap-1.5"
-            >
-              <RefreshCw size={14} />
-              <span>Reset</span>
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-            <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition text-xs">
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleApplyCrop}
-              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md shadow-emerald-600/25 transition flex items-center gap-2 text-xs"
-            >
-              <Check size={16} />
-              Apply Cropped Image
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function PromotionsCouponsOffersPage() {
   const [activeTab, setActiveTab] = useState<"promotions" | "coupons" | "offers">("promotions");
   const [promotions, setPromotions] = useState<Promotion[]>([]);
@@ -667,11 +299,6 @@ export default function PromotionsCouponsOffersPage() {
   const [loadingRedemptions, setLoadingRedemptions] = useState(false);
   const [popupPreviewModalOpen, setPopupPreviewModalOpen] = useState(false);
   const [previewOffer, setPreviewOffer] = useState<OfferBanner | null>(null);
-
-  // Image Cropper Modal State
-  const [cropperOpen, setCropperOpen] = useState(false);
-  const [cropperImageSrc, setCropperImageSrc] = useState("");
-  const [cropperTarget, setCropperTarget] = useState<"create" | "edit">("create");
 
   // Form State - Create Promotion
   const [promoForm, setPromoForm] = useState({
@@ -960,35 +587,6 @@ export default function PromotionsCouponsOffersPage() {
     reader.readAsDataURL(file);
   };
 
-  // Open Image Cropper Modal with chosen image
-  const handleOpenCropper = (imageSrc: string, target: "create" | "edit") => {
-    if (!imageSrc) {
-      showErrorToast("No image selected to crop");
-      return;
-    }
-    setCropperImageSrc(imageSrc);
-    setCropperTarget(target);
-    setCropperOpen(true);
-  };
-
-  // Handle Cropped Image Result from Canvas Cropper
-  const handleCropComplete = (croppedDataUrl: string) => {
-    if (cropperTarget === "create") {
-      setOfferForm((prev) => ({
-        ...prev,
-        banner_image: croppedDataUrl,
-        image_url: prev.image_url || "cropped_banner.webp",
-      }));
-    } else {
-      setEditOfferForm((prev) => ({
-        ...prev,
-        banner_image: croppedDataUrl,
-        image_url: prev.image_url || "cropped_banner.webp",
-      }));
-    }
-    showSuccessToast("🎉 Banner image cropped successfully!");
-  };
-
   // Open Edit Promotion Modal
   const openEditPromo = (p: Promotion) => {
     setEditingPromo(p);
@@ -1195,7 +793,7 @@ export default function PromotionsCouponsOffersPage() {
       if (res.data?.data) {
         setSelectedPromoForProducts(res.data.data);
       }
-    } catch (_) {}
+    } catch (_) { }
   };
 
   // Add Product to Promotion
@@ -1433,33 +1031,30 @@ export default function PromotionsCouponsOffersPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setActiveTab("promotions")}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
-                activeTab === "promotions"
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${activeTab === "promotions"
                   ? "bg-[#16a34a] text-white shadow-md shadow-emerald-600/20"
                   : "bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900"
-              }`}
+                }`}
             >
               <Percent className="w-4 h-4" />
               Promotions ({promotions.length})
             </button>
             <button
               onClick={() => setActiveTab("coupons")}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
-                activeTab === "coupons"
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${activeTab === "coupons"
                   ? "bg-teal-600 text-white shadow-md shadow-teal-600/20"
                   : "bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900"
-              }`}
+                }`}
             >
               <Ticket className="w-4 h-4" />
               Coupons ({coupons.length})
             </button>
             <button
               onClick={() => setActiveTab("offers")}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
-                activeTab === "offers"
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${activeTab === "offers"
                   ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
                   : "bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900"
-              }`}
+                }`}
             >
               <Tag className="w-4 h-4" />
               Offers, Slides &amp; Popups ({offers.length})
@@ -1588,13 +1183,12 @@ export default function PromotionsCouponsOffersPage() {
                       </td>
                       <td className="p-4">
                         <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                            p.status === "active"
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${p.status === "active"
                               ? "bg-emerald-50 text-emerald-700"
                               : p.status === "paused"
-                              ? "bg-amber-50 text-amber-700"
-                              : "bg-slate-100 text-slate-700"
-                          }`}
+                                ? "bg-amber-50 text-amber-700"
+                                : "bg-slate-100 text-slate-700"
+                            }`}
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-current" />
                           {p.status.toUpperCase()}
@@ -1693,11 +1287,10 @@ export default function PromotionsCouponsOffersPage() {
                       </td>
                       <td className="p-4">
                         <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                            c.status === "active"
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${c.status === "active"
                               ? "bg-emerald-50 text-emerald-700"
                               : "bg-slate-100 text-slate-700"
-                          }`}
+                            }`}
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-current" />
                           {c.status.toUpperCase()}
@@ -1745,43 +1338,39 @@ export default function PromotionsCouponsOffersPage() {
               <div className="flex flex-wrap items-center gap-1.5">
                 <button
                   onClick={() => setOfferPlacementFilter("all")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                    offerPlacementFilter === "all"
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${offerPlacementFilter === "all"
                       ? "bg-slate-900 text-white shadow-xs"
                       : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
-                  }`}
+                    }`}
                 >
                   All Banners ({offers.length})
                 </button>
                 <button
                   onClick={() => setOfferPlacementFilter("home_carousel")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                    offerPlacementFilter === "home_carousel"
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${offerPlacementFilter === "home_carousel"
                       ? "bg-indigo-600 text-white shadow-xs"
                       : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
-                  }`}
+                    }`}
                 >
                   <Tag size={13} />
                   Home Carousel ({offers.filter((o) => o.banner_type === "home_carousel" || !o.banner_type).length})
                 </button>
                 <button
                   onClick={() => setOfferPlacementFilter("category_slide")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                    offerPlacementFilter === "category_slide"
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${offerPlacementFilter === "category_slide"
                       ? "bg-purple-600 text-white shadow-xs"
                       : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
-                  }`}
+                    }`}
                 >
                   <FolderTree size={13} />
                   Category Slides ({offers.filter((o) => o.banner_type === "category_slide" || o.category_id).length})
                 </button>
                 <button
                   onClick={() => setOfferPlacementFilter("popup")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                    offerPlacementFilter === "popup"
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${offerPlacementFilter === "popup"
                       ? "bg-rose-600 text-white shadow-xs"
                       : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
-                  }`}
+                    }`}
                 >
                   <Smartphone size={13} />
                   Popup Banners ({offers.filter((o) => o.is_popup || o.banner_type === "popup").length})
@@ -1960,11 +1549,10 @@ export default function PromotionsCouponsOffersPage() {
                           <td className="p-4">
                             <button
                               onClick={() => togglePopupStatus(o.id, isPopup)}
-                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold transition ${
-                                isPopup
+                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold transition ${isPopup
                                   ? "bg-rose-50 text-rose-700 border border-rose-200"
                                   : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                              }`}
+                                }`}
                             >
                               <Smartphone size={12} />
                               {isPopup ? "Active Popup" : "Enable Popup"}
@@ -1972,11 +1560,10 @@ export default function PromotionsCouponsOffersPage() {
                           </td>
                           <td className="p-4">
                             <span
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                                o.is_active
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${o.is_active
                                   ? "bg-emerald-50 text-emerald-700"
                                   : "bg-slate-100 text-slate-700"
-                              }`}
+                                }`}
                             >
                               <span className="w-1.5 h-1.5 rounded-full bg-current" />
                               {o.is_active ? "ACTIVE" : "INACTIVE"}
@@ -2339,7 +1926,7 @@ export default function PromotionsCouponsOffersPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 3: CREATE OFFER BANNER (WITH PREVIEW, CROP & PLACEMENT TYPE) */}
+      {/* MODAL 3: CREATE OFFER BANNER (SCREEN-FITTED WITH LIVE DYNAMIC PREVIEW) */}
       {/* ========================================================================= */}
       {isCreateOfferOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -2365,10 +1952,56 @@ export default function PromotionsCouponsOffersPage() {
 
             {/* Modal Scrollable Body */}
             <form id="create-offer-form" onSubmit={handleCreateOffer} className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+              {/* SECTION 0: BANNER PLACEMENT & TYPE */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Banner Placement &amp; Type *</span>
+                  <span className="text-[11px] font-semibold text-emerald-600 capitalize">{offerForm.banner_type.replace('_', ' ')}</span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {[
+                    { type: "home_carousel", label: "Home Carousel", desc: "Top Home Slider", icon: Tag },
+                    { type: "category_slide", label: "Category Slide", desc: "Targeted in Category", icon: FolderTree },
+                    { type: "popup", label: "App Launch Popup", desc: "Modal On App Open", icon: Smartphone },
+                    { type: "checkout_banner", label: "Checkout Promo", desc: "Cart & Pay Screens", icon: ShoppingBag },
+                  ].map((b) => {
+                    const isSelected = offerForm.banner_type === b.type;
+                    const IconComp = b.icon;
+                    return (
+                      <button
+                        key={b.type}
+                        type="button"
+                        onClick={() =>
+                          setOfferForm({
+                            ...offerForm,
+                            banner_type: b.type as any,
+                            is_popup: b.type === "popup",
+                          })
+                        }
+                        className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${isSelected
+                            ? "bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-950 shadow-xs"
+                            : "bg-slate-50 hover:bg-white border-slate-200 text-slate-700"
+                          }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <IconComp size={16} className={isSelected ? "text-emerald-600" : "text-slate-400"} />
+                          {isSelected && <CheckCircle2 size={14} className="text-emerald-600" />}
+                        </div>
+                        <div>
+                          <div className="font-bold text-xs">{b.label}</div>
+                          <div className="text-[10px] text-slate-400 font-medium">{b.desc}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* SECTION 1: OFFER DETAILS */}
-              <div className="space-y-4">
+              <div className="space-y-4 pt-2 border-t border-slate-100">
                 <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Offer Details</div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="font-bold text-slate-700">Banner Title *</label>
@@ -2401,16 +2034,16 @@ export default function PromotionsCouponsOffersPage() {
                     value={offerForm.description}
                     onChange={(e) => setOfferForm({ ...offerForm, description: e.target.value })}
                     placeholder="Brief summary of the promotional offer..."
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
               </div>
 
-              {/* SECTION 2: BANNER IMAGE (URL OR UPLOAD WITH CROP & PREVIEW) */}
+              {/* SECTION 2: BANNER IMAGE (URL OR UPLOAD) */}
               <div className="space-y-4 pt-2 border-t border-slate-100">
                 <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Banner Image (URL or Upload)</div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="font-bold text-slate-700">Banner Image URL (Mandatory - Min 1)</label>
                     <input
@@ -2420,58 +2053,43 @@ export default function PromotionsCouponsOffersPage() {
                       placeholder="https://images.unsplash.com/... or /uploads/..."
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
-                    <p className="text-[10px] text-slate-400">Direct image link or upload &amp; crop on right</p>
+                    <p className="text-[10px] text-slate-400">Direct image link or leave upload below</p>
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="font-bold text-slate-700">Or Upload Banner Image</label>
-                    {offerForm.banner_image || offerForm.image_url ? (
-                      <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-3 space-y-3 shadow-xs">
-                        <div className="h-36 w-full rounded-xl overflow-hidden bg-white border border-slate-200/60 flex items-center justify-center p-2 shadow-inner">
-                          <img
-                            src={offerForm.banner_image || offerForm.image_url}
-                            alt="Banner Upload"
-                            className="max-h-full max-w-full object-contain rounded-lg"
-                          />
-                        </div>
-                        <div className="flex items-center justify-center gap-3">
+                    <label className="border-2 border-dashed border-slate-200 hover:border-emerald-500 bg-slate-50 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition text-center min-h-[72px]">
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleOfferImageUpload(file, false);
+                        }}
+                      />
+                      {offerForm.banner_image ? (
+                        <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs">
+                          <CheckCircle2 size={16} />
+                          <span>Image Selected</span>
                           <button
                             type="button"
-                            onClick={() => handleOpenCropper(offerForm.banner_image || offerForm.image_url, "create")}
-                            className="px-4 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs shadow-xs transition flex items-center gap-1.5"
+                            onClick={(ev) => {
+                              ev.preventDefault();
+                              setOfferForm({ ...offerForm, banner_image: "" });
+                            }}
+                            className="text-red-500 hover:underline text-[10px] ml-1"
                           >
-                            <Crop size={14} className="text-slate-500" />
-                            <span>Crop</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setOfferForm({ ...offerForm, banner_image: "", image_url: "" })}
-                            className="px-4 py-1.5 rounded-xl border border-red-500/80 bg-white hover:bg-red-50 text-red-600 font-bold text-xs shadow-xs transition"
-                          >
-                            Remove
+                            (Remove)
                           </button>
                         </div>
-                      </div>
-                    ) : (
-                      <label className="border-2 border-dashed border-slate-200 hover:border-emerald-500 bg-slate-50 rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer transition text-center min-h-[110px]">
-                        <input
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleOfferImageUpload(file, false);
-                          }}
-                        />
-                        <div className="flex flex-col items-center gap-1.5 text-slate-500 font-semibold text-xs">
-                          <div className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                            <Upload size={16} />
-                          </div>
-                          <span>Click to upload banner / drag &amp; drop</span>
-                          <span className="text-[10px] text-slate-400">PNG, JPG, WebP supported</span>
+                      ) : (
+                        <div className="flex items-center gap-2 text-slate-500 font-semibold text-xs">
+                          <Upload size={16} className="text-slate-400" />
+                          <span>Click to upload / drag &amp; drop</span>
                         </div>
-                      </label>
-                    )}
+                      )}
+                    </label>
                   </div>
                 </div>
               </div>
@@ -2583,11 +2201,10 @@ export default function PromotionsCouponsOffersPage() {
                     <button
                       type="button"
                       onClick={() => setOfferForm({ ...offerForm, is_active: !offerForm.is_active })}
-                      className={`w-full py-2.5 px-4 rounded-xl border font-bold flex items-center justify-between transition ${
-                        offerForm.is_active
+                      className={`w-full py-2.5 px-4 rounded-xl border font-bold flex items-center justify-between transition ${offerForm.is_active
                           ? "bg-emerald-50 border-emerald-300 text-emerald-800"
                           : "bg-slate-50 border-slate-200 text-slate-500"
-                      }`}
+                        }`}
                     >
                       <span>{offerForm.is_active ? "Active" : "Inactive"}</span>
                       {offerForm.is_active ? (
@@ -2600,76 +2217,22 @@ export default function PromotionsCouponsOffersPage() {
                 </div>
               </div>
 
-              {/* SECTION 5: BANNER PLACEMENT TYPE ABOVE PREVIEW */}
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-4 pt-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold tracking-wider text-slate-700 uppercase flex items-center gap-1.5">
-                      <SlidersHorizontal size={13} className="text-emerald-600" />
-                      Banner Placement Type *
-                    </span>
-                    <span className="text-[11px] font-bold text-emerald-700 capitalize bg-emerald-100 px-2.5 py-0.5 rounded-full">
-                      {offerForm.banner_type.replace('_', ' ')}
-                    </span>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                    {[
-                      { type: "home_carousel", label: "Home Carousel", desc: "Top Home Slider", icon: Tag },
-                      { type: "category_slide", label: "Category Slide", desc: "Targeted in Category", icon: FolderTree },
-                      { type: "popup", label: "App Launch Popup", desc: "Modal On App Open", icon: Smartphone },
-                      { type: "checkout_banner", label: "Checkout Promo", desc: "Cart & Pay Screens", icon: ShoppingBag },
-                    ].map((b) => {
-                      const isSelected = offerForm.banner_type === b.type;
-                      const IconComp = b.icon;
-                      return (
-                        <button
-                          key={b.type}
-                          type="button"
-                          onClick={() =>
-                            setOfferForm({
-                              ...offerForm,
-                              banner_type: b.type as any,
-                              is_popup: b.type === "popup",
-                            })
-                          }
-                          className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
-                            isSelected
-                              ? "bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-950 shadow-xs"
-                              : "bg-white hover:bg-slate-100 border-slate-200 text-slate-700"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-1.5">
-                            <IconComp size={16} className={isSelected ? "text-emerald-600" : "text-slate-400"} />
-                            {isSelected && <CheckCircle2 size={14} className="text-emerald-600" />}
-                          </div>
-                          <div>
-                            <div className="font-bold text-xs">{b.label}</div>
-                            <div className="text-[10px] text-slate-400 font-medium">{b.desc}</div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+              {/* DYNAMIC LIVE BANNER PREVIEW ACCORDING TO TYPE */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                  <span>Live Preview ({offerForm.banner_type.replace('_', ' ')}):</span>
+                  <span className="text-[10px] text-emerald-600 font-bold">Dynamic Rendering</span>
                 </div>
-
-                {/* DYNAMIC LIVE BANNER PREVIEW ACCORDING TO TYPE */}
-                <div className="space-y-1.5 pt-3 border-t border-slate-200/70">
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
-                    <span>Live Banner Rendering:</span>
-                    <span className="text-[10px] text-emerald-600 font-bold">Realtime Dynamic Preview</span>
-                  </div>
-                  <BannerVisualPreview
-                    title={offerForm.title}
-                    discount_text={offerForm.discount_text}
-                    description={offerForm.description}
-                    image_url={offerForm.banner_image || offerForm.image_url}
-                    banner_type={offerForm.banner_type}
-                    cta_label={offerForm.cta_label}
-                    background_color={offerForm.background_color}
-                    category_name={getCategoryName(offerForm.category_id)}
-                  />
-                </div>
+                <BannerVisualPreview
+                  title={offerForm.title}
+                  discount_text={offerForm.discount_text}
+                  description={offerForm.description}
+                  image_url={offerForm.banner_image || offerForm.image_url}
+                  banner_type={offerForm.banner_type}
+                  cta_label={offerForm.cta_label}
+                  background_color={offerForm.background_color}
+                  category_name={getCategoryName(offerForm.category_id)}
+                />
               </div>
             </form>
 
@@ -2696,7 +2259,7 @@ export default function PromotionsCouponsOffersPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 3B: EDIT OFFER BANNER (WITH PREVIEW, CROP & PLACEMENT TYPE) */}
+      {/* MODAL 3B: EDIT OFFER BANNER (SCREEN-FITTED WITH LIVE DYNAMIC PREVIEW) */}
       {/* ========================================================================= */}
       {isEditOfferOpen && editingOffer && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -2722,10 +2285,56 @@ export default function PromotionsCouponsOffersPage() {
 
             {/* Modal Scrollable Body */}
             <form id="edit-offer-form" onSubmit={handleUpdateOffer} className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+              {/* SECTION 0: BANNER PLACEMENT & TYPE */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Banner Placement &amp; Type *</span>
+                  <span className="text-[11px] font-semibold text-amber-600 capitalize">{editOfferForm.banner_type.replace('_', ' ')}</span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {[
+                    { type: "home_carousel", label: "Home Carousel", desc: "Top Home Slider", icon: Tag },
+                    { type: "category_slide", label: "Category Slide", desc: "Targeted in Category", icon: FolderTree },
+                    { type: "popup", label: "App Launch Popup", desc: "Modal On App Open", icon: Smartphone },
+                    { type: "checkout_banner", label: "Checkout Promo", desc: "Cart & Pay Screens", icon: ShoppingBag },
+                  ].map((b) => {
+                    const isSelected = editOfferForm.banner_type === b.type;
+                    const IconComp = b.icon;
+                    return (
+                      <button
+                        key={b.type}
+                        type="button"
+                        onClick={() =>
+                          setEditOfferForm({
+                            ...editOfferForm,
+                            banner_type: b.type as any,
+                            is_popup: b.type === "popup",
+                          })
+                        }
+                        className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${isSelected
+                            ? "bg-amber-50 border-amber-500 ring-2 ring-amber-500/20 text-amber-950 shadow-xs"
+                            : "bg-slate-50 hover:bg-white border-slate-200 text-slate-700"
+                          }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <IconComp size={16} className={isSelected ? "text-amber-600" : "text-slate-400"} />
+                          {isSelected && <CheckCircle2 size={14} className="text-amber-600" />}
+                        </div>
+                        <div>
+                          <div className="font-bold text-xs">{b.label}</div>
+                          <div className="text-[10px] text-slate-400 font-medium">{b.desc}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* SECTION 1: OFFER DETAILS */}
-              <div className="space-y-4">
+              <div className="space-y-4 pt-2 border-t border-slate-100">
                 <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Offer Details</div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="font-bold text-slate-700">Banner Title *</label>
@@ -2763,11 +2372,11 @@ export default function PromotionsCouponsOffersPage() {
                 </div>
               </div>
 
-              {/* SECTION 2: BANNER IMAGE (URL OR UPLOAD WITH CROP & PREVIEW) */}
+              {/* SECTION 2: BANNER IMAGE (URL OR UPLOAD) */}
               <div className="space-y-4 pt-2 border-t border-slate-100">
                 <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Banner Image (URL or Upload)</div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="font-bold text-slate-700">Banner Image URL (Mandatory - Min 1)</label>
                     <input
@@ -2777,58 +2386,43 @@ export default function PromotionsCouponsOffersPage() {
                       placeholder="https://images.unsplash.com/... or /uploads/..."
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
-                    <p className="text-[10px] text-slate-400">Direct image link or upload &amp; crop on right</p>
+                    <p className="text-[10px] text-slate-400">Direct image link or leave upload below</p>
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="font-bold text-slate-700">Or Upload Banner Image</label>
-                    {editOfferForm.banner_image || editOfferForm.image_url ? (
-                      <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-3 space-y-3 shadow-xs">
-                        <div className="h-36 w-full rounded-xl overflow-hidden bg-white border border-slate-200/60 flex items-center justify-center p-2 shadow-inner">
-                          <img
-                            src={editOfferForm.banner_image || editOfferForm.image_url}
-                            alt="Banner Upload"
-                            className="max-h-full max-w-full object-contain rounded-lg"
-                          />
-                        </div>
-                        <div className="flex items-center justify-center gap-3">
+                    <label className="border-2 border-dashed border-slate-200 hover:border-amber-500 bg-slate-50 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition text-center min-h-[72px]">
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleOfferImageUpload(file, true);
+                        }}
+                      />
+                      {editOfferForm.banner_image ? (
+                        <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs">
+                          <CheckCircle2 size={16} />
+                          <span>New Image Selected</span>
                           <button
                             type="button"
-                            onClick={() => handleOpenCropper(editOfferForm.banner_image || editOfferForm.image_url, "edit")}
-                            className="px-4 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs shadow-xs transition flex items-center gap-1.5"
+                            onClick={(ev) => {
+                              ev.preventDefault();
+                              setEditOfferForm({ ...editOfferForm, banner_image: "" });
+                            }}
+                            className="text-red-500 hover:underline text-[10px] ml-1"
                           >
-                            <Crop size={14} className="text-slate-500" />
-                            <span>Crop</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditOfferForm({ ...editOfferForm, banner_image: "", image_url: "" })}
-                            className="px-4 py-1.5 rounded-xl border border-red-500/80 bg-white hover:bg-red-50 text-red-600 font-bold text-xs shadow-xs transition"
-                          >
-                            Remove
+                            (Remove)
                           </button>
                         </div>
-                      </div>
-                    ) : (
-                      <label className="border-2 border-dashed border-slate-200 hover:border-amber-500 bg-slate-50 rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer transition text-center min-h-[110px]">
-                        <input
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleOfferImageUpload(file, true);
-                          }}
-                        />
-                        <div className="flex flex-col items-center gap-1.5 text-slate-500 font-semibold text-xs">
-                          <div className="w-9 h-9 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
-                            <Upload size={16} />
-                          </div>
-                          <span>Click to upload new banner / drag &amp; drop</span>
-                          <span className="text-[10px] text-slate-400">PNG, JPG, WebP supported</span>
+                      ) : (
+                        <div className="flex items-center gap-2 text-slate-500 font-semibold text-xs">
+                          <Upload size={16} className="text-slate-400" />
+                          <span>Click to upload new image</span>
                         </div>
-                      </label>
-                    )}
+                      )}
+                    </label>
                   </div>
                 </div>
               </div>
@@ -2940,11 +2534,10 @@ export default function PromotionsCouponsOffersPage() {
                     <button
                       type="button"
                       onClick={() => setEditOfferForm({ ...editOfferForm, is_active: !editOfferForm.is_active })}
-                      className={`w-full py-2.5 px-4 rounded-xl border font-bold flex items-center justify-between transition ${
-                        editOfferForm.is_active
+                      className={`w-full py-2.5 px-4 rounded-xl border font-bold flex items-center justify-between transition ${editOfferForm.is_active
                           ? "bg-emerald-50 border-emerald-300 text-emerald-800"
                           : "bg-slate-50 border-slate-200 text-slate-500"
-                      }`}
+                        }`}
                     >
                       <span>{editOfferForm.is_active ? "Active" : "Inactive"}</span>
                       {editOfferForm.is_active ? (
@@ -2957,76 +2550,22 @@ export default function PromotionsCouponsOffersPage() {
                 </div>
               </div>
 
-              {/* SECTION 5: BANNER PLACEMENT TYPE ABOVE PREVIEW */}
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-4 pt-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold tracking-wider text-slate-700 uppercase flex items-center gap-1.5">
-                      <SlidersHorizontal size={13} className="text-amber-600" />
-                      Banner Placement Type *
-                    </span>
-                    <span className="text-[11px] font-bold text-amber-700 capitalize bg-amber-100 px-2.5 py-0.5 rounded-full">
-                      {editOfferForm.banner_type.replace('_', ' ')}
-                    </span>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                    {[
-                      { type: "home_carousel", label: "Home Carousel", desc: "Top Home Slider", icon: Tag },
-                      { type: "category_slide", label: "Category Slide", desc: "Targeted in Category", icon: FolderTree },
-                      { type: "popup", label: "App Launch Popup", desc: "Modal On App Open", icon: Smartphone },
-                      { type: "checkout_banner", label: "Checkout Promo", desc: "Cart & Pay Screens", icon: ShoppingBag },
-                    ].map((b) => {
-                      const isSelected = editOfferForm.banner_type === b.type;
-                      const IconComp = b.icon;
-                      return (
-                        <button
-                          key={b.type}
-                          type="button"
-                          onClick={() =>
-                            setEditOfferForm({
-                              ...editOfferForm,
-                              banner_type: b.type as any,
-                              is_popup: b.type === "popup",
-                            })
-                          }
-                          className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
-                            isSelected
-                              ? "bg-amber-50 border-amber-500 ring-2 ring-amber-500/20 text-amber-950 shadow-xs"
-                              : "bg-white hover:bg-slate-100 border-slate-200 text-slate-700"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-1.5">
-                            <IconComp size={16} className={isSelected ? "text-amber-600" : "text-slate-400"} />
-                            {isSelected && <CheckCircle2 size={14} className="text-amber-600" />}
-                          </div>
-                          <div>
-                            <div className="font-bold text-xs">{b.label}</div>
-                            <div className="text-[10px] text-slate-400 font-medium">{b.desc}</div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+              {/* DYNAMIC LIVE BANNER PREVIEW ACCORDING TO TYPE */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                  <span>Live Preview ({editOfferForm.banner_type.replace('_', ' ')}):</span>
+                  <span className="text-[10px] text-amber-600 font-bold">Dynamic Rendering</span>
                 </div>
-
-                {/* DYNAMIC LIVE BANNER PREVIEW ACCORDING TO TYPE */}
-                <div className="space-y-1.5 pt-3 border-t border-slate-200/70">
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
-                    <span>Live Banner Rendering:</span>
-                    <span className="text-[10px] text-amber-600 font-bold">Realtime Dynamic Preview</span>
-                  </div>
-                  <BannerVisualPreview
-                    title={editOfferForm.title}
-                    discount_text={editOfferForm.discount_text}
-                    description={editOfferForm.description}
-                    image_url={editOfferForm.banner_image || editOfferForm.image_url}
-                    banner_type={editOfferForm.banner_type}
-                    cta_label={editOfferForm.cta_label}
-                    background_color={editOfferForm.background_color}
-                    category_name={getCategoryName(editOfferForm.category_id)}
-                  />
-                </div>
+                <BannerVisualPreview
+                  title={editOfferForm.title}
+                  discount_text={editOfferForm.discount_text}
+                  description={editOfferForm.description}
+                  image_url={editOfferForm.banner_image || editOfferForm.image_url}
+                  banner_type={editOfferForm.banner_type}
+                  cta_label={editOfferForm.cta_label}
+                  background_color={editOfferForm.background_color}
+                  category_name={getCategoryName(editOfferForm.category_id)}
+                />
               </div>
             </form>
 
@@ -3564,13 +3103,12 @@ export default function PromotionsCouponsOffersPage() {
                               setSelectedVariantIds([...selectedVariantIds, cp.variant_id]);
                             }
                           }}
-                          className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition text-xs ${
-                            isAlreadyLinked
+                          className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition text-xs ${isAlreadyLinked
                               ? "opacity-40 cursor-not-allowed bg-slate-50"
                               : isSelected
-                              ? "bg-purple-50 border border-purple-200 text-purple-900"
-                              : "hover:bg-slate-50 text-slate-700"
-                          }`}
+                                ? "bg-purple-50 border border-purple-200 text-purple-900"
+                                : "hover:bg-slate-50 text-slate-700"
+                            }`}
                         >
                           <div>
                             <div className="font-bold">{cp.product_name} - {cp.variant_name}</div>
@@ -3688,16 +3226,6 @@ export default function PromotionsCouponsOffersPage() {
           </div>
         </div>
       )}
-
-      {/* ========================================================================= */}
-      {/* MODAL 7: IMAGE CROPPER MODAL (FREE & RATIO BASED) */}
-      {/* ========================================================================= */}
-      <BannerCropperModal
-        isOpen={cropperOpen}
-        imageUrl={cropperImageSrc}
-        onClose={() => setCropperOpen(false)}
-        onCropComplete={handleCropComplete}
-      />
     </div>
   );
 }

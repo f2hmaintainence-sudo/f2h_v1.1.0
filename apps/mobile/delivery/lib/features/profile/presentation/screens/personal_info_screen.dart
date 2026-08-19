@@ -9,6 +9,7 @@ import 'package:f2h_delivery/features/profile/presentation/widgets/section_card.
 import 'package:f2h_delivery/features/profile/presentation/widgets/info_tile.dart';
 import 'package:f2h_delivery/features/profile/presentation/widgets/editable_field.dart';
 import 'package:f2h_delivery/features/profile/presentation/widgets/image_upload_field.dart';
+import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 
 class PersonalInfoScreen extends StatefulWidget {
   const PersonalInfoScreen({super.key});
@@ -215,15 +216,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       },
       child: Scaffold(
         backgroundColor: kBg,
-        appBar: AppBar(
-          backgroundColor: kPrimary,
-          foregroundColor: Colors.white,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-          title: const Text('Personal Details', style: TextStyle(fontWeight: FontWeight.bold)),
-          actions: [
+        appBar: F2hAppBar(
+        title: 'Personal Details',
+        actions: [
             if (!_isEditing)
               IconButton(
                 icon: const Icon(Icons.edit_rounded, color: kAccent),
@@ -235,7 +230,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 onPressed: () => setState(() => _isEditing = false),
               ),
           ],
-        ),
+      ),
         body: BlocBuilder<ProfileBloc, ProfileState>(
           builder: (context, state) {
             if (state is ProfileLoading) {

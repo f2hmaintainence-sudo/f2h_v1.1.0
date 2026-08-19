@@ -13,6 +13,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_delivery/core/config/app_config.dart';
+import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final GroupedStop stop;
@@ -186,16 +187,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final hasOneTime = _currentStop.orders.any((o) => o.orderType == 'one-time' || o.orderType == 'single');
     return Scaffold(
       backgroundColor: kBg,
-      appBar: AppBar(
-        backgroundColor: kSurface,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: kText, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Stop Details #${_currentStop.stop}',
-          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: kText),
-        ),
+      appBar: F2hAppBar(
+        title: 'Stop Details #${_currentStop.stop}',
         actions: [
           if (hasSubscription)
             Container(

@@ -10,6 +10,7 @@ import 'package:f2h_delivery/features/profile/presentation/widgets/bank_account_
 import 'package:f2h_delivery/features/profile/presentation/widgets/status_banner.dart';
 import 'package:f2h_delivery/features/profile/presentation/widgets/editable_field.dart';
 import 'package:f2h_delivery/features/profile/presentation/widgets/image_upload_field.dart';
+import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 
 class BankDetailsScreen extends StatefulWidget {
   const BankDetailsScreen({super.key});
@@ -199,15 +200,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
       },
       child: Scaffold(
         backgroundColor: kBg,
-        appBar: AppBar(
-          backgroundColor: kPrimary,
-          foregroundColor: Colors.white,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-          title: const Text('Configure Bank Payouts', style: TextStyle(fontWeight: FontWeight.bold)),
-        ),
+        appBar: F2hAppBar(title: 'Configure Bank Payouts'),
         body: BlocBuilder<ProfileBloc, ProfileState>(
           builder: (context, state) {
             if (state is ProfileLoading) {

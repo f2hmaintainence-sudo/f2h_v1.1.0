@@ -6,6 +6,7 @@ import 'package:f2h_delivery/features/delivery_session/presentation/bloc/deliver
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/orders/presentation/bloc/handover_bloc.dart';
 import 'package:f2h_delivery/features/orders/domain/repositories/orders_repository.dart';
+import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 
 class WarehouseHandoverScreen extends StatefulWidget {
   const WarehouseHandoverScreen({super.key});
@@ -181,12 +182,7 @@ class _WarehouseHandoverScreenState extends State<WarehouseHandoverScreen> {
 
           return Scaffold(
             backgroundColor: kBg,
-            appBar: AppBar(
-              title: const Text('Warehouse Handover', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
-              backgroundColor: kSurface,
-              elevation: 0,
-              centerTitle: true,
-            ),
+            appBar: F2hAppBar(title: 'Warehouse Handover'),
             body: Column(
               children: [
                 Expanded(

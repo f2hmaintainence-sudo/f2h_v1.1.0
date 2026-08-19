@@ -8,6 +8,7 @@ import 'package:f2h_delivery/features/profile/presentation/bloc/profile_event.da
 import 'package:f2h_delivery/features/profile/presentation/bloc/profile_state.dart';
 import 'package:f2h_delivery/features/profile/presentation/widgets/section_card.dart';
 import 'package:f2h_delivery/features/profile/presentation/widgets/editable_field.dart';
+import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 
 class SecurityScreen extends StatefulWidget {
   const SecurityScreen({super.key});
@@ -96,15 +97,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
       },
       child: Scaffold(
         backgroundColor: kBg,
-        appBar: AppBar(
-          backgroundColor: kPrimary,
-          foregroundColor: Colors.white,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-          title: const Text('Security & Access', style: TextStyle(fontWeight: FontWeight.bold)),
-        ),
+        appBar: F2hAppBar(title: 'Security & Access'),
         body: Form(
           key: _formKey,
           child: ListView(

@@ -13,13 +13,14 @@ import 'package:f2h_delivery/features/orders/domain/repositories/orders_reposito
 import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/services/mock_data_service.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:f2h_delivery/features/dashboard/presentation/widgets/dashboard_header.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/next_delivery_card.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/queue_item_tile.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/verification_pending_view.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/handover_status_card.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/collect_queue_item.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/pickup_selection_screen.dart';
+import 'package:f2h_delivery/features/profile/presentation/screens/notifications_screen.dart';
+import 'package:f2h_delivery/core/widgets/f2h_hero_header.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -254,6 +255,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+
+  /// Availability toggle.
+  ///
+  /// Lifted out of the old AppBar's inline `Switch.onChanged` so the hero header
+  /// can drive it. The GPS and permission gate below is load-bearing: going
+  /// online starts live location tracking, so refusing here is what stops a
+  /// partner appearing available with no position.
+  Future<void> _handleOnlineToggle(bool val) async {
+                          if (val) {
+                            bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+                            if (!serviceEnabled) {
+                              if (mounted) AppSnackBar.error(context, 'GPS/Location services are disabled. Please enable them to go online.');
+                              return;
+                            }
+                            LocationPermission permission = await Geolocator.checkPermission();
+                            if (permission == LocationPermission.denied) {
+                              permission = await Geolocator.requestPermission();
+                              if (permission == LocationPermission.denied) {
+                                if (mounted) AppSnackBar.error(context, 'Location permission is required to track live location while online.');
+                                return;
+                              }
+                            }
+                            if (permission == LocationPermission.deniedForever) {
+                              if (mounted) AppSnackBar.error(context, 'Location permissions are permanently denied. Please enable them in settings.');
+                              return;
+                            }
+                          }
+                          context.read<DeliverySessionBloc>().add(ToggleOnlineEvent(
+                            val,
+                            callback: (error) {
+                              if (!mounted) return;
+                              if (error != null) {
+                                AppSnackBar.error(context, error);
+                              } else {
+                                AppSnackBar.show(
+                                  context,
+                                  val ? 'You are now Online.' : 'You are now Offline.',
+                                  backgroundColor: val ? kSuccess : kDanger,
+                                );
+                                if (val) _showPickupSummaryDialog(context);
+                              }
+                            },
+                          ));
+                        }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<DeliverySessionBloc, DeliverySessionState>(
@@ -293,25 +339,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (!isVerified || !isAccountActive) {
           return Scaffold(
             backgroundColor: kBg,
-            appBar: AppBar(
-              backgroundColor: kSurface,
-              elevation: 0,
-              centerTitle: true,
-              title: Text(
-                !isVerified ? 'Verification Pending' : 'Account Suspended',
-                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: kText),
-              ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh_rounded, color: kText),
-                  tooltip: 'Reload status',
-                  onPressed: () async {
-                    AppSnackBar.info(context, 'Refreshing status...');
-                    context.read<DeliverySessionBloc>().add(ReloadSessionEvent());
-                  },
-                ),
-              ],
-            ),
             body: VerificationPendingView(
               isUnverified: !isVerified,
               onRedirectToProfile: () {
@@ -486,18 +513,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
           ),
-          body: RefreshIndicator(
+          body: Column(
+            children: [
+              F2hHeroHeader(
+                driverName: session.driverName,
+                isOnline: session.isOnline,
+                onToggleOnline: _handleOnlineToggle,
+                onNotifications: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                ),
+              ),
+              Expanded(
+                child: RefreshIndicator(
             onRefresh: () async => context.read<DeliverySessionBloc>().add(ReloadSessionEvent()),
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
               children: [
-                DashboardHeader(
-                  driverName: session.driverName,
-                  completedCount: completedActiveStops,
-                  totalStops: totalActiveStops,
-                  showCollectButton: !isShiftCompleted,
-                  onCollectTap: () => _showItemsToCollectDialog(context),
-                ),
                 if (!session.isOnline) ...[
                   Container(
                     margin: const EdgeInsets.symmetric(vertical: 16),
@@ -767,6 +799,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ],
             ),
+          )),
+            ],
           ),
         );
       },

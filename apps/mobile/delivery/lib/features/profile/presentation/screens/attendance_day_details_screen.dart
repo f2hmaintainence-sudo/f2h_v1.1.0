@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/features/profile/data/profile_repository.dart';
+import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 
 class AttendanceDayDetailsScreen extends StatefulWidget {
   final String dateStr;
@@ -98,18 +99,7 @@ class _AttendanceDayDetailsScreenState extends State<AttendanceDayDetailsScreen>
 
     return Scaffold(
       backgroundColor: kBg,
-      appBar: AppBar(
-        backgroundColor: kPrimary,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Daily Attendance Logs',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-      ),
+      appBar: F2hAppBar(title: 'Daily Attendance Logs'),
       body: _buildBody(friendlyDate),
     );
   }

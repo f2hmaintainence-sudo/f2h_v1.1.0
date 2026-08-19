@@ -5,6 +5,7 @@ import 'package:f2h_delivery/features/profile/presentation/bloc/profile_bloc.dar
 import 'package:f2h_delivery/features/profile/presentation/bloc/profile_event.dart';
 import 'package:f2h_delivery/features/profile/presentation/bloc/profile_state.dart';
 import 'package:f2h_delivery/features/profile/presentation/widgets/section_card.dart';
+import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 
 class NotificationsPreferencesScreen extends StatelessWidget {
   const NotificationsPreferencesScreen({super.key});
@@ -21,15 +22,7 @@ class NotificationsPreferencesScreen extends StatelessWidget {
       },
       child: Scaffold(
         backgroundColor: kBg,
-        appBar: AppBar(
-          backgroundColor: kPrimary,
-          foregroundColor: Colors.white,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-          title: const Text('Notifications & Language', style: TextStyle(fontWeight: FontWeight.bold)),
-        ),
+        appBar: F2hAppBar(title: 'Notifications & Language'),
         body: BlocBuilder<ProfileBloc, ProfileState>(
           builder: (context, state) {
             if (state is ProfileLoading) {

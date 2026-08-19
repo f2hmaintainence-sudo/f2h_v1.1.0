@@ -8,6 +8,7 @@ import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/core/api/dio_client.dart';
 import 'package:f2h_delivery/core/api/api_endpoints.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
+import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 
 class SupportScreen extends StatefulWidget {
   final int initialTabIndex; // 0: Raise Ticket, 1: My Tickets, 2: Helplines
@@ -297,17 +298,8 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kBg,
-      appBar: AppBar(
-        backgroundColor: kPrimary,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Support Center',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-        ),
+      appBar: F2hAppBar(
+        title: 'Support Center',
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: kAccent,

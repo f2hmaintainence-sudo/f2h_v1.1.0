@@ -5,6 +5,7 @@ import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/orders/presentation/bloc/pickup_bloc.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/pickup_selection_screen.dart';
+import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 
 class PickupStatusCard extends StatelessWidget {
   final DeliveryRun? currentRun;
@@ -196,7 +197,7 @@ class PickupStatusCard extends StatelessWidget {
                           } else if (state is PickupError) {
                             return Scaffold(
                               backgroundColor: kBg,
-                              appBar: AppBar(title: const Text('Error')),
+                              appBar: F2hAppBar(title: 'Error'),
                               body: Center(child: Text(state.message)),
                             );
                           } else if (state is PickupNoRun) {

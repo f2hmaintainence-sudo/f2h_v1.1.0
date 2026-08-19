@@ -4,6 +4,7 @@ import 'package:f2h_delivery/core/api/api_endpoints.dart';
 import 'package:f2h_delivery/core/api/dio_client.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
+import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 
 class ProductInventorySummary {
   final String productName;
@@ -439,25 +440,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 1,
-        centerTitle: false,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF0F172A), size: 18),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Delivery Basket Ledger',
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFF0F172A),
-            letterSpacing: -0.2,
-          ),
-        ),
-      ),
+      appBar: F2hAppBar(title: 'Delivery Basket Ledger'),
       body: Column(
         children: [
           // White Elevation Dashboard Banner with Light Gradient Cards
