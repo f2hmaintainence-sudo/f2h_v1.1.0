@@ -21,6 +21,7 @@ const PUBLIC_ROUTES = [
   '/terms-and-conditions',
   '/refund-policy',
   '/delivery-policy',
+  '/delete-account',
 ];
 
 // Panel routes use client-side auth guard (AuthProvider + /users/me)
