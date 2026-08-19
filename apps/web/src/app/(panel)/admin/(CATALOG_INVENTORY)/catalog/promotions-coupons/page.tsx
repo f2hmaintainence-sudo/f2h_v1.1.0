@@ -1034,8 +1034,8 @@ export default function PromotionsCouponsOffersPage() {
             <button
               onClick={() => setActiveTab("promotions")}
               className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${activeTab === "promotions"
-                  ? "bg-[#16a34a] text-white shadow-md shadow-emerald-600/20"
-                  : "bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900"
+                ? "bg-[#16a34a] text-white shadow-md shadow-emerald-600/20"
+                : "bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900"
                 }`}
             >
               <Percent className="w-4 h-4" />
@@ -1044,8 +1044,8 @@ export default function PromotionsCouponsOffersPage() {
             <button
               onClick={() => setActiveTab("coupons")}
               className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${activeTab === "coupons"
-                  ? "bg-teal-600 text-white shadow-md shadow-teal-600/20"
-                  : "bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900"
+                ? "bg-teal-600 text-white shadow-md shadow-teal-600/20"
+                : "bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900"
                 }`}
             >
               <Ticket className="w-4 h-4" />
@@ -1054,8 +1054,8 @@ export default function PromotionsCouponsOffersPage() {
             <button
               onClick={() => setActiveTab("offers")}
               className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${activeTab === "offers"
-                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
-                  : "bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                : "bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900"
                 }`}
             >
               <Tag className="w-4 h-4" />
@@ -1186,10 +1186,10 @@ export default function PromotionsCouponsOffersPage() {
                       <td className="p-4">
                         <span
                           className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${p.status === "active"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : p.status === "paused"
-                                ? "bg-amber-50 text-amber-700"
-                                : "bg-slate-100 text-slate-700"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : p.status === "paused"
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-slate-100 text-slate-700"
                             }`}
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-current" />
@@ -1290,8 +1290,8 @@ export default function PromotionsCouponsOffersPage() {
                       <td className="p-4">
                         <span
                           className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${c.status === "active"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-slate-100 text-slate-700"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-slate-100 text-slate-700"
                             }`}
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-current" />
@@ -1341,8 +1341,8 @@ export default function PromotionsCouponsOffersPage() {
                 <button
                   onClick={() => setOfferPlacementFilter("all")}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${offerPlacementFilter === "all"
-                      ? "bg-slate-900 text-white shadow-xs"
-                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                    ? "bg-slate-900 text-white shadow-xs"
+                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
                     }`}
                 >
                   All Banners ({offers.length})
@@ -1350,8 +1350,8 @@ export default function PromotionsCouponsOffersPage() {
                 <button
                   onClick={() => setOfferPlacementFilter("home_carousel")}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${offerPlacementFilter === "home_carousel"
-                      ? "bg-indigo-600 text-white shadow-xs"
-                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                    ? "bg-indigo-600 text-white shadow-xs"
+                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
                     }`}
                 >
                   <Tag size={13} />
@@ -1360,8 +1360,8 @@ export default function PromotionsCouponsOffersPage() {
                 <button
                   onClick={() => setOfferPlacementFilter("category_slide")}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${offerPlacementFilter === "category_slide"
-                      ? "bg-purple-600 text-white shadow-xs"
-                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                    ? "bg-purple-600 text-white shadow-xs"
+                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
                     }`}
                 >
                   <FolderTree size={13} />
@@ -1370,8 +1370,8 @@ export default function PromotionsCouponsOffersPage() {
                 <button
                   onClick={() => setOfferPlacementFilter("popup")}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${offerPlacementFilter === "popup"
-                      ? "bg-rose-600 text-white shadow-xs"
-                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                    ? "bg-rose-600 text-white shadow-xs"
+                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
                     }`}
                 >
                   <Smartphone size={13} />
@@ -1552,8 +1552,8 @@ export default function PromotionsCouponsOffersPage() {
                             <button
                               onClick={() => togglePopupStatus(o.id, isPopup)}
                               className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold transition ${isPopup
-                                  ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                  : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                : "bg-slate-100 text-slate-500 hover:bg-slate-200"
                                 }`}
                             >
                               <Smartphone size={12} />
@@ -1563,8 +1563,8 @@ export default function PromotionsCouponsOffersPage() {
                           <td className="p-4">
                             <span
                               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${o.is_active
-                                  ? "bg-emerald-50 text-emerald-700"
-                                  : "bg-slate-100 text-slate-700"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-slate-100 text-slate-700"
                                 }`}
                             >
                               <span className="w-1.5 h-1.5 rounded-full bg-current" />
@@ -1982,8 +1982,8 @@ export default function PromotionsCouponsOffersPage() {
                           })
                         }
                         className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${isSelected
-                            ? "bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-950 shadow-xs"
-                            : "bg-slate-50 hover:bg-white border-slate-200 text-slate-700"
+                          ? "bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-950 shadow-xs"
+                          : "bg-slate-50 hover:bg-white border-slate-200 text-slate-700"
                           }`}
                       >
                         <div className="flex items-center justify-between mb-1.5">
@@ -2073,8 +2073,8 @@ export default function PromotionsCouponsOffersPage() {
                       crop={true}
                       aspectRatio={
                         offerForm.banner_type === "home_carousel" ? 16 / 9 :
-                        offerForm.banner_type === "category_slide" ? 4 / 3 :
-                        offerForm.banner_type === "popup" ? 4 / 5 : 16 / 9
+                          offerForm.banner_type === "category_slide" ? 4 / 3 :
+                            offerForm.banner_type === "popup" ? 4 / 5 : 16 / 9
                       }
                     />
                   </div>
@@ -2189,8 +2189,8 @@ export default function PromotionsCouponsOffersPage() {
                       type="button"
                       onClick={() => setOfferForm({ ...offerForm, is_active: !offerForm.is_active })}
                       className={`w-full py-2.5 px-4 rounded-xl border font-bold flex items-center justify-between transition ${offerForm.is_active
-                          ? "bg-emerald-50 border-emerald-300 text-emerald-800"
-                          : "bg-slate-50 border-slate-200 text-slate-500"
+                        ? "bg-emerald-50 border-emerald-300 text-emerald-800"
+                        : "bg-slate-50 border-slate-200 text-slate-500"
                         }`}
                     >
                       <span>{offerForm.is_active ? "Active" : "Inactive"}</span>
@@ -2300,8 +2300,8 @@ export default function PromotionsCouponsOffersPage() {
                           })
                         }
                         className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${isSelected
-                            ? "bg-amber-50 border-amber-500 ring-2 ring-amber-500/20 text-amber-950 shadow-xs"
-                            : "bg-slate-50 hover:bg-white border-slate-200 text-slate-700"
+                          ? "bg-amber-50 border-amber-500 ring-2 ring-amber-500/20 text-amber-950 shadow-xs"
+                          : "bg-slate-50 hover:bg-white border-slate-200 text-slate-700"
                           }`}
                       >
                         <div className="flex items-center justify-between mb-1.5">
@@ -2359,13 +2359,13 @@ export default function PromotionsCouponsOffersPage() {
                 </div>
               </div>
 
-              {/* SECTION 2: BANNER IMAGE (URL OR UPLOAD WITH SKELETON IMAGE UPLOADER & CROPPER) */}
+              {/* SECTION 2: BANNER IMAGE (URL OR UPLOAD) */}
               <div className="space-y-4 pt-2 border-t border-slate-100">
                 <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Banner Image (URL or Upload)</div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="font-bold text-slate-700">Banner Image URL</label>
+                    <label className="font-bold text-slate-700">Banner Image URL (Mandatory - Min 1)</label>
                     <input
                       type="text"
                       value={editOfferForm.image_url}
@@ -2373,28 +2373,43 @@ export default function PromotionsCouponsOffersPage() {
                       placeholder="https://images.unsplash.com/... or /uploads/..."
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
-                    <p className="text-[10px] text-slate-400">Direct image link or upload &amp; crop on the right</p>
+                    <p className="text-[10px] text-slate-400">Direct image link or leave upload below</p>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="font-bold text-slate-700">Upload &amp; Crop Banner Image</label>
-                    <SkeletonImageUploader
-                      value={editOfferForm.banner_image || editOfferForm.image_url}
-                      onChange={(val) => {
-                        const src = typeof val === "string" ? val : (val[0] || "");
-                        setEditOfferForm((prev) => ({
-                          ...prev,
-                          banner_image: src,
-                          image_url: prev.image_url || "banner_image.webp",
-                        }));
-                      }}
-                      crop={true}
-                      aspectRatio={
-                        editOfferForm.banner_type === "home_carousel" ? 16 / 9 :
-                        editOfferForm.banner_type === "category_slide" ? 4 / 3 :
-                        editOfferForm.banner_type === "popup" ? 4 / 5 : 16 / 9
-                      }
-                    />
+                    <label className="font-bold text-slate-700">Or Upload Banner Image</label>
+                    <label className="border-2 border-dashed border-slate-200 hover:border-amber-500 bg-slate-50 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition text-center min-h-[72px]">
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleOfferImageUpload(file, true);
+                        }}
+                      />
+                      {editOfferForm.banner_image ? (
+                        <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs">
+                          <CheckCircle2 size={16} />
+                          <span>New Image Selected</span>
+                          <button
+                            type="button"
+                            onClick={(ev) => {
+                              ev.preventDefault();
+                              setEditOfferForm({ ...editOfferForm, banner_image: "" });
+                            }}
+                            className="text-red-500 hover:underline text-[10px] ml-1"
+                          >
+                            (Remove)
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-slate-500 font-semibold text-xs">
+                          <Upload size={16} className="text-slate-400" />
+                          <span>Click to upload new image</span>
+                        </div>
+                      )}
+                    </label>
                   </div>
                 </div>
               </div>
@@ -2507,8 +2522,8 @@ export default function PromotionsCouponsOffersPage() {
                       type="button"
                       onClick={() => setEditOfferForm({ ...editOfferForm, is_active: !editOfferForm.is_active })}
                       className={`w-full py-2.5 px-4 rounded-xl border font-bold flex items-center justify-between transition ${editOfferForm.is_active
-                          ? "bg-emerald-50 border-emerald-300 text-emerald-800"
-                          : "bg-slate-50 border-slate-200 text-slate-500"
+                        ? "bg-emerald-50 border-emerald-300 text-emerald-800"
+                        : "bg-slate-50 border-slate-200 text-slate-500"
                         }`}
                     >
                       <span>{editOfferForm.is_active ? "Active" : "Inactive"}</span>
@@ -3076,10 +3091,10 @@ export default function PromotionsCouponsOffersPage() {
                             }
                           }}
                           className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition text-xs ${isAlreadyLinked
-                              ? "opacity-40 cursor-not-allowed bg-slate-50"
-                              : isSelected
-                                ? "bg-purple-50 border border-purple-200 text-purple-900"
-                                : "hover:bg-slate-50 text-slate-700"
+                            ? "opacity-40 cursor-not-allowed bg-slate-50"
+                            : isSelected
+                              ? "bg-purple-50 border border-purple-200 text-purple-900"
+                              : "hover:bg-slate-50 text-slate-700"
                             }`}
                         >
                           <div>

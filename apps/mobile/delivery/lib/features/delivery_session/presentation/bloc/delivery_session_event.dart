@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 part of 'delivery_session_bloc.dart';
 
 abstract class DeliverySessionEvent {}
@@ -55,6 +56,18 @@ class UpdateStopStatusEvent extends DeliverySessionEvent {
 class StartRunEvent extends DeliverySessionEvent {
   final String runId;
   StartRunEvent(this.runId);
+}
+
+/// Confirms the warehouse pickup for the active run.
+///
+/// `warehouse_pickup_modal` has always dispatched this, but the class was never
+/// declared — so the delivery app did not compile. The callbacks mirror the
+/// modal's existing expectations rather than inventing a new contract.
+class ConfirmWarehousePickupEvent extends DeliverySessionEvent {
+  final VoidCallback? onSuccess;
+  final void Function(String error)? onError;
+
+  ConfirmWarehousePickupEvent({this.onSuccess, this.onError});
 }
 
 /// Trigger SOS alert.

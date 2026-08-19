@@ -36,6 +36,7 @@ class DeliverySessionBloc
     on<ToggleOnlineEvent>(_onToggleOnline);
     on<UpdateStopStatusEvent>(_onUpdateStopStatus);
     on<StartRunEvent>(_onStartRun);
+    on<ConfirmWarehousePickupEvent>(_onConfirmWarehousePickup);
     on<TriggerSosEvent>(_onTriggerSos);
     on<ClearSosEvent>(_onClearSos);
     on<ClearActiveRunEvent>(_onClearActiveRun);
@@ -301,6 +302,30 @@ class DeliverySessionBloc
     } catch (e) {
       // Roll back to original state on error and surface the message to the caller
       emit(current);
+      event.onError?.call(e.toString());
+    }
+  }
+
+  /// Confirms the items loaded at the warehouse, then starts the run so the
+  /// stops become navigable. Reuses the same repository call the run-start
+  /// button uses, so both entry points leave the session in one state.
+  Future<void> _onConfirmWarehousePickup(
+      ConfirmWarehousePickupEvent event, Emitter<DeliverySessionState> emit) async {
+    final current = _currentLoaded();
+    final runId = current.currentRun?.runId;
+    if (runId == null || runId.isEmpty) {
+      event.onError?.call('No active run to confirm.');
+      return;
+    }
+    try {
+      final success = await _ordersRepo.confirmPickup(runId);
+      if (!success) {
+        event.onError?.call('Warehouse pickup could not be confirmed.');
+        return;
+      }
+      add(StartRunEvent(runId));
+      event.onSuccess?.call();
+    } catch (e) {
       event.onError?.call(e.toString());
     }
   }
