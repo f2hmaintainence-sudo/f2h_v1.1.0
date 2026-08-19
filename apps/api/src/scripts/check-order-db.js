@@ -5,7 +5,7 @@ async function run() {
     host: process.env.DB_HOST || 'f2hfresh.com',
     port: parseInt(process.env.DB_PORT || '5432'),
     user: process.env.DB_USERNAME || 'f2h_user',
-    password: process.env.DB_PASSWORD || 'f2h_password',
+    password: process.env.DB_PASSWORD,
     database: process.env.DB_DATABASE || 'f2h_fresh',
   });
 

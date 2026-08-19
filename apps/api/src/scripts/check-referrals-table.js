@@ -5,7 +5,7 @@ async function run() {
     host: 'database.f2hfresh.com',
     port: 5432,
     user: 'f2h_user',
-    password: 'f2h_password',
+    password: process.env.DB_PASSWORD,
     database: 'f2h_fresh',
   });
 

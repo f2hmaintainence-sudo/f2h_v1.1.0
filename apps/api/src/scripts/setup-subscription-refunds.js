@@ -2,7 +2,7 @@ const { Client } = require('pg');
 
 async function run() {
   const client = new Client({
-    connectionString: process.env.DATABASE_URL || 'postgresql://f2h_user:f2h_password@f2hfresh.com:5432/f2h_fresh',
+    connectionString: process.env.DATABASE_URL,
   });
 
   await client.connect();

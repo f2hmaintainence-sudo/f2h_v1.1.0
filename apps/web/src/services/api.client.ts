@@ -19,7 +19,7 @@
  * - Rate limit (429) handling with retry
  */
 
-import { getCsrfToken } from '../lib/csrf';
+import { getCsrfToken, clearCsrfToken } from '../lib/csrf';
 
 // Types
 export interface ApiResponse<T = unknown> {
@@ -93,16 +93,26 @@ class ApiClient {
       return config;
     });
 
-    // Response interceptor: Handle 401 unauthorized
+    // Response interceptor: silent refresh, then redirect if that fails.
+    // Access tokens are short-lived now (15 minutes by default), so a 401 usually
+    // means "expired", not "logged out". Without this the admin panel would bounce
+    // the user to /login every quarter of an hour.
     this.addResponseInterceptor(async (response, config) => {
-      if (response.status === 401 && !config.skipAuth) {
-        // Don't redirect if we're on public pages (no auth required)
-        if (typeof window !== 'undefined') {
-          const publicPages = ['/', '/login', '/register', '/forgot-password', '/reset-password'];
-          const isPublicPage = publicPages.includes(window.location.pathname) || window.location.pathname.startsWith('/landing');
-          if (!isPublicPage) {
-            window.location.href = '/login';
-          }
+      if (response.status !== 401 || config.skipAuth) return response;
+
+      const isRetry = (config as RequestConfig & { _refreshed?: boolean })._refreshed;
+      if (!isRetry && (await this.refreshSession())) {
+        (config as RequestConfig & { _refreshed?: boolean })._refreshed = true;
+        clearCsrfToken();
+        return this.executeRequest(config.url, config);
+      }
+
+      // Don't redirect if we're on public pages (no auth required)
+      if (typeof window !== 'undefined') {
+        const publicPages = ['/', '/login', '/register', '/forgot-password', '/reset-password'];
+        const isPublicPage = publicPages.includes(window.location.pathname) || window.location.pathname.startsWith('/landing');
+        if (!isPublicPage) {
+          window.location.href = '/login';
         }
       }
       return response;
@@ -126,6 +136,45 @@ class ApiClient {
       }
       return response;
     });
+  }
+
+  /**
+   * Exchanges the refresh cookie for a new access token.
+   *
+   * Concurrent 401s share a single in-flight request: an admin page can fire a
+   * dozen calls at once, and refreshing once per call would rotate the refresh
+   * token repeatedly and invalidate the session.
+   */
+  private refreshPromise: Promise<boolean> | null = null;
+
+  private async refreshSession(): Promise<boolean> {
+    if (typeof window === 'undefined') return false;
+
+    if (!this.refreshPromise) {
+      this.refreshPromise = (async () => {
+        try {
+          // The refresh call is itself a cookie-authenticated mutation, so it has to
+          // carry a CSRF token like any other.
+          const csrfToken = await getCsrfToken().catch(() => '');
+          const res = await fetch(`${this.getBaseUrl()}/auth/refresh`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+            },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        } finally {
+          // Cleared on the next tick so callers awaiting this attempt all see it.
+          setTimeout(() => { this.refreshPromise = null; }, 0);
+        }
+      })();
+    }
+
+    return this.refreshPromise;
   }
 
   /**
