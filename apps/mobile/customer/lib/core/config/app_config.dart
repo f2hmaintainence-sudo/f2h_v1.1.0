@@ -46,6 +46,14 @@ class AppConfig {
   static String googleServerClientId =
       '842214638527-0hdom5v6ab9aum1jrn86treomqqhmm7m.apps.googleusercontent.com';
   static String googleMapsApiKey = 'AIzaSyDPzNGpuT5QHHdCmlKAogNkDJj1e34urbs';
+
+  /// Raster tiles are fetched through the F2H proxy rather than from the
+  /// tile origin. Hitting OpenStreetMap from every device gets the client's
+  /// network rate-blocked, which is what turned the map into a wall of
+  /// "Access blocked" tiles. The server refreshes this on every sync.
+  static String mapTileUrlTemplate =
+      'https://f2hfresh.com/api/v1/map/tiles/{z}/{x}/{y}';
+  static String mapAttribution = '© OpenStreetMap contributors';
   static String razorpayKeyId = '';
 
   static double minOrderAmount = 100.0;
@@ -96,6 +104,9 @@ class AppConfig {
     if (data.containsKey('google_maps') && data['google_maps'] is Map) {
       final maps = data['google_maps'] as Map<String, dynamic>;
       googleMapsApiKey = maps['apiKey'] as String? ?? googleMapsApiKey;
+      mapTileUrlTemplate =
+          maps['tileUrlTemplate'] as String? ?? mapTileUrlTemplate;
+      mapAttribution = maps['tileAttribution'] as String? ?? mapAttribution;
     }
 
     if (data.containsKey('razorpay') && data['razorpay'] is Map) {

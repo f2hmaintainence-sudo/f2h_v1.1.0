@@ -12,6 +12,7 @@ import 'package:f2h_delivery/features/orders/presentation/screens/report_issue_s
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:f2h_delivery/core/config/app_config.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final GroupedStop stop;
@@ -833,7 +834,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
               children: [
                 TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  urlTemplate: AppConfig.mapTileUrlTemplate,
                   userAgentPackageName: 'com.f2h.delivery',
                 ),
                 MarkerLayer(

@@ -16,7 +16,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, RotateCcw, RotateCw, Square, Circle, Check, UploadCloud } from 'lucide-react';
 import './SkeletonForm.css';
 import { api } from "../../services/api.client";
-import { showErrorToast, showSuccessToast } from "@/components/Toast"
+import { showErrorToast, showSuccessToast } from "@/components/Toast";
+
+const RATIO_PRESETS: { id: string; label: string; ratio?: number }[] = [
+  { id: 'free', label: 'Free Crop' },
+  { id: '16:9', label: '16:9', ratio: 16 / 9 },
+  { id: '4:3', label: '4:3', ratio: 4 / 3 },
+  { id: '1:1', label: '1:1 Square', ratio: 1 },
+  { id: '21:9', label: '21:9 Ultra', ratio: 21 / 9 },
+  { id: '3:2', label: '3:2', ratio: 3 / 2 },
+];
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -325,8 +334,29 @@ export default function SkeletonForm({
     h: number;
   }>({ x: 50, y: 50, w: 220, h: 220 });
 
+  const [selectedCropRatio, setSelectedCropRatio] = useState<string>('free');
   const [activeHandle, setActiveHandle] = useState<string | null>(null);
   const [dragStartBox, setDragStartBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+
+  const applyCropRatio = (ratioId: string) => {
+    setSelectedCropRatio(ratioId);
+    if (ratioId === 'free') return;
+    const targetRatio = RATIO_PRESETS.find((r) => r.id === ratioId)?.ratio;
+    if (!targetRatio) return;
+
+    let w = 240;
+    let h = 240;
+    if (targetRatio >= 1) {
+      w = 260;
+      h = Math.min(260, Math.round(w / targetRatio));
+    } else {
+      h = 260;
+      w = Math.min(260, Math.round(h * targetRatio));
+    }
+    const x = Math.max(10, Math.round((320 - w) / 2));
+    const y = Math.max(10, Math.round((320 - h) / 2));
+    setCropBox({ x, y, w, h });
+  };
 
   const handleHandleMouseDown = (handle: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1502,12 +1532,12 @@ export default function SkeletonForm({
         )}
       </div>
 
-      {/* ── Image Crop & Rotate Modal ── */}
+      {/* ── Image Crop & Rotate Modal (Free & Ratio-Based) ── */}
       {cropModal.isOpen && (
         <div className="skf-crop-modal-overlay">
-          <div className="skf-crop-modal">
+          <div className="skf-crop-modal" style={{ maxWidth: '540px' }}>
             <div className="skf-crop-modal-header">
-              <h3 className="skf-crop-modal-title">Image Crop & Rotate</h3>
+              <h3 className="skf-crop-modal-title">Image Crop &amp; Rotate</h3>
               <button
                 type="button"
                 className="skf-close-btn"
@@ -1517,6 +1547,36 @@ export default function SkeletonForm({
                 <X size={16} />
               </button>
             </div>
+
+            {/* Aspect Ratio Presets */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', overflowX: 'auto' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginRight: '4px', whiteSpace: 'nowrap' }}>Aspect Ratio:</span>
+              {RATIO_PRESETS.map((preset) => {
+                const isSelected = selectedCropRatio === preset.id;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => applyCropRatio(preset.id)}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      border: isSelected ? '1px solid #16a34a' : '1px solid #cbd5e1',
+                      background: isSelected ? '#16a34a' : '#ffffff',
+                      color: isSelected ? '#ffffff' : '#334155',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {preset.label}
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="skf-crop-modal-body">
               <div
                 ref={setCropContainerRef}

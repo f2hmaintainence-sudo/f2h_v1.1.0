@@ -590,11 +590,11 @@ class ProfileScreen extends StatelessWidget {
                                     profile.profilePhotoUrl!,
                                     fit: BoxFit.cover,
                                     errorBuilder: (context, error, stackTrace) => const Center(
-                                      child: Text('👨‍✈️', style: TextStyle(fontSize: 36)),
+                                      child: Icon(Icons.person_rounded, size: 40, color: Colors.white70),
                                     ),
                                   )
                                 : const Center(
-                                    child: Text('👨‍✈️', style: TextStyle(fontSize: 36)),
+                                    child: Icon(Icons.person_rounded, size: 40, color: Colors.white70),
                                   ),
                           ),
                         ),

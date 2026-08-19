@@ -23,6 +23,7 @@ import { RoleHeaderMiddleware } from './middleware/role-header.middleware';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
+import { MapModule } from './map/map.module';
 import { envValidationSchema } from './config/env.validation';
 import { AppService } from './app.service';
 import { SharedDatabaseModule } from './shared/database/Database.module';
@@ -153,6 +154,7 @@ import { CustomerAppAssetsModule } from './panels/customer/app_assets/app_assets
         limit: 3000,
       },
     ]),
+    MapModule,
   ],
   controllers: [
     CsrfController,

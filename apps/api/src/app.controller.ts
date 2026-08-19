@@ -68,6 +68,10 @@ const GOOGLE_OAUTH_DEFAULTS = () => ({
   webClientId: process.env.GOOGLE_CLIENT_ID || '',
 });
 
+/** Clients render tiles through our proxy, never the tile origin directly. */
+const DEFAULT_TILE_URL_TEMPLATE =
+  process.env.MAP_TILE_URL_TEMPLATE || 'https://f2hfresh.com/api/v1/map/tiles/{z}/{x}/{y}';
+
 /** Storefront constants the clients read from the same payload. */
 const CLIENT_CONFIG_STATIC = {
   min_order_amount: 100.0,
@@ -142,7 +146,14 @@ export class AppController {
       } : defaults;
 
       const googleOauth = dbConfigs['oauth:google'] || GOOGLE_OAUTH_DEFAULTS();
-      const mapsConfig = dbConfigs['maps:google_maps'] || { apiKey: process.env.GOOGLE_MAPS_API_KEY || '' };
+      // `upstreamTileUrl` is deliberately not forwarded: it is the proxy's own
+      // business, and clients must go through the proxy rather than the origin.
+      const rawMaps = dbConfigs['maps:google_maps'] || {};
+      const mapsConfig = {
+        apiKey: rawMaps.apiKey || process.env.GOOGLE_MAPS_API_KEY || '',
+        tileUrlTemplate: rawMaps.tileUrlTemplate || DEFAULT_TILE_URL_TEMPLATE,
+        tileAttribution: rawMaps.tileAttribution || '© OpenStreetMap contributors',
+      };
       const razorpayConfig = dbConfigs['payment-gateway:razorpay'] || { keyId: process.env.RAZORPAY_KEY_ID || '' };
 
       return {
@@ -161,7 +172,11 @@ export class AppController {
         data: {
           firebase: FIREBASE_CLIENT_DEFAULTS(isDelivery),
           google_oauth: GOOGLE_OAUTH_DEFAULTS(),
-          google_maps: { apiKey: process.env.GOOGLE_MAPS_API_KEY || '' },
+          google_maps: {
+            apiKey: process.env.GOOGLE_MAPS_API_KEY || '',
+            tileUrlTemplate: DEFAULT_TILE_URL_TEMPLATE,
+            tileAttribution: '© OpenStreetMap contributors',
+          },
           razorpay: { keyId: process.env.RAZORPAY_KEY_ID || '' },
           ...CLIENT_CONFIG_STATIC,
         },

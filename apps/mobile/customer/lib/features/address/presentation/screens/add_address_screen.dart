@@ -1143,10 +1143,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
             ),
             children: [
               TileLayer(
-                urlTemplate: AppConfig.googleMapsApiKey.isNotEmpty
-                    ? 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&key=${AppConfig.googleMapsApiKey}'
-                    : 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-                userAgentPackageName: 'com.form2home.app',
+                urlTemplate: AppConfig.mapTileUrlTemplate,
+                userAgentPackageName: 'com.f2h.customer',
               ),
               CircleLayer(
                 circles: activeBranches
