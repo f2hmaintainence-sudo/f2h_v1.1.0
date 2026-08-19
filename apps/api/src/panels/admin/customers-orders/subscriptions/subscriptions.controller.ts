@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -190,5 +191,45 @@ export class SubscriptionsController {
     } catch (err: any) {
       return { status: false, message: err.message };
     }
+  }
+
+  // ─── Vacation Pause, Resume & Auto Renew Controls ───────────────────────
+
+  @Post(['subscriptions/:subscriptionId/pause', ':subscriptionId/pause', 'subscriptions/pause/:subscriptionId'])
+  async pauseSubscription(
+    @Param('subscriptionId') subscriptionId: string,
+    @Body() body: { start_date?: string; end_date?: string; startDate?: string; endDate?: string; reason?: string },
+    @Req() req: any,
+  ) {
+    const adminId = req.user?.user_id ?? 'system';
+    const startDate = body.start_date || body.startDate;
+    const endDate = body.end_date || body.endDate;
+    return this.subscriptionsService.pauseSubscription(subscriptionId, startDate, endDate, body.reason, adminId);
+  }
+
+  @Post(['subscriptions/:subscriptionId/resume', ':subscriptionId/resume', 'subscriptions/resume/:subscriptionId'])
+  async resumeSubscription(
+    @Param('subscriptionId') subscriptionId: string,
+    @Body() body: { resume_date?: string; resumeDate?: string },
+    @Req() req: any,
+  ) {
+    const adminId = req.user?.user_id ?? 'system';
+    const resumeDate = body?.resume_date || body?.resumeDate;
+    return this.subscriptionsService.resumeSubscription(subscriptionId, resumeDate, adminId);
+  }
+
+  @Patch(['subscriptions/:subscriptionId/auto-renew', ':subscriptionId/auto-renew'])
+  async updateAutoRenew(
+    @Param('subscriptionId') subscriptionId: string,
+    @Body() body: { auto_renew: boolean },
+    @Req() req: any,
+  ) {
+    const adminId = req.user?.user_id ?? 'system';
+    return this.subscriptionsService.updateAutoRenew(subscriptionId, body.auto_renew, adminId);
+  }
+
+  @Get(['subscriptions/:subscriptionId/pause-history', ':subscriptionId/pause-history'])
+  async getPauseHistory(@Param('subscriptionId') subscriptionId: string) {
+    return this.subscriptionsService.getPauseHistory(subscriptionId);
   }
 }

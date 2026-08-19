@@ -14,8 +14,14 @@ import {
   Tag,
   Sun,
   Moon,
+  RotateCw,
+  History,
+  Clock,
+  Check,
+  ShieldCheck,
 } from 'lucide-react';
 import { api } from '@/services/api.client';
+import SubscriptionResumeModal from '@/components/f2h/SubscriptionResumeModal';
 
 interface SubscriptionDetailDrawerProps {
   subscriptionId: string | null;
@@ -31,12 +37,21 @@ export default function SubscriptionDetailDrawer({
   const [loading, setLoading] = useState(false);
   const [subData, setSubData] = useState<any>(null);
   const [subItems, setSubItems] = useState<any[]>([]);
+  const [pauseHistory, setPauseHistory] = useState<any[]>([]);
   const [pausing, setPausing] = useState(false);
   const [pauseFrom, setPauseFrom] = useState('');
   const [pauseTo, setPauseTo] = useState('');
   const [pauseReason, setPauseReason] = useState('');
   const [actionError, setActionError] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
+  const [togglingAutoRenew, setTogglingAutoRenew] = useState(false);
+  const [isResumeModalOpen, setIsResumeModalOpen] = useState(false);
+
+  const now = new Date();
+  const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  const tomorrowObj = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  tomorrowObj.setDate(tomorrowObj.getDate() + 1);
+  const tomorrowStr = tomorrowObj.toISOString().slice(0, 10);
 
   useEffect(() => {
     if (!subscriptionId) return;
@@ -48,9 +63,10 @@ export default function SubscriptionDetailDrawer({
     setActionError('');
     setActionSuccess('');
     try {
-      const [resView, resItems] = await Promise.all([
+      const [resView, resItems, resHistory] = await Promise.all([
         api.get<any>(`/subscriptions/subscriptions/${id}/view`).catch(() => null),
         api.get<any>(`/subscriptions/subscriptions/${id}/items`).catch(() => null),
+        api.get<any>(`/subscriptions/subscriptions/${id}/pause-history`).catch(() => null),
       ]);
 
       // View details parsing
@@ -68,6 +84,13 @@ export default function SubscriptionDetailDrawer({
         itemsList = resItems.data;
       }
       setSubItems(itemsList);
+
+      // Pause history
+      if (Array.isArray(resHistory?.data?.data)) {
+        setPauseHistory(resHistory.data.data);
+      } else if (Array.isArray(resHistory?.data)) {
+        setPauseHistory(resHistory.data);
+      }
     } catch (err) {
       console.error('Failed to load subscription details:', err);
     } finally {
@@ -77,10 +100,22 @@ export default function SubscriptionDetailDrawer({
 
   if (!subscriptionId) return null;
 
+  const cleanPFrom = subData?.pause_from_date ? String(subData.pause_from_date).slice(0, 10) : null;
+  const cleanPTo = subData?.pause_to_date ? String(subData.pause_to_date).slice(0, 10) : null;
+  const isCurrentlyPaused = Boolean(cleanPTo && cleanPTo >= todayStr);
+
   const handlePauseSubscription = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pauseFrom || !pauseTo) {
       setActionError('Start and End dates are required to pause subscription');
+      return;
+    }
+    if (pauseFrom < tomorrowStr) {
+      setActionError(`Pause start date must be tomorrow (${tomorrowStr}) or later`);
+      return;
+    }
+    if (pauseTo < pauseFrom) {
+      setActionError('Pause end date cannot be before pause start date');
       return;
     }
 
@@ -88,12 +123,15 @@ export default function SubscriptionDetailDrawer({
     setActionError('');
     setActionSuccess('');
     try {
-      await api.post(`/subscriptions/subscriptions/pause/${subscriptionId}`, {
+      await api.post(`/subscriptions/subscriptions/${subscriptionId}/pause`, {
         start_date: pauseFrom,
         end_date: pauseTo,
-        reason: pauseReason || 'Admin manual pause',
+        reason: pauseReason || 'Admin vacation pause',
       });
       setActionSuccess('Subscription paused successfully');
+      setPauseFrom('');
+      setPauseTo('');
+      setPauseReason('');
       fetchSubscriptionDetails(subscriptionId);
       if (onRefresh) onRefresh();
     } catch (err: any) {
@@ -103,20 +141,36 @@ export default function SubscriptionDetailDrawer({
     }
   };
 
-  const handleResumeSubscription = async () => {
-    if (!confirm('Are you sure you want to resume this subscription?')) return;
-    setPausing(true);
+  const handleToggleAutoRenew = async () => {
+    if (!subData) return;
+    const nextVal = !subData.auto_renew;
+    setTogglingAutoRenew(true);
     setActionError('');
     setActionSuccess('');
     try {
-      await api.post(`/subscriptions/subscriptions/resume/${subscriptionId}`, {});
-      setActionSuccess('Subscription resumed active status');
-      fetchSubscriptionDetails(subscriptionId);
+      await api.patch(`/subscriptions/subscriptions/${subscriptionId}/auto-renew`, {
+        auto_renew: nextVal,
+      });
+      setSubData((prev: any) => ({ ...prev, auto_renew: nextVal }));
+      setActionSuccess(`Auto Renew ${nextVal ? 'Enabled' : 'Disabled'} successfully`);
       if (onRefresh) onRefresh();
     } catch (err: any) {
-      setActionError(err.response?.data?.message || 'Failed to resume subscription');
+      setActionError(err.response?.data?.message || 'Failed to update auto renew');
     } finally {
-      setPausing(false);
+      setTogglingAutoRenew(false);
+    }
+  };
+
+  const formatDateDisplay = (dateStr?: string | null) => {
+    if (!dateStr) return 'N/A';
+    try {
+      return new Date(dateStr + 'T00:00:00Z').toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+    } catch {
+      return dateStr;
     }
   };
 
@@ -138,16 +192,16 @@ export default function SubscriptionDetailDrawer({
                 </h2>
                 <span
                   className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                    subData?.status === 'active'
+                    isCurrentlyPaused
+                      ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                      : subData?.status === 'active'
                       ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                      : subData?.status === 'paused'
-                      ? 'bg-amber-100 text-amber-800 border border-amber-200'
                       : subData?.status === 'cancelled'
                       ? 'bg-rose-100 text-rose-800 border border-rose-200'
                       : 'bg-slate-100 text-slate-700 border border-slate-200'
                   }`}
                 >
-                  {subData?.status || 'Active'}
+                  {isCurrentlyPaused ? 'Paused' : (subData?.status || 'Active')}
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5 font-medium">
@@ -186,8 +240,87 @@ export default function SubscriptionDetailDrawer({
                 </div>
               )}
 
+              {/* Pause Status Alert Banner if paused */}
+              {isCurrentlyPaused && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-extrabold text-amber-900">
+                        Paused until {formatDateDisplay(cleanPTo)}
+                      </p>
+                      <p className="text-[11px] text-amber-700">
+                        Pause period: {formatDateDisplay(cleanPFrom)} &rarr; {formatDateDisplay(cleanPTo)}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsResumeModalOpen(true)}
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer"
+                  >
+                    <PlayCircle className="w-3.5 h-3.5" /> Resume
+                  </button>
+                </div>
+              )}
+
+              {/* Subscription Core & Auto-Renew Card */}
+              <div className="p-4 bg-gradient-to-r from-emerald-50/50 via-teal-50/30 to-emerald-50/50 border border-emerald-100 rounded-2xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-emerald-600" /> Subscription Settings
+                  </span>
+
+                  {/* Auto Renew Toggle Switch */}
+                  <div className="flex items-center gap-2.5 bg-white px-3 py-1.5 rounded-xl border border-emerald-200 shadow-2xs">
+                    <span className="text-xs font-extrabold text-slate-700">Auto Renew:</span>
+                    <button
+                      type="button"
+                      onClick={handleToggleAutoRenew}
+                      disabled={togglingAutoRenew}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
+                        subData?.auto_renew ? 'bg-emerald-600' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                          subData?.auto_renew ? 'translate-x-4.5' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                    <span className={`text-[11px] font-black uppercase ${subData?.auto_renew ? 'text-emerald-700' : 'text-slate-400'}`}>
+                      {subData?.auto_renew ? 'ON' : 'OFF'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Start Date</span>
+                    <span className="font-bold text-slate-900 mt-0.5 block">{formatDateDisplay(subData?.start_date)}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">End Date</span>
+                    <span className="font-bold text-slate-900 mt-0.5 block">{formatDateDisplay(subData?.end_date) || 'Ongoing'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Payment Mode</span>
+                    <span className="font-bold text-slate-800 uppercase flex items-center gap-1 mt-0.5">
+                      <CreditCard className="w-3 h-3 text-emerald-600" /> {subData?.payment_type || 'Prepaid'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Renewal Status</span>
+                    <span className={`font-bold mt-0.5 block ${subData?.auto_renew ? 'text-emerald-700' : 'text-slate-500'}`}>
+                      {subData?.auto_renew ? 'Auto-renews' : 'Ends on Expiry'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               {/* Customer Details Card */}
-              <div className="p-4 bg-emerald-50/40 border border-emerald-100 rounded-2xl space-y-3">
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
                 <div className="flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider">
                   <span className="flex items-center gap-1.5 text-slate-900 font-bold">
                     <User className="w-4 h-4 text-emerald-600" /> Customer Details
@@ -204,16 +337,14 @@ export default function SubscriptionDetailDrawer({
                     <span className="font-bold text-slate-900 mt-0.5 block font-mono">📞 {subData?.phone || 'N/A'}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[11px]">Payment Mode</span>
-                    <span className="font-bold text-slate-800 uppercase flex items-center gap-1 mt-0.5">
-                      <CreditCard className="w-3.5 h-3.5 text-emerald-600" /> {subData?.payment_type || 'Prepaid'}
-                    </span>
-                  </div>
-                  <div>
                     <span className="text-slate-400 block text-[11px]">Wallet Balance</span>
                     <span className="font-bold text-emerald-700 mt-0.5 block">
                       ₹{Number(subData?.wallet_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px]">Billing Cycle</span>
+                    <span className="font-bold text-slate-800 capitalize mt-0.5 block">{subData?.billing_cycle || 'Monthly'}</span>
                   </div>
                 </div>
               </div>
@@ -291,62 +422,152 @@ export default function SubscriptionDetailDrawer({
                 </div>
               </div>
 
-              {/* Pause / Resume Controls Section */}
-              <div className="p-4 bg-amber-50/60 border border-amber-200/80 rounded-2xl space-y-3">
+              {/* Pause Controls Section (Rules compliant) */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                    <PauseCircle className="w-4 h-4 text-amber-600" /> Subscription Vacation & Pause Controls
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <PauseCircle className="w-4 h-4 text-amber-600" /> Vacation & Pause Management
                   </span>
-                  {subData?.status === 'paused' && (
-                    <button
-                      onClick={handleResumeSubscription}
-                      disabled={pausing}
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer flex items-center gap-1"
-                    >
-                      <PlayCircle className="w-3.5 h-3.5" /> Resume Subscription
-                    </button>
+                  {isCurrentlyPaused && (
+                    <span className="text-[11px] font-bold text-amber-800 px-2.5 py-0.5 bg-amber-100 border border-amber-200 rounded-full">
+                      Paused until {formatDateDisplay(cleanPTo)}
+                    </span>
                   )}
                 </div>
 
-                {subData?.status !== 'paused' && (
+                {isCurrentlyPaused ? (
+                  /* Disabled Pause State with prominent resume action */
+                  <div className="p-4 bg-white border border-amber-200 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-extrabold text-slate-900">Pause Subscription</p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Subscription is paused until <strong className="text-amber-800">{formatDateDisplay(cleanPTo)}</strong>.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled
+                          className="px-3 py-1.5 bg-slate-100 text-slate-400 text-xs font-bold rounded-xl border border-slate-200 cursor-not-allowed"
+                        >
+                          Pause Disabled
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsResumeModalOpen(true)}
+                          className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-xs flex items-center gap-1 cursor-pointer"
+                        >
+                          <PlayCircle className="w-3.5 h-3.5" /> Resume Deliveries
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Pause Form when NOT currently paused */
                   <form onSubmit={handlePauseSubscription} className="space-y-3 pt-1">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Pause From</label>
                         <input
                           type="date"
+                          min={tomorrowStr}
                           value={pauseFrom}
                           onChange={(e) => setPauseFrom(e.target.value)}
-                          className="w-full px-3 py-2 bg-white border border-amber-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-500"
+                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
                         />
                       </div>
                       <div>
                         <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Pause To</label>
                         <input
                           type="date"
+                          min={pauseFrom || tomorrowStr}
                           value={pauseTo}
                           onChange={(e) => setPauseTo(e.target.value)}
-                          className="w-full px-3 py-2 bg-white border border-amber-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-500"
+                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
                         />
                       </div>
                     </div>
                     <div>
                       <input
                         type="text"
-                        placeholder="Reason for pause (e.g. Customer out of station)"
+                        placeholder="Reason for pause (e.g. Vacation / Out of station)"
                         value={pauseReason}
                         onChange={(e) => setPauseReason(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-amber-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-amber-500"
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-emerald-500"
                       />
                     </div>
                     <button
                       type="submit"
-                      disabled={pausing}
-                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                      disabled={pausing || !pauseFrom || !pauseTo}
+                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
                     >
                       {pausing ? 'Applying Pause...' : 'Apply Vacation Pause'}
                     </button>
                   </form>
+                )}
+              </div>
+
+              {/* Pause History Widget (Immutable Timeline) */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                  <History className="w-4 h-4 text-emerald-600" /> Pause &amp; Vacation History ({pauseHistory.length})
+                </h3>
+
+                {pauseHistory.length === 0 ? (
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-center text-xs text-slate-400 font-semibold">
+                    No past pause records for this subscription.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {pauseHistory.map((item, idx) => {
+                      const isLatestActive = idx === 0 && item.status === 'paused';
+                      return (
+                        <div
+                          key={item.id || idx}
+                          className={`p-3.5 rounded-2xl border transition-colors flex items-center justify-between gap-3 ${
+                            isLatestActive
+                              ? 'bg-amber-50/70 border-amber-200'
+                              : 'bg-white border-slate-200'
+                          }`}
+                        >
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-black text-slate-900">
+                                {formatDateDisplay(item.start_date)} &rarr; {formatDateDisplay(item.end_date)}
+                              </span>
+                              <span
+                                className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                                  item.status === 'paused'
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                    : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                }`}
+                              >
+                                {item.status}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500">
+                              {item.reason || 'Customer vacation pause'} • Logged: {formatDateDisplay(item.created_at)}
+                            </p>
+                          </div>
+
+                          {/* Resume Button on Latest Active Record */}
+                          {isLatestActive ? (
+                            <button
+                              onClick={() => setIsResumeModalOpen(true)}
+                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl transition shadow-xs flex items-center gap-1 cursor-pointer shrink-0"
+                            >
+                              <PlayCircle className="w-3 h-3" /> Resume
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-bold uppercase shrink-0">
+                              Read-only
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             </>
@@ -363,6 +584,20 @@ export default function SubscriptionDetailDrawer({
           </button>
         </div>
       </div>
+
+      {/* Subscription Resume Modal */}
+      <SubscriptionResumeModal
+        isOpen={isResumeModalOpen}
+        onClose={() => setIsResumeModalOpen(false)}
+        subscriptionId={String(subData?.subscription_id || subData?.id || subscriptionId)}
+        subscriptionNumber={subData?.subscription_number}
+        pauseFromDate={subData?.pause_from_date}
+        pauseToDate={subData?.pause_to_date}
+        onSuccess={() => {
+          fetchSubscriptionDetails(subscriptionId);
+          if (onRefresh) onRefresh();
+        }}
+      />
     </div>
   );
 }

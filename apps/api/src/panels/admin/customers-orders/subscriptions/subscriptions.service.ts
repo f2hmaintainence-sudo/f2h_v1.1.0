@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { DataService } from '../../../../shared/database/Data.service';
 import { DatabaseService } from '../../../../shared/database/Database.service';
 import { DeveloperService } from '../../../../shared/logger/Developer.service';
@@ -296,6 +296,323 @@ export class SubscriptionsService {
     } catch (error) {
       this.developer.error('getSubscriptionsSummary error', { error });
       throw new InternalServerErrorException('Failed to retrieve subscription summary');
+    }
+  }
+
+  // ────────────────────────────────────────────────
+  // Subscription Pause
+  // ────────────────────────────────────────────────
+  async pauseSubscription(
+    subscriptionId: string,
+    startDate?: string,
+    endDate?: string,
+    reason?: string,
+    adminId: string = 'system',
+  ) {
+    this.developer.debug('SubscriptionsService.pauseSubscription called', { subscriptionId, startDate, endDate });
+    try {
+      return await this.databaseService.transaction(async (client) => {
+        const subRes = await client.query<any>(
+          `SELECT subscription_id, status, pause_from_date, pause_to_date 
+           FROM subscriptions 
+           WHERE id::text = $1 OR subscription_id = $1 OR subscription_number = $1
+           LIMIT 1`,
+          [subscriptionId],
+        );
+        const sub = subRes.rows[0];
+        if (!sub) throw new BadRequestException('Subscription not found');
+        if (sub.status !== 'active') throw new BadRequestException('Only active subscriptions can be paused');
+
+        const now = new Date();
+        const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+        const tomorrowObj = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+        tomorrowObj.setDate(tomorrowObj.getDate() + 1);
+        const tomorrowStr = tomorrowObj.toISOString().slice(0, 10);
+
+        if (sub.pause_to_date && String(sub.pause_to_date).slice(0, 10) >= todayStr) {
+          throw new BadRequestException(
+            `Subscription is already paused until ${String(sub.pause_to_date).slice(0, 10)}. Please resume before creating a new pause.`
+          );
+        }
+
+        const startStr = startDate ? startDate.trim() : tomorrowStr;
+        const endStr = endDate ? endDate.trim() : '2099-12-31';
+
+        if (startStr < tomorrowStr) {
+          throw new BadRequestException(`Pause start date must be tomorrow (${tomorrowStr}) or later`);
+        }
+        if (endStr < startStr) {
+          throw new BadRequestException('Pause end date cannot be before pause start date');
+        }
+
+        await client.query(
+          `UPDATE subscriptions
+           SET pause_from_date = $1,
+               pause_to_date = $2,
+               pause_reason = $3,
+               updated_by = $4,
+               updated_at = now()
+           WHERE subscription_id = $5`,
+          [startStr, endStr, reason || 'Admin vacation pause', adminId, sub.subscription_id],
+        );
+
+        await client.query(
+          `INSERT INTO subscription_pauses (subscription_id, start_date, end_date, status, reason, created_at, updated_at)
+           VALUES ($1, $2, $3, 'paused', $4, now(), now())`,
+          [sub.subscription_id, startStr, endStr, reason || 'Admin vacation pause'],
+        );
+
+        await client.query(
+          `INSERT INTO subscription_logs (subscription_id, action, new_data, created_by, created_at)
+           VALUES ($1, 'pause', $2, $3, now())`,
+          [sub.subscription_id, JSON.stringify({ paused_from: startStr, paused_to: endStr, reason }), adminId],
+        );
+
+        return {
+          status: true,
+          message: 'Subscription paused successfully',
+        };
+      });
+    } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
+      this.developer.error('pauseSubscription error', { error, subscriptionId });
+      throw new BadRequestException(error?.message || 'Failed to pause subscription');
+    }
+  }
+
+  // ────────────────────────────────────────────────
+  // Subscription Resume — 3-Scenario Logic
+  // ────────────────────────────────────────────────
+  async resumeSubscription(
+    subscriptionId: string,
+    requestedResumeDate?: string,
+    adminId: string = 'system',
+  ) {
+    this.developer.debug('SubscriptionsService.resumeSubscription called', { subscriptionId, requestedResumeDate });
+    try {
+      return await this.databaseService.transaction(async (client) => {
+        const subRes = await client.query<any>(
+          `SELECT subscription_id, status, pause_from_date, pause_to_date, auto_renew 
+           FROM subscriptions 
+           WHERE id::text = $1 OR subscription_id = $1 OR subscription_number = $1
+           LIMIT 1`,
+          [subscriptionId],
+        );
+        const sub = subRes.rows[0];
+        if (!sub) throw new BadRequestException('Subscription not found');
+        if (sub.status !== 'active') throw new BadRequestException('Only active subscriptions can be resumed');
+
+        const pFrom = sub.pause_from_date ? String(sub.pause_from_date).slice(0, 10) : null;
+        const pTo = sub.pause_to_date ? String(sub.pause_to_date).slice(0, 10) : null;
+
+        const now = new Date();
+        const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+        const tomorrowObj = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+        tomorrowObj.setDate(tomorrowObj.getDate() + 1);
+        const tomorrowStr = tomorrowObj.toISOString().slice(0, 10);
+
+        if (!pFrom || !pTo || pTo < todayStr) {
+          throw new BadRequestException('Subscription is not currently paused');
+        }
+
+        const pauseRes = await client.query<any>(
+          `SELECT id, start_date, end_date, status, reason
+           FROM subscription_pauses
+           WHERE subscription_id = $1 AND status = 'paused' AND deleted_at IS NULL
+           ORDER BY created_at DESC NULLS LAST, id DESC
+           LIMIT 1`,
+          [sub.subscription_id],
+        );
+        const activePause = pauseRes.rows[0];
+        if (!activePause) throw new BadRequestException('No active pause record found to resume');
+
+        const activePauseEnd = String(activePause.end_date).slice(0, 10);
+
+        // Scenario 1: Resume before pause starts
+        if (todayStr < pFrom) {
+          await client.query(
+            `UPDATE subscriptions 
+             SET pause_from_date = NULL, 
+                 pause_to_date = NULL, 
+                 pause_reason = NULL,
+                 updated_by = $1,
+                 updated_at = now() 
+             WHERE subscription_id = $2`,
+            [adminId, sub.subscription_id],
+          );
+
+          await client.query(
+            `UPDATE subscription_pauses 
+             SET status = 'resumed', 
+                 updated_at = now() 
+             WHERE id = $1`,
+            [activePause.id],
+          );
+
+          await client.query(
+            `UPDATE subscription_items SET status = 'active', updated_at = now() WHERE subscription_id = $1 AND status = 'paused'`,
+            [sub.subscription_id],
+          );
+
+          await client.query(
+            `INSERT INTO subscription_logs (subscription_id, action, new_data, created_by, created_at)
+             VALUES ($1, 'resume_before_start', $2, $3, now())`,
+            [sub.subscription_id, JSON.stringify({ resumed_at: todayStr, scenario: 1 }), adminId],
+          );
+
+          return {
+            status: true,
+            message: 'Upcoming pause cancelled. Regular deliveries will continue without interruption.',
+            scenario: 1,
+          };
+        }
+
+        // Scenario 2 & 3: Resume during pause
+        const resumeDate = (requestedResumeDate || '').trim();
+        if (!resumeDate) {
+          throw new BadRequestException('Please provide a resume_date (tomorrow or later)');
+        }
+
+        if (resumeDate < tomorrowStr) {
+          throw new BadRequestException(`Resume date must be tomorrow (${tomorrowStr}) or later`);
+        }
+        if (resumeDate > pTo) {
+          throw new BadRequestException(`Resume date cannot be after current pause end date (${pTo})`);
+        }
+
+        const rObj = new Date(resumeDate + 'T00:00:00Z');
+        rObj.setUTCDate(rObj.getUTCDate() - 1);
+        const dayBeforeResumeStr = rObj.toISOString().slice(0, 10);
+
+        if (dayBeforeResumeStr < pFrom) {
+          await client.query(
+            `UPDATE subscriptions 
+             SET pause_from_date = NULL, 
+                 pause_to_date = NULL, 
+                 pause_reason = NULL,
+                 updated_by = $1,
+                 updated_at = now() 
+             WHERE subscription_id = $2`,
+            [adminId, sub.subscription_id],
+          );
+          await client.query(
+            `UPDATE subscription_pauses 
+             SET status = 'resumed', 
+                 updated_at = now() 
+             WHERE id = $1`,
+            [activePause.id],
+          );
+        } else {
+          await client.query(
+            `UPDATE subscriptions 
+             SET pause_to_date = $1, 
+                 updated_by = $2,
+                 updated_at = now() 
+             WHERE subscription_id = $3`,
+            [dayBeforeResumeStr, adminId, sub.subscription_id],
+          );
+
+          await client.query(
+            `UPDATE subscription_pauses 
+             SET end_date = $1, 
+                 updated_at = now() 
+             WHERE id = $2`,
+            [dayBeforeResumeStr, activePause.id],
+          );
+
+          await client.query(
+            `INSERT INTO subscription_pauses (subscription_id, start_date, end_date, status, reason, created_at, updated_at)
+             VALUES ($1, $2, $3, 'resumed', $4, now(), now())`,
+            [
+              sub.subscription_id,
+              resumeDate,
+              activePauseEnd,
+              `Resumed on ${resumeDate}`,
+            ],
+          );
+        }
+
+        await client.query(
+          `UPDATE subscription_items SET status = 'active', updated_at = now() WHERE subscription_id = $1 AND status = 'paused'`,
+          [sub.subscription_id],
+        );
+
+        await client.query(
+          `INSERT INTO subscription_logs (subscription_id, action, new_data, created_by, created_at)
+           VALUES ($1, 'resume', $2, $3, now())`,
+          [sub.subscription_id, JSON.stringify({ resumed_at: todayStr, resume_date: resumeDate }), adminId],
+        );
+
+        this.developer.debug('SubscriptionsService.resumeSubscription success', { subscriptionId, resumeDate });
+        return {
+          status: true,
+          message: `Subscription resumed successfully! Deliveries will restart on ${resumeDate}.`,
+          scenario: resumeDate === pTo ? 3 : 2,
+        };
+      });
+    } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
+      this.developer.error('resumeSubscription error', { error, subscriptionId });
+      throw new BadRequestException(error?.message || 'Failed to resume subscription');
+    }
+  }
+
+  // ────────────────────────────────────────────────
+  // Pause History
+  // ────────────────────────────────────────────────
+  async getPauseHistory(subscriptionId: string) {
+    this.developer.debug('SubscriptionsService.getPauseHistory called', { subscriptionId });
+    try {
+      const rows = await this.databaseService.query(
+        `SELECT sp.id, sp.subscription_id, sp.start_date, sp.end_date, sp.status, sp.reason, sp.created_at, sp.updated_at
+         FROM subscription_pauses sp
+         JOIN subscriptions s ON s.subscription_id = sp.subscription_id
+         WHERE (s.id::text = $1 OR s.subscription_id = $1 OR s.subscription_number = $1)
+           AND sp.deleted_at IS NULL
+         ORDER BY sp.created_at DESC NULLS LAST, sp.id DESC`,
+        [subscriptionId],
+      );
+      return {
+        status: true,
+        data: Array.isArray(rows) ? rows : [],
+      };
+    } catch (error: any) {
+      this.developer.error('getPauseHistory error', { error, subscriptionId });
+      return { status: false, data: [] };
+    }
+  }
+
+  // ────────────────────────────────────────────────
+  // Auto Renew Toggle
+  // ────────────────────────────────────────────────
+  async updateAutoRenew(subscriptionId: string, autoRenew: boolean, adminId: string = 'system') {
+    this.developer.debug('SubscriptionsService.updateAutoRenew called', { subscriptionId, autoRenew });
+    try {
+      const rows = await this.databaseService.query(
+        `UPDATE subscriptions
+         SET auto_renew = $1, updated_by = $2, updated_at = now()
+         WHERE id::text = $3 OR subscription_id = $3 OR subscription_number = $3
+         RETURNING subscription_id, auto_renew, updated_at`,
+        [Boolean(autoRenew), adminId, subscriptionId],
+      );
+      const updated = Array.isArray(rows) ? rows[0] : null;
+      if (!updated) throw new BadRequestException('Subscription not found');
+
+      await this.databaseService.query(
+        `INSERT INTO subscription_logs (subscription_id, action, new_data, created_by, created_at)
+         VALUES ($1, 'update_auto_renew', $2, $3, now())`,
+        [updated.subscription_id, JSON.stringify({ auto_renew: Boolean(autoRenew) }), adminId],
+      );
+
+      return {
+        status: true,
+        data: updated,
+        message: `Auto renew ${autoRenew ? 'enabled' : 'disabled'} successfully`,
+      };
+    } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
+      this.developer.error('updateAutoRenew error', { error, subscriptionId });
+      throw new BadRequestException('Failed to update auto renew setting');
     }
   }
 }

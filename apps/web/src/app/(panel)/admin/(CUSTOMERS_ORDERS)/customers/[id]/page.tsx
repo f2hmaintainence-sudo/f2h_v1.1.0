@@ -29,10 +29,14 @@ import {
   Percent,
   Check,
   Search,
-  X
+  X,
+  PlayCircle,
+  PauseCircle,
+  Clock,
 } from 'lucide-react';
 import Link from 'next/link';
 import CustomerSpecialPriceModal from '@/components/f2h/CustomerSpecialPriceModal';
+import SubscriptionResumeModal from '@/components/f2h/SubscriptionResumeModal';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/services/api.client';
 import {
@@ -1360,7 +1364,15 @@ function WalletTab({ ledger }: { ledger: any }) {
   );
 }
 
-function SubscriptionTab({ subscriptions }: { subscriptions: any }) {
+function SubscriptionTab({ subscriptions, onRefresh }: { subscriptions: any; onRefresh?: () => void }) {
+  const [isResumeModalOpen, setIsResumeModalOpen] = useState(false);
+  const [togglingAutoRenew, setTogglingAutoRenew] = useState(false);
+  const [activePlanState, setActivePlanState] = useState<any>(subscriptions?.active_plan || null);
+
+  useEffect(() => {
+    setActivePlanState(subscriptions?.active_plan || null);
+  }, [subscriptions]);
+
   if (!subscriptions || (!subscriptions.active_plan && (!subscriptions.history || subscriptions.history.length === 0))) {
     return (
       <div className="text-center py-12 text-gray-500 font-medium flex flex-col items-center justify-center">
@@ -1371,59 +1383,124 @@ function SubscriptionTab({ subscriptions }: { subscriptions: any }) {
     );
   }
 
-  const { active_plan, items = [], history = [] } = subscriptions;
+  const { items = [], history = [] } = subscriptions;
+  const active_plan = activePlanState;
+
+  const now = new Date();
+  const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  const cleanPFrom = active_plan?.pause_from_date ? String(active_plan.pause_from_date).slice(0, 10) : null;
+  const cleanPTo = active_plan?.pause_to_date ? String(active_plan.pause_to_date).slice(0, 10) : null;
+  const isCurrentlyPaused = Boolean(cleanPTo && cleanPTo >= todayStr);
+
+  const handleToggleAutoRenew = async () => {
+    if (!active_plan) return;
+    const subId = active_plan.subscription_id || active_plan.id;
+    const nextVal = !active_plan.auto_renew;
+    setTogglingAutoRenew(true);
+    try {
+      await api.patch(`/subscriptions/subscriptions/${subId}/auto-renew`, {
+        auto_renew: nextVal,
+      });
+      setActivePlanState((prev: any) => ({ ...prev, auto_renew: nextVal }));
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error('Failed to toggle auto renew:', err);
+    } finally {
+      setTogglingAutoRenew(false);
+    }
+  };
+
+  const formatDate = (dateStr?: string | null) => {
+    if (!dateStr) return 'N/A';
+    try {
+      return new Date(dateStr + 'T00:00:00Z').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch {
+      return dateStr;
+    }
+  };
 
   return (
     <div className="space-y-6">
       {/* Active Subscription Summary Card */}
       {active_plan ? (
-        <div className="bg-gradient-to-r from-emerald-50 to-teal-50/50 p-6 rounded-2xl border border-emerald-100/80 shadow-xs">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-emerald-200/40">
+        <div className="bg-gradient-to-r from-emerald-50 via-teal-50/50 to-emerald-50 p-6 rounded-2xl border border-emerald-200 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-emerald-200/60">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-xs">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-xs">
                 <Calendar size={22} />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-base font-bold text-gray-900">
+                  <h3 className="text-base font-black text-gray-900">
                     Subscription #{active_plan.subscription_number || active_plan.subscription_id || active_plan.id}
                   </h3>
-                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
-                    active_plan.status === 'active' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-amber-100 text-amber-700 border border-amber-200'
+                  <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                    isCurrentlyPaused
+                      ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                      : active_plan.status === 'active'
+                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                      : 'bg-gray-100 text-gray-700 border border-gray-200'
                   }`}>
-                    {active_plan.status || 'ACTIVE'}
+                    {isCurrentlyPaused ? 'PAUSED' : (active_plan.status || 'ACTIVE')}
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Created on {new Date(active_plan.created_at || Date.now()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  Created on {formatDate(active_plan.created_at)}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
-              <span className="text-xs font-semibold px-3 py-1.5 bg-white border border-emerald-200 rounded-lg text-emerald-800 shadow-2xs">
-                Cycle: <strong className="capitalize">{active_plan.billing_cycle || active_plan.schedule_type || 'Daily'}</strong>
-              </span>
-              {active_plan.delivery_slot && (
-                <span className="text-xs font-semibold px-3 py-1.5 bg-white border border-emerald-200 rounded-lg text-emerald-800 shadow-2xs">
-                  Slot: <strong className="capitalize">{active_plan.delivery_slot}</strong>
+              {/* Auto Renew Toggle */}
+              <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-emerald-200 shadow-2xs">
+                <span className="text-xs font-bold text-slate-700">Auto Renew:</span>
+                <button
+                  type="button"
+                  onClick={handleToggleAutoRenew}
+                  disabled={togglingAutoRenew}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
+                    active_plan.auto_renew ? 'bg-emerald-600' : 'bg-slate-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                      active_plan.auto_renew ? 'translate-x-4.5' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <span className={`text-[11px] font-black uppercase ${active_plan.auto_renew ? 'text-emerald-700' : 'text-slate-400'}`}>
+                  {active_plan.auto_renew ? 'ON' : 'OFF'}
                 </span>
+              </div>
+
+              {isCurrentlyPaused && (
+                <button
+                  onClick={() => setIsResumeModalOpen(true)}
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <PlayCircle className="w-3.5 h-3.5" /> Resume Deliveries
+                </button>
               )}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
+          {/* Pause Status Alert */}
+          {isCurrentlyPaused && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs text-amber-900">
+              <span className="font-bold flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-amber-600" /> Currently Paused until {formatDate(cleanPTo)} ({formatDate(cleanPFrom)} &rarr; {formatDate(cleanPTo)})
+              </span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-1">
             <div>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Start Date</p>
-              <p className="text-sm font-bold text-gray-900">
-                {active_plan.start_date ? new Date(active_plan.start_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
-              </p>
+              <p className="text-sm font-bold text-gray-900">{formatDate(active_plan.start_date)}</p>
             </div>
             <div>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">End Date</p>
-              <p className="text-sm font-bold text-gray-900">
-                {active_plan.end_date ? new Date(active_plan.end_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Ongoing / No End'}
-              </p>
+              <p className="text-sm font-bold text-gray-900">{formatDate(active_plan.end_date) || 'Ongoing'}</p>
             </div>
             <div>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Schedule Type</p>
@@ -1499,6 +1576,21 @@ function SubscriptionTab({ subscriptions }: { subscriptions: any }) {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Resume Modal */}
+      {active_plan && (
+        <SubscriptionResumeModal
+          isOpen={isResumeModalOpen}
+          onClose={() => setIsResumeModalOpen(false)}
+          subscriptionId={String(active_plan.subscription_id || active_plan.id)}
+          subscriptionNumber={active_plan.subscription_number}
+          pauseFromDate={active_plan.pause_from_date}
+          pauseToDate={active_plan.pause_to_date}
+          onSuccess={() => {
+            if (onRefresh) onRefresh();
+          }}
+        />
       )}
     </div>
   );
