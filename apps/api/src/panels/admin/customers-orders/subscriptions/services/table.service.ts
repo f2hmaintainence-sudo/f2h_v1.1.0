@@ -142,6 +142,14 @@ export class SubscriptionsTableService {
       });
     }
 
+    if (query.branch_id || query.branchId) {
+      conditions.push({
+        column: 'subscriptions.branch_id',
+        operator: '=',
+        value: query.branch_id || query.branchId,
+      });
+    }
+
     const reqSet: ReqSet = {
       key: 'subscriptions',
       table: 'subscriptions',

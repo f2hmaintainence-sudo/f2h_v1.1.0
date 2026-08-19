@@ -121,7 +121,9 @@ class ApiEndpoints {
   // ---------------------------------------------------------------------------
   // App version & device  →  /api/v1/device/…
   // ---------------------------------------------------------------------------
-  static const String appVersion = '/device/app-version';
+  /// Force-update check. The route lives at the versioned root (`@Get('app-version')`),
+  /// not under `/device` — the old value 404'd, so version checking never ran.
+  static const String appVersion = '/app-version';
   static const String deviceInformation = '/device/deviceInformation';
 
   // ---------------------------------------------------------------------------

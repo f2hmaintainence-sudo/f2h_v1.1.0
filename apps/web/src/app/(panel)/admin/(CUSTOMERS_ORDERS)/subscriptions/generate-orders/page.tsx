@@ -145,17 +145,22 @@ export default function GenerateOrdersPage() {
     }
   }, [selectedDate, selectedSlot, selectedBranch]);
 
-  // Fetch subscription summary stats
+  // Fetch subscription summary stats based on current filters
   const fetchSubStats = useCallback(async () => {
     try {
-      const res = await api.get<any>('/subscriptions/subscriptions/summary');
+      const params: any = {};
+      if (selectedBranch) params.branchId = selectedBranch;
+      if (selectedDate) params.date = selectedDate;
+      if (selectedSlot) params.slot = selectedSlot;
+
+      const res = await api.get<any>('/subscriptions/subscriptions/summary', { params });
       if (res.data?.status && res.data?.data) {
         setSubSummary(res.data.data);
       }
     } catch (err) {
       console.error('Failed to fetch sub stats', err);
     }
-  }, []);
+  }, [selectedBranch, selectedDate, selectedSlot]);
 
   // Fetch subscriptions list
   const fetchSubscriptions = useCallback(async () => {
@@ -163,12 +168,16 @@ export default function GenerateOrdersPage() {
     try {
       const params: any = {
         page: 1,
-        limit: 100,
+        limit: 200,
         search: searchQuery,
       };
       if (statusFilter !== 'all') {
         params['status'] = statusFilter;
         params['filters[0]'] = statusFilter;
+      }
+      if (selectedBranch) {
+        params['branch_id'] = selectedBranch;
+        params['branchId'] = selectedBranch;
       }
       const res = await api.get<any>('/subscriptions/subscriptions/table', { params });
       if (res.data) {
@@ -189,7 +198,7 @@ export default function GenerateOrdersPage() {
     } finally {
       setLoadingSubs(false);
     }
-  }, [statusFilter, searchQuery]);
+  }, [statusFilter, searchQuery, selectedBranch]);
 
   // Load metrics & tables on filter change
   useEffect(() => {

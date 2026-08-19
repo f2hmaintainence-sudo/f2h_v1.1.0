@@ -34,8 +34,8 @@ export class SubscriptionsController {
   ) {}
 
   @Get('subscriptions/summary')
-  async getSubscriptionsSummary() {
-    return this.subscriptionsService.getSubscriptionsSummary();
+  async getSubscriptionsSummary(@Query() query: any) {
+    return this.subscriptionsService.getSubscriptionsSummary(query);
   }
 
   @Get('subscriptions/table')

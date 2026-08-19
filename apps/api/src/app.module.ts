@@ -24,6 +24,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { MapModule } from './map/map.module';
+import { DeviceModule } from './device/device.module';
 import { envValidationSchema } from './config/env.validation';
 import { AppService } from './app.service';
 import { SharedDatabaseModule } from './shared/database/Database.module';
@@ -155,6 +156,7 @@ import { CustomerAppAssetsModule } from './panels/customer/app_assets/app_assets
       },
     ]),
     MapModule,
+    DeviceModule,
   ],
   controllers: [
     CsrfController,

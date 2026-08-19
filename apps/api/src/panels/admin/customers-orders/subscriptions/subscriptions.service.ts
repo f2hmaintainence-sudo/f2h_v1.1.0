@@ -255,19 +255,38 @@ export class SubscriptionsService {
   // ────────────────────────────────────────────────
   // Subscription Dashboard Summary
   // ────────────────────────────────────────────────
-  async getSubscriptionsSummary() {
+  async getSubscriptionsSummary(query?: any) {
     try {
+      const conditions: string[] = [];
+      const params: any[] = [];
+      let pIdx = 1;
+
+      const branch = query?.branchId || query?.branch_id || query?.branch;
+      if (branch) {
+        conditions.push(`s.branch_id = $${pIdx++}`);
+        params.push(branch);
+      }
+
+      if (query?.date) {
+        conditions.push(`(s.start_date IS NULL OR s.start_date <= $${pIdx}) AND (s.end_date IS NULL OR s.end_date >= $${pIdx})`);
+        params.push(query.date);
+        pIdx++;
+      }
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
       const sql = `
         SELECT
           COUNT(*)::int                                          AS total,
-          COUNT(*) FILTER (WHERE status = 'active')::int         AS active,
-          COUNT(*) FILTER (WHERE status = 'paused')::int         AS paused,
-          COUNT(*) FILTER (WHERE status = 'expired')::int        AS expired,
-          COUNT(*) FILTER (WHERE status = 'cancelled')::int      AS cancelled
-        FROM subscriptions
+          COUNT(*) FILTER (WHERE s.status = 'active')::int         AS active,
+          COUNT(*) FILTER (WHERE s.status = 'paused')::int         AS paused,
+          COUNT(*) FILTER (WHERE s.status = 'expired')::int        AS expired,
+          COUNT(*) FILTER (WHERE s.status = 'cancelled')::int      AS cancelled
+        FROM subscriptions s
+        ${whereClause}
       `;
 
-      const rows = await this.databaseService.query(sql);
+      const rows = await this.databaseService.query(sql, params);
 
       return {
         status: true,

@@ -26,8 +26,8 @@ export default function ProductsPage() {
           {activeTab === "products"
             ? "Products"
             : activeTab === "variants"
-            ? "Product Variants"
-            : "Categories"}
+              ? "Product Variants"
+              : "Categories"}
         </span>
       </nav>
 
@@ -48,15 +48,15 @@ export default function ProductsPage() {
               {activeTab === "products"
                 ? "Products Management"
                 : activeTab === "variants"
-                ? "Product Variants Management"
-                : "Categories Management"}
+                  ? "Product Variants Management"
+                  : "Categories Management"}
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
               {activeTab === "products"
                 ? "Manage master product listings, descriptions, categories, and media."
                 : activeTab === "variants"
-                ? "Manage product sizes, units, pricing, stock levels, and SKUs."
-                : "Manage store categories, display orders, and catalog hierarchy."}
+                  ? "Manage product sizes, units, pricing, stock levels, and SKUs."
+                  : "Manage store categories, display orders, and catalog hierarchy."}
             </p>
           </div>
         </div>
@@ -70,8 +70,8 @@ export default function ProductsPage() {
           {activeTab === "products"
             ? "Add Product"
             : activeTab === "variants"
-            ? "Add Variant"
-            : "Add Category"}
+              ? "Add Variant"
+              : "Add Category"}
         </button>
       </div>
 
@@ -79,12 +79,23 @@ export default function ProductsPage() {
       <div className="flex items-center gap-2 border-b border-slate-200/80 pb-1">
         <button
           type="button"
-          onClick={() => setActiveTab("products")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === "products"
+          onClick={() => setActiveTab("categories")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "categories"
               ? "bg-[#16a34a] text-white shadow-sm"
               : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60"
-          }`}
+            }`}
+        >
+          <FolderTree size={15} />
+          Categories
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("products")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "products"
+              ? "bg-[#16a34a] text-white shadow-sm"
+              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60"
+            }`}
         >
           <Package size={15} />
           Products Catalog
@@ -93,28 +104,16 @@ export default function ProductsPage() {
         <button
           type="button"
           onClick={() => setActiveTab("variants")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === "variants"
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "variants"
               ? "bg-[#16a34a] text-white shadow-sm"
               : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60"
-          }`}
+            }`}
         >
           <Tag size={15} />
           Product Variants
         </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab("categories")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === "categories"
-              ? "bg-[#16a34a] text-white shadow-sm"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60"
-          }`}
-        >
-          <FolderTree size={15} />
-          Categories
-        </button>
+
       </div>
 
       {/* Tab Contents */}
