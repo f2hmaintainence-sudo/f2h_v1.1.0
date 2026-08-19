@@ -210,17 +210,27 @@ export default function PromotionsCouponsOffersPage() {
     setLoading(true);
     try {
       const [pRes, cRes, prodRes, catRes, offerRes] = await Promise.all([
-        api.get<any>("/v1/admin/promotions-coupons/promotions").catch(() => ({ data: [] } as any)),
-        api.get<any>("/v1/admin/promotions-coupons/coupons").catch(() => ({ data: [] } as any)),
-        api.get<any>("/v1/customer/products").catch(() => ({ data: [] } as any)),
-        api.get<any>("/v1/customer/categories").catch(() => ({ data: [] } as any)),
+        api.get<any>("/admin/promotions-coupons/promotions").catch(() => ({ data: [] } as any)),
+        api.get<any>("/admin/promotions-coupons/coupons").catch(() => ({ data: [] } as any)),
+        api.get<any>("/customer/products").catch(() => ({ data: [] } as any)),
+        api.get<any>("/customer/categories").catch(() => ({ data: [] } as any)),
         api.get<any>("/admin/catalog/offers/table").catch(() => ({ data: [] } as any)),
       ]);
 
-      const promos = Array.isArray((pRes as any)?.data) ? (pRes as any).data : (pRes as any)?.data?.data || [];
-      const cpns = Array.isArray((cRes as any)?.data) ? (cRes as any).data : (cRes as any)?.data?.data || [];
-      const prods = Array.isArray((prodRes as any)?.data) ? (prodRes as any).data : (prodRes as any)?.data?.data || [];
-      const cats = Array.isArray((catRes as any)?.data) ? (catRes as any).data : (catRes as any)?.data?.data || [];
+      const extractArray = (res: any, fallbackKey?: string) => {
+        if (!res) return [];
+        const payload = res.data !== undefined ? res.data : res;
+        if (Array.isArray(payload)) return payload;
+        if (fallbackKey && Array.isArray(payload?.[fallbackKey])) return payload[fallbackKey];
+        if (Array.isArray(payload?.data)) return payload.data;
+        if (Array.isArray(payload?.rows)) return payload.rows;
+        return [];
+      };
+
+      const promos = extractArray(pRes, "promotions");
+      const cpns = extractArray(cRes, "coupons");
+      const prods = extractArray(prodRes, "products");
+      const cats = extractArray(catRes, "categories");
 
       // Parse offers response
       let offerList: OfferBanner[] = [];
@@ -260,7 +270,7 @@ export default function PromotionsCouponsOffersPage() {
   const togglePromoStatus = async (id: string, currentStatus: string) => {
     const nextStatus = currentStatus === "active" ? "paused" : "active";
     try {
-      await api.patch(`/v1/admin/promotions-coupons/promotions/${id}/status`, { status: nextStatus });
+      await api.patch(`/admin/promotions-coupons/promotions/${id}/status`, { status: nextStatus });
       showSuccessToast(`Promotion status set to ${nextStatus}`);
       fetchData();
     } catch (e: any) {
@@ -271,7 +281,7 @@ export default function PromotionsCouponsOffersPage() {
   const toggleCouponStatus = async (id: string, currentStatus: string) => {
     const nextStatus = currentStatus === "active" ? "paused" : "active";
     try {
-      await api.patch(`/v1/admin/promotions-coupons/coupons/${id}/status`, { status: nextStatus });
+      await api.patch(`/admin/promotions-coupons/coupons/${id}/status`, { status: nextStatus });
       showSuccessToast(`Coupon status set to ${nextStatus}`);
       fetchData();
     } catch (e: any) {
@@ -305,7 +315,7 @@ export default function PromotionsCouponsOffersPage() {
   const deletePromotion = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to delete promotion "${name}"? Linked coupons will also be deleted.`)) return;
     try {
-      await api.delete<any>(`/v1/admin/promotions-coupons/promotions/${id}`);
+      await api.delete<any>(`/admin/promotions-coupons/promotions/${id}`);
       showSuccessToast("Promotion deleted successfully");
       fetchData();
     } catch (e: any) {
@@ -316,7 +326,7 @@ export default function PromotionsCouponsOffersPage() {
   const deleteCoupon = async (id: string, code: string) => {
     if (!confirm(`Are you sure you want to delete coupon code "${code}"?`)) return;
     try {
-      await api.delete<any>(`/v1/admin/promotions-coupons/coupons/${id}`);
+      await api.delete<any>(`/admin/promotions-coupons/coupons/${id}`);
       showSuccessToast("Coupon deleted successfully");
       fetchData();
     } catch (e: any) {
@@ -344,7 +354,7 @@ export default function PromotionsCouponsOffersPage() {
     }
 
     try {
-      await api.post<any>("/v1/admin/promotions-coupons/promotions", {
+      await api.post<any>("/admin/promotions-coupons/promotions", {
         name: promoForm.name.trim(),
         description: promoForm.description.trim() || undefined,
         promotion_type: promoForm.promotion_type,
@@ -384,7 +394,7 @@ export default function PromotionsCouponsOffersPage() {
     }
 
     try {
-      await api.post<any>("/v1/admin/promotions-coupons/coupons", {
+      await api.post<any>("/admin/promotions-coupons/coupons", {
         code: couponForm.code.trim().toUpperCase(),
         name: couponForm.name.trim() || undefined,
         description: couponForm.description.trim() || undefined,
@@ -452,7 +462,7 @@ export default function PromotionsCouponsOffersPage() {
       return;
     }
     try {
-      await api.put(`/v1/admin/promotions-coupons/promotions/${editingPromo.promotion_id}`, {
+      await api.put(`/admin/promotions-coupons/promotions/${editingPromo.promotion_id}`, {
         name: editPromoForm.name.trim(),
         description: editPromoForm.description.trim() || undefined,
         promotion_type: editPromoForm.promotion_type,
@@ -503,7 +513,7 @@ export default function PromotionsCouponsOffersPage() {
     e.preventDefault();
     if (!editingCoupon) return;
     try {
-      await api.put(`/v1/admin/promotions-coupons/coupons/${editingCoupon.coupon_id}`, {
+      await api.put(`/admin/promotions-coupons/coupons/${editingCoupon.coupon_id}`, {
         name: editCouponForm.name.trim() || undefined,
         description: editCouponForm.description.trim() || undefined,
         promotion_id: editCouponForm.promotion_id,
@@ -621,7 +631,7 @@ export default function PromotionsCouponsOffersPage() {
     setIsManageProductsOpen(true);
 
     try {
-      const res = await api.get<any>(`/v1/admin/promotions-coupons/promotions/${promo.promotion_id}`);
+      const res = await api.get<any>(`/admin/promotions-coupons/promotions/${promo.promotion_id}`);
       if (res.data?.data) {
         setSelectedPromoForProducts(res.data.data);
       }
@@ -632,12 +642,12 @@ export default function PromotionsCouponsOffersPage() {
   const handleAddProductsToPromo = async () => {
     if (!selectedPromoForProducts || selectedVariantIds.length === 0) return;
     try {
-      await api.post<any>(`/v1/admin/promotions-coupons/promotions/${selectedPromoForProducts.promotion_id}/products`, {
+      await api.post<any>(`/admin/promotions-coupons/promotions/${selectedPromoForProducts.promotion_id}/products`, {
         variant_ids: selectedVariantIds,
       });
       showSuccessToast("Product variants linked successfully!");
       setSelectedVariantIds([]);
-      const res = await api.get<any>(`/v1/admin/promotions-coupons/promotions/${selectedPromoForProducts.promotion_id}`);
+      const res = await api.get<any>(`/admin/promotions-coupons/promotions/${selectedPromoForProducts.promotion_id}`);
       if (res.data?.data) setSelectedPromoForProducts(res.data.data);
       fetchData();
     } catch (e: any) {
@@ -649,9 +659,9 @@ export default function PromotionsCouponsOffersPage() {
   const handleRemoveProductFromPromo = async (variantId: string) => {
     if (!selectedPromoForProducts) return;
     try {
-      await api.delete<any>(`/v1/admin/promotions-coupons/promotions/${selectedPromoForProducts.promotion_id}/products/${variantId}`);
+      await api.delete<any>(`/admin/promotions-coupons/promotions/${selectedPromoForProducts.promotion_id}/products/${variantId}`);
       showSuccessToast("Variant unlinked from promotion");
-      const res = await api.get<any>(`/v1/admin/promotions-coupons/promotions/${selectedPromoForProducts.promotion_id}`);
+      const res = await api.get<any>(`/admin/promotions-coupons/promotions/${selectedPromoForProducts.promotion_id}`);
       if (res.data?.data) setSelectedPromoForProducts(res.data.data);
       fetchData();
     } catch (e: any) {
@@ -667,7 +677,7 @@ export default function PromotionsCouponsOffersPage() {
     setIsRedemptionsOpen(true);
 
     try {
-      const path = type === "promo" ? `/v1/admin/promotions-coupons/promotions/${id}/redemptions` : `/v1/admin/promotions-coupons/coupons/${id}/redemptions`;
+      const path = type === "promo" ? `/admin/promotions-coupons/promotions/${id}/redemptions` : `/admin/promotions-coupons/coupons/${id}/redemptions`;
       const res = await api.get<any>(path);
       setRedemptionsData(res.data?.data || res.data || []);
     } catch (e: any) {
@@ -1785,8 +1795,52 @@ export default function PromotionsCouponsOffersPage() {
             </div>
 
             <form onSubmit={handleCreateOffer} className="space-y-6 text-xs">
+              {/* SECTION 0: BANNER PLACEMENT & TYPE */}
+              <div className="space-y-3">
+                <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Banner Placement &amp; Type *</div>
+                
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {[
+                    { type: "home_carousel", label: "Home Carousel", desc: "Top Home Slider", icon: Tag },
+                    { type: "category_slide", label: "Category Slide", desc: "Targeted in Category", icon: FolderTree },
+                    { type: "popup", label: "App Launch Popup", desc: "Modal On App Open", icon: Smartphone },
+                    { type: "checkout_banner", label: "Checkout Promo", desc: "Cart & Pay Screens", icon: ShoppingBag },
+                  ].map((b) => {
+                    const isSelected = offerForm.banner_type === b.type;
+                    const IconComp = b.icon;
+                    return (
+                      <button
+                        key={b.type}
+                        type="button"
+                        onClick={() =>
+                          setOfferForm({
+                            ...offerForm,
+                            banner_type: b.type as any,
+                            is_popup: b.type === "popup",
+                          })
+                        }
+                        className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
+                          isSelected
+                            ? "bg-emerald-50/80 border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-950"
+                            : "bg-slate-50 hover:bg-white border-slate-200 text-slate-700"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <IconComp size={16} className={isSelected ? "text-emerald-600" : "text-slate-400"} />
+                          {isSelected && <CheckCircle2 size={14} className="text-emerald-600" />}
+                        </div>
+                        <div>
+                          <div className="font-bold text-xs">{b.label}</div>
+                          <div className="text-[10px] text-slate-400 font-medium">{b.desc}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* SECTION 1: OFFER DETAILS */}
-              <div className="space-y-4">
+              <div className="space-y-4 pt-2 border-t border-slate-100">
                 <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Offer Details</div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2074,8 +2128,52 @@ export default function PromotionsCouponsOffersPage() {
             </div>
 
             <form onSubmit={handleUpdateOffer} className="space-y-6 text-xs">
+              {/* SECTION 0: BANNER PLACEMENT & TYPE */}
+              <div className="space-y-3">
+                <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Banner Placement &amp; Type *</div>
+                
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {[
+                    { type: "home_carousel", label: "Home Carousel", desc: "Top Home Slider", icon: Tag },
+                    { type: "category_slide", label: "Category Slide", desc: "Targeted in Category", icon: FolderTree },
+                    { type: "popup", label: "App Launch Popup", desc: "Modal On App Open", icon: Smartphone },
+                    { type: "checkout_banner", label: "Checkout Promo", desc: "Cart & Pay Screens", icon: ShoppingBag },
+                  ].map((b) => {
+                    const isSelected = editOfferForm.banner_type === b.type;
+                    const IconComp = b.icon;
+                    return (
+                      <button
+                        key={b.type}
+                        type="button"
+                        onClick={() =>
+                          setEditOfferForm({
+                            ...editOfferForm,
+                            banner_type: b.type as any,
+                            is_popup: b.type === "popup",
+                          })
+                        }
+                        className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
+                          isSelected
+                            ? "bg-amber-50/80 border-amber-500 ring-2 ring-amber-500/20 text-amber-950"
+                            : "bg-slate-50 hover:bg-white border-slate-200 text-slate-700"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <IconComp size={16} className={isSelected ? "text-amber-600" : "text-slate-400"} />
+                          {isSelected && <CheckCircle2 size={14} className="text-amber-600" />}
+                        </div>
+                        <div>
+                          <div className="font-bold text-xs">{b.label}</div>
+                          <div className="text-[10px] text-slate-400 font-medium">{b.desc}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* SECTION 1: OFFER DETAILS */}
-              <div className="space-y-4">
+              <div className="space-y-4 pt-2 border-t border-slate-100">
                 <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Offer Details</div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

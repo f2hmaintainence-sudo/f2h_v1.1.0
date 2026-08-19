@@ -233,8 +233,12 @@ class ApiClient {
    */
   private async executeRequest(endpoint: string, options: RequestConfig = {}): Promise<Response> {
     const baseUrl = this.getBaseUrl();
+    let cleanEndpoint = endpoint;
+    if (baseUrl.endsWith('/v1') && cleanEndpoint.startsWith('/v1/')) {
+      cleanEndpoint = cleanEndpoint.substring(3);
+    }
     const url = buildUrl(
-      endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`,
+      cleanEndpoint.startsWith('http') ? cleanEndpoint : `${baseUrl}${cleanEndpoint}`,
       options.params,
     );
 
