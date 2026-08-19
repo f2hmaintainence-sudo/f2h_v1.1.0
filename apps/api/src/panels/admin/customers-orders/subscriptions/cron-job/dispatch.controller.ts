@@ -53,6 +53,32 @@ export class DispatchController {
   }
 
   /**
+   * GET /admin/orders/dispatch/branch-stats
+   *
+   * Returns branch-wise breakdown of subscription orders created and one-time orders confirmed
+   * for the given date/slot.
+   */
+  @Get('branch-stats')
+  async getBranchWiseStats(
+    @Query('date') date: string,
+    @Query('slot') slot: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    if (!date || !slot) {
+      throw new BadRequestException('date and slot are required query parameters');
+    }
+    if (slot !== 'morning' && slot !== 'evening') {
+      throw new BadRequestException('slot must be "morning" or "evening"');
+    }
+
+    return this.snapshotService.getBranchWiseStats(
+      date,
+      slot as 'morning' | 'evening',
+      branchId || null,
+    );
+  }
+
+  /**
    * POST /admin/orders/dispatch/generate
    *
    * Generates orders for eligible subscriptions. Supports:

@@ -42,6 +42,14 @@ interface DispatchItem {
   subscription_count: string;
 }
 
+interface BranchStat {
+  branch_id: string | null;
+  branch_name: string | null;
+  subscription_orders_created: number;
+  onetime_orders_confirmed: number;
+  total_processed: number;
+}
+
 interface GenerationResult {
   success: boolean;
   targetDate: string;
@@ -50,6 +58,7 @@ interface GenerationResult {
   durationMs: number;
   status: 'success' | 'skipped' | 'failed';
   errors: string[];
+  branchStats?: BranchStat[];
 }
 
 function getDispatchItems(payload: unknown): DispatchItem[] {
@@ -78,9 +87,15 @@ export default function GenerateOrdersPage() {
   // Dispatch Summary State (for top summary metrics)
   const [dispatchItems, setDispatchItems] = useState<DispatchItem[]>([]);
 
+  // Branch-wise Orders Created Stats
+  const [branchStats, setBranchStats] = useState<BranchStat[]>([]);
+  const [loadingBranchStats, setLoadingBranchStats] = useState(false);
+
   // Order Generation State
   const [generating, setGenerating] = useState(false);
   const [generationResult, setGenerationResult] = useState<GenerationResult | null>(null);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
 
   // Subscriptions Table State
   const [subscriptionsList, setSubscriptionsList] = useState<any[]>([]);
@@ -200,26 +215,51 @@ export default function GenerateOrdersPage() {
     }
   }, [statusFilter, searchQuery, selectedBranch]);
 
+  // Fetch branch-wise created orders stats
+  const fetchBranchStats = useCallback(async () => {
+    setLoadingBranchStats(true);
+    try {
+      const q = new URLSearchParams({
+        date: selectedDate,
+        slot: selectedSlot,
+      });
+      if (selectedBranch) {
+        q.set('branchId', selectedBranch);
+      }
+      const res = await fetch(`${API_URL}/admin/orders/dispatch/branch-stats?${q.toString()}`, {
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setBranchStats(data);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load branch stats', e);
+    } finally {
+      setLoadingBranchStats(false);
+    }
+  }, [selectedDate, selectedSlot, selectedBranch]);
+
   // Load metrics & tables on filter change
   useEffect(() => {
     fetchSummary();
     fetchSubStats();
     fetchSubscriptions();
-  }, [fetchSummary, fetchSubStats, fetchSubscriptions]);
+    fetchBranchStats();
+  }, [fetchSummary, fetchSubStats, fetchSubscriptions, fetchBranchStats]);
 
-  // Trigger Order Generation
-  const handleGenerateOrders = async () => {
-    if (
-      !confirm(
-        `Are you sure you want to generate orders for ${selectedDate} (${selectedSlot === 'morning' ? 'Morning' : 'Evening'}) for ${
-          selectedBranch ? `branch: ${selectedBranch}` : 'ALL Branches'
-        }?`
-      )
-    ) {
-      return;
-    }
+  // Open Confirm Generation Modal
+  const handleOpenConfirmModal = () => {
+    setGenerateError(null);
+    setIsConfirmModalOpen(true);
+  };
 
+  // Execute Order Generation
+  const handleExecuteGenerate = async () => {
     setGenerating(true);
+    setGenerateError(null);
     setGenerationResult(null);
     try {
       const res = await fetch(`${API_URL}/admin/orders/dispatch/generate`, {
@@ -234,16 +274,22 @@ export default function GenerateOrdersPage() {
       });
 
       if (!res.ok) {
-        throw new Error('Order generation failed');
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.message || 'Order generation failed');
       }
 
       const result = await res.json();
       setGenerationResult(result);
+      if (Array.isArray(result.branchStats)) {
+        setBranchStats(result.branchStats);
+      }
+      setIsConfirmModalOpen(false);
       fetchSummary();
       fetchSubStats();
       fetchSubscriptions();
+      fetchBranchStats();
     } catch (e: any) {
-      alert(e.message || 'Error occurred during generation');
+      setGenerateError(e.message || 'Error occurred during generation');
     } finally {
       setGenerating(false);
     }
@@ -323,6 +369,19 @@ export default function GenerateOrdersPage() {
   const totalSubs = dispatchItems.reduce((acc, item) => acc + Number(item.subscription_count || 0), 0);
   const totalUniqueProducts = dispatchItems.length;
 
+  const totalSubOrdersCreated = branchStats.reduce(
+    (acc, item) => acc + Number(item.subscription_orders_created || 0),
+    0
+  );
+  const totalOnetimeOrdersConfirmed = branchStats.reduce(
+    (acc, item) => acc + Number(item.onetime_orders_confirmed || 0),
+    0
+  );
+  const totalOrdersProcessedAll = branchStats.reduce(
+    (acc, item) => acc + Number(item.total_processed || 0),
+    0
+  );
+
   return (
     <div className="space-y-6 p-2 md:p-4 font-sans min-h-screen">
       {/* Title Header */}
@@ -342,6 +401,7 @@ export default function GenerateOrdersPage() {
               fetchSummary();
               fetchSubStats();
               fetchSubscriptions();
+              fetchBranchStats();
             }}
             className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
           >
@@ -510,7 +570,7 @@ export default function GenerateOrdersPage() {
 
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <button
-              onClick={handleGenerateOrders}
+              onClick={handleOpenConfirmModal}
               disabled={generating}
               className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 py-3 text-xs font-bold text-white transition-all shadow-xs cursor-pointer disabled:opacity-50"
             >
@@ -606,6 +666,124 @@ export default function GenerateOrdersPage() {
           )}
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* BRANCH-WISE SUBSCRIPTION ORDERS CREATED BREAKDOWN */}
+      {/* ========================================================================= */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-5 space-y-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 pb-3 border-b border-slate-100">
+          <div>
+            <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-emerald-600" />
+              Total Subscription Orders Created — Branch-Wise Breakdown
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Live orders generated for <span className="font-bold text-slate-700">{selectedDate}</span> ({selectedSlot === 'morning' ? 'Morning Slot' : 'Evening Slot'}).
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200">
+              Total Sub Orders: <span className="font-extrabold text-sm">{totalSubOrdersCreated}</span>
+            </span>
+            <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-blue-50 text-blue-800 border border-blue-200">
+              Total One-Time: <span className="font-extrabold text-sm">{totalOnetimeOrdersConfirmed}</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Branch Stats Table */}
+        {loadingBranchStats ? (
+          <div className="py-10 text-center text-xs font-bold text-slate-400 flex flex-col items-center justify-center gap-2">
+            <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
+            Loading branch-wise created orders...
+          </div>
+        ) : branchStats.length === 0 ? (
+          <div className="py-8 text-center text-xs text-slate-400 font-semibold bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+            No orders generated yet for {selectedDate} ({selectedSlot === 'morning' ? 'Morning' : 'Evening'}). Click "Trigger Order Generation" above to process.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100 text-[10px] font-bold uppercase text-slate-400 bg-slate-50/50">
+                  <th className="py-3 px-4">Branch Details</th>
+                  <th className="py-3 px-4 text-center">Subscription Orders Created</th>
+                  <th className="py-3 px-4 text-center">One-Time Orders Confirmed</th>
+                  <th className="py-3 px-4 text-center">Total Processed Orders</th>
+                  <th className="py-3 px-4 text-right">Quick Filter</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                {branchStats.map((b, idx) => {
+                  const isSelected = selectedBranch === b.branch_id;
+                  return (
+                    <tr
+                      key={b.branch_id || `branch-${idx}`}
+                      className={`hover:bg-slate-50/60 transition-colors ${
+                        isSelected ? 'bg-emerald-50/40' : ''
+                      }`}
+                    >
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs shrink-0">
+                            <Building2 size={15} />
+                          </div>
+                          <div>
+                            <span className="font-bold text-slate-900 block text-xs">
+                              {b.branch_name || b.branch_id || 'All / Master Branch'}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block font-mono">
+                              ID: {b.branch_id || '—'}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="py-3.5 px-4 text-center">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          <CheckCircle2 size={13} className="text-emerald-600" />
+                          {b.subscription_orders_created} Orders
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 px-4 text-center">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-blue-100 text-blue-800 border border-blue-200">
+                          {b.onetime_orders_confirmed} Orders
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 px-4 text-center font-black text-slate-900 text-sm">
+                        {b.total_processed}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedBranch('');
+                            } else if (b.branch_id) {
+                              setSelectedBranch(b.branch_id);
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs ${
+                            isSelected
+                              ? 'bg-slate-900 text-white hover:bg-slate-800'
+                              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                          }`}
+                        >
+                          {isSelected ? 'Clear Filter' : 'Filter Branch'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Customer Subscriptions Master Ledger */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-5 space-y-4">
@@ -783,6 +961,105 @@ export default function GenerateOrdersPage() {
           </div>
         )}
       </div>
+
+      {/* ========================================================================= */}
+      {/* CONFIRM ORDER GENERATION MODAL */}
+      {/* ========================================================================= */}
+      {isConfirmModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 my-auto overflow-hidden animate-in zoom-in-95 duration-200 space-y-5">
+            {/* Header Icon & Title */}
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0 border border-emerald-100 shadow-xs">
+                <Play size={22} className="ml-0.5" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-black text-slate-900 tracking-tight">Confirm Order Generation</h3>
+                <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                  Are you sure you want to process and generate orders for active customer subscriptions?
+                </p>
+              </div>
+            </div>
+
+            {/* Target Parameters Summary Card */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2.5 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium flex items-center gap-1.5">
+                  <Calendar size={13} className="text-slate-400" /> Target Date:
+                </span>
+                <span className="font-bold text-slate-900 font-mono">{selectedDate}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium flex items-center gap-1.5">
+                  <Clock size={13} className="text-slate-400" /> Delivery Slot:
+                </span>
+                <span className="font-bold text-slate-900 capitalize">
+                  {selectedSlot === 'morning' ? 'Morning Slot' : 'Evening Slot'}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium flex items-center gap-1.5">
+                  <Building2 size={13} className="text-slate-400" /> Branch Scope:
+                </span>
+                <span className="font-bold text-slate-900">
+                  {selectedBranch
+                    ? branches.find((b) => b.branch_id === selectedBranch)?.branch_name || selectedBranch
+                    : 'All Active Branches (Global)'}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/60">
+                <span className="text-slate-500 font-medium">Pending Active Subscriptions:</span>
+                <span className="font-extrabold text-emerald-700">{totalSubs}</span>
+              </div>
+            </div>
+
+            {/* Error Message Feedback */}
+            {generateError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle size={15} className="shrink-0" />
+                <span>{generateError}</span>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={generating}
+                onClick={() => {
+                  setIsConfirmModalOpen(false);
+                  setGenerateError(null);
+                }}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={generating}
+                onClick={handleExecuteGenerate}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {generating ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    Generating Orders...
+                  </>
+                ) : (
+                  <>
+                    <Play size={14} />
+                    Confirm &amp; Generate
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Subscription Details Slide-Over Drawer */}
       {selectedSubId && (

@@ -419,4 +419,16 @@ export class SubscriptionSnapshotService {
       orientation: 'landscape',
     });
   }
+
+  /**
+   * Retrieves branch-wise statistics for subscription orders created and one-time orders.
+   */
+  async getBranchWiseStats(
+    targetDate: string,
+    slot: 'morning' | 'evening',
+    branchId?: string | null,
+  ) {
+    this.assertValidDate(targetDate);
+    return this.repository.getBranchWiseStats(targetDate, slot, branchId);
+  }
 }
