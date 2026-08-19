@@ -164,39 +164,45 @@ class _OtpField extends StatelessWidget {
   final TextEditingController controller;
   const _OtpField({required this.controller});
 
+  OutlineInputBorder _border(Color color) => OutlineInputBorder(
+    borderRadius: BorderRadius.circular(14),
+    borderSide: BorderSide(color: color, width: 1.4),
+  );
+
   @override
-  Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      color: kAuthFieldBg,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: kAuthFieldBorder, width: 1.2),
+  Widget build(BuildContext context) => TextField(
+    controller: controller,
+    keyboardType: TextInputType.number,
+    textAlign: TextAlign.center,
+    inputFormatters: [
+      FilteringTextInputFormatter.digitsOnly,
+      LengthLimitingTextInputFormatter(6),
+    ],
+    onTapOutside: (_) => FocusScope.of(context).unfocus(),
+    cursorColor: kPrimary,
+    style: const TextStyle(
+      fontSize: 22,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 10,
+      color: Color(0xFF17211B),
     ),
-    child: TextField(
-      controller: controller,
-      keyboardType: TextInputType.number,
-      textAlign: TextAlign.center,
-      inputFormatters: [
-        FilteringTextInputFormatter.digitsOnly,
-        LengthLimitingTextInputFormatter(6),
-      ],
-      onTapOutside: (_) => FocusScope.of(context).unfocus(),
-      style: const TextStyle(
-        fontSize: 22,
-        fontWeight: FontWeight.w800,
+    decoration: InputDecoration(
+      counterText: '',
+      filled: true,
+      fillColor: kAuthFieldBg,
+      hintText: '000000',
+      hintStyle: const TextStyle(
+        color: kAuthHint,
+        fontWeight: FontWeight.w600,
         letterSpacing: 10,
-        color: Color(0xFF17211B),
+        fontSize: 22,
       ),
-      decoration: const InputDecoration(
-        hintText: '000000',
-        hintStyle: TextStyle(
-          color: kAuthHint,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 10,
-          fontSize: 22,
-        ),
-        border: InputBorder.none,
-        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-      ),
+      border: _border(kAuthFieldBorder),
+      enabledBorder: _border(kAuthFieldBorder),
+      focusedBorder: _border(kPrimary),
+      errorBorder: _border(kRed),
+      focusedErrorBorder: _border(kRed),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
     ),
   );
 }

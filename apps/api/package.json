@@ -60,6 +60,7 @@
     "eventemitter2": "^6.4.9",
     "express-session": "^1.19.0",
     "firebase-admin": "^13.8.0",
+    "google-auth-library": "^10.9.0",
     "h3-js": "^4.4.0",
     "helmet": "^8.1.0",
     "ioredis": "^5.9.3",

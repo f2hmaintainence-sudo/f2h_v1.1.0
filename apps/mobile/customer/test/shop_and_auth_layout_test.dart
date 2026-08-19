@@ -17,6 +17,7 @@ import 'package:f2h_customer/features/catalog/domain/usecases/cart/get_cart_usec
 import 'package:f2h_customer/features/catalog/domain/usecases/cart/sync_cart_usecase.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_bloc.dart';
 import 'package:f2h_customer/features/catalog/presentation/widgets/product_grid_card.dart';
+import 'package:f2h_customer/theme/app_theme.dart';
 
 class _EmptyCartRepository implements CartRepository {
   @override
@@ -74,20 +75,6 @@ Future<void> _pump(
   required Size size,
   double textScale = 1.0,
 }) async {
-  final captured = <FlutterErrorDetails>[];
-  final previousOnError = FlutterError.onError;
-  FlutterError.onError = (details) {
-    captured.add(details);
-    previousOnError?.call(details);
-  };
-  addTearDown(() {
-    FlutterError.onError = previousOnError;
-    for (final d in captured) {
-      // ignore: avoid_print
-      print('CAPTURED >>> ${d.exception}\n${d.context}\n${d.library}');
-    }
-  });
-
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
@@ -231,6 +218,95 @@ void main() {
         ),
         size: const Size(390, 844),
         textScale: 1.3,
+      );
+    });
+  });
+
+  group('AuthField owns its own box', () {
+    testWidgets('overrides every border slot the app theme supplies', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: Scaffold(
+            body: AuthField(
+              controller: TextEditingController(),
+              hint: 'Email or Phone',
+              icon: Icons.mail_outline_rounded,
+            ),
+          ),
+        ),
+      );
+
+      final decoration = tester
+          .widget<TextField>(find.byType(TextField))
+          .decoration!;
+
+      // The app theme fills with a square shape and radius-18 error borders.
+      // Leaving any slot to the theme paints a box over the rounded corners,
+      // which is what made the focused field look double-bordered.
+      for (final border in <InputBorder?>[
+        decoration.border,
+        decoration.enabledBorder,
+        decoration.focusedBorder,
+        decoration.disabledBorder,
+        decoration.errorBorder,
+        decoration.focusedErrorBorder,
+      ]) {
+        expect(border, isA<OutlineInputBorder>());
+        expect(
+          (border as OutlineInputBorder).borderRadius,
+          BorderRadius.circular(14),
+        );
+      }
+
+      expect(decoration.filled, isTrue);
+      expect(decoration.fillColor, kAuthFieldBg);
+
+      // Focusing must not change stroke width, or the field shifts on tap.
+      expect(
+        decoration.enabledBorder!.borderSide.width,
+        decoration.focusedBorder!.borderSide.width,
+      );
+    });
+
+    testWidgets('reacts to focus without changing its geometry', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: Scaffold(
+            body: AuthField(
+              controller: TextEditingController(),
+              hint: 'Email or Phone',
+              icon: Icons.mail_outline_rounded,
+            ),
+          ),
+        ),
+      );
+
+      final fieldSize = tester.getSize(find.byType(TextField));
+      Color iconColour() =>
+          tester.widget<Icon>(find.byIcon(Icons.mail_outline_rounded)).color!;
+
+      final unfocused = iconColour();
+
+      await tester.tap(find.byType(TextField));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).focusNode?.hasFocus ??
+            true,
+        isTrue,
+        reason: 'the field should take focus on tap',
+      );
+      expect(iconColour(), isNot(unfocused), reason: 'focus should be visible');
+      expect(
+        tester.getSize(find.byType(TextField)),
+        fieldSize,
+        reason: 'focusing must not resize the field',
       );
     });
   });

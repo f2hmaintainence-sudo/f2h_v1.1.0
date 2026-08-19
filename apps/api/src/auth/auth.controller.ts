@@ -21,6 +21,7 @@ import { AuditLoggerService } from './audit-logger.service';
 import { RegisterDto, LoginDto, SendOtpDto, VerifyOtpDto } from './dto/auth.dto';
 import { Public } from './decorators/public.decorator';
 import { Roles, ROLE } from './decorators/roles.decorator';
+import { GoogleOAuthService } from './google-oauth.service';
 import { Throttle } from '@nestjs/throttler';
 import { DatabaseService } from 'src/shared/database/Database.service';
 
@@ -35,6 +36,7 @@ export class AuthController {
     private readonly deviceFingerprintService: DeviceFingerprintService,
     private readonly auditLogger: AuditLoggerService,
     private readonly db: DatabaseService,
+    private readonly googleOAuthService: GoogleOAuthService,
   ) { }
 
   @Public()
@@ -404,33 +406,61 @@ export class AuthController {
     return this.authService.getUsersByRole(role);
   }
 
+  /**
+   * Google Sign-In.
+   *
+   * Accepts whichever credential the client platform can produce — an
+   * `id_token` (Android/iOS) or an authorization `code` (web GIS) — and
+   * verifies it with Google before any session is issued. The caller's own
+   * `email`, `name` and `role` are deliberately ignored: everything identifying
+   * comes back signed from Google, and the role is capped to the self-service
+   * set so a crafted request can never create an admin.
+   */
   @Public()
   @Post('google')
   @HttpCode(HttpStatus.OK)
   async googleAuth(
-    @Body() body: { id_token?: string; email?: string; name?: string; fcm_token?: string; role?: string },
+    @Body() body: { id_token?: string; code?: string; fcm_token?: string },
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.googleLogin(body);
-    this.setCookies(res, result.accessToken, result.refreshToken);
-    return result;
+    return this.completeGoogleLogin(
+      { idToken: body?.id_token, code: body?.code },
+      body?.fcm_token,
+      req,
+      res,
+    );
   }
 
+  /**
+   * Legacy GET entry point kept for already-released mobile builds, which send
+   * the authorization code as a query parameter.
+   */
   @Public()
   @Get('google/callback')
   @HttpCode(HttpStatus.OK)
   async googleAuthCallback(
     @Query('code') code: string,
+    @Query('id_token') idToken: string,
     @Query('fcm_token') fcmToken: string,
-    @Query('email') email: string,
-    @Query('role') role: string,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.googleLogin({
-      id_token: code,
-      email: email || (code?.includes('@') ? code : 'google_user@f2hfresh.com'),
-      fcm_token: fcmToken,
-      role: role,
+    return this.completeGoogleLogin({ idToken, code }, fcmToken, req, res);
+  }
+
+  private async completeGoogleLogin(
+    credential: { idToken?: string; code?: string },
+    fcmToken: string | undefined,
+    req: Request,
+    res: Response,
+  ) {
+    const identity = await this.googleOAuthService.verify(credential);
+    const result = await this.authService.googleLogin(identity, {
+      fcmToken,
+      // The client declares which app it is via the same header it already
+      // sends at login; AuthService still clamps it to a safe role.
+      role: (req.headers['x-role'] as string | undefined)?.trim(),
     });
     this.setCookies(res, result.accessToken, result.refreshToken);
     return result;

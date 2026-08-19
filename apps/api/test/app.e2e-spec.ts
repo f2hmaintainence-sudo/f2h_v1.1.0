@@ -2,6 +2,7 @@ import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { AppModule } from './../src/app.module';
+import { assertConnectedToTestDatabase } from './assert-test-database';
 
 const TEST_DB = process.env.TEST_DB_DATABASE;
 const describeIfTestDb = TEST_DB ? describe : describe.skip;
@@ -10,9 +11,6 @@ describeIfTestDb('API root', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    process.env.DB_DATABASE = TEST_DB;
-    process.env.ENABLE_CRON = 'false';
-
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -22,6 +20,7 @@ describeIfTestDb('API root', () => {
     app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
+    await assertConnectedToTestDatabase(app, TEST_DB as string);
   });
 
   afterAll(async () => {

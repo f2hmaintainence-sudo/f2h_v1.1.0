@@ -136,7 +136,7 @@ class ProductGridCard extends StatelessWidget {
               muted: showSubscribe && subPrice != null,
             ),
             const SizedBox(height: 8),
-            _CardAction(product: product, showSubscribe: showSubscribe),
+            _CardAction(product: product),
           ],
         ),
       ),
@@ -455,9 +455,14 @@ void _openSubscriptionSetup(BuildContext context, Product product) {
 
 class _CardAction extends StatelessWidget {
   final Product product;
-  final bool showSubscribe;
 
-  const _CardAction({required this.product, required this.showSubscribe});
+  const _CardAction({required this.product});
+
+  /// The main action only becomes "Subscribe" for products that cannot be
+  /// bought one-off. Anything else keeps "Add" — the purchase sheet behind it
+  /// offers the subscription too, and the price row already carries a direct
+  /// Subscribe shortcut.
+  bool get _subscriptionOnly => product.isSubscribable && !product.isOneTime;
 
   void _add(BuildContext context) {
     context.runWithAuth(() {
@@ -540,6 +545,7 @@ class _CardAction extends StatelessWidget {
         if (qty > 0) {
           return _ActionShell(
             color: kPrimary,
+            fill: true,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -565,7 +571,7 @@ class _CardAction extends StatelessWidget {
         }
 
         return GestureDetector(
-          onTap: () => showSubscribe
+          onTap: () => _subscriptionOnly
               ? _openSubscriptionSetup(context, product)
               : _add(context),
           behavior: HitTestBehavior.opaque,
@@ -577,7 +583,7 @@ class _CardAction extends StatelessWidget {
                 const Icon(Icons.add_rounded, size: 18, color: Colors.white),
                 const SizedBox(width: 6),
                 Text(
-                  showSubscribe ? 'Subscribe' : 'Add',
+                  _subscriptionOnly ? 'Subscribe' : 'Add',
                   style: const TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w700,
@@ -596,18 +602,28 @@ class _CardAction extends StatelessWidget {
 class _ActionShell extends StatelessWidget {
   final Color color;
   final Widget child;
-  const _ActionShell({required this.color, required this.child});
+
+  /// When true the child spans the pill (the quantity stepper) instead of
+  /// being centred and shrink-wrapped (the labelled actions).
+  final bool fill;
+
+  const _ActionShell({
+    required this.color,
+    required this.child,
+    this.fill = false,
+  });
 
   @override
   Widget build(BuildContext context) => Container(
     height: 38,
     width: double.infinity,
     alignment: Alignment.center,
+    padding: const EdgeInsets.symmetric(horizontal: 4),
     decoration: BoxDecoration(
       color: color,
       borderRadius: BorderRadius.circular(10),
     ),
-    child: child,
+    child: fill ? child : FittedBox(fit: BoxFit.scaleDown, child: child),
   );
 }
 

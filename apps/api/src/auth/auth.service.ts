@@ -28,6 +28,7 @@ import { PasswordSecurityService } from './password-security.service';
 import { NotificationService } from 'src/notifications/notification.service';
 import * as crypto from 'crypto';
 import { generateId } from 'src/helpers/RandomHelper';
+import { ROLE } from './decorators/roles.decorator';
 import { RegisterDto, SendOtpDto, VerifyOtpDto } from './dto/auth.dto';
 import { DataService } from 'src/shared/database/Data.service';
 import { DatabaseService } from 'src/shared/database/Database.service';
@@ -1475,9 +1476,30 @@ export class AuthService {
     return { message: 'Password reset successful' };
   }
 
-  async googleLogin(body: { id_token?: string; email?: string; name?: string; fcm_token?: string; role?: string }) {
-    const email = body.email;
+  /**
+   * Signs a user in from an identity Google has already verified.
+   *
+   * The caller (`AuthController`) is responsible for that verification — this
+   * method must never be handed an email that came from a request body, or
+   * anyone could mint a session for any account.
+   *
+   * @param identity Signature-verified Google profile.
+   * @param options  `fcmToken` for push, and `role` used *only* when creating a
+   *                 brand-new account. Existing users keep their stored role.
+   */
+  async googleLogin(
+    identity: { email: string; name?: string; googleId: string },
+    options: { fcmToken?: string; role?: string } = {},
+  ) {
+    const email = identity.email?.toLowerCase().trim();
     if (!email) throw new BadRequestException('Email is required for Google Sign-In');
+
+    // Roles are never accepted from a client. Anything outside this list — most
+    // importantly ADMIN and SUPER_ADMIN — falls back to a plain customer.
+    const SELF_SERVICE_ROLES: string[] = [ROLE.CUSTOMER, ROLE.DELIVERY_PARTNER];
+    const requestedRole = options.role?.toUpperCase().trim();
+    const signupRole =
+      requestedRole && SELF_SERVICE_ROLES.includes(requestedRole) ? requestedRole : ROLE.CUSTOMER;
 
     const allUsersResult = await this.Data.query('users', {
       where: [{ column: 'email', operator: '=', value: email.toLowerCase().trim() }],
@@ -1487,18 +1509,18 @@ export class AuthService {
 
     if (!user) {
       const userId = `USER${Date.now().toString(36).toUpperCase()}`;
-      const roleId = body.role || 'CUSTOMER';
+      const roleId = signupRole;
       await this.Data.insert('users', {
         user_id: userId,
         email: email.toLowerCase().trim(),
-        first_name: body.name || email.split('@')[0],
+        first_name: identity.name || email.split('@')[0],
         role_id: roleId,
         is_active: true,
         created_at: new Date(),
         updated_at: new Date(),
       });
 
-      if (roleId === 'CUSTOMER') {
+      if (roleId === ROLE.CUSTOMER) {
         try {
           const now = new Date();
           const activeBranchRes = await this.Data.query('branches', {
@@ -1510,7 +1532,7 @@ export class AuthService {
 
           await this.Data.insert('customers', {
             customer_id: userId,
-            first_name: body.name || email.split('@')[0],
+            first_name: identity.name || email.split('@')[0],
             last_name: '',
             mobile: null,
             phone: null,
@@ -1527,8 +1549,8 @@ export class AuthService {
       user = { user_id: userId, email: email.toLowerCase().trim(), role_id: roleId };
     }
 
-    if (body.fcm_token) {
-      await this.updateFcmToken(user.user_id, body.fcm_token);
+    if (options.fcmToken) {
+      await this.updateFcmToken(user.user_id, options.fcmToken);
     }
 
     const { accessToken, refreshToken } = await this.generateTokens({

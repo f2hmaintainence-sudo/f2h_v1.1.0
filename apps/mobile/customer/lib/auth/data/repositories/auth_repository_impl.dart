@@ -8,8 +8,7 @@
 //
 // ============================================================================
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:google_sign_in/google_sign_in.dart';
+import 'package:f2h_customer/core/auth/google_auth_client.dart';
 import 'package:f2h_customer/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:f2h_customer/auth/data/datasources/auth_local_datasource.dart';
 import 'package:f2h_customer/auth/domain/entities/user_entity.dart';
@@ -17,22 +16,11 @@ import 'package:f2h_customer/auth/domain/repositories/auth_repository.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/auth/token_storage.dart';
-import 'package:f2h_customer/core/config/app_config.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   final AuthRemoteDataSource remoteDataSource;
   final AuthLocalDataSource localDataSource;
   final DioClient dioClient;
-
-  // Google Sign-In — reads serverClientId dynamically from AppConfig / API
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    clientId: kIsWeb ? AppConfig.googleServerClientId : null,
-    scopes: <String>[
-      'email',
-      'https://www.googleapis.com/auth/userinfo.profile',
-    ],
-    serverClientId: kIsWeb ? null : AppConfig.googleServerClientId,
-  );
 
   AuthRepositoryImpl({
     required this.remoteDataSource,
@@ -133,16 +121,11 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<User> signInWithGoogle({String? fcmToken}) async {
     try {
-      final GoogleSignInAccount? account = await _googleSignIn.signIn();
-      if (account == null) throw 'Sign-in cancelled by user';
-
-      final String? code = account.serverAuthCode;
-      if (code == null || code.isEmpty) {
-        throw 'Failed to retrieve authorization code from Google';
-      }
+      final credential = await signInWithGoogleAccount();
 
       final userModel = await remoteDataSource.signInWithGoogle(
-        code,
+        idToken: credential.idToken,
+        serverAuthCode: credential.serverAuthCode,
         fcmToken: fcmToken,
       );
       final access = userModel.token;
@@ -165,7 +148,7 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> logout() async {
     try {
-      _googleSignIn.signOut().catchError((_) => null);
+      signOutGoogleAccount().catchError((_) => null);
       remoteDataSource.logout().catchError((_) => null);
       await Future.wait([
         localDataSource.clearCache(),

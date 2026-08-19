@@ -52,12 +52,15 @@ export class PushNotificationService implements OnModuleInit {
             this.developerService.warn('Failed to fetch Firebase admin config from DB:', err?.message || err);
         }
 
-        // 2. Fallback to file system (/home/f2hfresh/htdocs/f2hfresh.com/firebase or local secrets)
+        // 2. Fallback to a service-account file on disk. The absolute path that
+        //    used to be hardcoded here pointed at a deleted directory and at the
+        //    retired `f2hfresh-65beb` project, so the location is now explicit
+        //    (FIREBASE_SERVICE_ACCOUNT_PATH) with the in-tree secret as default.
         const possiblePaths = [
-            '/home/f2hfresh/htdocs/f2hfresh.com/firebase/f2hfresh-65beb-firebase-adminsdk-fbsvc-732ac6da2d.json',
+            process.env.FIREBASE_SERVICE_ACCOUNT_PATH,
             path.join(process.cwd(), 'src/shared/secrets/firebasepushnotification.json'),
             path.join(process.cwd(), 'dist/shared/secrets/firebasepushnotification.json'),
-        ];
+        ].filter((p): p is string => Boolean(p && p.trim()));
 
         for (const p of possiblePaths) {
             if (fs.existsSync(p)) {

@@ -18,7 +18,15 @@ abstract class AuthRemoteDataSource {
     String? referralCode,
     String? fcmToken,
   });
-  Future<UserModel> signInWithGoogle(String serverAuthCode, {String? fcmToken});
+  /// Exchanges a Google credential for an F2H session.
+  ///
+  /// Both fields are forwarded because platforms differ in what they can
+  /// produce; the API verifies whichever one it receives.
+  Future<UserModel> signInWithGoogle({
+    String? idToken,
+    String? serverAuthCode,
+    String? fcmToken,
+  });
   Future<void> sendRegistrationOtp(String email, {String? userName});
   Future<String> verifyOtp({
     required String email,
@@ -222,15 +230,18 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   @override
-  Future<UserModel> signInWithGoogle(
-    String serverAuthCode, {
+  Future<UserModel> signInWithGoogle({
+    String? idToken,
+    String? serverAuthCode,
     String? fcmToken,
   }) async {
     try {
       final response = await dioClient.dio.post(
         ApiEndpoints.googleAuth,
         data: {
-          'id_token': serverAuthCode,
+          if (idToken != null && idToken.isNotEmpty) 'id_token': idToken,
+          if (serverAuthCode != null && serverAuthCode.isNotEmpty)
+            'code': serverAuthCode,
           if (fcmToken != null && fcmToken.isNotEmpty) 'fcm_token': fcmToken,
         },
       );

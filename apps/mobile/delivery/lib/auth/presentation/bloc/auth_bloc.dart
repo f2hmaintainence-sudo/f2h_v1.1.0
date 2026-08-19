@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_delivery/auth/domain/repositories/auth_repository.dart';
+import 'package:f2h_delivery/core/auth/google_auth_client.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_event.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_state.dart';
 
@@ -54,6 +55,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       final user = await authRepository.signInWithGoogle();
       emit(Authenticated(user: user));
+    } on GoogleSignInCancelled {
+      // Dismissing the account chooser is a decision, not a failure — drop
+      // back to the signed-out state without shouting at the user.
+      emit(const Unauthenticated());
     } catch (e) {
       emit(AuthFailure(error: e.toString()));
     }

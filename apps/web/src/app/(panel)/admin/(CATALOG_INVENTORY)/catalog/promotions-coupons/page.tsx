@@ -1,0 +1,2065 @@
+// ============================================================================
+// ChronoSparkSolutions — A Software Company
+// © 2026 ChronoSparkSolutions. All rights reserved.
+//
+// Project     : F2H Fresh
+// File        : page.tsx
+// Description : Full-featured Promotions, Coupons & Category-Based Offers / Popup Banners Management
+// ============================================================================
+
+"use client";
+
+import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { api } from "@/services/api.client";
+import {
+  Tag, Percent, Ticket, Plus, CheckCircle2, Clock, AlertCircle,
+  Search, RefreshCw, Layers, ChevronRight, Home, Trash2, Edit3,
+  Calendar, Check, X, ShieldAlert, Sparkles, ArrowUpRight, Copy,
+  Users, ShoppingBag, Eye, DollarSign, ArrowRight, CheckCheck,
+  Package, Boxes, Info, ToggleLeft, ToggleRight, Image as ImageIcon,
+  ExternalLink, Palette, Smartphone, MonitorSmartphone, FolderTree,
+  SlidersHorizontal, CheckSquare
+} from "lucide-react";
+import Link from "next/link";
+import { showSuccessToast, showErrorToast } from "@/components/Toast";
+
+interface Promotion {
+  id: number;
+  promotion_id: string;
+  name: string;
+  description: string;
+  promotion_type: "percentage" | "fixed_amount";
+  discount_value: number;
+  max_discount_amount?: number;
+  minimum_order_amount: number;
+  status: "draft" | "active" | "paused" | "expired";
+  first_order_only: boolean;
+  auto_apply: boolean;
+  stackable: boolean;
+  apply_to_all_products: boolean;
+  allow_subscription_orders: boolean;
+  usage_limit?: number;
+  usage_limit_per_customer: number;
+  total_redemptions: number;
+  products_count: number;
+  targeted_products?: Array<{ variant_id: string; product_name: string; variant_name: string; price: number }>;
+  start_at?: string;
+  end_at?: string;
+  created_at: string;
+}
+
+interface Coupon {
+  id: number;
+  coupon_id: string;
+  promotion_id: string;
+  code: string;
+  name: string;
+  description: string;
+  status: "draft" | "active" | "paused" | "expired";
+  usage_limit?: number;
+  usage_limit_per_customer: number;
+  used_count: number;
+  promotion_name: string;
+  promotion_type: "percentage" | "fixed_amount";
+  discount_value: number;
+  minimum_order_amount: number;
+  max_discount_amount?: number;
+  start_at?: string;
+  end_at?: string;
+  created_at: string;
+}
+
+interface OfferBanner {
+  id: number;
+  title: string;
+  discount_text?: string;
+  description?: string;
+  image_url: string;
+  action_type: string;
+  action_value?: string;
+  cta_label?: string;
+  background_color?: string;
+  banner_type?: "home_carousel" | "category_slide" | "popup" | string;
+  category_id?: string;
+  is_popup?: boolean;
+  display_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+interface CatalogProduct {
+  variant_id: string;
+  product_id: string;
+  product_name: string;
+  variant_name: string;
+  price: number;
+  original_price: number;
+  category?: string;
+}
+
+interface CategoryOption {
+  category_id: string;
+  name: string;
+  slug?: string;
+}
+
+export default function PromotionsCouponsOffersPage() {
+  const [activeTab, setActiveTab] = useState<"promotions" | "coupons" | "offers">("promotions");
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [offers, setOffers] = useState<OfferBanner[]>([]);
+  const [catalogProducts, setCatalogProducts] = useState<CatalogProduct[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  // Offer Placement Sub-filter (All, Home Carousel, Category Slide, Popup Banner)
+  const [offerPlacementFilter, setOfferPlacementFilter] = useState<string>("all");
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("all");
+
+  // Modals state
+  const [isCreatePromoOpen, setIsCreatePromoOpen] = useState(false);
+  const [isCreateCouponOpen, setIsCreateCouponOpen] = useState(false);
+  const [isCreateOfferOpen, setIsCreateOfferOpen] = useState(false);
+  const [isManageProductsOpen, setIsManageProductsOpen] = useState(false);
+  const [selectedPromoForProducts, setSelectedPromoForProducts] = useState<Promotion | null>(null);
+  const [isRedemptionsOpen, setIsRedemptionsOpen] = useState(false);
+  const [redemptionsData, setRedemptionsData] = useState<any[]>([]);
+  const [redemptionsTitle, setRedemptionsTitle] = useState("");
+  const [loadingRedemptions, setLoadingRedemptions] = useState(false);
+  const [popupPreviewModalOpen, setPopupPreviewModalOpen] = useState(false);
+  const [previewOffer, setPreviewOffer] = useState<OfferBanner | null>(null);
+
+  // Form State - Create Promotion
+  const [promoForm, setPromoForm] = useState({
+    name: "",
+    description: "",
+    promotion_type: "percentage" as "percentage" | "fixed_amount",
+    discount_value: 20,
+    max_discount_amount: 100,
+    minimum_order_amount: 100,
+    status: "active" as "active" | "draft" | "paused",
+    first_order_only: false,
+    auto_apply: true,
+    stackable: false,
+    apply_to_all_products: true,
+    allow_subscription_orders: false,
+    usage_limit: 1000,
+    usage_limit_per_customer: 1,
+    start_at: "",
+    end_at: "",
+  });
+
+  // Form State - Create Coupon
+  const [couponForm, setCouponForm] = useState({
+    code: "",
+    name: "",
+    description: "",
+    promotion_id: "",
+    status: "active" as "active" | "draft" | "paused",
+    usage_limit: 1000,
+    usage_limit_per_customer: 1,
+    start_at: "",
+    end_at: "",
+  });
+
+  // Form State - Create Offer Banner (with Category & Popup Support)
+  const [offerForm, setOfferForm] = useState({
+    title: "",
+    discount_text: "FLAT 50% OFF",
+    description: "",
+    image_url: "https://f2hfresh.com/uploads/app_assets/images/milk_bottle.png",
+    banner_type: "home_carousel" as "home_carousel" | "category_slide" | "popup",
+    category_id: "",
+    is_popup: false,
+    action_type: "CATEGORY",
+    action_value: "",
+    cta_label: "USE CODE: WELCOME50",
+    background_color: "#16a34a",
+    display_order: 1,
+    is_active: true,
+  });
+
+  // Product Selection for Target Modal
+  const [selectedVariantIds, setSelectedVariantIds] = useState<string[]>([]);
+  const [productSearch, setProductSearch] = useState("");
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [pRes, cRes, prodRes, catRes, offerRes] = await Promise.all([
+        api.get<any>("/v1/admin/promotions-coupons/promotions").catch(() => ({ data: [] } as any)),
+        api.get<any>("/v1/admin/promotions-coupons/coupons").catch(() => ({ data: [] } as any)),
+        api.get<any>("/v1/customer/products").catch(() => ({ data: [] } as any)),
+        api.get<any>("/v1/customer/categories").catch(() => ({ data: [] } as any)),
+        api.get<any>("/admin/catalog/offers/table").catch(() => ({ data: [] } as any)),
+      ]);
+
+      const promos = Array.isArray((pRes as any)?.data) ? (pRes as any).data : (pRes as any)?.data?.data || [];
+      const cpns = Array.isArray((cRes as any)?.data) ? (cRes as any).data : (cRes as any)?.data?.data || [];
+      const prods = Array.isArray((prodRes as any)?.data) ? (prodRes as any).data : (prodRes as any)?.data?.data || [];
+      const cats = Array.isArray((catRes as any)?.data) ? (catRes as any).data : (catRes as any)?.data?.data || [];
+
+      // Parse offers response
+      let offerList: OfferBanner[] = [];
+      const offerData = (offerRes as any)?.data;
+      if (offerData?.data && Array.isArray(offerData.data)) {
+        offerList = offerData.data;
+      } else if (offerData?.rows && Array.isArray(offerData.rows)) {
+        offerList = offerData.rows;
+      } else if (Array.isArray(offerData)) {
+        offerList = offerData;
+      }
+
+      setPromotions(promos);
+      setCoupons(cpns);
+      setCatalogProducts(prods);
+      setCategories(cats);
+      setOffers(offerList);
+
+      if (promos.length > 0 && !couponForm.promotion_id) {
+        setCouponForm((prev) => ({ ...prev, promotion_id: promos[0].promotion_id }));
+      }
+      if (cats.length > 0 && !offerForm.category_id) {
+        setOfferForm((prev) => ({ ...prev, category_id: cats[0].category_id }));
+      }
+    } catch (e: any) {
+      showErrorToast(e.message || "Failed to load promotions/coupons/offers");
+    } finally {
+      setLoading(false);
+    }
+  }, [couponForm.promotion_id, offerForm.category_id]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Status toggle handlers
+  const togglePromoStatus = async (id: string, currentStatus: string) => {
+    const nextStatus = currentStatus === "active" ? "paused" : "active";
+    try {
+      await api.patch(`/v1/admin/promotions-coupons/promotions/${id}/status`, { status: nextStatus });
+      showSuccessToast(`Promotion status set to ${nextStatus}`);
+      fetchData();
+    } catch (e: any) {
+      showErrorToast(e.message || "Failed to update status");
+    }
+  };
+
+  const toggleCouponStatus = async (id: string, currentStatus: string) => {
+    const nextStatus = currentStatus === "active" ? "paused" : "active";
+    try {
+      await api.patch(`/v1/admin/promotions-coupons/coupons/${id}/status`, { status: nextStatus });
+      showSuccessToast(`Coupon status set to ${nextStatus}`);
+      fetchData();
+    } catch (e: any) {
+      showErrorToast(e.message || "Failed to update status");
+    }
+  };
+
+  const toggleOfferStatus = async (id: number, currentActive: boolean) => {
+    try {
+      await api.post<any>(`/admin/catalog/offers/${id}/saveEdit`, { is_active: !currentActive });
+      showSuccessToast(`Offer banner ${!currentActive ? "activated" : "deactivated"}`);
+      fetchData();
+    } catch (e: any) {
+      showErrorToast(e.message || "Failed to update offer banner");
+    }
+  };
+
+  const togglePopupStatus = async (id: number, currentIsPopup: boolean) => {
+    try {
+      await api.post<any>(`/admin/catalog/offers/${id}/saveEdit`, {
+        is_popup: !currentIsPopup,
+        banner_type: !currentIsPopup ? "popup" : "home_carousel",
+      });
+      showSuccessToast(!currentIsPopup ? "Banner set as App Launch Popup!" : "Banner removed from App Launch Popup");
+      fetchData();
+    } catch (e: any) {
+      showErrorToast(e.message || "Failed to toggle popup status");
+    }
+  };
+
+  const deletePromotion = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete promotion "${name}"? Linked coupons will also be deleted.`)) return;
+    try {
+      await api.delete<any>(`/v1/admin/promotions-coupons/promotions/${id}`);
+      showSuccessToast("Promotion deleted successfully");
+      fetchData();
+    } catch (e: any) {
+      showErrorToast(e.message || "Failed to delete promotion");
+    }
+  };
+
+  const deleteCoupon = async (id: string, code: string) => {
+    if (!confirm(`Are you sure you want to delete coupon code "${code}"?`)) return;
+    try {
+      await api.delete<any>(`/v1/admin/promotions-coupons/coupons/${id}`);
+      showSuccessToast("Coupon deleted successfully");
+      fetchData();
+    } catch (e: any) {
+      showErrorToast(e.message || "Failed to delete coupon");
+    }
+  };
+
+  const deleteOffer = async (id: number, title: string) => {
+    if (!confirm(`Are you sure you want to delete offer banner "${title}"?`)) return;
+    try {
+      await api.delete<any>(`/admin/catalog/offers/${id}/delete`);
+      showSuccessToast("Offer banner deleted successfully");
+      fetchData();
+    } catch (e: any) {
+      showErrorToast(e.message || "Failed to delete offer");
+    }
+  };
+
+  // Submit Create Promotion
+  const handleCreatePromo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!promoForm.name.trim()) {
+      showErrorToast("Please enter a promotion name");
+      return;
+    }
+
+    try {
+      await api.post<any>("/v1/admin/promotions-coupons/promotions", {
+        name: promoForm.name.trim(),
+        description: promoForm.description.trim() || undefined,
+        promotion_type: promoForm.promotion_type,
+        discount_value: Number(promoForm.discount_value),
+        max_discount_amount: promoForm.promotion_type === "percentage" && promoForm.max_discount_amount ? Number(promoForm.max_discount_amount) : undefined,
+        minimum_order_amount: Number(promoForm.minimum_order_amount) || 0,
+        status: promoForm.status,
+        first_order_only: promoForm.first_order_only,
+        auto_apply: promoForm.auto_apply,
+        stackable: promoForm.stackable,
+        apply_to_all_products: promoForm.apply_to_all_products,
+        allow_subscription_orders: promoForm.allow_subscription_orders,
+        usage_limit: promoForm.usage_limit ? Number(promoForm.usage_limit) : undefined,
+        usage_limit_per_customer: Number(promoForm.usage_limit_per_customer) || 1,
+        start_at: promoForm.start_at || undefined,
+        end_at: promoForm.end_at || undefined,
+      });
+
+      showSuccessToast("🎉 Promotion created successfully!");
+      setIsCreatePromoOpen(false);
+      fetchData();
+    } catch (e: any) {
+      showErrorToast(e.response?.data?.message || e.message || "Failed to create promotion");
+    }
+  };
+
+  // Submit Create Coupon
+  const handleCreateCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!couponForm.code.trim()) {
+      showErrorToast("Please enter a coupon code");
+      return;
+    }
+    if (!couponForm.promotion_id) {
+      showErrorToast("Please select a linked promotion");
+      return;
+    }
+
+    try {
+      await api.post<any>("/v1/admin/promotions-coupons/coupons", {
+        code: couponForm.code.trim().toUpperCase(),
+        name: couponForm.name.trim() || undefined,
+        description: couponForm.description.trim() || undefined,
+        promotion_id: couponForm.promotion_id,
+        status: couponForm.status,
+        usage_limit: couponForm.usage_limit ? Number(couponForm.usage_limit) : undefined,
+        usage_limit_per_customer: Number(couponForm.usage_limit_per_customer) || 1,
+        start_at: couponForm.start_at || undefined,
+        end_at: couponForm.end_at || undefined,
+      });
+
+      showSuccessToast(`🎉 Coupon "${couponForm.code.toUpperCase()}" created successfully!`);
+      setIsCreateCouponOpen(false);
+      fetchData();
+    } catch (e: any) {
+      showErrorToast(e.response?.data?.message || e.message || "Failed to create coupon");
+    }
+  };
+
+  // Submit Create Offer Banner (with Category & Popup Type)
+  const handleCreateOffer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!offerForm.title.trim()) {
+      showErrorToast("Please enter an offer banner title");
+      return;
+    }
+    if (!offerForm.image_url.trim()) {
+      showErrorToast("Please provide an image URL for the banner");
+      return;
+    }
+
+    try {
+      await api.post<any>("/admin/catalog/offers/saveAdd", {
+        title: offerForm.title.trim(),
+        discount_text: offerForm.discount_text.trim() || null,
+        description: offerForm.description.trim() || null,
+        image_url: offerForm.image_url.trim(),
+        banner_type: offerForm.banner_type,
+        category_id: offerForm.banner_type === "category_slide" ? offerForm.category_id : null,
+        is_popup: offerForm.is_popup || offerForm.banner_type === "popup",
+        action_type: offerForm.action_type,
+        action_value: offerForm.action_value || (offerForm.banner_type === "category_slide" ? offerForm.category_id : null),
+        cta_label: offerForm.cta_label.trim() || "Shop Now",
+        background_color: offerForm.background_color || "#16a34a",
+        display_order: Number(offerForm.display_order) || 1,
+        is_active: offerForm.is_active,
+      });
+
+      showSuccessToast("🎉 Offer banner created successfully!");
+      setIsCreateOfferOpen(false);
+      fetchData();
+    } catch (e: any) {
+      showErrorToast(e.response?.data?.message || e.message || "Failed to create offer banner");
+    }
+  };
+
+  // Open Manage Products Modal
+  const openManageProducts = async (promo: Promotion) => {
+    setSelectedPromoForProducts(promo);
+    setSelectedVariantIds([]);
+    setIsManageProductsOpen(true);
+
+    try {
+      const res = await api.get<any>(`/v1/admin/promotions-coupons/promotions/${promo.promotion_id}`);
+      if (res.data?.data) {
+        setSelectedPromoForProducts(res.data.data);
+      }
+    } catch (_) {}
+  };
+
+  // Add Product to Promotion
+  const handleAddProductsToPromo = async () => {
+    if (!selectedPromoForProducts || selectedVariantIds.length === 0) return;
+    try {
+      await api.post<any>(`/v1/admin/promotions-coupons/promotions/${selectedPromoForProducts.promotion_id}/products`, {
+        variant_ids: selectedVariantIds,
+      });
+      showSuccessToast("Product variants linked successfully!");
+      setSelectedVariantIds([]);
+      const res = await api.get<any>(`/v1/admin/promotions-coupons/promotions/${selectedPromoForProducts.promotion_id}`);
+      if (res.data?.data) setSelectedPromoForProducts(res.data.data);
+      fetchData();
+    } catch (e: any) {
+      showErrorToast(e.message || "Failed to add products");
+    }
+  };
+
+  // Remove Product from Promotion
+  const handleRemoveProductFromPromo = async (variantId: string) => {
+    if (!selectedPromoForProducts) return;
+    try {
+      await api.delete<any>(`/v1/admin/promotions-coupons/promotions/${selectedPromoForProducts.promotion_id}/products/${variantId}`);
+      showSuccessToast("Variant unlinked from promotion");
+      const res = await api.get<any>(`/v1/admin/promotions-coupons/promotions/${selectedPromoForProducts.promotion_id}`);
+      if (res.data?.data) setSelectedPromoForProducts(res.data.data);
+      fetchData();
+    } catch (e: any) {
+      showErrorToast(e.message || "Failed to remove variant");
+    }
+  };
+
+  // View Redemptions
+  const openRedemptionsModal = async (type: "promo" | "coupon", id: string, name: string) => {
+    setRedemptionsTitle(name);
+    setRedemptionsData([]);
+    setLoadingRedemptions(true);
+    setIsRedemptionsOpen(true);
+
+    try {
+      const path = type === "promo" ? `/v1/admin/promotions-coupons/promotions/${id}/redemptions` : `/v1/admin/promotions-coupons/coupons/${id}/redemptions`;
+      const res = await api.get<any>(path);
+      setRedemptionsData(res.data?.data || res.data || []);
+    } catch (e: any) {
+      showErrorToast("Failed to load redemptions");
+    } finally {
+      setLoadingRedemptions(false);
+    }
+  };
+
+  const getCategoryName = (catId?: string) => {
+    if (!catId) return "—";
+    const found = categories.find((c) => c.category_id === catId);
+    return found ? found.name : catId;
+  };
+
+  // Filtered lists
+  const filteredPromotions = useMemo(() => {
+    return promotions.filter((p) => {
+      const matchSearch =
+        p.name?.toLowerCase().includes(search.toLowerCase()) ||
+        p.promotion_id?.toLowerCase().includes(search.toLowerCase()) ||
+        p.description?.toLowerCase().includes(search.toLowerCase());
+      const matchStatus = statusFilter === "all" || p.status === statusFilter;
+      return matchSearch && matchStatus;
+    });
+  }, [promotions, search, statusFilter]);
+
+  const filteredCoupons = useMemo(() => {
+    return coupons.filter((c) => {
+      const matchSearch =
+        c.code?.toLowerCase().includes(search.toLowerCase()) ||
+        c.name?.toLowerCase().includes(search.toLowerCase()) ||
+        c.promotion_name?.toLowerCase().includes(search.toLowerCase());
+      const matchStatus = statusFilter === "all" || c.status === statusFilter;
+      return matchSearch && matchStatus;
+    });
+  }, [coupons, search, statusFilter]);
+
+  const filteredOffers = useMemo(() => {
+    return offers.filter((o) => {
+      const matchSearch =
+        o.title?.toLowerCase().includes(search.toLowerCase()) ||
+        o.discount_text?.toLowerCase().includes(search.toLowerCase()) ||
+        o.description?.toLowerCase().includes(search.toLowerCase());
+      const matchStatus =
+        statusFilter === "all" ||
+        (statusFilter === "active" && o.is_active) ||
+        (statusFilter === "paused" && !o.is_active);
+
+      const matchPlacement =
+        offerPlacementFilter === "all" ||
+        (offerPlacementFilter === "popup" && (o.is_popup || o.banner_type === "popup")) ||
+        (offerPlacementFilter === "category_slide" && o.banner_type === "category_slide") ||
+        (offerPlacementFilter === "home_carousel" && (o.banner_type === "home_carousel" || !o.banner_type));
+
+      const matchCategory =
+        selectedCategoryFilter === "all" ||
+        o.category_id === selectedCategoryFilter;
+
+      return matchSearch && matchStatus && matchPlacement && matchCategory;
+    });
+  }, [offers, search, statusFilter, offerPlacementFilter, selectedCategoryFilter]);
+
+  return (
+    <div className="space-y-6 p-2 md:p-4 max-w-7xl mx-auto animate-in fade-in duration-300">
+      {/* Breadcrumbs */}
+      <nav className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+        <Link href="/admin/dashboard" className="flex items-center gap-1 hover:text-[#16a34a] transition-colors">
+          <Home size={13} /> Dashboard
+        </Link>
+        <ChevronRight size={12} className="text-slate-400" />
+        <span className="text-slate-500 font-medium">Catalog &amp; Inventory</span>
+        <ChevronRight size={12} className="text-slate-400" />
+        <span className="font-semibold text-slate-800">Promotions, Coupons &amp; Offers</span>
+      </nav>
+
+      {/* Header Banner */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-[#16a34a] flex items-center justify-center border border-emerald-100/60 shadow-xs shrink-0">
+            <Sparkles size={24} />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">Promotions, Coupons &amp; Offers</h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Manage discount campaigns, checkout coupons, category slides, and app launch popup banners.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={fetchData}
+            disabled={loading}
+            className="px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl transition-all border border-slate-200 flex items-center gap-1.5"
+          >
+            <RefreshCw size={14} className={loading ? "animate-spin text-[#16a34a]" : ""} />
+            Refresh
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsCreatePromoOpen(true)}
+            className="px-4 py-2.5 bg-[#16a34a] hover:bg-[#15803d] text-white text-xs font-semibold rounded-xl transition-all shadow-md shadow-emerald-600/20 flex items-center gap-2"
+          >
+            <Plus size={16} />
+            New Promotion
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsCreateCouponOpen(true)}
+            className="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-xl transition-all shadow-md shadow-teal-600/20 flex items-center gap-2"
+          >
+            <Ticket size={16} />
+            New Coupon
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsCreateOfferOpen(true)}
+            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition-all shadow-md shadow-indigo-600/20 flex items-center gap-2"
+          >
+            <Tag size={16} />
+            New Offer Banner
+          </button>
+        </div>
+      </div>
+
+      {/* Metric Counters */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-[#16a34a] flex items-center justify-center font-bold">
+            <Percent className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="text-xs text-slate-500 font-medium">Active Promotions</div>
+            <div className="text-2xl font-black text-slate-900">
+              {promotions.filter((p) => p.status === "active").length}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-0.5">
+              {promotions.length} Total Campaigns
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold">
+            <Ticket className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="text-xs text-slate-500 font-medium">Active Coupons</div>
+            <div className="text-2xl font-black text-slate-900">
+              {coupons.filter((c) => c.status === "active").length}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-0.5">
+              {coupons.length} Registered Codes
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+            <Smartphone className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="text-xs text-slate-500 font-medium">Launch Popup Banners</div>
+            <div className="text-2xl font-black text-slate-900">
+              {offers.filter((o) => o.is_active && (o.is_popup || o.banner_type === "popup")).length}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-0.5">
+              Active App Popups
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+            <FolderTree className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="text-xs text-slate-500 font-medium">Category Slide Banners</div>
+            <div className="text-2xl font-black text-slate-900">
+              {offers.filter((o) => o.is_active && (o.banner_type === "category_slide" || o.category_id)).length}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-0.5">Targeted Category Slides</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Card Container */}
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-xs p-4 md:p-6 space-y-6">
+        {/* Tabs & Controls */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab("promotions")}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                activeTab === "promotions"
+                  ? "bg-[#16a34a] text-white shadow-md shadow-emerald-600/20"
+                  : "bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Percent className="w-4 h-4" />
+              Promotions ({promotions.length})
+            </button>
+            <button
+              onClick={() => setActiveTab("coupons")}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                activeTab === "coupons"
+                  ? "bg-teal-600 text-white shadow-md shadow-teal-600/20"
+                  : "bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Ticket className="w-4 h-4" />
+              Coupons ({coupons.length})
+            </button>
+            <button
+              onClick={() => setActiveTab("offers")}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                activeTab === "offers"
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                  : "bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Tag className="w-4 h-4" />
+              Offers, Slides &amp; Popups ({offers.length})
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <option value="all">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="paused">Paused / Inactive</option>
+              <option value="draft">Draft</option>
+            </select>
+
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={`Search ${activeTab}...`}
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Tab 1: Promotions Table */}
+        {activeTab === "promotions" && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50/80 border-b border-slate-100 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
+                <tr>
+                  <th className="p-4">Promotion Name &amp; ID</th>
+                  <th className="p-4">Discount Value</th>
+                  <th className="p-4">Min. Order</th>
+                  <th className="p-4">Scope &amp; Rules</th>
+                  <th className="p-4">Redemptions</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredPromotions.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-12 text-center text-slate-400">
+                      No promotions matching your search.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredPromotions.map((p) => (
+                    <tr key={p.promotion_id} className="hover:bg-slate-50/60 transition">
+                      <td className="p-4">
+                        <div className="font-bold text-slate-900 text-sm">{p.name}</div>
+                        <div className="text-[11px] text-slate-400 font-mono mt-0.5">{p.promotion_id}</div>
+                        {p.description && (
+                          <div className="text-[11px] text-slate-500 mt-1 line-clamp-1">{p.description}</div>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-[#16a34a] font-black text-xs">
+                          {p.promotion_type === "percentage"
+                            ? `${Number(p.discount_value)}% OFF`
+                            : `₹${Number(p.discount_value)} FLAT OFF`}
+                        </span>
+                        {p.max_discount_amount && (
+                          <div className="text-[10px] text-slate-400 mt-1">
+                            Cap: ₹{Number(p.max_discount_amount)}
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-4 font-semibold text-slate-800">
+                        {Number(p.minimum_order_amount) > 0 ? `₹${Number(p.minimum_order_amount)}` : "None"}
+                      </td>
+                      <td className="p-4 space-y-1">
+                        <div className="flex flex-wrap gap-1">
+                          {p.first_order_only && (
+                            <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold">
+                              First Order Only
+                            </span>
+                          )}
+                          {p.auto_apply && (
+                            <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 text-[10px] font-bold">
+                              Auto Applied
+                            </span>
+                          )}
+                          {p.stackable && (
+                            <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-bold">
+                              Stackable
+                            </span>
+                          )}
+                          {p.allow_subscription_orders && (
+                            <span className="px-2 py-0.5 rounded bg-rose-50 text-rose-700 text-[10px] font-bold">
+                              Subscriptions Allowed
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          {p.apply_to_all_products ? (
+                            <span className="text-[11px] font-bold text-purple-700">
+                              📦 All Products in Store
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => openManageProducts(p)}
+                              className="text-[11px] font-bold text-[#16a34a] hover:underline flex items-center gap-1"
+                            >
+                              <Package size={12} />
+                              {p.products_count || 0} Targeted Variants (Edit)
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <button
+                          onClick={() => openRedemptionsModal("promo", p.promotion_id, p.name)}
+                          className="font-bold text-slate-900 hover:text-[#16a34a] hover:underline flex items-center gap-1"
+                        >
+                          <Users size={12} />
+                          {p.total_redemptions || 0} Claimed
+                        </button>
+                      </td>
+                      <td className="p-4">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                            p.status === "active"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : p.status === "paused"
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                          {p.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {!p.apply_to_all_products && (
+                            <button
+                              onClick={() => openManageProducts(p)}
+                              title="Manage Targeted Variants"
+                              className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition"
+                            >
+                              <Boxes size={14} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => togglePromoStatus(p.promotion_id, p.status)}
+                            className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold hover:bg-slate-100 transition"
+                          >
+                            {p.status === "active" ? "Pause" : "Activate"}
+                          </button>
+                          <button
+                            onClick={() => deletePromotion(p.promotion_id, p.name)}
+                            title="Delete Promotion"
+                            className="p-1.5 rounded-lg border border-red-100 text-red-600 hover:bg-red-50 transition"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Tab 2: Coupons Table */}
+        {activeTab === "coupons" && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50/80 border-b border-slate-100 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
+                <tr>
+                  <th className="p-4">Coupon Code &amp; Info</th>
+                  <th className="p-4">Linked Promotion</th>
+                  <th className="p-4">Discount</th>
+                  <th className="p-4">Min. Order</th>
+                  <th className="p-4">Usage Limit</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredCoupons.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-12 text-center text-slate-400">
+                      No coupon codes matching your search.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredCoupons.map((c) => (
+                    <tr key={c.coupon_id} className="hover:bg-slate-50/60 transition">
+                      <td className="p-4">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-teal-50 border border-teal-200 text-teal-800 font-mono font-black text-xs tracking-wider">
+                          <Ticket size={13} />
+                          {c.code}
+                        </div>
+                        {c.name && <div className="font-semibold text-slate-900 mt-1">{c.name}</div>}
+                        {c.description && <div className="text-[11px] text-slate-400">{c.description}</div>}
+                      </td>
+                      <td className="p-4">
+                        <div className="font-semibold text-slate-800">{c.promotion_name || "—"}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{c.promotion_id}</div>
+                      </td>
+                      <td className="p-4">
+                        <span className="font-black text-slate-900">
+                          {c.promotion_type === "percentage"
+                            ? `${Number(c.discount_value)}% OFF`
+                            : `₹${Number(c.discount_value)} OFF`}
+                        </span>
+                      </td>
+                      <td className="p-4 font-semibold text-slate-800">
+                        {Number(c.minimum_order_amount) > 0 ? `₹${Number(c.minimum_order_amount)}` : "None"}
+                      </td>
+                      <td className="p-4">
+                        <div className="text-slate-900 font-bold">
+                          {c.used_count || 0} / {c.usage_limit || "∞"}
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          {c.usage_limit_per_customer}x per customer
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                            c.status === "active"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                          {c.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => openRedemptionsModal("coupon", c.coupon_id, c.code)}
+                            title="View Redemptions"
+                            className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition"
+                          >
+                            <Users size={14} />
+                          </button>
+                          <button
+                            onClick={() => toggleCouponStatus(c.coupon_id, c.status)}
+                            className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold hover:bg-slate-100 transition"
+                          >
+                            {c.status === "active" ? "Pause" : "Activate"}
+                          </button>
+                          <button
+                            onClick={() => deleteCoupon(c.coupon_id, c.code)}
+                            title="Delete Coupon"
+                            className="p-1.5 rounded-lg border border-red-100 text-red-600 hover:bg-red-50 transition"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Tab 3: Offers, Category Slides & Popup Banners */}
+        {activeTab === "offers" && (
+          <div className="space-y-6">
+            {/* Placement Filter Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200/60">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  onClick={() => setOfferPlacementFilter("all")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                    offerPlacementFilter === "all"
+                      ? "bg-slate-900 text-white shadow-xs"
+                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                  }`}
+                >
+                  All Banners ({offers.length})
+                </button>
+                <button
+                  onClick={() => setOfferPlacementFilter("home_carousel")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                    offerPlacementFilter === "home_carousel"
+                      ? "bg-indigo-600 text-white shadow-xs"
+                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                  }`}
+                >
+                  <Tag size={13} />
+                  Home Carousel ({offers.filter((o) => o.banner_type === "home_carousel" || !o.banner_type).length})
+                </button>
+                <button
+                  onClick={() => setOfferPlacementFilter("category_slide")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                    offerPlacementFilter === "category_slide"
+                      ? "bg-purple-600 text-white shadow-xs"
+                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                  }`}
+                >
+                  <FolderTree size={13} />
+                  Category Slides ({offers.filter((o) => o.banner_type === "category_slide" || o.category_id).length})
+                </button>
+                <button
+                  onClick={() => setOfferPlacementFilter("popup")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                    offerPlacementFilter === "popup"
+                      ? "bg-rose-600 text-white shadow-xs"
+                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                  }`}
+                >
+                  <Smartphone size={13} />
+                  Popup Banners ({offers.filter((o) => o.is_popup || o.banner_type === "popup").length})
+                </button>
+              </div>
+
+              {/* Category Filter Selector */}
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-slate-500">Category Filter:</span>
+                <select
+                  value={selectedCategoryFilter}
+                  onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+                  className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="all">All Categories</option>
+                  {categories.map((c) => (
+                    <option key={c.category_id} value={c.category_id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Live Visual Previews Carousel Grid */}
+            <div>
+              <div className="text-xs font-bold text-slate-800 mb-3 flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Sparkles size={14} className="text-indigo-600" />
+                  Live App Banners &amp; Category Slides Previews:
+                </span>
+                <span className="text-[11px] text-slate-400 font-normal">
+                  Tap "View Popup Mockup" on any card to see how it renders as an app launch dialog.
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {filteredOffers.filter((o) => o.is_active).map((offer) => {
+                  const isPopup = Boolean(offer.is_popup || offer.banner_type === "popup");
+                  const isCatSlide = offer.banner_type === "category_slide" || Boolean(offer.category_id);
+
+                  return (
+                    <div
+                      key={offer.id}
+                      style={{ backgroundColor: offer.background_color || "#16a34a" }}
+                      className="p-4 rounded-3xl text-white relative overflow-hidden shadow-sm flex flex-col justify-between h-44 border border-black/5 group"
+                    >
+                      <div className="space-y-1 relative z-10">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {offer.discount_text && (
+                            <span className="px-2 py-0.5 rounded-md bg-white/20 text-[10px] font-extrabold uppercase tracking-wider">
+                              {offer.discount_text}
+                            </span>
+                          )}
+                          {isPopup && (
+                            <span className="px-2 py-0.5 rounded-md bg-rose-500 text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1 shadow-xs">
+                              <Smartphone size={10} /> App Popup
+                            </span>
+                          )}
+                          {isCatSlide && (
+                            <span className="px-2 py-0.5 rounded-md bg-purple-500/80 text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1">
+                              <FolderTree size={10} /> {getCategoryName(offer.category_id)}
+                            </span>
+                          )}
+                        </div>
+
+                        <h4 className="font-extrabold text-sm leading-tight drop-shadow-xs mt-1">{offer.title}</h4>
+                        {offer.description && (
+                          <p className="text-[11px] text-white/90 line-clamp-2">{offer.description}</p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between mt-2 relative z-10">
+                        <button
+                          onClick={() => {
+                            setPreviewOffer(offer);
+                            setPopupPreviewModalOpen(true);
+                          }}
+                          className="text-[10px] font-bold bg-white text-slate-900 px-2.5 py-1 rounded-lg hover:bg-slate-100 transition shadow-xs flex items-center gap-1"
+                        >
+                          <Eye size={12} />
+                          Popup Mockup
+                        </button>
+                        <span className="text-[10px] text-white/80 font-mono">Order #{offer.display_order}</span>
+                      </div>
+
+                      {/* Image Preview Thumbnail */}
+                      {offer.image_url && (
+                        <img
+                          src={offer.image_url}
+                          alt={offer.title}
+                          className="w-18 h-18 object-contain absolute right-2 bottom-2 drop-shadow-md z-0 opacity-90 group-hover:scale-105 transition"
+                          onError={(e) => {
+                            (e.target as any).style.display = "none";
+                          }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Offers Datatable */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50/80 border-b border-slate-100 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
+                  <tr>
+                    <th className="p-4">Banner &amp; Title</th>
+                    <th className="p-4">Placement / Scope</th>
+                    <th className="p-4">Discount Tag</th>
+                    <th className="p-4">Target / Action</th>
+                    <th className="p-4">Launch Popup?</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredOffers.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-12 text-center text-slate-400">
+                        No offer banners matching your filters. Click "+ New Offer Banner" to create one.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredOffers.map((o) => {
+                      const isPopup = Boolean(o.is_popup || o.banner_type === "popup");
+
+                      return (
+                        <tr key={o.id} className="hover:bg-slate-50/60 transition">
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <div
+                                style={{ backgroundColor: o.background_color || "#16a34a" }}
+                                className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 overflow-hidden shadow-xs"
+                              >
+                                {o.image_url ? (
+                                  <img src={o.image_url} alt="" className="w-10 h-10 object-contain" />
+                                ) : (
+                                  <ImageIcon size={18} />
+                                )}
+                              </div>
+                              <div>
+                                <div className="font-bold text-slate-900 text-sm">{o.title}</div>
+                                {o.description && (
+                                  <div className="text-[11px] text-slate-400 line-clamp-1">{o.description}</div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4 space-y-1">
+                            {o.banner_type === "category_slide" || o.category_id ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 font-bold text-xs">
+                                <FolderTree size={12} />
+                                {getCategoryName(o.category_id)}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs">
+                                <Tag size={12} />
+                                Home Carousel
+                              </span>
+                            )}
+                            <div className="text-[10px] text-slate-400 font-mono">Order #{o.display_order || 1}</div>
+                          </td>
+                          <td className="p-4">
+                            <span className="inline-block px-2.5 py-1 rounded-lg bg-emerald-50 text-[#16a34a] font-extrabold text-xs">
+                              {o.discount_text || "OFFER"}
+                            </span>
+                          </td>
+                          <td className="p-4 font-semibold text-slate-800">
+                            <div className="font-bold">{o.action_type || "BROWSE"}</div>
+                            {o.action_value && (
+                              <div className="text-[10px] text-slate-400 font-mono">{o.action_value}</div>
+                            )}
+                          </td>
+                          <td className="p-4">
+                            <button
+                              onClick={() => togglePopupStatus(o.id, isPopup)}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold transition ${
+                                isPopup
+                                  ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                  : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                              }`}
+                            >
+                              <Smartphone size={12} />
+                              {isPopup ? "Active Popup" : "Enable Popup"}
+                            </button>
+                          </td>
+                          <td className="p-4">
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                                o.is_active
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : "bg-slate-100 text-slate-700"
+                              }`}
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                              {o.is_active ? "ACTIVE" : "INACTIVE"}
+                            </span>
+                          </td>
+                          <td className="p-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => {
+                                  setPreviewOffer(o);
+                                  setPopupPreviewModalOpen(true);
+                                }}
+                                title="View Popup Dialog Mockup"
+                                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition"
+                              >
+                                <Eye size={14} />
+                              </button>
+                              <button
+                                onClick={() => toggleOfferStatus(o.id, o.is_active)}
+                                className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold hover:bg-slate-100 transition"
+                              >
+                                {o.is_active ? "Deactivate" : "Activate"}
+                              </button>
+                              <button
+                                onClick={() => deleteOffer(o.id, o.title)}
+                                title="Delete Offer Banner"
+                                className="p-1.5 rounded-lg border border-red-100 text-red-600 hover:bg-red-50 transition"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ========================================================================= */}
+      {/* MODAL 1: CREATE PROMOTION */}
+      {/* ========================================================================= */}
+      {isCreatePromoOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-6 shadow-2xl border border-slate-100 my-8">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#16a34a] flex items-center justify-center font-bold">
+                  <Percent size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Create New Promotion</h3>
+                  <p className="text-xs text-slate-500">Configure discount rules, targeting, and eligibility</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCreatePromoOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreatePromo} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2 space-y-1.5">
+                  <label className="font-bold text-slate-700">Promotion Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={promoForm.name}
+                    onChange={(e) => setPromoForm({ ...promoForm, name: e.target.value })}
+                    placeholder="e.g. First Milk Order 50% Off"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div className="sm:col-span-2 space-y-1.5">
+                  <label className="font-bold text-slate-700">Description</label>
+                  <textarea
+                    rows={2}
+                    value={promoForm.description}
+                    onChange={(e) => setPromoForm({ ...promoForm, description: e.target.value })}
+                    placeholder="Brief description for customer facing banner or app copy"
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">Discount Type *</label>
+                  <select
+                    value={promoForm.promotion_type}
+                    onChange={(e) => setPromoForm({ ...promoForm, promotion_type: e.target.value as any })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="percentage">Percentage (%)</option>
+                    <option value="fixed_amount">Fixed Amount (₹)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">
+                    Discount Value * ({promoForm.promotion_type === "percentage" ? "%" : "₹"})
+                  </label>
+                  <input
+                    type="number"
+                    min="0.1"
+                    step="0.01"
+                    required
+                    value={promoForm.discount_value}
+                    onChange={(e) => setPromoForm({ ...promoForm, discount_value: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                {promoForm.promotion_type === "percentage" && (
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Max Cap Discount Amount (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={promoForm.max_discount_amount}
+                      onChange={(e) => setPromoForm({ ...promoForm, max_discount_amount: parseFloat(e.target.value) || 0 })}
+                      placeholder="e.g. 100"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">Minimum Order Amount (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={promoForm.minimum_order_amount}
+                    onChange={(e) => setPromoForm({ ...promoForm, minimum_order_amount: parseFloat(e.target.value) || 0 })}
+                    placeholder="0"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">Usage Limit Per Customer</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={promoForm.usage_limit_per_customer}
+                    onChange={(e) => setPromoForm({ ...promoForm, usage_limit_per_customer: parseInt(e.target.value) || 1 })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">Global Total Usage Limit</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={promoForm.usage_limit}
+                    onChange={(e) => setPromoForm({ ...promoForm, usage_limit: parseInt(e.target.value) || 0 })}
+                    placeholder="e.g. 1000"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* Checkbox Options */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/60 space-y-3">
+                <div className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">
+                  Promotion Rules &amp; Flags
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="flex items-center gap-2.5 cursor-pointer font-semibold text-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={promoForm.auto_apply}
+                      onChange={(e) => setPromoForm({ ...promoForm, auto_apply: e.target.checked })}
+                      className="w-4 h-4 rounded text-[#16a34a] focus:ring-emerald-500"
+                    />
+                    <span>Auto Apply at Checkout</span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 cursor-pointer font-semibold text-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={promoForm.first_order_only}
+                      onChange={(e) => setPromoForm({ ...promoForm, first_order_only: e.target.checked })}
+                      className="w-4 h-4 rounded text-[#16a34a] focus:ring-emerald-500"
+                    />
+                    <span>First Order Only (First Milk)</span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 cursor-pointer font-semibold text-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={promoForm.apply_to_all_products}
+                      onChange={(e) => setPromoForm({ ...promoForm, apply_to_all_products: e.target.checked })}
+                      className="w-4 h-4 rounded text-[#16a34a] focus:ring-emerald-500"
+                    />
+                    <span>Apply to All Products</span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 cursor-pointer font-semibold text-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={promoForm.stackable}
+                      onChange={(e) => setPromoForm({ ...promoForm, stackable: e.target.checked })}
+                      className="w-4 h-4 rounded text-[#16a34a] focus:ring-emerald-500"
+                    />
+                    <span>Stackable with Coupons</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsCreatePromoOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-[#16a34a] hover:bg-[#15803d] text-white font-bold rounded-xl shadow-md shadow-emerald-600/20 transition flex items-center gap-2"
+                >
+                  <Plus size={16} />
+                  Create Promotion
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 2: CREATE COUPON CODE */}
+      {/* ========================================================================= */}
+      {isCreateCouponOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-6 shadow-2xl border border-slate-100 my-8">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold">
+                  <Ticket size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Create New Coupon Code</h3>
+                  <p className="text-xs text-slate-500">Customer entered discount promo code</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCreateCouponOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCoupon} className="space-y-4 text-xs">
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700">Coupon Code *</label>
+                <input
+                  type="text"
+                  required
+                  value={couponForm.code}
+                  onChange={(e) => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })}
+                  placeholder="e.g. WELCOME50, FRESH20"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-black tracking-wider focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700">Linked Promotion (Discount Source) *</label>
+                <select
+                  required
+                  value={couponForm.promotion_id}
+                  onChange={(e) => setCouponForm({ ...couponForm, promotion_id: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500"
+                >
+                  {promotions.map((p) => (
+                    <option key={p.promotion_id} value={p.promotion_id}>
+                      {p.name} ({p.promotion_type === "percentage" ? `${p.discount_value}% OFF` : `₹${p.discount_value} OFF`})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-400">
+                  The coupon inherits discount calculations and order value rules from the parent promotion.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700">Coupon Name / Label</label>
+                <input
+                  type="text"
+                  value={couponForm.name}
+                  onChange={(e) => setCouponForm({ ...couponForm, name: e.target.value })}
+                  placeholder="e.g. Welcome ₹50 Off"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">Usage Limit Per User</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={couponForm.usage_limit_per_customer}
+                    onChange={(e) => setCouponForm({ ...couponForm, usage_limit_per_customer: parseInt(e.target.value) || 1 })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">Total Global Limit</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={couponForm.usage_limit}
+                    onChange={(e) => setCouponForm({ ...couponForm, usage_limit: parseInt(e.target.value) || 0 })}
+                    placeholder="e.g. 1000"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateCouponOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-md shadow-teal-600/20 transition flex items-center gap-2"
+                >
+                  <Ticket size={16} />
+                  Create Coupon
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 3: CREATE OFFER BANNER (WITH CATEGORY & POPUP SUPPORT) */}
+      {/* ========================================================================= */}
+      {isCreateOfferOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-6 shadow-2xl border border-slate-100 my-8">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                  <Tag size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Create New Offer / Slide / Popup Banner</h3>
+                  <p className="text-xs text-slate-500">Configure top carousel, category slides, or launch popups</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCreateOfferOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateOffer} className="space-y-4 text-xs">
+              {/* Placement Selector */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700">Banner Placement &amp; Type *</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setOfferForm({ ...offerForm, banner_type: "home_carousel", is_popup: false })}
+                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center gap-1 ${
+                      offerForm.banner_type === "home_carousel" && !offerForm.is_popup
+                        ? "border-indigo-600 bg-indigo-50 text-indigo-900 font-extrabold"
+                        : "border-slate-200 bg-slate-50 text-slate-600"
+                    }`}
+                  >
+                    <Tag size={16} />
+                    <span>Home Carousel</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setOfferForm({ ...offerForm, banner_type: "category_slide", is_popup: false })}
+                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center gap-1 ${
+                      offerForm.banner_type === "category_slide"
+                        ? "border-purple-600 bg-purple-50 text-purple-900 font-extrabold"
+                        : "border-slate-200 bg-slate-50 text-slate-600"
+                    }`}
+                  >
+                    <FolderTree size={16} />
+                    <span>Category Slide</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setOfferForm({ ...offerForm, banner_type: "popup", is_popup: true })}
+                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center gap-1 ${
+                      offerForm.is_popup || offerForm.banner_type === "popup"
+                        ? "border-rose-600 bg-rose-50 text-rose-900 font-extrabold"
+                        : "border-slate-200 bg-slate-50 text-slate-600"
+                    }`}
+                  >
+                    <Smartphone size={16} />
+                    <span>Launch Popup</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Target Category Selector if Category Slide */}
+              {offerForm.banner_type === "category_slide" && (
+                <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-2xl space-y-1.5">
+                  <label className="font-bold text-purple-900 flex items-center gap-1.5">
+                    <FolderTree size={14} />
+                    Target Category for Slide *
+                  </label>
+                  <select
+                    required
+                    value={offerForm.category_id}
+                    onChange={(e) => setOfferForm({ ...offerForm, category_id: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-purple-200 rounded-xl text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    {categories.map((c) => (
+                      <option key={c.category_id} value={c.category_id}>
+                        {c.name} ({c.category_id})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-purple-700">
+                    This slide will be displayed to customers when viewing this specific product category.
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700">Offer Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={offerForm.title}
+                  onChange={(e) => setOfferForm({ ...offerForm, title: e.target.value })}
+                  placeholder="e.g. First Milk Order 50% Off"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">Discount Tag</label>
+                  <input
+                    type="text"
+                    value={offerForm.discount_text}
+                    onChange={(e) => setOfferForm({ ...offerForm, discount_text: e.target.value })}
+                    placeholder="e.g. FLAT 50% OFF"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">CTA Button Label</label>
+                  <input
+                    type="text"
+                    value={offerForm.cta_label}
+                    onChange={(e) => setOfferForm({ ...offerForm, cta_label: e.target.value })}
+                    placeholder="e.g. USE CODE: WELCOME50"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700">Description / Subtitle</label>
+                <textarea
+                  rows={2}
+                  value={offerForm.description}
+                  onChange={(e) => setOfferForm({ ...offerForm, description: e.target.value })}
+                  placeholder="Delivered fresh from farm to home every morning."
+                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700">Banner Image URL *</label>
+                <input
+                  type="text"
+                  required
+                  value={offerForm.image_url}
+                  onChange={(e) => setOfferForm({ ...offerForm, image_url: e.target.value })}
+                  placeholder="https://f2hfresh.com/uploads/app_assets/images/milk_bottle.png"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">Theme Color</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={offerForm.background_color}
+                      onChange={(e) => setOfferForm({ ...offerForm, background_color: e.target.value })}
+                      className="w-10 h-10 rounded-xl border border-slate-200 cursor-pointer p-1 bg-slate-50"
+                    />
+                    <input
+                      type="text"
+                      value={offerForm.background_color}
+                      onChange={(e) => setOfferForm({ ...offerForm, background_color: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">Display Order</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={offerForm.display_order}
+                    onChange={(e) => setOfferForm({ ...offerForm, display_order: parseInt(e.target.value) || 1 })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+
+              {/* Banner Live Preview in Modal */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/60 space-y-1.5">
+                <div className="text-[10px] font-bold text-slate-500 uppercase">Banner Card Preview:</div>
+                <div
+                  style={{ backgroundColor: offerForm.background_color }}
+                  className="p-4 rounded-2xl text-white relative overflow-hidden flex flex-col justify-between h-28"
+                >
+                  <div className="space-y-0.5 relative z-10">
+                    <span className="inline-block px-2 py-0.5 rounded bg-white/20 text-[9px] font-extrabold">
+                      {offerForm.discount_text || "OFFER"}
+                    </span>
+                    <h5 className="font-bold text-xs">{offerForm.title || "Offer Title"}</h5>
+                    <p className="text-[10px] text-white/80 line-clamp-1">{offerForm.description || "Description..."}</p>
+                  </div>
+                  <div className="relative z-10">
+                    <span className="text-[9px] font-bold bg-white text-slate-900 px-2 py-0.5 rounded">
+                      {offerForm.cta_label || "Shop Now"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateOfferOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md shadow-indigo-600/20 transition flex items-center gap-2"
+                >
+                  <Plus size={16} />
+                  Create Offer Banner
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 4: POPUP BANNER PREVIEW MOCKUP */}
+      {/* ========================================================================= */}
+      {popupPreviewModalOpen && previewOffer && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="relative bg-white rounded-3xl max-w-sm w-full overflow-hidden shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200">
+            {/* Top Close Button */}
+            <button
+              onClick={() => setPopupPreviewModalOpen(false)}
+              className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-white text-slate-800 shadow-md flex items-center justify-center hover:bg-slate-100 transition"
+            >
+              <X size={16} />
+            </button>
+
+            {/* Banner Top Image */}
+            <div
+              style={{ backgroundColor: previewOffer.background_color || "#16a34a" }}
+              className="h-48 w-full flex items-center justify-center relative p-4"
+            >
+              {previewOffer.image_url ? (
+                <img
+                  src={previewOffer.image_url}
+                  alt=""
+                  className="max-h-36 max-w-full object-contain drop-shadow-md"
+                />
+              ) : (
+                <ImageIcon size={48} className="text-white/60" />
+              )}
+            </div>
+
+            {/* Details & CTA */}
+            <div className="p-6 text-center space-y-3">
+              {previewOffer.discount_text && (
+                <span className="inline-block px-3 py-1 rounded-lg bg-amber-100 text-amber-900 font-extrabold text-xs tracking-wide">
+                  {previewOffer.discount_text.toUpperCase()}
+                </span>
+              )}
+
+              <h3 className="text-lg font-black text-slate-900">{previewOffer.title}</h3>
+
+              {previewOffer.description && (
+                <p className="text-xs text-slate-500 leading-relaxed">{previewOffer.description}</p>
+              )}
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPopupPreviewModalOpen(false)}
+                  className="w-full py-3 bg-[#16a34a] hover:bg-[#15803d] text-white font-bold text-sm rounded-2xl shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-2"
+                >
+                  <span>{previewOffer.cta_label || "Shop Now"}</span>
+                  <ArrowRight size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 5: MANAGE TARGETED PRODUCTS */}
+      {/* ========================================================================= */}
+      {isManageProductsOpen && selectedPromoForProducts && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-6 shadow-2xl border border-slate-100 my-8">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                  <Boxes size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Targeted Products</h3>
+                  <p className="text-xs text-slate-500">
+                    {selectedPromoForProducts.name} ({selectedPromoForProducts.promotion_id})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsManageProductsOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Currently Linked Variants */}
+            <div className="space-y-2">
+              <div className="text-xs font-bold text-slate-700">Currently Linked Variants:</div>
+              {selectedPromoForProducts.targeted_products && selectedPromoForProducts.targeted_products.length > 0 ? (
+                <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-2xl p-2 bg-slate-50">
+                  {selectedPromoForProducts.targeted_products.map((tp) => (
+                    <div key={tp.variant_id} className="flex items-center justify-between p-2 hover:bg-white rounded-xl transition text-xs">
+                      <div>
+                        <div className="font-bold text-slate-900">{tp.product_name} - {tp.variant_name}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{tp.variant_id} · ₹{tp.price}</div>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveProductFromPromo(tp.variant_id)}
+                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
+                        title="Remove Variant"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
+                  No specific variants linked yet.
+                </div>
+              )}
+            </div>
+
+            {/* Link New Variants */}
+            <div className="space-y-3 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-bold text-slate-700">Add Product Variants to Promotion:</div>
+                <div className="text-xs text-slate-500">{selectedVariantIds.length} Selected</div>
+              </div>
+
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  placeholder="Search catalog products..."
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-2xl p-2 bg-white">
+                {catalogProducts
+                  .filter((cp) =>
+                    cp.product_name?.toLowerCase().includes(productSearch.toLowerCase()) ||
+                    cp.variant_name?.toLowerCase().includes(productSearch.toLowerCase()) ||
+                    cp.variant_id?.toLowerCase().includes(productSearch.toLowerCase())
+                  )
+                  .map((cp) => {
+                    const isSelected = selectedVariantIds.includes(cp.variant_id);
+                    const isAlreadyLinked = selectedPromoForProducts.targeted_products?.some(
+                      (tp) => tp.variant_id === cp.variant_id
+                    );
+
+                    return (
+                      <div
+                        key={cp.variant_id}
+                        onClick={() => {
+                          if (isAlreadyLinked) return;
+                          if (isSelected) {
+                            setSelectedVariantIds(selectedVariantIds.filter((id) => id !== cp.variant_id));
+                          } else {
+                            setSelectedVariantIds([...selectedVariantIds, cp.variant_id]);
+                          }
+                        }}
+                        className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition text-xs ${
+                          isAlreadyLinked
+                            ? "opacity-40 cursor-not-allowed bg-slate-50"
+                            : isSelected
+                            ? "bg-purple-50 border border-purple-200 text-purple-900"
+                            : "hover:bg-slate-50 text-slate-700"
+                        }`}
+                      >
+                        <div>
+                          <div className="font-bold">{cp.product_name} - {cp.variant_name}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">{cp.variant_id} · ₹{cp.price}</div>
+                        </div>
+                        {isAlreadyLinked ? (
+                          <span className="text-[10px] font-bold text-slate-400">Already Added</span>
+                        ) : isSelected ? (
+                          <CheckCircle2 size={16} className="text-purple-600" />
+                        ) : (
+                          <Plus size={16} className="text-slate-400" />
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsManageProductsOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition text-xs"
+                >
+                  Done
+                </button>
+                <button
+                  type="button"
+                  disabled={selectedVariantIds.length === 0}
+                  onClick={handleAddProductsToPromo}
+                  className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 text-white font-bold rounded-xl shadow-md shadow-purple-600/20 transition flex items-center gap-2 text-xs"
+                >
+                  <Plus size={16} />
+                  Link {selectedVariantIds.length} Variants
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 6: VIEW REDEMPTIONS */}
+      {/* ========================================================================= */}
+      {isRedemptionsOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-6 shadow-2xl border border-slate-100 my-8">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                  <Users size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Claimed Redemptions</h3>
+                  <p className="text-xs text-slate-500">{redemptionsTitle}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsRedemptionsOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {loadingRedemptions ? (
+              <div className="p-12 text-center text-xs text-slate-400">Loading redemptions...</div>
+            ) : redemptionsData.length === 0 ? (
+              <div className="p-12 text-center text-xs text-slate-400">No redemptions claimed yet.</div>
+            ) : (
+              <div className="overflow-x-auto max-h-72 divide-y divide-slate-100 border border-slate-200 rounded-2xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold">
+                    <tr>
+                      <th className="p-3">Customer</th>
+                      <th className="p-3">Order ID</th>
+                      <th className="p-3">Discount</th>
+                      <th className="p-3 text-right">Redeemed At</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {redemptionsData.map((r, i) => (
+                      <tr key={i} className="hover:bg-slate-50/60">
+                        <td className="p-3 font-semibold text-slate-800">
+                          {r.first_name ? `${r.first_name} ${r.last_name || ""}` : r.customer_id}
+                          {r.phone && <div className="text-[10px] text-slate-400">{r.phone}</div>}
+                        </td>
+                        <td className="p-3 font-mono font-bold text-slate-900">{r.order_id}</td>
+                        <td className="p-3 font-bold text-[#16a34a]">₹{Number(r.discount_amount)}</td>
+                        <td className="p-3 text-right text-slate-400 text-[11px]">
+                          {r.redeemed_at ? new Date(r.redeemed_at).toLocaleString("en-IN") : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setIsRedemptionsOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

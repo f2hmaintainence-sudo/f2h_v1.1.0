@@ -13,6 +13,7 @@ import { DeviceFingerprintService } from './device-fingerprint.service';
 import { SecurityAlertsService } from './security-alerts.service';
 import { PasswordSecurityService } from './password-security.service';
 import { GoogleStrategy } from './social.strategies';
+import { GoogleOAuthService } from './google-oauth.service';
 import { MailService } from 'src/mail/mail.service';
 import { FieldEncryptionModule } from 'src/encryption/field-encryption.module';
 import { AuthService } from './auth.service';
@@ -60,6 +61,7 @@ import { JwtStrategy } from './jwt.strategy';
     SecurityAlertsService,
     PasswordSecurityService,
     GoogleStrategy,
+    GoogleOAuthService,
     MailService,
   ],
   exports: [

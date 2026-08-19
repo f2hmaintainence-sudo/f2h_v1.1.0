@@ -207,13 +207,16 @@ class _BrandLockup extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 18),
-      Text(
-        'F2H DELIVERY',
-        style: GoogleFonts.poppins(
-          fontSize: 15,
-          fontWeight: FontWeight.w700,
-          color: kPrimaryMid,
-          letterSpacing: 5,
+      FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          'F2H DELIVERY',
+          style: GoogleFonts.poppins(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: kPrimaryMid,
+            letterSpacing: 5,
+          ),
         ),
       ),
     ],
@@ -228,10 +231,8 @@ class DeliveryAuthBackdrop extends StatelessWidget {
   const DeliveryAuthBackdrop({super.key});
 
   @override
-  Widget build(BuildContext context) => CustomPaint(
-    painter: _BackdropPainter(),
-    size: Size.infinite,
-  );
+  Widget build(BuildContext context) =>
+      CustomPaint(painter: _BackdropPainter(), size: Size.infinite);
 }
 
 class _BackdropPainter extends CustomPainter {
@@ -239,11 +240,7 @@ class _BackdropPainter extends CustomPainter {
     final paint = Paint()..color = kPrimaryMid.withValues(alpha: 0.13);
     for (var c = 0; c < cols; c++) {
       for (var r = 0; r < rows; r++) {
-        canvas.drawCircle(
-          origin + Offset(c * 13.0, r * 13.0),
-          1.6,
-          paint,
-        );
+        canvas.drawCircle(origin + Offset(c * 13.0, r * 13.0), 1.6, paint);
       }
     }
   }
@@ -309,12 +306,7 @@ class _BackdropPainter extends CustomPainter {
     }
 
     _dotGrid(canvas, const Offset(18, 22), 7, 5);
-    _dotGrid(
-      canvas,
-      Offset(size.width - 105, size.height - 118),
-      7,
-      6,
-    );
+    _dotGrid(canvas, Offset(size.width - 105, size.height - 118), 7, 6);
   }
 
   @override
@@ -399,6 +391,7 @@ class _DeliveryAuthFieldState extends State<DeliveryAuthField> {
                   decoration: InputDecoration(
                     counterText: '',
                     isDense: true,
+                    filled: false,
                     hintText: widget.hint,
                     hintStyle: GoogleFonts.poppins(
                       fontSize: 15.5,
@@ -507,21 +500,27 @@ class _DeliveryPrimaryButtonState extends State<DeliveryPrimaryButton> {
                       strokeWidth: 2.4,
                     ),
                   )
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        widget.label,
-                        style: GoogleFonts.poppins(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                          letterSpacing: 0.2,
-                        ),
+                : Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            widget.label,
+                            style: GoogleFonts.poppins(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Icon(widget.icon, color: Colors.white, size: 20),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Icon(widget.icon, color: Colors.white, size: 20),
-                    ],
+                    ),
                   ),
           ),
         ),
@@ -597,29 +596,35 @@ class DeliveryGoogleButton extends StatelessWidget {
                   strokeWidth: 2.2,
                 ),
               )
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SvgPicture.asset(
-                    'assets/icons/google.svg',
-                    width: 23,
-                    height: 23,
-                    placeholderBuilder: (_) => const Icon(
-                      Icons.g_mobiledata_rounded,
-                      size: 28,
-                      color: kTextSub,
-                    ),
+            : Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SvgPicture.asset(
+                        'assets/icons/google.svg',
+                        width: 23,
+                        height: 23,
+                        placeholderBuilder: (_) => const Icon(
+                          Icons.g_mobiledata_rounded,
+                          size: 28,
+                          color: kTextSub,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Text(
+                        label,
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF3C4A42),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 14),
-                  Text(
-                    label,
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: const Color(0xFF3C4A42),
-                    ),
-                  ),
-                ],
+                ),
               ),
       ),
     ),

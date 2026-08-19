@@ -65,10 +65,7 @@ class AuthScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    final isKeyboardOpen = media.viewInsets.bottom > 0;
-    final heroHeight = isKeyboardOpen
-        ? 116.0
-        : math.min(media.size.height * 0.38, 320.0);
+    final heroHeight = math.min(media.size.height * 0.38, 320.0);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -82,65 +79,48 @@ class AuthScaffold extends StatelessWidget {
         body: Stack(
           children: [
             const Positioned.fill(child: _LeafyHeroBackground()),
+
+            // Hero and sheet scroll together, so nothing ever slides under
+            // the curve and gets clipped.
             SafeArea(
               bottom: false,
-              child: Column(
-                children: [
-                  SizedBox(
-                    height: heroHeight,
-                    child: _HeroContent(
-                      compact: isKeyboardOpen,
-                      action: heroAction,
-                      showBack: showBack,
+              child: SingleChildScrollView(
+                padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+                child: Column(
+                  children: [
+                    SizedBox(height: heroHeight, child: const _HeroBrand()),
+                    _FormSheet(
+                      title: title,
+                      subtitle: subtitle,
+                      minHeight: media.size.height - heroHeight,
+                      children: children,
                     ),
-                  ),
-                  Expanded(
-                    child: ClipPath(
-                      clipper: _AuthSheetClipper(),
-                      child: Container(
-                        width: double.infinity,
-                        color: Colors.white,
-                        child: SingleChildScrollView(
-                          padding: EdgeInsets.fromLTRB(
-                            24,
-                            56,
-                            24,
-                            24 + media.viewInsets.bottom,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text(
-                                title,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 21,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF17211B),
-                                  letterSpacing: -0.3,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                subtitle,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w500,
-                                  color: kAuthSubtitle,
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              const Center(child: _AccentRule()),
-                              const SizedBox(height: 22),
-                              ...children,
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
+              ),
+            ),
+
+            // Back and Skip stay pinned while the page scrolls beneath them.
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 16, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    if (showBack)
+                      _HeroCircleButton(
+                        icon: Icons.arrow_back_rounded,
+                        onTap: () => Navigator.maybePop(context),
+                      )
+                    else
+                      const SizedBox.shrink(),
+                    if (heroAction != null)
+                      heroAction!
+                    else
+                      const SizedBox.shrink(),
+                  ],
+                ),
               ),
             ),
           ],
@@ -148,6 +128,62 @@ class AuthScaffold extends StatelessWidget {
       ),
     );
   }
+}
+
+/// White sheet with the curved top edge, carrying the form.
+class _FormSheet extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final double minHeight;
+  final List<Widget> children;
+
+  const _FormSheet({
+    required this.title,
+    required this.subtitle,
+    required this.minHeight,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) => ClipPath(
+    clipper: _AuthSheetClipper(),
+    child: Container(
+      width: double.infinity,
+      color: Colors.white,
+      constraints: BoxConstraints(minHeight: math.max(minHeight, 0)),
+      // Top padding clears the curve so no field is ever cut by it.
+      padding: const EdgeInsets.fromLTRB(24, 78, 24, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 21,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF17211B),
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w500,
+              color: kAuthSubtitle,
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Center(child: _AccentRule()),
+          const SizedBox(height: 22),
+          ...children,
+        ],
+      ),
+    ),
+  );
 }
 
 /// Short green underline that sits under the sheet's subtitle.
@@ -165,77 +201,48 @@ class _AccentRule extends StatelessWidget {
   );
 }
 
-/// Logo, wordmark and optional hero action.
-class _HeroContent extends StatelessWidget {
-  final bool compact;
-  final Widget? action;
-  final bool showBack;
-
-  const _HeroContent({
-    required this.compact,
-    required this.action,
-    required this.showBack,
-  });
+/// Logo and wordmark. Scrolls with the sheet.
+class _HeroBrand extends StatelessWidget {
+  const _HeroBrand();
 
   @override
-  Widget build(BuildContext context) {
-    return Stack(
+  Widget build(BuildContext context) => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        if (showBack)
-          Positioned(
-            top: 8,
-            left: 12,
-            child: _HeroCircleButton(
-              icon: Icons.arrow_back_rounded,
-              onTap: () => Navigator.maybePop(context),
-            ),
+        Container(
+          width: 92,
+          height: 92,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: kPrimaryMid.withValues(alpha: 0.14),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
-        if (action != null)
-          Positioned(top: 8, right: 16, child: action!),
-        Positioned.fill(
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: compact ? 56 : 92,
-                  height: compact ? 56 : 92,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: kPrimaryMid.withValues(alpha: 0.14),
-                        blurRadius: 24,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  padding: EdgeInsets.all(compact ? 8 : 14),
-                  child: const _BrandMark(),
-                ),
-                if (!compact) ...[
-                  const SizedBox(height: 14),
-                  const Text(
-                    'F2H',
-                    style: TextStyle(
-                      fontSize: 42,
-                      height: 1.0,
-                      fontWeight: FontWeight.w900,
-                      color: kAuthBrandInk,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const _WordmarkRule(),
-                ],
-              ],
-            ),
+          padding: const EdgeInsets.all(14),
+          child: const _BrandMark(),
+        ),
+        const SizedBox(height: 14),
+        const Text(
+          'F2H',
+          style: TextStyle(
+            fontSize: 42,
+            height: 1.0,
+            fontWeight: FontWeight.w900,
+            color: kAuthBrandInk,
+            letterSpacing: 1.0,
           ),
         ),
+        const SizedBox(height: 8),
+        const _WordmarkRule(),
       ],
-    );
-  }
+    ),
+  );
 }
 
 /// "— FARM TO HOME —" rule under the F2H wordmark.
@@ -243,23 +250,34 @@ class _WordmarkRule extends StatelessWidget {
   const _WordmarkRule();
 
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Container(width: 22, height: 1.4, color: kPrimaryMid.withValues(alpha: 0.5)),
-      const SizedBox(width: 10),
-      const Text(
-        'FARM TO HOME',
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: kPrimaryMid,
-          letterSpacing: 4.0,
+  Widget build(BuildContext context) => FittedBox(
+    fit: BoxFit.scaleDown,
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 22,
+          height: 1.4,
+          color: kPrimaryMid.withValues(alpha: 0.5),
         ),
-      ),
-      const SizedBox(width: 10),
-      Container(width: 22, height: 1.4, color: kPrimaryMid.withValues(alpha: 0.5)),
-    ],
+        const SizedBox(width: 10),
+        const Text(
+          'FARM TO HOME',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: kPrimaryMid,
+            letterSpacing: 4.0,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Container(
+          width: 22,
+          height: 1.4,
+          color: kPrimaryMid.withValues(alpha: 0.5),
+        ),
+      ],
+    ),
   );
 }
 
@@ -330,20 +348,23 @@ class AuthSkipButton extends StatelessWidget {
           ),
         ],
       ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Skip',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: kAuthBrandInk,
+      child: const FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Skip',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: kAuthBrandInk,
+              ),
             ),
-          ),
-          SizedBox(width: 8),
-          Icon(Icons.arrow_forward_rounded, size: 16, color: kAuthBrandInk),
-        ],
+            SizedBox(width: 8),
+            Icon(Icons.arrow_forward_rounded, size: 16, color: kAuthBrandInk),
+          ],
+        ),
       ),
     ),
   );
@@ -374,7 +395,11 @@ class _LeafyHeroBackground extends StatelessWidget {
       Positioned.fill(child: CustomPaint(painter: _HeroBlobPainter())),
       const Positioned(top: 96, left: 26, child: _Leaf(size: 30, turns: -0.12)),
       const Positioned(top: 62, right: 34, child: _Leaf(size: 26, turns: 0.18)),
-      const Positioned(top: 150, right: 18, child: _Leaf(size: 38, turns: 0.42)),
+      const Positioned(
+        top: 150,
+        right: 18,
+        child: _Leaf(size: 38, turns: 0.42),
+      ),
     ],
   );
 }
@@ -393,12 +418,21 @@ class _HeroBlobPainter extends CustomPainter {
       );
     }
 
-    blob(Offset(size.width * 0.16, size.height * 0.10), 130,
-        Colors.white.withValues(alpha: 0.9));
-    blob(Offset(size.width * 0.88, size.height * 0.06), 110,
-        Colors.white.withValues(alpha: 0.75));
-    blob(Offset(size.width * 0.72, size.height * 0.22), 140,
-        kPrimaryLt.withValues(alpha: 0.16));
+    blob(
+      Offset(size.width * 0.16, size.height * 0.10),
+      130,
+      Colors.white.withValues(alpha: 0.9),
+    );
+    blob(
+      Offset(size.width * 0.88, size.height * 0.06),
+      110,
+      Colors.white.withValues(alpha: 0.75),
+    );
+    blob(
+      Offset(size.width * 0.72, size.height * 0.22),
+      140,
+      kPrimaryLt.withValues(alpha: 0.16),
+    );
   }
 
   @override
@@ -452,6 +486,7 @@ class AuthField extends StatefulWidget {
   final TextInputAction textInputAction;
   final List<TextInputFormatter>? inputFormatters;
   final ValueChanged<String>? onSubmitted;
+  final ValueChanged<String>? onChanged;
   final Widget? trailing;
   final bool enabled;
   final int? maxLength;
@@ -466,6 +501,7 @@ class AuthField extends StatefulWidget {
     this.textInputAction = TextInputAction.next,
     this.inputFormatters,
     this.onSubmitted,
+    this.onChanged,
     this.trailing,
     this.enabled = true,
     this.maxLength,
@@ -479,79 +515,78 @@ class _AuthFieldState extends State<AuthField> {
   bool _obscure = true;
   bool _focused = false;
 
+  /// One painter owns the whole box. The app theme sets `filled: true` with a
+  /// square fill and its own error borders, so every slot is overridden here —
+  /// otherwise the theme fill paints over the rounded corners and the focus
+  /// ring reads as a broken, doubled border.
+  OutlineInputBorder _border(Color color, double width) => OutlineInputBorder(
+    borderRadius: BorderRadius.circular(14),
+    borderSide: BorderSide(color: color, width: width),
+  );
+
   @override
   Widget build(BuildContext context) {
     return Focus(
+      canRequestFocus: false,
       onFocusChange: (f) => setState(() => _focused = f),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        decoration: BoxDecoration(
-          color: widget.enabled ? kAuthFieldBg : const Color(0xFFF3F5F4),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: _focused ? kPrimaryLt : kAuthFieldBorder,
-            width: _focused ? 1.6 : 1.2,
-          ),
-          boxShadow: _focused
-              ? [
-                  BoxShadow(
-                    color: kPrimary.withValues(alpha: 0.10),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
+      child: TextField(
+        controller: widget.controller,
+        enabled: widget.enabled,
+        keyboardType: widget.keyboardType,
+        obscureText: widget.isPassword && _obscure,
+        textInputAction: widget.textInputAction,
+        inputFormatters: widget.inputFormatters,
+        maxLength: widget.maxLength,
+        onSubmitted: widget.onSubmitted,
+        onChanged: widget.onChanged,
+        onTapOutside: (_) => FocusScope.of(context).unfocus(),
+        cursorColor: kPrimary,
+        style: const TextStyle(
+          fontSize: 14.5,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF17211B),
         ),
-        child: TextField(
-          controller: widget.controller,
-          enabled: widget.enabled,
-          keyboardType: widget.keyboardType,
-          obscureText: widget.isPassword && _obscure,
-          textInputAction: widget.textInputAction,
-          inputFormatters: widget.inputFormatters,
-          maxLength: widget.maxLength,
-          onSubmitted: widget.onSubmitted,
-          onTapOutside: (_) => FocusScope.of(context).unfocus(),
-          style: const TextStyle(
+        decoration: InputDecoration(
+          counterText: '',
+          isDense: false,
+          filled: true,
+          fillColor: widget.enabled ? kAuthFieldBg : const Color(0xFFF3F5F4),
+          prefixIcon: Icon(
+            widget.icon,
+            size: 21,
+            color: _focused ? kPrimary : kPrimaryMid.withValues(alpha: 0.75),
+          ),
+          prefixIconConstraints: const BoxConstraints(minWidth: 46),
+          hintText: widget.hint,
+          hintStyle: const TextStyle(
+            color: kAuthHint,
             fontSize: 14.5,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF17211B),
+            fontWeight: FontWeight.w500,
           ),
-          decoration: InputDecoration(
-            counterText: '',
-            prefixIcon: Icon(
-              widget.icon,
-              size: 21,
-              color: _focused ? kPrimary : kPrimaryMid.withValues(alpha: 0.75),
-            ),
-            hintText: widget.hint,
-            hintStyle: const TextStyle(
-              color: kAuthHint,
-              fontSize: 14.5,
-              fontWeight: FontWeight.w500,
-            ),
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            disabledBorder: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 17,
-            ),
-            suffixIcon: widget.isPassword
-                ? IconButton(
-                    splashRadius: 20,
-                    icon: Icon(
-                      _obscure
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                      size: 20,
-                      color: kAuthHint,
-                    ),
-                    onPressed: () => setState(() => _obscure = !_obscure),
-                  )
-                : widget.trailing,
+          // Same stroke width in every state so focusing never shifts layout.
+          border: _border(kAuthFieldBorder, 1.4),
+          enabledBorder: _border(kAuthFieldBorder, 1.4),
+          focusedBorder: _border(kPrimary, 1.4),
+          disabledBorder: _border(kAuthFieldBorder, 1.4),
+          errorBorder: _border(kRed, 1.4),
+          focusedErrorBorder: _border(kRed, 1.4),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 18,
           ),
+          suffixIcon: widget.isPassword
+              ? IconButton(
+                  splashRadius: 20,
+                  icon: Icon(
+                    _obscure
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    size: 20,
+                    color: kAuthHint,
+                  ),
+                  onPressed: () => setState(() => _obscure = !_obscure),
+                )
+              : widget.trailing,
         ),
       ),
     );
@@ -610,21 +645,27 @@ class AuthPrimaryButton extends StatelessWidget {
                       strokeWidth: 2.4,
                     ),
                   )
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        label,
-                        style: const TextStyle(
-                          fontSize: 16.5,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                          letterSpacing: 0.2,
-                        ),
+                : Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            label,
+                            style: const TextStyle(
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Icon(icon, size: 19, color: Colors.white),
+                        ],
                       ),
-                      const SizedBox(width: 10),
-                      Icon(icon, size: 19, color: Colors.white),
-                    ],
+                    ),
                   ),
           ),
         ),
@@ -699,20 +740,26 @@ class GoogleAuthButton extends StatelessWidget {
                   strokeWidth: 2.2,
                 ),
               )
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const GoogleGlyph(size: 22),
-                  const SizedBox(width: 12),
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF3C4A42),
-                    ),
+            : Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const GoogleGlyph(size: 22),
+                      const SizedBox(width: 12),
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF3C4A42),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
       ),
     ),

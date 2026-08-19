@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "277443632535",
-    "project_id": "f2hfresh-65beb",
-    "storage_bucket": "f2hfresh-65beb.firebasestorage.app"
+    "project_number": "842214638527",
+    "project_id": "f2h-fresh",
+    "storage_bucket": "f2h-fresh.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:277443632535:android:a9290d2881da2d5e0b38d2",
+        "mobilesdk_app_id": "1:842214638527:android:1800c0a5729eb74823d70a",
         "android_client_info": {
           "package_name": "com.f2h.customer"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBMqFkPAenVd4rurNYLxcb17fqRN0Bm47U"
+          "current_key": "AIzaSyAM1WRkJSfx4PTbuIkl4w4A09mCSH777js"
         }
       ],
       "services": {
@@ -26,7 +26,7 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:277443632535:android:0f9e3b1ff9e36e9f0b38d2",
+        "mobilesdk_app_id": "1:842214638527:android:48141f5c3bf1127123d70a",
         "android_client_info": {
           "package_name": "com.f2h.delivery"
         }
@@ -34,7 +34,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBMqFkPAenVd4rurNYLxcb17fqRN0Bm47U"
+          "current_key": "AIzaSyAM1WRkJSfx4PTbuIkl4w4A09mCSH777js"
         }
       ],
       "services": {

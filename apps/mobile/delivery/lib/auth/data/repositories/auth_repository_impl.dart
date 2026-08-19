@@ -1,5 +1,4 @@
-import 'package:flutter/foundation.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+import 'package:f2h_delivery/core/auth/google_auth_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:f2h_delivery/auth/domain/entities/user_entity.dart';
 import 'package:f2h_delivery/auth/domain/repositories/auth_repository.dart';
@@ -9,21 +8,11 @@ import 'package:f2h_delivery/core/api/dio_client.dart';
 import 'package:f2h_delivery/core/auth/token_storage.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
 
-import 'package:f2h_delivery/core/config/app_config.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   final AuthRemoteDataSource remoteDataSource;
   final AuthLocalDataSource localDataSource;
   
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    clientId: kIsWeb ? AppConfig.googleServerClientId : null,
-    scopes: <String>[
-      'email',
-      'https://www.googleapis.com/auth/userinfo.profile',
-    ],
-    serverClientId: kIsWeb ? null : AppConfig.googleServerClientId,
-  );
-
   AuthRepositoryImpl({
     required this.remoteDataSource,
     required this.localDataSource,
@@ -102,17 +91,7 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<User> signInWithGoogle() async {
     try {
-      final GoogleSignInAccount? account = await _googleSignIn.signIn();
-      
-      if (account == null) {
-        throw 'Sign-in cancelled by user';
-      }
-
-      final String? code = account.serverAuthCode;
-      
-      if (code == null || code.isEmpty) {
-        throw 'Failed to retrieve authorization code from Google';
-      }
+      final credential = await signInWithGoogleAccount();
 
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -124,7 +103,10 @@ class AuthRepositoryImpl implements AuthRepository {
         ]);
       } catch (_) {}
 
-      final user = await remoteDataSource.signInWithGoogle(code);
+      final user = await remoteDataSource.signInWithGoogle(
+        idToken: credential.idToken,
+        serverAuthCode: credential.serverAuthCode,
+      );
       if (user.token != null && user.token!.isNotEmpty) {
         await TokenStorage.saveTokens(
           accessToken: user.token!,
@@ -135,6 +117,8 @@ class AuthRepositoryImpl implements AuthRepository {
       }
       await localDataSource.cacheUser(user);
       return user;
+    } on GoogleSignInCancelled {
+      rethrow;
     } catch (e) {
       throw e.toString();
     }
@@ -148,7 +132,7 @@ class AuthRepositoryImpl implements AuthRepository {
       } catch (_) {}
 
       try {
-        await _googleSignIn.signOut();
+        await signOutGoogleAccount();
       } catch (_) {}
 
       try {

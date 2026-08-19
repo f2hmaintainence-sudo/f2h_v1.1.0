@@ -34,6 +34,49 @@ function assertWebhookSecret(provided: string | undefined, expected: string | un
   }
 }
 
+/**
+ * Last-resort client configuration, used only when `api_integrations_config`
+ * has no row (or the query fails). The database is the source of truth — these
+ * values exist so a first boot against an unseeded database still starts.
+ *
+ * Everything below belongs to the `f2h-fresh` Firebase project. The previous
+ * `f2hfresh-65beb` values were removed along with the project.
+ */
+const FIREBASE_CLIENT_DEFAULTS = (isDelivery: boolean) => ({
+  apiKey: process.env.FIREBASE_ANDROID_API_KEY || 'AIzaSyAM1WRkJSfx4PTbuIkl4w4A09mCSH777js',
+  appId: isDelivery
+    ? '1:842214638527:android:48141f5c3bf1127123d70a'
+    : '1:842214638527:android:1800c0a5729eb74823d70a',
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '842214638527',
+  projectId: process.env.FIREBASE_PROJECT_ID || 'f2h-fresh',
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'f2h-fresh.firebasestorage.app',
+  authDomain: 'f2h-fresh.firebaseapp.com',
+  // No iOS app is registered in the Firebase project. Empty strings tell the
+  // client there is nothing to initialise rather than pointing it at a
+  // different project's app id.
+  iosApiKey: '',
+  iosAppId: '',
+  iosBundleId: isDelivery ? 'com.f2h.delivery' : 'com.f2h.customer',
+});
+
+/**
+ * `serverClientId` is the *web* OAuth client on every platform: Android and iOS
+ * exchange their serverAuthCode against it, so the API can verify one audience.
+ */
+const GOOGLE_OAUTH_DEFAULTS = () => ({
+  serverClientId: process.env.GOOGLE_CLIENT_ID || '',
+  webClientId: process.env.GOOGLE_CLIENT_ID || '',
+});
+
+/** Storefront constants the clients read from the same payload. */
+const CLIENT_CONFIG_STATIC = {
+  min_order_amount: 100.0,
+  free_delivery_threshold: 500.0,
+  support_phone: '+919876543210',
+  support_email: 'support@f2hfresh.com',
+  maintenance_mode: false,
+} as const;
+
 @Controller({ version: '1' })
 export class AppController {
   constructor(
@@ -60,6 +103,9 @@ export class AppController {
   @Public()
   @Get('device/client-config')
   async getClientConfig(@Req() req: any, @Query('role') queryRole?: string, @Query('app') queryApp?: string) {
+    const roleHeader = (req?.headers?.['x-role'] || queryRole || queryApp || '').toString().toUpperCase();
+    const isDelivery = roleHeader.includes('D') || roleHeader.includes('DELIVERY');
+
     try {
       const sql = `
         SELECT category, config_key, provider, config_data
@@ -75,45 +121,29 @@ export class AppController {
         }
       }
 
-      const roleHeader = (req?.headers?.['x-role'] || req?.headers?.['x-role'] || queryRole || queryApp || '').toString().toUpperCase();
-      const isDelivery = roleHeader.includes('D') || roleHeader.includes('DELIVERY');
-
       const rawFb = isDelivery
         ? (dbConfigs['firebase:delivery'] || dbConfigs['firebase:customer'] || dbConfigs['firebase:client'])
         : (dbConfigs['firebase:customer'] || dbConfigs['firebase:delivery'] || dbConfigs['firebase:client']);
 
+      const defaults = FIREBASE_CLIENT_DEFAULTS(isDelivery);
       const firebaseConfig = rawFb ? {
-        apiKey: rawFb.apiKey || rawFb.client_api_key || 'AIzaSyBMqFkPAenVd4rurNYLxcb17fqRN0Bm47U',
-        appId: rawFb.appId || rawFb.android_app_id || (isDelivery ? '1:277443632535:android:0f9e3b1ff9e36e9f0b38d2' : '1:277443632535:android:a9290d2881da2d5e0b38d2'),
-        messagingSenderId: rawFb.messagingSenderId || rawFb.messaging_sender_id || '277443632535',
-        projectId: rawFb.projectId || rawFb.project_id || 'f2hfresh-65beb',
-        storageBucket: rawFb.storageBucket || rawFb.storage_bucket || 'f2hfresh-65beb.firebasestorage.app',
-        iosApiKey: rawFb.iosApiKey || rawFb.ios_api_key || rawFb.apiKey || rawFb.client_api_key,
-        iosAppId: rawFb.iosAppId || rawFb.ios_app_id || (isDelivery ? '1:445665408019:ios:8b7b36e7cca52b2d59fbe6' : '1:1060833982707:ios:64708d0f2c64294ef31f86'),
-        iosBundleId: rawFb.iosBundleId || rawFb.ios_bundle_id || (isDelivery ? 'com.f2h.delivery' : 'com.f2h.customer'),
-        authDomain: rawFb.authDomain || rawFb.auth_domain || 'f2hfresh-65beb.firebaseapp.com',
-      } : {
-        apiKey: process.env.FIREBASE_ANDROID_API_KEY || 'AIzaSyBMqFkPAenVd4rurNYLxcb17fqRN0Bm47U',
-        appId: isDelivery ? '1:277443632535:android:0f9e3b1ff9e36e9f0b38d2' : '1:277443632535:android:a9290d2881da2d5e0b38d2',
-        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '277443632535',
-        projectId: process.env.FIREBASE_PROJECT_ID || 'f2hfresh-65beb',
-        storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'f2hfresh-65beb.firebasestorage.app',
-        iosApiKey: isDelivery ? 'AIzaSyAtT56n3QZdD7ZFYyXOwVPlFoLEuVkkOFk' : 'AIzaSyBR4Xs71YQTs8Hzlp5Ql5a15ZxD2FfzGxg',
-        iosAppId: isDelivery ? '1:445665408019:ios:8b7b36e7cca52b2d59fbe6' : '1:1060833982707:ios:64708d0f2c64294ef31f86',
-        iosBundleId: isDelivery ? 'com.f2h.delivery' : 'com.f2h.customer',
-      };
+        apiKey: rawFb.apiKey || rawFb.client_api_key || defaults.apiKey,
+        appId: rawFb.appId || rawFb.android_app_id || defaults.appId,
+        messagingSenderId: rawFb.messagingSenderId || rawFb.messaging_sender_id || defaults.messagingSenderId,
+        projectId: rawFb.projectId || rawFb.project_id || defaults.projectId,
+        storageBucket: rawFb.storageBucket || rawFb.storage_bucket || defaults.storageBucket,
+        // iOS is served only when the row actually carries it. F2H has no iOS
+        // app registered in the Firebase project yet, so inventing a value here
+        // would hand the client a config that fails at Firebase.initializeApp.
+        iosApiKey: rawFb.iosApiKey || rawFb.ios_api_key || '',
+        iosAppId: rawFb.iosAppId || rawFb.ios_app_id || '',
+        iosBundleId: rawFb.iosBundleId || rawFb.ios_bundle_id || defaults.iosBundleId,
+        authDomain: rawFb.authDomain || rawFb.auth_domain || defaults.authDomain,
+      } : defaults;
 
-      const googleOauth = dbConfigs['oauth:google'] || {
-        serverClientId: process.env.GOOGLE_SERVER_CLIENT_ID || '605526160181-00mmui7o3uuijjgvhgjjs5qbldai544g.apps.googleusercontent.com',
-      };
-
-      const mapsConfig = dbConfigs['maps:google_maps'] || {
-        apiKey: process.env.GOOGLE_MAPS_API_KEY || '',
-      };
-
-      const razorpayConfig = dbConfigs['payment-gateway:razorpay'] || {
-        keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_default',
-      };
+      const googleOauth = dbConfigs['oauth:google'] || GOOGLE_OAUTH_DEFAULTS();
+      const mapsConfig = dbConfigs['maps:google_maps'] || { apiKey: process.env.GOOGLE_MAPS_API_KEY || '' };
+      const razorpayConfig = dbConfigs['payment-gateway:razorpay'] || { keyId: process.env.RAZORPAY_KEY_ID || '' };
 
       return {
         status: true,
@@ -122,37 +152,18 @@ export class AppController {
           google_oauth: googleOauth,
           google_maps: mapsConfig,
           razorpay: razorpayConfig,
-          min_order_amount: 100.0,
-          free_delivery_threshold: 500.0,
-          support_phone: '+919876543210',
-          support_email: 'support@f2hfresh.com',
-          maintenance_mode: false,
+          ...CLIENT_CONFIG_STATIC,
         },
       };
     } catch (e) {
       return {
         status: true,
         data: {
-          firebase: {
-            apiKey: 'AIzaSyBMqFkPAenVd4rurNYLxcb17fqRN0Bm47U',
-            appId: '1:277443632535:android:a9290d2881da2d5e0b38d2',
-            messagingSenderId: '277443632535',
-            projectId: 'f2hfresh-65beb',
-            storageBucket: 'f2hfresh-65beb.firebasestorage.app',
-            iosApiKey: 'AIzaSyBR4Xs71YQTs8Hzlp5Ql5a15ZxD2FfzGxg',
-            iosAppId: '1:1060833982707:ios:64708d0f2c64294ef31f86',
-            iosBundleId: 'com.f2h.customer',
-          },
-          google_oauth: {
-            serverClientId: '605526160181-00mmui7o3uuijjgvhgjjs5qbldai544g.apps.googleusercontent.com',
-          },
-          google_maps: { apiKey: '' },
-          razorpay: { keyId: 'rzp_test_default' },
-          min_order_amount: 100.0,
-          free_delivery_threshold: 500.0,
-          support_phone: '+919876543210',
-          support_email: 'support@f2hfresh.com',
-          maintenance_mode: false,
+          firebase: FIREBASE_CLIENT_DEFAULTS(isDelivery),
+          google_oauth: GOOGLE_OAUTH_DEFAULTS(),
+          google_maps: { apiKey: process.env.GOOGLE_MAPS_API_KEY || '' },
+          razorpay: { keyId: process.env.RAZORPAY_KEY_ID || '' },
+          ...CLIENT_CONFIG_STATIC,
         },
       };
     }

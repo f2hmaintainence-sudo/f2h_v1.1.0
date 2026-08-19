@@ -776,7 +776,15 @@ class _OtpBoxState extends State<_OtpBox> {
           fontWeight: FontWeight.w700,
           color: kPrimary,
         ),
-        decoration: const InputDecoration(counterText: '', border: InputBorder.none),
+        decoration: const InputDecoration(
+          counterText: '',
+          filled: false,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          errorBorder: InputBorder.none,
+          focusedErrorBorder: InputBorder.none,
+        ),
         onChanged: widget.onChanged,
       ),
     );
@@ -839,6 +847,7 @@ class _LightFieldState extends State<_LightField> {
                   ),
                   decoration: InputDecoration(
                     isDense: true,
+                    filled: false,
                     hintText: widget.hint,
                     hintStyle: GoogleFonts.poppins(
                       color: kAuthHint,

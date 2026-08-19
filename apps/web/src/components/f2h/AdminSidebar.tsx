@@ -12,7 +12,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ClipboardCheck, CalendarCheck, Boxes, AlignLeft, TriangleAlert, Users, Package, Truck, BarChart3, Menu, X, ShoppingCart, Wallet, Settings, ClipboardList, UserCog, Shield, RefreshCw, AlertTriangle, PieChart, ChevronDown, MapPin, Banknote, LineChart, BookOpen, Box, Archive, Factory, Clipboard, Building, Building2, ArrowRightLeft, Container, CreditCard, FileText, ShieldAlert, Ticket, Percent, Gift, TrendingUp, Bell, Layers, Calendar, AlertOctagon, ShoppingBag, Clock, Orbit, Activity, IndianRupee, Target, Zap, Eye, UserCheck, BarChart, Gauge, CalendarOff, Tag, Globe } from "lucide-react";
+import { LayoutDashboard, ClipboardCheck, TicketPercent, CalendarCheck, Boxes, AlignLeft, TriangleAlert, Users, Package, Truck, BarChart3, Menu, X, ShoppingCart, Wallet, Settings, ClipboardList, UserCog, Shield, RefreshCw, AlertTriangle, PieChart, ChevronDown, MapPin, Banknote, LineChart, BookOpen, Box, Archive, Factory, Clipboard, Building, Building2, ArrowRightLeft, Container, CreditCard, FileText, ShieldAlert, Ticket, Percent, Gift, TrendingUp, Bell, Layers, Calendar, AlertOctagon, ShoppingBag, Clock, Orbit, Activity, IndianRupee, Target, Zap, Eye, UserCheck, BarChart, Gauge, CalendarOff, Tag, Globe } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
 const adminNav = [
@@ -37,17 +37,27 @@ const adminNav = [
     label: "ORDERS & DELIVERIES",
     items: [
       { name: "Orders", href: "/admin/orders/allorders", icon: ShoppingBag },
-      {
-        name: "Delivery Operations",
-        icon: Truck,
-        subItems: [
-          { name: "Delivery Runs", href: "/admin/delivery/assign", icon: Zap },
-          { name: "Delivery Partners", href: "/admin/delivery/partners", icon: UserCog },
-          { name: "Delivery Logs", href: "/admin/delivery/logs", icon: PieChart },
-          { name: "Leave Requests", href: "/admin/delivery/leave-requests", icon: CalendarOff },
-        ]
-      },
-      { name: "Containers", href: "/admin/packages/dashboard", icon: Container },
+      { name: "Delivery Runs", href: "/admin/delivery/assign", icon: Zap },
+      // {
+      //   name: "Delivery Operations",
+      //   icon: Truck,
+      //   subItems: [
+
+      //     { name: "Delivery Partners", href: "/admin/delivery/partners", icon: UserCog },
+      //     { name: "Delivery Logs", href: "/admin/delivery/logs", icon: PieChart },
+      //     { name: "Leave Requests", href: "/admin/delivery/leave-requests", icon: CalendarOff },
+      //   ]
+      // },
+
+    ],
+  },
+  {
+    label: "DELIVERIES PARTNERS",
+    items: [
+      { name: "Delivery Partners", href: "/admin/delivery/partners", icon: UserCog },
+      { name: "Delivery Logs", href: "/admin/delivery/logs", icon: PieChart },
+      { name: "Leave Requests", href: "/admin/delivery/leave-requests", icon: CalendarOff },
+
     ],
   },
   {
@@ -55,7 +65,8 @@ const adminNav = [
     items: [
       { name: "Categories", href: "/admin/catalog/categories", icon: Layers },
       { name: "Products", href: "/admin/catalog/products", icon: Package },
-      { name: "Offers", href: "/admin/catalog/offers", icon: Tag },
+      // { name: "Offers", href: "/admin/catalog/offers", icon: Tag },
+      { name: "Promotions Coupons", href: "/admin/catalog/promotions-coupons", icon: TicketPercent },
       {
         name: "Inventory & Warehouse",
         icon: Archive,
@@ -63,7 +74,8 @@ const adminNav = [
           { name: "Warehouses", href: "/admin/warehouse/list", icon: Building },
           { name: "Stock Overview", href: "/admin/inventory/overview", icon: AlignLeft },
           { name: "Stock In/Out", href: "/admin/warehouse/stock-movements", icon: ArrowRightLeft },
-          { name: "Dispatch Requirements", href: "/admin/warehouse/dispatch", icon: Truck },
+          { name: "Dispatch", href: "/admin/warehouse/dispatch", icon: Truck },
+          { name: "Containers", href: "/admin/packages/dashboard", icon: Container },
         ]
       },
       {
@@ -80,9 +92,24 @@ const adminNav = [
   {
     label: "FINANCE & REPORTS",
     items: [
-      { name: "Payments & Billing", href: "/admin/finance/payments", icon: CreditCard },
-      { name: "Wallet Transactions", href: "/admin/finance/wallet", icon: Wallet },
-      { name: "Refunds", href: "/admin/finance/refunds", icon: ArrowRightLeft },
+      {
+        name: "Billings",
+        icon: Settings,
+        subItems: [
+          // { name: "Payments & Billing", href: "/admin/finance/payments", icon: CreditCard },
+          { name: "Billing", href: "/admin/finance/billing", icon: CreditCard },
+          { name: "Outstandings", href: "/admin/finance/outstandings", icon: CreditCard },
+        ]
+      },
+      {
+        name: "Wallet",
+        icon: Wallet,
+        subItems: [
+          { name: "Wallet Transactions", href: "/admin/finance/wallet", icon: Wallet },
+          { name: "Refunds", href: "/admin/finance/refunds", icon: ArrowRightLeft },
+        ]
+      },
+
       { name: "Revenue Reports", href: "/admin/reports/revenue", icon: TrendingUp },
     ],
   },
@@ -106,6 +133,8 @@ const adminNav = [
     label: "SYSTEM",
     items: [
       { name: "Company Profile", href: "/admin/profile/company", icon: Shield },
+      { name: "Audit Logs", href: "/admin/system/audit", icon: FileText },
+
     ],
   },
 ];

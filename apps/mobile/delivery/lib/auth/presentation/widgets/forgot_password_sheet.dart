@@ -353,7 +353,15 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
                   textAlign: TextAlign.center,
                   maxLength: 1,
                   style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700, color: kPrimary),
-                  decoration: const InputDecoration(counterText: "", border: InputBorder.none),
+                  decoration: const InputDecoration(
+                    counterText: '',
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                  ),
                   onChanged: (val) {
                     if (val.isNotEmpty && index < 5) {
                       _otpFocus[index + 1].requestFocus();

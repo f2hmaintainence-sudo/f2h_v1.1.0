@@ -5,6 +5,7 @@ import request from 'supertest';
 import { AppModule } from 'src/app.module';
 import { RedisService } from 'src/shared/redis/redis.service';
 import { DatabaseService } from 'src/shared/database/Database.service';
+import { assertConnectedToTestDatabase } from './assert-test-database';
 
 /**
  * The regression suite for the authorization layer (F-02, F-03) and for the money
@@ -61,9 +62,8 @@ describeIfTestDb('Authorization and checkout', () => {
   };
 
   beforeAll(async () => {
-    process.env.DB_DATABASE = TEST_DB;
-    process.env.ENABLE_CRON = 'false';
-
+    // The database is selected in test/setup-env.ts, which runs before app.module
+    // is imported — by the time this hook runs, ConfigModule has already cached it.
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api');
@@ -71,10 +71,13 @@ describeIfTestDb('Authorization and checkout', () => {
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
 
-    db = app.get(DatabaseService);
+    db = await assertConnectedToTestDatabase(app, TEST_DB as string);
     redis = app.get(RedisService);
     jwt = app.get(JwtService);
 
+    // Clear first: an aborted earlier run leaves rows that collide on unique
+    // constraints the ON CONFLICT clauses below do not cover (phone, sku, slug).
+    await cleanup(db);
     await seed(db);
   });
 
@@ -264,8 +267,8 @@ async function seed(db: DatabaseService) {
   );
   await db.query(
     `INSERT INTO users (user_id, email, user_name, first_name, last_name, phone, role_id, account_status)
-     VALUES ($1,$2,'e2ecust','E2E','Customer','9000000001','CUSTOMER','active'),
-            ($3,$4,'e2eadmin','E2E','Admin','9000000002','ADMIN','active')
+     VALUES ($1,$2,'e2ecust','E2E','Customer','9990000001','CUSTOMER','active'),
+            ($3,$4,'e2eadmin','E2E','Admin','9990000002','ADMIN','active')
      ON CONFLICT (user_id) DO NOTHING`,
     [CUSTOMER_ID, `${CUSTOMER_ID}@example.com`, ADMIN_ID, `${ADMIN_ID}@example.com`],
   );
@@ -280,7 +283,7 @@ async function seed(db: DatabaseService) {
   );
   await db.query(
     `INSERT INTO customer_addresses (address_id, customer_id, address_line, contact_mobile, contact_name, branch_id, is_default, status)
-     VALUES ('E2EADDR',$1,'1 E2E Street','9000000001','E2E Customer','E2EBRANCH', true, true)
+     VALUES ('E2EADDR',$1,'1 E2E Street','9990000001','E2E Customer','E2EBRANCH', true, true)
      ON CONFLICT (address_id) DO NOTHING`,
     [CUSTOMER_ID],
   );
@@ -311,6 +314,12 @@ async function seed(db: DatabaseService) {
   );
 }
 
+/**
+ * Removes everything seed() created. The catalog rows (category, product, variant,
+ * branch) were originally missing from here, and an earlier run left them behind in
+ * a database it should never have reached — a visible "E2E" category in the
+ * customer-facing catalog. Anything seed() writes must be deleted here.
+ */
 async function cleanup(db: DatabaseService) {
   await db.query(`DELETE FROM order_items WHERE order_id IN (SELECT order_id FROM orders WHERE customer_id = ANY($1))`, [[CUSTOMER_ID, ADMIN_ID]]);
   await db.query(`DELETE FROM orders WHERE customer_id = ANY($1)`, [[CUSTOMER_ID, ADMIN_ID]]);
@@ -322,4 +331,11 @@ async function cleanup(db: DatabaseService) {
   await db.query(`DELETE FROM customer_addresses WHERE customer_id = ANY($1)`, [[CUSTOMER_ID, ADMIN_ID]]);
   await db.query(`DELETE FROM customers WHERE customer_id = ANY($1)`, [[CUSTOMER_ID, ADMIN_ID]]);
   await db.query(`DELETE FROM users WHERE user_id = ANY($1)`, [[CUSTOMER_ID, ADMIN_ID]]);
+  await db.query(`DELETE FROM product_variants WHERE variant_id = 'E2EVAR'`);
+  await db.query(`DELETE FROM products WHERE product_id = 'E2EPROD'`);
+  await db.query(`DELETE FROM categories WHERE category_id = 'E2ECAT'`);
+  await db.query(`DELETE FROM branches WHERE branch_id = 'E2EBRANCH'`);
+  await db.query(`DELETE FROM roles WHERE id = ANY($1)`, [[901, 902]]);
+  // Also clear by the synthetic phone numbers, which carry their own unique index.
+  await db.query(`DELETE FROM users WHERE phone = ANY($1)`, [['9990000001', '9990000002']]);
 }

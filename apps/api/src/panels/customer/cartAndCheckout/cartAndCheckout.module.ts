@@ -7,6 +7,7 @@ import {
   CartController,
 } from './controller/cartAndCheckout.controller';
 import { CartService } from './ModuleServices/cartAndCheckout.service';
+import { PricingService } from './ModuleServices/pricing.service';
 import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
 import { NotificationModule } from 'src/notifications/notification.module';
 
@@ -15,6 +16,7 @@ import { ReferralModule } from '../referral/referral.module';
 @Module({
   imports: [ConfigModule, NotificationModule, ReferralModule],
   controllers: [CartController],
-  providers: [DatabaseService, DataService, DeveloperService, CartService, PushNotificationService],
+  providers: [DatabaseService, DataService, DeveloperService, CartService, PricingService, PushNotificationService],
+  exports: [CartService, PricingService],
 })
 export class CartAndCheckoutModule { }
