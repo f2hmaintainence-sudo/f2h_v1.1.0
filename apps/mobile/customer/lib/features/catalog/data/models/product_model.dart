@@ -80,18 +80,32 @@ class ProductVariant {
       parsedImages = [imgPath];
     }
 
+    final priceVal = double.tryParse(json['final_price']?.toString() ?? '') ??
+        double.tryParse(json['finalPrice']?.toString() ?? '') ??
+        double.tryParse(json['price']?.toString() ?? '') ??
+        0.0;
+    final origPriceVal = double.tryParse(json['original_price']?.toString() ?? '') ??
+        double.tryParse(json['originalPrice']?.toString() ?? '') ??
+        priceVal;
+    final subPriceVal = double.tryParse(json['final_subscription_price']?.toString() ?? '') ??
+        double.tryParse(json['finalSubscriptionPrice']?.toString() ?? '') ??
+        double.tryParse(json['finalSubPrice']?.toString() ?? '') ??
+        double.tryParse(json['special_price']?.toString() ?? '') ??
+        double.tryParse(json['subscription_price']?.toString() ?? '') ??
+        double.tryParse(json['subscriptionPrice']?.toString() ?? '');
+
     return ProductVariant(
-      id: json['id'],
-      label: json['label'],
+      id: json['id']?.toString() ?? json['variant_id']?.toString() ?? '',
+      label: json['label']?.toString() ?? json['variant_name']?.toString() ?? 'Standard',
       unitValue:
           json['unit_value']?.toString() ?? json['unitValue']?.toString(),
       unitType: json['unit_type']?.toString() ?? json['unitType']?.toString(),
-      price: json['price']?.toDouble() ?? 0.0,
-      originalPrice: json['originalPrice']?.toDouble() ?? 0.0,
-      subscriptionPrice: json['subscriptionPrice']?.toDouble(),
-      availableQuantity: json['availableQuantity']?.toDouble(),
-      lowStockThreshold: json['lowStockThreshold']?.toDouble(),
-      isLowStock: json['isLowStock'] ?? false,
+      price: priceVal,
+      originalPrice: origPriceVal,
+      subscriptionPrice: subPriceVal,
+      availableQuantity: double.tryParse(json['available_quantity']?.toString() ?? json['availableQuantity']?.toString() ?? ''),
+      lowStockThreshold: double.tryParse(json['low_stock_threshold']?.toString() ?? json['lowStockThreshold']?.toString() ?? ''),
+      isLowStock: json['is_low_stock'] == true || json['isLowStock'] == true,
       imagePath: imgPath,
       images: parsedImages,
     );
@@ -220,38 +234,52 @@ class Product {
   }
 
   factory Product.fromJson(Map<String, dynamic> json) {
+    final priceVal = double.tryParse(json['final_price']?.toString() ?? '') ??
+        double.tryParse(json['finalPrice']?.toString() ?? '') ??
+        double.tryParse(json['price']?.toString() ?? '') ??
+        0.0;
+    final origPriceVal = double.tryParse(json['original_price']?.toString() ?? '') ??
+        double.tryParse(json['originalPrice']?.toString() ?? '') ??
+        priceVal;
+    final subPriceVal = double.tryParse(json['final_subscription_price']?.toString() ?? '') ??
+        double.tryParse(json['finalSubscriptionPrice']?.toString() ?? '') ??
+        double.tryParse(json['finalSubPrice']?.toString() ?? '') ??
+        double.tryParse(json['special_price']?.toString() ?? '') ??
+        double.tryParse(json['subscription_price']?.toString() ?? '') ??
+        double.tryParse(json['subscriptionPrice']?.toString() ?? '');
+
     return Product(
-      id: json['id'],
-      name: json['name'],
-      vendor: json['vendor'],
-      unit: json['unit'] ?? '',
+      id: json['id']?.toString() ?? json['variant_id']?.toString() ?? json['product_id']?.toString() ?? '',
+      name: json['name']?.toString() ?? json['product_name']?.toString() ?? json['variant_name']?.toString() ?? '',
+      vendor: json['vendor']?.toString() ?? 'F2H',
+      unit: json['unit']?.toString() ?? '',
       unitValue:
           json['unit_value']?.toString() ?? json['unitValue']?.toString(),
       unitType: json['unit_type']?.toString() ?? json['unitType']?.toString(),
-      category: json['category'],
-      emoji: json['emoji'],
-      badge: json['badge'],
-      price: json['price']?.toDouble() ?? 0.0,
-      originalPrice: json['originalPrice']?.toDouble() ?? 0.0,
-      subscriptionPrice: json['subscriptionPrice']?.toDouble(),
-      rating: json['rating']?.toDouble() ?? 0.0,
-      reviews: json['reviews'] ?? 0,
-      isOrganic: json['isOrganic'] ?? false,
-      isSubscribable: json['isSubscribable'] ?? true,
-      isOneTime: json['isOneTime'] ?? true,
-      isOutOfStock: json['isOutOfStock'] ?? false,
-      isLowStock: json['isLowStock'] ?? false,
-      description: json['description'],
-      highlights: json['highlights'],
-      ingredients: json['ingredients'],
-      legalInfo: json['legalInfo'],
-      badgeColor: Color(json['badgeColor']),
+      category: json['category']?.toString() ?? '',
+      emoji: json['emoji']?.toString() ?? '',
+      badge: json['badge']?.toString() ?? '',
+      price: priceVal,
+      originalPrice: origPriceVal,
+      subscriptionPrice: subPriceVal,
+      rating: double.tryParse(json['rating']?.toString() ?? '') ?? 0.0,
+      reviews: int.tryParse(json['reviews']?.toString() ?? '') ?? 0,
+      isOrganic: json['isOrganic'] == true || json['is_organic'] == true,
+      isSubscribable: json['isSubscribable'] ?? json['is_subscribable'] ?? true,
+      isOneTime: json['isOneTime'] ?? json['is_one_time'] ?? true,
+      isOutOfStock: json['isOutOfStock'] == true || json['is_out_of_stock'] == true,
+      isLowStock: json['isLowStock'] == true || json['is_low_stock'] == true,
+      description: json['description']?.toString(),
+      highlights: json['highlights']?.toString(),
+      ingredients: json['ingredients']?.toString(),
+      legalInfo: json['legalInfo']?.toString() ?? json['legal_info']?.toString(),
+      badgeColor: json['badgeColor'] != null ? Color(json['badgeColor']) : kPrimaryMid,
       variants: json['variants'] != null
           ? (json['variants'] as List)
                 .map((v) => ProductVariant.fromJson(v))
                 .toList()
           : [],
-      imageAsset: json['imageAsset'],
+      imageAsset: json['imageAsset']?.toString() ?? json['image_path']?.toString(),
       images: json['images'] != null
           ? List<String>.from(json['images'])
           : (json['imageAsset'] != null

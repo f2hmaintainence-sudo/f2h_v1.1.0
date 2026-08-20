@@ -823,102 +823,47 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
 
   Widget _buildAddressSection() {
     return _SectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _SectionTitle(
-            icon: Icons.location_on_outlined,
-            label: 'Delivery Address',
-          ),
-          const SizedBox(height: 10),
-          if (_selectedAddress != null)
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _selectedAddress!.addressType.toUpperCase(),
-                        style: const TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                          color: kPrimary,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${_selectedAddress!.name}, ${_selectedAddress!.detail}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: kText,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: _changeAddress,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: kPrimaryPl,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: kPrimary.withOpacity(0.3)),
-                    ),
-                    child: const Text(
-                      'Change',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: kPrimary,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            )
-          else
-            GestureDetector(
-              onTap: _changeAddress,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: kPrimaryPl,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: kPrimary.withOpacity(0.3)),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.add_location_alt_outlined,
-                      size: 16,
-                      color: kPrimary,
-                    ),
-                    SizedBox(width: 6),
-                    Text(
-                      'Add Delivery Address',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: kPrimary,
-                      ),
-                    ),
-                  ],
-                ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      child: InkWell(
+        onTap: _changeAddress,
+        borderRadius: BorderRadius.circular(10),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: kPrimaryPl,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.location_on_rounded,
+                size: 16,
+                color: kPrimary,
               ),
             ),
-        ],
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                _selectedAddress != null
+                    ? '${_selectedAddress!.addressType.toUpperCase()} · ${_selectedAddress!.detail.isNotEmpty ? _selectedAddress!.detail : _selectedAddress!.name}'
+                    : 'Select Delivery Address',
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: kText,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: kTextSub,
+            ),
+          ],
+        ),
       ),
     );
   }

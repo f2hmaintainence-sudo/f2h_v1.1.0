@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DatabaseService } from 'src/shared/database/Database.service';
 import { DataService } from 'src/shared/database/Data.service';
 import { DeveloperService } from 'src/shared/logger/Developer.service';
+import { PricingService } from 'src/shared/services/pricing.service';
 import {
   CreateDeveloperSubscriptionDto,
   DeveloperSubscriptionItemDto,
@@ -14,6 +15,7 @@ export class CategoriesProductsService {
     private readonly db: DatabaseService,
     private readonly Data: DataService,
     private readonly developer: DeveloperService,
+    private readonly pricingService: PricingService,
   ) { }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -96,7 +98,7 @@ export class CategoriesProductsService {
   // Variant images  → product_images.storage_key (variants/ folder, variant_id FK)
   // Product fallback → products.image_path (products/ folder)
   // ─────────────────────────────────────────────────────────────────────────
-  async getProducts() {
+  async getProducts(customerId?: string | null) {
     const baseUrl =
       process.env.MOBILE_BACKEND_URL ||
       process.env.BACKEND_URL ||
@@ -185,7 +187,9 @@ export class CategoriesProductsService {
         };
       });
 
-      return { data: mappedData };
+      const enrichedData = await this.pricingService.applyPricingToProductList(customerId || null, mappedData);
+
+      return { data: enrichedData };
     } catch (e) {
       console.error('Error in getProducts service:', e);
       return { data: [] };
@@ -196,7 +200,7 @@ export class CategoriesProductsService {
   // GET PRODUCTS BY CATEGORY ID
   // Same image rules as getProducts()
   // ─────────────────────────────────────────────────────────────────────────
-  async getProductsByCategoryId(categoryId: string) {
+  async getProductsByCategoryId(categoryId: string, customerId?: string | null) {
     const baseUrl =
       process.env.MOBILE_BACKEND_URL ||
       process.env.BACKEND_URL ||
@@ -283,7 +287,9 @@ export class CategoriesProductsService {
         };
       });
 
-      return { data: mappedData };
+      const enrichedData = await this.pricingService.applyPricingToProductList(customerId || null, mappedData);
+
+      return { data: enrichedData };
     } catch (e) {
       console.error('Error in getProductsByCategoryId service:', e);
       return { data: [] };

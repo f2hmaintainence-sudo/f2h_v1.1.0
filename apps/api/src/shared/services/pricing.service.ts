@@ -4,6 +4,11 @@ import { Injectable, Optional,
 import { DatabaseService } from '../database/Database.service';
 import { DeveloperService } from '../logger/Developer.service';
 
+export interface SpecialPriceRule {
+  specialPrice: number;
+  discountPercentage: number;
+}
+
 export interface CalculatedPrice {
   original_price: number;
   price: number;
@@ -26,10 +31,10 @@ export class PricingService {
 
   /**
    * WORKFLOW STEP 1 — Load customer special price rules from DB.
-   * Returns a Map<product_variant_id, discount_percentage>.
+   * Returns a Map<product_variant_id, SpecialPriceRule>.
    */
-  async getSpecialPricesMap(customerId?: string | null): Promise<Map<string, number>> {
-    const specialPricesMap = new Map<string, number>();
+  async getSpecialPricesMap(customerId?: string | null): Promise<Map<string, SpecialPriceRule>> {
+    const specialPricesMap = new Map<string, SpecialPriceRule>();
 
     // STEP 1a: Validate customerId
     if (!customerId) {
@@ -48,7 +53,7 @@ export class PricingService {
       const res: any = await this.db.query(
         `SELECT csp.product_variant_id, 
                 COALESCE(csp.discount_percentage, csp.discount, 0) AS discount_percentage,
-                csp.special_price 
+                COALESCE(csp.special_price, 0) AS special_price 
          FROM customer_special_prices csp
          LEFT JOIN customers c ON (c.customer_id = csp.customer_id)
          LEFT JOIN users u ON (u.user_id = csp.customer_id)
@@ -63,7 +68,7 @@ export class PricingService {
       );
       const rows = Array.isArray(res) ? res : (res?.rows || []);
 
-      // STEP 1c: Build map from DB rows (Map<variantId, discount_percentage>)
+      // STEP 1c: Build map from DB rows
       if (rows.length === 0) {
         this.logger.log(`[PRICING FLOW] STEP 1c: No special price rules found in DB for customer "${customerId}"`);
       } else {
@@ -71,20 +76,16 @@ export class PricingService {
         for (const row of rows) {
           const variantId = row.product_variant_id;
           const discountPct = Number(row.discount_percentage || 0);
-          if (variantId && discountPct > 0) {
-            specialPricesMap.set(variantId, discountPct);
-            this.logger.log(`[PRICING FLOW]          -> variantId="${variantId}", discount_percentage=${discountPct}%`);
+          const specialPriceVal = Number(row.special_price || 0);
+          if (variantId && (discountPct > 0 || specialPriceVal > 0)) {
+            specialPricesMap.set(variantId, {
+              specialPrice: specialPriceVal,
+              discountPercentage: discountPct,
+            });
+            this.logger.log(`[PRICING FLOW]          -> variantId="${variantId}", special_price=Rs.${specialPriceVal}, discount_percentage=${discountPct}%`);
           }
         }
       }
-
-      const mapEntries = Array.from(specialPricesMap.entries()).map(([vId, disc]) => `${vId}:${disc}%`);
-      this.logger.log(`[PRICING FLOW] STEP 1c: Special prices map built = [${mapEntries.join(', ') || 'empty'}]`);
-      this.developer?.debug('[PricingService] Special prices loaded', {
-        customerId,
-        count: specialPricesMap.size,
-        entries: mapEntries,
-      });
     } catch (e: any) {
       console.error(`[PRICING FLOW] STEP 1 ERROR: Failed to fetch special prices for customer "${customerId}":`, e?.message || e);
       this.developer?.error('[PricingService] Error fetching customer special prices', { customerId, error: e?.message || e });
@@ -94,10 +95,9 @@ export class PricingService {
   }
 
   /**
-   * WORKFLOW STEP 2 — Calculate final prices for a single variant dynamically from stored discount.
-   * Special discount applies dynamically to final_subscription_price.
+   * WORKFLOW STEP 2 — Calculate final prices for a single variant dynamically.
    */
-  calculateVariantPrice(variant: any, discountPercentage: number = 0): CalculatedPrice {
+  calculateVariantPrice(variant: any, ruleInput: SpecialPriceRule | number = 0): CalculatedPrice {
     const variantId = variant?.variant_id || variant?.id || 'unknown';
     const price = Number(variant?.price || 0);
     const rawOriginalPrice = variant?.original_price != null ? Number(variant.original_price) : 0;
@@ -107,107 +107,96 @@ export class PricingService {
     const isSubscribable = variant?.is_subscribable !== false && variant?.is_subscribable !== 0 && (rawSubPrice > 0 || variant?.is_subscribable === true || variant?.is_subscribable === 1);
     const subscriptionPrice = (isSubscribable && rawSubPrice > 0) ? rawSubPrice : price;
 
-    const storedDiscount = Number(discountPercentage || 0);
+    const rule: SpecialPriceRule = typeof ruleInput === 'number'
+      ? { specialPrice: 0, discountPercentage: ruleInput }
+      : (ruleInput || { specialPrice: 0, discountPercentage: 0 });
 
-    if (storedDiscount > 0) {
-      // Stored discount percentage applies dynamically to subscription_price
-      const finalPrice = price; // one-time price is NEVER modified
-      const finalSubPrice = Math.max(
-        0,
-        Math.round(subscriptionPrice * (1 - (storedDiscount / 100.0)) * 100) / 100,
-      );
+    if (rule.specialPrice > 0 || rule.discountPercentage > 0) {
+      let finalSubPrice = subscriptionPrice;
+      let discountPercentage = rule.discountPercentage;
+
+      if (rule.specialPrice > 0) {
+        finalSubPrice = rule.specialPrice;
+        if (subscriptionPrice > 0) {
+          discountPercentage = Math.round(((subscriptionPrice - finalSubPrice) / subscriptionPrice) * 10000) / 100;
+        }
+      } else if (rule.discountPercentage > 0) {
+        finalSubPrice = Math.max(0, Math.round(subscriptionPrice * (1 - (rule.discountPercentage / 100.0)) * 100) / 100);
+      }
+
       const discountAmount = Math.max(0, Math.round((subscriptionPrice - finalSubPrice) * 100) / 100);
 
-      const result: CalculatedPrice = {
-        original_price: originalPrice,
-        price: price,
-        subscription_price: subscriptionPrice,
-        discount_percentage: storedDiscount,
-        discount_amount: discountAmount,
-        final_price: finalPrice,
-        final_subscription_price: finalSubPrice,
-        has_special_price: true,
-      };
-
       this.logger.log(
-        `[PRICING FLOW] STEP 2: SPECIAL PRICE applied to variant "${variantId}" | ` +
-        `MRP=Rs.${originalPrice} | One-time=Rs.${price} (unchanged) | ` +
-        `Sub=Rs.${subscriptionPrice} -> Discount=${storedDiscount}% -> Dynamic Special Price=Rs.${finalSubPrice} | ` +
-        `has_special_price=true | -> API sends: { final_price: ${finalPrice}, final_subscription_price: ${finalSubPrice} }`
+        `[PricingService] Special price applied directly to variant ${JSON.stringify({
+          variantId,
+          specialPrice: finalSubPrice,
+          discountPercentage,
+          discountAmount,
+          price,
+          finalPrice: price,
+          subscriptionPrice,
+          finalSubPrice,
+        })}`
       );
-      this.developer?.debug('[PricingService] Special price applied dynamically to variant', {
-        variantId, discountPercentage: storedDiscount, discountAmount,
-        price, finalPrice, subscriptionPrice, finalSubPrice,
-      });
-
-      return result;
-    } else {
-      // No special price — standard pricing
-      const finalSubPrice = isSubscribable && rawSubPrice > 0 ? subscriptionPrice : price;
 
       return {
         original_price: originalPrice,
         price: price,
         subscription_price: subscriptionPrice,
-        discount_percentage: 0,
-        discount_amount: 0,
+        discount_percentage: discountPercentage,
+        discount_amount: discountAmount,
         final_price: price,
         final_subscription_price: finalSubPrice,
-        has_special_price: false,
+        has_special_price: true,
       };
     }
+
+    const finalSubPrice = isSubscribable && rawSubPrice > 0 ? subscriptionPrice : price;
+
+    return {
+      original_price: originalPrice,
+      price: price,
+      subscription_price: subscriptionPrice,
+      discount_percentage: 0,
+      discount_amount: 0,
+      final_price: price,
+      final_subscription_price: finalSubPrice,
+      has_special_price: false,
+    };
   }
 
   /**
-   * WORKFLOW STEP 3 — Apply pricing to a full product list.
-   * WORKFLOW STEP 4 — Return enriched list (this is the JSON sent to the customer app).
+   * WORKFLOW STEP 3 & 4 — Apply pricing to product list and return enriched list.
    */
   async applyPricingToProductList(customerId: string | null, products: any[]): Promise<any[]> {
     if (!products || products.length === 0) return [];
 
-    this.logger.log(`[PRICING FLOW] =============================================`);
-    this.logger.log(`[PRICING FLOW] START applyPricingToProductList`);
-    this.logger.log(`[PRICING FLOW]   customerId   : "${customerId}"`);
-    this.logger.log(`[PRICING FLOW]   productCount : ${products.length}`);
-    this.developer?.debug('[PricingService] applyPricingToProductList started', { customerId, productCount: products.length });
-
-    // STEP 1 & 1b: Load special prices map
     const specialPricesMap = await this.getSpecialPricesMap(customerId);
 
-    this.logger.log(`[PRICING FLOW] STEP 3: Iterating ${products.length} variant(s) to apply pricing...`);
-    let specialPricesAppliedCount = 0;
-    let standardPricingCount = 0;
-
-    const result = products.map((prod) => {
+    return products.map((prod) => {
       const copy = { ...prod };
+      const variantId = copy.variant_id || copy.id;
+      if (variantId && specialPricesMap.has(variantId)) {
+        const pricing = this.calculateVariantPrice(copy, specialPricesMap.get(variantId));
+        Object.assign(copy, pricing);
+      }
       if (copy.variants && Array.isArray(copy.variants)) {
         copy.variants = copy.variants.map((v: any) => {
-          const variantId = v.variant_id || v.id;
-          const specialPrice = specialPricesMap.get(variantId) || 0;
-          if (specialPrice > 0) specialPricesAppliedCount++;
-          else standardPricingCount++;
-          const pricing = this.calculateVariantPrice(v, specialPrice);
+          const vId = v.variant_id || v.id;
+          const rule = specialPricesMap.get(vId);
+          const pricing = this.calculateVariantPrice(v, rule);
           return { ...v, ...pricing };
         });
       }
       if (copy.allVariants && Array.isArray(copy.allVariants)) {
         copy.allVariants = copy.allVariants.map((v: any) => {
-          const variantId = v.variant_id || v.id;
-          const specialPrice = specialPricesMap.get(variantId) || 0;
-          const pricing = this.calculateVariantPrice(v, specialPrice);
+          const vId = v.variant_id || v.id;
+          const rule = specialPricesMap.get(vId);
+          const pricing = this.calculateVariantPrice(v, rule);
           return { ...v, ...pricing };
         });
       }
       return copy;
     });
-
-    // STEP 4: Log result summary — this data gets serialized to JSON and sent to the app
-    this.logger.log(`[PRICING FLOW] STEP 4: Pricing complete`);
-    this.logger.log(`[PRICING FLOW]   -> ${specialPricesAppliedCount} variant(s) received SPECIAL subscription price`);
-    this.logger.log(`[PRICING FLOW]   -> ${standardPricingCount} variant(s) received standard price`);
-    this.logger.log(`[PRICING FLOW] =============================================`);
-    this.developer?.debug('[PricingService] applyPricingToProductList finished', { customerId, specialPricesAppliedCount });
-
-    return result;
   }
 }

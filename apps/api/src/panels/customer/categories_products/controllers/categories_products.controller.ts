@@ -93,20 +93,47 @@ export class CategoriesController {
     };
   }
 
+  private extractCustomerId(req: Request): string | null {
+    if ((req as any).user?.user_id) return (req as any).user.user_id;
+    if ((req as any).user?.id) return (req as any).user.id;
+    if ((req as any).user?.customer_id) return (req as any).user.customer_id;
+
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.substring(7);
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'));
+          return payload?.user_id || payload?.id || payload?.sub || payload?.customer_id || null;
+        }
+      } catch {}
+    }
+
+    const customHeader = req.headers['x-user-id'] || req.headers['x-customer-id'];
+    if (customHeader) return String(customHeader);
+
+    return null;
+  }
+
   @Public()
   @Get('categories')
   async getCategories() {
     return this.service.getCategories();
   }
+
   @Public()
   @Get('products')
-  async getProducts() {
-    return this.service.getProducts();
+  async getProducts(@Req() req: Request) {
+    const customerId = this.extractCustomerId(req);
+    return this.service.getProducts(customerId);
   }
+
   @Public()
   @Get('category/:category_id')
   async getProductsByCategoryId(@Req() req: Request) {
-    return this.service.getProductsByCategoryId(req.params.category_id as string);
+    const customerId = this.extractCustomerId(req);
+    return this.service.getProductsByCategoryId(req.params.category_id as string, customerId);
   }
 
   // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]

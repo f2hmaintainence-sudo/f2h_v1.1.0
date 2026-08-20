@@ -15,8 +15,8 @@ class CatalogRepositoryImpl implements CatalogRepository {
 
     // 1. Try to load from cache
     try {
-      // Bumped cache key to cached_products_v13 to force reload variant multi-image data
-      final cachedData = prefs.getString('cached_products_v13');
+      // Bumped cache key to cached_products_v14 to force reload with special pricing
+      final cachedData = prefs.getString('cached_products_v14');
       if (cachedData != null) {
         final List<dynamic> decoded = jsonDecode(cachedData);
         final cachedProducts = decoded
@@ -50,7 +50,7 @@ class CatalogRepositoryImpl implements CatalogRepository {
 
       if (products.isNotEmpty) {
         final encoded = jsonEncode(products.map((p) => p.toJson()).toList());
-        await prefs.setString('cached_products_v13', encoded);
+        await prefs.setString('cached_products_v14', encoded);
       }
 
       return products;
@@ -96,12 +96,23 @@ class CatalogRepositoryImpl implements CatalogRepository {
         final variantName = item['variant_name']?.toString() ?? '';
         final unitValue = item['unit_value']?.toString() ?? '';
         final unitType = item['unit_type']?.toString() ?? '';
-        final price = double.tryParse(item['price']?.toString() ?? '') ?? 0.0;
-        final origPrice = double.tryParse(item['original_price']?.toString() ?? '') ?? price;
+        final price = double.tryParse(item['final_price']?.toString() ?? '') ??
+            double.tryParse(item['finalPrice']?.toString() ?? '') ??
+            double.tryParse(item['price']?.toString() ?? '') ??
+            0.0;
+        final origPrice = double.tryParse(item['original_price']?.toString() ?? '') ??
+            double.tryParse(item['originalPrice']?.toString() ?? '') ??
+            price;
         final pNameLower = (item['product_name']?.toString() ?? '').toLowerCase();
         final vNameLower = variantName.toLowerCase();
         final isCurdOrNonSub = pNameLower.contains('curd') || vNameLower.contains('curd') || pNameLower.contains('paneer') || vNameLower.contains('paneer');
-        final subscriptionPrice = isCurdOrNonSub ? null : double.tryParse(item['subscription_price']?.toString() ?? '');
+        final rawSubPrice = double.tryParse(item['final_subscription_price']?.toString() ?? '') ??
+            double.tryParse(item['finalSubscriptionPrice']?.toString() ?? '') ??
+            double.tryParse(item['finalSubPrice']?.toString() ?? '') ??
+            double.tryParse(item['special_price']?.toString() ?? '') ??
+            double.tryParse(item['subscription_price']?.toString() ?? '') ??
+            double.tryParse(item['subscriptionPrice']?.toString() ?? '');
+        final subscriptionPrice = isCurdOrNonSub ? null : rawSubPrice;
 
         final availQty = item['available_quantity'] != null ? double.tryParse(item['available_quantity'].toString()) : null;
         final lowThreshold = item['low_stock_threshold'] != null ? double.tryParse(item['low_stock_threshold'].toString()) : 10.0;
@@ -186,9 +197,20 @@ class CatalogRepositoryImpl implements CatalogRepository {
         parsedProdImgs = [imageAsset];
       }
 
-      final price = double.tryParse(item['price']?.toString() ?? '') ?? 0.0;
-      final subscriptionPrice = isSubscribable ? double.tryParse(item['subscription_price']?.toString() ?? '') : null;
-      final originalPrice = double.tryParse(item['original_price']?.toString() ?? '') ?? price;
+      final price = double.tryParse(item['final_price']?.toString() ?? '') ??
+          double.tryParse(item['finalPrice']?.toString() ?? '') ??
+          double.tryParse(item['price']?.toString() ?? '') ??
+          0.0;
+      final rawSubPrice = double.tryParse(item['final_subscription_price']?.toString() ?? '') ??
+          double.tryParse(item['finalSubscriptionPrice']?.toString() ?? '') ??
+          double.tryParse(item['finalSubPrice']?.toString() ?? '') ??
+          double.tryParse(item['special_price']?.toString() ?? '') ??
+          double.tryParse(item['subscription_price']?.toString() ?? '') ??
+          double.tryParse(item['subscriptionPrice']?.toString() ?? '');
+      final subscriptionPrice = isSubscribable ? rawSubPrice : null;
+      final originalPrice = double.tryParse(item['original_price']?.toString() ?? '') ??
+          double.tryParse(item['originalPrice']?.toString() ?? '') ??
+          price;
 
       final siblingVariants = productVariantsMap[productId] ?? [];
 
