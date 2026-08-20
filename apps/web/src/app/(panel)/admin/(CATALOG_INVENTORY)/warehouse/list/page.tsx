@@ -17,6 +17,7 @@ import WarehouseSummaryCards from "@/components/warehouse/WarehouseSummaryCards"
 import WarehouseToolbar from "@/components/warehouse/WarehouseToolbar";
 import WarehouseCard, { WarehouseItem } from "@/components/warehouse/WarehouseCard";
 import WarehouseListView from "@/components/warehouse/WarehouseListView";
+import WarehouseModal from "@/components/warehouse/WarehouseModal";
 import TableComponents from "@/components/Table Generator/TableComponents";
 
 const API = "/admin/warehouses";
@@ -37,6 +38,11 @@ export default function WarehouseListPage() {
   // Pagination states
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(9);
+
+  // Dedicated Warehouse Modal with MapPicker
+  const [modalOpen, setModalOpen] = useState<boolean>(false);
+  const [modalMode, setModalMode] = useState<"create" | "edit">("create");
+  const [selectedWarehouse, setSelectedWarehouse] = useState<WarehouseItem | null>(null);
 
   // Fetch warehouses table data from backend API
   const fetchWarehouses = useCallback(async () => {
@@ -203,7 +209,9 @@ export default function WarehouseListPage() {
 
   // Action Triggers for Add/Edit/View
   const handleAddWarehouse = () => {
-    window.dispatchEvent(new CustomEvent("table:add"));
+    setSelectedWarehouse(null);
+    setModalMode("create");
+    setModalOpen(true);
   };
 
   const handleViewWarehouse = (warehouse: WarehouseItem) => {
@@ -215,11 +223,9 @@ export default function WarehouseListPage() {
   };
 
   const handleEditWarehouse = (warehouse: WarehouseItem) => {
-    window.dispatchEvent(
-      new CustomEvent("table:action", {
-        detail: { type: "edit", row: warehouse },
-      })
-    );
+    setSelectedWarehouse(warehouse);
+    setModalMode("edit");
+    setModalOpen(true);
   };
 
   const handleResetFilters = () => {
@@ -432,11 +438,20 @@ export default function WarehouseListPage() {
         </div>
       )}
 
-      {/* MODAL FORMS & DRAWERS (ADD, EDIT, VIEW, DELETE) */}
+      {/* DEDICATED WAREHOUSE MODAL WITH GOOGLE MAP PIN PICKER */}
+      <WarehouseModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSuccess={fetchWarehouses}
+        mode={modalMode}
+        warehouse={selectedWarehouse}
+      />
+
+      {/* MODAL FORMS & DRAWERS (VIEW, DELETE) */}
       <TableComponents
         title="Warehouse"
         apiBase={API}
-        actionTypes={["view", "edit", "delete"]}
+        actionTypes={["view", "delete"]}
         modalsOnly={true}
       />
     </div>
