@@ -70,6 +70,8 @@ import { AdminReferralModule } from './panels/admin/referrals/admin-referral.mod
 import { PromotionsCouponsModule } from './panels/admin/promotions-coupons/promotions-coupons.module';
 import { CustomerAppAssetsModule } from './panels/customer/app_assets/app_assets.module';
 import { FinanceModule } from './panels/admin/finance/finance.module';
+import { PaymentGatewayModule } from './shared/payments/payment-gateway.module';
+import { CustomerPaymentModule } from './panels/customer/payment/payment.module';
 @Module({
   imports: [
     FinanceModule,
@@ -143,6 +145,8 @@ import { FinanceModule } from './panels/admin/finance/finance.module';
     ReferralModule,
     AdminReferralModule,
     PromotionsCouponsModule,
+    PaymentGatewayModule,
+    CustomerPaymentModule,
     // Two tiers only. A third 'bruteForce' tier of 100/hour was declared here, and
     // because every named tier applies to every route it would have capped the whole
     // API at 100 requests an hour once the guard's bypass was removed. Brute-force

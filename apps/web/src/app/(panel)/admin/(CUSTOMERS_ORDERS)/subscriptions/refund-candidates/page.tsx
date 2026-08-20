@@ -18,6 +18,7 @@ import {
   Package,
   CalendarDays,
   Receipt,
+  Eye,
 } from 'lucide-react';
 import { getApiBaseUrl } from '@/lib/api-config';
 
@@ -41,12 +42,20 @@ interface Delivery {
   scheduled_date: string;
   delivery_slot: string;
   quantity: number;
+  /** The prepaid subscription price this refund is valued at. */
+  final_price?: number;
+  unit_price?: number;
   refund_amount: number;
   refund_reason: string;
+  /** 'pause' = paused day, 'order' = failed delivery. */
+  source?: string;
   product_name: string;
   variant_name: string;
   order_number?: string;
   status: string;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  notes?: string | null;
 }
 
 interface CustomerGroup {
@@ -169,11 +178,15 @@ function DeliveryRow({
   delivery,
   selected,
   onToggle,
+  onInspect,
 }: {
   delivery: Delivery;
   selected: boolean;
   onToggle: () => void;
+  onInspect?: (id: string) => void;
 }) {
+  // Pause day and failed order are different kinds of money owed — never blur them.
+  const isPause = (delivery.source ?? delivery.refund_reason) === 'pause';
   return (
     <div
       className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
@@ -197,17 +210,41 @@ function DeliveryRow({
         }`}>
           {delivery.delivery_slot}
         </span>
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${REASON_COLORS[delivery.refund_reason] ?? 'bg-slate-100'}`}>
-          {REASON_LABELS[delivery.refund_reason] ?? delivery.refund_reason}
+        <span
+          className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+            isPause
+              ? 'bg-amber-50 text-amber-800 border-amber-200'
+              : 'bg-rose-50 text-rose-700 border-rose-200'
+          }`}
+        >
+          {isPause ? 'PAUSE DAY' : 'FAILED ORDER'}
         </span>
         <span className="text-xs text-slate-500 truncate">
           {delivery.product_name} · {delivery.variant_name}
         </span>
+        <span className="text-[11px] text-slate-400 font-semibold">
+          {delivery.quantity} × {fmtAmount(delivery.final_price ?? 0)}
+        </span>
         {delivery.order_number && (
           <span className="text-xs font-mono text-slate-400">#{delivery.order_number}</span>
         )}
+        {delivery.status === 'reviewed' && (
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+            REVIEWED
+          </span>
+        )}
       </label>
-      <span className="font-black text-emerald-700 text-sm ml-auto shrink-0">
+      {onInspect && (
+        <button
+          type="button"
+          onClick={() => onInspect(delivery.refund_candidate_id)}
+          title="Review calculation"
+          className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+        >
+          <Eye size={15} />
+        </button>
+      )}
+      <span className="font-black text-emerald-700 text-sm shrink-0">
         {fmtAmount(delivery.refund_amount)}
       </span>
     </div>
@@ -221,11 +258,13 @@ function CustomerAccordion({
   selectedIds,
   onToggleDelivery,
   onSelectAll,
+  onInspect,
 }: {
   group: CustomerGroup;
   selectedIds: Set<string>;
   onToggleDelivery: (id: string) => void;
   onSelectAll: (ids: string[]) => void;
+  onInspect?: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const deliveries = group.deliveries ?? [];
@@ -274,6 +313,7 @@ function CustomerAccordion({
               delivery={d}
               selected={selectedIds.has(d.refund_candidate_id)}
               onToggle={() => onToggleDelivery(d.refund_candidate_id)}
+              onInspect={onInspect}
             />
           ))}
         </div>
@@ -375,9 +415,21 @@ export default function RefundCandidatesPage() {
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
   // ── Filters ──────────────────────────────────────────────────────────────────
+  const [filterMonth, setFilterMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [filterCustomer, setFilterCustomer] = useState('');
+  const [filterBranch, setFilterBranch] = useState('');
+  const [filterWarehouse, setFilterWarehouse] = useState('');
+  const [filterSubscription, setFilterSubscription] = useState('');
+  const [filterSource, setFilterSource] = useState('');
+
+  const [branches, setBranches] = useState<Array<{ branch_id: string; branch_name: string }>>([]);
+  const [warehouses, setWarehouses] = useState<Array<{ warehouse_id: string; name: string }>>([]);
+  const [scanning, setScanning] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
+  const [detail, setDetail] = useState<any | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const showToast = (type: 'success' | 'error', msg: string) => {
     setToast({ type, msg });
@@ -397,23 +449,124 @@ export default function RefundCandidatesPage() {
   }, []);
 
   // ── Fetch Customer Groups ─────────────────────────────────────────────────────
+  /** Filters shared by the listing and the calculation, so both agree on scope. */
+  const buildQuery = useCallback(() => {
+    const q = new URLSearchParams();
+    // An explicit date range wins over the month picker.
+    if (filterDateFrom && filterDateTo) {
+      q.set('date_from', filterDateFrom);
+      q.set('date_to', filterDateTo);
+    } else {
+      if (filterDateFrom) q.set('date_from', filterDateFrom);
+      if (filterDateTo) q.set('date_to', filterDateTo);
+      if (filterMonth) q.set('month', filterMonth);
+    }
+    if (filterCustomer) q.set('customer_id', filterCustomer);
+    if (filterBranch) q.set('branch_id', filterBranch);
+    if (filterWarehouse) q.set('warehouse_id', filterWarehouse);
+    if (filterSubscription) q.set('subscription_id', filterSubscription);
+    if (filterSource) q.set('source', filterSource);
+    return q;
+  }, [
+    filterMonth, filterDateFrom, filterDateTo, filterCustomer,
+    filterBranch, filterWarehouse, filterSubscription, filterSource,
+  ]);
+
   const fetchGroups = useCallback(async () => {
     setGroupsLoading(true);
-    const q = new URLSearchParams();
-    if (filterDateFrom) q.set('date_from', filterDateFrom);
-    if (filterDateTo) q.set('date_to', filterDateTo);
-    if (filterCustomer) q.set('customer_id', filterCustomer);
     try {
-      const res = await fetch(`${API}/subscriptions/refund-candidates/customer-groups?${q}`, { credentials: 'include' });
+      const res = await fetch(
+        `${API}/subscriptions/refund-candidates/customer-groups?${buildQuery()}`,
+        { credentials: 'include' },
+      );
       const json = await res.json();
       setGroups(json.data ?? []);
     } finally {
       setGroupsLoading(false);
     }
-  }, [filterDateFrom, filterDateTo, filterCustomer]);
+  }, [buildQuery]);
 
   useEffect(() => { fetchSummary(); }, [fetchSummary]);
   useEffect(() => { fetchGroups(); }, [fetchGroups]);
+
+  // Branch and warehouse pickers.
+  useEffect(() => {
+    fetch(`${API}/admin/zone/branches-list`, { credentials: 'include' })
+      .then((r) => r.json())
+      .then((j) => setBranches(j?.data ?? []))
+      .catch(() => {});
+    fetch(`${API}/admin/warehouses/active/list`, { credentials: 'include' })
+      .then((r) => r.json())
+      .then((j) => setWarehouses(j?.data ?? []))
+      .catch(() => {});
+  }, []);
+
+  // ── Calculate refundable days/orders for the selected scope ──────────────────
+  const handleScan = async () => {
+    setScanning(true);
+    try {
+      const res = await fetch(
+        `${API}/subscriptions/refund-candidates/scan?${buildQuery()}`,
+        { method: 'POST', credentials: 'include' },
+      );
+      const json = await res.json();
+      if (json.status) {
+        showToast('success', json.message ?? 'Refund calculation complete');
+        fetchSummary();
+        fetchGroups();
+      } else {
+        showToast('error', json.message ?? 'Calculation failed');
+      }
+    } catch {
+      showToast('error', 'Network error — please try again');
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  // ── Review (Eligible → Reviewed) ─────────────────────────────────────────────
+  const handleBulkReview = async () => {
+    if (!selectedIds.size) return showToast('error', 'Please select at least one delivery');
+    setReviewing(true);
+    try {
+      const res = await fetch(`${API}/subscriptions/refund-candidates/bulk-review`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidate_ids: Array.from(selectedIds) }),
+      });
+      const json = await res.json();
+      if (json.status) {
+        showToast('success', json.message ?? 'Marked as reviewed');
+        fetchGroups();
+      } else {
+        showToast('error', json.message ?? 'Could not mark as reviewed');
+      }
+    } catch {
+      showToast('error', 'Network error — please try again');
+    } finally {
+      setReviewing(false);
+    }
+  };
+
+  /** Opens the review drawer with the full calculation basis for one day. */
+  const openDetail = async (candidateId: string) => {
+    setDetailLoading(true);
+    setDetail({ loading: true });
+    try {
+      const res = await fetch(
+        `${API}/subscriptions/refund-candidates/detail/${candidateId}`,
+        { credentials: 'include' },
+      );
+      const json = await res.json();
+      setDetail(json.data ?? null);
+    } catch {
+      setDetail(null);
+      showToast('error', 'Could not load refund details');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   // ── Selection Helpers ─────────────────────────────────────────────────────────
   const toggleDelivery = (id: string) => {
@@ -560,7 +713,19 @@ export default function RefundCandidatesPage() {
               <Filter size={16} className="text-slate-400" />
               Filters
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
+                  <CalendarDays size={12} />
+                  Month
+                </label>
+                <input
+                  type="month"
+                  value={filterMonth}
+                  onChange={(e) => setFilterMonth(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400 transition-colors"
+                />
+              </div>
               <div className="space-y-1">
                 <label className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
                   <CalendarDays size={12} />
@@ -586,6 +751,54 @@ export default function RefundCandidatesPage() {
                 />
               </div>
               <div className="space-y-1">
+                <label className="text-xs font-bold uppercase text-slate-400">Branch</label>
+                <select
+                  value={filterBranch}
+                  onChange={(e) => setFilterBranch(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400 transition-colors bg-white"
+                >
+                  <option value="">All branches</option>
+                  {branches.map((b) => (
+                    <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase text-slate-400">Warehouse</label>
+                <select
+                  value={filterWarehouse}
+                  onChange={(e) => setFilterWarehouse(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400 transition-colors bg-white"
+                >
+                  <option value="">All warehouses</option>
+                  {warehouses.map((w) => (
+                    <option key={w.warehouse_id} value={w.warehouse_id}>{w.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase text-slate-400">Reason</label>
+                <select
+                  value={filterSource}
+                  onChange={(e) => setFilterSource(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400 transition-colors bg-white"
+                >
+                  <option value="">Pause days + failed orders</option>
+                  <option value="pause">Pause days only</option>
+                  <option value="order">Failed orders only</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase text-slate-400">Subscription</label>
+                <input
+                  type="text"
+                  placeholder="Subscription no. or ID…"
+                  value={filterSubscription}
+                  onChange={(e) => setFilterSubscription(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400 transition-colors"
+                />
+              </div>
+              <div className="space-y-1">
                 <label className="text-xs font-bold uppercase text-slate-400">Customer ID</label>
                 <input
                   type="text"
@@ -596,12 +809,38 @@ export default function RefundCandidatesPage() {
                 />
               </div>
             </div>
+
+            {/* Nothing is refundable until it has been calculated — this is that trigger. */}
+            <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-slate-100">
+              <button
+                onClick={handleScan}
+                disabled={scanning}
+                className="flex items-center gap-2 px-4 py-2 bg-deep-green hover:bg-emerald-800 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-60"
+              >
+                {scanning ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                {scanning
+                  ? 'Calculating…'
+                  : `Calculate refunds for ${filterMonth || 'this month'}`}
+              </button>
+              <p className="text-xs text-slate-400 font-medium">
+                Scans paused days and failed subscription orders. Safe to re-run — existing
+                refunds are never duplicated.
+              </p>
+            </div>
           </div>
 
           {/* Bulk Actions Bar */}
           {selectedIds.size > 0 && (
             <div className="sticky top-16 z-30 flex flex-wrap items-center gap-3 bg-deep-green text-white px-5 py-3 rounded-2xl shadow-xl">
               <span className="font-bold text-sm">{selectedIds.size} selected</span>
+              <button
+                onClick={handleBulkReview}
+                disabled={reviewing || processing}
+                className="flex items-center gap-2 px-4 py-1.5 bg-white/15 hover:bg-white/25 text-white font-bold text-sm rounded-xl transition-colors disabled:opacity-60"
+              >
+                {reviewing ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
+                Mark Reviewed
+              </button>
               <button
                 onClick={handleBulkApprove}
                 disabled={processing}
@@ -656,6 +895,7 @@ export default function RefundCandidatesPage() {
                   selectedIds={selectedIds}
                   onToggleDelivery={toggleDelivery}
                   onSelectAll={toggleSelectAll}
+                  onInspect={openDetail}
                 />
               ))}
             </div>
@@ -665,6 +905,97 @@ export default function RefundCandidatesPage() {
 
       {/* ── Payouts Tab ── */}
       {activeTab === 'payouts' && <PayoutsTab />}
+
+      {/* ── Review Drawer: how this amount was arrived at ── */}
+      {detail && (
+        <div
+          className="fixed inset-0 z-50 flex justify-end bg-slate-900/40"
+          onClick={() => setDetail(null)}
+        >
+          <div
+            className="w-full max-w-md h-full bg-white shadow-2xl overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 sticky top-0 bg-white">
+              <div className="flex items-center gap-2">
+                <Receipt size={16} className="text-emerald-600" />
+                <h3 className="font-black text-slate-800 text-sm">Refund Review</h3>
+              </div>
+              <button
+                onClick={() => setDetail(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100"
+              >
+                <XCircle size={18} />
+              </button>
+            </div>
+
+            {detailLoading || detail.loading ? (
+              <div className="p-10 flex justify-center">
+                <Loader2 size={22} className="animate-spin text-emerald-600" />
+              </div>
+            ) : (
+              <div className="p-5 space-y-5">
+                <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">
+                    Refundable amount
+                  </p>
+                  <p className="text-3xl font-black text-emerald-800 mt-1">
+                    {fmtAmount(detail.refund_amount)}
+                  </p>
+                  <p className="text-xs text-emerald-700/80 mt-1 font-semibold">
+                    {detail.quantity} × {fmtAmount(detail.final_price)} (prepaid price)
+                  </p>
+                  {Number(detail.recomputed_amount) !== Number(detail.refund_amount) && (
+                    <p className="text-xs font-bold text-rose-700 mt-2">
+                      Stored amount differs from quantity × price — verify before approving.
+                    </p>
+                  )}
+                </div>
+
+                <dl className="space-y-2 text-sm">
+                  {[
+                    ['Status', String(detail.status ?? '').toUpperCase()],
+                    ['Reason', detail.source === 'pause' ? 'Pause Day' : 'Failed Order'],
+                    ['Customer', `${detail.customer_name ?? ''} · ${detail.customer_phone ?? ''}`],
+                    ['Subscription', detail.subscription_number ?? detail.subscription_id],
+                    ['Payment type', detail.payment_type],
+                    ['Branch', detail.branch_name ?? detail.branch_id],
+                    ['Date', `${fmtDate(detail.scheduled_date)} · ${detail.delivery_slot}`],
+                    ['Product', `${detail.product_name ?? ''} ${detail.variant_name ?? ''}`],
+                    ['Order', detail.order_number ?? '—'],
+                    ['Order status', detail.order_status ?? '—'],
+                    ['Stop status', detail.stop_status ?? '—'],
+                    ['Failure reason', detail.failed_reason ?? '—'],
+                    ['Item unit price', fmtAmount(detail.item_unit_price ?? 0)],
+                    ['Discount applied', fmtAmount(detail.discount_amount ?? 0)],
+                    ['Coupon applied', fmtAmount(detail.coupon_amount ?? 0)],
+                    ['Reviewed by', detail.reviewed_by ?? '—'],
+                  ].map(([label, value]) => (
+                    <div key={label as string} className="flex justify-between gap-4">
+                      <dt className="text-slate-400 font-semibold shrink-0">{label}</dt>
+                      <dd className="text-slate-800 font-bold text-right break-words">
+                        {String(value ?? '—')}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+
+                {detail.notes && (
+                  <div className="rounded-xl bg-amber-50 border border-amber-100 p-3">
+                    <p className="text-[10px] font-black uppercase text-amber-700">Notes</p>
+                    <p className="text-xs text-amber-900 mt-1">{detail.notes}</p>
+                  </div>
+                )}
+
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Amounts use the price stored on the subscription item at purchase time, so
+                  later catalogue price changes never affect a refund.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

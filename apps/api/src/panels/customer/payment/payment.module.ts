@@ -9,8 +9,10 @@ import { PushNotificationService } from 'src/shared/pushNotifications/pushNotifi
 import { DataService } from 'src/shared/database/Data.service';
 import { DatabaseService } from 'src/shared/database/Database.service';
 import { DeveloperService } from 'src/shared/logger/Developer.service';
+import { PaymentGatewayModule } from 'src/shared/payments/payment-gateway.module';
 
 @Module({
+  imports: [PaymentGatewayModule],
   controllers: [CustomerPaymentController, RazorpayWebhookController],
   providers: [
     CustomerPaymentService,
@@ -20,6 +22,6 @@ import { DeveloperService } from 'src/shared/logger/Developer.service';
     DatabaseService,
     DeveloperService,
   ],
-  exports: [CustomerPaymentService],
+  exports: [CustomerPaymentService, PaymentGatewayModule],
 })
 export class CustomerPaymentModule {}

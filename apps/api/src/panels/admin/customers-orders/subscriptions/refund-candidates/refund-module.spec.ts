@@ -346,21 +346,13 @@ describe('RefundProcessingService — atomic payout', () => {
 
   it('notifies the customer only after the transaction commits', async () => {
     const order: string[] = [];
-    const { db, wallet, service } = processing([
-      {
-        rows: [
-          { refund_candidate_id: 'c1', subscription_id: 'S1', scheduled_date: '2026-08-12', refund_amount: 78, status: 'pending' },
-        ],
-      },
-      { rows: [] }, { rows: [{ refund_payout_id: 'PO-1' }] },
-      { rows: [] }, { rows: [] }, { rows: [] }, { rows: [] },
-    ]);
+    const { db, wallet, service } = happyPath();
     db.transaction.mockImplementation(async (cb: any) => {
-      const client = fakeClient([
-        { rows: [{ refund_candidate_id: 'c1', subscription_id: 'S1', scheduled_date: '2026-08-12', refund_amount: 78, status: 'pending' }] },
-        { rows: [] }, { rows: [{ refund_payout_id: 'PO-1' }] },
-        { rows: [] }, { rows: [] }, { rows: [] }, { rows: [] },
-      ]);
+      const client = fakeClient(
+        clientQueue([
+          { refund_candidate_id: 'c1', subscription_id: 'S1', scheduled_date: '2026-08-12', refund_amount: 78, status: 'pending' },
+        ]),
+      );
       const out = await cb(client);
       order.push('commit');
       return out;
@@ -378,15 +370,11 @@ describe('RefundProcessingService — atomic payout', () => {
   });
 
   it('propagates a wallet failure so the whole payout rolls back', async () => {
-    const { db, service, wallet } = processing([
-      {
-        rows: [
-          { refund_candidate_id: 'c1', subscription_id: 'S1', scheduled_date: '2026-08-12', refund_amount: 39, status: 'pending' },
-        ],
-      },
-      { rows: [] },
-      { rows: [{ refund_payout_id: 'PO-1' }] },
-    ]);
+    const { db, service, wallet } = processing(
+      clientQueue([
+        { refund_candidate_id: 'c1', subscription_id: 'S1', scheduled_date: '2026-08-12', refund_amount: 39, status: 'pending' },
+      ]),
+    );
     wallet.credit.mockRejectedValue(new Error('insufficient wallet lock'));
     db.query.mockResolvedValue([
       { refund_candidate_id: 'c1', customer_id: 'C1', status: 'pending' },
