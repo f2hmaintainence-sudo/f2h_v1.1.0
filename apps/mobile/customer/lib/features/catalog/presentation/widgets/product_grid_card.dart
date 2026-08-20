@@ -34,7 +34,7 @@ const Color _stockGrey = Color(0xFFE4E9EC);
 /// Aspect ratio the shop grid should use with this card. Chosen so the
 /// artwork still gets roughly a third of the cell once the fixed rows
 /// (badges, name, unit, price, action) have taken their space.
-const double kProductGridAspectRatio = 0.52;
+const double kProductGridAspectRatio = 0.58;
 
 class ProductGridCard extends StatelessWidget {
   final Product product;
@@ -75,17 +75,17 @@ class ProductGridCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: kSurface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _cardBorder, width: 1.2),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: _cardBorder, width: 1.1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.035),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
-        padding: const EdgeInsets.fromLTRB(9, 9, 9, 9),
+        padding: const EdgeInsets.fromLTRB(7, 7, 7, 7),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -96,16 +96,16 @@ class ProductGridCard extends StatelessWidget {
               rating: product.rating,
               reviews: product.reviews,
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Expanded(
               child: Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: const Color(0xFFF5F7F6),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                   child: Center(
                     child: Hero(
                       tag: 'product-v-${product.id}',
@@ -120,34 +120,34 @@ class ProductGridCard extends StatelessWidget {
               ),
             ),
             if (showSubscribe && subPrice != null) ...[
-              const SizedBox(height: 5),
+              const SizedBox(height: 4),
               _SubscriptionPillButton(
                 product: product,
                 subscriptionPrice: subPrice,
               ),
             ],
-            const SizedBox(height: 6),
+            const SizedBox(height: 5),
             Text(
               product.name,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
                 color: kText,
                 letterSpacing: -0.2,
-                height: 1.2,
+                height: 1.15,
               ),
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 2),
             _UnitLine(unit: unit, showSubscribeHint: false),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             _PriceRow(
               price: product.price,
               originalPrice: product.originalPrice,
               muted: false,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             _CardAction(product: product),
           ],
         ),
@@ -604,7 +604,7 @@ class _ActionShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    height: 38,
+    height: 34,
     width: double.infinity,
     alignment: Alignment.center,
     padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -626,9 +626,9 @@ class _StepperButton extends StatelessWidget {
     onTap: onTap,
     behavior: HitTestBehavior.opaque,
     child: SizedBox(
-      width: 44,
-      height: 38,
-      child: Icon(icon, size: 20, color: Colors.white),
+      width: 40,
+      height: 34,
+      child: Icon(icon, size: 18, color: Colors.white),
     ),
   );
 }

@@ -133,7 +133,7 @@ function BannerVisualPreview({
   discount_text,
   description,
   image_url,
-  banner_type,
+  banner_type = "home_carousel",
   cta_label,
   background_color,
   category_name,
@@ -153,37 +153,53 @@ function BannerVisualPreview({
 
   if (banner_type === "popup") {
     return (
-      <div className="mx-auto max-w-[320px] w-full bg-white rounded-3xl overflow-hidden shadow-xl border border-slate-200 animate-in zoom-in-95 duration-200">
-        <div style={{ backgroundColor: bg }} className="min-h-[140px] max-h-[220px] w-full flex items-center justify-center p-3 relative overflow-hidden">
-          <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/90 text-slate-700 flex items-center justify-center text-[10px] font-bold shadow-xs z-20">
+      <div className="mx-auto max-w-[340px] w-full bg-white rounded-3xl overflow-hidden shadow-xl border border-slate-200 animate-in zoom-in-95 duration-200">
+        <div style={{ backgroundColor: bg }} className="min-h-[150px] max-h-[220px] w-full flex items-center justify-center p-3 relative overflow-hidden">
+          <div className="absolute top-2.5 right-2.5 w-6 h-6 rounded-full bg-white/90 text-slate-700 flex items-center justify-center text-[10px] font-bold shadow-xs z-20">
             ✕
           </div>
           {cleanSrc ? (
             <img
               src={cleanSrc}
               alt=""
-              className="max-h-[190px] w-auto max-w-full object-contain drop-shadow-md rounded-lg"
+              className="max-h-[180px] w-auto max-w-full object-contain drop-shadow-md rounded-xl"
               onError={(e) => {
                 (e.target as HTMLElement).style.display = "none";
               }}
             />
           ) : (
-            <Smartphone size={40} className="text-white/70" />
+            <div className="flex flex-col items-center justify-center gap-1.5 text-white/80">
+              <Smartphone size={38} />
+              <span className="text-[10px] font-bold tracking-wide uppercase">App Launch Popup</span>
+            </div>
           )}
         </div>
-        <div className="p-4 text-center space-y-2">
+        <div className="p-4 text-center space-y-2.5">
           {discount_text && (
-            <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-extrabold text-[10px] tracking-wide">
+            <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-950 font-black text-[11px] tracking-wide shadow-2xs border border-amber-300">
               {discount_text.toUpperCase()}
             </span>
           )}
-          <h4 className="font-extrabold text-sm sm:text-base text-slate-900 leading-tight">{title || "Offer Headline"}</h4>
-          {description && <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">{description}</p>}
+          <h4 className="font-black text-sm sm:text-base text-slate-900 leading-snug break-words">
+            {title || "Special Promotional Offer"}
+          </h4>
+          {description ? (
+            <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line break-words bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+              {description}
+            </p>
+          ) : (
+            <p className="text-xs text-slate-400 italic">No description provided</p>
+          )}
+          {category_name && (
+            <div className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md inline-block">
+              Target: {category_name}
+            </div>
+          )}
           <div className="pt-1">
             <button
               type="button"
               style={{ backgroundColor: bg }}
-              className="w-full py-2.5 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5"
+              className="w-full py-2.5 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 hover:opacity-95 active:scale-[0.99]"
             >
               <span>{cta}</span>
               <ArrowRight size={13} />
@@ -198,25 +214,36 @@ function BannerVisualPreview({
     return (
       <div
         style={{ backgroundColor: bg }}
-        className="rounded-2xl p-4 text-white relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-3 min-h-[110px] shadow-sm transition-all"
+        className="rounded-2xl p-4 text-white relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-3 min-h-[120px] shadow-sm transition-all"
       >
-        <div className="space-y-1.5 z-10 flex-1 min-w-0">
+        <div className="space-y-2 z-10 flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="px-2 py-0.5 rounded-md bg-black/25 text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1">
               <FolderTree size={10} /> Category Slide
             </span>
+            {category_name && (
+              <span className="px-2 py-0.5 rounded-md bg-white/20 text-white font-extrabold text-[9px]">
+                {category_name}
+              </span>
+            )}
             {discount_text && (
-              <span className="px-2 py-0.5 rounded-md bg-white text-slate-900 font-extrabold text-[9px]">
+              <span className="px-2 py-0.5 rounded-md bg-white text-slate-900 font-black text-[9px]">
                 {discount_text}
               </span>
             )}
           </div>
           <h4 className="font-extrabold text-sm sm:text-base leading-tight break-words">{title || "Category Offer Title"}</h4>
-          <p className="text-[10px] text-white/85 line-clamp-2">
-            {description || (category_name ? `Target Category: ${category_name}` : "Targeted category promotional slide")}
-          </p>
+          {description ? (
+            <p className="text-xs text-white/90 leading-relaxed whitespace-pre-line break-words bg-black/10 p-2 rounded-xl">
+              {description}
+            </p>
+          ) : (
+            <p className="text-[11px] text-white/80">
+              {category_name ? `Featured promotion in ${category_name}` : "Targeted category promotional slide"}
+            </p>
+          )}
           <div className="pt-0.5">
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-white text-slate-900 px-2.5 py-1 rounded-lg shadow-xs">
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-white text-slate-900 px-3 py-1 rounded-lg shadow-xs">
               {cta} <ArrowRight size={11} />
             </span>
           </div>
@@ -243,42 +270,48 @@ function BannerVisualPreview({
 
   if (banner_type === "checkout_banner") {
     return (
-      <div className="rounded-2xl p-3.5 bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-amber-500/10 border-2 border-dashed border-emerald-500/40 flex flex-col sm:flex-row items-center justify-between gap-3 min-h-[70px]">
-        <div className="flex items-center gap-3 min-w-0 w-full sm:w-auto">
+      <div className="rounded-2xl p-4 bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-amber-500/10 border-2 border-dashed border-emerald-500/40 flex flex-col sm:flex-row items-center justify-between gap-3 min-h-[85px]">
+        <div className="flex items-center gap-3.5 min-w-0 w-full sm:w-auto flex-1">
           {cleanSrc ? (
-            <div className="w-12 h-12 rounded-xl shrink-0 overflow-hidden flex items-center justify-center bg-white shadow-xs border border-slate-100">
+            <div className="w-14 h-14 rounded-xl shrink-0 overflow-hidden flex items-center justify-center bg-white shadow-xs border border-slate-100">
               <img
                 src={cleanSrc}
                 alt=""
-                className="max-h-11 max-w-11 object-contain"
+                className="max-h-12 max-w-12 object-contain"
                 onError={(e) => {
                   (e.target as HTMLElement).style.display = "none";
                 }}
               />
             </div>
           ) : (
-            <div style={{ backgroundColor: bg }} className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-xs">
-              <Percent size={18} />
+            <div style={{ backgroundColor: bg }} className="w-12 h-12 rounded-xl flex items-center justify-center text-white shrink-0 shadow-xs">
+              <ShoppingBag size={20} />
             </div>
           )}
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-extrabold text-xs text-slate-900">{title || "Checkout Promotion"}</span>
+              <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-extrabold text-[9px] uppercase tracking-wider flex items-center gap-1">
+                <ShoppingBag size={10} /> Checkout Promo
+              </span>
+              <span className="font-black text-xs sm:text-sm text-slate-900">{title || "Checkout Promotion"}</span>
               {discount_text && (
-                <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[9px] font-bold uppercase">
+                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold uppercase">
                   {discount_text}
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-slate-500 line-clamp-1">{description || "Applied automatically at checkout"}</p>
+            {description && (
+              <p className="text-xs text-slate-600 leading-snug whitespace-pre-line break-words">{description}</p>
+            )}
           </div>
         </div>
         <button
           type="button"
           style={{ backgroundColor: bg }}
-          className="px-3.5 py-1.5 text-white font-bold text-[10px] rounded-lg shrink-0 shadow-xs flex items-center gap-1 w-full sm:w-auto justify-center"
+          className="px-4 py-2 text-white font-bold text-xs rounded-xl shrink-0 shadow-xs flex items-center gap-1 w-full sm:w-auto justify-center hover:opacity-95"
         >
           <span>{cta}</span>
+          <ArrowRight size={12} />
         </button>
       </div>
     );
@@ -288,7 +321,7 @@ function BannerVisualPreview({
   return (
     <div
       style={{ backgroundColor: bg }}
-      className="rounded-2xl p-4 text-white relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-4 min-h-[120px] shadow-sm transition-all"
+      className="rounded-2xl p-4 text-white relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-4 min-h-[130px] shadow-sm transition-all"
     >
       <div className="space-y-2 z-10 flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -296,13 +329,19 @@ function BannerVisualPreview({
             <Tag size={10} /> Home Carousel
           </span>
           {discount_text && (
-            <span className="px-2 py-0.5 rounded-md bg-white text-slate-900 font-extrabold text-[9px]">
+            <span className="px-2 py-0.5 rounded-md bg-white text-slate-900 font-black text-[9px]">
               {discount_text}
             </span>
           )}
         </div>
-        <h4 className="font-extrabold text-sm sm:text-base leading-snug break-words">{title || "Home Carousel Title"}</h4>
-        <p className="text-[11px] text-white/85 line-clamp-2">{description || "Discover fresh organic harvest & daily essentials"}</p>
+        <h4 className="font-black text-sm sm:text-base leading-snug break-words">{title || "Home Carousel Title"}</h4>
+        {description ? (
+          <p className="text-xs text-white/90 leading-relaxed whitespace-pre-line break-words bg-black/10 p-2 rounded-xl">
+            {description}
+          </p>
+        ) : (
+          <p className="text-[11px] text-white/85">Discover fresh organic harvest &amp; daily essentials</p>
+        )}
         <div className="pt-1">
           <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-white text-slate-900 px-3 py-1.5 rounded-xl shadow-xs">
             {cta} <ArrowRight size={12} />
@@ -761,15 +800,16 @@ export default function PromotionsCouponsOffersPage() {
   const openEditOffer = (o: OfferBanner) => {
     setEditingOffer(o);
     const cleanUrl = cleanImageUrl(o.image_url);
+    const resolvedType = (o.banner_type as any) || (o.is_popup ? "popup" : (o.category_id ? "category_slide" : "home_carousel"));
     setEditOfferForm({
       title: o.title || "",
       discount_text: o.discount_text || "",
       description: o.description || "",
       image_url: cleanUrl,
       banner_image: cleanUrl,
-      banner_type: (o.banner_type as any) || "home_carousel",
+      banner_type: resolvedType,
       category_id: o.category_id || "",
-      is_popup: Boolean(o.is_popup || o.banner_type === "popup"),
+      is_popup: Boolean(o.is_popup || resolvedType === "popup"),
       action_type: o.action_type || "CATEGORY",
       action_value: o.action_value || "",
       cta_label: o.cta_label || "Shop Now",
@@ -1444,6 +1484,16 @@ export default function PromotionsCouponsOffersPage() {
                   <Smartphone size={13} />
                   Popup Banners ({offers.filter((o) => o.is_popup || o.banner_type === "popup").length})
                 </button>
+                <button
+                  onClick={() => setOfferPlacementFilter("checkout_banner")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${offerPlacementFilter === "checkout_banner"
+                    ? "bg-amber-600 text-white shadow-xs"
+                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                    }`}
+                >
+                  <ShoppingBag size={13} />
+                  Checkout Promos ({offers.filter((o) => o.banner_type === "checkout_banner").length})
+                </button>
               </div>
 
               {/* Category Filter Selector */}
@@ -1469,61 +1519,74 @@ export default function PromotionsCouponsOffersPage() {
               <div className="text-xs font-bold text-slate-800 mb-3 flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <Sparkles size={14} className="text-indigo-600" />
-                  Live App Banners &amp; Category Slides Previews:
+                  Live App Banners &amp; Visual Previews:
                 </span>
                 <span className="text-[11px] text-slate-400 font-normal">
-                  Tap "View Popup Mockup" on any card to see how it renders as an app launch dialog.
+                  Tap "Live Mockup" on any card to view its mobile rendering dialog.
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredOffers.filter((o) => o.is_active).map((offer) => {
-                  const isPopup = Boolean(offer.is_popup || offer.banner_type === "popup");
-                  const isCatSlide = offer.banner_type === "category_slide" || Boolean(offer.category_id);
+                  const bannerType = offer.banner_type || (offer.is_popup ? "popup" : (offer.category_id ? "category_slide" : "home_carousel"));
+                  const isPopup = bannerType === "popup" || Boolean(offer.is_popup);
+                  const isCatSlide = bannerType === "category_slide" || Boolean(offer.category_id);
+                  const isCheckout = bannerType === "checkout_banner";
 
                   return (
                     <div
                       key={offer.id}
                       style={{ backgroundColor: offer.background_color || "#16a34a" }}
-                      className="p-4 rounded-3xl text-white relative overflow-hidden shadow-sm flex flex-col justify-between h-44 border border-black/5 group"
+                      className="p-4 rounded-3xl text-white relative overflow-hidden shadow-sm flex flex-col justify-between min-h-[180px] border border-black/5 group"
                     >
-                      <div className="space-y-1 relative z-10">
+                      <div className="space-y-1.5 relative z-10">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {offer.discount_text && (
-                            <span className="px-2 py-0.5 rounded-md bg-white/20 text-[10px] font-extrabold uppercase tracking-wider">
+                            <span className="px-2 py-0.5 rounded-md bg-white text-slate-900 text-[10px] font-black uppercase tracking-wider shadow-2xs">
                               {offer.discount_text}
                             </span>
                           )}
-                          {isPopup && (
+                          {isPopup ? (
                             <span className="px-2 py-0.5 rounded-md bg-rose-500 text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1 shadow-xs">
                               <Smartphone size={10} /> App Popup
                             </span>
-                          )}
-                          {isCatSlide && (
-                            <span className="px-2 py-0.5 rounded-md bg-purple-500/80 text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1">
+                          ) : isCatSlide ? (
+                            <span className="px-2 py-0.5 rounded-md bg-purple-500/90 text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1 shadow-xs">
                               <FolderTree size={10} /> {getCategoryName(offer.category_id)}
+                            </span>
+                          ) : isCheckout ? (
+                            <span className="px-2 py-0.5 rounded-md bg-amber-500 text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1 shadow-xs">
+                              <ShoppingBag size={10} /> Checkout Promo
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md bg-black/25 text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1">
+                              <Tag size={10} /> Home Carousel
                             </span>
                           )}
                         </div>
 
-                        <h4 className="font-extrabold text-sm leading-tight drop-shadow-xs mt-1">{offer.title}</h4>
-                        {offer.description && (
-                          <p className="text-[11px] text-white/90 line-clamp-2">{offer.description}</p>
+                        <h4 className="font-extrabold text-sm sm:text-base leading-snug drop-shadow-xs mt-1 break-words">{offer.title}</h4>
+                        {offer.description ? (
+                          <p className="text-xs text-white/90 line-clamp-2 leading-relaxed bg-black/10 p-1.5 rounded-lg whitespace-pre-line">
+                            {offer.description}
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-white/70 italic">No description</p>
                         )}
                       </div>
 
-                      <div className="flex items-center justify-between mt-2 relative z-10">
+                      <div className="flex items-center justify-between mt-3 relative z-10 pt-2 border-t border-white/10">
                         <button
                           onClick={() => {
                             setPreviewOffer(offer);
                             setPopupPreviewModalOpen(true);
                           }}
-                          className="text-[10px] font-bold bg-white text-slate-900 px-2.5 py-1 rounded-lg hover:bg-slate-100 transition shadow-xs flex items-center gap-1"
+                          className="text-[10px] font-bold bg-white text-slate-900 px-3 py-1.5 rounded-xl hover:bg-slate-100 transition shadow-xs flex items-center gap-1.5"
                         >
                           <Eye size={12} />
-                          Popup Mockup
+                          Live Mockup
                         </button>
-                        <span className="text-[10px] text-white/80 font-mono">Order #{offer.display_order}</span>
+                        <span className="text-[10px] text-white/90 font-mono font-bold">Order #{offer.display_order}</span>
                       </div>
 
                       {/* Image Preview Thumbnail */}
@@ -1533,7 +1596,7 @@ export default function PromotionsCouponsOffersPage() {
                           <img
                             src={src}
                             alt={offer.title}
-                            className="w-20 h-20 object-contain absolute right-2 bottom-2 drop-shadow-md z-0 opacity-90 group-hover:scale-105 transition rounded-lg"
+                            className="w-20 h-20 object-contain absolute right-2 bottom-8 drop-shadow-md z-0 opacity-85 group-hover:scale-105 transition rounded-lg"
                             onError={(e) => {
                               (e.target as HTMLElement).style.display = "none";
                             }}
@@ -1569,7 +1632,8 @@ export default function PromotionsCouponsOffersPage() {
                     </tr>
                   ) : (
                     filteredOffers.map((o) => {
-                      const isPopup = Boolean(o.is_popup || o.banner_type === "popup");
+                      const bannerType = o.banner_type || (o.is_popup ? "popup" : (o.category_id ? "category_slide" : "home_carousel"));
+                      const isPopup = bannerType === "popup" || Boolean(o.is_popup);
                       const cleanTableSrc = getImageSrc(o.image_url);
 
                       return (
@@ -1578,7 +1642,7 @@ export default function PromotionsCouponsOffersPage() {
                             <div className="flex items-center gap-3">
                               <div
                                 style={{ backgroundColor: o.background_color || "#16a34a" }}
-                                className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 overflow-hidden shadow-xs relative"
+                                className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shrink-0 overflow-hidden shadow-xs relative"
                               >
                                 {cleanTableSrc ? (
                                   <img
@@ -1593,19 +1657,31 @@ export default function PromotionsCouponsOffersPage() {
                                   <ImageIcon size={18} />
                                 )}
                               </div>
-                              <div>
-                                <div className="font-bold text-slate-900 text-sm">{o.title}</div>
-                                {o.description && (
-                                  <div className="text-[11px] text-slate-400 line-clamp-1">{o.description}</div>
+                              <div className="max-w-xs">
+                                <div className="font-bold text-slate-900 text-sm leading-snug">{o.title}</div>
+                                {o.description ? (
+                                  <div className="text-[11px] text-slate-500 line-clamp-2 mt-0.5 whitespace-pre-line">{o.description}</div>
+                                ) : (
+                                  <div className="text-[10px] text-slate-400 italic">No description</div>
                                 )}
                               </div>
                             </div>
                           </td>
                           <td className="p-4 space-y-1">
-                            {o.banner_type === "category_slide" || o.category_id ? (
+                            {bannerType === "category_slide" || o.category_id ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 font-bold text-xs">
                                 <FolderTree size={12} />
                                 {getCategoryName(o.category_id)}
+                              </span>
+                            ) : bannerType === "popup" || o.is_popup ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 font-bold text-xs">
+                                <Smartphone size={12} />
+                                App Popup
+                              </span>
+                            ) : bannerType === "checkout_banner" ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-bold text-xs">
+                                <ShoppingBag size={12} />
+                                Checkout Promo
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs">

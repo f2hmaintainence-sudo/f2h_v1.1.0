@@ -267,15 +267,15 @@ class _BrowseState extends State<BrowseScreen> {
   /// Derives the cell height from the real card width so the artwork keeps a
   /// usable share of the card even on narrow screens.
   SliverGridDelegate _gridDelegate(double availableWidth) {
-    const horizontalPadding = 20.0;
-    const crossAxisSpacing = 12.0;
+    const horizontalPadding = 16.0;
+    const crossAxisSpacing = 10.0;
     final cardWidth =
         (availableWidth - horizontalPadding - crossAxisSpacing) / 2;
-    final extent = math.max(cardWidth / kProductGridAspectRatio, 292.0);
+    final extent = math.max(cardWidth / kProductGridAspectRatio, 252.0);
 
     return SliverGridDelegateWithFixedCrossAxisCount(
       crossAxisCount: 2,
-      mainAxisSpacing: 12,
+      mainAxisSpacing: 10,
       crossAxisSpacing: crossAxisSpacing,
       mainAxisExtent: extent,
     );
@@ -298,7 +298,7 @@ class _BrowseState extends State<BrowseScreen> {
     });
 
     return Container(
-      width: 84,
+      width: 78,
       decoration: const BoxDecoration(color: Color(0xFFF1F4F6)),
       child: isLoadingState
           ? const Center(child: CircularProgressIndicator(color: kPrimary))

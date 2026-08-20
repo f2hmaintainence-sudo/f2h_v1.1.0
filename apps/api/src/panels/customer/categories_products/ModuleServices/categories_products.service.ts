@@ -32,18 +32,33 @@ export class CategoriesProductsService {
     isPopup: boolean,
   ): Promise<any[]> {
     try {
-      const rows = await this.db.query(
-        `SELECT id, title, description, discount_text, action_type, action_value,
-                category_id, cta_label, background_color, banner_type,
-                is_popup, display_order, image_url, image_path
-           FROM product_banner
-          WHERE deleted_at IS NULL
-            AND is_active = TRUE
-            AND COALESCE(is_popup, FALSE) = $1
-            AND COALESCE(banner_type, 'home_carousel') = ANY($2::text[])
-          ORDER BY display_order ASC, id ASC`,
-        [isPopup, bannerTypes],
-      );
+      let queryStr: string;
+      let params: any[];
+
+      if (isPopup) {
+        queryStr = `SELECT id, title, description, discount_text, action_type, action_value,
+                           category_id, cta_label, background_color, banner_type,
+                           is_popup, display_order, image_url, image_path
+                      FROM product_banner
+                     WHERE deleted_at IS NULL
+                       AND is_active = TRUE
+                       AND (COALESCE(is_popup, FALSE) = TRUE OR banner_type = 'popup')
+                     ORDER BY display_order ASC, id ASC`;
+        params = [];
+      } else {
+        queryStr = `SELECT id, title, description, discount_text, action_type, action_value,
+                           category_id, cta_label, background_color, banner_type,
+                           is_popup, display_order, image_url, image_path
+                      FROM product_banner
+                     WHERE deleted_at IS NULL
+                       AND is_active = TRUE
+                       AND COALESCE(is_popup, FALSE) = FALSE
+                       AND COALESCE(banner_type, 'home_carousel') = ANY($1::text[])
+                     ORDER BY display_order ASC, id ASC`;
+        params = [bannerTypes];
+      }
+
+      const rows = await this.db.query(queryStr, params);
       return rows ?? [];
     } catch (error) {
       this.developer.error('getManagedBanners failed', { error, bannerTypes, isPopup });
