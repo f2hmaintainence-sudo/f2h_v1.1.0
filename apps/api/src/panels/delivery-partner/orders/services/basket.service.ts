@@ -656,7 +656,7 @@ export class BasketService {
       return { status: false, message: 'No active delivery run found' };
     }
 
-    // 1. Ensure live container transactions are synced to delivery_container_reconciliation first
+    // 1. Refresh the reconciliation rows for this run before submitting
     await this.getContainerSummary(partnerId, activeRunId);
 
     // 2. Submit all collected containers for activeRunId in delivery_container_reconciliation

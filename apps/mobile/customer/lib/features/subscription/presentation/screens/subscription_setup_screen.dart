@@ -628,8 +628,12 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                   _buildFrequencySection(),
                   const SizedBox(height: 16),
 
-                  // ── Start Date & Auto Renewal ─────────────────
-                  _buildScheduleOptions(),
+                  // ── Start Date Card ───────────────────────────
+                  _buildStartDateCard(),
+                  const SizedBox(height: 16),
+
+                  // ── Auto Renewal Card ─────────────────────────
+                  _buildAutoRenewalCard(),
                   const SizedBox(height: 16),
 
                   // ── Payment Type ──────────────────────────────
@@ -1137,9 +1141,9 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     return map[abbr] ?? abbr;
   }
 
-  // ── Schedule Options (Start Date + Auto Renewal) ──────
+  // ── Start Date Card (Standalone Card) ─────────────────────
 
-  Widget _buildScheduleOptions() {
+  Widget _buildStartDateCard() {
     final monthNames = [
       'Jan',
       'Feb',
@@ -1156,95 +1160,129 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     ];
 
     return _SectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Start From
-          Row(
-            children: [
-              const Icon(
-                Icons.play_circle_outline_rounded,
-                size: 16,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          _pickStartDate();
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: kPrimaryPl,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.play_circle_fill_rounded,
+                size: 20,
                 color: kPrimary,
               ),
-              const SizedBox(width: 6),
-              const Text(
-                'Start From',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: kText,
-                ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Start From',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      color: kText,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'First delivery will start on this date',
+                    style: TextStyle(fontSize: 11, color: kTextSub),
+                  ),
+                ],
               ),
-              const Spacer(),
-              GestureDetector(
-                onTap: _pickStartDate,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: kPrimaryPl,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: kPrimary.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.calendar_today_rounded,
-                        size: 13,
-                        color: kPrimary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${_startDate.day} ${monthNames[_startDate.month - 1]} ${_startDate.year}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: kPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 7,
               ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          const Divider(color: Color(0xFFE5E7EB), height: 1),
-          const SizedBox(height: 14),
+              decoration: BoxDecoration(
+                color: kPrimaryPl,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: kPrimary.withOpacity(0.35), width: 1.2),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.calendar_today_rounded,
+                    size: 14,
+                    color: kPrimary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${_startDate.day} ${monthNames[_startDate.month - 1]} ${_startDate.year}',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w900,
+                      color: kPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-          // Auto Renewal
-          Row(
-            children: [
-              const Icon(Icons.autorenew_rounded, size: 16, color: kPrimary),
-              const SizedBox(width: 6),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Auto Renewal',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: kText,
-                      ),
-                    ),
-                    Text(
-                      'Subscription renews automatically each month',
-                      style: TextStyle(fontSize: 10, color: kTextSub),
-                    ),
-                  ],
+  // ── Auto Renewal Card (Standalone Card) ───────────────────
+
+  Widget _buildAutoRenewalCard() {
+    return _SectionCard(
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F5E9),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.autorenew_rounded,
+              size: 20,
+              color: Color(0xFF1B4332),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Auto Renewal',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    color: kText,
+                  ),
                 ),
-              ),
-              Switch(
-                value: _autoRenew,
-                onChanged: (v) => setState(() => _autoRenew = v),
-                activeColor: kPrimary,
-              ),
-            ],
+                const SizedBox(height: 2),
+                const Text(
+                  'Subscription renews automatically each month',
+                  style: TextStyle(fontSize: 11, color: kTextSub),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: _autoRenew,
+            onChanged: (v) {
+              HapticFeedback.lightImpact();
+              setState(() => _autoRenew = v);
+            },
+            activeColor: kPrimary,
           ),
         ],
       ),
@@ -1570,17 +1608,31 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
 class _SectionCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
-  const _SectionCard({required this.child, this.padding});
+  final Color? backgroundColor;
+  final Border? border;
+  const _SectionCard({
+    required this.child,
+    this.padding,
+    this.backgroundColor,
+    this.border,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: padding ?? const EdgeInsets.all(14),
+      padding: padding ?? const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: backgroundColor ?? Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: border ?? Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
+        ],
       ),
       child: child,
     );
@@ -1596,12 +1648,12 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 15, color: kPrimary),
+        Icon(icon, size: 16, color: kPrimary),
         const SizedBox(width: 6),
         Text(
           label,
           style: const TextStyle(
-            fontSize: 13,
+            fontSize: 13.5,
             fontWeight: FontWeight.w900,
             color: kText,
           ),
@@ -1646,7 +1698,10 @@ class _FreqChip extends StatelessWidget {
     final isSel = value == selected;
     return Expanded(
       child: GestureDetector(
-        onTap: () => onTap(value),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap(value);
+        },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 9),
@@ -1655,7 +1710,17 @@ class _FreqChip extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: isSel ? const Color(0xFF1B4332) : const Color(0xFFDDE1E6),
+              width: isSel ? 1.5 : 1.0,
             ),
+            boxShadow: isSel
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF1B4332).withValues(alpha: 0.2),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
           child: Text(
             label,
@@ -1695,44 +1760,73 @@ class _PaymentTypeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = selected ? const Color(0xFF1B4332) : kText;
+    final activeColor = const Color(0xFF1B4332);
     final bg = !isEnabled
-        ? const Color(0xFFF1F5F9)
-        : (selected ? const Color(0xFFE8F5E9) : Colors.white);
+        ? const Color(0xFFF8FAFC)
+        : (selected ? const Color(0xFFF0FDF4) : Colors.white);
     final borderColor = !isEnabled
-        ? const Color(0xFFCBD5E1)
-        : (selected ? const Color(0xFF1B4332) : const Color(0xFFDDE1E6));
+        ? const Color(0xFFE2E8F0)
+        : (selected ? activeColor : const Color(0xFFE2E8F0));
 
     return GestureDetector(
-      onTap: isEnabled ? onTap : null,
+      onTap: isEnabled
+          ? () {
+              HapticFeedback.selectionClick();
+              onTap?.call();
+            }
+          : null,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.all(10),
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: borderColor, width: selected ? 1.5 : 1.0),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: borderColor, width: selected ? 2.0 : 1.0),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: activeColor.withValues(alpha: 0.12),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  )
+                ]
+              : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(
               children: [
-                Icon(
-                  icon,
-                  size: 14,
-                  color: !isEnabled
-                      ? const Color(0xFF94A3B8)
-                      : (selected ? const Color(0xFF1B4332) : kTextSub),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: !isEnabled
+                        ? const Color(0xFFE2E8F0)
+                        : (selected
+                            ? activeColor.withValues(alpha: 0.12)
+                            : const Color(0xFFF1F5F9)),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 15,
+                    color: !isEnabled
+                        ? const Color(0xFF94A3B8)
+                        : (selected ? activeColor : kTextSub),
+                  ),
                 ),
-                const SizedBox(width: 5),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     label,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: FontWeight.w900,
-                      color: !isEnabled ? const Color(0xFF94A3B8) : activeColor,
+                      color: !isEnabled
+                          ? const Color(0xFF94A3B8)
+                          : (selected ? activeColor : kText),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -1741,7 +1835,7 @@ class _PaymentTypeCard extends StatelessWidget {
                 if (!isEnabled) ...[
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 4,
+                      horizontal: 5,
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
@@ -1749,9 +1843,9 @@ class _PaymentTypeCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text(
-                      'Not Activated',
+                      'Locked',
                       style: TextStyle(
-                        fontSize: 8,
+                        fontSize: 8.5,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF64748B),
                       ),
@@ -1760,12 +1854,12 @@ class _PaymentTypeCard extends StatelessWidget {
                 ] else if (isVip) ...[
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
+                      horizontal: 6,
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(6),
                       border: Border.all(
                         color: const Color(0xFFF59E0B),
                         width: 0.6,
@@ -1780,23 +1874,24 @@ class _PaymentTypeCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (selected) const SizedBox(width: 4),
+                  const SizedBox(width: 4),
                 ],
                 if (selected && isEnabled)
-                  const Icon(
+                  Icon(
                     Icons.check_circle_rounded,
-                    size: 14,
-                    color: Color(0xFF1B4332),
+                    size: 16,
+                    color: activeColor,
                   ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             Text(
               description,
               style: TextStyle(
-                fontSize: 9,
+                fontSize: 10,
                 color: !isEnabled ? const Color(0xFF94A3B8) : kTextSub,
-                height: 1.3,
+                height: 1.35,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
