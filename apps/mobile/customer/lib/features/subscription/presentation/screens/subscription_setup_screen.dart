@@ -1569,13 +1569,14 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
 
 class _SectionCard extends StatelessWidget {
   final Widget child;
-  const _SectionCard({required this.child});
+  final EdgeInsetsGeometry? padding;
+  const _SectionCard({required this.child, this.padding});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: padding ?? const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),

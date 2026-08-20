@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/core/services/app_asset_service.dart';
+import 'package:f2h_customer/theme/app_colors.dart';
 
 // ══════════════════════════════════════════════════════════
 //  PRODUCT VARIANT — size/weight options per product
