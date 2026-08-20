@@ -38,6 +38,28 @@ export class FinanceService {
     };
   }
 
+  async getAllCustomerBills(query: any): Promise<any> {
+    const res = await this.repository.getAllCustomerBills(query);
+    return {
+      status: true,
+      data: res.bills,
+      meta: {
+        total: res.total,
+        page: Number(query.page || 1),
+        limit: Number(query.limit || 20),
+        totalPages: Math.ceil(res.total / Math.max(1, Number(query.limit || 20))),
+      },
+    };
+  }
+
+  async getBillingStats(days = 30): Promise<any> {
+    const stats = await this.repository.getBillingStats(days);
+    return {
+      status: true,
+      data: stats,
+    };
+  }
+
   async getCombinedPayments(query: any): Promise<any> {
     const res = await this.repository.getCombinedPaymentsReport(query);
     return {

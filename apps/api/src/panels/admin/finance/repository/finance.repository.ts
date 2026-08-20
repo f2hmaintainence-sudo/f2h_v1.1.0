@@ -243,10 +243,10 @@ export class FinanceRepository {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ─── PAYMENTS & BILLING REPORT (ORDER + SUBSCRIPTION BILLS) ───────────────
+  // ─── ALL CUSTOMER BILLING (CUSTOMER_BILLS TABLE: WALLET, COD, UPI, ETC.) ──
   // ═══════════════════════════════════════════════════════════════════════════
 
-  async getCombinedPaymentsReport(query: any): Promise<{ data: any[]; total: number }> {
+  async getAllCustomerBills(query: any): Promise<{ bills: any[]; total: number }> {
     const conditions: string[] = [`pb.deleted_at IS NULL`];
     const params: any[] = [];
     let paramIndex = 1;
@@ -255,14 +255,22 @@ export class FinanceRepository {
       const t = String(query.type).toLowerCase();
       if (t === 'subscription' || t === 'postpaid') {
         conditions.push(`(pb.bill_type IN ('subscription', 'postpaid') OR pb.payment_type = 'postpaid')`);
-      } else if (t === 'order' || t === 'one-time' || t === 'one_time') {
+      } else if (t === 'order' || t === 'prepaid' || t === 'one-time' || t === 'one_time') {
         conditions.push(`((pb.bill_type IN ('order', 'prepaid') OR pb.payment_type = 'prepaid') AND pb.bill_type NOT IN ('subscription', 'postpaid'))`);
       }
     }
 
-    if (query.method && query.method !== 'all') {
+    if (query.payment_method && query.payment_method !== 'all') {
+      conditions.push(`LOWER(pb.payment_method::text) = $${paramIndex++}`);
+      params.push(String(query.payment_method).toLowerCase());
+    } else if (query.method && query.method !== 'all') {
       conditions.push(`LOWER(pb.payment_method::text) = $${paramIndex++}`);
       params.push(String(query.method).toLowerCase());
+    }
+
+    if (query.payment_type && query.payment_type !== 'all') {
+      conditions.push(`LOWER(pb.payment_type::text) = $${paramIndex++}`);
+      params.push(String(query.payment_type).toLowerCase());
     }
 
     if (query.status && query.status !== 'all') {
@@ -325,6 +333,12 @@ export class FinanceRepository {
           pb.bill_type,
           pb.payment_method,
           pb.payment_type,
+          pb.billing_from AS period_start,
+          pb.billing_to AS period_end,
+          pb.due_date,
+          pb.subtotal,
+          pb.tax_amount,
+          pb.discount_amount,
           pb.total_amount,
           pb.paid_amount,
           pb.due_amount,
@@ -335,7 +349,12 @@ export class FinanceRepository {
           COALESCE(u.phone, '') AS customer_phone,
           COALESCE(u.email, '') AS customer_email,
           COALESCE(b.branch_name, 'Main Hub') AS branch_name,
-          b.branch_id
+          b.branch_id,
+          (
+            SELECT COUNT(*)
+            FROM public.customer_bill_items cbi
+            WHERE cbi.bill_id = pb.bill_id
+          ) AS order_count
         FROM public.customer_bills pb
         LEFT JOIN public.customers c ON (c.customer_id = pb.customer_id)
         LEFT JOIN public.users u ON (u.user_id = pb.customer_id)
@@ -344,8 +363,8 @@ export class FinanceRepository {
         ORDER BY pb.created_at DESC
         LIMIT 5000
       `;
-      const data = await this.db.query(dataSql, params);
-      return { data: Array.isArray(data) ? data : [], total };
+      const bills = await this.db.query(dataSql, params);
+      return { bills: Array.isArray(bills) ? bills : [], total };
     }
 
     const page = Math.max(1, Number(query.page || 1));
@@ -360,6 +379,12 @@ export class FinanceRepository {
         pb.bill_type,
         pb.payment_method,
         pb.payment_type,
+        pb.billing_from AS period_start,
+        pb.billing_to AS period_end,
+        pb.due_date,
+        pb.subtotal,
+        pb.tax_amount,
+        pb.discount_amount,
         pb.total_amount,
         pb.paid_amount,
         pb.due_amount,
@@ -370,13 +395,220 @@ export class FinanceRepository {
         COALESCE(u.phone, '') AS customer_phone,
         COALESCE(u.email, '') AS customer_email,
         COALESCE(b.branch_name, 'Main Hub') AS branch_name,
-        b.branch_id
+        b.branch_id,
+        (
+          SELECT COUNT(*)
+          FROM public.customer_bill_items cbi
+          WHERE cbi.bill_id = pb.bill_id
+        ) AS order_count,
+        GREATEST(0, (CURRENT_DATE - pb.due_date::date)) AS days_overdue
       FROM public.customer_bills pb
       LEFT JOIN public.customers c ON (c.customer_id = pb.customer_id)
       LEFT JOIN public.users u ON (u.user_id = pb.customer_id)
       LEFT JOIN public.branches b ON (b.branch_id = c.branch_id)
       ${whereClause}
       ORDER BY pb.created_at DESC
+      LIMIT $${paramIndex++} OFFSET $${paramIndex++}
+    `;
+
+    const bills = await this.db.query(dataSql, [...params, limit, offset]);
+
+    return { bills: Array.isArray(bills) ? bills : [], total };
+  }
+
+  async getBillingStats(days = 30): Promise<any> {
+    const daysNum = Math.max(1, Number(days));
+
+    const sqlGeneral = `
+      SELECT 
+        COALESCE(SUM(pb.total_amount), 0)::numeric AS total_invoiced,
+        COALESCE(SUM(pb.paid_amount), 0)::numeric AS total_collected,
+        COALESCE(SUM(pb.due_amount), 0)::numeric AS total_due,
+        COUNT(*)::int AS total_bills,
+
+        COALESCE(SUM(CASE WHEN pb.bill_type IN ('subscription', 'postpaid') OR pb.payment_type = 'postpaid' THEN pb.total_amount ELSE 0 END), 0)::numeric AS subscription_invoiced,
+        COALESCE(SUM(CASE WHEN pb.bill_type IN ('subscription', 'postpaid') OR pb.payment_type = 'postpaid' THEN pb.paid_amount ELSE 0 END), 0)::numeric AS subscription_paid,
+        COUNT(CASE WHEN pb.bill_type IN ('subscription', 'postpaid') OR pb.payment_type = 'postpaid' THEN 1 END)::int AS subscription_count,
+
+        COALESCE(SUM(CASE WHEN (pb.bill_type IN ('order', 'prepaid') OR pb.payment_type = 'prepaid') AND pb.bill_type NOT IN ('subscription', 'postpaid') THEN pb.total_amount ELSE 0 END), 0)::numeric AS order_invoiced,
+        COALESCE(SUM(CASE WHEN (pb.bill_type IN ('order', 'prepaid') OR pb.payment_type = 'prepaid') AND pb.bill_type NOT IN ('subscription', 'postpaid') THEN pb.paid_amount ELSE 0 END), 0)::numeric AS order_paid,
+        COUNT(CASE WHEN (pb.bill_type IN ('order', 'prepaid') OR pb.payment_type = 'prepaid') AND pb.bill_type NOT IN ('subscription', 'postpaid') THEN 1 END)::int AS order_count,
+
+        COUNT(CASE WHEN LOWER(pb.status::text) = 'paid' THEN 1 END)::int AS paid_count,
+        COUNT(CASE WHEN LOWER(pb.status::text) IN ('pending', 'unpaid') THEN 1 END)::int AS pending_count,
+        COUNT(CASE WHEN LOWER(pb.status::text) = 'partial' THEN 1 END)::int AS partial_count,
+        COUNT(CASE WHEN LOWER(pb.status::text) = 'failed' THEN 1 END)::int AS failed_count,
+
+        COALESCE(SUM(CASE WHEN LOWER(pb.payment_method) = 'wallet' THEN pb.paid_amount ELSE 0 END), 0)::numeric AS wallet_collected,
+        COALESCE(SUM(CASE WHEN LOWER(pb.payment_method) = 'upi' THEN pb.paid_amount ELSE 0 END), 0)::numeric AS upi_collected,
+        COALESCE(SUM(CASE WHEN LOWER(pb.payment_method) = 'razorpay' OR LOWER(pb.payment_method) = 'online' THEN pb.paid_amount ELSE 0 END), 0)::numeric AS razorpay_collected,
+        COALESCE(SUM(CASE WHEN LOWER(pb.payment_method) = 'cash' OR LOWER(pb.payment_method) = 'cod' THEN pb.paid_amount ELSE 0 END), 0)::numeric AS cash_collected
+      FROM public.customer_bills pb
+      WHERE pb.deleted_at IS NULL
+        AND pb.created_at >= (CURRENT_DATE - (${daysNum} || ' days')::interval)
+    `;
+    const rows = await this.db.query(sqlGeneral, []);
+    const general = rows?.[0] || {};
+
+    const sqlMethods = `
+      SELECT 
+        COALESCE(NULLIF(LOWER(pb.payment_method), ''), 'other') AS payment_method,
+        COUNT(*)::int AS count,
+        COALESCE(SUM(pb.paid_amount), 0)::numeric AS paid_amount,
+        COALESCE(SUM(pb.total_amount), 0)::numeric AS total_amount
+      FROM public.customer_bills pb
+      WHERE pb.deleted_at IS NULL
+        AND pb.created_at >= (CURRENT_DATE - (${daysNum} || ' days')::interval)
+      GROUP BY COALESCE(NULLIF(LOWER(pb.payment_method), ''), 'other')
+      ORDER BY paid_amount DESC
+    `;
+    const methodsRes = await this.db.query(sqlMethods, []);
+    const methods = Array.isArray(methodsRes) ? methodsRes : [];
+
+    return {
+      general,
+      methods,
+      days: daysNum,
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ─── ONLINE PAYMENT TRANSACTIONS (PAYMENT_TRANSACTIONS TABLE: RAZORPAY) ───
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async getOnlinePaymentTransactions(query: any): Promise<{ data: any[]; total: number }> {
+    const conditions: string[] = [`pt.deleted_at IS NULL`];
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (query.status && query.status !== 'all') {
+      conditions.push(`LOWER(pt.status::text) = $${paramIndex++}`);
+      params.push(String(query.status).toLowerCase());
+    }
+
+    if (query.purpose && query.purpose !== 'all') {
+      conditions.push(`LOWER(pt.purpose::text) = $${paramIndex++}`);
+      params.push(String(query.purpose).toLowerCase());
+    }
+
+    if (query.method && query.method !== 'all') {
+      conditions.push(`LOWER(pt.method::text) = $${paramIndex++}`);
+      params.push(String(query.method).toLowerCase());
+    }
+
+    if (query.provider && query.provider !== 'all') {
+      conditions.push(`LOWER(pt.provider::text) = $${paramIndex++}`);
+      params.push(String(query.provider).toLowerCase());
+    }
+
+    if (query.startDate || query.from_date) {
+      const sDate = query.startDate || query.from_date;
+      conditions.push(`pt.created_at >= $${paramIndex++}::date`);
+      params.push(sDate);
+    }
+
+    if (query.endDate || query.to_date) {
+      const eDate = query.endDate || query.to_date;
+      conditions.push(`pt.created_at <= $${paramIndex++}::date + interval '1 day'`);
+      params.push(eDate);
+    }
+
+    if (query.search) {
+      conditions.push(
+        `(pt.transaction_id ILIKE $${paramIndex} OR pt.provider_order_id ILIKE $${paramIndex} OR pt.provider_payment_id ILIKE $${paramIndex} OR pt.customer_id ILIKE $${paramIndex} OR u.first_name ILIKE $${paramIndex} OR u.last_name ILIKE $${paramIndex} OR u.phone ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex})`
+      );
+      params.push(`%${query.search.trim()}%`);
+      paramIndex++;
+    }
+
+    if (query.days && !query.startDate && !query.from_date) {
+      const daysNum = Math.max(1, Number(query.days || 30));
+      conditions.push(`pt.created_at >= (CURRENT_DATE - ($${paramIndex++} || ' days')::interval)`);
+      params.push(daysNum);
+    }
+
+    const whereClause = `WHERE ${conditions.join(' AND ')}`;
+
+    const countSql = `
+      SELECT COUNT(*) AS total
+      FROM public.payment_transactions pt
+      LEFT JOIN public.users u ON (u.user_id = pt.customer_id)
+      ${whereClause}
+    `;
+    const countRows = await this.db.query(countSql, params);
+    const total = Number(countRows?.[0]?.total || 0);
+
+    if (query.export === 'true' || query.export === true) {
+      const dataSql = `
+        SELECT 
+          pt.id,
+          pt.transaction_id,
+          pt.customer_id,
+          pt.purpose,
+          pt.reference_id,
+          pt.provider,
+          pt.provider_order_id,
+          pt.provider_payment_id,
+          pt.method,
+          pt.amount,
+          pt.currency,
+          pt.status,
+          pt.failure_reason,
+          pt.notes,
+          pt.paid_at,
+          pt.fulfilled_at,
+          pt.refunded_amount,
+          pt.created_at,
+          COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), NULLIF(u.user_name, ''), NULLIF(u.email, ''), pt.customer_id) AS customer_name,
+          COALESCE(u.phone, '') AS customer_phone,
+          COALESCE(u.email, '') AS customer_email,
+          COALESCE(b.branch_name, 'Main Hub') AS branch_name
+        FROM public.payment_transactions pt
+        LEFT JOIN public.customers c ON (c.customer_id = pt.customer_id)
+        LEFT JOIN public.users u ON (u.user_id = pt.customer_id)
+        LEFT JOIN public.branches b ON (b.branch_id = c.branch_id)
+        ${whereClause}
+        ORDER BY pt.created_at DESC
+        LIMIT 5000
+      `;
+      const data = await this.db.query(dataSql, params);
+      return { data: Array.isArray(data) ? data : [], total };
+    }
+
+    const page = Math.max(1, Number(query.page || 1));
+    const limit = Math.max(1, Math.min(100, Number(query.limit || 20)));
+    const offset = (page - 1) * limit;
+
+    const dataSql = `
+      SELECT 
+        pt.id,
+        pt.transaction_id,
+        pt.customer_id,
+        pt.purpose,
+        pt.reference_id,
+        pt.provider,
+        pt.provider_order_id,
+        pt.provider_payment_id,
+        pt.method,
+        pt.amount,
+        pt.currency,
+        pt.status,
+        pt.failure_reason,
+        pt.notes,
+        pt.paid_at,
+        pt.fulfilled_at,
+        pt.refunded_amount,
+        pt.created_at,
+        COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), NULLIF(u.user_name, ''), NULLIF(u.email, ''), pt.customer_id) AS customer_name,
+        COALESCE(u.phone, '') AS customer_phone,
+        COALESCE(u.email, '') AS customer_email,
+        COALESCE(b.branch_name, 'Main Hub') AS branch_name
+      FROM public.payment_transactions pt
+      LEFT JOIN public.customers c ON (c.customer_id = pt.customer_id)
+      LEFT JOIN public.users u ON (u.user_id = pt.customer_id)
+      LEFT JOIN public.branches b ON (b.branch_id = c.branch_id)
+      ${whereClause}
+      ORDER BY pt.created_at DESC
       LIMIT $${paramIndex++} OFFSET $${paramIndex++}
     `;
 
@@ -388,45 +620,53 @@ export class FinanceRepository {
   async getPaymentsStats(days = 30): Promise<any> {
     const daysNum = Math.max(1, Number(days));
 
+    // Telemetry from payment_transactions (Razorpay gateway)
     const sqlGeneral = `
       SELECT 
-        COALESCE(SUM(pb.paid_amount), 0)::numeric AS total_collected,
-        COALESCE(SUM(pb.total_amount), 0)::numeric AS total_billed,
-        COALESCE(SUM(pb.due_amount), 0)::numeric AS total_pending_due,
-        COUNT(*)::int AS total_invoices,
+        COALESCE(SUM(CASE WHEN LOWER(pt.status::text) IN ('paid', 'fulfilled') THEN pt.amount ELSE 0 END), 0)::numeric AS total_collected,
+        COALESCE(SUM(pt.amount), 0)::numeric AS total_volume,
+        COALESCE(SUM(pt.refunded_amount), 0)::numeric AS total_refunded,
+        COUNT(*)::int AS total_transactions,
 
-        COALESCE(SUM(CASE WHEN pb.bill_type IN ('subscription', 'postpaid') OR pb.payment_type = 'postpaid' THEN pb.paid_amount ELSE 0 END), 0)::numeric AS subscription_paid,
-        COUNT(CASE WHEN pb.bill_type IN ('subscription', 'postpaid') OR pb.payment_type = 'postpaid' THEN 1 END)::int AS subscription_count,
+        COUNT(CASE WHEN LOWER(pt.status::text) IN ('paid', 'fulfilled') THEN 1 END)::int AS paid_count,
+        COUNT(CASE WHEN LOWER(pt.status::text) = 'created' THEN 1 END)::int AS created_count,
+        COUNT(CASE WHEN LOWER(pt.status::text) = 'failed' THEN 1 END)::int AS failed_count,
+        COUNT(CASE WHEN LOWER(pt.status::text) = 'refunded' OR pt.refunded_amount > 0 THEN 1 END)::int AS refunded_count,
 
-        COALESCE(SUM(CASE WHEN (pb.bill_type IN ('order', 'prepaid') OR pb.payment_type = 'prepaid') AND pb.bill_type NOT IN ('subscription', 'postpaid') THEN pb.paid_amount ELSE 0 END), 0)::numeric AS order_paid,
-        COUNT(CASE WHEN (pb.bill_type IN ('order', 'prepaid') OR pb.payment_type = 'prepaid') AND pb.bill_type NOT IN ('subscription', 'postpaid') THEN 1 END)::int AS order_count,
+        COALESCE(SUM(CASE WHEN LOWER(pt.purpose::text) = 'wallet_topup' AND LOWER(pt.status::text) IN ('paid', 'fulfilled') THEN pt.amount ELSE 0 END), 0)::numeric AS wallet_topup_volume,
+        COUNT(CASE WHEN LOWER(pt.purpose::text) = 'wallet_topup' THEN 1 END)::int AS wallet_topup_count,
 
-        COUNT(CASE WHEN LOWER(pb.status::text) = 'paid' THEN 1 END)::int AS paid_count,
-        COUNT(CASE WHEN LOWER(pb.status::text) IN ('pending', 'unpaid', 'partial') THEN 1 END)::int AS pending_count,
-        COUNT(CASE WHEN LOWER(pb.status::text) = 'failed' THEN 1 END)::int AS failed_count
-      FROM public.customer_bills pb
-      WHERE pb.deleted_at IS NULL
-        AND pb.created_at >= (CURRENT_DATE - (${daysNum} || ' days')::interval)
+        COALESCE(SUM(CASE WHEN LOWER(pt.purpose::text) = 'order' AND LOWER(pt.status::text) IN ('paid', 'fulfilled') THEN pt.amount ELSE 0 END), 0)::numeric AS order_volume,
+        COUNT(CASE WHEN LOWER(pt.purpose::text) = 'order' THEN 1 END)::int AS order_count,
+
+        COALESCE(SUM(CASE WHEN LOWER(pt.purpose::text) = 'subscription' AND LOWER(pt.status::text) IN ('paid', 'fulfilled') THEN pt.amount ELSE 0 END), 0)::numeric AS subscription_volume,
+        COUNT(CASE WHEN LOWER(pt.purpose::text) = 'subscription' THEN 1 END)::int AS subscription_count,
+
+        COALESCE(SUM(CASE WHEN LOWER(pt.purpose::text) = 'bill' AND LOWER(pt.status::text) IN ('paid', 'fulfilled') THEN pt.amount ELSE 0 END), 0)::numeric AS bill_volume,
+        COUNT(CASE WHEN LOWER(pt.purpose::text) = 'bill' THEN 1 END)::int AS bill_count
+      FROM public.payment_transactions pt
+      WHERE pt.deleted_at IS NULL
+        AND pt.created_at >= (CURRENT_DATE - (${daysNum} || ' days')::interval)
     `;
     const rowsGeneral = await this.db.query(sqlGeneral, []);
     const general = rowsGeneral?.[0] || {};
     const totalCollected = Number(general.total_collected || 0);
-    const totalInvoices = Number(general.total_invoices || 0);
+    const totalTransactions = Number(general.total_transactions || 0);
     const paidCount = Number(general.paid_count || 0);
 
-    const successRate = totalInvoices > 0 ? Number(((paidCount / totalInvoices) * 100).toFixed(1)) : 100;
+    const successRate = totalTransactions > 0 ? Number(((paidCount / totalTransactions) * 100).toFixed(1)) : 100;
     const avgTransactionValue = paidCount > 0 ? Number((totalCollected / paidCount).toFixed(2)) : 0;
 
     const sqlMethods = `
       SELECT 
-        COALESCE(NULLIF(LOWER(pb.payment_method), ''), 'online') AS payment_method,
+        COALESCE(NULLIF(LOWER(pt.method), ''), 'razorpay') AS payment_method,
         COUNT(*)::int AS count,
-        COALESCE(SUM(pb.paid_amount), 0)::numeric AS paid_amount,
-        COALESCE(SUM(pb.total_amount), 0)::numeric AS total_amount
-      FROM public.customer_bills pb
-      WHERE pb.deleted_at IS NULL
-        AND pb.created_at >= (CURRENT_DATE - (${daysNum} || ' days')::interval)
-      GROUP BY COALESCE(NULLIF(LOWER(pb.payment_method), ''), 'online')
+        COALESCE(SUM(CASE WHEN LOWER(pt.status::text) IN ('paid', 'fulfilled') THEN pt.amount ELSE 0 END), 0)::numeric AS paid_amount,
+        COALESCE(SUM(pt.amount), 0)::numeric AS total_amount
+      FROM public.payment_transactions pt
+      WHERE pt.deleted_at IS NULL
+        AND pt.created_at >= (CURRENT_DATE - (${daysNum} || ' days')::interval)
+      GROUP BY COALESCE(NULLIF(LOWER(pt.method), ''), 'razorpay')
       ORDER BY paid_amount DESC
     `;
     const methodsResult = await this.db.query(sqlMethods, []);
@@ -444,24 +684,24 @@ export class FinanceRepository {
       };
     });
 
-    // Query daily payments segmented by payment method
+    // Daily payment trend specifically from payment_transactions (Razorpay)
     const sqlDaily = `
       SELECT 
-        TO_CHAR((pb.created_at AT TIME ZONE 'Asia/Kolkata')::date, 'YYYY-MM-DD') AS payment_date,
-        COALESCE(NULLIF(LOWER(pb.payment_method), ''), 'online') AS payment_method,
+        TO_CHAR((pt.created_at AT TIME ZONE 'Asia/Kolkata')::date, 'YYYY-MM-DD') AS payment_date,
+        COALESCE(NULLIF(LOWER(pt.method), ''), 'razorpay') AS payment_method,
         COUNT(*)::int AS count,
-        COALESCE(SUM(pb.paid_amount), 0)::numeric AS paid_amount,
-        COALESCE(SUM(pb.total_amount), 0)::numeric AS total_amount
-      FROM public.customer_bills pb
-      WHERE pb.deleted_at IS NULL
-        AND pb.created_at >= (CURRENT_DATE - (${daysNum} || ' days')::interval)
-      GROUP BY (pb.created_at AT TIME ZONE 'Asia/Kolkata')::date, COALESCE(NULLIF(LOWER(pb.payment_method), ''), 'online')
+        COALESCE(SUM(CASE WHEN LOWER(pt.status::text) IN ('paid', 'fulfilled') THEN pt.amount ELSE 0 END), 0)::numeric AS paid_amount,
+        COALESCE(SUM(pt.amount), 0)::numeric AS total_amount
+      FROM public.payment_transactions pt
+      WHERE pt.deleted_at IS NULL
+        AND pt.created_at >= (CURRENT_DATE - (${daysNum} || ' days')::interval)
+      GROUP BY (pt.created_at AT TIME ZONE 'Asia/Kolkata')::date, COALESCE(NULLIF(LOWER(pt.method), ''), 'razorpay')
       ORDER BY payment_date ASC
     `;
     const dailyRaw = await this.db.query(sqlDaily, []);
     const dailyRows = Array.isArray(dailyRaw) ? dailyRaw : [];
 
-    // Map into date-keyed dictionary
+    // Map into continuous date-keyed dictionary
     const dateMap = new Map<string, any>();
     const today = new Date();
     for (let i = daysNum - 1; i >= 0; i--) {
@@ -476,8 +716,8 @@ export class FinanceRepository {
         upi: 0,
         razorpay: 0,
         wallet: 0,
-        cash: 0,
         card: 0,
+        netbanking: 0,
         other: 0,
         count: 0,
       });
@@ -494,8 +734,8 @@ export class FinanceRepository {
           upi: 0,
           razorpay: 0,
           wallet: 0,
-          cash: 0,
           card: 0,
+          netbanking: 0,
           other: 0,
           count: 0,
         });
@@ -509,14 +749,14 @@ export class FinanceRepository {
       const method = String(row.payment_method || '').toLowerCase();
       if (method.includes('upi')) {
         entry.upi += amt;
-      } else if (method.includes('razorpay') || method === 'online') {
-        entry.razorpay += amt;
-      } else if (method.includes('wallet')) {
-        entry.wallet += amt;
-      } else if (method.includes('cash') || method.includes('cod')) {
-        entry.cash += amt;
       } else if (method.includes('card')) {
         entry.card += amt;
+      } else if (method.includes('netbanking')) {
+        entry.netbanking += amt;
+      } else if (method.includes('wallet')) {
+        entry.wallet += amt;
+      } else if (method.includes('razorpay') || method === 'online') {
+        entry.razorpay += amt;
       } else {
         entry.other += amt;
       }
@@ -534,6 +774,11 @@ export class FinanceRepository {
       dailyTrend,
       days: daysNum,
     };
+  }
+
+  // Fallback combined report for general queries
+  async getCombinedPaymentsReport(query: any): Promise<{ data: any[]; total: number }> {
+    return await this.getOnlinePaymentTransactions(query);
   }
 
   async findBillById(id: string): Promise<any> {

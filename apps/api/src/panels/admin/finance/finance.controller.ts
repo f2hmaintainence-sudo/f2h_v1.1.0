@@ -28,6 +28,16 @@ import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 export class FinanceController {
   constructor(private readonly service: FinanceService) {}
 
+  @Get(['billing', 'bills'])
+  async getAllCustomerBills(@Query() query: any) {
+    return await this.service.getAllCustomerBills(query);
+  }
+
+  @Get(['billing/stats', 'bills/stats'])
+  async getBillingStats(@Query('days') days?: number) {
+    return await this.service.getBillingStats(days ? Number(days) : 30);
+  }
+
   @Get('outstandings')
   async getSubscriberOutstandings(@Query() query: any) {
     return await this.service.getSubscriberOutstandings(query);
@@ -38,7 +48,7 @@ export class FinanceController {
     return await this.service.getSubscriberOutstandingsStats();
   }
 
-  @Get('payments-report')
+  @Get(['payments', 'payments-report', 'payment-transactions'])
   async getCombinedPayments(@Query() query: any) {
     return await this.service.getCombinedPayments(query);
   }

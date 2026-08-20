@@ -121,8 +121,9 @@ const adminNav = [
         name: "Billing",
         icon: Receipt,
         subItems: [
-          { name: "Payments", href: "/admin/finance/payments", icon: CreditCard },
+          { name: "Billing", href: "/admin/finance/billing", icon: Receipt },
           { name: "Outstandings", href: "/admin/finance/outstandings", icon: IndianRupee },
+          { name: "Payments", href: "/admin/finance/payments", icon: CreditCard },
         ],
       },
       {
