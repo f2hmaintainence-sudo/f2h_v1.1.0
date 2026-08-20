@@ -70,6 +70,8 @@ flutter_*.log
 .cookies/
 *.isar
 *.isar.lock
+apps/api/.tile-cache/
+.tile-cache/
 
 # Credential material. `keys-set/` holds the live Google/Firebase key set and
 # `firebasepushnotification.json` is a Firebase Admin service-account private key —

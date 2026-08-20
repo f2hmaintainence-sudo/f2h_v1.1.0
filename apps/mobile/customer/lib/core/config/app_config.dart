@@ -52,8 +52,8 @@ class AppConfig {
   /// network rate-blocked, which is what turned the map into a wall of
   /// "Access blocked" tiles. The server refreshes this on every sync.
   static String mapTileUrlTemplate =
-      'https://f2hfresh.com/api/v1/map/tiles/{z}/{x}/{y}';
-  static String mapAttribution = '© OpenStreetMap contributors';
+      'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+  static String mapAttribution = '© Google Maps';
   static String razorpayKeyId = '';
 
   static double minOrderAmount = 100.0;

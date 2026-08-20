@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:f2h_customer/core/errors/error_handler.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -9,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
+import 'package:f2h_customer/core/errors/error_handler.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
 import 'package:f2h_customer/core/di/injection.dart';
@@ -16,6 +16,8 @@ import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:f2h_customer/features/address/data/models/profile_address.dart';
 import 'package:f2h_customer/core/config/app_config.dart';
+
+enum MapLayerType { googleRoadmap, googleSatellite, googleTerrain }
 
 class AddAddressScreen extends StatefulWidget {
   final AddressModel? existing;
@@ -49,8 +51,11 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   bool isLoadingLocation = false;
   bool isReverseGeocoding = false;
   bool _isMapExpanded = false;
+  bool _isMapDragging = false;
   Timer? _mapMoveDebounce;
   String? _selectedInstruction;
+
+  MapLayerType _currentLayer = MapLayerType.googleRoadmap;
 
   late double selectedLat;
   late double selectedLng;
@@ -62,6 +67,17 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
   List<dynamic> activeBranches = [];
   bool isLoadingBranches = true;
+
+  String get _currentTileUrl {
+    switch (_currentLayer) {
+      case MapLayerType.googleSatellite:
+        return 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
+      case MapLayerType.googleTerrain:
+        return 'https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}';
+      case MapLayerType.googleRoadmap:
+        return 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+    }
+  }
 
   String get _formattedAddress => [
     streetController.text,
@@ -202,12 +218,11 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
   bool _isLocationAllowed() {
     if (activeBranches.isEmpty) {
-      // If still loading and we have a cached copy in session, use it
       final cached = context.read<CustomerSessionCubit>().state.branches;
       if (cached.isNotEmpty) {
         activeBranches = cached;
       } else {
-        return isLoadingBranches; // Allow during initial load, block if loaded and empty
+        return isLoadingBranches;
       }
     }
 
@@ -244,7 +259,6 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
           return true;
         }
       } else {
-        // default circle
         final dist = getDistanceKm(bLat, bLng, selectedLat, selectedLng);
         if (dist <= totalRadius) {
           return true;
@@ -323,6 +337,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       selectedLat = address.latitude;
       selectedLng = address.longitude;
     } else {
+      // Default to India center coordinates (e.g. Bangalore center)
       selectedLat = 12.9716;
       selectedLng = 77.5946;
 
@@ -364,16 +379,20 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       });
       return;
     }
-    _searchDebounce = Timer(const Duration(milliseconds: 800), () {
+    _searchDebounce = Timer(const Duration(milliseconds: 600), () {
       _performSearch(query);
     });
   }
 
-  void _parseGoogleAddressComponents(List? components) {
+  void _parseGoogleAddressComponents(List? components, {String? formattedAddress}) {
     if (components == null) return;
+    String premise = '';
+    String subpremise = '';
     String streetNum = '';
     String route = '';
-    String area = '';
+    String sublocality2 = '';
+    String sublocality1 = '';
+    String neighborhood = '';
     String city = '';
     String state = '';
     String pincode = '';
@@ -383,18 +402,25 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
           (comp['types'] as List?)?.map((e) => e.toString()).toList() ?? [];
       final name = comp['long_name']?.toString() ?? '';
 
-      if (types.contains('street_number')) {
+      if (types.contains('premise') || types.contains('building')) {
+        premise = name;
+      } else if (types.contains('subpremise')) {
+        subpremise = name;
+      } else if (types.contains('street_number')) {
         streetNum = name;
       } else if (types.contains('route')) {
         route = name;
+      } else if (types.contains('sublocality_level_2') ||
+          types.contains('sublocality_level_3')) {
+        if (sublocality2.isEmpty) sublocality2 = name;
       } else if (types.contains('sublocality_level_1') ||
-          types.contains('sublocality') ||
-          types.contains('neighborhood')) {
-        if (area.isEmpty) area = name;
+          types.contains('sublocality')) {
+        if (sublocality1.isEmpty) sublocality1 = name;
+      } else if (types.contains('neighborhood')) {
+        if (neighborhood.isEmpty) neighborhood = name;
       } else if (types.contains('locality')) {
         city = name;
-      } else if (types.contains('administrative_area_level_2') &&
-          city.isEmpty) {
+      } else if (types.contains('administrative_area_level_2') && city.isEmpty) {
         city = name;
       } else if (types.contains('administrative_area_level_1')) {
         state = name;
@@ -406,11 +432,22 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     String streetValue = [
       streetNum,
       route,
-    ].where((s) => s.isNotEmpty).join(' ');
+      sublocality2,
+    ].where((s) => s.isNotEmpty).join(', ');
+
+    String areaValue = [
+      sublocality1.isNotEmpty ? sublocality1 : neighborhood,
+    ].where((s) => s.isNotEmpty).join(', ');
 
     setState(() {
+      if (flatNoController.text.isEmpty && subpremise.isNotEmpty) {
+        flatNoController.text = subpremise;
+      }
+      if (buildingNameController.text.isEmpty && premise.isNotEmpty) {
+        buildingNameController.text = premise;
+      }
       if (streetValue.isNotEmpty) streetController.text = streetValue;
-      if (area.isNotEmpty) areaController.text = area;
+      if (areaValue.isNotEmpty) areaController.text = areaValue;
       if (city.isNotEmpty) cityController.text = city;
       if (state.isNotEmpty) stateController.text = state;
       if (pincode.isNotEmpty) pincodeController.text = pincode;
@@ -422,7 +459,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       final apiKey = AppConfig.googleMapsApiKey;
       if (apiKey.isNotEmpty) {
         final url = Uri.parse(
-          'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${Uri.encodeComponent(query)}&key=$apiKey',
+          'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${Uri.encodeComponent(query)}&components=country:in&key=$apiKey',
         );
         final response = await http.get(url);
         if (response.statusCode == 200) {
@@ -436,6 +473,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                     (p) => {
                       'description': p['description'] ?? '',
                       'place_id': p['place_id'] ?? '',
+                      'main_text': p['structured_formatting']?['main_text'] ?? '',
+                      'secondary_text': p['structured_formatting']?['secondary_text'] ?? '',
                     },
                   )
                   .toList();
@@ -446,7 +485,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       }
 
       final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&limit=5&addressdetails=1',
+        'https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&countrycodes=in&limit=5&addressdetails=1',
       );
       final response = await http.get(
         url,
@@ -490,9 +529,10 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                 _searchResults.clear();
                 _searchController.clear();
               });
-              _mapController.move(LatLng(lat, lng), 16.0);
+              _mapController.move(LatLng(lat, lng), 16.5);
               _parseGoogleAddressComponents(
                 resObj['address_components'] as List?,
+                formattedAddress: resObj['formatted_address']?.toString(),
               );
               return;
             }
@@ -512,7 +552,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
         _searchResults.clear();
         _searchController.clear();
       });
-      _mapController.move(LatLng(lat, lon), 16.0);
+      _mapController.move(LatLng(lat, lon), 16.5);
 
       final address = result['address'] as Map<String, dynamic>?;
       if (address != null) {
@@ -604,7 +644,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
           selectedLng = position.longitude;
         });
 
-        _mapController.move(LatLng(selectedLat, selectedLng), 16.0);
+        _mapController.move(LatLng(selectedLat, selectedLng), 16.5);
         await _reverseGeocodeLocation(selectedLat, selectedLng);
       }
     } catch (e) {
@@ -633,7 +673,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       final apiKey = AppConfig.googleMapsApiKey;
       if (apiKey.isNotEmpty) {
         final url = Uri.parse(
-          'https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&key=$apiKey',
+          'https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&region=in&key=$apiKey',
         );
         final response = await http.get(url);
         if (response.statusCode == 200) {
@@ -644,7 +684,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
               mounted) {
             final firstResult = data['results'][0];
             final components = firstResult['address_components'] as List?;
-            _parseGoogleAddressComponents(components);
+            final formatted = firstResult['formatted_address']?.toString();
+            _parseGoogleAddressComponents(components, formattedAddress: formatted);
             return;
           }
         }
@@ -705,6 +746,125 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
         });
       }
     }
+  }
+
+  void _zoomIn() {
+    final currentZoom = _mapController.camera.zoom;
+    if (currentZoom < 19.5) {
+      _mapController.move(LatLng(selectedLat, selectedLng), currentZoom + 1.0);
+    }
+  }
+
+  void _zoomOut() {
+    final currentZoom = _mapController.camera.zoom;
+    if (currentZoom > 4.0) {
+      _mapController.move(LatLng(selectedLat, selectedLng), currentZoom - 1.0);
+    }
+  }
+
+  void _showLayerSelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Google Map Layers',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: kText,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildLayerOption(
+                    type: MapLayerType.googleRoadmap,
+                    label: 'Default',
+                    icon: Icons.map_outlined,
+                  ),
+                  _buildLayerOption(
+                    type: MapLayerType.googleSatellite,
+                    label: 'Satellite',
+                    icon: Icons.satellite_alt_outlined,
+                  ),
+                  _buildLayerOption(
+                    type: MapLayerType.googleTerrain,
+                    label: 'Terrain',
+                    icon: Icons.terrain_outlined,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLayerOption({
+    required MapLayerType type,
+    required String label,
+    required IconData icon,
+  }) {
+    final isSelected = _currentLayer == type;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _currentLayer = type;
+        });
+        Navigator.pop(context);
+      },
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: isSelected ? kPrimary.withValues(alpha: 0.12) : kBg,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isSelected ? kPrimary : kBorder,
+                width: isSelected ? 2 : 1,
+              ),
+            ),
+            child: Icon(
+              icon,
+              color: isSelected ? kPrimary : kTextSub,
+              size: 24,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+              color: isSelected ? kPrimary : kTextSub,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _save() async {
@@ -796,19 +956,31 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: kText, size: 20),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (_isMapExpanded && !isEdit) {
+              Navigator.pop(context);
+            } else if (_isMapExpanded && isEdit) {
+              setState(() {
+                _isMapExpanded = false;
+              });
+            } else {
+              Navigator.pop(context);
+            }
+          },
         ),
         title: Text(
-          isEdit ? 'Modify Address' : 'New Address Details',
+          _isMapExpanded
+              ? 'Pin Location on Google Map'
+              : (isEdit ? 'Modify Address' : 'New Address Details'),
           style: const TextStyle(
             color: kText,
-            fontSize: 18,
+            fontSize: 17,
             fontWeight: FontWeight.w800,
           ),
         ),
         centerTitle: true,
         actions: [
-          if (isEdit)
+          if (isEdit && !_isMapExpanded)
             IconButton(
               icon: const Icon(Icons.delete_outline, color: kRed),
               onPressed: () async {
@@ -888,9 +1060,10 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
           key: _formKey,
           child: Column(
             children: [
-              // Map view container
+              // Full-screen Map view
               if (_isMapExpanded) Expanded(child: _buildMapWidget()),
 
+              // Address Form View
               if (!_isMapExpanded) ...[
                 if (!_isLocationAllowed())
                   Container(
@@ -905,20 +1078,20 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                         bottom: BorderSide(color: kRed, width: 0.5),
                       ),
                     ),
-                    child: Row(
+                    child: const Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.error_outline_rounded,
                           color: kRed,
                           size: 18,
                         ),
-                        const SizedBox(width: 8),
-                        const Expanded(
+                        SizedBox(width: 8),
+                        Expanded(
                           child: Text(
-                            'order not allowed for that location',
+                            'Order not allowed for that location (Outside service area)',
                             style: TextStyle(
                               color: kRed,
-                              fontSize: 13,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -928,104 +1101,157 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                   ),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(18),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Re-pin / Map location summary card
+                        // Compact Google Map Snippet Card with Tap to Re-pin
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 16,
-                            horizontal: 20,
-                          ),
+                          height: 180,
+                          width: double.infinity,
                           decoration: BoxDecoration(
                             color: kSurface,
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(color: kBorder),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.02),
+                                color: Colors.black.withValues(alpha: 0.04),
                                 blurRadius: 10,
-                                offset: const Offset(0, 4),
+                                offset: const Offset(0, 3),
                               ),
                             ],
                           ),
-                          child: Column(
+                          clipBehavior: Clip.antiAlias,
+                          child: Stack(
                             children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: kPrimary.withValues(alpha: 0.08),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.location_on_rounded,
-                                      color: kPrimary,
-                                      size: 24,
-                                    ),
+                              FlutterMap(
+                                options: MapOptions(
+                                  initialCenter: LatLng(selectedLat, selectedLng),
+                                  initialZoom: 16.0,
+                                  interactionOptions: const InteractionOptions(
+                                    flags: InteractiveFlag.none,
                                   ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          'Map Location Pinned',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w800,
-                                            color: kText,
-                                          ),
+                                ),
+                                children: [
+                                  TileLayer(
+                                    urlTemplate: _currentTileUrl,
+                                    subdomains: const ['mt0', 'mt1', 'mt2', 'mt3'],
+                                    userAgentPackageName: 'com.f2h.customer',
+                                  ),
+                                  MarkerLayer(
+                                    markers: [
+                                      Marker(
+                                        point: LatLng(selectedLat, selectedLng),
+                                        width: 36,
+                                        height: 36,
+                                        child: const Icon(
+                                          Icons.location_on_rounded,
+                                          color: Color(0xFFEA4335),
+                                          size: 36,
                                         ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          _formattedAddress.isNotEmpty
-                                              ? _formattedAddress
-                                              : 'Coordinates: ${selectedLat.toStringAsFixed(5)}, ${selectedLng.toStringAsFixed(5)}',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: kTextSub,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 16),
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  setState(() {
-                                    _isMapExpanded = true;
-                                  });
-                                },
-                                icon: const Icon(Icons.map_outlined, size: 18),
-                                label: const Text(
-                                  'OPEN FULL MAP TO RE-PIN',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.5,
+                              Positioned(
+                                top: 10,
+                                left: 10,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.15),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.check_circle_rounded, color: Colors.green, size: 14),
+                                      SizedBox(width: 5),
+                                      Text(
+                                        'Google Map Pinned',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: kPrimaryPl,
-                                  foregroundColor: kPrimary,
-                                  minimumSize: const Size(double.infinity, 44),
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                              ),
+                              Positioned(
+                                bottom: 10,
+                                right: 10,
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    setState(() {
+                                      _isMapExpanded = true;
+                                    });
+                                  },
+                                  icon: const Icon(Icons.edit_location_alt_rounded, size: 16),
+                                  label: const Text(
+                                    'Change Pin on Map',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: kPrimary,
+                                    foregroundColor: Colors.white,
+                                    elevation: 4,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
                                   ),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
+
+                        // Formatted Address summary
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: kSurface,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: kBorder),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.pin_drop_rounded,
+                                color: kPrimary,
+                                size: 22,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  _formattedAddress.isNotEmpty
+                                      ? _formattedAddress
+                                      : 'Coordinates: ${selectedLat.toStringAsFixed(5)}, ${selectedLng.toStringAsFixed(5)}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: kText,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
 
                         _sectionHeader('CONTACT DETAILS'),
                         const SizedBox(height: 10),
@@ -1042,7 +1268,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                           Icons.phone_outlined,
                           keyboard: TextInputType.phone,
                           validator: (v) =>
-                              v!.length < 10 ? 'Enter valid number' : null,
+                              v!.length < 10 ? 'Enter valid 10-digit number' : null,
                         ),
 
                         const SizedBox(height: 24),
@@ -1058,9 +1284,52 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                         ),
                         const SizedBox(height: 12),
                         _buildField(
+                          buildingNameController,
+                          'Building / Apartment Name (Optional)',
+                          Icons.apartment_outlined,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildField(
                           landmarkController,
                           'Landmark (Optional)',
                           Icons.pin_drop_outlined,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildField(
+                          streetController,
+                          'Street / Road *',
+                          Icons.add_road_outlined,
+                          validator: (v) => v!.isEmpty ? 'Street required' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildField(
+                          areaController,
+                          'Area / Locality *',
+                          Icons.location_city_outlined,
+                          validator: (v) => v!.isEmpty ? 'Area required' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildField(
+                                cityController,
+                                'City *',
+                                Icons.location_city_rounded,
+                                validator: (v) => v!.isEmpty ? 'City required' : null,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _buildField(
+                                pincodeController,
+                                'PIN Code *',
+                                Icons.numbers_rounded,
+                                keyboard: TextInputType.number,
+                                validator: (v) => v!.isEmpty ? 'PIN required' : null,
+                              ),
+                            ),
+                          ],
                         ),
 
                         const SizedBox(height: 24),
@@ -1069,64 +1338,63 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children:
-                              [
-                                'Leave at Door',
-                                'Ring Bell',
-                                'Hand to Me',
-                                'Other',
-                              ].map((instruction) {
-                                final isSel =
-                                    _selectedInstruction == instruction;
-                                final color = isSel ? kPrimary : kTextSub;
-                                final borderColor = isSel ? kPrimary : kBorder;
+                          children: [
+                            'Leave at Door',
+                            'Ring Bell',
+                            'Hand to Me',
+                            'Other',
+                          ].map((instruction) {
+                            final isSel =
+                                _selectedInstruction == instruction;
+                            final color = isSel ? kPrimary : kTextSub;
+                            final borderColor = isSel ? kPrimary : kBorder;
 
-                                return ChoiceChip(
-                                  label: Text(
-                                    instruction,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: color,
-                                    ),
-                                  ),
-                                  selected: isSel,
-                                  selectedColor: kPrimaryPl,
-                                  backgroundColor: kSurface,
-                                  checkmarkColor: kPrimary,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(20),
-                                    side: BorderSide(
-                                      color: borderColor,
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                  onSelected: (selected) {
-                                    if (selected) {
-                                      setState(() {
-                                        _selectedInstruction = instruction;
-                                        if (instruction != 'Other') {
-                                          deliveryNoteController.text =
-                                              instruction;
-                                        } else {
-                                          final currentText =
-                                              deliveryNoteController.text;
-                                          if (currentText == 'Leave at Door' ||
-                                              currentText == 'Ring Bell' ||
-                                              currentText == 'Hand to Me') {
-                                            deliveryNoteController.clear();
-                                          }
-                                        }
-                                      });
+                            return ChoiceChip(
+                              label: Text(
+                                instruction,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: color,
+                                ),
+                              ),
+                              selected: isSel,
+                              selectedColor: kPrimaryPl,
+                              backgroundColor: kSurface,
+                              checkmarkColor: kPrimary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                side: BorderSide(
+                                  color: borderColor,
+                                  width: 1.5,
+                                ),
+                              ),
+                              onSelected: (selected) {
+                                if (selected) {
+                                  setState(() {
+                                    _selectedInstruction = instruction;
+                                    if (instruction != 'Other') {
+                                      deliveryNoteController.text =
+                                          instruction;
                                     } else {
-                                      setState(() {
-                                        _selectedInstruction = null;
+                                      final currentText =
+                                          deliveryNoteController.text;
+                                      if (currentText == 'Leave at Door' ||
+                                          currentText == 'Ring Bell' ||
+                                          currentText == 'Hand to Me') {
                                         deliveryNoteController.clear();
-                                      });
+                                      }
                                     }
-                                  },
-                                );
-                              }).toList(),
+                                  });
+                                } else {
+                                  setState(() {
+                                    _selectedInstruction = null;
+                                    deliveryNoteController.clear();
+                                  });
+                                }
+                              },
+                            );
+                          }).toList(),
                         ),
                         if (_selectedInstruction == 'Other') ...[
                           const SizedBox(height: 12),
@@ -1300,172 +1568,261 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   }
 
   Widget _buildMapWidget() {
+    final isDeliverable = _isLocationAllowed();
+
     return Stack(
       children: [
-        Container(
-          height: _isMapExpanded ? double.infinity : 240,
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: kBorderLt)),
-          ),
-          child: FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: LatLng(selectedLat, selectedLng),
-              initialZoom: 16.0,
-              onPositionChanged: (position, hasGesture) {
-                if (hasGesture) {
-                  final center = position.center;
-                  setState(() {
-                    selectedLat = center.latitude;
-                    selectedLng = center.longitude;
-                  });
-                  _mapMoveDebounce?.cancel();
-                  _mapMoveDebounce = Timer(
-                    const Duration(milliseconds: 800),
-                    () {
+        FlutterMap(
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: LatLng(selectedLat, selectedLng),
+            initialZoom: 16.5,
+            minZoom: 4.0,
+            maxZoom: 19.5,
+            onTap: (tapPosition, point) {
+              setState(() {
+                selectedLat = point.latitude;
+                selectedLng = point.longitude;
+              });
+              _mapController.move(point, _mapController.camera.zoom);
+              _mapMoveDebounce?.cancel();
+              _mapMoveDebounce = Timer(const Duration(milliseconds: 500), () {
+                _reverseGeocodeLocation(point.latitude, point.longitude);
+              });
+            },
+            onPositionChanged: (position, hasGesture) {
+              if (hasGesture) {
+                final center = position.center;
+                setState(() {
+                  _isMapDragging = true;
+                  selectedLat = center.latitude;
+                  selectedLng = center.longitude;
+                });
+                _mapMoveDebounce?.cancel();
+                _mapMoveDebounce = Timer(
+                  const Duration(milliseconds: 600),
+                  () {
+                    if (mounted) {
+                      setState(() {
+                        _isMapDragging = false;
+                      });
                       _reverseGeocodeLocation(selectedLat, selectedLng);
-                    },
-                  );
-                }
-              },
+                    }
+                  },
+                );
+              }
+            },
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: _currentTileUrl,
+              subdomains: const ['mt0', 'mt1', 'mt2', 'mt3'],
+              userAgentPackageName: 'com.f2h.customer',
+              maxZoom: 20,
             ),
-            children: [
-              TileLayer(
-                urlTemplate: AppConfig.mapTileUrlTemplate,
-                userAgentPackageName: 'com.f2h.customer',
-              ),
-              CircleLayer(
-                circles: activeBranches
-                    .where((branch) {
-                      final shape =
-                          branch['hex_shape']?.toString().toLowerCase() ??
-                          'circle';
-                      return shape == 'circle';
-                    })
-                    .map((branch) {
-                      final bLat =
-                          double.tryParse(branch['lat']?.toString() ?? '') ??
-                          0.0;
-                      final bLng =
-                          double.tryParse(branch['lng']?.toString() ?? '') ??
-                          0.0;
-                      final radiusKm =
-                          double.tryParse(
-                            branch['delivery_radius_km']?.toString() ?? '',
-                          ) ??
-                          5.0;
-                      return CircleMarker(
-                        point: LatLng(bLat, bLng),
-                        radius: radiusKm * 1000,
-                        useRadiusInMeter: true,
-                        color: kPrimary.withValues(alpha: 0.12),
-                        borderColor: kPrimary.withValues(alpha: 0.6),
-                        borderStrokeWidth: 2,
-                      );
-                    })
-                    .toList(),
-              ),
-              PolygonLayer(
-                polygons: activeBranches
-                    .where((branch) {
-                      final shape =
-                          branch['hex_shape']?.toString().toLowerCase() ??
-                          'circle';
-                      return shape == 'hexagon' ||
-                          shape == 'square' ||
-                          shape == 'rectangle';
-                    })
-                    .map((branch) {
-                      final bLat =
-                          double.tryParse(branch['lat']?.toString() ?? '') ??
-                          0.0;
-                      final bLng =
-                          double.tryParse(branch['lng']?.toString() ?? '') ??
-                          0.0;
-                      final radiusKm =
-                          double.tryParse(
-                            branch['delivery_radius_km']?.toString() ?? '',
-                          ) ??
-                          5.0;
-                      final shape =
-                          branch['hex_shape']?.toString().toLowerCase() ??
-                          'circle';
-                      final points = shape == 'hexagon'
-                          ? getHexagonPoints(LatLng(bLat, bLng), radiusKm)
-                          : shape == 'rectangle'
-                          ? getRectanglePoints(LatLng(bLat, bLng), radiusKm)
-                          : getSquarePoints(LatLng(bLat, bLng), radiusKm);
-                      return Polygon(
-                        points: points,
-                        color: kPrimary.withValues(alpha: 0.12),
-                        borderColor: kPrimary.withValues(alpha: 0.6),
-                        borderStrokeWidth: 2,
-                      );
-                    })
-                    .toList(),
-              ),
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: LatLng(selectedLat, selectedLng),
-                    width: 180,
-                    height: 90,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
+            CircleLayer(
+              circles: activeBranches
+                  .where((branch) {
+                    final shape =
+                        branch['hex_shape']?.toString().toLowerCase() ??
+                        'circle';
+                    return shape == 'circle';
+                  })
+                  .map((branch) {
+                    final bLat =
+                        double.tryParse(branch['lat']?.toString() ?? '') ??
+                        0.0;
+                    final bLng =
+                        double.tryParse(branch['lng']?.toString() ?? '') ??
+                        0.0;
+                    final radiusKm =
+                        double.tryParse(
+                          branch['delivery_radius_km']?.toString() ?? '',
+                        ) ??
+                        5.0;
+                    return CircleMarker(
+                      point: LatLng(bLat, bLng),
+                      radius: radiusKm * 1000,
+                      useRadiusInMeter: true,
+                      color: kPrimary.withValues(alpha: 0.12),
+                      borderColor: kPrimary.withValues(alpha: 0.6),
+                      borderStrokeWidth: 2,
+                    );
+                  })
+                  .toList(),
+            ),
+            PolygonLayer(
+              polygons: activeBranches
+                  .where((branch) {
+                    final shape =
+                        branch['hex_shape']?.toString().toLowerCase() ??
+                        'circle';
+                    return shape == 'hexagon' ||
+                        shape == 'square' ||
+                        shape == 'rectangle';
+                  })
+                  .map((branch) {
+                    final bLat =
+                        double.tryParse(branch['lat']?.toString() ?? '') ??
+                        0.0;
+                    final bLng =
+                        double.tryParse(branch['lng']?.toString() ?? '') ??
+                        0.0;
+                    final radiusKm =
+                        double.tryParse(
+                          branch['delivery_radius_km']?.toString() ?? '',
+                        ) ??
+                        5.0;
+                    final shape =
+                        branch['hex_shape']?.toString().toLowerCase() ??
+                        'circle';
+                    final points = shape == 'hexagon'
+                        ? getHexagonPoints(LatLng(bLat, bLng), radiusKm)
+                        : shape == 'rectangle'
+                        ? getRectanglePoints(LatLng(bLat, bLng), radiusKm)
+                        : getSquarePoints(LatLng(bLat, bLng), radiusKm);
+                    return Polygon(
+                      points: points,
+                      color: kPrimary.withValues(alpha: 0.12),
+                      borderColor: kPrimary.withValues(alpha: 0.6),
+                      borderStrokeWidth: 2,
+                    );
+                  })
+                  .toList(),
+            ),
+          ],
+        ),
+
+        // Center Pin & Floating Tooltip (Google Maps Pin Placement)
+        Positioned.fill(
+          child: IgnorePointer(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 38),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Floating Badge
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      transform: Matrix4.translationValues(
+                        0,
+                        _isMapDragging ? -10 : 0,
+                        0,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(
+                              alpha: _isMapDragging ? 0.25 : 0.15,
+                            ),
+                            blurRadius: _isMapDragging ? 14 : 8,
+                            offset: Offset(0, _isMapDragging ? 6 : 2),
                           ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.15),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isReverseGeocoding)
+                            const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: kPrimary,
                               ),
-                            ],
+                            )
+                          else
+                            Icon(
+                              isDeliverable
+                                  ? Icons.local_shipping_rounded
+                                  : Icons.info_outline_rounded,
+                              color: isDeliverable ? Colors.green : Colors.orange,
+                              size: 16,
+                            ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _isMapDragging
+                                ? 'Pinning location...'
+                                : (isReverseGeocoding
+                                    ? 'Locating address...'
+                                    : (isDeliverable
+                                        ? 'Products delivered here'
+                                        : 'Outside standard zone')),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black87,
+                            ),
                           ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.local_shipping_rounded,
-                                color: Colors.green,
-                                size: 16,
-                              ),
-                              SizedBox(width: 6),
-                              Text(
-                                'Products delivered here',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Icon(
-                          Icons.location_on,
-                          color: Colors.red,
-                          size: 42,
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+
+                    // Google Map Marker Icon
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      transform: Matrix4.translationValues(
+                        0,
+                        _isMapDragging ? -12 : 0,
+                        0,
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          const Icon(
+                            Icons.location_on_rounded,
+                            color: Color(0xFFEA4335), // Google Map Pin Red
+                            size: 46,
+                          ),
+                          Positioned(
+                            top: 10,
+                            child: Container(
+                              width: 11,
+                              height: 11,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Ground Shadow
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: _isMapDragging ? 8 : 14,
+                      height: _isMapDragging ? 3 : 5,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(
+                          alpha: _isMapDragging ? 0.15 : 0.4,
+                        ),
+                        borderRadius: BorderRadius.all(
+                          Radius.elliptical(
+                            _isMapDragging ? 8 : 14,
+                            _isMapDragging ? 3 : 5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ],
+            ),
           ),
         ),
 
-        // Floating Search Bar above the map
+        // Floating Search Bar with India Google Places Autocomplete
         Positioned(
           top: 12,
           left: 12,
@@ -1478,8 +1835,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                   borderRadius: BorderRadius.circular(30),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 8,
+                      color: Colors.black.withValues(alpha: 0.12),
+                      blurRadius: 10,
                       offset: const Offset(0, 3),
                     ),
                   ],
@@ -1487,11 +1844,15 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Search address or location...',
-                    prefixIcon: const Icon(Icons.search, color: kPrimary),
+                    hintText: 'Search India address, area, or landmark...',
+                    hintStyle: const TextStyle(
+                      color: kMuted,
+                      fontSize: 13,
+                    ),
+                    prefixIcon: const Icon(Icons.search_rounded, color: kPrimary),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear),
+                            icon: const Icon(Icons.clear_rounded, size: 18),
                             onPressed: () {
                               _searchController.clear();
                               setState(() {
@@ -1511,29 +1872,56 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
               ),
               if (_searchResults.isNotEmpty)
                 Container(
-                  margin: const EdgeInsets.only(top: 4),
-                  constraints: const BoxConstraints(maxHeight: 180),
+                  margin: const EdgeInsets.only(top: 6),
+                  constraints: const BoxConstraints(maxHeight: 220),
                   decoration: BoxDecoration(
                     color: kSurface,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
+                        color: Colors.black.withValues(alpha: 0.15),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
-                  child: ListView.builder(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
                     shrinkWrap: true,
                     itemCount: _searchResults.length,
+                    separatorBuilder: (ctx, idx) => const Divider(height: 1, color: kBorderLt),
                     itemBuilder: (context, index) {
                       final result = _searchResults[index];
+                      final mainText = result['main_text']?.toString() ?? '';
+                      final desc = result['display_name'] ?? result['description'] ?? '';
+                      final secondaryText = result['secondary_text']?.toString() ?? desc;
+
                       return ListTile(
-                        title: Text(
-                          result['display_name'] ?? result['description'] ?? '',
-                          style: const TextStyle(fontSize: 12, color: kText),
+                        dense: true,
+                        leading: const Icon(
+                          Icons.location_on_outlined,
+                          color: kPrimary,
+                          size: 20,
                         ),
+                        title: Text(
+                          mainText.isNotEmpty ? mainText : desc,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: kText,
+                          ),
+                        ),
+                        subtitle: mainText.isNotEmpty
+                            ? Text(
+                                secondaryText,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: kTextSub,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              )
+                            : null,
                         onTap: () => _selectSearchResult(result),
                       );
                     },
@@ -1543,80 +1931,217 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
           ),
         ),
 
-        // Minimize Map Toggle Button
+        // Floating Map Controls (Right Side)
         Positioned(
-          bottom: 12,
-          left: 12,
-          child: ElevatedButton.icon(
-            onPressed: () {
-              setState(() {
-                _isMapExpanded = false;
-              });
-            },
-            icon: const Icon(Icons.fullscreen_exit, size: 16),
-            label: const Text(
-              'Lock Location',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kPrimary,
-              foregroundColor: kSurface,
-              elevation: 3,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-            ),
-          ),
-        ),
-
-        // Current Location Action Button
-        Positioned(
-          bottom: 12,
+          top: 72,
           right: 12,
-          child: FloatingActionButton.small(
-            heroTag: 'gps_fab_add_address',
-            onPressed: isLoadingLocation ? null : _requestAndSetCurrentLocation,
-            backgroundColor: kSurface,
-            foregroundColor: kPrimary,
-            child: isLoadingLocation
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: kPrimary,
-                    ),
-                  )
-                : const Icon(Icons.gps_fixed),
+          child: Column(
+            children: [
+              // Layer Switcher (Google Map Layers)
+              FloatingActionButton.small(
+                heroTag: 'layer_btn_add_address',
+                onPressed: _showLayerSelector,
+                backgroundColor: kSurface,
+                foregroundColor: kPrimary,
+                elevation: 3,
+                tooltip: 'Map Layers',
+                child: const Icon(Icons.layers_rounded, size: 20),
+              ),
+              const SizedBox(height: 8),
+
+              // Zoom In
+              FloatingActionButton.small(
+                heroTag: 'zoom_in_add_address',
+                onPressed: _zoomIn,
+                backgroundColor: kSurface,
+                foregroundColor: kText,
+                elevation: 3,
+                tooltip: 'Zoom In',
+                child: const Icon(Icons.add_rounded, size: 20),
+              ),
+              const SizedBox(height: 8),
+
+              // Zoom Out
+              FloatingActionButton.small(
+                heroTag: 'zoom_out_add_address',
+                onPressed: _zoomOut,
+                backgroundColor: kSurface,
+                foregroundColor: kText,
+                elevation: 3,
+                tooltip: 'Zoom Out',
+                child: const Icon(Icons.remove_rounded, size: 20),
+              ),
+              const SizedBox(height: 8),
+
+              // GPS Current Location Button
+              FloatingActionButton.small(
+                heroTag: 'gps_fab_add_address',
+                onPressed: isLoadingLocation ? null : _requestAndSetCurrentLocation,
+                backgroundColor: kSurface,
+                foregroundColor: kPrimary,
+                elevation: 3,
+                tooltip: 'Current GPS Location',
+                child: isLoadingLocation
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: kPrimary,
+                        ),
+                      )
+                    : const Icon(Icons.my_location_rounded, size: 20),
+              ),
+            ],
           ),
         ),
 
-        if (isReverseGeocoding)
+        // Bottom Confirmation Panel (when expanded in full-screen map mode)
+        if (_isMapExpanded)
           Positioned(
-            bottom: 60,
-            left: 12,
-            child: const Card(
-              elevation: 2,
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                child: Row(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 20),
+              decoration: BoxDecoration(
+                color: kSurface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 16,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(
-                      width: 12,
-                      height: 12,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 1.5,
-                        color: kPrimary,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: kPrimary.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.place_rounded,
+                            color: kPrimary,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'SELECTED LOCATION',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: kTextSub,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _formattedAddress.isNotEmpty
+                                    ? _formattedAddress
+                                    : 'Pin at ${selectedLat.toStringAsFixed(5)}, ${selectedLng.toStringAsFixed(5)}',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: kText,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Serviceability Pill
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isDeliverable
+                            ? Colors.green.withValues(alpha: 0.08)
+                            : Colors.orange.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isDeliverable
+                              ? Colors.green.withValues(alpha: 0.3)
+                              : Colors.orange.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isDeliverable
+                                ? Icons.check_circle_rounded
+                                : Icons.warning_amber_rounded,
+                            color: isDeliverable ? Colors.green : Colors.orange.shade800,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            isDeliverable
+                                ? 'Deliverable location in service area'
+                                : 'Location is outside current service boundary',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: isDeliverable
+                                  ? Colors.green.shade800
+                                  : Colors.orange.shade900,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    SizedBox(width: 8),
-                    Text(
-                      'Locating...',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                    const SizedBox(height: 14),
+
+                    // Lock & Proceed Button
+                    ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _isMapExpanded = false;
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kPrimary,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.check_rounded, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'CONFIRM PIN LOCATION & ENTER DETAILS',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
