@@ -4,18 +4,7 @@
 //
 // Project     : F2H Fresh
 // File        : map-tiles.controller.ts
-// Description : Server-side proxy for raster map tiles.
-//
-//               The apps used to fetch tile.openstreetmap.org straight from the
-//               device. That breaks in two ways: OpenStreetMap's usage policy
-//               requires an identifying User-Agent and caching (a browser can
-//               supply neither — Flutter web ignores `userAgentPackageName`
-//               because the browser owns that header), and every device hits OSM
-//               with its own IP, so a busy fleet gets rate-blocked per-network
-//               and the map fills with "Access blocked" tiles.
-//
-//               Routing tiles through here means one identified client, one
-//               cache, and one place to swap providers.
+// Description : Server-side proxy for raster map tiles and Google Places API.
 // ============================================================================
 
 import {
@@ -24,6 +13,7 @@ import {
   Header,
   NotFoundException,
   Param,
+  Query,
   Res,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -38,14 +28,8 @@ export class MapTilesController {
 
   /**
    * A single 256px raster tile.
-   *
-   * `z/x/y` are parsed as integers and range-checked before they reach the
-   * upstream URL — they are path segments on a third-party host, so anything
-   * less would be a request-forgery hole.
    */
   @Public()
-  // A map view pulls tens of tiles at once, so the ceiling is high; it exists to
-  // stop a scraper walking the whole pyramid through us.
   @Throttle({ short: { limit: 300, ttl: 60_000 } })
   @Get('tiles/:z/:x/:y')
   @Header('Cache-Control', 'public, max-age=604800, immutable')
@@ -56,7 +40,6 @@ export class MapTilesController {
     @Param('y') y: string,
     @Res() res: Response,
   ): Promise<void> {
-    // `y` arrives as "1972" or "1972.png" depending on the client.
     const coords = this.tiles.parseCoords(z, x, y.replace(/\.png$/i, ''));
     if (!coords) throw new NotFoundException('Invalid tile coordinates');
 
@@ -65,5 +48,42 @@ export class MapTilesController {
       throw new ServiceUnavailableException('Tile provider is unavailable');
     }
     res.end(tile);
+  }
+
+  /**
+   * Places autocomplete proxy endpoint for Web & Mobile clients.
+   * Allows searching for colonies, layouts, apartments, buildings, schools,
+   * colleges, hotels, offices, restaurants, shops, landmarks, etc. in India.
+   */
+  @Public()
+  @Throttle({ short: { limit: 150, ttl: 60_000 } })
+  @Get('places/autocomplete')
+  async autocomplete(@Query('input') input?: string) {
+    return this.tiles.autocompletePlaces(input || '');
+  }
+
+  /**
+   * Place details proxy endpoint.
+   */
+  @Public()
+  @Throttle({ short: { limit: 150, ttl: 60_000 } })
+  @Get('places/details')
+  async details(@Query('place_id') placeId?: string) {
+    return this.tiles.getPlaceDetails(placeId || '');
+  }
+
+  /**
+   * Reverse geocode proxy endpoint with establishment/business detection.
+   */
+  @Public()
+  @Throttle({ short: { limit: 150, ttl: 60_000 } })
+  @Get('geocode')
+  async geocode(@Query('lat') lat?: string, @Query('lng') lng?: string) {
+    const parsedLat = parseFloat(lat || '0');
+    const parsedLng = parseFloat(lng || '0');
+    if (isNaN(parsedLat) || isNaN(parsedLng)) {
+      return { status: 'INVALID_REQUEST', results: [] };
+    }
+    return this.tiles.reverseGeocode(parsedLat, parsedLng);
   }
 }

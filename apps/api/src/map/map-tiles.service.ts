@@ -4,7 +4,8 @@
 //
 // Project     : F2H Fresh
 // File        : map-tiles.service.ts
-// Description : Fetches and caches raster tiles from the configured upstream.
+// Description : Fetches and caches raster tiles, and proxies Google Places /
+//               Geocoding requests for web and mobile clients.
 // ============================================================================
 
 import { Injectable, Logger } from '@nestjs/common';
@@ -140,5 +141,213 @@ export class MapTilesService {
       this.logger.warn(`Tile fetch failed for ${url}: ${String(error)}`);
       return null;
     }
+  }
+
+  /**
+   * Retrieves Google Maps API key from DB configuration or fallback.
+   */
+  async getApiKey(): Promise<string> {
+    try {
+      const rows = await this.db.query(
+        `SELECT config_data ->> 'apiKey' AS api_key
+           FROM api_integrations_config
+          WHERE category = 'maps' AND is_active = true AND deleted_at IS NULL
+          LIMIT 1`,
+      );
+      const configured = rows?.[0]?.api_key;
+      if (typeof configured === 'string' && configured.trim().length > 0) {
+        return configured.trim();
+      }
+    } catch (error) {
+      this.logger.warn(`Maps apiKey lookup failed: ${String(error)}`);
+    }
+    return (
+      process.env.GOOGLE_MAPS_API_KEY ||
+      'AIzaSyDPzNGpuT5QHHdCmlKAogNkDJj1e34urbs'
+    );
+  }
+
+  /**
+   * Google Places Autocomplete proxy with India country restriction.
+   * Allows searching for colonies, layouts, apartments, buildings, schools,
+   * colleges, hotels, offices, restaurants, shops, landmarks, IT parks, areas, etc.
+   */
+  async autocompletePlaces(input: string) {
+    if (!input || input.trim().length === 0) {
+      return { predictions: [], status: 'OK' };
+    }
+    const query = input.trim();
+    const apiKey = await this.getApiKey();
+
+    if (apiKey) {
+      try {
+        const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
+          query,
+        )}&components=country:in&key=${apiKey}`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+        if (res.ok) {
+          const data = (await res.json()) as any;
+          if (data && data.status === 'OK' && Array.isArray(data.predictions)) {
+            return {
+              status: 'OK',
+              predictions: data.predictions.map((p: any) => ({
+                place_id: p.place_id,
+                description: p.description,
+                main_text: p.structured_formatting?.main_text || p.description,
+                secondary_text: p.structured_formatting?.secondary_text || '',
+                types: p.types || [],
+              })),
+            };
+          }
+        }
+      } catch (err) {
+        this.logger.warn(`Google Places Autocomplete failed: ${String(err)}`);
+      }
+    }
+
+    // Fallback: OpenStreetMap Nominatim
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+        query,
+      )}&countrycodes=in&limit=10&addressdetails=1`;
+      const res = await fetch(url, {
+        headers: { 'User-Agent': USER_AGENT },
+        signal: AbortSignal.timeout(6000),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as any[];
+        if (Array.isArray(data)) {
+          return {
+            status: 'OK',
+            predictions: data.map((item: any) => ({
+              place_id: `osm-${item.place_id || item.osm_id}`,
+              description: item.display_name,
+              main_text: item.name || item.display_name.split(',')[0] || '',
+              secondary_text: item.display_name,
+              lat: parseFloat(item.lat),
+              lng: parseFloat(item.lon),
+              types: [item.type, item.class].filter(Boolean),
+              raw_address: item.address,
+            })),
+          };
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`Nominatim search fallback failed: ${String(err)}`);
+    }
+
+    return { predictions: [], status: 'ZERO_RESULTS' };
+  }
+
+  /**
+   * Google Place Details proxy to retrieve coordinates and full address components.
+   */
+  async getPlaceDetails(placeId: string) {
+    if (!placeId) {
+      return { result: null, status: 'INVALID_REQUEST' };
+    }
+    const apiKey = await this.getApiKey();
+
+    if (apiKey && !placeId.startsWith('osm-')) {
+      try {
+        const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(
+          placeId,
+        )}&fields=name,geometry,address_components,formatted_address,types&key=${apiKey}`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+        if (res.ok) {
+          const data = (await res.json()) as any;
+          if (data && data.status === 'OK' && data.result) {
+            return {
+              status: 'OK',
+              result: data.result,
+            };
+          }
+        }
+      } catch (err) {
+        this.logger.warn(`Google Place Details failed: ${String(err)}`);
+      }
+    }
+
+    return { result: null, status: 'NOT_FOUND' };
+  }
+
+  /**
+   * Reverse geocoding proxy with business/establishment detection.
+   */
+  async reverseGeocode(lat: number, lng: number) {
+    const apiKey = await this.getApiKey();
+
+    if (apiKey) {
+      try {
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&region=in&key=${apiKey}`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+        if (res.ok) {
+          const data = (await res.json()) as any;
+          if (data && data.status === 'OK' && Array.isArray(data.results)) {
+            // Find establishment / point of interest / business name if available
+            let businessName = '';
+            for (const r of data.results) {
+              const types = Array.isArray(r.types) ? r.types : [];
+              if (
+                types.includes('establishment') ||
+                types.includes('point_of_interest') ||
+                types.includes('premise') ||
+                types.includes('store') ||
+                types.includes('restaurant') ||
+                types.includes('school') ||
+                types.includes('hospital')
+              ) {
+                const firstComp = r.address_components?.[0]?.long_name;
+                if (firstComp && !firstComp.match(/^\d+$/)) {
+                  businessName = firstComp;
+                  break;
+                }
+              }
+            }
+
+            return {
+              status: 'OK',
+              results: data.results,
+              business_name: businessName,
+            };
+          }
+        }
+      } catch (err) {
+        this.logger.warn(`Google Reverse Geocoding failed: ${String(err)}`);
+      }
+    }
+
+    // Fallback: Nominatim reverse
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
+      const res = await fetch(url, {
+        headers: { 'User-Agent': USER_AGENT },
+        signal: AbortSignal.timeout(6000),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        if (data && data.address) {
+          const name = data.name || data.display_name?.split(',')[0] || '';
+          return {
+            status: 'OK',
+            results: [
+              {
+                formatted_address: data.display_name,
+                address_components: [],
+                geometry: {
+                  location: { lat, lng },
+                },
+                raw_address: data.address,
+              },
+            ],
+            business_name: name,
+          };
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`Nominatim reverse fallback failed: ${String(err)}`);
+    }
+
+    return { results: [], status: 'ZERO_RESULTS', business_name: '' };
   }
 }

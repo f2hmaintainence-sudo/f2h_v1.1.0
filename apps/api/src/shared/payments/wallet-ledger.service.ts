@@ -31,6 +31,17 @@ export interface WalletMovementResult {
   amount: number;
 }
 
+/** Anything that can run a parameterised query — a pool client or the pool. */
+export interface WalletExecutor {
+  query: (sql: string, params?: any[]) => Promise<any>;
+}
+
+/** Notification the wallet owner should receive once a joined credit commits. */
+export interface PendingWalletNotification {
+  customerId: string;
+  result: WalletMovementResult;
+}
+
 @Injectable()
 export class WalletLedgerService {
   constructor(
@@ -50,15 +61,23 @@ export class WalletLedgerService {
    * Credits a wallet atomically: the balance update and the ledger row commit
    * together, and the balance is re-read `FOR UPDATE` inside the transaction so
    * concurrent credits cannot both write the same `balance_after`.
+   *
+   * Pass `executor` to join a transaction the caller already opened — used where
+   * the credit must commit with other work (a refund payout, say) rather than on
+   * its own. The push notification is only sent for self-contained credits,
+   * because the caller's transaction may still roll back after this returns.
    */
-  async credit(movement: WalletMovement): Promise<WalletMovementResult> {
+  async credit(
+    movement: WalletMovement,
+    executor?: WalletExecutor,
+  ): Promise<WalletMovementResult> {
     if (!(movement.amount > 0)) {
       throw new BadRequestException('Credit amount must be greater than zero');
     }
 
     const transactionId = this.buildTransactionId('WT');
 
-    const result = await this.db.transaction(async (client) => {
+    const apply = async (client: WalletExecutor) => {
       const balanceRows = await client.query(
         `SELECT COALESCE(wallet_balance, 0)::numeric AS wallet_balance
            FROM customers
@@ -99,8 +118,12 @@ export class WalletLedgerService {
       );
 
       return { transactionId, balanceBefore, balanceAfter, amount: movement.amount };
-    });
+    };
 
+    // Joining a caller's transaction: they own the commit, and the notification.
+    if (executor) return apply(executor);
+
+    const result = await this.db.transaction(apply);
     await this.notifyCredit(movement.customerId, result);
     return result;
   }
@@ -164,6 +187,17 @@ export class WalletLedgerService {
   }
 
   /** In-app + push notification. Never allowed to fail a committed credit. */
+  /**
+   * Sends the wallet-credit notification for a credit that joined a caller's
+   * transaction. Call it only after that transaction has committed.
+   */
+  async notifyCreditCommitted(
+    customerId: string,
+    result: WalletMovementResult,
+  ): Promise<void> {
+    await this.notifyCredit(customerId, result);
+  }
+
   private async notifyCredit(
     customerId: string,
     result: WalletMovementResult,

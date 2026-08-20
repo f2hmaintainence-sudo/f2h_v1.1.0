@@ -371,20 +371,31 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     super.dispose();
   }
 
+  bool isSearching = false;
+
   void _onSearchChanged(String query) {
     _searchDebounce?.cancel();
     if (query.trim().isEmpty) {
       setState(() {
         _searchResults.clear();
+        isSearching = false;
       });
       return;
     }
-    _searchDebounce = Timer(const Duration(milliseconds: 600), () {
+    setState(() {
+      isSearching = true;
+    });
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
       _performSearch(query);
     });
   }
 
-  void _parseGoogleAddressComponents(List? components, {String? formattedAddress}) {
+  void _parseGoogleAddressComponents(
+    List? components, {
+    String? formattedAddress,
+    String? placeName,
+    List? allResults,
+  }) {
     if (components == null) return;
     String premise = '';
     String subpremise = '';
@@ -396,6 +407,30 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     String city = '';
     String state = '';
     String pincode = '';
+    String businessOrBuilding = placeName ?? '';
+
+    // Check allResults to find any establishment / point of interest / business name
+    if (allResults != null && businessOrBuilding.isEmpty) {
+      for (final r in allResults) {
+        final types =
+            (r['types'] as List?)?.map((e) => e.toString()).toList() ?? [];
+        if (types.contains('establishment') ||
+            types.contains('point_of_interest') ||
+            types.contains('premise') ||
+            types.contains('store') ||
+            types.contains('restaurant') ||
+            types.contains('school') ||
+            types.contains('hospital') ||
+            types.contains('lodging')) {
+          final comp = (r['address_components'] as List?)?.firstOrNull;
+          final name = comp?['long_name']?.toString() ?? '';
+          if (name.isNotEmpty && !name.contains(RegExp(r'^\d+$'))) {
+            businessOrBuilding = name;
+            break;
+          }
+        }
+      }
+    }
 
     for (final comp in components) {
       final types =
@@ -439,12 +474,19 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       sublocality1.isNotEmpty ? sublocality1 : neighborhood,
     ].where((s) => s.isNotEmpty).join(', ');
 
+    final detectedBuilding = businessOrBuilding.isNotEmpty
+        ? businessOrBuilding
+        : (premise.isNotEmpty ? premise : '');
+
     setState(() {
-      if (flatNoController.text.isEmpty && subpremise.isNotEmpty) {
-        flatNoController.text = subpremise;
+      if (detectedBuilding.isNotEmpty) {
+        buildingNameController.text = detectedBuilding;
+        if (landmarkController.text.isEmpty) {
+          landmarkController.text = 'Near $detectedBuilding';
+        }
       }
-      if (buildingNameController.text.isEmpty && premise.isNotEmpty) {
-        buildingNameController.text = premise;
+      if (subpremise.isNotEmpty && flatNoController.text.isEmpty) {
+        flatNoController.text = subpremise;
       }
       if (streetValue.isNotEmpty) streetController.text = streetValue;
       if (areaValue.isNotEmpty) areaController.text = areaValue;
@@ -455,6 +497,40 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   }
 
   Future<void> _performSearch(String query) async {
+    try {
+      // 1. Try Backend Proxy API first (handles Google Places, no CORS block on Web/App)
+      final dio = sl<DioClient>().dio;
+      final response = await dio.get(
+        '/map/places/autocomplete',
+        queryParameters: {'input': query},
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data['status'] == 'OK' && data['predictions'] != null && mounted) {
+          setState(() {
+            isSearching = false;
+            _searchResults = (data['predictions'] as List)
+                .map(
+                  (p) => {
+                    'description': p['description'] ?? '',
+                    'place_id': p['place_id'] ?? '',
+                    'main_text': p['main_text'] ?? p['description'] ?? '',
+                    'secondary_text': p['secondary_text'] ?? '',
+                    'lat': p['lat'],
+                    'lng': p['lng'],
+                    'types': p['types'] ?? [],
+                  },
+                )
+                .toList();
+          });
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('Backend map search error: $e');
+    }
+
+    // 2. Fallback: Direct Google Places HTTP
     try {
       final apiKey = AppConfig.googleMapsApiKey;
       if (apiKey.isNotEmpty) {
@@ -468,6 +544,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
               data['predictions'] != null &&
               mounted) {
             setState(() {
+              isSearching = false;
               _searchResults = (data['predictions'] as List)
                   .map(
                     (p) => {
@@ -475,6 +552,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                       'place_id': p['place_id'] ?? '',
                       'main_text': p['structured_formatting']?['main_text'] ?? '',
                       'secondary_text': p['structured_formatting']?['secondary_text'] ?? '',
+                      'types': p['types'] ?? [],
                     },
                   )
                   .toList();
@@ -483,9 +561,14 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
           }
         }
       }
+    } catch (e) {
+      debugPrint('Direct Google search error: $e');
+    }
 
+    // 3. Fallback: OpenStreetMap Nominatim
+    try {
       final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&countrycodes=in&limit=5&addressdetails=1',
+        'https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&countrycodes=in&limit=10&addressdetails=1',
       );
       final response = await http.get(
         url,
@@ -495,32 +578,54 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
         final data = json.decode(response.body);
         if (mounted) {
           setState(() {
-            _searchResults = data as List;
+            isSearching = false;
+            _searchResults = (data as List).map((item) {
+              return {
+                'place_id': 'osm-${item['place_id'] ?? item['osm_id']}',
+                'description': item['display_name'] ?? '',
+                'main_text': item['name'] ?? (item['display_name']?.toString().split(',')[0] ?? ''),
+                'secondary_text': item['display_name'] ?? '',
+                'lat': double.tryParse(item['lat']?.toString() ?? ''),
+                'lng': double.tryParse(item['lon']?.toString() ?? ''),
+                'types': [item['type'], item['class']].where((e) => e != null).toList(),
+              };
+            }).toList();
           });
+          return;
         }
       }
     } catch (e) {
       debugPrint('Search error: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          isSearching = false;
+        });
+      }
     }
   }
 
   Future<void> _selectSearchResult(dynamic result) async {
-    final apiKey = AppConfig.googleMapsApiKey;
     final placeId = result['place_id']?.toString() ?? '';
+    final directLat = double.tryParse(result['lat']?.toString() ?? '');
+    final directLng = double.tryParse(result['lng']?.toString() ?? '');
 
-    if (apiKey.isNotEmpty && placeId.isNotEmpty) {
+    // 1. Try Backend Proxy details
+    if (placeId.isNotEmpty && !placeId.startsWith('osm-')) {
       try {
-        final detailsUrl = Uri.parse(
-          'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&fields=geometry,address_components,formatted_address&key=$apiKey',
+        final dio = sl<DioClient>().dio;
+        final res = await dio.get(
+          '/map/places/details',
+          queryParameters: {'place_id': placeId},
         );
-        final res = await http.get(detailsUrl);
-        if (res.statusCode == 200) {
-          final data = json.decode(res.body);
+        if (res.statusCode == 200 && res.data != null) {
+          final data = res.data;
           if (data['status'] == 'OK' && data['result'] != null) {
             final resObj = data['result'];
             final location = resObj['geometry']?['location'];
             final lat = (location?['lat'] as num?)?.toDouble() ?? 0.0;
             final lng = (location?['lng'] as num?)?.toDouble() ?? 0.0;
+            final placeName = resObj['name']?.toString() ?? '';
 
             if (lat != 0.0 && lng != 0.0) {
               setState(() {
@@ -529,12 +634,52 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                 _searchResults.clear();
                 _searchController.clear();
               });
-              _mapController.move(LatLng(lat, lng), 16.5);
+              _mapController.move(LatLng(lat, lng), 17.0);
               _parseGoogleAddressComponents(
                 resObj['address_components'] as List?,
                 formattedAddress: resObj['formatted_address']?.toString(),
+                placeName: placeName,
               );
               return;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Backend details error: $e');
+      }
+
+      // Fallback: Direct Google Place Details HTTP
+      try {
+        final apiKey = AppConfig.googleMapsApiKey;
+        if (apiKey.isNotEmpty) {
+          final detailsUrl = Uri.parse(
+            'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&fields=name,geometry,address_components,formatted_address,types&key=$apiKey',
+          );
+          final res = await http.get(detailsUrl);
+          if (res.statusCode == 200) {
+            final data = json.decode(res.body);
+            if (data['status'] == 'OK' && data['result'] != null) {
+              final resObj = data['result'];
+              final location = resObj['geometry']?['location'];
+              final lat = (location?['lat'] as num?)?.toDouble() ?? 0.0;
+              final lng = (location?['lng'] as num?)?.toDouble() ?? 0.0;
+              final placeName = resObj['name']?.toString() ?? '';
+
+              if (lat != 0.0 && lng != 0.0) {
+                setState(() {
+                  selectedLat = lat;
+                  selectedLng = lng;
+                  _searchResults.clear();
+                  _searchController.clear();
+                });
+                _mapController.move(LatLng(lat, lng), 17.0);
+                _parseGoogleAddressComponents(
+                  resObj['address_components'] as List?,
+                  formattedAddress: resObj['formatted_address']?.toString(),
+                  placeName: placeName,
+                );
+                return;
+              }
             }
           }
         }
@@ -543,53 +688,20 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       }
     }
 
-    final lat = double.tryParse(result['lat']?.toString() ?? '') ?? 0.0;
-    final lon = double.tryParse(result['lon']?.toString() ?? '') ?? 0.0;
-    if (lat != 0.0 && lon != 0.0) {
+    // Direct coords from search result (e.g. OSM)
+    if (directLat != null &&
+        directLng != null &&
+        directLat != 0.0 &&
+        directLng != 0.0) {
       setState(() {
-        selectedLat = lat;
-        selectedLng = lon;
+        selectedLat = directLat;
+        selectedLng = directLng;
         _searchResults.clear();
         _searchController.clear();
       });
-      _mapController.move(LatLng(lat, lon), 16.5);
-
-      final address = result['address'] as Map<String, dynamic>?;
-      if (address != null) {
-        final road = address['road']?.toString() ?? '';
-        final suburb = address['suburb']?.toString() ?? '';
-        final neighbourhood = address['neighbourhood']?.toString() ?? '';
-        final cityDistrict = address['city_district']?.toString() ?? '';
-        final county = address['county']?.toString() ?? '';
-
-        final city =
-            address['city']?.toString() ??
-            address['town']?.toString() ??
-            address['village']?.toString() ??
-            address['municipality']?.toString() ??
-            '';
-        final state = address['state']?.toString() ?? '';
-        final postcode = address['postcode']?.toString() ?? '';
-
-        String streetValue = road.isNotEmpty
-            ? road
-            : (suburb.isNotEmpty ? suburb : county);
-        String areaValue = neighbourhood.isNotEmpty
-            ? neighbourhood
-            : (cityDistrict.isNotEmpty
-                  ? cityDistrict
-                  : (suburb.isNotEmpty ? suburb : city));
-
-        setState(() {
-          streetController.text = streetValue;
-          areaController.text = areaValue;
-          cityController.text = city;
-          stateController.text = state;
-          pincodeController.text = postcode;
-        });
-      } else {
-        _reverseGeocodeLocation(lat, lon);
-      }
+      _mapController.move(LatLng(directLat, directLng), 17.0);
+      await _reverseGeocodeLocation(directLat, directLng);
+      return;
     }
   }
 
@@ -670,6 +782,39 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     });
 
     try {
+      // 1. Try Backend Proxy Geocoding (with business/establishment detection)
+      final dio = sl<DioClient>().dio;
+      final response = await dio.get(
+        '/map/geocode',
+        queryParameters: {'lat': lat, 'lng': lng},
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data['status'] == 'OK' &&
+            data['results'] != null &&
+            (data['results'] as List).isNotEmpty &&
+            mounted) {
+          final results = data['results'] as List;
+          final firstResult = results[0];
+          final components = firstResult['address_components'] as List?;
+          final formatted = firstResult['formatted_address']?.toString();
+          final businessName = data['business_name']?.toString() ?? '';
+
+          _parseGoogleAddressComponents(
+            components,
+            formattedAddress: formatted,
+            placeName: businessName,
+            allResults: results,
+          );
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('Backend geocode error: $e');
+    }
+
+    // 2. Fallback: Direct Google Geocoding
+    try {
       final apiKey = AppConfig.googleMapsApiKey;
       if (apiKey.isNotEmpty) {
         final url = Uri.parse(
@@ -682,15 +827,25 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
               data['results'] != null &&
               (data['results'] as List).isNotEmpty &&
               mounted) {
-            final firstResult = data['results'][0];
+            final results = data['results'] as List;
+            final firstResult = results[0];
             final components = firstResult['address_components'] as List?;
             final formatted = firstResult['formatted_address']?.toString();
-            _parseGoogleAddressComponents(components, formattedAddress: formatted);
+            _parseGoogleAddressComponents(
+              components,
+              formattedAddress: formatted,
+              allResults: results,
+            );
             return;
           }
         }
       }
+    } catch (e) {
+      debugPrint('Direct Google reverse geocode error: $e');
+    }
 
+    // 3. Fallback: Nominatim reverse
+    try {
       final url = Uri.parse(
         'https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lng&zoom=18&addressdetails=1',
       );
@@ -1567,6 +1722,51 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     );
   }
 
+  IconData _getPlaceTypeIcon(List types) {
+    final typeStrings = types.map((e) => e.toString().toLowerCase()).toList();
+    if (typeStrings.any((t) =>
+        t.contains('school') ||
+        t.contains('university') ||
+        t.contains('college'))) {
+      return Icons.school_rounded;
+    }
+    if (typeStrings.any((t) => t.contains('hotel') || t.contains('lodging'))) {
+      return Icons.hotel_rounded;
+    }
+    if (typeStrings.any((t) =>
+        t.contains('hospital') ||
+        t.contains('doctor') ||
+        t.contains('health'))) {
+      return Icons.local_hospital_rounded;
+    }
+    if (typeStrings.any((t) =>
+        t.contains('restaurant') ||
+        t.contains('food') ||
+        t.contains('cafe'))) {
+      return Icons.restaurant_rounded;
+    }
+    if (typeStrings.any((t) =>
+        t.contains('store') ||
+        t.contains('shop') ||
+        t.contains('mall'))) {
+      return Icons.storefront_rounded;
+    }
+    if (typeStrings.any((t) =>
+        t.contains('business') ||
+        t.contains('establishment') ||
+        t.contains('office'))) {
+      return Icons.business_rounded;
+    }
+    if (typeStrings.any((t) =>
+        t.contains('sublocality') ||
+        t.contains('neighborhood') ||
+        t.contains('colony') ||
+        t.contains('residential'))) {
+      return Icons.home_work_rounded;
+    }
+    return Icons.location_on_rounded;
+  }
+
   Widget _buildMapWidget() {
     final isDeliverable = _isLocationAllowed();
 
@@ -1844,23 +2044,40 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Search India address, area, or landmark...',
+                    hintText: 'Search place, colony, building, school, hotel...',
                     hintStyle: const TextStyle(
                       color: kMuted,
                       fontSize: 13,
                     ),
                     prefixIcon: const Icon(Icons.search_rounded, color: kPrimary),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isSearching)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 8.0),
+                            child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: kPrimary,
+                              ),
+                            ),
+                          ),
+                        if (_searchController.text.isNotEmpty)
+                          IconButton(
                             icon: const Icon(Icons.clear_rounded, size: 18),
                             onPressed: () {
                               _searchController.clear();
                               setState(() {
                                 _searchResults.clear();
+                                isSearching = false;
                               });
                             },
-                          )
-                        : null,
+                          ),
+                      ],
+                    ),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -1873,14 +2090,14 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
               if (_searchResults.isNotEmpty)
                 Container(
                   margin: const EdgeInsets.only(top: 6),
-                  constraints: const BoxConstraints(maxHeight: 220),
+                  constraints: const BoxConstraints(maxHeight: 240),
                   decoration: BoxDecoration(
                     color: kSurface,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.15),
-                        blurRadius: 12,
+                        color: Colors.black.withValues(alpha: 0.18),
+                        blurRadius: 14,
                         offset: const Offset(0, 4),
                       ),
                     ],
@@ -1889,19 +2106,30 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     shrinkWrap: true,
                     itemCount: _searchResults.length,
-                    separatorBuilder: (ctx, idx) => const Divider(height: 1, color: kBorderLt),
+                    separatorBuilder: (ctx, idx) =>
+                        const Divider(height: 1, color: kBorderLt),
                     itemBuilder: (context, index) {
                       final result = _searchResults[index];
                       final mainText = result['main_text']?.toString() ?? '';
-                      final desc = result['display_name'] ?? result['description'] ?? '';
-                      final secondaryText = result['secondary_text']?.toString() ?? desc;
+                      final desc =
+                          result['display_name'] ?? result['description'] ?? '';
+                      final secondaryText =
+                          result['secondary_text']?.toString() ?? desc;
+                      final types = (result['types'] as List?) ?? [];
 
                       return ListTile(
                         dense: true,
-                        leading: const Icon(
-                          Icons.location_on_outlined,
-                          color: kPrimary,
-                          size: 20,
+                        leading: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: kPrimary.withValues(alpha: 0.08),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            _getPlaceTypeIcon(types),
+                            color: kPrimary,
+                            size: 18,
+                          ),
                         ),
                         title: Text(
                           mainText.isNotEmpty ? mainText : desc,
@@ -1911,7 +2139,9 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                             color: kText,
                           ),
                         ),
-                        subtitle: mainText.isNotEmpty
+                        subtitle: mainText.isNotEmpty &&
+                                secondaryText.isNotEmpty &&
+                                secondaryText != mainText
                             ? Text(
                                 secondaryText,
                                 style: const TextStyle(
