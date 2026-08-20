@@ -1,7 +1,5 @@
-"use client";
-
-import BillingReportPage from "../../reports/billing/page";
+import { redirect } from 'next/navigation';
 
 export default function FinanceBillingPage() {
-  return <BillingReportPage />;
+  redirect('/admin/finance/outstandings');
 }

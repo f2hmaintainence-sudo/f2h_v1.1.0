@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/app.dart';
+import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
+import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_view_screen.dart';
 import 'package:f2h_customer/features/wallet/presentation/screens/wallet_screen.dart';
 
 /// Displays top promo banners (subscription_banner.png & wallet_banner.png) as a sliding carousel.
@@ -18,7 +20,9 @@ class _PromoBannerState extends State<PromoBanner> {
   List<Map<String, dynamic>> _banners = [];
   bool _loading = true;
   static const int _initialPage = 3000;
-  late final PageController _pageController = PageController(initialPage: _initialPage);
+  late final PageController _pageController = PageController(
+    initialPage: _initialPage,
+  );
   Timer? _autoScrollTimer;
 
   @override
@@ -54,7 +58,10 @@ class _PromoBannerState extends State<PromoBanner> {
       if (data is String) {
         data = jsonDecode(data);
       }
-      if (data is Map && data['status'] == true && data['data'] is List && (data['data'] as List).isNotEmpty) {
+      if (data is Map &&
+          data['status'] == true &&
+          data['data'] is List &&
+          (data['data'] as List).isNotEmpty) {
         final list = (data['data'] as List)
             .where((b) => b['isActive'] == true)
             .map((b) => Map<String, dynamic>.from(b as Map))
@@ -80,9 +87,11 @@ class _PromoBannerState extends State<PromoBanner> {
       _banners = [
         {
           'id': 'promo-1',
-          'imageUrl': '${ApiEndpoints.host}/uploads/banners/subscription_banner.png',
+          'imageUrl':
+              '${ApiEndpoints.host}/uploads/banners/subscription_banner.png',
           'title': 'Subscription Savings',
-          'subtitle': 'Subscribe to fresh milk, curd, paneer & more for hassle-free morning deliveries.',
+          'subtitle':
+              'Subscribe to fresh milk, curd, paneer & more for hassle-free morning deliveries.',
           'cta': 'Subscribe Now',
           'route': 'subscribe',
           'isActive': true,
@@ -91,7 +100,8 @@ class _PromoBannerState extends State<PromoBanner> {
           'id': 'promo-2',
           'imageUrl': '${ApiEndpoints.host}/uploads/banners/wallet_banner.png',
           'title': 'F2H Wallet',
-          'subtitle': 'Add cash to your wallet & get instant cashback on orders.',
+          'subtitle':
+              'Add cash to your wallet & get instant cashback on orders.',
           'cta': 'Add Money',
           'route': 'wallet',
           'isActive': true,
@@ -106,12 +116,36 @@ class _PromoBannerState extends State<PromoBanner> {
     final route = banner['route']?.toString().toLowerCase() ?? '';
     final imageUrl = banner['imageUrl']?.toString().toLowerCase() ?? '';
 
-    if (route == 'wallet' || imageUrl.contains('wallet_banner')) {
+    // Admin-managed banners carry an explicit destination.
+    final actionType = banner['actionType']?.toString().toUpperCase() ?? '';
+    final actionValue = banner['actionValue']?.toString();
+    if (actionType == 'PRODUCT' &&
+        actionValue != null &&
+        actionValue.startsWith('PRD')) {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => const WalletScreen(),
+          builder: (_) =>
+              ProductDetailViewScreen(product: getProductById(actionValue)),
         ),
+      );
+      return;
+    }
+    if (actionType == 'CATEGORY' &&
+        actionValue != null &&
+        actionValue.isNotEmpty) {
+      AppShell.of(context)?.setTab(1, category: actionValue);
+      return;
+    }
+    if (actionType == 'MENU' || route == 'menu') {
+      AppShell.of(context)?.setTab(1);
+      return;
+    }
+
+    if (route == 'wallet' || imageUrl.contains('wallet_banner')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const WalletScreen()),
       );
     } else {
       // Default to subscribe tab (tab 3 in AppShell)
@@ -124,7 +158,14 @@ class _PromoBannerState extends State<PromoBanner> {
     if (rawUrl.isEmpty) return '';
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
       final uri = Uri.tryParse(rawUrl);
-      if (uri != null && uri.path.isNotEmpty) {
+      // Admin banners may point at an external image host — only URLs served
+      // by the API itself (or a stale dev host) get rewritten to the current
+      // host, otherwise the external image would 404 against our domain.
+      const localHosts = {'localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2'};
+      final apiHost = Uri.tryParse(ApiEndpoints.host)?.host;
+      if (uri != null &&
+          uri.path.isNotEmpty &&
+          (localHosts.contains(uri.host) || uri.host == apiHost)) {
         return '${ApiEndpoints.host}${uri.path}';
       }
       return rawUrl;
@@ -209,14 +250,22 @@ class _PromoBannerState extends State<PromoBanner> {
                         );
                       },
                       errorBuilder: (context, error, stackTrace) {
-                        final isWallet = banner['route'] == 'wallet' || imageUrl.contains('wallet');
+                        final isWallet =
+                            banner['route'] == 'wallet' ||
+                            imageUrl.contains('wallet');
                         return Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: isWallet
-                                  ? [const Color(0xFF1D4ED8), const Color(0xFF3B82F6)]
-                                  : [const Color(0xFF15803D), const Color(0xFF22C55E)],
+                                  ? [
+                                      const Color(0xFF1D4ED8),
+                                      const Color(0xFF3B82F6),
+                                    ]
+                                  : [
+                                      const Color(0xFF15803D),
+                                      const Color(0xFF22C55E),
+                                    ],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
@@ -231,7 +280,9 @@ class _PromoBannerState extends State<PromoBanner> {
                                   children: [
                                     Text(
                                       banner['title']?.toString() ??
-                                          (isWallet ? 'F2H Wallet' : 'Save Up To 5%'),
+                                          (isWallet
+                                              ? 'F2H Wallet'
+                                              : 'Save Up To 5%'),
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.bold,
@@ -244,7 +295,10 @@ class _PromoBannerState extends State<PromoBanner> {
                                           (isWallet
                                               ? 'Add cash & get instant cashback on orders.'
                                               : 'Subscription to fresh milk, curd, paneer & more.'),
-                                      style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 11,
+                                      ),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -253,15 +307,21 @@ class _PromoBannerState extends State<PromoBanner> {
                               ),
                               const SizedBox(width: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 8,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(
-                                  banner['cta']?.toString() ?? (isWallet ? 'Add Money' : 'Order Now'),
+                                  banner['cta']?.toString() ??
+                                      (isWallet ? 'Add Money' : 'Order Now'),
                                   style: TextStyle(
-                                    color: isWallet ? const Color(0xFF1D4ED8) : const Color(0xFF15803D),
+                                    color: isWallet
+                                        ? const Color(0xFF1D4ED8)
+                                        : const Color(0xFF15803D),
                                     fontWeight: FontWeight.bold,
                                     fontSize: 12,
                                   ),

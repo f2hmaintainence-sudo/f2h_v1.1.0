@@ -88,6 +88,7 @@ class ApiEndpoints {
   static const String products = '$_customer/products';
   static const String orders = '$_customer/orders';
   static const String checkOut = '$_customer/checkout/payment';
+  static const String availableCoupons = '$_customer/coupons';
   static const String validateCoupon = '$_customer/coupon/validate';
   static const String previewDiscounts = '$_customer/checkout/preview-discounts';
 

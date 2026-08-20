@@ -19,6 +19,39 @@ export class CategoriesProductsService {
   ) { }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // BANNERS: rows the admin panel manages in `product_banner`
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Active banners of the given types, ordered the way the admin arranged
+   * them. Returns [] on any failure so callers can fall back to the bundled
+   * banner images rather than showing the customer an empty carousel.
+   */
+  async getManagedBanners(
+    bannerTypes: string[],
+    isPopup: boolean,
+  ): Promise<any[]> {
+    try {
+      const rows = await this.db.query(
+        `SELECT id, title, description, discount_text, action_type, action_value,
+                category_id, cta_label, background_color, banner_type,
+                is_popup, display_order, image_url, image_path
+           FROM product_banner
+          WHERE deleted_at IS NULL
+            AND is_active = TRUE
+            AND COALESCE(is_popup, FALSE) = $1
+            AND COALESCE(banner_type, 'home_carousel') = ANY($2::text[])
+          ORDER BY display_order ASC, id ASC`,
+        [isPopup, bannerTypes],
+      );
+      return rows ?? [];
+    } catch (error) {
+      this.developer.error('getManagedBanners failed', { error, bannerTypes, isPopup });
+      return [];
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // SHARED: Build a map of product_id → { rating, reviews } from all ratings
   // ─────────────────────────────────────────────────────────────────────────
   private async buildRatingsMap(): Promise<Map<string, { rating: number; reviews: number }>> {

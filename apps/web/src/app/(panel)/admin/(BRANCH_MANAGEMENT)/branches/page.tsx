@@ -14,7 +14,7 @@ import { showSuccessToast } from '@/services/toast.service';
 const MapPicker = dynamic(() => import('@/components/shared/MapPicker'), { ssr: false });
 const SectorMap = dynamic(() => import('@/components/branch/SectorMap'), { ssr: false });
 
-type BranchHexShape = 'hexagon' | 'circle' | 'square';
+type BranchHexShape = 'hexagon' | 'circle' | 'square' | 'rectangle';
 
 interface Branch {
   id?: number;
@@ -80,7 +80,9 @@ export default function BranchesPage() {
   const [allocating, setAllocating] = useState(false);
 
   const normalizeHexShape = (value: unknown): BranchHexShape => {
-    return value === 'circle' || value === 'square' || value === 'hexagon' ? value : 'hexagon';
+    return value === 'circle' || value === 'square' || value === 'rectangle' || value === 'hexagon'
+      ? value
+      : 'hexagon';
   };
 
   // Fetch branches list
@@ -215,7 +217,8 @@ export default function BranchesPage() {
     (form.lat !== null && form.lng !== null) && (
       String(form.lat) !== String(selectedBranch.lat) ||
       String(form.lng) !== String(selectedBranch.lng) ||
-      form.delivery_radius_km !== Number(selectedBranch.delivery_radius_km)
+      form.delivery_radius_km !== Number(selectedBranch.delivery_radius_km) ||
+      form.hex_shape !== normalizeHexShape(selectedBranch.hex_shape)
     )
   );
   const openEditBranch = (branch: Branch) => {
@@ -631,7 +634,7 @@ export default function BranchesPage() {
                       <div>
                         <p className="text-xs font-bold text-amber-800 uppercase tracking-wider">Coverage Reconfiguration</p>
                         <p className="text-xs text-amber-700 leading-relaxed mt-1">
-                          Updating the location pin or delivery radius will update the hub's operational boundary.
+                          Updating the location pin, delivery radius, or shape will update the hub's operational boundary.
                         </p>
                       </div>
                     </div>

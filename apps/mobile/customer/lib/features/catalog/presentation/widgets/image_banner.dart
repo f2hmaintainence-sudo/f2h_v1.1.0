@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/app.dart';
+import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
+import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_view_screen.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/referral_screen.dart';
+import 'package:f2h_customer/features/wallet/presentation/screens/wallet_screen.dart';
 
 /// Fetches banners from the API and displays them as a tappable carousel.
 /// Tapping navigates to the route specified by each banner (e.g. Subscribe tab).
@@ -19,7 +22,9 @@ class _ImageBannerState extends State<ImageBanner> {
   List<Map<String, dynamic>> _banners = [];
   bool _loading = true;
   static const int _initialPage = 3000;
-  late final PageController _pageController = PageController(initialPage: _initialPage);
+  late final PageController _pageController = PageController(
+    initialPage: _initialPage,
+  );
   Timer? _autoScrollTimer;
 
   @override
@@ -55,7 +60,10 @@ class _ImageBannerState extends State<ImageBanner> {
       if (data is String) {
         data = jsonDecode(data);
       }
-      if (data is Map && data['status'] == true && data['data'] is List && (data['data'] as List).isNotEmpty) {
+      if (data is Map &&
+          data['status'] == true &&
+          data['data'] is List &&
+          (data['data'] as List).isNotEmpty) {
         final list = (data['data'] as List)
             .where((b) => b['isActive'] == true)
             .map((b) => Map<String, dynamic>.from(b as Map))
@@ -116,15 +124,46 @@ class _ImageBannerState extends State<ImageBanner> {
     final imageUrl = banner['imageUrl']?.toString().toLowerCase() ?? '';
     final id = banner['id']?.toString().toLowerCase() ?? '';
 
-    if (route == 'subscribe' || imageUrl.contains('sub_banner_1') || id.contains('sub-banner-1')) {
-      final shellState = context.findAncestorStateOfType<AppShellState>();
-      shellState?.setTab(2); // Redirect to Subscription tab
-    } else if (route == 'refer' || imageUrl.contains('sub_banner_2') || id.contains('sub-banner-2')) {
+    // Admin-managed banners carry an explicit destination.
+    final actionType = banner['actionType']?.toString().toUpperCase() ?? '';
+    final actionValue = banner['actionValue']?.toString();
+    if (actionType == 'PRODUCT' &&
+        actionValue != null &&
+        actionValue.startsWith('PRD')) {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => const ReferralScreen(),
+          builder: (_) =>
+              ProductDetailViewScreen(product: getProductById(actionValue)),
         ),
+      );
+      return;
+    }
+    if (actionType == 'CATEGORY' &&
+        actionValue != null &&
+        actionValue.isNotEmpty) {
+      AppShell.of(context)?.setTab(1, category: actionValue);
+      return;
+    }
+    if (actionType == 'WALLET') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const WalletScreen()),
+      );
+      return;
+    }
+
+    if (route == 'subscribe' ||
+        imageUrl.contains('sub_banner_1') ||
+        id.contains('sub-banner-1')) {
+      final shellState = context.findAncestorStateOfType<AppShellState>();
+      shellState?.setTab(2); // Redirect to Subscription tab
+    } else if (route == 'refer' ||
+        imageUrl.contains('sub_banner_2') ||
+        id.contains('sub-banner-2')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ReferralScreen()),
       );
     } else {
       final shellState = context.findAncestorStateOfType<AppShellState>();
@@ -136,7 +175,14 @@ class _ImageBannerState extends State<ImageBanner> {
     if (rawUrl.isEmpty) return '';
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
       final uri = Uri.tryParse(rawUrl);
-      if (uri != null && uri.path.isNotEmpty) {
+      // Admin banners may point at an external image host — only URLs served
+      // by the API itself (or a stale dev host) get rewritten to the current
+      // host, otherwise the external image would 404 against our domain.
+      const localHosts = {'localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2'};
+      final apiHost = Uri.tryParse(ApiEndpoints.host)?.host;
+      if (uri != null &&
+          uri.path.isNotEmpty &&
+          (localHosts.contains(uri.host) || uri.host == apiHost)) {
         return '${ApiEndpoints.host}${uri.path}';
       }
       return rawUrl;
@@ -221,17 +267,30 @@ class _ImageBannerState extends State<ImageBanner> {
                         );
                       },
                       errorBuilder: (context, error, stackTrace) {
-                        final isRefer = banner['route'] == 'refer' || imageUrl.contains('sub_banner_2');
-                        final isMenu = banner['route'] == 'menu' || imageUrl.contains('sub_banner_3');
+                        final isRefer =
+                            banner['route'] == 'refer' ||
+                            imageUrl.contains('sub_banner_2');
+                        final isMenu =
+                            banner['route'] == 'menu' ||
+                            imageUrl.contains('sub_banner_3');
                         return Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: isRefer
-                                  ? [const Color(0xFFD97706), const Color(0xFFF59E0B)]
+                                  ? [
+                                      const Color(0xFFD97706),
+                                      const Color(0xFFF59E0B),
+                                    ]
                                   : isMenu
-                                      ? [const Color(0xFF0284C7), const Color(0xFF38BDF8)]
-                                      : [const Color(0xFF15803D), const Color(0xFF22C55E)],
+                                  ? [
+                                      const Color(0xFF0284C7),
+                                      const Color(0xFF38BDF8),
+                                    ]
+                                  : [
+                                      const Color(0xFF15803D),
+                                      const Color(0xFF22C55E),
+                                    ],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
@@ -245,7 +304,10 @@ class _ImageBannerState extends State<ImageBanner> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: Colors.white24,
                                         borderRadius: BorderRadius.circular(6),
@@ -254,8 +316,8 @@ class _ImageBannerState extends State<ImageBanner> {
                                         isRefer
                                             ? 'REFER & EARN'
                                             : isMenu
-                                                ? 'FARM FRESH'
-                                                : 'DAILY SUBSCRIPTION',
+                                            ? 'FARM FRESH'
+                                            : 'DAILY SUBSCRIPTION',
                                         style: const TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.bold,
@@ -270,8 +332,8 @@ class _ImageBannerState extends State<ImageBanner> {
                                           (isRefer
                                               ? 'Refer & Earn'
                                               : isMenu
-                                                  ? 'Farm Fresh Essentials'
-                                                  : 'VIP Member'),
+                                              ? 'Farm Fresh Essentials'
+                                              : 'VIP Member'),
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.bold,
@@ -284,9 +346,12 @@ class _ImageBannerState extends State<ImageBanner> {
                                           (isRefer
                                               ? 'Invite friends and earn rewards on every referral.'
                                               : isMenu
-                                                  ? 'Pure, fresh and natural milk, curd, paneer & ghee.'
-                                                  : 'Exclusive benefits & premium experience.'),
-                                      style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                              ? 'Pure, fresh and natural milk, curd, paneer & ghee.'
+                                              : 'Exclusive benefits & premium experience.'),
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 11,
+                                      ),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -305,8 +370,8 @@ class _ImageBannerState extends State<ImageBanner> {
                                   isRefer
                                       ? Icons.card_giftcard_rounded
                                       : isMenu
-                                          ? Icons.shopping_bag_rounded
-                                          : Icons.calendar_month_rounded,
+                                      ? Icons.shopping_bag_rounded
+                                      : Icons.calendar_month_rounded,
                                   color: Colors.amber,
                                   size: 26,
                                 ),

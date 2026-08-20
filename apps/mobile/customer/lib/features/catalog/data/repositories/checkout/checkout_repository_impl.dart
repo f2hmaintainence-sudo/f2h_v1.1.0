@@ -37,6 +37,11 @@ class CheckoutRepositoryImpl implements CheckoutRepository {
   }
 
   @override
+  Future<List<Map<String, dynamic>>> getAvailableCoupons(double subtotal) {
+    return remoteDataSource.getAvailableCoupons(subtotal);
+  }
+
+  @override
   Future<Map<String, dynamic>> previewDiscounts(CheckoutRequestEntity request) {
     final requestModel = CheckoutRequestModel(
       userId: request.userId,

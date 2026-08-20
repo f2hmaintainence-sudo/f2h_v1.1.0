@@ -75,8 +75,16 @@ export class FinanceController {
 
   @Post('outstandings/:id/remind')
   @HttpCode(HttpStatus.OK)
-  async sendBillReminder(@Param('id') id: string) {
-    return await this.service.sendBillReminder(id);
+  async sendBillReminder(@Param('id') id: string, @Body() body?: { message?: string }) {
+    return await this.service.sendBillReminder(id, body?.message);
+  }
+
+  @Post('outstandings/bulk-remind')
+  @HttpCode(HttpStatus.OK)
+  async sendBulkBillReminders(
+    @Body() body: { billIds?: string[]; overdueOnly?: boolean; customMessage?: string },
+  ) {
+    return await this.service.sendBulkBillReminders(body);
   }
 }
 

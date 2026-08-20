@@ -1015,6 +1015,14 @@ export class CartService {
     return this.discountEngine.validateCouponCode(couponCode.trim(), customerId, subtotal || 0);
   }
 
+  async listCoupons(customerId: string, subtotal: number) {
+    const coupons = await this.discountEngine.listAvailableCoupons(
+      customerId,
+      subtotal || 0,
+    );
+    return { status: true, data: coupons };
+  }
+
   async previewDiscounts(customerId: string, body: CheckOutDto) {
     body.customer_id = customerId;
     const plan = await this.buildCheckoutPlan(body);

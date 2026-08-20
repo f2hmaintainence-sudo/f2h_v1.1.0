@@ -10,6 +10,11 @@ abstract class CheckoutRepository {
     required double subtotal,
   });
 
+  /// Coupons the customer can pick from, priced against [subtotal]. Each entry
+  /// carries `code`, `name`, `description`, `discount_preview`, `eligible` and,
+  /// when not eligible, a `reason`.
+  Future<List<Map<String, dynamic>>> getAvailableCoupons(double subtotal);
+
   /// Server-side pricing for the order as it stands, including auto-applied
   /// promotions and the coupon carried on [request]. Nothing is charged.
   Future<Map<String, dynamic>> previewDiscounts(CheckoutRequestEntity request);

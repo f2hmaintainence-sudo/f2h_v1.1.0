@@ -10,10 +10,56 @@ import { CategoriesProductsService } from '../ModuleServices/categories_products
 export class CategoriesController {
   constructor(private readonly service: CategoriesProductsService) { }
 
+  /**
+   * Turns an admin `product_banner` row into the shape the app's carousels
+   * expect. `route` keeps the old string contract for existing taps, while
+   * actionType/actionValue let the app target a category or product exactly.
+   */
+  private mapManagedBanner(row: any, host: string) {
+    const actionType = (row.action_type || 'NONE').toUpperCase();
+    const actionValue = row.action_value || row.category_id || null;
+
+    let route = 'menu';
+    if (actionType === 'PRODUCT') route = 'product';
+    else if (actionType === 'CATEGORY') route = 'category';
+    else if (actionType === 'SUBSCRIPTION') route = 'subscribe';
+    else if (actionType === 'WALLET') route = 'wallet';
+    else if (actionType === 'REFERRAL') route = 'refer';
+
+    const rawImage = row.image_url || row.image_path || '';
+    const imageUrl = /^https?:\/\//i.test(rawImage)
+      ? rawImage
+      : `${host}${rawImage.startsWith('/') ? '' : '/'}${rawImage}`;
+
+    return {
+      id: `banner-${row.id}`,
+      imageUrl,
+      title: row.title || '',
+      subtitle: row.description || row.discount_text || '',
+      discountText: row.discount_text || null,
+      backgroundColor: row.background_color || null,
+      cta: row.cta_label || 'Shop Now',
+      route,
+      actionType,
+      actionValue,
+      isActive: true,
+    };
+  }
+
   @Public()
   @Get('banners')
   async getBanners(@Req() req: Request) {
     const host = `${req.protocol}://${req.get('host')}`;
+
+    // Admin-managed carousel banners win; the bundled files are the fallback.
+    const managed = await this.service.getManagedBanners(['home_carousel'], false);
+    if (managed.length > 0) {
+      return {
+        status: true,
+        data: managed.map((row) => this.mapManagedBanner(row, host)),
+      };
+    }
+
     const bannersDir = join(process.cwd(), 'uploads', 'banners');
     let bannerFiles: string[] = [];
     try {
@@ -45,6 +91,8 @@ export class CategoriesController {
         subtitle: 'Subscribe to pure organic milk, paneer, ghee & daily essentials.',
         cta: route === 'subscribe' ? 'Subscribe Now' : route === 'refer' ? 'Refer Now' : 'Shop Now',
         route,
+        actionType: 'NONE',
+        actionValue: null,
         isActive: true,
       };
     });
@@ -59,6 +107,18 @@ export class CategoriesController {
   @Get('promo-banners')
   async getPromoBanners(@Req() req: Request) {
     const host = `${req.protocol}://${req.get('host')}`;
+
+    const managed = await this.service.getManagedBanners(
+      ['offer_banner', 'category_slide'],
+      false,
+    );
+    if (managed.length > 0) {
+      return {
+        status: true,
+        data: managed.map((row) => this.mapManagedBanner(row, host)),
+      };
+    }
+
     const bannersDir = join(process.cwd(), 'uploads', 'banners');
     let promoFiles: string[] = [];
     try {
@@ -83,6 +143,8 @@ export class CategoriesController {
         subtitle: isSub ? 'Subscribe & Save on Daily Fresh Essentials' : 'Add Cash & Get Extra Cashback',
         cta: isSub ? 'Subscribe Now' : 'Add Money',
         route: isSub ? 'subscribe' : 'wallet',
+        actionType: 'NONE',
+        actionValue: null,
         isActive: true,
       };
     });
@@ -90,6 +152,40 @@ export class CategoriesController {
     return {
       status: true,
       data,
+    };
+  }
+
+  /**
+   * Popup banners the admin flagged with `is_popup`. The app reads the raw
+   * column names here, so the row shape is kept as-is apart from the image
+   * URL, which is made absolute.
+   */
+  @Public()
+  @Get('popup-banner')
+  async getPopupBanner(@Req() req: Request) {
+    const host = `${req.protocol}://${req.get('host')}`;
+    const rows = await this.service.getManagedBanners(['popup', 'home_carousel'], true);
+
+    const banners = rows.map((row) => {
+      const rawImage = row.image_url || row.image_path || '';
+      return {
+        id: row.id,
+        title: row.title || '',
+        description: row.description || null,
+        discount_text: row.discount_text || null,
+        image_url: /^https?:\/\//i.test(rawImage)
+          ? rawImage
+          : `${host}${rawImage.startsWith('/') ? '' : '/'}${rawImage}`,
+        action_type: (row.action_type || 'NONE').toUpperCase(),
+        action_value: row.action_value || row.category_id || null,
+        cta_label: row.cta_label || 'Shop Now',
+        background_color: row.background_color || null,
+      };
+    });
+
+    return {
+      status: true,
+      banners,
     };
   }
 

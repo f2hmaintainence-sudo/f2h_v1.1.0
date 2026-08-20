@@ -12,12 +12,20 @@ export class FinanceRepository {
   async getSubscriberOutstandingBills(query: any): Promise<{ bills: any[]; total: number }> {
     const conditions: string[] = [
       `pb.deleted_at IS NULL`,
-      `(pb.bill_type IN ('subscription', 'postpaid', 'subscriber') OR pb.payment_type = 'postpaid')`,
       `pb.due_amount > 0`,
       `LOWER(pb.status::text) NOT IN ('paid', 'cancelled')`,
     ];
     const params: any[] = [];
     let paramIndex = 1;
+
+    if (query.type && query.type !== 'all') {
+      const t = String(query.type).toLowerCase();
+      if (t === 'subscription' || t === 'postpaid' || t === 'subscriber') {
+        conditions.push(`(pb.bill_type IN ('subscription', 'postpaid', 'subscriber') OR pb.payment_type = 'postpaid')`);
+      } else if (t === 'order' || t === 'prepaid' || t === 'one-time') {
+        conditions.push(`((pb.bill_type IN ('order', 'prepaid') OR pb.payment_type = 'prepaid') AND pb.bill_type NOT IN ('subscription', 'postpaid'))`);
+      }
+    }
 
     if (query.status) {
       const st = String(query.status).toLowerCase();
@@ -402,25 +410,128 @@ export class FinanceRepository {
     `;
     const rowsGeneral = await this.db.query(sqlGeneral, []);
     const general = rowsGeneral?.[0] || {};
+    const totalCollected = Number(general.total_collected || 0);
+    const totalInvoices = Number(general.total_invoices || 0);
+    const paidCount = Number(general.paid_count || 0);
+
+    const successRate = totalInvoices > 0 ? Number(((paidCount / totalInvoices) * 100).toFixed(1)) : 100;
+    const avgTransactionValue = paidCount > 0 ? Number((totalCollected / paidCount).toFixed(2)) : 0;
 
     const sqlMethods = `
       SELECT 
-        COALESCE(NULLIF(pb.payment_method, ''), 'online') AS payment_method,
+        COALESCE(NULLIF(LOWER(pb.payment_method), ''), 'online') AS payment_method,
         COUNT(*)::int AS count,
         COALESCE(SUM(pb.paid_amount), 0)::numeric AS paid_amount,
         COALESCE(SUM(pb.total_amount), 0)::numeric AS total_amount
       FROM public.customer_bills pb
       WHERE pb.deleted_at IS NULL
         AND pb.created_at >= (CURRENT_DATE - (${daysNum} || ' days')::interval)
-      GROUP BY COALESCE(NULLIF(pb.payment_method, ''), 'online')
+      GROUP BY COALESCE(NULLIF(LOWER(pb.payment_method), ''), 'online')
       ORDER BY paid_amount DESC
     `;
     const methodsResult = await this.db.query(sqlMethods, []);
-    const methods = Array.isArray(methodsResult) ? methodsResult : [];
+    const rawMethods = Array.isArray(methodsResult) ? methodsResult : [];
+
+    const methods = rawMethods.map((m: any) => {
+      const pAmt = Number(m.paid_amount || 0);
+      const percentage = totalCollected > 0 ? Number(((pAmt / totalCollected) * 100).toFixed(1)) : 0;
+      const count = Number(m.count || 0);
+      const avg = count > 0 ? Number((pAmt / count).toFixed(2)) : 0;
+      return {
+        ...m,
+        percentage,
+        average_amount: avg,
+      };
+    });
+
+    // Query daily payments segmented by payment method
+    const sqlDaily = `
+      SELECT 
+        TO_CHAR((pb.created_at AT TIME ZONE 'Asia/Kolkata')::date, 'YYYY-MM-DD') AS payment_date,
+        COALESCE(NULLIF(LOWER(pb.payment_method), ''), 'online') AS payment_method,
+        COUNT(*)::int AS count,
+        COALESCE(SUM(pb.paid_amount), 0)::numeric AS paid_amount,
+        COALESCE(SUM(pb.total_amount), 0)::numeric AS total_amount
+      FROM public.customer_bills pb
+      WHERE pb.deleted_at IS NULL
+        AND pb.created_at >= (CURRENT_DATE - (${daysNum} || ' days')::interval)
+      GROUP BY (pb.created_at AT TIME ZONE 'Asia/Kolkata')::date, COALESCE(NULLIF(LOWER(pb.payment_method), ''), 'online')
+      ORDER BY payment_date ASC
+    `;
+    const dailyRaw = await this.db.query(sqlDaily, []);
+    const dailyRows = Array.isArray(dailyRaw) ? dailyRaw : [];
+
+    // Map into date-keyed dictionary
+    const dateMap = new Map<string, any>();
+    const today = new Date();
+    for (let i = daysNum - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const dateKey = d.toISOString().slice(0, 10);
+      const displayDate = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+      dateMap.set(dateKey, {
+        date: dateKey,
+        displayDate,
+        total: 0,
+        upi: 0,
+        razorpay: 0,
+        wallet: 0,
+        cash: 0,
+        card: 0,
+        other: 0,
+        count: 0,
+      });
+    }
+
+    for (const row of dailyRows) {
+      const dKey = row.payment_date;
+      if (!dateMap.has(dKey)) {
+        const dObj = new Date(dKey);
+        dateMap.set(dKey, {
+          date: dKey,
+          displayDate: !isNaN(dObj.getTime()) ? dObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : dKey,
+          total: 0,
+          upi: 0,
+          razorpay: 0,
+          wallet: 0,
+          cash: 0,
+          card: 0,
+          other: 0,
+          count: 0,
+        });
+      }
+      const entry = dateMap.get(dKey);
+      const amt = Number(row.paid_amount || 0);
+      const cnt = Number(row.count || 0);
+      entry.total += amt;
+      entry.count += cnt;
+
+      const method = String(row.payment_method || '').toLowerCase();
+      if (method.includes('upi')) {
+        entry.upi += amt;
+      } else if (method.includes('razorpay') || method === 'online') {
+        entry.razorpay += amt;
+      } else if (method.includes('wallet')) {
+        entry.wallet += amt;
+      } else if (method.includes('cash') || method.includes('cod')) {
+        entry.cash += amt;
+      } else if (method.includes('card')) {
+        entry.card += amt;
+      } else {
+        entry.other += amt;
+      }
+    }
+
+    const dailyTrend = Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
 
     return {
-      general,
+      general: {
+        ...general,
+        success_rate: successRate,
+        avg_transaction_value: avgTransactionValue,
+      },
       methods,
+      dailyTrend,
       days: daysNum,
     };
   }
@@ -449,6 +560,32 @@ export class FinanceRepository {
     `;
     const rows = await this.db.query(sql, [id]);
     return rows?.[0] ?? null;
+  }
+
+  async findBillsByIds(ids: string[]): Promise<any[]> {
+    if (!ids || ids.length === 0) return [];
+    const sql = `
+      SELECT 
+        pb.bill_id AS id,
+        pb.bill_id AS bill_number,
+        pb.customer_id,
+        pb.billing_from AS period_start,
+        pb.billing_to AS period_end,
+        pb.due_date,
+        pb.total_amount,
+        pb.paid_amount,
+        pb.due_amount,
+        pb.status,
+        pb.created_at,
+        COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), NULLIF(u.user_name, ''), NULLIF(u.email, ''), pb.customer_id) AS customer_name,
+        COALESCE(u.phone, '') AS customer_phone
+      FROM public.customer_bills pb
+      LEFT JOIN public.customers c ON (c.customer_id = pb.customer_id)
+      LEFT JOIN public.users u ON (u.user_id = pb.customer_id)
+      WHERE pb.bill_id = ANY($1::varchar[])
+    `;
+    const rows = await this.db.query(sql, [ids]);
+    return Array.isArray(rows) ? rows : [];
   }
 
   async updateBillPayment(id: string, paidAmount: number, status: string): Promise<any> {

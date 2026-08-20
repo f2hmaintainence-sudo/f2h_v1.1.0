@@ -101,6 +101,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   bool _isCouponLoading = false;
 
+  /// Coupons the server says this customer can use, fetched once per screen
+  /// and re-priced whenever the cart subtotal moves.
+  List<Map<String, dynamic>> _availableCoupons = const [];
+  bool _loadingAvailableCoupons = false;
+  double _couponsListedForSubtotal = -1;
+
   // ===== Checkout Item Filtering =====
 
   /// Filters cart items to only include one-time items selected by the user.
@@ -150,6 +156,36 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   // ===== Coupon Handling =====
+
+  Future<void> _loadAvailableCoupons(double subtotal) async {
+    if (_loadingAvailableCoupons) return;
+    _loadingAvailableCoupons = true;
+    _couponsListedForSubtotal = subtotal;
+
+    try {
+      final coupons = await sl<CheckoutRepository>().getAvailableCoupons(
+        subtotal,
+      );
+      if (!mounted) return;
+      setState(() => _availableCoupons = coupons);
+    } catch (_) {
+      // A failed lookup just means no suggestions — typing a code still works.
+      if (mounted && _availableCoupons.isNotEmpty) {
+        setState(() => _availableCoupons = const []);
+      }
+    } finally {
+      _loadingAvailableCoupons = false;
+    }
+  }
+
+  /// Fetches the coupon list on first build and after the subtotal changes.
+  void _refreshAvailableCouponsIfNeeded(double subtotal) {
+    if ((subtotal - _couponsListedForSubtotal).abs() < 0.01) return;
+    _couponsListedForSubtotal = subtotal;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadAvailableCoupons(subtotal);
+    });
+  }
 
   String? _defaultAddressId() {
     final list = context.read<CustomerSessionCubit>().state.addresses;
@@ -248,6 +284,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         );
       });
     }
+  }
+
+  Future<void> _applyListedCoupon(
+    String code,
+    List<CartItemEntity> checkoutItems,
+    double subtotal,
+    String customerId,
+  ) {
+    _couponController.text = code;
+    return _applyCoupon(checkoutItems, subtotal, customerId);
   }
 
   void _removeCoupon() {
@@ -494,6 +540,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     // Quantities can change on this screen — keep the coupon priced
                     // against what is actually in the order.
                     _repriceCouponIfNeeded(checkoutItems, subtotal, customerId);
+                    _refreshAvailableCouponsIfNeeded(subtotal);
 
                     final double payableItems = _payableFor(subtotal);
                     final double couponSavings = subtotal - payableItems;
@@ -1317,6 +1364,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ),
               ],
             ),
+          if (!applied && _availableCoupons.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Text(
+              'AVAILABLE FOR YOU',
+              style: TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w900,
+                color: kTextSub,
+                letterSpacing: 0.6,
+              ),
+            ),
+            const SizedBox(height: 8),
+            for (final coupon in _availableCoupons)
+              _buildCouponOffer(coupon, checkoutItems, subtotal, customerId),
+          ],
           if (_couponError != null) ...[
             const SizedBox(height: 8),
             Row(
@@ -1338,6 +1400,133 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  /// One row in the "available for you" list. Ineligible coupons stay visible
+  /// but muted, showing how much more the customer needs to spend.
+  Widget _buildCouponOffer(
+    Map<String, dynamic> coupon,
+    List<CartItemEntity> checkoutItems,
+    double subtotal,
+    String customerId,
+  ) {
+    final code = coupon['code']?.toString() ?? '';
+    final eligible = coupon['eligible'] != false;
+    final discount = _toDouble(coupon['discount_preview']);
+    final reason = coupon['reason']?.toString();
+    final title = coupon['name']?.toString();
+    final description = coupon['description']?.toString();
+    final label = coupon['label']?.toString();
+
+    final subtitle = !eligible && reason != null && reason.isNotEmpty
+        ? reason
+        : (description != null && description.isNotEmpty
+              ? description
+              : (title ?? ''));
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Opacity(
+        opacity: eligible ? 1 : 0.6,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: kBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: eligible ? kPrimary.withValues(alpha: 0.3) : kBorder,
+              style: BorderStyle.solid,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: eligible
+                      ? kPrimary.withValues(alpha: 0.1)
+                      : kMuted.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: eligible
+                        ? kPrimary.withValues(alpha: 0.45)
+                        : kBorder,
+                  ),
+                ),
+                child: Text(
+                  code,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.6,
+                    color: eligible ? kPrimary : kTextSub,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      eligible && discount > 0
+                          ? 'Save ₹${discount.toStringAsFixed(0)}'
+                          : (label != null && label.isNotEmpty
+                                ? label
+                                : (title ?? '')),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: kText,
+                      ),
+                    ),
+                    if (subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w500,
+                          color: kTextSub,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: eligible && !_isCouponLoading
+                    ? () => _applyListedCoupon(
+                        code,
+                        checkoutItems,
+                        subtotal,
+                        customerId,
+                      )
+                    : null,
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(0, 30),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  'APPLY',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.4,
+                    color: eligible ? kPrimary : kMuted,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -12,6 +12,7 @@ import { BranchShowEditService } from './showEdit.service';
 import { SectorService } from '../ModuleServices/sector.service';
 import { CreateBranchDto } from '../dto/branch.dto';
 
+const BRANCH_COVERAGE_SHAPES = new Set(['hexagon', 'circle', 'square', 'rectangle']);
 
 @Injectable()
 export class BranchSaveEditService {
@@ -105,6 +106,15 @@ export class BranchSaveEditService {
       }
       if (body.buffer_zone !== undefined) {
         updateData.buffer_zone = body.buffer_zone;
+      }
+      if (body.hex_shape !== undefined) {
+        if (!BRANCH_COVERAGE_SHAPES.has(body.hex_shape)) {
+          throw new BadRequestException({
+            status: false,
+            message: 'Invalid branch coverage shape',
+          });
+        }
+        updateData.hex_shape = body.hex_shape;
       }
       if (geoUpdated) {
         updateData.lat = newLat;

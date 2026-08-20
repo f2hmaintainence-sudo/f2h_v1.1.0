@@ -68,6 +68,7 @@ export class BranchSaveAddService {
           lng: body.lng || null,
           delivery_radius_km: radiusKm,
           buffer_zone: bufferZone,
+          hex_shape: body.hex_shape || 'hexagon',
         };
         this.Developer.log('Branch data', { branchData });
         const branchResult = await this.Data.insert('branches', branchData, { transaction: tx });

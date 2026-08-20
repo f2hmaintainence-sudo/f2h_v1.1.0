@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req } from '@nestjs/common';
 import { CartDto, CheckOutDto } from '../dto/cart.dto';
 import { CartService } from '../ModuleServices/cartAndCheckout.service';
 import { Request } from 'express';
@@ -33,6 +33,13 @@ export class CartController {
   async validateCoupon(@Req() req: Request, @Body() body: { coupon_code: string; subtotal?: number }) {
     const customerId = (req.user as any)?.user_id;
     return this.cartService.validateCoupon(customerId, body.coupon_code, Number(body.subtotal || 0));
+  }
+
+  /** Coupons this customer can pick from, priced against the cart subtotal. */
+  @Get('/coupons')
+  async listCoupons(@Req() req: Request, @Query('subtotal') subtotal?: string) {
+    const customerId = (req.user as any)?.user_id;
+    return this.cartService.listCoupons(customerId, Number(subtotal || 0));
   }
 
   @Post('/checkout/preview-discounts')

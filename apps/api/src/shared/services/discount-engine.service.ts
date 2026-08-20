@@ -233,6 +233,141 @@ export class DiscountEngineService {
     };
   }
 
+  // ── Coupons a customer can pick from (checkout coupon list) ──────────────
+
+  /**
+   * Every coupon the customer could use right now, newest-value first.
+   * Coupons blocked by the cart subtotal are still returned, flagged
+   * `eligible: false` with the reason, so the app can show "add ₹X more"
+   * instead of hiding an offer the customer nearly qualifies for.
+   * Coupons that are expired, used up, or barred for this customer are omitted.
+   */
+  async listAvailableCoupons(
+    customerId: string,
+    subtotal: number,
+    orderSource: 'one-time' | 'subscription' = 'one-time',
+  ): Promise<
+    Array<{
+      code: string;
+      name: string | null;
+      description: string | null;
+      promotion_type: string;
+      discount_value: number;
+      max_discount_amount: number | null;
+      minimum_order_amount: number;
+      end_at: string | null;
+      first_order_only: boolean;
+      eligible: boolean;
+      reason: string | null;
+      discount_preview: number;
+    }>
+  > {
+    const rows = await this.db.query(
+      `SELECT
+         c.coupon_id, c.code, c.name, c.description,
+         c.usage_limit AS coupon_usage_limit,
+         c.usage_limit_per_customer AS coupon_upc,
+         c.used_count, c.end_at,
+         p.promotion_id, p.name AS promo_name,
+         p.promotion_type, p.discount_value::float AS discount_value,
+         p.max_discount_amount::float AS max_discount_amount,
+         COALESCE(p.minimum_order_amount, 0)::float AS minimum_order_amount,
+         p.allow_subscription_orders, p.first_order_only,
+         p.apply_to_all_products,
+         p.usage_limit_per_customer AS promo_upc,
+         COALESCE(
+           (SELECT COUNT(*) FROM coupon_redemptions cr
+             WHERE cr.coupon_id = c.coupon_id AND cr.customer_id = $1),
+           0
+         ) AS customer_used,
+         COALESCE(
+           (SELECT ARRAY_AGG(pp.product_variant_id) FROM promotion_products pp
+             WHERE pp.promotion_id = p.promotion_id),
+           ARRAY[]::text[]
+         ) AS product_variant_ids
+       FROM coupons c
+       JOIN promotions p ON p.promotion_id = c.promotion_id
+       WHERE c.deleted_at IS NULL AND p.deleted_at IS NULL
+         AND c.status = 'active' AND p.status = 'active'
+         AND (c.start_at IS NULL OR c.start_at <= NOW())
+         AND (c.end_at IS NULL OR c.end_at >= NOW())
+         AND (p.start_at IS NULL OR p.start_at <= NOW())
+         AND (p.end_at IS NULL OR p.end_at >= NOW())
+         AND (c.usage_limit IS NULL OR c.used_count < c.usage_limit)
+       ORDER BY p.discount_value DESC`,
+      [customerId],
+    );
+
+    const available: Array<any> = [];
+
+    for (const row of rows ?? []) {
+      if (orderSource === 'subscription' && !row.allow_subscription_orders) continue;
+
+      const perCustLimit = Number(row.coupon_upc ?? row.promo_upc ?? 1);
+      if (Number(row.customer_used ?? 0) >= perCustLimit) continue;
+
+      if (row.first_order_only) {
+        const variantIds: string[] = row.product_variant_ids || [];
+        const spent =
+          row.apply_to_all_products || variantIds.length === 0
+            ? await this.customerHasAnyPriorOrder(customerId)
+            : await this.customerHasPriorPurchaseOfVariants(customerId, variantIds);
+        if (spent) continue;
+      }
+
+      const minAmount = Number(row.minimum_order_amount || 0);
+      const meetsMinimum = minAmount <= 0 || subtotal >= minAmount;
+
+      const promo: PromotionRow = {
+        promotion_id: row.promotion_id,
+        name: row.promo_name,
+        promotion_type: row.promotion_type,
+        discount_value: Number(row.discount_value),
+        max_discount_amount: row.max_discount_amount != null ? Number(row.max_discount_amount) : null,
+        minimum_order_amount: minAmount,
+        first_order_only: row.first_order_only,
+        usage_limit: row.coupon_usage_limit,
+        usage_limit_per_customer: perCustLimit,
+        stackable: false,
+        apply_to_all_products: row.apply_to_all_products,
+        product_variant_ids: row.product_variant_ids || [],
+      } as PromotionRow;
+
+      // A coupon limited to specific variants cannot be priced without the
+      // cart contents, so only whole-cart coupons carry a rupee preview —
+      // the rest advertise their headline offer instead.
+      const appliesToWholeCart =
+        row.apply_to_all_products || (row.product_variant_ids || []).length === 0;
+
+      available.push({
+        code: row.code,
+        name: row.name || row.promo_name || null,
+        description: row.description || null,
+        label:
+          row.promotion_type === 'percentage'
+            ? `${Number(row.discount_value)}% OFF`
+            : `₹${Number(row.discount_value).toFixed(0)} OFF`,
+        promotion_type: row.promotion_type,
+        discount_value: Number(row.discount_value),
+        max_discount_amount: row.max_discount_amount != null ? Number(row.max_discount_amount) : null,
+        minimum_order_amount: minAmount,
+        applies_to_all_products: appliesToWholeCart,
+        end_at: row.end_at ? new Date(row.end_at).toISOString() : null,
+        first_order_only: !!row.first_order_only,
+        eligible: meetsMinimum,
+        reason: meetsMinimum
+          ? null
+          : `Add ₹${(minAmount - subtotal).toFixed(0)} more to use this coupon`,
+        discount_preview:
+          meetsMinimum && appliesToWholeCart
+            ? this.calcRawItemDiscount(promo, subtotal)
+            : 0,
+      });
+    }
+
+    return available;
+  }
+
   // ── Record redemptions (call inside checkout transaction with PoolClient) ──
 
   async recordRedemptions(

@@ -47,8 +47,8 @@ export class CreateBranchDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['hexagon', 'circle', 'square'])
-  hex_shape?: string;
+  @IsIn(['hexagon', 'circle', 'square', 'rectangle'])
+  hex_shape?: 'hexagon' | 'circle' | 'square' | 'rectangle';
 
   // ─── H3 Sector-Split Fields ──────────────────────────────────
 

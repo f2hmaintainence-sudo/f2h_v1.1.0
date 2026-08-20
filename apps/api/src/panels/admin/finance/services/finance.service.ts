@@ -91,22 +91,76 @@ export class FinanceService {
     };
   }
 
-  async sendBillReminder(billId: string): Promise<any> {
+  async sendBillReminder(billId: string, customMessage?: string): Promise<any> {
     const bill = await this.repository.findBillById(billId);
     if (!bill) throw new NotFoundException('Bill not found');
 
     const dueAmountStr = `₹${Number(bill.due_amount || bill.total_amount || 0).toFixed(2)}`;
+    const dueDateStr = bill.due_date ? new Date(bill.due_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'immediate';
+    const bodyText = customMessage || `Dear ${bill.customer_name || 'Customer'}, your bill #${bill.bill_number || bill.id} of ${dueAmountStr} is pending (Due: ${dueDateStr}). Settle now via F2H App to maintain uninterrupted deliveries.`;
+
     await this.pushNotificationService.sendNotificationToUsers(
       [bill.customer_id],
       {
-        title: '🔔 F2H Outstanding Bill Reminder',
-        body: `Urgent Reminder: Your subscriber bill #${bill.bill_number || bill.id} of ${dueAmountStr} is pending. Settle now to maintain active deliveries.`,
+        title: '🔔 F2H Bill Due Date Intimation',
+        body: bodyText,
       },
     ).catch(() => {});
 
     return {
       status: true,
-      message: `Reminder sent to customer ${bill.customer_name || bill.customer_id}.`,
+      message: `Due date reminder sent to ${bill.customer_name || bill.customer_id} for ${dueAmountStr}.`,
+    };
+  }
+
+  async sendBulkBillReminders(body: { billIds?: string[]; overdueOnly?: boolean; customMessage?: string }): Promise<any> {
+    const { billIds, overdueOnly, customMessage } = body || {};
+    let targetBills: any[] = [];
+
+    if (billIds && billIds.length > 0) {
+      targetBills = await this.repository.findBillsByIds(billIds);
+    } else {
+      const res = await this.repository.getSubscriberOutstandingBills({
+        status: overdueOnly ? 'overdue' : undefined,
+        limit: 500,
+      });
+      targetBills = res.bills || [];
+    }
+
+    if (targetBills.length === 0) {
+      return {
+        status: true,
+        sentCount: 0,
+        message: 'No pending customer bills found to intimate.',
+      };
+    }
+
+    let sentCount = 0;
+    const notifiedCustomers = new Set<string>();
+
+    for (const bill of targetBills) {
+      if (!bill.customer_id || notifiedCustomers.has(bill.customer_id)) continue;
+      const dueAmountStr = `₹${Number(bill.due_amount || bill.total_amount || 0).toFixed(2)}`;
+      const dueDateStr = bill.due_date ? new Date(bill.due_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'immediate';
+      const bodyText = customMessage || `Dear ${bill.customer_name || 'Customer'}, your pending bill #${bill.bill_number || bill.id} of ${dueAmountStr} is awaiting payment (Due: ${dueDateStr}). Please settle now via F2H App.`;
+
+      await this.pushNotificationService.sendNotificationToUsers(
+        [bill.customer_id],
+        {
+          title: '🔔 F2H Bill Payment Due Reminder',
+          body: bodyText,
+        },
+      ).catch(() => {});
+
+      notifiedCustomers.add(bill.customer_id);
+      sentCount++;
+    }
+
+    return {
+      status: true,
+      sentCount,
+      totalBills: targetBills.length,
+      message: `Successfully dispatched due date intimations to ${sentCount} customers.`,
     };
   }
 

@@ -7,13 +7,22 @@ import {
   AdvancedMarker,
   Pin,
   Circle,
+  Polygon,
   useMap,
   useMapsLibrary,
 } from '@vis.gl/react-google-maps';
 import MapErrorBoundary from './MapErrorBoundary';
-import { Search, Loader2, MapPin } from 'lucide-react';
+import {
+  Search,
+  Loader2,
+  MapPin,
+  Circle as CircleIcon,
+  Square,
+  RectangleHorizontal,
+  Hexagon,
+} from 'lucide-react';
 import { useClientConfig } from '@/lib/client-config';
-export type ShapeType = 'hexagon' | 'circle' | 'square';
+export type ShapeType = 'hexagon' | 'circle' | 'square' | 'rectangle';
 
 interface ExistingBranch {
   branch_id?: string;
@@ -23,6 +32,7 @@ interface ExistingBranch {
   lng?: number | null;
   delivery_radius_km?: number | null;
   buffer_zone?: number | null;
+  hex_shape?: ShapeType;
 }
 
 interface MapPickerProps {
@@ -40,6 +50,109 @@ interface SearchSuggestion {
   display_name: string;
   lat: number;
   lng: number;
+}
+
+const SHAPE_OPTIONS = [
+  { value: 'circle', label: 'Circle', Icon: CircleIcon },
+  { value: 'square', label: 'Square', Icon: Square },
+  { value: 'rectangle', label: 'Rectangle', Icon: RectangleHorizontal },
+  { value: 'hexagon', label: 'Hexagon', Icon: Hexagon },
+] as const;
+
+const EARTH_RADIUS_KM = 6371;
+const RECTANGLE_CORNER_BEARING_DEGREES = Math.atan2(2, 1) * (180 / Math.PI);
+
+function destinationPoint(
+  lat: number,
+  lng: number,
+  distanceKm: number,
+  bearingDegrees: number,
+): google.maps.LatLngLiteral {
+  const angularDistance = distanceKm / EARTH_RADIUS_KM;
+  const bearing = bearingDegrees * (Math.PI / 180);
+  const latitude = lat * (Math.PI / 180);
+  const longitude = lng * (Math.PI / 180);
+
+  const destinationLatitude = Math.asin(
+    Math.sin(latitude) * Math.cos(angularDistance)
+    + Math.cos(latitude) * Math.sin(angularDistance) * Math.cos(bearing),
+  );
+  const destinationLongitude = longitude + Math.atan2(
+    Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(latitude),
+    Math.cos(angularDistance) - Math.sin(latitude) * Math.sin(destinationLatitude),
+  );
+
+  return {
+    lat: destinationLatitude * (180 / Math.PI),
+    lng: ((((destinationLongitude * (180 / Math.PI)) + 540) % 360) - 180),
+  };
+}
+
+function buildShapePath(
+  lat: number,
+  lng: number,
+  radiusKm: number,
+  shape: Exclude<ShapeType, 'circle'>,
+): google.maps.LatLngLiteral[] {
+  const bearings = shape === 'hexagon'
+    ? [0, 60, 120, 180, 240, 300]
+    : shape === 'square'
+      ? [45, 135, 225, 315]
+      : [
+          RECTANGLE_CORNER_BEARING_DEGREES,
+          180 - RECTANGLE_CORNER_BEARING_DEGREES,
+          180 + RECTANGLE_CORNER_BEARING_DEGREES,
+          360 - RECTANGLE_CORNER_BEARING_DEGREES,
+        ];
+
+  return bearings.map((bearing) => destinationPoint(lat, lng, radiusKm, bearing));
+}
+
+function CoverageOverlay({
+  lat,
+  lng,
+  radiusKm,
+  shape,
+  isBuffer = false,
+  isExisting = false,
+}: {
+  lat: number;
+  lng: number;
+  radiusKm: number;
+  shape: ShapeType;
+  isBuffer?: boolean;
+  isExisting?: boolean;
+}) {
+  const color = isBuffer ? '#a855f7' : isExisting ? '#059669' : '#16a34a';
+  const strokeWeight = isBuffer || isExisting ? 1.5 : 2;
+  const strokeOpacity = isBuffer ? 0.7 : isExisting ? 0.5 : 0.9;
+  const fillOpacity = isBuffer ? 0.04 : isExisting ? 0.05 : 0.08;
+
+  if (shape === 'circle') {
+    return (
+      <Circle
+        center={{ lat: Number(lat), lng: Number(lng) }}
+        radius={Number(radiusKm) * 1000}
+        strokeColor={color}
+        strokeWeight={strokeWeight}
+        strokeOpacity={strokeOpacity}
+        fillColor={color}
+        fillOpacity={fillOpacity}
+      />
+    );
+  }
+
+  return (
+    <Polygon
+      paths={buildShapePath(lat, lng, radiusKm, shape)}
+      strokeColor={color}
+      strokeWeight={strokeWeight}
+      strokeOpacity={strokeOpacity}
+      fillColor={color}
+      fillOpacity={fillOpacity}
+      geodesic
+    />
+  );
 }
 
 // ── Smart Places search bar with theme styling and fallback ──────────────────
@@ -145,7 +258,7 @@ function PlacesSearch({ onPlaceSelect }: { onPlaceSelect: (lat: number, lng: num
   };
 
   return (
-    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 w-[320px] sm:w-[420px]">
+    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 w-[320px] sm:w-[420px]">
       <div className="relative">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
         <input
@@ -207,10 +320,11 @@ function ClickHandler({ onClick }: { onClick: (lat: number, lng: number) => void
 
 // ── Inner map contents ──────────────────────────────────────────────────────
 function MapContents({
-  lat, lng, radiusKm, bufferZoneKm, existingBranches, onLocationChange,
+  lat, lng, radiusKm, bufferZoneKm, existingBranches, selectedShape, onLocationChange,
 }: {
   lat: number; lng: number; radiusKm: number; bufferZoneKm: number;
-  existingBranches: ExistingBranch[]; onLocationChange: (lat: number, lng: number) => void;
+  existingBranches: ExistingBranch[]; selectedShape: ShapeType;
+  onLocationChange: (lat: number, lng: number) => void;
 }) {
   const handlePlaceSelect = useCallback((plat: number, plng: number) => {
     onLocationChange(plat, plng);
@@ -233,27 +347,20 @@ function MapContents({
         <Pin background="#16a34a" borderColor="#15803d" glyphColor="#fff" scale={1.2} />
       </AdvancedMarker>
 
-      {/* Delivery radius circle (Green Theme) */}
-      <Circle
-        center={{ lat: Number(lat), lng: Number(lng) }}
-        radius={Number(radiusKm) * 1000}
-        strokeColor="#16a34a"
-        strokeWeight={2}
-        strokeOpacity={0.9}
-        fillColor="#16a34a"
-        fillOpacity={0.08}
+      <CoverageOverlay
+        lat={lat}
+        lng={lng}
+        radiusKm={radiusKm}
+        shape={selectedShape}
       />
 
-      {/* Buffer zone ring */}
       {Number(bufferZoneKm) > 0 && (
-        <Circle
-          center={{ lat: Number(lat), lng: Number(lng) }}
-          radius={(Number(radiusKm) + Number(bufferZoneKm)) * 1000}
-          strokeColor="#a855f7"
-          strokeWeight={1.5}
-          strokeOpacity={0.7}
-          fillColor="#a855f7"
-          fillOpacity={0.04}
+        <CoverageOverlay
+          lat={lat}
+          lng={lng}
+          radiusKm={Number(radiusKm) + Number(bufferZoneKm)}
+          shape={selectedShape}
+          isBuffer
         />
       )}
 
@@ -272,14 +379,12 @@ function MapContents({
               <Pin background="#059669" borderColor="#047857" glyphColor="#fff" scale={0.9} />
             </AdvancedMarker>
             {b.delivery_radius_km && !isNaN(Number(b.delivery_radius_km)) && (
-              <Circle
-                center={{ lat: blat, lng: blng }}
-                radius={Number(b.delivery_radius_km) * 1000}
-                strokeColor="#059669"
-                strokeWeight={1.5}
-                strokeOpacity={0.5}
-                fillColor="#059669"
-                fillOpacity={0.05}
+              <CoverageOverlay
+                lat={blat}
+                lng={blng}
+                radiusKm={Number(b.delivery_radius_km)}
+                shape={b.hex_shape ?? 'circle'}
+                isExisting
               />
             )}
           </React.Fragment>
@@ -297,7 +402,7 @@ export default function MapPicker({
   radiusKm = 5,
   bufferZoneKm = 0,
   existingBranches = [],
-  selectedShape,
+  selectedShape = 'circle',
   onShapeChange,
 }: MapPickerProps) {
   const { googleMapsApiKey } = useClientConfig();
@@ -384,6 +489,7 @@ export default function MapPicker({
                   radiusKm={radiusKm}
                   bufferZoneKm={bufferZoneKm}
                   existingBranches={existingBranches}
+                  selectedShape={selectedShape}
                   onLocationChange={onLocationChange}
                 />
               )}
@@ -395,6 +501,36 @@ export default function MapPicker({
             </Map>
           </APIProvider>
         </MapErrorBoundary>
+
+        {onShapeChange && (
+          <div className="absolute inset-x-3 top-16 z-20 flex justify-center">
+            <div
+              role="group"
+              aria-label="Coverage shape"
+              className="grid w-full max-w-md grid-cols-4 gap-1 rounded-xl border border-slate-200 bg-white/95 p-1 shadow-lg backdrop-blur"
+            >
+              {SHAPE_OPTIONS.map(({ value, label, Icon }) => {
+                const isSelected = selectedShape === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => onShapeChange(value)}
+                    className={`flex items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-bold transition-colors ${isSelected
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-700'
+                    }`}
+                    title={value === 'rectangle' ? 'Rectangle (2:1)' : label}
+                  >
+                    <Icon size={14} aria-hidden="true" />
+                    <span>{label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Coord display badge */}
         {lat !== null && lng !== null && lat !== undefined && lng !== undefined && (
