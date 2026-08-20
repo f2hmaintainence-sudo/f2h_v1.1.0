@@ -2,6 +2,7 @@ import { Controller, Get, Post, Patch, Query, Body, Param, Req, UseGuards,
   Logger,
 } from '@nestjs/common';
 import { AdminSystemService } from './admin-system.service';
+import { AuditLogQueryDto } from './admin-system.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
@@ -70,7 +71,7 @@ export class AdminSystemController {
   // ── Audit Logs ──
 
   @Get('audit')
-  async getAuditLogs(@Query() query: any) {
+  async getAuditLogs(@Query() query: AuditLogQueryDto) {
     return this.systemService.getAuditLogs(query);
   }
 

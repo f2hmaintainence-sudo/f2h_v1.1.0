@@ -1,6 +1,31 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { DatabaseService } from '../../../shared/database/Database.service';
 import { DeveloperService } from '../../../shared/logger/Developer.service';
+import { AuditLogQueryDto } from './admin-system.dto';
+
+export interface AuditActionBreakdown {
+  action: string;
+  count: number;
+}
+
+interface AuditInsightRow {
+  total_events: number;
+  events_today: number;
+  delete_events: number;
+  active_admins: number;
+  affected_resources: number;
+  action_breakdown: AuditActionBreakdown[] | null;
+}
+
+interface AuditFilterOptionsRow {
+  actions: string[] | null;
+  target_types: string[] | null;
+}
+
+export interface AuditAdminOption {
+  admin_id: string;
+  admin_name: string;
+}
 
 @Injectable()
 export class AdminSystemService {
@@ -205,41 +230,162 @@ export class AdminSystemService {
   // ────────────────────────────────────────────────
   // Audit Logs
   // ────────────────────────────────────────────────
-  async getAuditLogs(query: any) {
+  async getAuditLogs(query: AuditLogQueryDto) {
     try {
-      const { admin_id, action, target_type, page = 1, limit = 50, search } = query;
-      const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-      const params: any[] = [];
+      const {
+        admin_id,
+        action,
+        target_type,
+        search,
+        from_date,
+        to_date,
+        page = 1,
+        limit = 50,
+      } = query;
+      const offset = (page - 1) * limit;
+      const params: string[] = [];
       const where: string[] = [];
 
-      if (admin_id) { params.push(admin_id); where.push(`al.admin_id = $${params.length}`); }
-      if (action) { params.push(action); where.push(`al.action = $${params.length}`); }
-      if (target_type) { params.push(target_type); where.push(`al.target_type = $${params.length}`); }
+      if (admin_id) {
+        params.push(admin_id);
+        where.push(`al.admin_id = ${params.length}`);
+      }
+      if (action) {
+        params.push(action);
+        where.push(`al.action = ${params.length}`);
+      }
+      if (target_type) {
+        params.push(target_type);
+        where.push(`al.target_type = ${params.length}`);
+      }
       if (search) {
         params.push(`%${search}%`);
-        where.push(`(al.admin_name ILIKE $${params.length} OR al.action ILIKE $${params.length} OR al.target_type ILIKE $${params.length})`);
+        where.push(`(
+          al.admin_name ILIKE $${params.length}
+          OR al.action ILIKE $${params.length}
+          OR al.target_type ILIKE $${params.length}
+          OR COALESCE(al.target_id, '') ILIKE $${params.length}
+          OR COALESCE(al.ip_address, '') ILIKE $${params.length}
+        )`);
+      }
+      if (from_date) {
+        params.push(from_date);
+        where.push(
+          `al.created_at >= (${params.length}::date::timestamp AT TIME ZONE 'Asia/Kolkata')`,
+        );
+      }
+      if (to_date) {
+        params.push(to_date);
+        where.push(
+          `al.created_at < ((${params.length}::date + INTERVAL '1 day') AT TIME ZONE 'Asia/Kolkata')`,
+        );
       }
 
-      const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+      const whereClause =
+        where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
 
-      const sql = `
+      const rowsSql = `
         SELECT al.*
         FROM admin_audit_logs al
         ${whereClause}
-        ORDER BY al.created_at DESC
+        ORDER BY al.created_at DESC, al.id DESC
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
       `;
-      params.push(parseInt(limit, 10), offset);
 
-      const rows = await this.db.query(sql, params);
+      const insightSql = `
+        WITH filtered_logs AS (
+          SELECT al.action, al.admin_id, al.target_type, al.created_at
+          FROM admin_audit_logs al
+          ${whereClause}
+        )
+        SELECT
+          COUNT(*)::int AS total_events,
+          COUNT(*) FILTER (
+            WHERE (created_at AT TIME ZONE 'Asia/Kolkata')::date =
+              (NOW() AT TIME ZONE 'Asia/Kolkata')::date
+          )::int AS events_today,
+          COUNT(*) FILTER (WHERE LOWER(action) LIKE '%delete%')::int AS delete_events,
+          COUNT(DISTINCT admin_id)::int AS active_admins,
+          COUNT(DISTINCT target_type)::int AS affected_resources,
+          COALESCE((
+            SELECT json_agg(
+              json_build_object('action', ranked.action, 'count', ranked.count)
+              ORDER BY ranked.count DESC, ranked.action ASC
+            )
+            FROM (
+              SELECT action, COUNT(*)::int AS count
+              FROM filtered_logs
+              GROUP BY action
+              ORDER BY count DESC, action ASC
+              LIMIT 5
+            ) ranked
+          ), '[]'::json) AS action_breakdown
+        FROM filtered_logs
+      `;
 
-      const countSql = `SELECT COUNT(*)::int AS total FROM admin_audit_logs al ${whereClause}`;
-      const countRows = await this.db.query(countSql, params.slice(0, -2));
+      const filterOptionsSql = `
+        SELECT
+          COALESCE(
+            ARRAY_AGG(DISTINCT action ORDER BY action)
+              FILTER (WHERE action IS NOT NULL AND action <> ''),
+            ARRAY[]::varchar[]
+          ) AS actions,
+          COALESCE(
+            ARRAY_AGG(DISTINCT target_type ORDER BY target_type)
+              FILTER (WHERE target_type IS NOT NULL AND target_type <> ''),
+            ARRAY[]::varchar[]
+          ) AS target_types
+        FROM admin_audit_logs
+      `;
+
+      const adminOptionsSql = `
+        SELECT admin_id, admin_name
+        FROM (
+          SELECT DISTINCT ON (admin_id)
+            admin_id,
+            COALESCE(NULLIF(admin_name, ''), admin_id) AS admin_name
+          FROM admin_audit_logs
+          WHERE admin_id IS NOT NULL AND admin_id <> ''
+          ORDER BY admin_id, created_at DESC
+        ) latest_admin_names
+        ORDER BY admin_name ASC, admin_id ASC
+      `;
+
+      const [rows, insightRows, filterOptionRows, adminOptions] =
+        await Promise.all([
+          this.db.query<Record<string, unknown>>(rowsSql, [
+            ...params,
+            limit,
+            offset,
+          ]),
+          this.db.query<AuditInsightRow>(insightSql, params),
+          this.db.query<AuditFilterOptionsRow>(filterOptionsSql),
+          this.db.query<AuditAdminOption>(adminOptionsSql),
+        ]);
+
+      const insightRow = insightRows[0];
+      const filterOptionRow = filterOptionRows[0];
+      const insights = {
+        total_events: Number(insightRow?.total_events ?? 0),
+        events_today: Number(insightRow?.events_today ?? 0),
+        delete_events: Number(insightRow?.delete_events ?? 0),
+        active_admins: Number(insightRow?.active_admins ?? 0),
+        affected_resources: Number(insightRow?.affected_resources ?? 0),
+        action_breakdown: Array.isArray(insightRow?.action_breakdown)
+          ? insightRow.action_breakdown
+          : [],
+      };
 
       return {
         status: true,
         data: rows,
-        total: countRows[0]?.total ?? 0,
+        total: insights.total_events,
+        insights,
+        filter_options: {
+          actions: filterOptionRow?.actions ?? [],
+          target_types: filterOptionRow?.target_types ?? [],
+          admins: adminOptions,
+        },
         message: 'Audit logs fetched',
       };
     } catch (error) {

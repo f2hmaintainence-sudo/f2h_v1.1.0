@@ -605,44 +605,6 @@ CREATE TABLE public.contact_enquiries (
 );
 
 
---
--- Name: container_transactions; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.container_transactions (
-    id bigint NOT NULL,
-    customer_id character varying(30) NOT NULL,
-    container_id character varying(30) CONSTRAINT container_transactions_packaging_type_id_not_null NOT NULL,
-    reference_type character varying(20) NOT NULL,
-    reference_id character varying(30),
-    transaction_type character varying(20) NOT NULL,
-    quantity integer NOT NULL,
-    remarks text,
-    transaction_date date DEFAULT CURRENT_DATE NOT NULL,
-    created_by character varying(30),
-    created_at timestamp with time zone DEFAULT now(),
-    deleted_at timestamp without time zone
-);
-
-
---
--- Name: container_transactions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.container_transactions_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: container_transactions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.container_transactions_id_seq OWNED BY public.container_transactions.id;
-
 
 --
 -- Name: containers; Type: TABLE; Schema: public; Owner: -
@@ -2834,12 +2796,6 @@ ALTER TABLE ONLY public.breakdown_incidents ALTER COLUMN id SET DEFAULT nextval(
 ALTER TABLE ONLY public.categories ALTER COLUMN id SET DEFAULT nextval('public.categories_id_seq'::regclass);
 
 
---
--- Name: container_transactions id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.container_transactions ALTER COLUMN id SET DEFAULT nextval('public.container_transactions_id_seq'::regclass);
-
 
 --
 -- Name: containers id; Type: DEFAULT; Schema: public; Owner: -
@@ -3161,13 +3117,6 @@ ALTER TABLE ONLY public.categories
 ALTER TABLE ONLY public.categories
     ADD CONSTRAINT categories_pkey PRIMARY KEY (id);
 
-
---
--- Name: container_transactions container_transactions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.container_transactions
-    ADD CONSTRAINT container_transactions_pkey PRIMARY KEY (id);
 
 
 --
@@ -4022,12 +3971,6 @@ CREATE INDEX idx_categories_active ON public.categories USING btree (category_id
 
 CREATE INDEX idx_contact_enquiries_product_id ON public.contact_enquiries USING btree (product_id);
 
-
---
--- Name: idx_container_transactions_customer_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_container_transactions_customer_id ON public.container_transactions USING btree (customer_id);
 
 
 --
@@ -4890,13 +4833,6 @@ CREATE UNIQUE INDEX subscription_custom_dates_subscription_item_id_delivery_dat_
 
 CREATE UNIQUE INDEX subscription_items_pkey ON public.subscription_items USING btree (subscription_item_id);
 
-
---
--- Name: container_transactions container_transactions_container_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.container_transactions
-    ADD CONSTRAINT container_transactions_container_id_fkey FOREIGN KEY (container_id) REFERENCES public.containers(container_id);
 
 
 --

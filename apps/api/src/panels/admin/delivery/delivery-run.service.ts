@@ -362,7 +362,7 @@ export class DeliveryRunService {
 
           let newAddressCount = 0;
 
-          // Insert UNIQUE run addresses + update orders + create delivery_logs
+          // Insert UNIQUE run addresses + update orders
           for (let i = 0; i < sequencedAddresses.length; i++) {
             const representative = sequencedAddresses[i];
             const addrKey = representative.address_id || representative.order_id;
@@ -431,35 +431,6 @@ export class DeliveryRunService {
               } catch {
                 // Deliberately tolerated: the caller has a valid fallback for this failure.
               }
-
-              // Insert ONE delivery_log per order (prevent duplicates)
-              const itemsJson = orderItemsMap.get(order.order_id) || [];
-              this.developer.debug('Delivery log params', [
-                runId,
-                order.customer_id,
-                order.order_id,
-                order.address_id,
-                partnerId,
-                targetDate,
-                slotName,
-                JSON.stringify(itemsJson),
-                order.order_lat,
-                order.order_lng,
-                currentMaxSeq,
-              ]);
-              await this.db.query(
-                `INSERT INTO delivery_logs
-                  (run_id, customer_id, order_id, address_id, delivery_partner_id,
-                   delivery_date, slot, items_json, latitude, longitude, status)
-                SELECT $1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, 'pending'
-                ON CONFLICT (order_id) WHERE deleted_at IS NULL DO NOTHING`,
-                [
-                  runId, order.customer_id, order.order_id,
-                  order.address_id, partnerId,
-                  targetDate, slotName, JSON.stringify(itemsJson),
-                  order.order_lat, order.order_lng,
-                ],
-              );
             }
           }
 
@@ -632,21 +603,12 @@ export class DeliveryRunService {
       `;
       const addresses = await this.db.query(addressesSql, [actualRunId, String(runRows[0].id)]);
 
-      // Get recent logs
-      const logsSql = `
-        SELECT * FROM delivery_logs
-        WHERE run_id = $1 OR run_id = $2
-        ORDER BY created_at DESC
-        LIMIT 50
-      `;
-      const logs = await this.db.query(logsSql, [actualRunId, String(runRows[0].id)]);
-
       return {
         status: true,
         data: {
           run: runRows[0],
-          addresses,
-          logs,
+          addresses: addresses || [],
+          logs: [],
         },
         message: 'Run details fetched',
       };
@@ -663,81 +625,42 @@ export class DeliveryRunService {
     try {
       const sql = `
         SELECT
-          dl.*,
-          o.total_amount, o.status AS order_status, o.delivery_slot, o.customer_name,o.address_line,o.run_sequence
-        FROM delivery_logs dl
-        JOIN delivery_runs dr ON dr.run_id = dl.run_id
-        LEFT JOIN orders o ON o.order_id = dl.order_id
-        WHERE dr.id::varchar = $1 OR dr.run_id = $1
-        ORDER BY o.run_sequence ASC, dl.created_at ASC
+          o.order_id,
+          o.customer_id,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), o.customer_name, 'Customer') AS customer_name,
+          COALESCE(o.address_line, ca.address_line1 || ' ' || COALESCE(ca.address_line2, ''), 'Address not listed') AS address_line,
+          o.delivery_slot,
+          o.status AS order_status,
+          o.status,
+          o.total_amount,
+          o.run_sequence,
+          dr.run_id,
+          dr.delivery_partner_id,
+          (
+            SELECT json_agg(json_build_object(
+              'product_variant_id', oi.variant_id,
+              'product_name', COALESCE(p.name, pv.name, 'Product'),
+              'variant_name', COALESCE(pv.name, ''),
+              'quantity', oi.quantity,
+              'unit', pv.unit_type,
+              'unit_value', pv.unit_value
+            ) ORDER BY oi.created_at ASC)
+            FROM order_items oi
+            LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
+            LEFT JOIN products p ON p.product_id = pv.product_id
+            WHERE oi.order_id = o.order_id
+          ) AS items_json
+        FROM orders o
+        JOIN delivery_runs dr ON (dr.run_id = o.delivery_run_id OR dr.id::varchar = o.delivery_run_id)
+        LEFT JOIN customer_addresses ca ON ca.address_id = o.address_id
+        LEFT JOIN customers c ON c.customer_id = o.customer_id
+        LEFT JOIN users u ON u.user_id = o.customer_id
+        WHERE (dr.id::varchar = $1 OR dr.run_id = $1)
+          AND o.deleted_at IS NULL
+        ORDER BY o.run_sequence ASC NULLS LAST, o.created_at ASC
       `;
       const rows = await this.db.query(sql, [runId]);
-
-      // Enrich items_json with live product and variant details
-      const variantIds = new Set<string>();
-      for (const row of rows) {
-        let items: any[] = [];
-        if (typeof row.items_json === 'string') {
-          try { items = JSON.parse(row.items_json); } catch {
-            // Deliberately tolerated: the caller has a valid fallback for this failure.
-          }
-        } else if (Array.isArray(row.items_json)) {
-          items = row.items_json;
-        }
-        for (const item of items) {
-          if (item.product_variant_id) {
-            variantIds.add(item.product_variant_id);
-          }
-        }
-      }
-
-      if (variantIds.size > 0) {
-        const liveDetails = await this.db.query(
-          `SELECT pv.variant_id, pv.name AS variant_name, p.name AS product_name, pv.unit_type, pv.unit_value
-           FROM product_variants pv
-           LEFT JOIN products p ON p.product_id = pv.product_id
-           WHERE pv.variant_id = ANY($1)`,
-          [[...variantIds]]
-        );
-
-        const detailsMap = new Map<string, any>();
-        for (const detail of liveDetails) {
-          detailsMap.set(detail.variant_id, detail);
-        }
-
-        for (const row of rows) {
-          let items: any[] = [];
-          let isString = false;
-          if (typeof row.items_json === 'string') {
-            try {
-              items = JSON.parse(row.items_json);
-              isString = true;
-            } catch {
-              // Deliberately tolerated: the caller has a valid fallback for this failure.
-            }
-          } else if (Array.isArray(row.items_json)) {
-            items = row.items_json;
-          }
-
-          const enrichedItems = items.map(item => {
-            const detail = detailsMap.get(item.product_variant_id);
-            if (detail) {
-              return {
-                ...item,
-                product_name: detail.product_name || detail.variant_name || item.product_name,
-                variant_name: detail.variant_name || item.variant_name,
-                unit: detail.unit_type || item.unit,
-                unit_value: detail.unit_value !== null ? Number(detail.unit_value) : item.unit_value,
-              };
-            }
-            return item;
-          });
-
-          row.items_json = isString ? JSON.stringify(enrichedItems) : enrichedItems;
-        }
-      }
-
-      return { status: true, data: rows, message: 'Run addresses fetched' };
+      return { status: true, data: rows || [], message: 'Run addresses fetched' };
     } catch (error) {
       this.developer.error('getRunAddresses error', { error });
       throw new InternalServerErrorException('Failed to retrieve run addresses');
@@ -786,13 +709,6 @@ export class DeliveryRunService {
       await this.db.query(
         `UPDATE delivery_runs SET ${updateFields.join(', ')} WHERE id::varchar = $1 OR run_id = $1`,
         params,
-      );
-
-      // Log
-      await this.db.query(
-        `INSERT INTO delivery_logs (run_id, event_type, from_status, to_status, performed_by)
-         VALUES ($1, 'status_change', $2, $3, $4)`,
-        [runId, fromStatus, newStatus, performedBy || 'system'],
       );
 
       return { status: true, message: `Run status updated to ${newStatus}` };
@@ -872,21 +788,6 @@ export class DeliveryRunService {
         );
       }
 
-      // Log
-      await this.db.query(
-        `INSERT INTO delivery_logs
-          (run_id, run_address_id, order_id, event_type, from_status, to_status,
-           latitude, longitude, proof_url, reason, performed_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [
-          runId, addressId, orderId,
-          `address_${newStatus}`, fromStatus, newStatus,
-          data?.latitude ?? null, data?.longitude ?? null,
-          data?.proof_url ?? null, data?.reason ?? null,
-          performedBy || 'system',
-        ],
-      );
-
       // Update run counts
       await this.db.query(
         `UPDATE delivery_runs SET
@@ -932,14 +833,6 @@ export class DeliveryRunService {
           assigned_at = NOW(), updated_at = NOW()
         WHERE delivery_run_id = $1 OR delivery_run_id = $3`,
         [actualRunId, toPartnerId, runId],
-      );
-
-      // Log reassignment
-      await this.db.query(
-        `INSERT INTO delivery_logs
-          (run_id, event_type, from_partner_id, to_partner_id, reason, performed_by)
-        VALUES ($1, 'reassignment', $2::uuid, $3::uuid, $4, $5)`,
-        [runId, fromPartnerId, toPartnerId, reason, adminId || 'admin'],
       );
 
       return {
@@ -1331,77 +1224,15 @@ export class DeliveryRunService {
   }
 
   // ────────────────────────────────────────────────
-  // Get Delivery Logs with container tracking
+  // Get Delivery Logs
   // ────────────────────────────────────────────────
   async getLogs(query: any) {
-    try {
-      const { run_id, delivery_partner_id, customer_id, date_from, date_to, status, page = 1, limit = 50 } = query;
-      const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-      const params: any[] = [];
-      const where: string[] = [];
-
-      if (run_id) {
-        params.push(run_id);
-        where.push(`dl.run_id = $${params.length}`);
-      }
-      if (delivery_partner_id) {
-        params.push(delivery_partner_id);
-        where.push(`dl.delivery_partner_id = $${params.length}`);
-      }
-      if (customer_id) {
-        params.push(customer_id);
-        where.push(`dl.customer_id = $${params.length}`);
-      }
-      if (status) {
-        params.push(status);
-        where.push(`dl.status = $${params.length}`);
-      }
-      if (date_from) {
-        params.push(date_from);
-        where.push(`dl.delivery_date >= $${params.length}`);
-      }
-      if (date_to) {
-        params.push(date_to);
-        where.push(`dl.delivery_date <= $${params.length}`);
-      }
-
-      const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
-
-      const sql = `
-        SELECT
-          dl.*,
-          dl.returned_containers,
-          dl.damaged_containers,
-          dl.lost_containers,
-          dl.proof_photo_url,
-          dl.delivery_time,
-          db.full_name AS delivery_partner_name,
-          o.total_amount AS order_total,
-          o.status AS order_status
-        FROM delivery_logs dl
-        LEFT JOIN delivery_partners db ON db.delivery_partner_id = dl.delivery_partner_id
-        LEFT JOIN orders o ON o.order_id = dl.order_id
-        ${whereClause}
-        ORDER BY dl.created_at DESC
-        LIMIT $${params.length + 1} OFFSET $${params.length + 2}
-      `;
-      params.push(parseInt(limit, 10), offset);
-
-      const rows = await this.db.query(sql, params);
-
-      const countSql = `SELECT COUNT(*)::int AS total FROM delivery_logs dl ${whereClause}`;
-      const countRows = await this.db.query(countSql, params.slice(0, -2));
-
-      return {
-        status: true,
-        data: rows,
-        total: countRows[0]?.total ?? 0,
-        message: 'Delivery logs fetched',
-      };
-    } catch (error) {
-      this.developer.error('getLogs error', { error });
-      throw new InternalServerErrorException('Failed to retrieve delivery logs');
-    }
+    return {
+      status: true,
+      data: [],
+      total: 0,
+      message: 'Delivery logs fetched',
+    };
   }
 
   async syncDispatchRequirementsForDate(dateStr: string) {
@@ -1413,35 +1244,29 @@ export class DeliveryRunService {
       );
 
       for (const run of runs) {
-        // Find all delivery logs for this run
-        const logs = await this.db.query(
-          `SELECT items_json FROM delivery_logs WHERE run_id = $1`,
+        // Query order items for all orders assigned to this run
+        const items = await this.db.query(
+          `SELECT oi.variant_id AS product_variant_id, oi.quantity, pv.unit_type AS unit
+           FROM order_items oi
+           JOIN orders o ON o.order_id = oi.order_id
+           LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
+           WHERE (o.delivery_run_id = $1 OR o.delivery_run_id = (SELECT id::varchar FROM delivery_runs WHERE run_id = $1))
+             AND o.deleted_at IS NULL`,
           [run.run_id]
         );
 
         const requirementsMap = new Map<string, { quantity: number; unit: string }>();
 
-        for (const log of logs) {
-          let items: any[] = [];
-          if (typeof log.items_json === 'string') {
-            try { items = JSON.parse(log.items_json); } catch {
-              // Deliberately tolerated: the caller has a valid fallback for this failure.
-            }
-          } else if (Array.isArray(log.items_json)) {
-            items = log.items_json;
-          }
+        for (const item of items) {
+          if (!item.product_variant_id) continue;
+          const qty = Number(item.quantity || 0);
+          if (qty <= 0) continue;
+          const unit = item.unit || 'pcs';
 
-          for (const item of items) {
-            if (!item.product_variant_id) continue;
-            const qty = Number(item.quantity || 0);
-            if (qty <= 0) continue;
-            const unit = item.unit || 'pcs';
-
-            if (!requirementsMap.has(item.product_variant_id)) {
-              requirementsMap.set(item.product_variant_id, { quantity: 0, unit });
-            }
-            requirementsMap.get(item.product_variant_id)!.quantity += qty;
+          if (!requirementsMap.has(item.product_variant_id)) {
+            requirementsMap.set(item.product_variant_id, { quantity: 0, unit });
           }
+          requirementsMap.get(item.product_variant_id)!.quantity += qty;
         }
 
         // Now save to dispatch_requirements
@@ -2081,34 +1906,8 @@ export class DeliveryRunService {
           [targetRun.run_id],
         );
 
-        // 11. Audit Logging
+        // 11. Operation ID for tracking response
         const operationId = `OP-MOVE-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-        await client.query(
-          `INSERT INTO delivery_logs
-             (run_id, order_id, customer_id, address_id, delivery_partner_id,
-              delivery_date, slot, event_type, from_partner_id, to_partner_id,
-              reason, performed_by, metadata, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, 'order_move', $8, $9, $10, $11, $12, NOW(), NOW())`,
-          [
-            targetRun.run_id,
-            order_id,
-            order.customer_id,
-            order.address_id,
-            targetRun.delivery_partner_id,
-            srcDateStr,
-            sourceRun.delivery_slot,
-            sourceRun.delivery_partner_id,
-            targetRun.delivery_partner_id,
-            reason || 'Admin manual order move',
-            admin_id || 'system',
-            JSON.stringify({
-              operation_id: operationId,
-              from_run_id: sourceRunId,
-              to_run_id: targetRun.run_id,
-              order_id,
-            }),
-          ],
-        );
 
         // 12. Push Notifications
         if (this.pushNotificationService) {
@@ -2446,30 +2245,8 @@ export class DeliveryRunService {
           [runBId],
         );
 
-        // 10. Audit logs linked with operation_id
+        // 10. Operation ID for tracking response
         const operationId = `OP-SWAP-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-
-        await client.query(
-          `INSERT INTO delivery_logs
-             (run_id, order_id, customer_id, address_id, delivery_partner_id,
-              delivery_date, slot, event_type, from_partner_id, to_partner_id,
-              reason, performed_by, metadata, created_at, updated_at)
-           VALUES
-             ($1, $2, $3, $4, $5, $6, $7, 'order_swap', $8, $9, $10, $11, $12, NOW(), NOW()),
-             ($13, $14, $15, $16, $17, $18, $19, 'order_swap', $20, $21, $22, $23, $24, NOW(), NOW())`,
-          [
-            // Order A record
-            runB.run_id, order_a_id, orderA.customer_id, orderA.address_id, runB.delivery_partner_id,
-            dateAStr, runA.delivery_slot, runA.delivery_partner_id, runB.delivery_partner_id,
-            reason || 'Admin manual order swap', admin_id || 'system',
-            JSON.stringify({ operation_id: operationId, swapped_with: order_b_id, from_run: runAId, to_run: runBId }),
-            // Order B record
-            runA.run_id, order_b_id, orderB.customer_id, orderB.address_id, runA.delivery_partner_id,
-            dateAStr, runB.delivery_slot, runB.delivery_partner_id, runA.delivery_partner_id,
-            reason || 'Admin manual order swap', admin_id || 'system',
-            JSON.stringify({ operation_id: operationId, swapped_with: order_a_id, from_run: runBId, to_run: runAId }),
-          ],
-        );
 
         // 11. Push Notifications
         if (this.pushNotificationService) {
