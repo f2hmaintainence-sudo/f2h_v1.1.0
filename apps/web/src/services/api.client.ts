@@ -128,7 +128,9 @@ class ApiClient {
       if (!isRetry && (await this.refreshSession())) {
         (config as RequestConfig & { _refreshed?: boolean })._refreshed = true;
         clearCsrfToken();
-        return this.executeRequest(config.url, config);
+        // config.url already carries the query string, so the params must not
+        // be appended a second time — that duplicates every filter.
+        return this.executeRequest(config.url, { ...config, params: undefined });
       }
 
       // Don't redirect if we're on public pages (no auth required)
@@ -159,9 +161,10 @@ class ApiClient {
           const delay = Math.pow(2, retryCount) * 1000;
           await new Promise(resolve => setTimeout(resolve, delay));
 
-          // Retry the request
+          // Retry the request. config.url already carries the query string,
+          // so params are dropped here to avoid duplicating them.
           (config as any)._retryCount = retryCount + 1;
-          return this.executeRequest(config.url, config);
+          return this.executeRequest(config.url, { ...config, params: undefined });
         }
       }
       return response;

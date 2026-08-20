@@ -308,13 +308,13 @@ export class NotificationGateway
 
   private async getDisplayNameByUserId(userId: string): Promise<string> {
     try {
-      const numericId = Number(userId);
+      // users is keyed by the varchar user_id; there is no numeric id column.
       const rows = await this.databaseService.query<any>(
         `SELECT COALESCE(NULLIF(user_name, ''), TRIM(CONCAT_WS(' ', first_name, last_name))) AS display_name
          FROM users
-         WHERE user_id = ? OR id = ?
+         WHERE user_id = ?
          LIMIT 1`,
-        [userId, Number.isFinite(numericId) ? numericId : -1],
+        [userId],
       );
 
       const displayName = rows?.[0]?.display_name;

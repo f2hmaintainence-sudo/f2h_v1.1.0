@@ -2078,14 +2078,14 @@ export class DeliveryRunService {
           `UPDATE delivery_runs
            SET total_addresses = (SELECT COUNT(*)::int FROM delivery_run_addresses WHERE (run_id = $1 OR run_id = $2) AND deleted_at IS NULL),
                updated_at = NOW()
-           WHERE id = $2 OR run_id = $1`,
+           WHERE id::varchar = $2 OR run_id = $1`,
           [sourceRun.run_id, String(sourceRun.id)],
         );
         await client.query(
           `UPDATE delivery_runs
            SET total_addresses = (SELECT COUNT(*)::int FROM delivery_run_addresses WHERE (run_id = $1 OR run_id = $2) AND deleted_at IS NULL),
                updated_at = NOW()
-           WHERE id = $2 OR run_id = $1`,
+           WHERE id::varchar = $2 OR run_id = $1`,
           [targetRun.run_id, String(targetRun.id)],
         );
 

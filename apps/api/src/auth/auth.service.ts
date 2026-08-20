@@ -1676,8 +1676,9 @@ export class AuthService {
 
     while (!isUnique && attempts < 10) {
       try {
+        // referral_code lives on users, not customers — see referral.repository
         const checkRes: any = await this.DataBase.query(
-          `SELECT customer_id FROM customers WHERE UPPER(referral_code) = $1 LIMIT 1`,
+          `SELECT user_id FROM users WHERE UPPER(referral_code) = $1 LIMIT 1`,
           [code.toUpperCase()],
         );
         const rows = Array.isArray(checkRes) ? checkRes : (checkRes?.rows || []);
