@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   AlertCircle,
+  CalendarClock,
   CalendarOff,
   Loader2,
   RefreshCw,
@@ -19,6 +20,7 @@ interface AvailabilityPartner {
   is_active?: boolean;
   is_online?: boolean;
   on_leave_today?: boolean;
+  pending_leave_requests?: number;
 }
 
 interface PartnerAvailabilityResponse {
@@ -58,6 +60,20 @@ function AvailabilityBadge({ partner }: { partner: AvailabilityPartner }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
       <WifiOff size={13} /> Offline
+    </span>
+  );
+}
+
+function PendingLeaveBadge({ partner }: { partner: AvailabilityPartner }) {
+  const pendingCount = partner.pending_leave_requests ?? 0;
+
+  if (pendingCount === 0) {
+    return <span className="text-xs text-slate-400">None</span>;
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">
+      <CalendarClock size={13} /> {pendingCount} Pending
     </span>
   );
 }
@@ -115,7 +131,7 @@ export default function OnlinePartnersPanel({
             Active Partner Availability
           </h2>
           <p className="text-xs text-slate-500">
-            Online, offline, and approved leave status
+            Online, offline, approved leave, and pending leave requests
           </p>
         </div>
         <button
@@ -156,7 +172,7 @@ export default function OnlinePartnersPanel({
         </p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] text-left">
+          <table className="w-full min-w-[680px] text-left">
             <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
               <tr>
                 <th scope="col" className="px-5 py-3 font-bold">
@@ -167,6 +183,9 @@ export default function OnlinePartnersPanel({
                 </th>
                 <th scope="col" className="px-5 py-3 font-bold">
                   Status
+                </th>
+                <th scope="col" className="px-5 py-3 font-bold">
+                  Pending Leave
                 </th>
               </tr>
             </thead>
@@ -183,6 +202,9 @@ export default function OnlinePartnersPanel({
                   </td>
                   <td className="px-5 py-3">
                     <AvailabilityBadge partner={partner} />
+                  </td>
+                  <td className="px-5 py-3">
+                    <PendingLeaveBadge partner={partner} />
                   </td>
                 </tr>
               ))}
