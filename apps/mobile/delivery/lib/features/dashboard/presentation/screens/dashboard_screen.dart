@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/core/utils/app_snackbar.dart';
@@ -16,8 +17,10 @@ import 'package:f2h_delivery/features/dashboard/presentation/widgets/queue_item_
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/verification_pending_view.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/handover_status_card.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/collect_queue_item.dart';
+import 'package:f2h_delivery/features/dashboard/presentation/widgets/pickup_status_card.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/pickup_selection_screen.dart';
 import 'package:f2h_delivery/features/profile/presentation/screens/notifications_screen.dart';
+import 'package:f2h_delivery/features/profile/presentation/screens/support_screen.dart';
 import 'package:f2h_delivery/core/widgets/f2h_hero_header.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -155,88 +158,102 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final response = await ordersRepo.getPickupItems();
       if (!mounted) return;
       Navigator.pop(context);
-      if (response.status && response.items.isNotEmpty && !response.pickupConfirmed) {
-        final success = await Navigator.push<bool>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => PickupSelectionScreen(response: response),
-          ),
+      if (response.status && response.items.isNotEmpty) {
+        showDialog(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: kPrimary.withOpacity(0.1), shape: BoxShape.circle),
+                    child: const Icon(Icons.inventory_2_rounded, color: kPrimary, size: 22),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text('Morning Pickup Ready', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: kText)),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'You have ${response.items.length} items ready for warehouse collection today.',
+                    style: const TextStyle(color: kTextSub, fontSize: 13, height: 1.4),
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: kBgDeep, borderRadius: BorderRadius.circular(12)),
+                    child: Column(
+                      children: response.items.take(3).map((item) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(item.productName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: kText), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            ),
+                            Text('${item.totalQuantity} Units', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: kPrimary)),
+                          ],
+                        ),
+                      )).toList(),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Later', style: TextStyle(color: kTextSub, fontWeight: FontWeight.bold)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: kPrimary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                    _showItemsToCollectDialog(context);
+                  },
+                  child: const Text('Start Pickup', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
         );
-        if (success == true && mounted) {
-          AppSnackBar.success(context, '✅ Pickup confirmed. Starting deliveries!');
-          setState(() => _selectedTab = 1);
-        }
-      } else {
-        AppSnackBar.info(context, response.message ?? 'No items to pick up for today.', color: kPrimary);
       }
-    } catch (e) {
-      if (!mounted) return;
-      Navigator.pop(context);
-      AppSnackBar.error(context, 'Failed to load pickup items: $e');
+    } catch (_) {
+      if (mounted) Navigator.pop(context);
     }
   }
 
-  void _showConfirmation(BuildContext context, GroupedStop stop) async {
-    final position = await _locationService.getCurrentPosition();
-    if (position != null) {
-      final dist = _locationService.haversineDistanceKm(
-        position.latitude,
-        position.longitude,
-        stop.addressLat,
-        stop.addressLng,
-      );
-      print('[DEBUG] Rider is $dist km away from stop.');
-      // Bypassed 300 meters check to allow testing locally
-      /*
-      if (dist > 0.3) {
-        if (mounted) AppSnackBar.error(context, 'Please reach the location to mark as delivered.');
-        return;
-      }
-      */
-    }
-    if (!mounted) return;
+  void _showConfirmation(BuildContext context, GroupedStop stop) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => DeliveryConfirmationSheet(
+      builder: (sheetContext) => DeliveryConfirmationSheet(
         stop: stop,
-        onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns) {
-          if (stop.orders.isEmpty) return;
-          final orderId = stop.orders.first.orderId;
-
-          // Show a loading dialog during status update
+        onDelivered: (deliveredOrders, returnedOrders, returnReason, emptyBottles, customerUnavailable) {
           showDialog(
             context: context,
             barrierDismissible: false,
-            builder: (_) => const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
-              ),
-            ),
+            builder: (ctx) => const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(kPrimary))),
           );
 
-          context.read<DeliverySessionBloc>().add(UpdateStopStatusEvent(
-            orderId: orderId,
-            newStatus: status,
+          context.read<DeliverySessionBloc>().add(MarkDeliveredEvent(
+            orderIds: deliveredOrders.map((o) => o.orderId).toList(),
             emptyBottles: emptyBottles,
-            returnedContainers: returnedContainers,
-            damagedContainers: damagedContainers,
-            lostContainers: lostContainers,
-            notes: notes,
-            paymentMode: paymentMode,
-            paymentStatus: paymentStatus,
-            deliveryImage: deliveryImage,
-            containerReturns: containerReturns,
-            onSuccess: () {
+            returnedOrders: returnedOrders.map((o) => o.orderId).toList(),
+            returnReason: returnReason,
+            customerUnavailable: customerUnavailable,
+            onSuccess: (isLastDelivery) {
               if (mounted) {
                 Navigator.pop(context); // pop loading dialog
-                AppSnackBar.show(
-                  context,
-                  'Stop #${stop.stop} marked as $status!',
-                  backgroundColor: status == 'delivered' ? kSuccess : kDanger,
-                );
-                if (status == 'delivered') {
+                AppSnackBar.success(context, 'Delivery marked successfully!');
+                if (isLastDelivery) {
                   MockDataService().tabNavigationNotifier.value = 2;
                 }
               }
@@ -253,50 +270,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-
-  /// Availability toggle.
-  ///
-  /// Lifted out of the old AppBar's inline `Switch.onChanged` so the hero header
-  /// can drive it. The GPS and permission gate below is load-bearing: going
-  /// online starts live location tracking, so refusing here is what stops a
-  /// partner appearing available with no position.
   Future<void> _handleOnlineToggle(bool val) async {
-                          if (val) {
-                            bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-                            if (!serviceEnabled) {
-                              if (mounted) AppSnackBar.error(context, 'GPS/Location services are disabled. Please enable them to go online.');
-                              return;
-                            }
-                            LocationPermission permission = await Geolocator.checkPermission();
-                            if (permission == LocationPermission.denied) {
-                              permission = await Geolocator.requestPermission();
-                              if (permission == LocationPermission.denied) {
-                                if (mounted) AppSnackBar.error(context, 'Location permission is required to track live location while online.');
-                                return;
-                              }
-                            }
-                            if (permission == LocationPermission.deniedForever) {
-                              if (mounted) AppSnackBar.error(context, 'Location permissions are permanently denied. Please enable them in settings.');
-                              return;
-                            }
-                          }
-                          context.read<DeliverySessionBloc>().add(ToggleOnlineEvent(
-                            val,
-                            callback: (error) {
-                              if (!mounted) return;
-                              if (error != null) {
-                                AppSnackBar.error(context, error);
-                              } else {
-                                AppSnackBar.show(
-                                  context,
-                                  val ? 'You are now Online.' : 'You are now Offline.',
-                                  backgroundColor: val ? kSuccess : kDanger,
-                                );
-                                if (val) _showPickupSummaryDialog(context);
-                              }
-                            },
-                          ));
-                        }
+    if (val) {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) AppSnackBar.error(context, 'GPS/Location services are disabled. Please enable them to go online.');
+        return;
+      }
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) AppSnackBar.error(context, 'Location permission is required to track live location while online.');
+          return;
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) AppSnackBar.error(context, 'Location permissions are permanently denied. Please enable them in settings.');
+        return;
+      }
+    }
+    if (!mounted) return;
+    context.read<DeliverySessionBloc>().add(ToggleOnlineEvent(
+      val,
+      callback: (error) {
+        if (!mounted) return;
+        if (error != null) {
+          AppSnackBar.error(context, error);
+        } else {
+          AppSnackBar.show(
+            context,
+            val ? 'You are now Online.' : 'You are now Offline.',
+            backgroundColor: val ? kSuccess : kDanger,
+          );
+          if (val) _showPickupSummaryDialog(context);
+        }
+      },
+    ));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -304,14 +315,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (context, sessionState) {
         if (sessionState is DeliverySessionLoading || sessionState is DeliverySessionInitial) {
           return const Scaffold(
-            backgroundColor: kBg,
+            backgroundColor: Color(0xFFF8FAFC),
             body: Center(child: CircularProgressIndicator(color: kPrimary)),
           );
         }
 
         if (sessionState is DeliverySessionError) {
           return Scaffold(
-            backgroundColor: kBg,
+            backgroundColor: const Color(0xFFF8FAFC),
             body: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -336,7 +347,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         if (!isVerified || !isAccountActive) {
           return Scaffold(
-            backgroundColor: kBg,
+            backgroundColor: const Color(0xFFF8FAFC),
             body: VerificationPendingView(
               isUnverified: !isVerified,
               onRedirectToProfile: () {
@@ -369,8 +380,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 return s == 'out_for_delivery' || s == 'delivered' || s == 'failed';
               })).toList();
 
-        final totalActiveStops = activeQueue.length;
         final completedActiveStops = activeQueue.where((s) => s.status == 'delivered').length;
+        final ongoingActiveStops = activeQueue.where((s) => s.status == 'out_for_delivery' || s.status == 'pending').length;
+        final acceptedActiveStops = listQueue.length;
+        final cancelledActiveStops = activeQueue.where((s) => s.status == 'failed' || s.status == 'cancelled').length;
 
         final GroupedStop? nextStop = (() {
           for (final s in activeQueue) {
@@ -380,139 +393,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         })();
 
         return Scaffold(
-          backgroundColor: kBg,
-          appBar: AppBar(
-            backgroundColor: kSurface,
-            elevation: 0,
-            titleSpacing: 16,
-            centerTitle: false,
-            automaticallyImplyLeading: false,
-            title: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: !session.isOnline
-                            ? kDanger
-                            : (isShiftCompleted ? kPrimary : kSuccess),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: (!session.isOnline
-                                    ? kDanger
-                                    : (isShiftCompleted ? kPrimary : kSuccess))
-                                .withOpacity(0.35),
-                            blurRadius: 6,
-                            spreadRadius: 1,
-                          )
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      !session.isOnline
-                          ? 'SHIFT INACTIVE · OFFLINE'
-                          : (isShiftCompleted ? 'SHIFT COMPLETED' : 'SHIFT ACTIVE · ONLINE'),
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        color: !session.isOnline
-                            ? kDanger
-                            : kPrimary,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    GestureDetector(
-                      onTap: _isReloading ? null : _reloadDashboardOrders,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: kPrimaryMid,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(color: kPrimaryMid.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2)),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (_isReloading)
-                              const SizedBox(
-                                width: 12,
-                                height: 12,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 1.5),
-                              )
-                            else
-                              const Icon(Icons.refresh_rounded, size: 14, color: Colors.white),
-                            const SizedBox(width: 4),
-                            const Text('REFRESH', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Transform.scale(
-                      scale: 0.8,
-                      alignment: Alignment.centerRight,
-                      child: Switch(
-                        value: session.isOnline,
-                        activeColor: kPrimary,
-                        inactiveThumbColor: kTextSub,
-                        onChanged: (val) async {
-                          if (val) {
-                            bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-                            if (!serviceEnabled) {
-                              if (mounted) AppSnackBar.error(context, 'GPS/Location services are disabled. Please enable them to go online.');
-                              return;
-                            }
-                            LocationPermission permission = await Geolocator.checkPermission();
-                            if (permission == LocationPermission.denied) {
-                              permission = await Geolocator.requestPermission();
-                              if (permission == LocationPermission.denied) {
-                                if (mounted) AppSnackBar.error(context, 'Location permission is required to track live location while online.');
-                                return;
-                              }
-                            }
-                            if (permission == LocationPermission.deniedForever) {
-                              if (mounted) AppSnackBar.error(context, 'Location permissions are permanently denied. Please enable them in settings.');
-                              return;
-                            }
-                          }
-                          context.read<DeliverySessionBloc>().add(ToggleOnlineEvent(
-                            val,
-                            callback: (error) {
-                              if (!mounted) return;
-                              if (error != null) {
-                                AppSnackBar.error(context, error);
-                              } else {
-                                AppSnackBar.show(
-                                  context,
-                                  val ? 'You are now Online.' : 'You are now Offline.',
-                                  backgroundColor: val ? kSuccess : kDanger,
-                                );
-                                if (val) _showPickupSummaryDialog(context);
-                              }
-                            },
-                          ));
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+          backgroundColor: const Color(0xFFF8FAFC),
           body: Column(
             children: [
+              // ── HERO GREETING HEADER ───────────────────────────────
               F2hHeroHeader(
                 driverName: session.driverName,
                 isOnline: session.isOnline,
@@ -522,286 +406,529 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   MaterialPageRoute(builder: (_) => const NotificationsScreen()),
                 ),
               ),
+
+              // ── SCROLLABLE DASHBOARD BODY ───────────────────────────
               Expanded(
                 child: RefreshIndicator(
-            onRefresh: () async => context.read<DeliverySessionBloc>().add(ReloadSessionEvent()),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-              children: [
-                if (!session.isOnline) ...[
-                  Container(
-                    margin: const EdgeInsets.symmetric(vertical: 16),
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: kSurface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: kDanger.withOpacity(0.3)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: kDanger.withOpacity(0.06),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+                  onRefresh: () async => context.read<DeliverySessionBloc>().add(ReloadSessionEvent()),
+                  color: kPrimary,
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                    children: [
+                      if (!session.isOnline) ...[
                         Container(
-                          padding: const EdgeInsets.all(16),
+                          margin: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
-                            color: kDanger.withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.power_settings_new_rounded,
-                            color: kDanger,
-                            size: 36,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'You are Currently Offline',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: kText,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Turn on the SHIFT ACTIVE switch at the top right to go online and view your assigned orders for today.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: kTextSub,
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ] else if (isShiftCompleted) ...[
-                  HandoverStatusCard(currentRun: session.currentRun),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: kSurface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: kBorder),
-                      boxShadow: [
-                        BoxShadow(
-                          color: kPrimary.withOpacity(0.02),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: kSuccess.withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.done_all_rounded,
-                            color: kSuccess,
-                            size: 36,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          "You're All Done!",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: kText,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          "Your deliveries, empty bottles, and returns have been processed and confirmed. Rest up and have a great day!",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: kTextSub,
-                            height: 1.4,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ] else ...[
-                  HandoverStatusCard(currentRun: session.currentRun),
-                  const SizedBox(height: 12),
-                  // Tab Selector
-                  Container(
-                    height: 48,
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(color: kBgDeep, borderRadius: BorderRadius.circular(16)),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => setState(() => _selectedTab = 0),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: _selectedTab == 0 ? kSurface : Colors.transparent,
-                                borderRadius: BorderRadius.circular(12),
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: kDanger.withOpacity(0.3)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: kDanger.withOpacity(0.06),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
-                              child: Center(
-                                child: Text(
-                                  'To Collect (${collectQueue.length})',
-                                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: _selectedTab == 0 ? kPrimary : kTextSub),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: kDanger.withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.power_settings_new_rounded,
+                                  color: kDanger,
+                                  size: 36,
                                 ),
                               ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => setState(() => _selectedTab = 1),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: _selectedTab == 1 ? kSurface : Colors.transparent,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  'Active Queue (${activeQueue.length})',
-                                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: _selectedTab == 1 ? kPrimary : kTextSub),
+                              const SizedBox(height: 16),
+                              Text(
+                                'You are Currently Offline',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF0F172A),
                                 ),
                               ),
-                            ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Turn on the Online switch in the header to go online and receive your assigned delivery batches.',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12.5,
+                                  color: const Color(0xFF64748B),
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  if (_selectedTab == 0) ...[
-                    if (collectQueue.isEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(20), border: Border.all(color: kBorder)),
-                        child: const Center(child: Text('No items to collect for today.', style: TextStyle(color: kTextSub, fontWeight: FontWeight.bold))),
-                      )
-                    else ...[
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(colors: [kPrimary, kPrimary.withOpacity(0.8)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [BoxShadow(color: kPrimary.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4))],
+                      ] else if (isShiftCompleted) ...[
+                        HandoverStatusCard(currentRun: session.currentRun),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x06000000),
+                                blurRadius: 10,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFDCFCE7),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.done_all_rounded,
+                                  color: Color(0xFF16A34A),
+                                  size: 36,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                "You're All Done!",
+                                style: GoogleFonts.poppins(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                "Your deliveries, empty containers, and returns have been processed and confirmed. Rest up and have a great day!",
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12.5,
+                                  color: const Color(0xFF64748B),
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      ] else ...[
+                        // ── SECTION 1: TODAY'S PROGRESS ─────────────────────
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
-                                  child: const Icon(Icons.inventory_2_rounded, color: Colors.white, size: 24),
+                            Text(
+                              "Today's Progress",
+                              style: GoogleFonts.poppins(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF0F172A),
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                MockDataService().tabNavigationNotifier.value = 1;
+                              },
+                              child: Text(
+                                'View Details',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF16A34A),
                                 ),
-                                const SizedBox(width: 14),
-                                const Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text('Collect from Warehouse', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.white)),
-                                      SizedBox(height: 2),
-                                      Text('Verify and load items before starting', style: TextStyle(fontSize: 12, color: Colors.white70, fontWeight: FontWeight.bold)),
-                                    ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+
+                        // 4 Progress Counter Cards
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x04000000),
+                                blurRadius: 8,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              _buildProgressItem(
+                                count: completedActiveStops,
+                                label: 'Completed',
+                                icon: Icons.shopping_bag_outlined,
+                                iconBg: const Color(0xFFDCFCE7),
+                                iconColor: const Color(0xFF16A34A),
+                                labelColor: const Color(0xFF15803D),
+                              ),
+                              _buildProgressItem(
+                                count: ongoingActiveStops,
+                                label: 'Ongoing',
+                                icon: Icons.access_time_rounded,
+                                iconBg: const Color(0xFFFEF3C7),
+                                iconColor: const Color(0xFFD97706),
+                                labelColor: const Color(0xFFB45309),
+                              ),
+                              _buildProgressItem(
+                                count: acceptedActiveStops,
+                                label: 'Accepted',
+                                icon: Icons.sync_rounded,
+                                iconBg: const Color(0xFFDBEAFE),
+                                iconColor: const Color(0xFF2563EB),
+                                labelColor: const Color(0xFF1D4ED8),
+                              ),
+                              _buildProgressItem(
+                                count: cancelledActiveStops,
+                                label: 'Cancelled',
+                                icon: Icons.cancel_outlined,
+                                iconBg: const Color(0xFFF1F5F9),
+                                iconColor: const Color(0xFF64748B),
+                                labelColor: const Color(0xFF475569),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // ── SECTION 2: NEXT DELIVERY ─────────────────────────
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Next Delivery',
+                              style: GoogleFonts.poppins(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF0F172A),
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                MockDataService().tabNavigationNotifier.value = 1;
+                              },
+                              child: Text(
+                                'View All',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF16A34A),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+
+                        if (nextStop != null) ...[
+                          NextDeliveryCard(
+                            stop: nextStop,
+                            distanceStr: _calculateDistanceStr(nextStop),
+                            onDeliverTap: () => _showConfirmation(context, nextStop),
+                          ),
+                        ] else ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Center(
+                              child: Text(
+                                'No active next delivery. Check orders queue below.',
+                                style: GoogleFonts.poppins(
+                                  color: const Color(0xFF64748B),
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+
+                        const SizedBox(height: 20),
+
+                        // ── SECTION 3: QUICK ACTIONS ────────────────────────
+                        Text(
+                          'Quick Actions',
+                          style: GoogleFonts.poppins(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF0F172A),
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        Row(
+                          children: [
+                            _buildQuickActionCard(
+                              label: 'My Routes',
+                              icon: Icons.map_outlined,
+                              cardBg: const Color(0xFFECFDF5),
+                              borderColor: const Color(0xFFA7F3D0),
+                              iconColor: const Color(0xFF16A34A),
+                              onTap: () {
+                                MockDataService().tabNavigationNotifier.value = 2;
+                              },
+                            ),
+                            const SizedBox(width: 10),
+                            _buildQuickActionCard(
+                              label: 'Help Center',
+                              icon: Icons.help_outline_rounded,
+                              cardBg: const Color(0xFFFAF5FF),
+                              borderColor: const Color(0xFFE9D5FF),
+                              iconColor: const Color(0xFF9333EA),
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SupportScreen(initialTabIndex: 1),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            _buildQuickActionCard(
+                              label: 'Support',
+                              icon: Icons.headset_mic_outlined,
+                              cardBg: const Color(0xFFFFFBEB),
+                              borderColor: const Color(0xFFFDE68A),
+                              iconColor: const Color(0xFFEA580C),
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SupportScreen(initialTabIndex: 0),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 18),
+
+                        // ── SECTION 4: STEP 1 OF SHIFT / PICKUP CARD ────────
+                        if (currentRun != null) ...[
+                          PickupStatusCard(currentRun: currentRun),
+                          const SizedBox(height: 12),
+                        ],
+
+                        // ── SECTION 5: QUEUE TABS & ORDER ITEMS ─────────────
+                        Container(
+                          height: 48,
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(16)),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _selectedTab = 0),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: _selectedTab == 0 ? Colors.white : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: _selectedTab == 0
+                                          ? const [BoxShadow(color: Color(0x08000000), blurRadius: 4, offset: Offset(0, 2))]
+                                          : null,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'To Collect (${collectQueue.length})',
+                                        style: GoogleFonts.poppins(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 12.5,
+                                          color: _selectedTab == 0 ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 48,
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  foregroundColor: kPrimary,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                onPressed: () => _showItemsToCollectDialog(context),
-                                child: const Text('Select & Collect Items', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
                               ),
-                            ),
-                          ],
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _selectedTab = 1),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: _selectedTab == 1 ? Colors.white : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: _selectedTab == 1
+                                          ? const [BoxShadow(color: Color(0x08000000), blurRadius: 4, offset: Offset(0, 2))]
+                                          : null,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'Active Queue (${activeQueue.length})',
+                                        style: GoogleFonts.poppins(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 12.5,
+                                          color: _selectedTab == 1 ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      const Text('Orders waiting to be collected', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: kText)),
-                      const SizedBox(height: 12),
-                      ...collectQueue.map((stop) => CollectQueueItem(stop: stop)),
-                    ],
-                  ] else ...[
-                    if (nextStop != null) ...[
-                      NextDeliveryCard(
-                        stop: nextStop,
-                        distanceStr: _calculateDistanceStr(nextStop),
-                        onDeliverTap: () => _showConfirmation(context, nextStop),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Delivery Queue Route', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: kText)),
-                        Text('$completedActiveStops/$totalActiveStops Done', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: kTextSub)),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    if (activeQueue.isEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(20), border: Border.all(color: kBorder)),
-                        child: const Center(child: Text('No active deliveries. Complete collection first.', style: TextStyle(color: kTextSub, fontWeight: FontWeight.bold))),
-                      )
-                    else
-                      ...List.generate(activeQueue.length, (index) {
-                        final stop = activeQueue[index];
-                        final isNext = nextStop?.customerId == stop.customerId;
-                        return Column(
-                          children: [
-                            QueueItemTile(
-                              stop: stop,
-                              isNext: isNext,
-                              distanceStr: _calculateDistanceStr(stop),
-                              onDeliverTap: () => _showConfirmation(context, stop),
-                            ),
-                            if (index < activeQueue.length - 1)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 6),
-                                child: Row(
-                                  children: [
-                                    const SizedBox(width: 38),
-                                    Icon(Icons.arrow_downward_rounded, size: 18, color: kMuted.withOpacity(0.5)),
-                                  ],
-                                ),
-                              ),
+                        const SizedBox(height: 16),
+
+                        if (_selectedTab == 0) ...[
+                          if (collectQueue.isEmpty)
+                            Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFE2E8F0))),
+                              child: Center(child: Text('No items to collect for today.', style: GoogleFonts.poppins(color: const Color(0xFF64748B), fontWeight: FontWeight.w600))),
+                            )
+                          else ...[
+                            ...collectQueue.map((stop) => CollectQueueItem(stop: stop)),
                           ],
-                        );
-                      }),
-                  ],
-                ],
-              ],
-            ),
-          )),
+                        ] else ...[
+                          if (activeQueue.isEmpty)
+                            Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFE2E8F0))),
+                              child: Center(child: Text('No active deliveries. Complete collection first.', style: GoogleFonts.poppins(color: const Color(0xFF64748B), fontWeight: FontWeight.w600))),
+                            )
+                          else
+                            ...List.generate(activeQueue.length, (index) {
+                              final stop = activeQueue[index];
+                              final isNext = nextStop?.customerId == stop.customerId;
+                              return Column(
+                                children: [
+                                  QueueItemTile(
+                                    stop: stop,
+                                    isNext: isNext,
+                                    distanceStr: _calculateDistanceStr(stop),
+                                    onDeliverTap: () => _showConfirmation(context, stop),
+                                  ),
+                                  if (index < activeQueue.length - 1)
+                                    const SizedBox(height: 10),
+                                ],
+                              );
+                            }),
+                        ],
+                      ],
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildProgressItem({
+    required int count,
+    required String label,
+    required IconData icon,
+    required Color iconBg,
+    required Color iconColor,
+    required Color labelColor,
+  }) {
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: iconBg,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: iconColor, size: 18),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '$count',
+            style: GoogleFonts.poppins(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 1),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: labelColor,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActionCard({
+    required String label,
+    required IconData icon,
+    required Color cardBg,
+    required Color borderColor,
+    required Color iconColor,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: Container(
+        height: 72,
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: iconColor, size: 22),
+                  const SizedBox(height: 5),
+                  Text(
+                    label,
+                    style: GoogleFonts.poppins(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF0F172A),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

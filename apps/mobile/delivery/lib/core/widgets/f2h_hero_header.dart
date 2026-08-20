@@ -1,26 +1,7 @@
-// ============================================================================
-// ChronoSparkSolutions — A Software Company
-// © 2026 ChronoSparkSolutions. All rights reserved.
-//
-// Project     : F2H Delivery
-// File        : f2h_hero_header.dart
-// Description : The home hero — greeting, availability toggle and notification
-//               bell over the rider artwork.
-//
-//               Replaces HomeAppHeader and DashboardHeader, which were two
-//               competing implementations of the same thing.
-//
-//               The artwork is laid out as a sibling of the text rather than a
-//               full-bleed background, because the old version positioned the
-//               greeting with a hardcoded `right: 140` gutter: on a narrow
-//               screen the name still ran under the scooter, and on a wide one
-//               the text was needlessly cramped.
-// ============================================================================
-
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/core/utils/date_formatter.dart';
-import 'package:f2h_delivery/core/widgets/f2h_ui.dart';
 
 class F2hHeroHeader extends StatelessWidget {
   final String driverName;
@@ -45,147 +26,99 @@ class F2hHeroHeader extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(
-        F2hSpace.md,
-        topInset + F2hSpace.md,
-        F2hSpace.md,
-        F2hSpace.lg,
-      ),
+      padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 16),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFE8F7EE), Color(0xFFF3FBF5), kBg],
+          colors: [
+            Color(0xFFE8F7EE),
+            Color(0xFFF3FBF5),
+            Color(0xFFF8FAFC),
+          ],
           stops: [0.0, 0.55, 1.0],
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Flexible, so a long name shortens the text block instead of
-              // sliding underneath the artwork.
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${AppGreeting.get()}, $firstName!',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: kText,
-                        letterSpacing: -0.4,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    const Text(
-                      'Ready to deliver happiness today',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        color: kTextSub,
-                      ),
-                    ),
-                    const SizedBox(height: F2hSpace.md),
-                    _AvailabilityToggle(
-                      isOnline: isOnline,
-                      onToggle: () => onToggleOnline(!isOnline),
-                    ),
-                  ],
+          // Background rider illustration placeholder / background image
+          Positioned(
+            right: 0,
+            bottom: -8,
+            child: Opacity(
+              opacity: 0.95,
+              child: SizedBox(
+                width: 145,
+                height: 110,
+                child: Image.asset(
+                  'assets/bg/home_intro.jpg',
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                 ),
               ),
-              const SizedBox(width: F2hSpace.sm),
-              _BellButton(onTap: onNotifications, unreadCount: unreadCount),
+            ),
+          ),
+
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Bar with Greeting and Notification Icon
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${AppGreeting.get()}, $firstName!',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF0F172A),
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            Text(
+                              'Ready to deliver amazing today',
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFF64748B),
+                              ),
+                            ),
+                            const SizedBox(width: 3),
+                            const Text('📍', style: TextStyle(fontSize: 12)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Notification Bell Pill Button
+                  _buildBellButton(onTap: onNotifications, unreadCount: unreadCount),
+                ],
+              ),
+
+              const SizedBox(height: 14),
+
+              // Online / Offline Status Dropdown Pill
+              _buildOnlineStatusPill(context),
             ],
           ),
         ],
       ),
     );
   }
-}
 
-/// Availability switch. The label sits opposite the knob so the control reads
-/// as its current state rather than as the action it performs.
-class _AvailabilityToggle extends StatelessWidget {
-  final bool isOnline;
-  final VoidCallback onToggle;
-
-  const _AvailabilityToggle({required this.isOnline, required this.onToggle});
-
-  @override
-  Widget build(BuildContext context) {
-    final tint = isOnline ? kPrimary : kMuted;
-    return GestureDetector(
-      onTap: onToggle,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeInOut,
-        height: 38,
-        padding: const EdgeInsets.symmetric(horizontal: 5),
-        decoration: BoxDecoration(
-          color: isOnline ? kPrimaryPl : kBgDeep,
-          borderRadius: BorderRadius.circular(F2hRadius.pill),
-          border: Border.all(color: tint.withValues(alpha: 0.45)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!isOnline) const SizedBox(width: 6),
-            if (!isOnline)
-              Text(
-                'Offline',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: tint,
-                ),
-              ),
-            if (!isOnline) const SizedBox(width: 8),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              width: 26,
-              height: 26,
-              decoration: BoxDecoration(color: tint, shape: BoxShape.circle),
-              child: Icon(
-                isOnline ? Icons.check_rounded : Icons.power_settings_new_rounded,
-                size: 15,
-                color: Colors.white,
-              ),
-            ),
-            if (isOnline) const SizedBox(width: 8),
-            if (isOnline)
-              const Text(
-                'Online',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: kPrimary,
-                ),
-              ),
-            if (isOnline) const SizedBox(width: 6),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _BellButton extends StatelessWidget {
-  final VoidCallback? onTap;
-  final int unreadCount;
-
-  const _BellButton({this.onTap, this.unreadCount = 0});
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildBellButton({VoidCallback? onTap, int unreadCount = 0}) {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -193,41 +126,102 @@ class _BellButton extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: kSurface,
+              color: Colors.white,
               shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFFE2E8F0)),
               boxShadow: const [
-                BoxShadow(color: Color(0x140F172A), blurRadius: 10, offset: Offset(0, 3)),
+                BoxShadow(
+                  color: Color(0x08000000),
+                  blurRadius: 6,
+                  offset: Offset(0, 2),
+                ),
               ],
             ),
-            child: const Icon(Icons.notifications_none_rounded, color: kText, size: 22),
+            child: const Icon(
+              Icons.notifications_none_rounded,
+              color: Color(0xFF0F172A),
+              size: 20,
+            ),
           ),
           if (unreadCount > 0)
             Positioned(
-              right: -2,
-              top: -2,
+              right: -1,
+              top: -1,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                constraints: const BoxConstraints(minWidth: 18),
-                decoration: BoxDecoration(
-                  color: kRed,
-                  borderRadius: BorderRadius.circular(F2hRadius.pill),
-                  border: Border.all(color: kSurface, width: 1.5),
+                padding: const EdgeInsets.all(3.5),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEF4444),
+                  shape: BoxShape.circle,
                 ),
+                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                 child: Text(
                   unreadCount > 9 ? '9+' : '$unreadCount',
-                  textAlign: TextAlign.center,
                   style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
                     color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    height: 1,
                   ),
+                  textAlign: TextAlign.center,
                 ),
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildOnlineStatusPill(BuildContext context) {
+    return GestureDetector(
+      onTap: () => onToggleOnline(!isOnline),
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: isOnline ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isOnline ? const Color(0xFF86EFAC) : const Color(0xFFCBD5E1),
+          ),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x06000000),
+              blurRadius: 4,
+              offset: Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: isOnline ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              isOnline ? 'Online' : 'Offline',
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: isOnline ? const Color(0xFF15803D) : const Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 16,
+              color: isOnline ? const Color(0xFF15803D) : const Color(0xFF64748B),
+            ),
+          ],
+        ),
       ),
     );
   }
