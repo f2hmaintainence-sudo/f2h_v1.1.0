@@ -1642,7 +1642,7 @@ export class DeliveryRunService {
         `SELECT o.order_id, o.customer_id,
                 COALESCE(NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), o.customer_name, 'Customer') AS customer_name,
                 o.address_id,
-                COALESCE(o.address_line, ca.address_line1 || ' ' || COALESCE(ca.address_line2, ''), 'Customer Address') AS address_line,
+                COALESCE(o.address_line, NULLIF(TRIM(ca.address_line), ''), 'Customer Address') AS address_line,
                 o.branch_id, o.delivery_slot, o.scheduled_date, o.status,
                 o.delivery_run_id, o.delivery_partner_id, o.total_amount,
                 b.branch_name,
@@ -1719,7 +1719,7 @@ export class DeliveryRunService {
             `SELECT o.order_id, o.customer_id,
                     COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), o.customer_name, 'Customer') AS customer_name,
                     o.address_id,
-                    COALESCE(o.address_line, ca.address_line1 || ' ' || COALESCE(ca.address_line2, ''), 'Customer Address') AS address_line,
+                    COALESCE(o.address_line, NULLIF(TRIM(ca.address_line), ''), 'Customer Address') AS address_line,
                     o.delivery_slot, o.status, o.total_amount,
                     COALESCE(dra.sequence_no, o.run_sequence, 1) AS run_sequence
              FROM orders o
@@ -2313,7 +2313,7 @@ export class DeliveryRunService {
                 'customer_id', o.customer_id,
                 'customer_name', COALESCE(NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), o.customer_name, 'Customer'),
                 'address_id', o.address_id,
-                'address_line', COALESCE(o.address_line, ca.address_line1 || ' ' || COALESCE(ca.address_line2, ''), 'Customer Address'),
+                'address_line', COALESCE(o.address_line, NULLIF(TRIM(ca.address_line), ''), 'Customer Address'),
                 'delivery_slot', o.delivery_slot,
                 'status', o.status,
                 'total_amount', o.total_amount,

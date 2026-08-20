@@ -65,8 +65,10 @@ describe('AdminSystemService audit logs', () => {
     expect(insightCall).toBeDefined();
     expect(adminCall).toBeDefined();
 
-    const [rowsSql, rowsParams] = rowsCall!;
-    const [insightSql, insightParams] = insightCall!;
+    const rowsSql = rowsCall![0];
+    const rowsParams = rowsCall![1] ?? [];
+    const insightSql = insightCall![0];
+    const insightParams = insightCall![1] ?? [];
     expect(rowsSql).toContain('al.admin_id = $1');
     expect(rowsSql).toContain('al.action = $2');
     expect(rowsSql).toContain('al.target_type = $3');
@@ -92,12 +94,20 @@ describe('AdminSystemService audit logs', () => {
     expect(insightSql).toContain('al.admin_id = $1');
     expect(insightSql).toContain('al.action = $2');
     expect(insightSql).toContain('al.target_type = $3');
+    expect(insightSql).toContain("COALESCE(al.target_id, '') ILIKE $4");
     expect(insightSql).toContain(
       "al.created_at >= ($5::date::timestamp AT TIME ZONE 'Asia/Kolkata')",
     );
     expect(insightSql).toContain(
       "al.created_at < (($6::date + INTERVAL '1 day') AT TIME ZONE 'Asia/Kolkata')",
     );
+    expect(insightSql).toContain('COUNT(*)::int AS total_events');
+    expect(insightSql).toContain(
+      "COUNT(*) FILTER (WHERE LOWER(action) LIKE '%delete%')::int",
+    );
+    expect(insightSql).toContain('COUNT(DISTINCT admin_id)::int');
+    expect(insightSql).toContain('ORDER BY count DESC, action ASC');
+    expect(insightSql).toContain('LIMIT 5');
     expect(insightParams).toEqual(rowsParams.slice(0, -2));
     expect(adminCall![0]).toContain(
       'ORDER BY admin_id, created_at DESC, id DESC',
