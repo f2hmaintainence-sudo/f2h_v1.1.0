@@ -36,7 +36,14 @@ class ApiEndpoints {
   }
 
   /// Root host (scheme + host + port), no trailing slash.
-  static String get host => _envBaseUrl.isNotEmpty ? _envBaseUrl : _devBaseUrl;
+  static String get host {
+    if (kIsWeb) {
+      if (Uri.base.origin.isNotEmpty && !Uri.base.origin.startsWith('null')) {
+        return Uri.base.origin;
+      }
+    }
+    return _envBaseUrl.isNotEmpty ? _envBaseUrl : _devBaseUrl;
+  }
 
   /// Full versioned API prefix — all endpoints append to this.
   static String get apiBaseUrl => '$host/api/v1';

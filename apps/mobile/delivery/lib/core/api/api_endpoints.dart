@@ -34,7 +34,14 @@ class ApiEndpoints {
     return 'http://192.168.1.16:5001';
   }
 
-  static String get host => _envBaseUrl.isNotEmpty ? _envBaseUrl : _devBaseUrl;
+  static String get host {
+    if (kIsWeb) {
+      if (Uri.base.origin.isNotEmpty && !Uri.base.origin.startsWith('null')) {
+        return Uri.base.origin;
+      }
+    }
+    return _envBaseUrl.isNotEmpty ? _envBaseUrl : _devBaseUrl;
+  }
 
   static String get apiBaseUrl => '$host/api/v1';
   static String get baseUrl => apiBaseUrl;
