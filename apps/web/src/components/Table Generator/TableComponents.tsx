@@ -276,16 +276,24 @@ export default function TableComponents({
           <SkeletonForm
             isOpen={editOpen}
             onClose={() => {
+              const closedId = editId;
               setEditOpen(false);
               setEditId(null);
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('table:edit:closed', { detail: { id: closedId, saved: false } }));
+              }
             }}
             apiEndpoint={api.showEdit(editId)}
             submitEndpoint={api.saveEdit(editId)}
             onSuccess={() => {
+              const closedId = editId;
               setEditOpen(false);
               setEditId(null);
               refreshTable();
-              if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('table:refresh'));
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('table:refresh'));
+                window.dispatchEvent(new CustomEvent('table:edit:closed', { detail: { id: closedId, saved: true } }));
+              }
             }}
           />
         )}
@@ -415,15 +423,24 @@ export default function TableComponents({
         <SkeletonForm
           isOpen={editOpen}
           onClose={() => {
+            const closedId = editId;
             setEditOpen(false);
             setEditId(null);
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('table:edit:closed', { detail: { id: closedId, saved: false } }));
+            }
           }}
           apiEndpoint={api.showEdit(editId)}
           submitEndpoint={api.saveEdit(editId)}
           onSuccess={() => {
+            const closedId = editId;
             setEditOpen(false);
             setEditId(null);
             refreshTable();
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('table:refresh'));
+              window.dispatchEvent(new CustomEvent('table:edit:closed', { detail: { id: closedId, saved: true } }));
+            }
           }}
         />
       )}

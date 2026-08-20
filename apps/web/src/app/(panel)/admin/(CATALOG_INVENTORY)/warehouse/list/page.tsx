@@ -43,6 +43,25 @@ export default function WarehouseListPage() {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [selectedWarehouse, setSelectedWarehouse] = useState<WarehouseItem | null>(null);
+  const [pendingMapWarehouse, setPendingMapWarehouse] = useState<WarehouseItem | null>(null);
+
+  // Listen for default edit form close to show map pin form next
+  useEffect(() => {
+    const handleEditClosed = () => {
+      if (pendingMapWarehouse) {
+        const wh = pendingMapWarehouse;
+        setPendingMapWarehouse(null);
+        setSelectedWarehouse(wh);
+        setModalMode("edit");
+        setModalOpen(true);
+      }
+    };
+
+    window.addEventListener("table:edit:closed", handleEditClosed);
+    return () => {
+      window.removeEventListener("table:edit:closed", handleEditClosed);
+    };
+  }, [pendingMapWarehouse]);
 
   // Fetch warehouses table data from backend API
   const fetchWarehouses = useCallback(async () => {
@@ -223,9 +242,17 @@ export default function WarehouseListPage() {
   };
 
   const handleEditWarehouse = (warehouse: WarehouseItem) => {
-    setSelectedWarehouse(warehouse);
-    setModalMode("edit");
-    setModalOpen(true);
+    // Show default edit form first; once closed, the new map pin form will show next
+    setPendingMapWarehouse(warehouse);
+    window.dispatchEvent(
+      new CustomEvent("table:action", {
+        detail: {
+          type: "edit",
+          id: String(warehouse.id || warehouse.warehouse_id),
+          row: warehouse,
+        },
+      })
+    );
   };
 
   const handleResetFilters = () => {
@@ -447,11 +474,11 @@ export default function WarehouseListPage() {
         warehouse={selectedWarehouse}
       />
 
-      {/* MODAL FORMS & DRAWERS (VIEW, DELETE) */}
+      {/* MODAL FORMS & DRAWERS (VIEW, EDIT, DELETE) */}
       <TableComponents
         title="Warehouse"
         apiBase={API}
-        actionTypes={["view", "delete"]}
+        actionTypes={["view", "edit", "delete"]}
         modalsOnly={true}
       />
     </div>

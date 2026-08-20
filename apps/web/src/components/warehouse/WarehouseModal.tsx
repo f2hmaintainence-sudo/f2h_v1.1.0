@@ -32,6 +32,7 @@ interface WarehouseModalProps {
   onSuccess: () => void;
   mode: 'create' | 'edit';
   warehouse?: WarehouseItem | null;
+  initialStep?: 1 | 2;
 }
 
 export interface WarehouseFormData {
@@ -86,8 +87,9 @@ export default function WarehouseModal({
   onSuccess,
   mode,
   warehouse,
+  initialStep,
 }: WarehouseModalProps) {
-  const [formStep, setFormStep] = useState<1 | 2>(1);
+  const [formStep, setFormStep] = useState<1 | 2>(initialStep || (mode === 'edit' ? 2 : 1));
   const [form, setForm] = useState<WarehouseFormData>(DEFAULT_FORM);
   const [branches, setBranches] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -116,7 +118,7 @@ export default function WarehouseModal({
   useEffect(() => {
     if (isOpen) {
       setError('');
-      setFormStep(1);
+      setFormStep(initialStep || (mode === 'edit' ? 2 : 1));
       if (mode === 'edit' && warehouse) {
         setLoading(true);
         // Also fetch fresh details from API if available
@@ -566,7 +568,7 @@ export default function WarehouseModal({
                   <MapPicker
                     lat={form.latitude}
                     lng={form.longitude}
-                    radiusKm={3}
+                    radiusKm={0}
                     onLocationChange={(lat, lng) => setForm((f) => ({ ...f, latitude: lat, longitude: lng }))}
                   />
                 </div>

@@ -347,14 +347,16 @@ function MapContents({
         <Pin background="#16a34a" borderColor="#15803d" glyphColor="#fff" scale={1.2} />
       </AdvancedMarker>
 
-      <CoverageOverlay
-        lat={lat}
-        lng={lng}
-        radiusKm={radiusKm}
-        shape={selectedShape}
-      />
+      {Number(radiusKm) > 0 && (
+        <CoverageOverlay
+          lat={lat}
+          lng={lng}
+          radiusKm={radiusKm}
+          shape={selectedShape}
+        />
+      )}
 
-      {Number(bufferZoneKm) > 0 && (
+      {Number(radiusKm) > 0 && Number(bufferZoneKm) > 0 && (
         <CoverageOverlay
           lat={lat}
           lng={lng}
