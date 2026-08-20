@@ -11,6 +11,12 @@ class CheckoutRequestEntity {
   final bool? subscriptionAutoRenew;
   final String? couponCode;
 
+  // Online / Razorpay payment identifiers
+  // Only present when paymentMethod is 'online'.
+  final String? razorpayOrderId;
+  final String? razorpayPaymentId;
+  final String? razorpaySignature;
+
   CheckoutRequestEntity({
     required this.userId,
     required this.items,
@@ -21,5 +27,8 @@ class CheckoutRequestEntity {
     this.subscriptionEndDate,
     this.subscriptionAutoRenew,
     this.couponCode,
+    this.razorpayOrderId,
+    this.razorpayPaymentId,
+    this.razorpaySignature,
   });
 }

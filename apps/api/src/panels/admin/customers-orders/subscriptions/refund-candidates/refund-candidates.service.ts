@@ -10,6 +10,8 @@ import {
   RefundCandidatesRepository,
 } from './refund-candidates.repository';
 import { DatabaseService } from '../../../../../shared/database/Database.service';
+import { RefundEligibilityService } from './refund-eligibility.service';
+import { RefundProcessingService } from './refund-processing.service';
 
 @Injectable()
 export class RefundCandidatesService {
@@ -18,6 +20,8 @@ export class RefundCandidatesService {
   constructor(
     private readonly repo: RefundCandidatesRepository,
     private readonly db: DatabaseService,
+    private readonly eligibility: RefundEligibilityService,
+    private readonly processing: RefundProcessingService,
   ) {}
 
   // ─── Candidate Creation (called from cron / order handlers) ─────────────────
@@ -94,86 +98,77 @@ export class RefundCandidatesService {
 
   // ─── Bulk Approve → create one payout per customer, credit wallet ────────────
 
+  /**
+   * Approves and pays out. All the money movement lives in
+   * RefundProcessingService so payout, candidate status and wallet credit share
+   * one transaction — see that file for the ordering.
+   */
   async bulkApprove(candidateIds: string[], adminId: string) {
-    if (!candidateIds?.length) {
-      throw new BadRequestException('No candidate IDs provided');
-    }
-
-    // Fetch the selected candidates
-    const candidates = await this.repo.getCandidatesByIds(candidateIds);
-
-    // Filter: only pending, not already refunded
-    const eligible = candidates.filter((c) => c.status === 'pending');
-    if (!eligible.length) {
-      throw new BadRequestException('No eligible pending candidates found');
-    }
-
-    // Check for already-refunded duplicates
-    const alreadyRefunded = candidates.filter((c) => c.status === 'refunded');
-    if (alreadyRefunded.length) {
-      throw new BadRequestException(
-        `${alreadyRefunded.length} candidates are already refunded`,
-      );
-    }
-
-    // Group by customer
-    const byCustomer = new Map<string, typeof eligible>();
-    for (const c of eligible) {
-      if (!byCustomer.has(c.customer_id)) byCustomer.set(c.customer_id, []);
-      byCustomer.get(c.customer_id)!.push(c);
-    }
-
-    const payouts: any[] = [];
-    for (const [customerId, items] of byCustomer.entries()) {
-      const totalAmount = items.reduce((s, c) => s + Number(c.refund_amount ?? 0), 0);
-      const totalDeliveries = items.length;
-      const ids = items.map((c) => c.refund_candidate_id);
-
-      // Generate refund number
-      const ts = Math.floor(Date.now() / 1000).toString(36).toUpperCase();
-      const suffix = Math.floor(Math.random() * 9000 + 1000);
-      const refundNumber = `SRF${ts}${suffix}`;
-
-      // Create payout record
-      const payoutId = await this.repo.createPayout({
-        refund_number: refundNumber,
-        customer_id: customerId,
-        total_amount: totalAmount,
-        total_deliveries: totalDeliveries,
-        approved_by: adminId,
-      });
-
-      // Update candidates to approved
-      await this.repo.approveCandidates(ids, payoutId, adminId);
-
-      // Immediately credit wallet (approve + process in one step)
-      const walletTxId = await this.repo.creditCustomerWallet(
-        customerId,
-        totalAmount,
-        payoutId,
-        refundNumber,
-      );
-
-      // Mark payout as processed
-      await this.repo.updatePayoutProcessed(payoutId, walletTxId);
-
-      // Mark candidates as refunded
-      await this.repo.markRefunded(payoutId);
-
-      payouts.push({
-        payout_id: payoutId,
-        refund_number: refundNumber,
-        customer_id: customerId,
-        total_amount: totalAmount,
-        total_deliveries: totalDeliveries,
-        wallet_transaction_id: walletTxId,
-      });
-    }
+    const payouts = await this.processing.approveAndProcess(candidateIds, adminId);
+    const refunded = payouts.reduce((sum, p) => sum + p.total_deliveries, 0);
 
     return {
       status: true,
-      message: `Approved and credited ${eligible.length} refund(s) across ${payouts.length} customer(s)`,
+      message: `Approved and credited ${refunded} refund(s) across ${payouts.length} customer(s)`,
       data: payouts,
+    };
+  }
+
+  // ─── Review step (Eligible → Reviewed) ───────────────────────────────────────
+
+  /**
+   * Marks candidates as reviewed. This is the checkpoint before money moves:
+   * an admin has opened the calculation and agrees with it.
+   */
+  async bulkReview(candidateIds: string[], adminId: string, notes?: string) {
+    if (!candidateIds?.length) {
+      throw new BadRequestException('No candidate IDs provided');
+    }
+    const count = await this.repo.reviewCandidates(candidateIds, adminId, notes);
+    if (!count) {
+      throw new BadRequestException('No pending candidates were available to review');
+    }
+    return {
+      status: true,
+      message: `Marked ${count} refund(s) as reviewed`,
+      data: { reviewed_count: count },
+    };
+  }
+
+  async reviewSingle(candidateId: string, adminId: string, notes?: string) {
+    return this.bulkReview([candidateId], adminId, notes);
+  }
+
+  /** Full detail for the review drawer, including how the amount was derived. */
+  async getCandidateDetail(candidateId: string) {
+    const detail = await this.repo.getCandidateDetail(candidateId);
+    if (!detail) throw new NotFoundException('Refund candidate not found');
+    return { status: true, data: detail };
+  }
+
+  // ─── Eligibility scan ────────────────────────────────────────────────────────
+
+  /** Recalculates refundable days/orders for a month or explicit date range. */
+  async scan(filters: any) {
+    const result = await this.eligibility.scan(filters ?? {});
+    return {
+      status: true,
+      message: `${result.found} refundable item(s) found — ${result.created} new, ${result.skipped_existing} already tracked`,
+      data: result,
+    };
+  }
+
+  /** Same calculation, nothing written — used to preview before scanning. */
+  async previewScan(filters: any) {
+    const { range, rows } = await this.eligibility.preview(filters ?? {});
+    return {
+      status: true,
+      data: {
+        range,
+        count: rows.length,
+        total_amount: Math.round(rows.reduce((s, r) => s + r.refund_amount, 0) * 100) / 100,
+        rows,
+      },
     };
   }
 

@@ -63,6 +63,7 @@ interface PartnerInfo {
 
 import { FirstOrderDetectorService } from '../../customer/referral/services/first-order-detector.service';
 import { ReferralRewardEngineService } from '../../customer/referral/services/referral-reward-engine.service';
+import { RefundEligibilityService } from '../customers-orders/subscriptions/refund-candidates/refund-eligibility.service';
 
 import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
 
@@ -78,6 +79,7 @@ export class DeliveryRunService {
     private authServices: AuthService,
     private firstOrderDetector: FirstOrderDetectorService,
     private referralRewardEngine: ReferralRewardEngineService,
+    private readonly refundEligibility: RefundEligibilityService,
   ) { }
 
   // ────────────────────────────────────────────────
@@ -916,6 +918,17 @@ export class DeliveryRunService {
           `UPDATE orders SET status = 'failed', updated_at = NOW() WHERE order_id = $1`,
           [orderId],
         );
+
+        // A failed delivery on a prepaid subscription order is money owed back.
+        // Best-effort: never let refund bookkeeping fail the status update.
+        try {
+          await this.refundEligibility.onDeliveryFailed(orderId);
+        } catch (refundErr) {
+          this.developer.error('Failed to raise refund candidate for failed delivery', {
+            refundErr,
+            orderId,
+          });
+        }
       }
 
       // Update run counts

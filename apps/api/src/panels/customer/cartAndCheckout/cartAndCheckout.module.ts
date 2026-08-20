@@ -13,9 +13,10 @@ import { NotificationModule } from 'src/notifications/notification.module';
 
 import { ReferralModule } from '../referral/referral.module';
 import { DiscountEngineModule } from 'src/shared/services/discount-engine.module';
+import { CustomerPaymentModule } from '../payment/payment.module';
 
 @Module({
-  imports: [ConfigModule, NotificationModule, ReferralModule, DiscountEngineModule],
+  imports: [ConfigModule, NotificationModule, ReferralModule, DiscountEngineModule, CustomerPaymentModule],
   controllers: [CartController],
   providers: [DatabaseService, DataService, DeveloperService, CartService, PricingService, PushNotificationService],
   exports: [CartService, PricingService],

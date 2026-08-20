@@ -112,4 +112,20 @@ export class CheckOutDto {
   @IsString()
   @IsOptional()
   coupon_code?: string;
+
+  // ── Online / Razorpay payment identifiers ──
+  // Only required when payment_method is 'online' or 'upi'.
+  // The server uses these to verify the payment before creating the order.
+
+  @IsString()
+  @IsOptional()
+  razorpay_order_id?: string;
+
+  @IsString()
+  @IsOptional()
+  razorpay_payment_id?: string;
+
+  @IsString()
+  @IsOptional()
+  razorpay_signature?: string;
 }

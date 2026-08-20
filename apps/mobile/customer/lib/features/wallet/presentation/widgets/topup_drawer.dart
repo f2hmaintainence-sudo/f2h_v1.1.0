@@ -2,16 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import 'package:f2h_customer/core/api/api_endpoints.dart';
-import 'package:f2h_customer/core/api/dio_client.dart';
-import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
-import 'package:f2h_customer/core/errors/error_handler.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
+import 'package:f2h_customer/core/payments/payment_service.dart';
+import 'package:f2h_customer/core/payments/payment_models.dart';
 
 class TopupDrawer extends StatefulWidget {
   const TopupDrawer({super.key});
@@ -53,45 +51,56 @@ class _TopupDrawerState extends State<TopupDrawer> {
     setState(() => _isSubmitting = true);
 
     final amount = _enteredAmount;
-    final dioClient = sl<DioClient>();
     final sessionCubit = context.read<CustomerSessionCubit>();
 
     try {
-      await dioClient.fetchCsrfToken();
-      final response = await dioClient.dio.post(
-        ApiEndpoints.customerWalletTopup,
-        data: {
-          'amount': amount,
-          'transaction_type': 'credit',
-          'direction': 'credit',
-          'reference_type': 'wallet_topup',
-          'remarks': 'Wallet top-up',
-          'reason': 'Wallet top-up',
-          'initiated_by': 'customer',
-        },
+      // Step 1 → create a Razorpay order, open the payment sheet, and verify
+      // the signature server-side — all in one call.
+      final result = await PaymentService.instance.pay(
+        purpose: PaymentPurpose.walletTopup,
+        amount: amount,
       );
 
-      final data = response.data;
-      if (data is Map && data['status'] == false) {
-        throw Exception(data['message'] ?? 'Failed to add money');
+      if (!mounted) return;
+
+      if (result.cancelled) {
+        // User dismissed the sheet — no money moved, nothing to show.
+        setState(() => _isSubmitting = false);
+        return;
       }
 
-      sessionCubit.rechargeWallet(amount);
+      if (!result.success) {
+        F2HToast.error(
+          context,
+          result.message.isNotEmpty
+              ? result.message
+              : 'Payment failed. Please try again.',
+        );
+        setState(() => _isSubmitting = false);
+        return;
+      }
+
+      // Payment verified server-side — refresh the session so the new balance
+      // appears immediately without the customer having to pull-to-refresh.
+      final newBalance = result.walletBalance;
+      if (newBalance != null) {
+        final currentBalance = sessionCubit.state.profile?.walletBalance ?? 0;
+        sessionCubit.rechargeWallet(newBalance - currentBalance);
+      } else {
+        sessionCubit.rechargeWallet(amount);
+      }
       await sessionCubit.refresh();
 
       if (!mounted) return;
       F2HToast.success(
         context,
-        '\u{20B9}${amount.toStringAsFixed(0)} added successfully',
+        '₹${amount.toStringAsFixed(0)} added successfully',
       );
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      F2HToast.error(context, extractErrorMessage(e, fallback: 'Failed to add money'));
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
+      F2HToast.error(context, 'Payment failed. Please try again.');
+      setState(() => _isSubmitting = false);
     }
   }
 
@@ -206,7 +215,7 @@ class _TopupDrawerState extends State<TopupDrawer> {
                           ),
                         ),
                         child: Text(
-                          '+ \u{20B9}${amt.toStringAsFixed(0)}',
+                          '+ ₹${amt.toStringAsFixed(0)}',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontWeight: FontWeight.w700,

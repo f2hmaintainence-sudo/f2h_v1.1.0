@@ -12,6 +12,7 @@ import {
 import { generateId } from 'src/helpers/RandomHelper';
 import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
 import { NotificationService } from 'src/notifications/notification.service';
+import { CustomerPaymentService } from '../../payment/payment.service';
 
 import { FirstOrderDetectorService } from '../../referral/services/first-order-detector.service';
 import { ReferralRewardEngineService } from '../../referral/services/referral-reward-engine.service';
@@ -28,6 +29,7 @@ export class CartService {
     private readonly firstOrderDetector: FirstOrderDetectorService,
     private readonly referralRewardEngine: ReferralRewardEngineService,
     private readonly discountEngine: DiscountEngineService,
+    private readonly customerPaymentService: CustomerPaymentService,
   ) { }
 
   async syncCart(body: CartDto, customerId: string) {
@@ -184,6 +186,30 @@ export class CartService {
 
   async checkout(body: CheckOutDto, req?: any) {
     const plan = await this.buildCheckoutPlan(body, req);
+
+    // ── Online payment gate ──
+    // When the customer paid via Razorpay (payment_method 'online' or 'upi'),
+    // the client sends back the three Razorpay identifiers. We verify and lock
+    // the payment *before* the database transaction so a signature failure never
+    // leaves an uncommitted order row.
+    const isOnlinePayment = ['online', 'upi'].includes(plan.paymentMethod);
+    if (isOnlinePayment) {
+      if (!body.razorpay_order_id) {
+        throw new BadRequestException(
+          'razorpay_order_id is required for online payment checkout.',
+        );
+      }
+      // consumeOrderPayment verifies the signature (if not yet verified) and
+      // atomically marks the payment row as fulfilled so it can only be used once.
+      await this.customerPaymentService.consumeOrderPayment({
+        customerId: plan.customerId,
+        razorpayOrderId: body.razorpay_order_id,
+        razorpayPaymentId: body.razorpay_payment_id,
+        razorpaySignature: body.razorpay_signature,
+        expectedAmount: plan.onetimeTotal,
+        orderReference: 'CHECKOUT_PENDING',
+      });
+    }
 
     // Everything that moves money or creates an order happens inside one
     // transaction. Previously these were separate autocommitted statements, so a

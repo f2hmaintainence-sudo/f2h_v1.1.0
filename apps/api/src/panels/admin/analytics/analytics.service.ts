@@ -2,6 +2,7 @@ import { Injectable, InternalServerErrorException, BadRequestException } from '@
 import { DatabaseService } from '../../../shared/database/Database.service';
 import { DeveloperService } from '../../../shared/logger/Developer.service';
 import { PdfService } from '../../../common/pdf/pdf.service';
+import { WalletLedgerService } from '../../../shared/payments/wallet-ledger.service';
 
 function formatMoney(v: unknown): string {
   return '₹' + Number(v ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
@@ -13,6 +14,7 @@ export class AnalyticsService {
     private readonly db: DatabaseService,
     private readonly developer: DeveloperService,
     private readonly pdfService: PdfService,
+    private readonly walletLedger: WalletLedgerService,
   ) { }
 
   async getRevenueReport(query: any) {
@@ -489,45 +491,42 @@ export class AnalyticsService {
 
         const refundAmount = Number(sr.refund_amount || 0);
 
-        // Fetch customer balance
-        const custRes = await this.db.query(
-          `SELECT wallet_balance FROM customers WHERE customer_id = $1 LIMIT 1`,
-          [sr.customer_id]
-        );
-        const currentBalance = Number(custRes?.[0]?.wallet_balance || 0);
-        const newBalance = currentBalance + refundAmount;
+        // The wallet is written by WalletLedgerService alone: it locks the
+        // balance FOR UPDATE and commits the ledger row in the same transaction.
+        // The previous inline read-modify-write here could lose concurrent
+        // credits, and it marked *every* pause on the subscription as refunded
+        // regardless of which month the refund covered.
+        const credit = await this.walletLedger.credit({
+          customerId: sr.customer_id,
+          amount: refundAmount,
+          referenceType: 'subscription_pause_refund',
+          referenceId: String(refundId),
+          remarks: `Refund for ${sr.total_paused_days} paused days in ${sr.refund_month}`,
+          createdBy: 'system',
+        });
 
-        // Credit customer wallet balance
-        await this.db.query(
-          `UPDATE customers SET wallet_balance = $1, updated_at = NOW() WHERE customer_id = $2`,
-          [newBalance, sr.customer_id]
-        );
-
-        // Insert wallet transaction
-        const walletTxRes = await this.db.query(
-          `INSERT INTO customer_wallet_transactions (customer_id, transaction_type, amount, balance_after, reference_type, reference_id, remarks, created_at)
-           VALUES ($1, 'credit', $2, $3, 'subscription_pause_refund', $4, $5, NOW()) RETURNING id`,
-          [sr.customer_id, refundAmount, newBalance, sr.subscription_id, `Refund for ${sr.total_paused_days} paused days in ${sr.refund_month}`]
-        );
-
-        const walletTxId = String(walletTxRes?.[0]?.id || '');
-
-        // Update subscription_refunds record status to processed
         await this.db.query(
           `UPDATE subscription_refunds SET status = 'processed', wallet_transaction_id = $1 WHERE id = $2`,
-          [walletTxId, refundId]
+          [credit.transactionId, refundId]
         );
 
-        // Mark subscription_pauses as is_refunded = true
+        // Only the pauses this refund actually covers — bounded by the month it
+        // was raised for, not the whole subscription history.
         await this.db.query(
-          `UPDATE subscription_pauses SET is_refunded = true WHERE subscription_id = $1 AND is_refunded = false`,
-          [sr.subscription_id]
+          `UPDATE subscription_pauses
+              SET is_refunded = true, updated_at = NOW()
+            WHERE subscription_id = $1
+              AND is_refunded = false
+              AND deleted_at IS NULL
+              AND to_char(start_date, 'YYYY-MM') <= $2
+              AND to_char(end_date, 'YYYY-MM') >= $2`,
+          [sr.subscription_id, sr.refund_month]
         );
 
         return {
           status: true,
           message: `Refund ₹${refundAmount} processed and credited to customer wallet successfully.`,
-          new_balance: newBalance
+          new_balance: credit.balanceAfter
         };
       }
 
@@ -541,37 +540,31 @@ export class AnalyticsService {
         const r = refundRes[0];
         const refundAmount = Number(r.refund_amount || 0);
 
-        // Fetch customer balance
-        const custRes = await this.db.query(
-          `SELECT wallet_balance FROM customers WHERE customer_id = $1 LIMIT 1`,
-          [r.customer_id]
-        );
-        const currentBalance = Number(custRes?.[0]?.wallet_balance || 0);
-        const newBalance = currentBalance + refundAmount;
+        if (r.status === 'processed') {
+          return { status: true, message: 'Refund is already processed' };
+        }
 
-        // Credit customer wallet balance
-        await this.db.query(
-          `UPDATE customers SET wallet_balance = $1, updated_at = NOW() WHERE customer_id = $2`,
-          [newBalance, r.customer_id]
-        );
+        const credit = await this.walletLedger.credit({
+          customerId: r.customer_id,
+          amount: refundAmount,
+          referenceType: 'order_refund',
+          referenceId: String(r.order_id || r.id),
+          remarks: `Order refund ${r.refund_number || r.id}`,
+          createdBy: 'system',
+        });
 
-        // Insert wallet transaction
         await this.db.query(
-          `INSERT INTO customer_wallet_transactions (customer_id, transaction_type, amount, balance_after, reference_type, reference_id, remarks, created_at)
-           VALUES ($1, 'credit', $2, $3, 'order_refund', $4, $5, NOW())`,
-          [r.customer_id, refundAmount, newBalance, r.order_id || r.id, `Order refund ${r.refund_number || r.id}`]
-        );
-
-        // Update refunds table status
-        await this.db.query(
-          `UPDATE refunds SET status = 'processed' WHERE id = $1`,
-          [r.id]
+          `UPDATE refunds
+              SET status = 'processed', processed_at = NOW(),
+                  transaction_id = $1, updated_at = NOW()
+            WHERE id = $2`,
+          [credit.transactionId, r.id]
         );
 
         return {
           status: true,
           message: `Order refund ₹${refundAmount} processed and credited to customer wallet successfully.`,
-          new_balance: newBalance
+          new_balance: credit.balanceAfter
         };
       }
 

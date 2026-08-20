@@ -31,6 +31,8 @@ import '../helpers/cart_helpers.dart';
 import '../widgets/cart_widgets.dart';
 // [ADDED BY ANTIGRAVITY FOR WALLET TOPUP]
 import '../../../wallet/presentation/widgets/topup_drawer.dart';
+// [ADDED BY ANTIGRAVITY FOR ONLINE PAYMENT]
+import '../../../../core/payments/payment_service.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  CHECKOUT SCREEN WIDGET
@@ -48,7 +50,7 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   // ===== State Variables =====
 
-  /// Selected payment method: 'wallet', 'upi', or 'cod'
+  /// Selected payment method: 'wallet', 'online', or 'cod'
   String _selectedPayment = 'wallet';
 
   /// Whether the user opted into donation
@@ -349,8 +351,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     double grandTotal,
     List<CartItemEntity> checkoutItems,
     String userId,
-    String? addressId,
-  ) {
+    String? addressId, {
+    String? razorpayOrderId,
+    String? razorpayPaymentId,
+    String? razorpaySignature,
+  }) {
     final paymentMethod = _selectedPayment;
     final paymentType = _selectedPayment == 'cod' ? 'postpaid' : 'prepaid';
 
@@ -361,9 +366,61 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       paymentMethod: paymentMethod,
       paymentType: paymentType,
       couponCode: _appliedCouponCode,
+      razorpayOrderId: razorpayOrderId,
+      razorpayPaymentId: razorpayPaymentId,
+      razorpaySignature: razorpaySignature,
     );
 
     context.read<CheckoutBloc>().add(PlaceCheckoutEvent(request));
+  }
+
+  /// For online (Razorpay) payments: open the payment sheet, then submit checkout
+  /// with the verified payment identifiers. Falls back gracefully on cancel/failure.
+  Future<void> _handleOnlinePaymentAndCheckout({
+    required double grandTotal,
+    required List<CartItemEntity> checkoutItems,
+    required String userId,
+    required String? addressId,
+  }) async {
+    setState(() => _isLoading = true);
+
+    final result = await PaymentService.instance.payForOrder(
+      amount: grandTotal,
+      notes: {'customer_id': userId, 'purpose': 'order_checkout'},
+    );
+
+    if (!mounted) return;
+
+    if (result.cancelled) {
+      setState(() => _isLoading = false);
+      F2HToast.show(context, 'Payment cancelled');
+      setState(() => _dragKey++);
+      return;
+    }
+
+    if (!result.success) {
+      setState(() {
+        _isLoading = false;
+        _dragKey++;
+      });
+      F2HToast.error(
+        context,
+        result.message.isNotEmpty ? result.message : 'Payment failed. Please try again.',
+      );
+      return;
+    }
+
+    // Payment succeeded — pass the Razorpay IDs to the checkout API for
+    // server-side verification before the order is written.
+    _placeOrder(
+      grandTotal,
+      checkoutItems,
+      userId,
+      addressId,
+      razorpayOrderId: result.razorpayOrderId,
+      razorpayPaymentId: result.razorpayPaymentId,
+      razorpaySignature: result.razorpaySignature,
+    );
   }
 
   @override
@@ -981,7 +1038,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                       ),
                                       const SizedBox(height: 10),
                                       _buildPaymentOption(
-                                        id: 'upi',
+                                        id: 'online',
                                         icon: Icons.bolt_outlined,
                                         title: 'Instant UPI',
                                         subtitle:
@@ -1146,12 +1203,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                           )
                                           .id
                                           ?.toString();
-                                _placeOrder(
-                                  grandTotal,
-                                  checkoutItems,
-                                  sessionState.profile?.customerId ?? '',
-                                  addressId,
-                                );
+                                final customerId =
+                                    sessionState.profile?.customerId ?? '';
+
+                                if (_selectedPayment == 'online') {
+                                  _handleOnlinePaymentAndCheckout(
+                                    grandTotal: grandTotal,
+                                    checkoutItems: checkoutItems,
+                                    userId: customerId,
+                                    addressId: addressId,
+                                  );
+                                } else {
+                                  _placeOrder(
+                                    grandTotal,
+                                    checkoutItems,
+                                    customerId,
+                                    addressId,
+                                  );
+                                }
                               },
                             ),
                           ),

@@ -2,6 +2,7 @@ import { Injectable, InternalServerErrorException, BadRequestException } from '@
 import { DataService } from '../../../../shared/database/Data.service';
 import { DatabaseService } from '../../../../shared/database/Database.service';
 import { DeveloperService } from '../../../../shared/logger/Developer.service';
+import { RefundEligibilityService } from './refund-candidates/refund-eligibility.service';
 
 @Injectable()
 export class SubscriptionsService {
@@ -9,6 +10,7 @@ export class SubscriptionsService {
     private readonly dataService: DataService,
     private readonly databaseService: DatabaseService,
     private readonly developer: DeveloperService,
+    private readonly refundEligibility: RefundEligibilityService,
   ) {}
 
   async getSubscriptionView(subscriptionId: string) {
@@ -197,7 +199,7 @@ export class SubscriptionsService {
   ) {
     this.developer.debug('SubscriptionsService.pauseSubscription called', { subscriptionId, startDate, endDate });
     try {
-      return await this.databaseService.transaction(async (client) => {
+      const result = await this.databaseService.transaction(async (client) => {
         const subRes = await client.query<any>(
           `SELECT subscription_id, status, pause_from_date, pause_to_date 
            FROM subscriptions 
@@ -257,8 +259,23 @@ export class SubscriptionsService {
         return {
           status: true,
           message: 'Subscription paused successfully',
+          subscription_id: sub.subscription_id,
+          paused_from: startStr,
+          paused_to: endStr,
         };
       });
+
+      // Raise refund candidates for the paused days once the pause is committed.
+      // Prepaid-only and best-effort: the pause itself must stand regardless.
+      if (result?.status) {
+        await this.refundEligibility.onPauseCreated(
+          result.subscription_id,
+          result.paused_from,
+          result.paused_to,
+        );
+      }
+
+      return result;
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
       this.developer.error('pauseSubscription error', { error, subscriptionId });

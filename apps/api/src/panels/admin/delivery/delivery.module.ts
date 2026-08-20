@@ -21,9 +21,17 @@ import { DeliveryLeaveTableService } from './services/table.service';
 import { DeliveryLeaveShowEditService, DeliveryLeaveSaveEditService } from './services/leave-edit.service';
 
 import { ReferralModule } from '../../customer/referral/referral.module';
+import { RefundCandidatesModule } from '../customers-orders/subscriptions/refund-candidates/refund-candidates.module';
 
 @Module({
-  imports: [HelpersModule, NotificationModule, AdminAuthModule, ReferralModule],
+  imports: [
+    HelpersModule,
+    NotificationModule,
+    AdminAuthModule,
+    ReferralModule,
+    // A failed delivery on a prepaid subscription raises a refund candidate.
+    RefundCandidatesModule,
+  ],
   controllers: [DeliveryManagementController],
   providers: [
     DeliveryManagementService,

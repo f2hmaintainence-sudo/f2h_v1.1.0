@@ -117,14 +117,31 @@ export class RefundCandidatesRepository {
       conditions.push(`src.scheduled_date <= $${params.length}`);
     }
     if (query.month) {
-      // month = YYYY-MM
+      // month = YYYY-MM. Let Postgres work out the last day — '2026-02-31'
+      // is not a date and would blow up the query.
       params.push(query.month + '-01');
-      params.push(query.month + '-31');
-      conditions.push(`src.scheduled_date BETWEEN $${params.length - 1} AND $${params.length}`);
+      conditions.push(
+        `src.scheduled_date >= $${params.length}::date
+         AND src.scheduled_date < ($${params.length}::date + INTERVAL '1 month')`,
+      );
     }
     if (query.branch_id) {
       params.push(query.branch_id);
       conditions.push(`s.branch_id = $${params.length}`);
+    }
+    if (query.warehouse_id) {
+      // Subscriptions hang off a branch; the warehouse is the one serving it.
+      params.push(query.warehouse_id);
+      conditions.push(
+        `EXISTS (SELECT 1 FROM warehouses w
+                  WHERE w.branch_id = s.branch_id
+                    AND w.warehouse_id = $${params.length}
+                    AND w.deleted_at IS NULL)`,
+      );
+    }
+    if (query.source) {
+      params.push(query.source);
+      conditions.push(`src.source = $${params.length}`);
     }
 
     const where = conditions.join(' AND ');
@@ -168,7 +185,11 @@ export class RefundCandidatesRepository {
   // ─── Customer Groups (for accordion UI) ─────────────────────────────────────
 
   async getCustomerGroups(query: any): Promise<any[]> {
-    const conditions: string[] = ["src.deleted_at IS NULL", "src.status = 'pending'"];
+    // Anything not yet paid out is actionable: eligible and reviewed alike.
+    const conditions: string[] = [
+      'src.deleted_at IS NULL',
+      `src.status IN ('pending', 'reviewed')`,
+    ];
     const params: any[] = [];
 
     if (query.customer_id) {
@@ -182,6 +203,36 @@ export class RefundCandidatesRepository {
     if (query.date_to) {
       params.push(query.date_to);
       conditions.push(`src.scheduled_date <= $${params.length}`);
+    }
+    if (query.month) {
+      params.push(query.month + '-01');
+      conditions.push(
+        `src.scheduled_date >= $${params.length}::date
+         AND src.scheduled_date < ($${params.length}::date + INTERVAL '1 month')`,
+      );
+    }
+    if (query.subscription_id) {
+      params.push(query.subscription_id);
+      conditions.push(
+        `(src.subscription_id = $${params.length} OR s.subscription_number = $${params.length})`,
+      );
+    }
+    if (query.source) {
+      params.push(query.source);
+      conditions.push(`src.source = $${params.length}`);
+    }
+    if (query.branch_id) {
+      params.push(query.branch_id);
+      conditions.push(`s.branch_id = $${params.length}`);
+    }
+    if (query.warehouse_id) {
+      params.push(query.warehouse_id);
+      conditions.push(
+        `EXISTS (SELECT 1 FROM warehouses w
+                  WHERE w.branch_id = s.branch_id
+                    AND w.warehouse_id = $${params.length}
+                    AND w.deleted_at IS NULL)`,
+      );
     }
 
     const where = conditions.join(' AND ');
@@ -209,6 +260,10 @@ export class RefundCandidatesRepository {
              'refund_amount', src.refund_amount,
              'refund_reason', src.refund_reason,
              'source', src.source,
+             'status', src.status,
+             'reviewed_by', src.reviewed_by,
+             'reviewed_at', src.reviewed_at,
+             'notes', src.notes,
              'product_name', p.name,
              'variant_name', pv.name
            ) ORDER BY src.scheduled_date ASC
@@ -227,6 +282,84 @@ export class RefundCandidatesRepository {
       params,
     );
     return rows ?? [];
+  }
+
+  // ─── Review (Eligible → Reviewed) ────────────────────────────────────────────
+
+  /**
+   * Moves candidates to `reviewed`. Only `pending` rows move, so re-reviewing an
+   * approved or refunded candidate is a no-op rather than a status regression.
+   */
+  async reviewCandidates(
+    candidateIds: string[],
+    adminId: string,
+    notes?: string,
+  ): Promise<number> {
+    const rows = await this.db.query(
+      `UPDATE subscription_refund_candidates
+          SET status = 'reviewed',
+              reviewed_by = $2,
+              reviewed_at = NOW(),
+              notes = CASE WHEN $3::text IS NULL OR $3::text = ''
+                           THEN notes
+                           ELSE COALESCE(notes || ' | ', '') || $3::text END,
+              updated_at = NOW()
+        WHERE refund_candidate_id = ANY($1::varchar[])
+          AND status = 'pending'
+          AND deleted_at IS NULL
+        RETURNING refund_candidate_id`,
+      [candidateIds, adminId, notes ?? null],
+    );
+    return rows?.length ?? 0;
+  }
+
+  /**
+   * One candidate with everything an admin needs to sanity-check the amount:
+   * the subscription item's prepaid price, the quantity, the schedule it came
+   * from and the order/run it relates to.
+   */
+  async getCandidateDetail(candidateId: string): Promise<any | null> {
+    const rows = await this.db.query(
+      `SELECT
+         src.*,
+         u.first_name || ' ' || u.last_name AS customer_name,
+         u.phone  AS customer_phone,
+         u.email  AS customer_email,
+         s.subscription_number,
+         s.payment_type,
+         s.branch_id,
+         b.branch_name,
+         si.final_price AS item_final_price,
+         si.unit_price  AS item_unit_price,
+         si.discount_amount,
+         si.coupon_amount,
+         p.name  AS product_name,
+         pv.name AS variant_name,
+         pv.unit_value,
+         pv.unit_type,
+         o.order_id     AS order_number,
+         o.status       AS order_status,
+         o.delivery_run_id,
+         dra.status         AS stop_status,
+         dra.failed_reason,
+         (src.quantity * src.final_price)::numeric AS recomputed_amount
+       FROM subscription_refund_candidates src
+       LEFT JOIN subscriptions s       ON s.subscription_id = src.subscription_id
+       LEFT JOIN branches b            ON b.branch_id = s.branch_id
+       LEFT JOIN users u               ON u.user_id = src.customer_id
+       LEFT JOIN subscription_items si ON si.subscription_item_id = src.subscription_item_id
+                                       OR si.id::text = src.subscription_item_id
+       LEFT JOIN product_variants pv   ON pv.variant_id = si.product_variant_id
+       LEFT JOIN products p            ON p.product_id = pv.product_id
+       LEFT JOIN orders o              ON o.order_id::text = src.order_id
+       LEFT JOIN delivery_run_addresses dra
+              ON dra.order_id = src.order_id AND dra.deleted_at IS NULL
+       WHERE src.refund_candidate_id = $1
+         AND src.deleted_at IS NULL
+       LIMIT 1`,
+      [candidateId],
+    );
+    return rows?.[0] ?? null;
   }
 
   // ─── Approve candidates (bulk) ───────────────────────────────────────────────

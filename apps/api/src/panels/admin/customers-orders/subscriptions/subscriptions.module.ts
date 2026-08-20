@@ -12,9 +12,16 @@ import { SubscriptionsShowAddService } from './services/showAdd.service';
 import { SubscriptionsTableService } from './services/table.service';
 import { SubscriptionsService } from './subscriptions.service';
 import { SubscriptionStatusModule } from './status/subscription-status.module';
+import { RefundCandidatesModule } from './refund-candidates/refund-candidates.module';
 
 @Module({
-  imports: [HelpersModule, FieldEncryptionModule, SubscriptionStatusModule],
+  imports: [
+    HelpersModule,
+    FieldEncryptionModule,
+    SubscriptionStatusModule,
+    // Pausing a prepaid subscription raises refund candidates for the paused days.
+    RefundCandidatesModule,
+  ],
   controllers: [SubscriptionsController],
   providers: [
     SubscriptionsService,

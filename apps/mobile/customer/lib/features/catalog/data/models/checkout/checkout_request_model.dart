@@ -11,6 +11,9 @@ class CheckoutRequestModel extends CheckoutRequestEntity {
     super.subscriptionEndDate,
     super.subscriptionAutoRenew,
     super.couponCode,
+    super.razorpayOrderId,
+    super.razorpayPaymentId,
+    super.razorpaySignature,
   });
 
   Map<String, dynamic> toJson() {
@@ -56,6 +59,10 @@ class CheckoutRequestModel extends CheckoutRequestEntity {
       if (paymentType != null) 'payment_type': paymentType,
       if (couponCode != null && couponCode!.trim().isNotEmpty)
         'coupon_code': couponCode!.trim(),
+      // Online payment identifiers (only present for online/upi payments)
+      if (razorpayOrderId != null) 'razorpay_order_id': razorpayOrderId,
+      if (razorpayPaymentId != null) 'razorpay_payment_id': razorpayPaymentId,
+      if (razorpaySignature != null) 'razorpay_signature': razorpaySignature,
     };
   }
 }

@@ -42,6 +42,49 @@ export class RefundCandidatesController {
     return this.service.getCustomerGroups(query);
   }
 
+  // ─── Eligibility scan (month-wise calculation) ───────────────────────────────
+
+  /**
+   * POST /subscriptions/refund-candidates/scan
+   * Body/query: { month?: 'YYYY-MM', from?, to?, branch_id?, customer_id?, subscription_id? }
+   *
+   * Recalculates refundable pause days and failed subscription orders and
+   * materialises them as candidates. Idempotent — safe to re-run for a month.
+   */
+  @Post('scan')
+  async scan(@Body() body: any, @Query() query: any) {
+    return this.service.scan({ ...query, ...body });
+  }
+
+  /** GET /subscriptions/refund-candidates/scan/preview — calculate, write nothing. */
+  @Get('scan/preview')
+  async previewScan(@Query() query: any) {
+    return this.service.previewScan(query);
+  }
+
+  // ─── Review (Eligible → Reviewed) ────────────────────────────────────────────
+
+  /** POST /subscriptions/refund-candidates/bulk-review */
+  @Post('bulk-review')
+  async bulkReview(
+    @Body() body: { candidate_ids: string[]; notes?: string },
+    @Req() req: any,
+  ) {
+    const adminId = req.user?.user_id ?? 'system';
+    return this.service.bulkReview(body.candidate_ids ?? [], adminId, body.notes);
+  }
+
+  /** POST /subscriptions/refund-candidates/:id/review */
+  @Post(':id/review')
+  async reviewSingle(
+    @Param('id') id: string,
+    @Body() body: { notes?: string },
+    @Req() req: any,
+  ) {
+    const adminId = req.user?.user_id ?? 'system';
+    return this.service.reviewSingle(id, adminId, body?.notes);
+  }
+
   // ─── Payouts List ────────────────────────────────────────────────────────────
 
   /** GET /subscriptions/refund-candidates/payouts */
@@ -86,6 +129,14 @@ export class RefundCandidatesController {
   ) {
     const adminId = req.user?.user_id ?? 'system';
     return this.service.bulkReject(body.candidate_ids ?? [], adminId, body.notes);
+  }
+
+  // ─── Candidate Detail (review drawer) ────────────────────────────────────────
+
+  /** GET /subscriptions/refund-candidates/detail/:id */
+  @Get('detail/:id')
+  async getCandidateDetail(@Param('id') id: string) {
+    return this.service.getCandidateDetail(id);
   }
 
   // ─── Single Approve ───────────────────────────────────────────────────────────
