@@ -361,10 +361,8 @@ export class DeliveryOrderService {
   /**
    * Adds a delta to a customer's running container balance.
    *
-   * `customer_container_balances` carries no unique key on
-   * (customer_id, container_id), so this updates first and only inserts when
-   * no row was there. `balance_quantity` is a generated column and is never
-   * written directly.
+   * (customer_id, container_id) is unique, so this upserts in one statement.
+   * `balance_quantity` is a generated column and is never written directly.
    */
   private async applyBalanceDelta(
     executor: { query: (sql: string, params?: any[]) => Promise<any> },
@@ -372,35 +370,31 @@ export class DeliveryOrderService {
     containerId: string,
     delta: { issued?: number; returned?: number; damaged?: number; lost?: number },
   ): Promise<void> {
-    const issued = delta.issued ?? 0;
-    const returned = delta.returned ?? 0;
-    const damaged = delta.damaged ?? 0;
-    const lost = delta.lost ?? 0;
-
-    const updated = await executor.query(
-      `UPDATE customer_container_balances
-          SET issued_quantity   = COALESCE(issued_quantity, 0) + $3,
-              returned_quantity = COALESCE(returned_quantity, 0) + $4,
-              damaged_quantity  = COALESCE(damaged_quantity, 0) + $5,
-              lost_quantity     = COALESCE(lost_quantity, 0) + $6,
-              updated_at = NOW()
-        WHERE customer_id = $1 AND container_id = $2 AND deleted_at IS NULL
-        RETURNING id`,
-      [customerId, containerId, issued, returned, damaged, lost],
-    );
-
-    const affected = Array.isArray(updated) ? updated.length : (updated?.rowCount ?? 0);
-    if (affected) return;
-
     await executor.query(
       `INSERT INTO customer_container_balances (
          customer_id, container_id, issued_quantity, returned_quantity,
          damaged_quantity, lost_quantity, updated_at
-       ) VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-      [customerId, containerId, issued, returned, damaged, lost],
+       ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+       ON CONFLICT (customer_id, container_id) DO UPDATE SET
+         issued_quantity   = customer_container_balances.issued_quantity + EXCLUDED.issued_quantity,
+         returned_quantity = customer_container_balances.returned_quantity + EXCLUDED.returned_quantity,
+         damaged_quantity  = customer_container_balances.damaged_quantity + EXCLUDED.damaged_quantity,
+         lost_quantity     = customer_container_balances.lost_quantity + EXCLUDED.lost_quantity,
+         updated_at = NOW()`,
+      [
+        customerId,
+        containerId,
+        delta.issued ?? 0,
+        delta.returned ?? 0,
+        delta.damaged ?? 0,
+        delta.lost ?? 0,
+      ],
     );
   }
 
+  /**
+   * Bottle returns are container returns against the default bottle container.
+   */
   async handleBottleReturn(
     executor: { query: (sql: string, params?: any[]) => Promise<any> },
     params: {

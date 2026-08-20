@@ -228,33 +228,24 @@ export class PackageService {
           action === 'damaged' ? 'damaged_quantity' :
           'lost_quantity';
 
-        // No unique key covers (customer_id, container_id), so this is an
-        // update-then-insert rather than an upsert. `balance_quantity` is a
-        // generated column and is never written directly.
-        const updated = await client.query(
-          `UPDATE customer_container_balances
-             SET ${col} = COALESCE(${col}, 0) + $3,
-                 updated_at = NOW()
-           WHERE customer_id = $1 AND container_id = $2 AND deleted_at IS NULL
-           RETURNING id`,
-          [customer_id, container_type_id, qty],
+        // (customer_id, container_id) is unique, so this upserts atomically.
+        // `balance_quantity` is a generated column and is never written directly.
+        await client.query(
+          `INSERT INTO customer_container_balances (
+            customer_id, container_id, issued_quantity, returned_quantity,
+            damaged_quantity, lost_quantity, updated_at
+          ) VALUES ($1, $2, 0, $3, $4, $5, NOW())
+          ON CONFLICT (customer_id, container_id) DO UPDATE SET
+            ${col} = customer_container_balances.${col} + EXCLUDED.${col},
+            updated_at = NOW()`,
+          [
+            customer_id,
+            container_type_id,
+            action === 'returned' ? qty : 0,
+            action === 'damaged' ? qty : 0,
+            action === 'lost' ? qty : 0,
+          ],
         );
-
-        if (!updated?.rowCount) {
-          await client.query(
-            `INSERT INTO customer_container_balances (
-              customer_id, container_id, issued_quantity, returned_quantity,
-              damaged_quantity, lost_quantity, updated_at
-            ) VALUES ($1, $2, 0, $3, $4, $5, NOW())`,
-            [
-              customer_id,
-              container_type_id,
-              action === 'returned' ? qty : 0,
-              action === 'damaged' ? qty : 0,
-              action === 'lost' ? qty : 0,
-            ],
-          );
-        }
       });
 
       return {

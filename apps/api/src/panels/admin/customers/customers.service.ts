@@ -1677,28 +1677,19 @@ export class CustomersService {
       const lostAdd = transaction_type === 'lost' ? qty : 0;
 
       // Only the running balance is kept now; there is no per-transaction
-      // ledger table. No unique key covers (customer_id, container_id), so
-      // this is an update-then-insert rather than an upsert.
-      const updated = await this.databaseService.query(
-        `UPDATE customer_container_balances
-            SET issued_quantity   = COALESCE(issued_quantity, 0) + ?,
-                returned_quantity = COALESCE(returned_quantity, 0) + ?,
-                damaged_quantity  = COALESCE(damaged_quantity, 0) + ?,
-                lost_quantity     = COALESCE(lost_quantity, 0) + ?,
-                updated_at = NOW()
-          WHERE customer_id = ? AND container_id = ? AND deleted_at IS NULL
-          RETURNING id`,
-        [issueAdd, returnAdd, damagedAdd, lostAdd, customerId, packaging_type_id]
+      // ledger table. (customer_id, container_id) is unique, so this upserts.
+      await this.databaseService.query(
+        `INSERT INTO customer_container_balances 
+         (customer_id, container_id, issued_quantity, returned_quantity, damaged_quantity, lost_quantity)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (customer_id, container_id) DO UPDATE SET
+           issued_quantity   = customer_container_balances.issued_quantity + EXCLUDED.issued_quantity,
+           returned_quantity = customer_container_balances.returned_quantity + EXCLUDED.returned_quantity,
+           damaged_quantity  = customer_container_balances.damaged_quantity + EXCLUDED.damaged_quantity,
+           lost_quantity     = customer_container_balances.lost_quantity + EXCLUDED.lost_quantity,
+           updated_at = NOW()`,
+        [customerId, packaging_type_id, issueAdd, returnAdd, damagedAdd, lostAdd]
       );
-
-      if (!updated?.length) {
-        await this.databaseService.query(
-          `INSERT INTO customer_container_balances 
-           (customer_id, container_id, issued_quantity, returned_quantity, damaged_quantity, lost_quantity)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [customerId, packaging_type_id, issueAdd, returnAdd, damagedAdd, lostAdd]
-        );
-      }
 
       return { status: true, message: 'Container transaction logged successfully' };
     } catch (error) {

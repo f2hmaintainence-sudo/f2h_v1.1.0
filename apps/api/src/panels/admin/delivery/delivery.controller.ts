@@ -99,7 +99,7 @@ export class DeliveryManagementController {
   }
 
   /**
-   * Partners currently on shift.
+   * Active partners and their current availability.
    *
    * Declared above `partners/:id` on purpose — Nest matches routes in
    * declaration order, so a literal segment registered after the parameterised

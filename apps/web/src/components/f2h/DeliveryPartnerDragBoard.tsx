@@ -126,10 +126,28 @@ export default function DeliveryPartnerDragBoard({
     return allPartners.find((p) => p.delivery_partner_id === partnerAId) || null;
   }, [allPartners, partnerAId]);
 
-  // Filter available partners for Partner B:
-  // MUST be in the SAME branch as Partner A and not equal to Partner A
+  // Determine Partner B data
+  const partnerB = useMemo(() => {
+    return allPartners.find((p) => p.delivery_partner_id === partnerBId) || null;
+  }, [allPartners, partnerBId]);
+
+  // Eligible partners for A:
+  // If Partner B is selected, filter to only show partners from Partner B's branch
+  // Otherwise, allow selecting ANY partner across all branches
+  const eligiblePartnersForA = useMemo(() => {
+    if (!partnerB) return allPartners;
+    return allPartners.filter(
+      (p) =>
+        p.delivery_partner_id !== partnerB.delivery_partner_id &&
+        (!partnerB.branch_id || p.branch_id === partnerB.branch_id)
+    );
+  }, [allPartners, partnerB]);
+
+  // Eligible partners for B:
+  // If Partner A is selected, filter to only show partners from Partner A's branch
+  // Otherwise, allow selecting ANY partner across all branches
   const eligiblePartnersForB = useMemo(() => {
-    if (!partnerA) return [];
+    if (!partnerA) return allPartners;
     return allPartners.filter(
       (p) =>
         p.delivery_partner_id !== partnerA.delivery_partner_id &&
@@ -137,37 +155,63 @@ export default function DeliveryPartnerDragBoard({
     );
   }, [allPartners, partnerA]);
 
-  // Auto-select Partner A & B defaults when partners load
+  // Auto-select initial defaults only once when data first arrives and neither is set
   useEffect(() => {
-    if (allPartners.length > 0) {
-      if (!partnerAId || !allPartners.some((p) => p.delivery_partner_id === partnerAId)) {
-        // Prefer partner with an active run
-        const withRun = allPartners.find((p) => p.run_id);
-        setPartnerAId(withRun ? withRun.delivery_partner_id : allPartners[0].delivery_partner_id);
+    if (allPartners.length > 0 && !partnerAId && !partnerBId) {
+      // Pick first partner with an active run (or first partner)
+      const withRun = allPartners.find((p) => p.run_id) || allPartners[0];
+      setPartnerAId(withRun.delivery_partner_id);
+
+      // Find another partner in the same branch for Partner B
+      const sameBranch = allPartners.filter(
+        (p) =>
+          p.delivery_partner_id !== withRun.delivery_partner_id &&
+          (!withRun.branch_id || p.branch_id === withRun.branch_id)
+      );
+      if (sameBranch.length > 0) {
+        const bWithRun = sameBranch.find((p) => p.run_id) || sameBranch[0];
+        setPartnerBId(bWithRun.delivery_partner_id);
       }
     }
-  }, [allPartners, partnerAId]);
+  }, [allPartners, partnerAId, partnerBId]);
 
-  // Adjust Partner B when Partner A changes or when eligible partners update
-  useEffect(() => {
-    if (partnerA) {
-      if (!partnerBId || !eligiblePartnersForB.some((p) => p.delivery_partner_id === partnerBId)) {
-        if (eligiblePartnersForB.length > 0) {
-          // Prefer another partner in same branch with a run or first available
-          const withRun = eligiblePartnersForB.find((p) => p.run_id);
-          setPartnerBId(withRun ? withRun.delivery_partner_id : eligiblePartnersForB[0].delivery_partner_id);
-        } else {
-          setPartnerBId("");
-        }
-      }
-    } else {
+  // Handler for Partner A Selection
+  const handleSelectPartnerA = (newId: string) => {
+    setPartnerAId(newId);
+    if (!newId) return;
+
+    const selected = allPartners.find((p) => p.delivery_partner_id === newId);
+    if (!selected) return;
+
+    // If Partner B was already chosen and is from a DIFFERENT branch (or is the exact same partner),
+    // clear Partner B so the admin can pick from Partner A's branch
+    if (
+      partnerB &&
+      (partnerB.delivery_partner_id === newId ||
+        (partnerB.branch_id && selected.branch_id && partnerB.branch_id !== selected.branch_id))
+    ) {
       setPartnerBId("");
     }
-  }, [partnerA, eligiblePartnersForB, partnerBId]);
+  };
 
-  const partnerB = useMemo(() => {
-    return allPartners.find((p) => p.delivery_partner_id === partnerBId) || null;
-  }, [allPartners, partnerBId]);
+  // Handler for Partner B Selection
+  const handleSelectPartnerB = (newId: string) => {
+    setPartnerBId(newId);
+    if (!newId) return;
+
+    const selected = allPartners.find((p) => p.delivery_partner_id === newId);
+    if (!selected) return;
+
+    // If Partner A was already chosen and is from a DIFFERENT branch (or is the exact same partner),
+    // clear Partner A so the admin can pick from Partner B's branch
+    if (
+      partnerA &&
+      (partnerA.delivery_partner_id === newId ||
+        (partnerA.branch_id && selected.branch_id && partnerA.branch_id !== selected.branch_id))
+    ) {
+      setPartnerAId("");
+    }
+  };
 
   const getStops = (partner: PartnerWithStops | null): AddressStop[] => {
     if (!partner || !partner.address_stops) return [];
@@ -364,7 +408,7 @@ export default function DeliveryPartnerDragBoard({
               </span>
             </h2>
             <p className="text-xs text-slate-500 mt-0.5 max-w-2xl leading-relaxed">
-              Select <strong className="text-slate-800 font-bold">Partner A</strong> to view their run. Partner B will automatically list all delivery partners from the <strong className="text-indigo-700 font-bold">same branch</strong>. Drag any <strong className="text-amber-700 font-bold">pending</strong> address card across to move or swap stops.
+              Select either <strong className="text-slate-800 font-bold">Partner A</strong> or <strong className="text-emerald-800 font-bold">Partner B</strong> first. The other partner dropdown will automatically filter to delivery partners from the <strong className="text-indigo-700 font-bold">same branch</strong>. Drag any <strong className="text-amber-700 font-bold">pending</strong> address card across to move or swap stops.
             </p>
           </div>
         </div>
@@ -411,41 +455,61 @@ export default function DeliveryPartnerDragBoard({
           <div className="p-4 bg-slate-50/80 border-b border-slate-200 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <span className="px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-800 text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5">
-                <Truck size={13} /> Partner A
+                <Truck size={13} /> Partner A {partnerB ? `(${partnerB.branch_name || "Same Branch"})` : ""}
               </span>
               {partnerA?.run_id ? (
                 <span className="font-mono text-xs font-black text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200">
                   {partnerA.run_id}
                 </span>
-              ) : (
+              ) : partnerA ? (
                 <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60">
                   No Run Assigned
                 </span>
-              )}
+              ) : null}
             </div>
 
-            {/* Partner A Selector Dropdown (All Active Partners) */}
+            {/* Partner A Selector Dropdown (Bidirectional: filtered if Partner B is selected) */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-600 flex items-center justify-between">
-                <span>Select Partner A:</span>
-                <span className="text-[10px] font-semibold text-slate-400">
-                  {allPartners.length} Total Partner{allPartners.length === 1 ? "" : "s"}
-                </span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5">
+                  <span>Select Partner A:</span>
+                  {partnerB && (
+                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200/60">
+                      {partnerB.branch_name} Branch
+                    </span>
+                  )}
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-semibold text-slate-500">
+                    {eligiblePartnersForA.length} Partner{eligiblePartnersForA.length === 1 ? "" : "s"}
+                  </span>
+                  {partnerAId && (
+                    <button
+                      type="button"
+                      onClick={() => setPartnerAId("")}
+                      className="text-[10px] text-rose-500 hover:text-rose-700 font-bold underline cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
               <select
                 value={partnerAId}
-                onChange={(e) => setPartnerAId(e.target.value)}
+                onChange={(e) => handleSelectPartnerA(e.target.value)}
                 className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:border-indigo-600 shadow-2xs"
               >
-                <option value="" disabled>
-                  Select a delivery partner
+                <option value="">
+                  {partnerB
+                    ? `-- Select Partner in ${partnerB.branch_name} (${eligiblePartnersForA.length}) --`
+                    : "-- Select any Partner A --"}
                 </option>
-                {allPartners.map((p) => {
+                {eligiblePartnersForA.map((p) => {
                   const hasRun = Boolean(p.run_id);
                   const stopsCount = p.address_stops?.length || 0;
                   return (
                     <option key={p.delivery_partner_id} value={p.delivery_partner_id}>
-                      {p.partner_name} ({p.branch_name || "No Branch"}) {hasRun ? `• ${stopsCount} stops` : "• No run"}
+                      {p.partner_name} ({p.branch_name || "No Branch"}) {hasRun ? `• ${stopsCount} stops (${p.run_id})` : "• No run"}
                     </option>
                   );
                 })}
@@ -618,53 +682,64 @@ export default function DeliveryPartnerDragBoard({
           <div className="p-4 bg-slate-50/80 border-b border-slate-200 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <span className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5">
-                <Truck size={13} /> Partner B (Same Branch)
+                <Truck size={13} /> Partner B {partnerA ? `(${partnerA.branch_name || "Same Branch"})` : ""}
               </span>
               {partnerB?.run_id ? (
                 <span className="font-mono text-xs font-black text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200">
                   {partnerB.run_id}
                 </span>
-              ) : (
+              ) : partnerB ? (
                 <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
                   Ready for Drop / Auto-Create Run
                 </span>
-              )}
+              ) : null}
             </div>
 
-            {/* Partner B Selector Dropdown (Filtered to Partner A's Branch) */}
+            {/* Partner B Selector Dropdown (Bidirectional: filtered if Partner A is selected) */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-600 flex items-center justify-between">
-                <span>Select Partner B:</span>
-                <span className="text-[10px] font-semibold text-indigo-600">
-                  {partnerA ? `${partnerA.branch_name || "Branch"} Partners (${eligiblePartnersForB.length})` : "Choose Partner A first"}
-                </span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5">
+                  <span>Select Partner B:</span>
+                  {partnerA && (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60">
+                      {partnerA.branch_name} Branch
+                    </span>
+                  )}
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-semibold text-slate-500">
+                    {eligiblePartnersForB.length} Partner{eligiblePartnersForB.length === 1 ? "" : "s"}
+                  </span>
+                  {partnerBId && (
+                    <button
+                      type="button"
+                      onClick={() => setPartnerBId("")}
+                      className="text-[10px] text-rose-500 hover:text-rose-700 font-bold underline cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
               <select
                 value={partnerBId}
-                disabled={!partnerA || eligiblePartnersForB.length === 0}
-                onChange={(e) => setPartnerBId(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:border-indigo-600 shadow-2xs disabled:bg-slate-100 disabled:text-slate-400"
+                onChange={(e) => handleSelectPartnerB(e.target.value)}
+                className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:border-indigo-600 shadow-2xs"
               >
-                {!partnerA ? (
-                  <option value="">Please select Partner A first</option>
-                ) : eligiblePartnersForB.length === 0 ? (
-                  <option value="">No other partners in {partnerA.branch_name || "this"} branch</option>
-                ) : (
-                  <>
-                    <option value="" disabled>
-                      Select a partner in {partnerA.branch_name}
+                <option value="">
+                  {partnerA
+                    ? `-- Select Partner in ${partnerA.branch_name} (${eligiblePartnersForB.length}) --`
+                    : "-- Select any Partner B --"}
+                </option>
+                {eligiblePartnersForB.map((p) => {
+                  const hasRun = Boolean(p.run_id);
+                  const stopsCount = p.address_stops?.length || 0;
+                  return (
+                    <option key={p.delivery_partner_id} value={p.delivery_partner_id}>
+                      {p.partner_name} ({p.branch_name || "No Branch"}) {hasRun ? `• ${stopsCount} stops (${p.run_id})` : "• No run (Ready for Drop)"}
                     </option>
-                    {eligiblePartnersForB.map((p) => {
-                      const hasRun = Boolean(p.run_id);
-                      const stopsCount = p.address_stops?.length || 0;
-                      return (
-                        <option key={p.delivery_partner_id} value={p.delivery_partner_id}>
-                          {p.partner_name} {hasRun ? `(Run: ${p.run_id} • ${stopsCount} stops)` : "(Ready for New Run)"}
-                        </option>
-                      );
-                    })}
-                  </>
-                )}
+                  );
+                })}
               </select>
             </div>
 
@@ -692,7 +767,7 @@ export default function DeliveryPartnerDragBoard({
               </div>
             ) : (
               <p className="text-xs text-slate-400 italic">
-                {partnerA ? `Select a partner from ${partnerA.branch_name}` : "Select Partner A first"}
+                {partnerA ? `Please select a delivery partner from ${partnerA.branch_name}` : "Select any Partner B or Partner A"}
               </p>
             )}
 
@@ -717,7 +792,7 @@ export default function DeliveryPartnerDragBoard({
               <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400 space-y-2">
                 <Users size={32} className="stroke-1 text-slate-300" />
                 <p className="text-xs font-semibold">
-                  {partnerA ? `Select Partner B from ${partnerA.branch_name}` : "Select Partner A first"}
+                  {partnerA ? `Select Partner B from ${partnerA.branch_name} to compare runs.` : "Select Partner B to load assigned address stops."}
                 </p>
               </div>
             ) : !partnerB.run_id ? (

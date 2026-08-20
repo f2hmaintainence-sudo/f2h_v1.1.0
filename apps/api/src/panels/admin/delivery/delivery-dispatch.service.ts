@@ -74,16 +74,22 @@ export class DeliveryDispatchService {
             );
           }
 
-          // 2. Create delivery_dispatch_items record
+          // 2. Create or refresh the delivery_dispatch_items record.
+          // The unique index on (delivery_run_id, product_variant_id) is
+          // partial, so the conflict target must repeat its WHERE clause.
           const insertResult = await client.query(
             `INSERT INTO delivery_dispatch_items
               (dispatch_id, warehouse_id, delivery_run_id, product_variant_id,
                planned_qty, loaded_qty, unit, created_at, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-            ON CONFLICT (delivery_run_id, product_variant_id) DO UPDATE SET
-              loaded_qty = EXCLUDED.loaded_qty,
-              planned_qty = EXCLUDED.planned_qty,
-              updated_at = NOW()
+            ON CONFLICT (delivery_run_id, product_variant_id) WHERE deleted_at IS NULL
+            DO UPDATE SET
+              dispatch_id  = EXCLUDED.dispatch_id,
+              warehouse_id = EXCLUDED.warehouse_id,
+              loaded_qty   = EXCLUDED.loaded_qty,
+              planned_qty  = EXCLUDED.planned_qty,
+              unit         = EXCLUDED.unit,
+              updated_at   = NOW()
             RETURNING *`,
             [
               dispatchId, item.warehouse_id, run.run_id, item.product_variant_id,

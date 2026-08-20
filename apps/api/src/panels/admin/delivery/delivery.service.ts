@@ -577,7 +577,7 @@ export class DeliveryManagementService {
    * load so every partner marker appears on the map before WebSocket takes over.
    */
   /**
-   * Delivery partners who are currently online, with everything the admin needs
+   * Active delivery partners with their current availability state.
    * to act on them in one payload.
    *
    * Kept separate from `getPartners` deliberately: that list is a roster and is
@@ -711,7 +711,7 @@ export class DeliveryManagementService {
            ORDER BY r.created_at DESC LIMIT 1
         ) run ON TRUE
         WHERE dp.deleted_at IS NULL
-          AND dp.is_online = true
+          AND dp.is_active = true
           ${branchFilter}
         ORDER BY dp.last_location_at DESC NULLS LAST
       `;
@@ -750,7 +750,7 @@ export class DeliveryManagementService {
         status: true,
         data: partners,
         summary: {
-          total_online: partners.length,
+          total_online: partners.filter((p) => p.is_online).length,
           on_duty: partners.filter((p) => p.duty_status === 'on_duty').length,
           available: partners.filter((p) => p.is_available).length,
           online_while_on_leave: partners.filter((p) => p.on_leave_today).length,
@@ -761,7 +761,7 @@ export class DeliveryManagementService {
     } catch (error) {
       this.developer.error('getOnlinePartners error', { error });
       throw new InternalServerErrorException(
-        'Failed to retrieve online delivery partners',
+        'Failed to retrieve partner availability',
       );
     }
   }
