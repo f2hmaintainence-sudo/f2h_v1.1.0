@@ -90,7 +90,8 @@ export class DeliveryDispatchService {
         );
 
         for (const item of items) {
-          const loadedQty = item.loaded_qty || item.planned_qty;
+          const plannedQty = Number(item.planned_qty ?? 0);
+          const loadedQty = item.loaded_qty !== undefined ? Number(item.loaded_qty) : plannedQty;
 
           // 1. Validate warehouse stock
           const stock = await this.stockCore.getLockedStockBalance(
@@ -124,7 +125,7 @@ export class DeliveryDispatchService {
             RETURNING *`,
             [
               activeDispatchId, item.warehouse_id, run.run_id, item.product_variant_id,
-              item.planned_qty, loadedQty, item.unit || 'pcs',
+              plannedQty, loadedQty, item.unit || 'pcs',
             ],
           );
 
@@ -137,7 +138,7 @@ export class DeliveryDispatchService {
             quantity: loadedQty,
             reference_type: 'delivery_run',
             reference_id: runId,
-            notes: `Dispatch to delivery boy for run ${run.run_id || runId}`,
+            notes: `Dispatch to delivery boy for run ${run.run_id || runId} (planned: ${plannedQty}, loaded: ${loadedQty})`,
             created_by: adminId,
           });
 

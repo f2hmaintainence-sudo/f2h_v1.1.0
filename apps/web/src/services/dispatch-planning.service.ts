@@ -366,13 +366,17 @@ export class DispatchPlanningService {
    * Dispatches the stock for a delivery run
    */
   static async approveDispatch(runDbId: number, warehouseId: string, totals: Record<string, DispatchItem>): Promise<any> {
-    const items = Object.values(totals).map(t => ({
-      warehouse_id: warehouseId,
-      product_variant_id: t.product_variant_id,
-      planned_qty: t.quantity,
-      loaded_qty: t.quantity,
-      unit: t.unit_type
-    }));
+    const items = Object.values(totals).map((t) => {
+      const planned = t.planned_qty !== undefined ? Number(t.planned_qty) : (t.orderCount === 0 ? 0 : Number(t.quantity || 0));
+      const loaded = t.loaded_qty !== undefined ? Number(t.loaded_qty) : Number(t.quantity || 0);
+      return {
+        warehouse_id: warehouseId,
+        product_variant_id: t.product_variant_id,
+        planned_qty: planned,
+        loaded_qty: loaded,
+        unit: t.unit_type || "pcs",
+      };
+    });
 
     return api.post<any>(`/admin/delivery/dispatch/${runDbId}`, { items });
   }

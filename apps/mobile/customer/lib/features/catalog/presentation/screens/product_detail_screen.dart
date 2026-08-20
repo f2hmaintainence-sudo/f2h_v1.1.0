@@ -398,50 +398,54 @@ class _SidebarItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Icon circle ──────────────────────
+            // ── Icon circle / squircle ──────────────────────
             AnimatedScale(
-              scale: isSelected ? 1.08 : 1.0,
+              scale: isSelected ? 1.05 : 1.0,
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeOutBack,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                width: 48,
-                height: 48,
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
                   color: isAll
-                      ? (isSelected ? kPrimary : const Color(0xFFFAFBF9))
-                      : Colors.white,
-                  shape: BoxShape.circle,
+                      ? kPrimary
+                      : (isSelected ? Colors.white : Colors.white),
+                  borderRadius: isAll
+                      ? BorderRadius.circular(16)
+                      : BorderRadius.circular(26),
+                  shape: BoxShape.rectangle,
                   border: Border.all(
                     color: isSelected ? kPrimary : const Color(0xFFEBEFF0),
-                    width: isSelected ? 1.5 : 1.0,
+                    width: isSelected ? 2.0 : 1.0,
                   ),
                   boxShadow: [
                     BoxShadow(
                       color: isSelected
-                          ? kPrimary.withValues(alpha: 0.10)
-                          : Colors.black.withValues(alpha: 0.02),
+                          ? kPrimary.withValues(alpha: 0.15)
+                          : Colors.black.withValues(alpha: 0.03),
                       blurRadius: isSelected ? 8 : 4,
                       offset: const Offset(0, 2),
                     ),
                   ],
                 ),
                 child: isAll
-                    ? Center(
+                    ? const Center(
                         child: Icon(
                           Icons.grid_view_rounded,
-                          color: isSelected ? Colors.white : kPrimary,
-                          size: 24,
+                          color: Colors.white,
+                          size: 26,
                         ),
                       )
                     : (imagePath != null && imagePath.isNotEmpty
-                          ? ClipOval(
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
                               child: Padding(
                                 padding: const EdgeInsets.all(2),
                                 child: buildProductImage(
                                   catName,
                                   imageAsset: imagePath,
-                                  fit: BoxFit.contain,
+                                  fit: BoxFit.cover,
                                 ),
                               ),
                             )
@@ -449,12 +453,12 @@ class _SidebarItem extends StatelessWidget {
                               child: Icon(
                                 Icons.shopping_bag_outlined,
                                 color: kPrimary,
-                                size: 20,
+                                size: 22,
                               ),
                             )),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 5),
             // ── Label ────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -465,9 +469,9 @@ class _SidebarItem extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 10.5,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
                   color: isSelected ? kPrimary : kText,
-                  height: 1.2,
+                  height: 1.15,
                 ),
               ),
             ),

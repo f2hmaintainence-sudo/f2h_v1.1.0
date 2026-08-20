@@ -1222,7 +1222,17 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
       return;
     }
     setActivePlanForModal(plan);
-    setModalItems(Object.values(plan.totals || {}).map((item) => ({ ...item, planned_qty: item.quantity, loaded_qty: item.quantity })));
+    setModalItems(
+      Object.values(plan.totals || {}).map((item) => {
+        const planned = item.planned_qty !== undefined ? Number(item.planned_qty) : (item.orderCount === 0 ? 0 : Number(item.quantity || 0));
+        const loaded = item.loaded_qty !== undefined ? Number(item.loaded_qty) : Number(item.quantity || 0);
+        return {
+          ...item,
+          planned_qty: planned,
+          loaded_qty: loaded,
+        };
+      })
+    );
     setSelectedVariantToAdd("");
     setQtyToAdd(1);
     setSearchQueryVariant("");
@@ -1237,7 +1247,16 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
       const updatedTotals: Record<string, any> = {};
       modalItems.forEach((item) => {
         const key = `${item.product_name.trim()}::${item.variant_name.trim()}`;
-        updatedTotals[key] = { ...item, quantity: item.loaded_qty };
+        const planned = Number(item.planned_qty || 0);
+        const loaded = Number(item.loaded_qty || 0);
+        const extra = Math.max(0, loaded - planned);
+        updatedTotals[key] = {
+          ...item,
+          planned_qty: planned,
+          loaded_qty: loaded,
+          extra_qty: extra,
+          quantity: loaded,
+        };
       });
       const res = await DispatchPlanningService.approveDispatch(
         activePlanForModal.id,
@@ -1247,7 +1266,15 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
       if (res && res.error) { showErrorToast(res.error); return; }
       showSuccessToast(`Dispatch approved for ${activePlanForModal.delivery_partner_name}!`);
       setPlans((prev) => prev.map((p) => p.run_id === activePlanForModal.run_id
-        ? { ...p, status: "dispatched", totals: updatedTotals, totalQuantity: modalItems.reduce((s, i) => s + Number(i.loaded_qty || 0), 0), totalProducts: modalItems.length }
+        ? {
+            ...p,
+            status: "dispatched",
+            totals: updatedTotals,
+            totalQuantity: modalItems.reduce((s, i) => s + Number(i.loaded_qty || 0), 0),
+            totalPlannedQty: modalItems.reduce((s, i) => s + Number(i.planned_qty || 0), 0),
+            totalExtraQty: modalItems.reduce((s, i) => s + Math.max(0, Number(i.loaded_qty || 0) - Number(i.planned_qty || 0)), 0),
+            totalProducts: modalItems.length,
+          }
         : p
       ));
     } catch (err: any) {
@@ -1823,39 +1850,82 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
                         <tr className="bg-slate-50/80 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
                           <th className="px-4 py-3">Product</th>
                           <th className="px-4 py-3">Variant</th>
-                          <th className="px-4 py-3 text-center w-20">Planned</th>
-                          <th className="px-4 py-3 text-center w-40">Issue Qty</th>
+                          <th className="px-4 py-3 text-center w-24">Required</th>
+                          <th className="px-4 py-3 text-center w-36">Loaded Qty</th>
+                          <th className="px-4 py-3 text-center w-28">Extra Stock</th>
                           <th className="px-4 py-3 w-10" />
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                        {modalItems.map((item, idx) => (
-                          <tr key={item.product_variant_id || idx} className="hover:bg-slate-50/40 transition-colors">
-                            <td className="px-4 py-3.5 font-semibold text-slate-800">{item.product_name}</td>
-                            <td className="px-4 py-3.5 text-slate-500 font-medium">{item.variant_name || "—"}</td>
-                            <td className="px-4 py-3.5 text-center font-black text-slate-500">{item.planned_qty || 0}</td>
-                            <td className="px-4 py-3.5 text-center">
-                              <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-                                <button type="button" onClick={() => setModalItems((prev) => prev.map((mi) => mi.product_variant_id === item.product_variant_id ? { ...mi, loaded_qty: Math.max(0, (mi.loaded_qty || 0) - 1) } : mi))}
-                                  className="w-8 h-8 flex items-center justify-center text-slate-600 font-black hover:bg-slate-100 border-r border-slate-200 text-sm active:scale-90 transition-all">−</button>
-                                <input type="number" min="0" value={item.loaded_qty}
-                                  onChange={(e) => {
-                                    const val = Math.max(0, parseInt(e.target.value, 10) || 0);
-                                    setModalItems((prev) => prev.map((mi) => mi.product_variant_id === item.product_variant_id ? { ...mi, loaded_qty: val } : mi));
-                                  }}
-                                  className="w-12 h-8 text-center font-black text-slate-800 bg-white outline-none text-sm border-none" />
-                                <button type="button" onClick={() => setModalItems((prev) => prev.map((mi) => mi.product_variant_id === item.product_variant_id ? { ...mi, loaded_qty: (mi.loaded_qty || 0) + 1 } : mi))}
-                                  className="w-8 h-8 flex items-center justify-center text-slate-600 font-black hover:bg-slate-100 border-l border-slate-200 text-sm active:scale-90 transition-all">+</button>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3.5 text-center">
-                              <button onClick={() => setModalItems((prev) => prev.filter((mi) => mi.product_variant_id !== item.product_variant_id))}
-                                className="p-1.5 text-rose-400 hover:bg-rose-50 rounded-xl transition-all hover:scale-110 active:scale-90">
-                                <Trash2 size={13} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                        {modalItems.map((item, idx) => {
+                          const planned = Number(item.planned_qty || 0);
+                          const loaded = Number(item.loaded_qty || 0);
+                          const extra = loaded - planned;
+                          const hasExtra = extra > 0;
+                          const isShort = extra < 0;
+
+                          return (
+                            <tr key={item.product_variant_id || idx} className={`hover:bg-slate-50/40 transition-colors ${hasExtra ? "bg-amber-50/30" : isShort ? "bg-rose-50/30" : ""}`}>
+                              <td className="px-4 py-3.5 font-semibold text-slate-800">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span>{item.product_name}</span>
+                                  {planned === 0 && (
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-purple-100 text-purple-800 border border-purple-200 uppercase">
+                                      Extra Added
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3.5 text-slate-500 font-medium">{item.variant_name || "—"}</td>
+                              <td className="px-4 py-3.5 text-center font-black text-slate-600">
+                                {planned > 0 ? (
+                                  <span className="inline-flex px-2 py-0.5 bg-slate-100 text-slate-800 rounded-md font-bold">
+                                    {planned}
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex px-2 py-0.5 bg-slate-100 text-slate-400 font-semibold rounded-md text-[10px]">
+                                    0 (None)
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3.5 text-center">
+                                <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                                  <button type="button" onClick={() => setModalItems((prev) => prev.map((mi) => mi.product_variant_id === item.product_variant_id ? { ...mi, loaded_qty: Math.max(0, (mi.loaded_qty || 0) - 1) } : mi))}
+                                    className="w-8 h-8 flex items-center justify-center text-slate-600 font-black hover:bg-slate-100 border-r border-slate-200 text-sm active:scale-90 transition-all">−</button>
+                                  <input type="number" min="0" value={item.loaded_qty}
+                                    onChange={(e) => {
+                                      const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                                      setModalItems((prev) => prev.map((mi) => mi.product_variant_id === item.product_variant_id ? { ...mi, loaded_qty: val } : mi));
+                                    }}
+                                    className="w-12 h-8 text-center font-black text-slate-800 bg-white outline-none text-sm border-none" />
+                                  <button type="button" onClick={() => setModalItems((prev) => prev.map((mi) => mi.product_variant_id === item.product_variant_id ? { ...mi, loaded_qty: (mi.loaded_qty || 0) + 1 } : mi))}
+                                    className="w-8 h-8 flex items-center justify-center text-slate-600 font-black hover:bg-slate-100 border-l border-slate-200 text-sm active:scale-90 transition-all">+</button>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3.5 text-center">
+                                {hasExtra ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100 text-amber-900 border border-amber-300 rounded-xl font-black text-[11px] shadow-2xs">
+                                    +{extra} Extra
+                                  </span>
+                                ) : isShort ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-100 text-rose-800 border border-rose-200 rounded-xl font-black text-[11px]">
+                                    {extra} Short
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center px-2 py-0.5 text-slate-400 font-bold text-[11px]">
+                                    Exact
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3.5 text-center">
+                                <button onClick={() => setModalItems((prev) => prev.filter((mi) => mi.product_variant_id !== item.product_variant_id))}
+                                  className="p-1.5 text-rose-400 hover:bg-rose-50 rounded-xl transition-all hover:scale-110 active:scale-90">
+                                  <Trash2 size={13} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -1948,10 +2018,20 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
               </div>
             </div>
 
-            <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between gap-3 shrink-0">
-              <p className="text-[11px] text-slate-400 font-medium hidden sm:block">
-                {modalItems.length} items · {modalItems.reduce((s, i) => s + Number(i.loaded_qty || 0), 0)} total units to issue
-              </p>
+            <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-3 flex-wrap">
+                <p className="text-xs text-slate-500 font-medium">
+                  <strong>{modalItems.reduce((s, i) => s + Number(i.planned_qty || 0), 0)}</strong> required · <strong className="text-emerald-700">{modalItems.reduce((s, i) => s + Number(i.loaded_qty || 0), 0)}</strong> total to issue
+                </p>
+                {(() => {
+                  const totalExtra = modalItems.reduce((s, i) => s + Math.max(0, Number(i.loaded_qty || 0) - Number(i.planned_qty || 0)), 0);
+                  return totalExtra > 0 ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-full text-[11px] font-black shadow-2xs">
+                      <Sparkles size={11} className="text-amber-700" /> +{totalExtra} Extra Loaded
+                    </span>
+                  ) : null;
+                })()}
+              </div>
               <div className="flex items-center gap-2 ml-auto">
                 <button onClick={() => { setIsApproveModalOpen(false); setActivePlanForModal(null); }}
                   className="px-4 py-2.5 border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95">

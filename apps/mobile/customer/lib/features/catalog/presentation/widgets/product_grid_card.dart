@@ -109,7 +109,14 @@ class ProductGridCard extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            if (showSubscribe && subPrice != null) ...[
+              const SizedBox(height: 5),
+              _SubscriptionPillButton(
+                product: product,
+                subscriptionPrice: subPrice,
+              ),
+            ],
+            const SizedBox(height: 6),
             Text(
               product.name,
               maxLines: 2,
@@ -123,17 +130,12 @@ class ProductGridCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 3),
-            _UnitLine(unit: unit, showSubscribeHint: showSubscribe),
+            _UnitLine(unit: unit, showSubscribeHint: false),
             const SizedBox(height: 6),
-            if (showSubscribe && subPrice != null)
-              _SubscriptionPriceRow(
-                product: product,
-                subscriptionPrice: subPrice,
-              ),
             _PriceRow(
               price: product.price,
               originalPrice: product.originalPrice,
-              muted: showSubscribe && subPrice != null,
+              muted: false,
             ),
             const SizedBox(height: 8),
             _CardAction(product: product),
@@ -319,68 +321,55 @@ class _UnitLine extends StatelessWidget {
           ),
       ],
     );
-  }
-}
-
-// ── Pricing ──
-
-class _SubscriptionPriceRow extends StatelessWidget {
+class _SubscriptionPillButton extends StatelessWidget {
   final Product product;
   final double subscriptionPrice;
 
-  const _SubscriptionPriceRow({
+  const _SubscriptionPillButton({
     required this.product,
     required this.subscriptionPrice,
   });
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 5),
-    child: Row(
-      children: [
-        Flexible(
-          flex: 3,
-          child: _ScaleDown(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              '₹${subscriptionPrice.toStringAsFixed(0)}',
-              style: const TextStyle(
-                fontSize: 15.5,
-                fontWeight: FontWeight.w800,
-                color: kSubscribe,
-              ),
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _openSubscriptionSetup(context, product),
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: kPrimary,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: kPrimary.withValues(alpha: 0.2),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
-          ),
+          ],
         ),
-        const SizedBox(width: 6),
-        Flexible(
-          flex: 5,
-          child: _ScaleDown(
-            alignment: Alignment.centerRight,
-            child: GestureDetector(
-              onTap: () => _openSubscriptionSetup(context, product),
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: kSubscribeSoft,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: kSubscribe, width: 1.2),
-                ),
-                child: const Text(
-                  'Subscribe',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: kSubscribe,
-                  ),
-                ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.autorenew_rounded, color: Colors.white, size: 12),
+            const SizedBox(width: 4),
+            Text(
+              'Subscribe @ ₹${subscriptionPrice.toStringAsFixed(0)}',
+              style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
               ),
             ),
-          ),
+            const SizedBox(width: 2),
+            const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 13),
+          ],
+        ),
+      ),
+    );
+  }
+},
         ),
       ],
     ),
