@@ -83,37 +83,14 @@ const adminNav = [
         name: "Branch Config",
         icon: Settings,
         subItems: [
-          { name: "Branches", href: "/admin/branches", icon: Building },
+          { name: "Branches", href: "/admin/branches/branch-config", icon: Building },
           { name: "Partner Allocation", href: "/admin/branches/partners", icon: UserCheck },
           { name: "Branch Analytics", href: "/admin/branches/analytics", icon: BarChart },
         ]
       },
     ],
   },
-  // {
-  //   label: "FINANCE & REPORTS",
-  //   items: [
-  //     {
-  //       name: "Billings",
-  //       icon: Settings,
-  //       subItems: [
-  //         // { name: "Payments & Billing", href: "/admin/finance/payments", icon: CreditCard },
-  //         { name: "Billing", href: "/admin/finance/billing", icon: CreditCard },
-  //         { name: "Outstandings", href: "/admin/finance/outstandings", icon: CreditCard },
-  //       ]
-  //     },
-  //     {
-  //       name: "Wallet",
-  //       icon: Wallet,
-  //       subItems: [
-  //         { name: "Wallet Transactions", href: "/admin/finance/wallet", icon: Wallet },
-  //         { name: "Refunds", href: "/admin/finance/refunds", icon: ArrowRightLeft },
-  //       ]
-  //     },
 
-  //     { name: "Revenue Reports", href: "/admin/reports/revenue", icon: TrendingUp },
-  //   ],
-  // },
   {
     label: "FINANCE & REPORTS",
     items: [

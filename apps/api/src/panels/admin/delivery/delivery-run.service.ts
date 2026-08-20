@@ -2052,26 +2052,36 @@ export class DeliveryRunService {
           );
         }
 
-        // 9. Update orders table based on address_id and delivery_run_address
-        const orderUpdateRes = await client.query<any>(
-          `UPDATE orders
-           SET delivery_run_id = $1,
-               delivery_partner_id = $2,
-               run_sequence = $3,
-               assignment_method = 'manual_move',
-               assigned_at = NOW(),
-               updated_at = NOW()
-           WHERE address_id = $4
-             AND (
-               delivery_run_id = $5
-               OR delivery_run_id = $6
-               OR delivery_run_id IS NULL
-               OR status NOT IN ('cancelled', 'failed')
-             )
-           RETURNING order_id`,
-          [targetRun.run_id, targetRun.delivery_partner_id, nextTargetSeq, resolvedAddressId, sourceRun.run_id, String(sourceRun.id)],
-        );
-        const movedOrderIds = orderUpdateRes.rows.map((r: any) => r.order_id);
+        // 9. Update only the specific orders listed in delivery_run_addresses.order_ids.
+        //    Do NOT use address_id as a filter — it would hit orders from other days/runs
+        //    that happen to share the same delivery address.
+        let stopOrderIds: string[] = [];
+        try {
+          const raw = sourceStop.order_ids;
+          const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          stopOrderIds = Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+        } catch {
+          stopOrderIds = [];
+        }
+
+        let movedOrderIds: string[] = [];
+        if (stopOrderIds.length > 0) {
+          const orderUpdateRes = await client.query<any>(
+            `UPDATE orders
+             SET delivery_run_id = $1,
+                 delivery_partner_id = $2,
+                 run_sequence = $3,
+                 assignment_method = 'manual_move',
+                 assigned_at = NOW(),
+                 updated_at = NOW()
+             WHERE order_id = ANY($4)
+               AND (delivery_run_id = $5 OR delivery_run_id = $6)
+               AND status NOT IN ('cancelled', 'failed')
+             RETURNING order_id`,
+            [targetRun.run_id, targetRun.delivery_partner_id, nextTargetSeq, stopOrderIds, sourceRun.run_id, String(sourceRun.id)],
+          );
+          movedOrderIds = orderUpdateRes.rows.map((r: any) => r.order_id);
+        }
 
         // 10. Update total_addresses counter on both runs
         await client.query(
@@ -2343,34 +2353,57 @@ export class DeliveryRunService {
           await client.query(`UPDATE delivery_run_addresses SET sequence_no = $1 WHERE id = $2`, [i + 1, remBStops.rows[i].id]);
         }
 
-        // 8. Update orders table based on address_id
-        const updateOrdersA = await client.query<any>(
-          `UPDATE orders
-           SET delivery_run_id = $1,
-               delivery_partner_id = $2,
-               assignment_method = 'manual_swap',
-               assigned_at = NOW(),
-               updated_at = NOW()
-           WHERE address_id = $3
-             AND (delivery_run_id = $4 OR delivery_run_id = $5 OR delivery_run_id IS NULL OR status NOT IN ('cancelled', 'failed'))
-           RETURNING order_id`,
-          [runB.run_id, runB.delivery_partner_id, stopA.address_id, runA.run_id, String(runA.id)],
-        );
-        const swappedOrdersA = updateOrdersA.rows.map((r: any) => r.order_id);
+        // 8. Update only the specific orders listed in delivery_run_addresses.order_ids.
+        //    Do NOT use address_id as a filter — it would hit orders from other days/runs
+        //    that happen to share the same delivery address.
+        const parseStopOrderIds = (stop: any): string[] => {
+          try {
+            const raw = stop.order_ids;
+            const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+          } catch {
+            return [];
+          }
+        };
 
-        const updateOrdersB = await client.query<any>(
-          `UPDATE orders
-           SET delivery_run_id = $1,
-               delivery_partner_id = $2,
-               assignment_method = 'manual_swap',
-               assigned_at = NOW(),
-               updated_at = NOW()
-           WHERE address_id = $3
-             AND (delivery_run_id = $4 OR delivery_run_id = $5 OR delivery_run_id IS NULL OR status NOT IN ('cancelled', 'failed'))
-           RETURNING order_id`,
-          [runA.run_id, runA.delivery_partner_id, stopB.address_id, runB.run_id, String(runB.id)],
-        );
-        const swappedOrdersB = updateOrdersB.rows.map((r: any) => r.order_id);
+        const stopAOrderIds = parseStopOrderIds(stopA);
+        const stopBOrderIds = parseStopOrderIds(stopB);
+
+        let swappedOrdersA: string[] = [];
+        if (stopAOrderIds.length > 0) {
+          const updateOrdersA = await client.query<any>(
+            `UPDATE orders
+             SET delivery_run_id = $1,
+                 delivery_partner_id = $2,
+                 assignment_method = 'manual_swap',
+                 assigned_at = NOW(),
+                 updated_at = NOW()
+             WHERE order_id = ANY($3)
+               AND (delivery_run_id = $4 OR delivery_run_id = $5)
+               AND status NOT IN ('cancelled', 'failed')
+             RETURNING order_id`,
+            [runB.run_id, runB.delivery_partner_id, stopAOrderIds, runA.run_id, String(runA.id)],
+          );
+          swappedOrdersA = updateOrdersA.rows.map((r: any) => r.order_id);
+        }
+
+        let swappedOrdersB: string[] = [];
+        if (stopBOrderIds.length > 0) {
+          const updateOrdersB = await client.query<any>(
+            `UPDATE orders
+             SET delivery_run_id = $1,
+                 delivery_partner_id = $2,
+                 assignment_method = 'manual_swap',
+                 assigned_at = NOW(),
+                 updated_at = NOW()
+             WHERE order_id = ANY($3)
+               AND (delivery_run_id = $4 OR delivery_run_id = $5)
+               AND status NOT IN ('cancelled', 'failed')
+             RETURNING order_id`,
+            [runA.run_id, runA.delivery_partner_id, stopBOrderIds, runB.run_id, String(runB.id)],
+          );
+          swappedOrdersB = updateOrdersB.rows.map((r: any) => r.order_id);
+        }
 
         // 9. Operation ID for tracking response
         const operationId = `OP-SWAP-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;

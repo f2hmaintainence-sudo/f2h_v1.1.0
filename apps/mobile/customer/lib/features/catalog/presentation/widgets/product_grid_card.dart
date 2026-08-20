@@ -188,14 +188,6 @@ class _TopStrip extends StatelessWidget {
                     background: kPrimary,
                     foreground: Colors.white,
                   ),
-                if (subscriptionPrice != null) ...[
-                  const SizedBox(width: 5),
-                  _Chip(
-                    label: '@${subscriptionPrice!.toStringAsFixed(0)}',
-                    background: kSubscribe,
-                    foreground: Colors.white,
-                  ),
-                ],
               ],
             ),
           ),
