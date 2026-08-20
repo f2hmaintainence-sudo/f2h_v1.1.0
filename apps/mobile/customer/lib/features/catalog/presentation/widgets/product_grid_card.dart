@@ -321,6 +321,9 @@ class _UnitLine extends StatelessWidget {
           ),
       ],
     );
+  }
+}
+
 class _SubscriptionPillButton extends StatelessWidget {
   final Product product;
   final double subscriptionPrice;
@@ -369,11 +372,6 @@ class _SubscriptionPillButton extends StatelessWidget {
       ),
     );
   }
-},
-        ),
-      ],
-    ),
-  );
 }
 
 class _PriceRow extends StatelessWidget {
