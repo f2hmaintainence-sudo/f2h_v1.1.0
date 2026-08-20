@@ -388,44 +388,82 @@ export class FinanceService {
     // Right Box: Financial Summary
     doc.roundedRect(totalsX, currentY, totalsW, totalsH, 6).fillAndStroke('#f8fafc', '#cbd5e1');
 
-    const subTotalVal = Number(bill.subtotal || bill.total_amount || 0);
-    const discountVal = Number(bill.discount_amount || 0);
-    const taxVal = Number(bill.tax_amount || 0);
+    const rawGrossSubtotal = itemList.reduce(
+      (sum: number, it: any) => sum + (Number(it.unit_price || 0) * (Number(it.quantity) || 1)),
+      0,
+    );
+    const itemDiscountsSum = itemList.reduce(
+      (sum: number, it: any) => sum + Number(it.discount_amount || 0),
+      0,
+    );
     const grandTotalVal = Number(bill.total_amount || 0);
+
+    const discountVal = Math.max(
+      Number(bill.discount_amount || 0),
+      itemDiscountsSum,
+      Math.max(0, rawGrossSubtotal - grandTotalVal),
+    );
+
+    const subTotalVal = Math.max(
+      rawGrossSubtotal,
+      Number(bill.subtotal || 0),
+      grandTotalVal + discountVal,
+    );
+
+    const taxVal = Number(bill.tax_amount || 0);
     const paidVal = Number(bill.paid_amount || 0);
     const dueVal = Number(bill.due_amount || 0);
 
-    doc.font('Helvetica').fontSize(8.5).fillColor('#475569');
-    doc.text('Subtotal:', totalsX + 12, currentY + 8);
-    doc.text(fmtMoney(subTotalVal), totalsX + 130, currentY + 8, { width: 110, align: 'right' });
+    let totY = currentY + 8;
 
+    // Subtotal Row
+    doc.font('Helvetica').fontSize(8.5).fillColor('#475569');
+    doc.text('Subtotal:', totalsX + 12, totY);
+    doc.text(fmtMoney(subTotalVal), totalsX + 130, totY, { width: 110, align: 'right' });
+    totY += 13;
+
+    // Discount / Savings Row (Always displayed)
     if (discountVal > 0) {
-      doc.text('Discount Applied:', totalsX + 12, currentY + 22);
-      doc.font('Helvetica-Bold').fillColor('#059669').text(`-${fmtMoney(discountVal)}`, totalsX + 130, currentY + 22, { width: 110, align: 'right' });
+      doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#059669');
+      doc.text('Discount / Savings:', totalsX + 12, totY);
+      doc.text(`-${fmtMoney(discountVal)}`, totalsX + 130, totY, { width: 110, align: 'right' });
+      totY += 13;
+    } else {
+      doc.font('Helvetica').fontSize(8.5).fillColor('#64748b');
+      doc.text('Discounts & Offers:', totalsX + 12, totY);
+      doc.text('Rs. 0.00', totalsX + 130, totY, { width: 110, align: 'right' });
+      totY += 13;
     }
 
+    // Taxes Row
     if (taxVal > 0) {
-      doc.font('Helvetica').fillColor('#475569').text('Taxes & GST (Included):', totalsX + 12, currentY + 36);
-      doc.text(`+${fmtMoney(taxVal)}`, totalsX + 130, currentY + 36, { width: 110, align: 'right' });
+      doc.font('Helvetica').fontSize(8.5).fillColor('#475569');
+      doc.text('Taxes & GST (Included):', totalsX + 12, totY);
+      doc.text(`+${fmtMoney(taxVal)}`, totalsX + 130, totY, { width: 110, align: 'right' });
+      totY += 13;
     }
 
     // Divider line
-    doc.rect(totalsX + 12, currentY + 52, totalsW - 24, 1).fill('#cbd5e1');
+    totY += 1;
+    doc.rect(totalsX + 12, totY, totalsW - 24, 0.75).fill('#cbd5e1');
+    totY += 5;
 
     // Grand Total Row
-    doc.font('Helvetica-Bold').fontSize(11).fillColor('#0f172a');
-    doc.text('Grand Total:', totalsX + 12, currentY + 60);
-    doc.text(fmtMoney(grandTotalVal), totalsX + 110, currentY + 60, { width: 130, align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(10.5).fillColor('#0f172a');
+    doc.text('Grand Total:', totalsX + 12, totY);
+    doc.text(fmtMoney(grandTotalVal), totalsX + 110, totY, { width: 130, align: 'right' });
+    totY += 16;
 
     // Paid Row
     doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#059669');
-    doc.text('Amount Paid:', totalsX + 12, currentY + 78);
-    doc.text(fmtMoney(paidVal), totalsX + 130, currentY + 78, { width: 110, align: 'right' });
+    doc.text('Amount Paid:', totalsX + 12, totY);
+    doc.text(fmtMoney(paidVal), totalsX + 130, totY, { width: 110, align: 'right' });
+    totY += 13;
 
     // Due Row
     doc.font('Helvetica-Bold').fontSize(9).fillColor(dueVal > 0 ? '#dc2626' : '#64748b');
-    doc.text('Balance Due:', totalsX + 12, currentY + 94);
-    doc.text(fmtMoney(dueVal), totalsX + 130, currentY + 94, { width: 110, align: 'right' });
+    doc.text('Balance Due:', totalsX + 12, totY);
+    doc.text(fmtMoney(dueVal), totalsX + 130, totY, { width: 110, align: 'right' });
 
     // -------------------------------------------------------------
     // FOOTER (Page numbers & computer-generated note)

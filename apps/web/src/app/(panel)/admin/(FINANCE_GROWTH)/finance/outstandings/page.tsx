@@ -1200,38 +1200,53 @@ export default function OutstandingPage() {
                   </div>
 
                   {/* Calculations & Totals Box */}
-                  <div className="bg-slate-50/90 p-4.5 rounded-2xl border border-slate-200 space-y-2 shadow-2xs">
-                    <div className="flex justify-between text-slate-600">
-                      <span>Subtotal:</span>
-                      <span className="font-bold text-slate-800">{formatMoney(receiptDetail.bill.subtotal || receiptDetail.bill.total_amount)}</span>
-                    </div>
-                    {Number(receiptDetail.bill.discount_amount) > 0 && (
-                      <div className="flex justify-between text-emerald-700 font-bold">
-                        <span>Discounts &amp; Promos:</span>
-                        <span>-{formatMoney(receiptDetail.bill.discount_amount)}</span>
+                  {(() => {
+                    const itemsGrossSubtotal = (receiptDetail.items || []).reduce((sum: number, it: any) => sum + (Number(it.unit_price || 0) * (Number(it.quantity) || 1)), 0);
+                    const itemsDiscounts = (receiptDetail.items || []).reduce((sum: number, it: any) => sum + Number(it.discount_amount || 0), 0);
+                    const billTotal = Number(receiptDetail.bill.total_amount || 0);
+                    const effectiveDiscount = Math.max(Number(receiptDetail.bill.discount_amount || 0), itemsDiscounts, Math.max(0, itemsGrossSubtotal - billTotal));
+                    const effectiveSubtotal = Math.max(itemsGrossSubtotal, Number(receiptDetail.bill.subtotal || 0), billTotal + effectiveDiscount);
+
+                    return (
+                      <div className="bg-slate-50/90 p-4.5 rounded-2xl border border-slate-200 space-y-2 shadow-2xs">
+                        <div className="flex justify-between text-slate-600">
+                          <span>Subtotal:</span>
+                          <span className="font-bold text-slate-800">{formatMoney(effectiveSubtotal)}</span>
+                        </div>
+                        {effectiveDiscount > 0 ? (
+                          <div className="flex justify-between text-emerald-700 font-bold bg-emerald-50/80 px-2.5 py-1 rounded-lg border border-emerald-200/60">
+                            <span>Discount / Promo Savings:</span>
+                            <span>-{formatMoney(effectiveDiscount)}</span>
+                          </div>
+                        ) : (
+                          <div className="flex justify-between text-slate-500">
+                            <span>Discounts &amp; Offers:</span>
+                            <span>₹0.00</span>
+                          </div>
+                        )}
+                        {Number(receiptDetail.bill.tax_amount) > 0 && (
+                          <div className="flex justify-between text-slate-600">
+                            <span>Taxes &amp; GST (Included):</span>
+                            <span>+{formatMoney(receiptDetail.bill.tax_amount)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t border-slate-200">
+                          <span>Total Invoiced Amount:</span>
+                          <span className="text-emerald-700 font-black">{formatMoney(receiptDetail.bill.total_amount)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs font-bold text-slate-700">
+                          <span>Amount Paid to Date:</span>
+                          <span className="text-emerald-600">{formatMoney(receiptDetail.bill.paid_amount)}</span>
+                        </div>
+                        {Number(receiptDetail.bill.due_amount) > 0 && (
+                          <div className="flex justify-between text-sm font-black text-rose-700 pt-1.5 border-t border-slate-200">
+                            <span>Remaining Balance Due:</span>
+                            <span>{formatMoney(receiptDetail.bill.due_amount)}</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {Number(receiptDetail.bill.tax_amount) > 0 && (
-                      <div className="flex justify-between text-slate-600">
-                        <span>Taxes &amp; GST (Included):</span>
-                        <span>+{formatMoney(receiptDetail.bill.tax_amount)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t border-slate-200">
-                      <span>Total Invoiced Amount:</span>
-                      <span className="text-emerald-700 font-black">{formatMoney(receiptDetail.bill.total_amount)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs font-bold text-slate-700">
-                      <span>Amount Paid to Date:</span>
-                      <span className="text-emerald-600">{formatMoney(receiptDetail.bill.paid_amount)}</span>
-                    </div>
-                    {Number(receiptDetail.bill.due_amount) > 0 && (
-                      <div className="flex justify-between text-sm font-black text-rose-700 pt-1.5 border-t border-slate-200">
-                        <span>Remaining Balance Due:</span>
-                        <span>{formatMoney(receiptDetail.bill.due_amount)}</span>
-                      </div>
-                    )}
-                  </div>
+                    );
+                  })()}
                 </div>
               ) : null}
             </div>

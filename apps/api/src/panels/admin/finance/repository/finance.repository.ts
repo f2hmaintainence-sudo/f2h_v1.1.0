@@ -457,10 +457,61 @@ export class FinanceRepository {
     const methodsRes = await this.db.query(sqlMethods, []);
     const methods = Array.isArray(methodsRes) ? methodsRes : [];
 
+    const daysNum = days && Number(days) > 0 ? Number(days) : 30;
+    const sqlDaily = `
+      SELECT 
+        TO_CHAR((pb.created_at AT TIME ZONE 'Asia/Kolkata')::date, 'YYYY-MM-DD') AS bill_date,
+        COALESCE(NULLIF(LOWER(pb.payment_method), ''), 'wallet') AS payment_method,
+        COUNT(*)::int AS count,
+        COALESCE(SUM(pb.paid_amount), 0)::numeric AS paid_amount,
+        COALESCE(SUM(pb.total_amount), 0)::numeric AS total_amount
+      FROM public.customer_bills pb
+      WHERE pb.deleted_at IS NULL
+        AND pb.created_at >= (CURRENT_DATE - (${daysNum} || ' days')::interval)
+      GROUP BY (pb.created_at AT TIME ZONE 'Asia/Kolkata')::date, COALESCE(NULLIF(LOWER(pb.payment_method), ''), 'wallet')
+      ORDER BY bill_date ASC
+    `;
+    const dailyRaw = await this.db.query(sqlDaily, []).catch(() => []);
+    const dailyRows = Array.isArray(dailyRaw) ? dailyRaw : [];
+
+    const dateMap = new Map<string, any>();
+    const today = new Date();
+    for (let i = daysNum - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const iso = d.toISOString().slice(0, 10);
+      const displayDate = d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+      dateMap.set(iso, {
+        date: iso,
+        displayDate,
+        total: 0,
+        upi: 0,
+        razorpay: 0,
+        card: 0,
+        wallet: 0,
+        cash: 0,
+      });
+    }
+
+    for (const r of dailyRows) {
+      const item = dateMap.get(r.bill_date);
+      if (!item) continue;
+      const amt = Number(r.paid_amount || r.total_amount || 0);
+      item.total += amt;
+      const meth = String(r.payment_method || '').toLowerCase();
+      if (meth.includes('upi')) item.upi += amt;
+      else if (meth.includes('razorpay') || meth.includes('online') || meth.includes('gateway')) item.razorpay += amt;
+      else if (meth.includes('card')) item.card += amt;
+      else if (meth.includes('wallet')) item.wallet += amt;
+      else if (meth.includes('cash') || meth.includes('cod')) item.cash += amt;
+      else item.wallet += amt;
+    }
+
     return {
       general,
       methods,
-      days: days || 'all',
+      dailyTrend: Array.from(dateMap.values()),
+      days: daysNum,
     };
   }
 
@@ -1151,6 +1202,54 @@ export class FinanceRepository {
         }
       } catch {
         // Deliberately tolerated: the caller has a valid fallback for this failure.
+      }
+    }
+
+    // 7. Reconcile item-level discounts, gross subtotal, and bill discounts
+    if (Array.isArray(orderItems) && orderItems.length > 0) {
+      orderItems = orderItems.map((it: any) => {
+        const qty = Number(it.quantity) > 0 ? Number(it.quantity) : 1;
+        const uPrice = Number(it.unit_price || 0);
+        const lTotal = Number(it.total_amount || (uPrice * qty));
+        const lineGross = uPrice * qty;
+        const lineDiscount = Math.max(Number(it.discount_amount || 0), Math.max(0, lineGross - lTotal));
+        return {
+          ...it,
+          quantity: qty,
+          unit_price: uPrice,
+          total_amount: lTotal,
+          discount_amount: lineDiscount,
+        };
+      });
+
+      const itemsGrossSubtotal = orderItems.reduce(
+        (sum: number, it: any) => sum + (Number(it.unit_price || 0) * Number(it.quantity || 1)),
+        0,
+      );
+      const itemsDiscounts = orderItems.reduce(
+        (sum: number, it: any) => sum + Number(it.discount_amount || 0),
+        0,
+      );
+      const itemsTaxes = orderItems.reduce(
+        (sum: number, it: any) => sum + Number(it.tax_amount || 0),
+        0,
+      );
+      const grandTotal = Number(bill.total_amount || 0);
+
+      const effectiveDiscount = Math.max(
+        Number(bill.discount_amount || 0),
+        itemsDiscounts,
+        Math.max(0, itemsGrossSubtotal - grandTotal),
+      );
+
+      bill.discount_amount = effectiveDiscount;
+      bill.subtotal = Math.max(
+        itemsGrossSubtotal,
+        Number(bill.subtotal || 0),
+        grandTotal + effectiveDiscount,
+      );
+      if (itemsTaxes > 0 && !Number(bill.tax_amount)) {
+        bill.tax_amount = itemsTaxes;
       }
     }
 

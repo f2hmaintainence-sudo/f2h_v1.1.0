@@ -785,14 +785,31 @@ class BillDetailSheet extends StatelessWidget {
     final dueDate = bill['due_date'];
     final createdAt = bill['created_at'];
 
-    final subtotal = double.tryParse(bill['subtotal']?.toString() ?? '0') ?? 0.0;
-    final discount = double.tryParse(bill['discount_amount']?.toString() ?? '0') ?? 0.0;
-    final tax = double.tryParse(bill['tax_amount']?.toString() ?? '0') ?? 0.0;
+    final rawItems = bill['items'] as List<dynamic>? ?? [];
+
+    double itemsGross = 0.0;
+    double itemsDisc = 0.0;
+    for (final it in rawItems) {
+      if (it is Map) {
+        final price = double.tryParse(it['unit_price']?.toString() ?? it['original_price']?.toString() ?? it['final_price']?.toString() ?? '0') ?? 0.0;
+        final qty = double.tryParse(it['quantity']?.toString() ?? '1') ?? 1.0;
+        final totalP = double.tryParse(it['total_amount']?.toString() ?? it['total_price']?.toString() ?? '0') ?? (price * qty);
+        final lineGross = price * qty;
+        final lineDisc = double.tryParse(it['discount_amount']?.toString() ?? '0') ?? 0.0;
+        itemsGross += lineGross;
+        itemsDisc += lineDisc > 0 ? lineDisc : (lineGross > totalP ? lineGross - totalP : 0.0);
+      }
+    }
+
     final total = double.tryParse(bill['total_amount']?.toString() ?? '0') ?? 0.0;
+    final parsedDisc = double.tryParse(bill['discount_amount']?.toString() ?? '0') ?? 0.0;
+    final discount = parsedDisc > 0 ? parsedDisc : (itemsDisc > 0 ? itemsDisc : (itemsGross > total ? itemsGross - total : 0.0));
+    final parsedSub = double.tryParse(bill['subtotal']?.toString() ?? '0') ?? 0.0;
+    final subtotal = parsedSub > total ? parsedSub : (itemsGross > total ? itemsGross : (total + discount));
+    final tax = double.tryParse(bill['tax_amount']?.toString() ?? '0') ?? 0.0;
     final paid = double.tryParse(bill['paid_amount']?.toString() ?? '0') ?? 0.0;
     final due = double.tryParse(bill['due_amount']?.toString() ?? '0') ?? 0.0;
     final remarks = bill['remarks']?.toString() ?? '';
-    final rawItems = bill['items'] as List<dynamic>? ?? [];
 
     final isPaid = status == 'paid';
     final statusColor = isPaid
@@ -1198,9 +1215,11 @@ class BillDetailSheet extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        _calcRow('Subtotal', '₹${subtotal > 0 ? subtotal.toStringAsFixed(2) : total.toStringAsFixed(2)}'),
+                        _calcRow('Subtotal', '₹${subtotal.toStringAsFixed(2)}'),
                         if (discount > 0)
-                          _calcRow('Discounts & Offers', '-₹${discount.toStringAsFixed(2)}', valueColor: const Color(0xFF059669)),
+                          _calcRow('Discount / Savings', '-₹${discount.toStringAsFixed(2)}', valueColor: const Color(0xFF059669))
+                        else
+                          _calcRow('Discounts & Offers', '₹0.00', valueColor: const Color(0xFF94A3B8)),
                         if (tax > 0)
                           _calcRow('Taxes & GST (Included)', '+₹${tax.toStringAsFixed(2)}'),
                         const Padding(

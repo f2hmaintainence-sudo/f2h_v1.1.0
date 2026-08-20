@@ -17,8 +17,17 @@ import {
   Receipt, RefreshCw, ChevronRight, Home, Search,
   CheckCircle2, Clock, AlertCircle, AlertTriangle, X, Eye, Loader2,
   Calendar, CreditCard, ShoppingBag, Download, Send, Phone,
-  Mail, Building, DollarSign, Wallet, ArrowUpRight, Layers
+  Mail, Building, DollarSign, Wallet, ArrowUpRight, Layers, TrendingUp
 } from "lucide-react";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+} from "recharts";
 
 const formatMoney = (v: number) =>
   "₹" + Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -53,9 +62,23 @@ export default function CustomerBillingPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const searchTimeoutRef = useRef<any>(null);
 
-  // Stats & Branches
+  // Stats & Trend Chart
   const [stats, setStats] = useState<any>(null);
   const [branches, setBranches] = useState<any[]>([]);
+  const [days, setDays] = useState(30);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [activeLines, setActiveLines] = useState<Record<string, boolean>>({
+    total: true,
+    wallet: true,
+    upi: true,
+    razorpay: true,
+    card: true,
+    cash: true,
+  });
+
+  const toggleLine = (key: string) => {
+    setActiveLines((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   // Receipt / Line Items Modal
   const [inspectingBillId, setInspectingBillId] = useState<string | null>(null);
@@ -77,16 +100,19 @@ export default function CustomerBillingPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const fetchStats = useCallback(async () => {
+  const fetchStats = useCallback(async (d = days) => {
+    setLoadingStats(true);
     try {
-      const res = await api.get<any>("/admin/finance/billing/stats");
+      const res = await api.get<any>(`/admin/finance/billing/stats?days=${d}`);
       if (res.data?.status && res.data.data) {
         setStats(res.data.data);
       }
     } catch (err) {
       console.error("Failed to load billing stats:", err);
+    } finally {
+      setLoadingStats(false);
     }
-  }, []);
+  }, [days]);
 
   const fetchBranches = useCallback(async () => {
     try {
@@ -424,6 +450,254 @@ export default function CustomerBillingPage() {
           <p className="text-[10px] font-extrabold text-blue-700 uppercase tracking-wider mb-1">Razorpay Online</p>
           <p className="text-xl font-black text-blue-800">{formatMoney(general.razorpay_collected || 0)}</p>
           <p className="text-[10px] text-blue-600/70 font-semibold mt-0.5">Gateway collections</p>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* ONLINE PAYMENT METHOD LINE GRAPH & TREND AREA CHART */}
+      {/* ========================================================================= */}
+      <div className="bg-white rounded-3xl border border-slate-200 p-5 md:p-6 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div>
+            <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+              <TrendingUp size={18} className="text-emerald-600" />
+              <span>Online Payment Method Revenue Trend</span>
+            </h2>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              Daily customer billing &amp; collection volume segmented by payment method over the last {days} days.
+            </p>
+          </div>
+
+          {/* Days Filter + Interactive Line Toggles */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <select
+              value={days}
+              onChange={(e) => {
+                const d = Number(e.target.value);
+                setDays(d);
+                fetchStats(d);
+              }}
+              className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none cursor-pointer mr-1"
+            >
+              <option value={7}>Last 7 Days</option>
+              <option value={15}>Last 15 Days</option>
+              <option value={30}>Last 30 Days</option>
+              <option value={60}>Last 60 Days</option>
+              <option value={90}>Last 90 Days</option>
+            </select>
+
+            <button
+              type="button"
+              onClick={() => toggleLine("total")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeLines.total ? "bg-slate-900 text-white shadow-2xs" : "bg-slate-100 text-slate-400"
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-slate-400" />
+              <span>Total Volume</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => toggleLine("wallet")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeLines.wallet ? "bg-purple-600 text-white shadow-2xs" : "bg-slate-100 text-slate-400"
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-purple-300" />
+              <span>Wallet</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => toggleLine("upi")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeLines.upi ? "bg-emerald-600 text-white shadow-2xs" : "bg-slate-100 text-slate-400"
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-300" />
+              <span>UPI</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => toggleLine("razorpay")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeLines.razorpay ? "bg-sky-600 text-white shadow-2xs" : "bg-slate-100 text-slate-400"
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-sky-300" />
+              <span>Razorpay</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => toggleLine("card")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeLines.card ? "bg-pink-600 text-white shadow-2xs" : "bg-slate-100 text-slate-400"
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-pink-300" />
+              <span>Card</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => toggleLine("cash")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeLines.cash ? "bg-amber-600 text-white shadow-2xs" : "bg-slate-100 text-slate-400"
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-300" />
+              <span>Cash / COD</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Chart Canvas */}
+        <div className="h-72 w-full pt-2">
+          {loadingStats ? (
+            <div className="h-full flex flex-col items-center justify-center space-y-2 text-slate-400">
+              <Loader2 size={32} className="animate-spin text-emerald-600" />
+              <span className="text-xs font-bold">Rendering revenue trend graphs...</span>
+            </div>
+          ) : (stats?.dailyTrend || []).length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-slate-400">
+              <p className="text-xs font-bold">No billing transaction records in this time range.</p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={stats?.dailyTrend || []} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="totalGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#0f172a" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="#0f172a" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="walletGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="upiGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="razorpayGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="cardGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ec4899" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#ec4899" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="cashGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis
+                  dataKey="displayDate"
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 10, fill: "#94a3b8", fontWeight: 600 }}
+                />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 10, fill: "#94a3b8", fontWeight: 600 }}
+                  tickFormatter={(v) => `₹${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`}
+                />
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-slate-900/95 backdrop-blur-sm text-white p-3.5 rounded-2xl shadow-xl border border-slate-800 text-xs space-y-1.5 min-w-[170px]">
+                          <p className="font-extrabold text-slate-300 border-b border-slate-800 pb-1">{label}</p>
+                          {payload.map((entry: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between gap-3">
+                              <span className="flex items-center gap-1.5 text-slate-300">
+                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                                {entry.name}:
+                              </span>
+                              <span className="font-black text-white">{formatMoney(entry.value)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+
+                {activeLines.total && (
+                  <Area
+                    type="monotone"
+                    dataKey="total"
+                    name="Total Volume"
+                    stroke="#0f172a"
+                    strokeWidth={2.5}
+                    fillOpacity={1}
+                    fill="url(#totalGrad)"
+                  />
+                )}
+                {activeLines.wallet && (
+                  <Area
+                    type="monotone"
+                    dataKey="wallet"
+                    name="Wallet"
+                    stroke="#8b5cf6"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#walletGrad)"
+                  />
+                )}
+                {activeLines.upi && (
+                  <Area
+                    type="monotone"
+                    dataKey="upi"
+                    name="UPI"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#upiGrad)"
+                  />
+                )}
+                {activeLines.razorpay && (
+                  <Area
+                    type="monotone"
+                    dataKey="razorpay"
+                    name="Razorpay"
+                    stroke="#0ea5e9"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#razorpayGrad)"
+                  />
+                )}
+                {activeLines.card && (
+                  <Area
+                    type="monotone"
+                    dataKey="card"
+                    name="Card"
+                    stroke="#ec4899"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#cardGrad)"
+                  />
+                )}
+                {activeLines.cash && (
+                  <Area
+                    type="monotone"
+                    dataKey="cash"
+                    name="Cash / COD"
+                    stroke="#f59e0b"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#cashGrad)"
+                  />
+                )}
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
@@ -836,38 +1110,53 @@ export default function CustomerBillingPage() {
                   </div>
 
                   {/* Calculations & Totals Box */}
-                  <div className="bg-slate-50/90 p-4.5 rounded-2xl border border-slate-200 space-y-2 shadow-2xs">
-                    <div className="flex justify-between text-slate-600">
-                      <span>Subtotal:</span>
-                      <span className="font-bold text-slate-800">{formatMoney(receiptDetail.bill.subtotal || receiptDetail.bill.total_amount)}</span>
-                    </div>
-                    {Number(receiptDetail.bill.discount_amount) > 0 && (
-                      <div className="flex justify-between text-emerald-700 font-bold">
-                        <span>Discounts &amp; Promos:</span>
-                        <span>-{formatMoney(receiptDetail.bill.discount_amount)}</span>
+                  {(() => {
+                    const itemsGrossSubtotal = (receiptDetail.items || []).reduce((sum: number, it: any) => sum + (Number(it.unit_price || 0) * (Number(it.quantity) || 1)), 0);
+                    const itemsDiscounts = (receiptDetail.items || []).reduce((sum: number, it: any) => sum + Number(it.discount_amount || 0), 0);
+                    const billTotal = Number(receiptDetail.bill.total_amount || 0);
+                    const effectiveDiscount = Math.max(Number(receiptDetail.bill.discount_amount || 0), itemsDiscounts, Math.max(0, itemsGrossSubtotal - billTotal));
+                    const effectiveSubtotal = Math.max(itemsGrossSubtotal, Number(receiptDetail.bill.subtotal || 0), billTotal + effectiveDiscount);
+
+                    return (
+                      <div className="bg-slate-50/90 p-4.5 rounded-2xl border border-slate-200 space-y-2 shadow-2xs">
+                        <div className="flex justify-between text-slate-600">
+                          <span>Subtotal:</span>
+                          <span className="font-bold text-slate-800">{formatMoney(effectiveSubtotal)}</span>
+                        </div>
+                        {effectiveDiscount > 0 ? (
+                          <div className="flex justify-between text-emerald-700 font-bold bg-emerald-50/80 px-2.5 py-1 rounded-lg border border-emerald-200/60">
+                            <span>Discount / Promo Savings:</span>
+                            <span>-{formatMoney(effectiveDiscount)}</span>
+                          </div>
+                        ) : (
+                          <div className="flex justify-between text-slate-500">
+                            <span>Discounts &amp; Offers:</span>
+                            <span>₹0.00</span>
+                          </div>
+                        )}
+                        {Number(receiptDetail.bill.tax_amount) > 0 && (
+                          <div className="flex justify-between text-slate-600">
+                            <span>Taxes &amp; GST (Included):</span>
+                            <span>+{formatMoney(receiptDetail.bill.tax_amount)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t border-slate-200">
+                          <span>Total Invoiced Amount:</span>
+                          <span className="text-emerald-700 font-black">{formatMoney(receiptDetail.bill.total_amount)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs font-bold text-slate-700">
+                          <span>Amount Paid to Date:</span>
+                          <span className="text-emerald-600">{formatMoney(receiptDetail.bill.paid_amount)}</span>
+                        </div>
+                        {Number(receiptDetail.bill.due_amount) > 0 && (
+                          <div className="flex justify-between text-sm font-black text-rose-700 pt-1.5 border-t border-slate-200">
+                            <span>Remaining Balance Due:</span>
+                            <span>{formatMoney(receiptDetail.bill.due_amount)}</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {Number(receiptDetail.bill.tax_amount) > 0 && (
-                      <div className="flex justify-between text-slate-600">
-                        <span>Taxes &amp; GST (Included):</span>
-                        <span>+{formatMoney(receiptDetail.bill.tax_amount)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t border-slate-200">
-                      <span>Total Invoiced Amount:</span>
-                      <span className="text-emerald-700 font-black">{formatMoney(receiptDetail.bill.total_amount)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs font-bold text-slate-700">
-                      <span>Amount Paid to Date:</span>
-                      <span className="text-emerald-600">{formatMoney(receiptDetail.bill.paid_amount)}</span>
-                    </div>
-                    {Number(receiptDetail.bill.due_amount) > 0 && (
-                      <div className="flex justify-between text-sm font-black text-rose-700 pt-1.5 border-t border-slate-200">
-                        <span>Remaining Balance Due:</span>
-                        <span>{formatMoney(receiptDetail.bill.due_amount)}</span>
-                      </div>
-                    )}
-                  </div>
+                    );
+                  })()}
                 </div>
               ) : null}
             </div>
