@@ -333,6 +333,33 @@ class ApiClient {
   }
 
   /**
+   * GET Blob (for binary downloads like PDF invoices, Excel, CSVs)
+   */
+  async getBlob(endpoint: string, options?: RequestConfig): Promise<Blob> {
+    const response = await this.executeRequest(endpoint, {
+      ...options,
+      method: 'GET',
+      headers: {
+        Accept: 'application/pdf, application/octet-stream, */*',
+        ...options?.headers,
+      },
+    });
+
+    if (!response.ok) {
+      let msg = `Failed to download: HTTP ${response.status}`;
+      try {
+        const errJson = await response.json();
+        msg = errJson.message || errJson.error || msg;
+      } catch {
+        // ignore
+      }
+      throw new Error(msg);
+    }
+
+    return await response.blob();
+  }
+
+  /**
    * POST request
    */
   async post<T>(endpoint: string, body?: unknown, options?: RequestConfig): Promise<ApiResponse<T>> {

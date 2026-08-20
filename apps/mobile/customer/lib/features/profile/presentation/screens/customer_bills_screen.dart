@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
-import 'package:f2h_customer/theme/app_colors.dart';
+import 'package:f2h_customer/core/auth/token_storage.dart';
 import 'package:f2h_customer/features/wallet/presentation/screens/wallet_screen.dart';
 
 class CustomerBillsScreen extends StatefulWidget {
@@ -1031,10 +1031,20 @@ class BillDetailSheet extends StatelessWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () async {
-                    final pdfUrl = ApiEndpoints.receiptPdf(billId);
-                    final uri = Uri.parse(pdfUrl);
-                    if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    try {
+                      final token = await TokenStorage.getAccessToken();
+                      final basePdfUrl = ApiEndpoints.receiptPdf(billId);
+                      final pdfUrl = token != null && token.isNotEmpty
+                          ? '$basePdfUrl?token=$token'
+                          : basePdfUrl;
+                      final uri = Uri.parse(pdfUrl);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      } else {
+                        await launchUrl(uri, mode: LaunchMode.platformDefault);
+                      }
+                    } catch (e) {
+                      debugPrint('Error downloading invoice PDF: $e');
                     }
                   },
                   icon: const Icon(Icons.picture_as_pdf_rounded, size: 18, color: Color(0xFF16653A)),

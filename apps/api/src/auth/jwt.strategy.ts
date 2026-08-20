@@ -27,6 +27,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           return request?.cookies?.access_token;
         },
         ExtractJwt.fromAuthHeaderAsBearerToken(),
+        ExtractJwt.fromUrlQueryParameter('token'),
+        ExtractJwt.fromUrlQueryParameter('auth_token'),
       ]),
       // Expiry is enforced. Ignoring it made every issued token permanent, since
       // nothing else in the request path checks `exp`.

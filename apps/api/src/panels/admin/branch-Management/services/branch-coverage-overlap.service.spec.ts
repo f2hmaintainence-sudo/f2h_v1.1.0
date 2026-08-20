@@ -124,12 +124,16 @@ describe('BranchCoverageOverlapService', () => {
     );
 
     expect(transaction.query).toHaveBeenCalledTimes(2);
-    expect(transaction.query.mock.calls[0][0]).toContain(
-      'pg_advisory_xact_lock',
+    expect(transaction.query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('pg_advisory_xact_lock'),
+      ['branch-coverage'],
     );
-    expect(transaction.query.mock.calls[1][0]).toContain('is_active = true');
-    expect(transaction.query.mock.calls[1][0]).toContain('branch_id <> $1');
-    expect(transaction.query.mock.calls[1][1]).toEqual(['BRANCH_A']);
+    expect(transaction.query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringMatching(/is_active = true[\s\S]*branch_id <> \$1/),
+      ['BRANCH_A'],
+    );
     expect(conflict).toEqual({
       branch_id: 'BRANCH_B',
       branch_name: 'Branch B',

@@ -236,13 +236,22 @@ export default function OutstandingPage() {
   };
 
   // Download PDF
-  const downloadBillPdf = (billId: string) => {
+  const downloadBillPdf = async (billId: string) => {
     try {
       const cleanId = String(billId).trim();
-      const url = `${process.env.NEXT_PUBLIC_API_URL || "https://f2hfresh.com/api/v1"}/admin/finance/receipt/${cleanId}/pdf`;
-      window.open(url, "_blank");
-      showToast(`Downloading invoice PDF for ${cleanId}...`, true);
-    } catch {
+      showToast(`Generating invoice PDF for #${cleanId}...`, true);
+      const blob = await api.getBlob(`/admin/finance/receipt/${cleanId}/pdf`);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `Tax-Invoice-${cleanId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      showToast(`Invoice #${cleanId} downloaded successfully!`, true);
+    } catch (err) {
+      console.error("Failed to download PDF invoice:", err);
       showToast("Could not download PDF invoice", false);
     }
   };

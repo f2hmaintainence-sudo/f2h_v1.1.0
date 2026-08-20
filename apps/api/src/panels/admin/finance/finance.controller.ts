@@ -113,9 +113,14 @@ export class CustomerBillsController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
+    const user = req.user as any;
+    const userId = user?.user_id || user?.id;
+    const userRole = user?.role;
+    const isPrivileged = userRole === ROLE.ADMIN || userRole === ROLE.SUPER_ADMIN;
+
     const { buffer, filename } = await this.service.getBillReceiptPdf(
       id,
-      (req.user as any)?.user_id,
+      isPrivileged ? undefined : userId,
     );
     res.set({
       'Content-Type': 'application/pdf',
@@ -127,6 +132,11 @@ export class CustomerBillsController {
 
   @Get(['receipt/:id', ':id/receipt', ':id'])
   async getOwnReceipt(@Param('id') id: string, @Req() req: Request) {
-    return await this.service.getBillReceipt(id, (req.user as any)?.user_id);
+    const user = req.user as any;
+    const userId = user?.user_id || user?.id;
+    const userRole = user?.role;
+    const isPrivileged = userRole === ROLE.ADMIN || userRole === ROLE.SUPER_ADMIN;
+
+    return await this.service.getBillReceipt(id, isPrivileged ? undefined : userId);
   }
 }
