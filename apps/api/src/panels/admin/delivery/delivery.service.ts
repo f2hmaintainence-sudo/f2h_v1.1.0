@@ -613,8 +613,8 @@ export class DeliveryManagementService {
           EXTRACT(EPOCH FROM (NOW() - dp.last_location_at))::int AS location_age_seconds,
           dp.vehicle_type, dp.vehicle_number,
           dp.average_rating, dp.total_deliveries, dp.total_runs, dp.max_daily_orders,
-          dp.salary_type, dp.monthly_fixed_salary, dp.per_order_commission, dp.fuel_allowance_daily,
-          dp.joining_date, dp.driving_license_number,
+          dp.daily_salary,
+          dp.joined_date AS joining_date,
           dp.branch_id, b.branch_name,
           dp.breakdown_reason, dp.breakdown_reported_at,
           lv.id            AS leave_id,
@@ -723,9 +723,7 @@ export class DeliveryManagementService {
       const partners = rows.map((r: any) => ({
         ...r,
         average_rating: r.average_rating != null ? Number(r.average_rating) : null,
-        monthly_fixed_salary: r.monthly_fixed_salary != null ? Number(r.monthly_fixed_salary) : null,
-        per_order_commission: r.per_order_commission != null ? Number(r.per_order_commission) : null,
-        fuel_allowance_daily: r.fuel_allowance_daily != null ? Number(r.fuel_allowance_daily) : null,
+        daily_salary: r.daily_salary != null ? Number(r.daily_salary) : null,
         current_lat: r.current_lat != null ? Number(r.current_lat) : null,
         current_lng: r.current_lng != null ? Number(r.current_lng) : null,
         is_location_stale:

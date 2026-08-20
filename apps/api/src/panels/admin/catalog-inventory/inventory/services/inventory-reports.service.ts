@@ -82,9 +82,16 @@ export class InventoryReportsService {
             0
           )::int AS avg_daily,
           COALESCE(
-            (SELECT SUM(si.quantity)::int FROM subscription_items si
+            -- Daily rate = weekly scheduled quantity / 7; subscription_items no
+            -- longer carries a quantity of its own.
+            (SELECT ROUND(SUM(ws.m_quantity + ws.e_quantity)::numeric / 7, 0)
+             FROM subscription_items si
              JOIN subscriptions s ON s.subscription_id = si.subscription_id
-             WHERE si.variant_id = pv.variant_id
+             JOIN subscription_weekly_schedule ws
+               ON ws.subscription_item_id = si.subscription_item_id AND ws.deleted_at IS NULL
+             WHERE si.product_variant_id = pv.variant_id
+               AND si.deleted_at IS NULL
+               AND si.status = 'active'
                AND s.status = 'active'
                ${branchId ? 'AND s.branch_id = $2' : ''}),
             0

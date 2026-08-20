@@ -198,8 +198,8 @@ export default function DeliveryOrderSwapModal({
               <ArrowRightLeft size={20} />
             </div>
             <div>
-              <h3 className="text-base font-black tracking-tight">Controlled Order Swap & Move</h3>
-              <p className="text-xs text-indigo-200/80">Reassign order across active delivery runs</p>
+              <h3 className="text-base font-black tracking-tight">Controlled Address & Order Swap</h3>
+              <p className="text-xs text-indigo-200/80">Reassign customer address stop and orders across active delivery runs</p>
             </div>
           </div>
           <button

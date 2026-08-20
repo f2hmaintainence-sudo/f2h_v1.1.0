@@ -578,10 +578,13 @@ export class DeliveryRunService {
     try {
       const runSql = `
         SELECT
-          dr.*, db.full_name AS partner_name, db.phone AS partner_phone,
+          dr.*,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), dp.full_name, 'Partner') AS partner_name,
+          COALESCE(dp.phone, u.phone) AS partner_phone,
           b.branch_name
         FROM delivery_runs dr
-        LEFT JOIN delivery_partners db ON db.delivery_partner_id = dr.delivery_partner_id
+        LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
+        LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
         LEFT JOIN branches b ON b.branch_id = dr.branch_id
         WHERE dr.id::varchar = $1 OR dr.run_id = $1 OR dr.run_number = $1
       `;
@@ -590,14 +593,35 @@ export class DeliveryRunService {
 
       const actualRunId = runRows[0].run_id || String(runRows[0].id);
 
-      // Get addresses
+      // Get addresses with enriched customer address and list of orders at this address
       const addressesSql = `
         SELECT
           dra.*,
-          o.total_amount, o.status AS order_status, o.delivery_slot,
-          o.order_source
+          COALESCE(NULLIF(TRIM(ca.address_line), ''), ca.landmark, 'Customer Address') AS address_line,
+          ca.contact_name,
+          ca.contact_mobile,
+          COALESCE(ca.latitude, dra.latitude) AS latitude,
+          COALESCE(ca.longitude, dra.longitude) AS longitude,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), c.full_name, u.user_name, 'Customer') AS customer_name,
+          (
+            SELECT json_agg(json_build_object(
+              'order_id', o.order_id,
+              'customer_id', o.customer_id,
+              'customer_name', o.customer_name,
+              'total_amount', o.total_amount,
+              'status', o.status,
+              'delivery_slot', o.delivery_slot,
+              'order_source', o.order_source
+            ))
+            FROM orders o
+            WHERE (o.delivery_run_id = $1 OR o.delivery_run_id = $2)
+              AND o.address_id = dra.address_id
+              AND o.deleted_at IS NULL
+          ) AS orders
         FROM delivery_run_addresses dra
-        LEFT JOIN orders o ON o.order_id = dra.order_id
+        LEFT JOIN customer_addresses ca ON ca.address_id = dra.address_id
+        LEFT JOIN customers c ON c.customer_id = dra.customer_id
+        LEFT JOIN users u ON u.user_id = dra.customer_id
         WHERE dra.run_id = $1 OR dra.run_id = $2
         ORDER BY dra.sequence_no ASC
       `;
@@ -625,17 +649,51 @@ export class DeliveryRunService {
     try {
       const sql = `
         SELECT
-          o.order_id,
-          o.customer_id,
-          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), o.customer_name, 'Customer') AS customer_name,
-          COALESCE(o.address_line, ca.address_line1 || ' ' || COALESCE(ca.address_line2, ''), 'Address not listed') AS address_line,
-          o.delivery_slot,
-          o.status AS order_status,
-          o.status,
-          o.total_amount,
-          o.run_sequence,
-          dr.run_id,
+          dra.id AS run_address_id,
+          dra.run_id,
+          dra.address_id,
+          dra.customer_id,
+          dra.sequence_no,
+          dra.delivery_status AS status,
+          dra.delivery_status,
+          dra.proof_photo_url,
+          dra.failed_reason,
+          dra.delivered_at,
+          COALESCE(NULLIF(TRIM(ca.address_line), ''), ca.landmark, 'Customer Address') AS address_line,
+          ca.contact_name,
+          ca.contact_mobile,
+          COALESCE(ca.latitude, dra.latitude) AS latitude,
+          COALESCE(ca.longitude, dra.longitude) AS longitude,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), c.full_name, u.user_name, 'Customer') AS customer_name,
           dr.delivery_partner_id,
+          dr.delivery_slot,
+          (
+            SELECT json_agg(json_build_object(
+              'order_id', o.order_id,
+              'customer_id', o.customer_id,
+              'customer_name', o.customer_name,
+              'status', o.status,
+              'total_amount', o.total_amount,
+              'items', (
+                SELECT json_agg(json_build_object(
+                  'product_variant_id', oi.variant_id,
+                  'product_name', COALESCE(p.name, pv.name, 'Product'),
+                  'variant_name', COALESCE(pv.name, ''),
+                  'quantity', oi.quantity,
+                  'unit', pv.unit_type,
+                  'unit_value', pv.unit_value
+                ) ORDER BY oi.created_at ASC)
+                FROM order_items oi
+                LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
+                LEFT JOIN products p ON p.product_id = pv.product_id
+                WHERE oi.order_id = o.order_id
+              )
+            ) ORDER BY o.run_sequence ASC NULLS LAST, o.created_at ASC)
+            FROM orders o
+            WHERE (o.delivery_run_id = dr.run_id OR o.delivery_run_id = dr.id::varchar)
+              AND o.address_id = dra.address_id
+              AND o.deleted_at IS NULL
+          ) AS orders,
           (
             SELECT json_agg(json_build_object(
               'product_variant_id', oi.variant_id,
@@ -646,18 +704,21 @@ export class DeliveryRunService {
               'unit_value', pv.unit_value
             ) ORDER BY oi.created_at ASC)
             FROM order_items oi
+            JOIN orders o ON o.order_id = oi.order_id
             LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
             LEFT JOIN products p ON p.product_id = pv.product_id
-            WHERE oi.order_id = o.order_id
+            WHERE (o.delivery_run_id = dr.run_id OR o.delivery_run_id = dr.id::varchar)
+              AND o.address_id = dra.address_id
+              AND o.deleted_at IS NULL
           ) AS items_json
-        FROM orders o
-        JOIN delivery_runs dr ON (dr.run_id = o.delivery_run_id OR dr.id::varchar = o.delivery_run_id)
-        LEFT JOIN customer_addresses ca ON ca.address_id = o.address_id
-        LEFT JOIN customers c ON c.customer_id = o.customer_id
-        LEFT JOIN users u ON u.user_id = o.customer_id
+        FROM delivery_run_addresses dra
+        JOIN delivery_runs dr ON (dr.run_id = dra.run_id OR dr.id::varchar = dra.run_id)
+        LEFT JOIN customer_addresses ca ON ca.address_id = dra.address_id
+        LEFT JOIN customers c ON c.customer_id = dra.customer_id
+        LEFT JOIN users u ON u.user_id = dra.customer_id
         WHERE (dr.id::varchar = $1 OR dr.run_id = $1)
-          AND o.deleted_at IS NULL
-        ORDER BY o.run_sequence ASC NULLS LAST, o.created_at ASC
+          AND dra.deleted_at IS NULL
+        ORDER BY dra.sequence_no ASC
       `;
       const rows = await this.db.query(sql, [runId]);
       return { status: true, data: rows || [], message: 'Run addresses fetched' };
@@ -1320,10 +1381,10 @@ export class DeliveryRunService {
           dra.address_id,
           dra.sequence_no,
           dra.delivery_status,
-          COALESCE(ca.address_line1 || ' ' || COALESCE(ca.address_line2, ''), ca.landmark, 'Customer Address') AS address_line,
+          COALESCE(NULLIF(TRIM(ca.address_line), ''), ca.landmark, 'Customer Address') AS address_line,
           ca.contact_name,
           ca.contact_mobile,
-          COALESCE(NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''), c.name, u.user_name, 'Customer') AS customer_name,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''), c.full_name, u.user_name, 'Customer') AS customer_name,
           (
             SELECT COUNT(*)::int FROM orders o
             WHERE o.delivery_run_id = dr.run_id
@@ -1514,7 +1575,7 @@ export class DeliveryRunService {
                  (run_id, address_id, sequence_no, customer_id, order_ids)
                VALUES
                  ($1, $2, (SELECT COALESCE(MAX(sequence_no), 0) + 1 FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL), $3, $4)`,
-              [targetRunId, address_id, customerId, order_ids ? order_ids.join(',') : null],
+              [targetRunId, address_id, customerId, order_ids ? JSON.stringify(order_ids) : null],
             );
           }
 
@@ -1578,17 +1639,22 @@ export class DeliveryRunService {
     this.developer.debug('DeliveryRunService.getEligibleTargetRuns called', { orderId });
     try {
       const orderRes = await this.db.query(
-        `SELECT o.order_id, o.customer_id, o.customer_name, o.address_id, o.address_line,
+        `SELECT o.order_id, o.customer_id,
+                COALESCE(NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), o.customer_name, 'Customer') AS customer_name,
+                o.address_id,
+                COALESCE(o.address_line, ca.address_line1 || ' ' || COALESCE(ca.address_line2, ''), 'Customer Address') AS address_line,
                 o.branch_id, o.delivery_slot, o.scheduled_date, o.status,
                 o.delivery_run_id, o.delivery_partner_id, o.total_amount,
                 b.branch_name,
-                u.first_name || ' ' || u.last_name AS current_partner_name,
+                COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), dp.full_name, 'Partner') AS current_partner_name,
                 dr.run_id AS current_run_id, dr.status AS current_run_status
          FROM orders o
+         LEFT JOIN customer_addresses ca ON ca.address_id = o.address_id
+         LEFT JOIN users cu ON cu.user_id = o.customer_id
          LEFT JOIN branches b ON b.branch_id = o.branch_id
          LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = o.delivery_partner_id
          LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
-         LEFT JOIN delivery_runs dr ON dr.run_id = o.delivery_run_id
+         LEFT JOIN delivery_runs dr ON (dr.run_id = o.delivery_run_id OR dr.id::varchar = o.delivery_run_id)
          WHERE o.order_id = $1 LIMIT 1`,
         [orderId],
       );
@@ -1615,12 +1681,12 @@ export class DeliveryRunService {
         `SELECT dr.id, dr.run_id, dr.run_date, dr.delivery_slot, dr.status,
                 dr.branch_id, b.branch_name,
                 dr.delivery_partner_id,
-                u.first_name || ' ' || u.last_name AS partner_name,
-                dp.phone AS partner_phone,
+                COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), dp.full_name, 'Partner') AS partner_name,
+                COALESCE(dp.phone, u.phone) AS partner_phone,
                 dp.is_active AS partner_active,
                 dp.is_available AS partner_available,
                 dr.total_addresses,
-                (SELECT COUNT(*)::int FROM orders ord WHERE ord.delivery_run_id = dr.run_id AND ord.status NOT IN ('cancelled', 'failed')) AS current_orders_count
+                (SELECT COUNT(*)::int FROM orders ord WHERE (ord.delivery_run_id = dr.run_id OR ord.delivery_run_id = dr.id::varchar) AND ord.status NOT IN ('cancelled', 'failed')) AS current_orders_count
          FROM delivery_runs dr
          LEFT JOIN branches b ON b.branch_id = dr.branch_id
          LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
@@ -1629,6 +1695,7 @@ export class DeliveryRunService {
            AND dr.delivery_slot = $2
            AND ($3::varchar IS NULL OR dr.branch_id = $3)
            AND dr.run_id != $4
+           AND dr.id::varchar != $4
            AND dr.status IN ('planned', 'assigned')
            AND dr.deleted_at IS NULL
            AND dp.is_active = true
@@ -1649,12 +1716,20 @@ export class DeliveryRunService {
       const runsWithOrders = await Promise.all(
         runsRes.map(async (run: any) => {
           const runOrders = await this.db.query(
-            `SELECT o.order_id, o.customer_id, o.customer_name, o.address_id, o.address_line,
-                    o.delivery_slot, o.status, o.total_amount, o.run_sequence
+            `SELECT o.order_id, o.customer_id,
+                    COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), o.customer_name, 'Customer') AS customer_name,
+                    o.address_id,
+                    COALESCE(o.address_line, ca.address_line1 || ' ' || COALESCE(ca.address_line2, ''), 'Customer Address') AS address_line,
+                    o.delivery_slot, o.status, o.total_amount,
+                    COALESCE(dra.sequence_no, o.run_sequence, 1) AS run_sequence
              FROM orders o
-             WHERE o.delivery_run_id = $1
+             LEFT JOIN customer_addresses ca ON ca.address_id = o.address_id
+             LEFT JOIN users u ON u.user_id = o.customer_id
+             LEFT JOIN delivery_run_addresses dra ON dra.run_id = o.delivery_run_id AND dra.address_id = o.address_id AND dra.deleted_at IS NULL
+             WHERE (o.delivery_run_id = $1 OR o.delivery_run_id = (SELECT id::varchar FROM delivery_runs WHERE run_id = $1))
                AND o.status NOT IN ('delivered', 'cancelled', 'failed')
-             ORDER BY o.run_sequence ASC NULLS LAST, o.created_at ASC`,
+               AND o.deleted_at IS NULL
+             ORDER BY COALESCE(dra.sequence_no, o.run_sequence, 1) ASC, o.created_at ASC`,
             [run.run_id],
           );
           return {
@@ -1696,7 +1771,7 @@ export class DeliveryRunService {
 
     try {
       return await this.db.transaction(async (client) => {
-        // 1. Lock and fetch source order
+        // 1. Lock and fetch the order
         const orderRes = await client.query<any>(
           `SELECT * FROM orders WHERE order_id = $1 FOR UPDATE`,
           [order_id],
@@ -1718,7 +1793,7 @@ export class DeliveryRunService {
 
         // 2. Lock and fetch source run
         const srcRunRes = await client.query<any>(
-          `SELECT * FROM delivery_runs WHERE run_id = $1 FOR UPDATE`,
+          `SELECT * FROM delivery_runs WHERE run_id = $1 OR id::varchar = $1 FOR UPDATE`,
           [sourceRunId],
         );
         const sourceRun = srcRunRes.rows[0];
@@ -1729,7 +1804,7 @@ export class DeliveryRunService {
 
         // 3. Lock and fetch target run
         const tgtRunRes = await client.query<any>(
-          `SELECT * FROM delivery_runs WHERE run_id = $1 FOR UPDATE`,
+          `SELECT * FROM delivery_runs WHERE run_id = $1 OR id::varchar = $1 FOR UPDATE`,
           [target_run_id],
         );
         const targetRun = tgtRunRes.rows[0];
@@ -1759,7 +1834,7 @@ export class DeliveryRunService {
         // 5. Target partner active & leave check
         const partnerRes = await client.query<any>(
           `SELECT dp.delivery_partner_id, dp.is_active, dp.is_available,
-                  u.first_name || ' ' || u.last_name AS partner_name
+                  COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), dp.full_name, 'Partner') AS partner_name
            FROM delivery_partners dp
            LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
            WHERE dp.delivery_partner_id = $1 LIMIT 1`,
@@ -1772,16 +1847,29 @@ export class DeliveryRunService {
 
         // 6. Warehouse dispatch / handover check
         const dispatchCheck = await client.query<any>(
-          `SELECT status FROM delivery_dispatch WHERE delivery_run_id = $1 LIMIT 1`,
-          [sourceRunId],
+          `SELECT status FROM delivery_dispatch WHERE delivery_run_id = $1 OR delivery_run_id = $2 LIMIT 1`,
+          [sourceRun.run_id, String(sourceRun.id)],
         );
         if (dispatchCheck.rows[0] && ['collected', 'dispatched', 'in_progress'].includes(dispatchCheck.rows[0].status)) {
           throw new BadRequestException(
-            `Order ${order_id} belongs to run ${sourceRunId} which has already been collected/dispatched from the warehouse and cannot be reassigned.`
+            `Order ${order_id} belongs to run ${sourceRun.run_id} which has already been collected/dispatched from the warehouse and cannot be reassigned.`
           );
         }
 
-        // 7. Update the order assignment
+        // 7. Find all orders at this address stop in the source run
+        const relatedOrders = await client.query<any>(
+          `SELECT order_id FROM orders
+           WHERE (delivery_run_id = $1 OR delivery_run_id = $2)
+             AND address_id = $3
+             AND deleted_at IS NULL`,
+          [sourceRun.run_id, String(sourceRun.id), order.address_id],
+        );
+        let allOrderIdsToMove = relatedOrders.rows.map((r: any) => r.order_id);
+        if (!allOrderIdsToMove.includes(order_id)) {
+          allOrderIdsToMove.push(order_id);
+        }
+
+        // Update all orders at this address
         await client.query(
           `UPDATE orders
            SET delivery_run_id = $1,
@@ -1789,53 +1877,23 @@ export class DeliveryRunService {
                assignment_method = 'manual_move',
                assigned_at = NOW(),
                updated_at = NOW()
-           WHERE order_id = $3`,
-          [targetRun.run_id, targetRun.delivery_partner_id, order_id],
+           WHERE order_id = ANY($3)`,
+          [targetRun.run_id, targetRun.delivery_partner_id, allOrderIdsToMove],
         );
 
-        // 8. Update delivery_run_addresses for Source Run:
-        // Remove order_id from address entry in source run
-        const srcAddrRes = await client.query<any>(
-          `SELECT id, sequence_no, address_id, customer_id, order_ids
-           FROM delivery_run_addresses
-           WHERE run_id = $1 AND deleted_at IS NULL
-           ORDER BY sequence_no ASC`,
-          [sourceRunId],
+        // 8. Delete this address from source run in delivery_run_addresses
+        await client.query(
+          `DELETE FROM delivery_run_addresses
+           WHERE (run_id = $1 OR run_id = $2) AND address_id = $3`,
+          [sourceRun.run_id, String(sourceRun.id), order.address_id],
         );
-
-        for (const row of srcAddrRes.rows) {
-          let orderList: string[] = [];
-          try {
-            const parsed = typeof row.order_ids === 'string' ? JSON.parse(row.order_ids) : row.order_ids;
-            orderList = Array.isArray(parsed) ? parsed : (row.order_ids ? String(row.order_ids).split(',') : []);
-          } catch {
-            orderList = row.order_ids ? String(row.order_ids).split(',') : [];
-          }
-
-          if (orderList.includes(order_id)) {
-            const remainingOrders = orderList.filter((oid) => oid !== order_id);
-            if (remainingOrders.length === 0) {
-              // Delete stop since no orders left at this address for this run
-              await client.query(
-                `DELETE FROM delivery_run_addresses WHERE id = $1`,
-                [row.id],
-              );
-            } else {
-              // Update with remaining orders
-              await client.query(
-                `UPDATE delivery_run_addresses
-                 SET order_ids = $1, updated_at = NOW()
-                 WHERE id = $2`,
-                [JSON.stringify(remainingOrders), row.id],
-              );
-            }
-          }
-        }
 
         // Re-sequence remaining stops for source run
         const remainingSrcStops = await client.query<any>(
-          `SELECT id FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL ORDER BY sequence_no ASC, id ASC`,
-          [sourceRunId],
+          `SELECT id FROM delivery_run_addresses
+           WHERE (run_id = $1 OR run_id = $2) AND deleted_at IS NULL
+           ORDER BY sequence_no ASC, id ASC`,
+          [sourceRun.run_id, String(sourceRun.id)],
         );
         for (let i = 0; i < remainingSrcStops.rows.length; i++) {
           await client.query(
@@ -1844,13 +1902,13 @@ export class DeliveryRunService {
           );
         }
 
-        // 9. Update delivery_run_addresses for Target Run:
+        // 9. Update delivery_run_addresses for Target Run
         const tgtAddrRes = await client.query<any>(
           `SELECT id, sequence_no, order_ids
            FROM delivery_run_addresses
-           WHERE run_id = $1 AND address_id = $2 AND deleted_at IS NULL
+           WHERE (run_id = $1 OR run_id = $2) AND address_id = $3 AND deleted_at IS NULL
            LIMIT 1`,
-          [targetRun.run_id, order.address_id],
+          [targetRun.run_id, String(targetRun.id), order.address_id],
         );
 
         let targetSeq = 1;
@@ -1864,8 +1922,8 @@ export class DeliveryRunService {
           } catch {
             tgtOrderList = existingTgtStop.order_ids ? String(existingTgtStop.order_ids).split(',') : [];
           }
-          if (!tgtOrderList.includes(order_id)) {
-            tgtOrderList.push(order_id);
+          for (const oid of allOrderIdsToMove) {
+            if (!tgtOrderList.includes(oid)) tgtOrderList.push(oid);
           }
           await client.query(
             `UPDATE delivery_run_addresses SET order_ids = $1, updated_at = NOW() WHERE id = $2`,
@@ -1873,37 +1931,38 @@ export class DeliveryRunService {
           );
         } else {
           const maxSeqRes = await client.query<any>(
-            `SELECT COALESCE(MAX(sequence_no), 0) + 1 AS next_seq FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL`,
-            [targetRun.run_id],
+            `SELECT COALESCE(MAX(sequence_no), 0) + 1 AS next_seq FROM delivery_run_addresses
+             WHERE (run_id = $1 OR run_id = $2) AND deleted_at IS NULL`,
+            [targetRun.run_id, String(targetRun.id)],
           );
           targetSeq = Number(maxSeqRes.rows[0]?.next_seq || 1);
           await client.query(
             `INSERT INTO delivery_run_addresses
                (run_id, address_id, sequence_no, customer_id, order_ids, delivery_status, created_at, updated_at)
              VALUES ($1, $2, $3, $4, $5, 'pending', NOW(), NOW())`,
-            [targetRun.run_id, order.address_id, targetSeq, order.customer_id, JSON.stringify([order_id])],
+            [targetRun.run_id, order.address_id, targetSeq, order.customer_id, JSON.stringify(allOrderIdsToMove)],
           );
         }
 
         await client.query(
-          `UPDATE orders SET run_sequence = $1 WHERE order_id = $2`,
-          [targetSeq, order_id],
+          `UPDATE orders SET run_sequence = $1 WHERE order_id = ANY($2)`,
+          [targetSeq, allOrderIdsToMove],
         );
 
         // 10. Update total_addresses counter on both runs
         await client.query(
           `UPDATE delivery_runs
-           SET total_addresses = (SELECT COUNT(*)::int FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL),
+           SET total_addresses = (SELECT COUNT(*)::int FROM delivery_run_addresses WHERE (run_id = $1 OR run_id = $2) AND deleted_at IS NULL),
                updated_at = NOW()
-           WHERE run_id = $1`,
-          [sourceRunId],
+           WHERE id = $2 OR run_id = $1`,
+          [sourceRun.run_id, String(sourceRun.id)],
         );
         await client.query(
           `UPDATE delivery_runs
-           SET total_addresses = (SELECT COUNT(*)::int FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL),
+           SET total_addresses = (SELECT COUNT(*)::int FROM delivery_run_addresses WHERE (run_id = $1 OR run_id = $2) AND deleted_at IS NULL),
                updated_at = NOW()
-           WHERE run_id = $1`,
-          [targetRun.run_id],
+           WHERE id = $2 OR run_id = $1`,
+          [targetRun.run_id, String(targetRun.id)],
         );
 
         // 11. Operation ID for tracking response
@@ -1917,7 +1976,7 @@ export class DeliveryRunService {
                 [sourceRun.delivery_partner_id],
                 {
                   title: 'Delivery Run Updated',
-                  body: `Order #${order_id} has been reassigned.`,
+                  body: `Address stop and ${allOrderIdsToMove.length} order(s) have been reassigned.`,
                 },
               );
             } catch (_) {}
@@ -1927,8 +1986,8 @@ export class DeliveryRunService {
               await this.pushNotificationService.sendNotificationToUsers(
                 [targetRun.delivery_partner_id],
                 {
-                  title: 'New Order Added',
-                  body: `Order #${order_id} has been added to your delivery run.`,
+                  title: 'New Address Stop Added',
+                  body: `Address stop and ${allOrderIdsToMove.length} order(s) added to your delivery run.`,
                 },
               );
             } catch (_) {}
@@ -1937,11 +1996,12 @@ export class DeliveryRunService {
 
         return {
           status: true,
-          message: `Order #${order_id} successfully moved to run ${targetRun.run_id}`,
+          message: `Address and ${allOrderIdsToMove.length} order(s) successfully moved to run ${targetRun.run_id}`,
           data: {
             operation_id: operationId,
             order_id,
-            from_run_id: sourceRunId,
+            moved_orders: allOrderIdsToMove,
+            from_run_id: sourceRun.run_id,
             to_run_id: targetRun.run_id,
             from_partner_id: sourceRun.delivery_partner_id,
             to_partner_id: targetRun.delivery_partner_id,
@@ -2007,24 +2067,24 @@ export class DeliveryRunService {
 
         // 3. Lock and fetch Run A & Run B
         const runARes = await client.query<any>(
-          `SELECT * FROM delivery_runs WHERE run_id = $1 FOR UPDATE`,
+          `SELECT * FROM delivery_runs WHERE run_id = $1 OR id::varchar = $1 FOR UPDATE`,
           [runAId],
         );
         const runA = runARes.rows[0];
         if (!runA) throw new BadRequestException(`Delivery run ${runAId} not found`);
 
         const runBRes = await client.query<any>(
-          `SELECT * FROM delivery_runs WHERE run_id = $1 FOR UPDATE`,
+          `SELECT * FROM delivery_runs WHERE run_id = $1 OR id::varchar = $1 FOR UPDATE`,
           [runBId],
         );
         const runB = runBRes.rows[0];
         if (!runB) throw new BadRequestException(`Delivery run ${runBId} not found`);
 
         if (['completed', 'cancelled'].includes(runA.status)) {
-          throw new BadRequestException(`Delivery run ${runAId} is ${runA.status} and cannot be modified`);
+          throw new BadRequestException(`Delivery run ${runA.run_id} is ${runA.status} and cannot be modified`);
         }
         if (['completed', 'cancelled'].includes(runB.status)) {
-          throw new BadRequestException(`Delivery run ${runBId} is ${runB.status} and cannot be modified`);
+          throw new BadRequestException(`Delivery run ${runB.run_id} is ${runB.status} and cannot be modified`);
         }
 
         // 4. Invariance validations
@@ -2054,8 +2114,8 @@ export class DeliveryRunService {
 
         // 6. Dispatch check
         const dCheck = await client.query<any>(
-          `SELECT delivery_run_id, status FROM delivery_dispatch WHERE delivery_run_id IN ($1, $2)`,
-          [runAId, runBId],
+          `SELECT delivery_run_id, status FROM delivery_dispatch WHERE delivery_run_id IN ($1, $2, $3, $4)`,
+          [runA.run_id, String(runA.id), runB.run_id, String(runB.id)],
         );
         for (const d of dCheck.rows) {
           if (['collected', 'dispatched', 'in_progress'].includes(d.status)) {
@@ -2063,7 +2123,22 @@ export class DeliveryRunService {
           }
         }
 
-        // 7. Update orders: Order A -> Run B, Order B -> Run A
+        // 7. Find all orders at Address A (in Run A) and Address B (in Run B)
+        const relatedOrdersA = await client.query<any>(
+          `SELECT order_id FROM orders WHERE (delivery_run_id = $1 OR delivery_run_id = $2) AND address_id = $3 AND deleted_at IS NULL`,
+          [runA.run_id, String(runA.id), orderA.address_id],
+        );
+        let allOrdersA = relatedOrdersA.rows.map((r: any) => r.order_id);
+        if (!allOrdersA.includes(order_a_id)) allOrdersA.push(order_a_id);
+
+        const relatedOrdersB = await client.query<any>(
+          `SELECT order_id FROM orders WHERE (delivery_run_id = $1 OR delivery_run_id = $2) AND address_id = $3 AND deleted_at IS NULL`,
+          [runB.run_id, String(runB.id), orderB.address_id],
+        );
+        let allOrdersB = relatedOrdersB.rows.map((r: any) => r.order_id);
+        if (!allOrdersB.includes(order_b_id)) allOrdersB.push(order_b_id);
+
+        // Update all Address A orders -> Run B / Partner B
         await client.query(
           `UPDATE orders
            SET delivery_run_id = $1,
@@ -2071,10 +2146,11 @@ export class DeliveryRunService {
                assignment_method = 'manual_swap',
                assigned_at = NOW(),
                updated_at = NOW()
-           WHERE order_id = $3`,
-          [runB.run_id, runB.delivery_partner_id, order_a_id],
+           WHERE order_id = ANY($3)`,
+          [runB.run_id, runB.delivery_partner_id, allOrdersA],
         );
 
+        // Update all Address B orders -> Run A / Partner A
         await client.query(
           `UPDATE orders
            SET delivery_run_id = $1,
@@ -2082,167 +2158,78 @@ export class DeliveryRunService {
                assignment_method = 'manual_swap',
                assigned_at = NOW(),
                updated_at = NOW()
-           WHERE order_id = $3`,
-          [runA.run_id, runA.delivery_partner_id, order_b_id],
+           WHERE order_id = ANY($3)`,
+          [runA.run_id, runA.delivery_partner_id, allOrdersB],
         );
 
-        // 8. Adjust delivery_run_addresses for Run A (remove A, add B)
-        const srcAAddrs = await client.query<any>(
-          `SELECT id, sequence_no, address_id, customer_id, order_ids
-           FROM delivery_run_addresses
-           WHERE run_id = $1 AND deleted_at IS NULL`,
-          [runAId],
+        // Remove Address A from Run A and remove Address B from Run B
+        await client.query(
+          `DELETE FROM delivery_run_addresses WHERE (run_id = $1 OR run_id = $2) AND address_id = $3`,
+          [runA.run_id, String(runA.id), orderA.address_id],
         );
-        for (const row of srcAAddrs.rows) {
-          let orderList: string[] = [];
-          try {
-            const parsed = typeof row.order_ids === 'string' ? JSON.parse(row.order_ids) : row.order_ids;
-            orderList = Array.isArray(parsed) ? parsed : (row.order_ids ? String(row.order_ids).split(',') : []);
-          } catch {
-            orderList = row.order_ids ? String(row.order_ids).split(',') : [];
-          }
-          if (orderList.includes(order_a_id)) {
-            const remaining = orderList.filter((oid) => oid !== order_a_id);
-            if (remaining.length === 0) {
-              await client.query(`DELETE FROM delivery_run_addresses WHERE id = $1`, [row.id]);
-            } else {
-              await client.query(
-                `UPDATE delivery_run_addresses SET order_ids = $1, updated_at = NOW() WHERE id = $2`,
-                [JSON.stringify(remaining), row.id],
-              );
-            }
-          }
-        }
-
-        // Add Order B to Run A addresses
-        const tgtAAddr = await client.query<any>(
-          `SELECT id, sequence_no, order_ids FROM delivery_run_addresses WHERE run_id = $1 AND address_id = $2 AND deleted_at IS NULL LIMIT 1`,
-          [runAId, orderB.address_id],
+        await client.query(
+          `DELETE FROM delivery_run_addresses WHERE (run_id = $1 OR run_id = $2) AND address_id = $3`,
+          [runB.run_id, String(runB.id), orderB.address_id],
         );
-        let seqA = 1;
-        if (tgtAAddr.rows.length > 0) {
-          const row = tgtAAddr.rows[0];
-          seqA = row.sequence_no;
-          let oList: string[] = [];
-          try {
-            const parsed = typeof row.order_ids === 'string' ? JSON.parse(row.order_ids) : row.order_ids;
-            oList = Array.isArray(parsed) ? parsed : (row.order_ids ? String(row.order_ids).split(',') : []);
-          } catch {
-            oList = row.order_ids ? String(row.order_ids).split(',') : [];
-          }
-          if (!oList.includes(order_b_id)) oList.push(order_b_id);
-          await client.query(
-            `UPDATE delivery_run_addresses SET order_ids = $1, updated_at = NOW() WHERE id = $2`,
-            [JSON.stringify(oList), row.id],
-          );
-        } else {
-          const maxSeqA = await client.query<any>(
-            `SELECT COALESCE(MAX(sequence_no), 0) + 1 AS next_seq FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL`,
-            [runAId],
-          );
-          seqA = Number(maxSeqA.rows[0]?.next_seq || 1);
-          await client.query(
-            `INSERT INTO delivery_run_addresses
-               (run_id, address_id, sequence_no, customer_id, order_ids, delivery_status, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, 'pending', NOW(), NOW())`,
-            [runAId, orderB.address_id, seqA, orderB.customer_id, JSON.stringify([order_b_id])],
-          );
-        }
-        await client.query(`UPDATE orders SET run_sequence = $1 WHERE order_id = $2`, [seqA, order_b_id]);
 
-        // 9. Adjust delivery_run_addresses for Run B (remove B, add A)
-        const srcBAddrs = await client.query<any>(
-          `SELECT id, sequence_no, address_id, customer_id, order_ids
-           FROM delivery_run_addresses
-           WHERE run_id = $1 AND deleted_at IS NULL`,
-          [runBId],
+        // Add Address B to Run A
+        const maxSeqA = await client.query<any>(
+          `SELECT COALESCE(MAX(sequence_no), 0) + 1 AS next_seq FROM delivery_run_addresses WHERE (run_id = $1 OR run_id = $2) AND deleted_at IS NULL`,
+          [runA.run_id, String(runA.id)],
         );
-        for (const row of srcBAddrs.rows) {
-          let orderList: string[] = [];
-          try {
-            const parsed = typeof row.order_ids === 'string' ? JSON.parse(row.order_ids) : row.order_ids;
-            orderList = Array.isArray(parsed) ? parsed : (row.order_ids ? String(row.order_ids).split(',') : []);
-          } catch {
-            orderList = row.order_ids ? String(row.order_ids).split(',') : [];
-          }
-          if (orderList.includes(order_b_id)) {
-            const remaining = orderList.filter((oid) => oid !== order_b_id);
-            if (remaining.length === 0) {
-              await client.query(`DELETE FROM delivery_run_addresses WHERE id = $1`, [row.id]);
-            } else {
-              await client.query(
-                `UPDATE delivery_run_addresses SET order_ids = $1, updated_at = NOW() WHERE id = $2`,
-                [JSON.stringify(remaining), row.id],
-              );
-            }
-          }
-        }
-
-        // Add Order A to Run B addresses
-        const tgtBAddr = await client.query<any>(
-          `SELECT id, sequence_no, order_ids FROM delivery_run_addresses WHERE run_id = $1 AND address_id = $2 AND deleted_at IS NULL LIMIT 1`,
-          [runBId, orderA.address_id],
+        const seqA = Number(maxSeqA.rows[0]?.next_seq || 1);
+        await client.query(
+          `INSERT INTO delivery_run_addresses
+             (run_id, address_id, sequence_no, customer_id, order_ids, delivery_status, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, 'pending', NOW(), NOW())`,
+          [runA.run_id, orderB.address_id, seqA, orderB.customer_id, JSON.stringify(allOrdersB)],
         );
-        let seqB = 1;
-        if (tgtBAddr.rows.length > 0) {
-          const row = tgtBAddr.rows[0];
-          seqB = row.sequence_no;
-          let oList: string[] = [];
-          try {
-            const parsed = typeof row.order_ids === 'string' ? JSON.parse(row.order_ids) : row.order_ids;
-            oList = Array.isArray(parsed) ? parsed : (row.order_ids ? String(row.order_ids).split(',') : []);
-          } catch {
-            oList = row.order_ids ? String(row.order_ids).split(',') : [];
-          }
-          if (!oList.includes(order_a_id)) oList.push(order_a_id);
-          await client.query(
-            `UPDATE delivery_run_addresses SET order_ids = $1, updated_at = NOW() WHERE id = $2`,
-            [JSON.stringify(oList), row.id],
-          );
-        } else {
-          const maxSeqB = await client.query<any>(
-            `SELECT COALESCE(MAX(sequence_no), 0) + 1 AS next_seq FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL`,
-            [runBId],
-          );
-          seqB = Number(maxSeqB.rows[0]?.next_seq || 1);
-          await client.query(
-            `INSERT INTO delivery_run_addresses
-               (run_id, address_id, sequence_no, customer_id, order_ids, delivery_status, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, 'pending', NOW(), NOW())`,
-            [runBId, orderA.address_id, seqB, orderA.customer_id, JSON.stringify([order_a_id])],
-          );
-        }
-        await client.query(`UPDATE orders SET run_sequence = $1 WHERE order_id = $2`, [seqB, order_a_id]);
+        await client.query(`UPDATE orders SET run_sequence = $1 WHERE order_id = ANY($2)`, [seqA, allOrdersB]);
 
-        // Re-sequence and recalculate total_addresses for both runs
+        // Add Address A to Run B
+        const maxSeqB = await client.query<any>(
+          `SELECT COALESCE(MAX(sequence_no), 0) + 1 AS next_seq FROM delivery_run_addresses WHERE (run_id = $1 OR run_id = $2) AND deleted_at IS NULL`,
+          [runB.run_id, String(runB.id)],
+        );
+        const seqB = Number(maxSeqB.rows[0]?.next_seq || 1);
+        await client.query(
+          `INSERT INTO delivery_run_addresses
+             (run_id, address_id, sequence_no, customer_id, order_ids, delivery_status, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, 'pending', NOW(), NOW())`,
+          [runB.run_id, orderA.address_id, seqB, orderA.customer_id, JSON.stringify(allOrdersA)],
+        );
+        await client.query(`UPDATE orders SET run_sequence = $1 WHERE order_id = ANY($2)`, [seqB, allOrdersA]);
+
+        // Re-sequence both runs
         const remAStops = await client.query<any>(
-          `SELECT id FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL ORDER BY sequence_no ASC, id ASC`,
-          [runAId],
+          `SELECT id FROM delivery_run_addresses WHERE (run_id = $1 OR run_id = $2) AND deleted_at IS NULL ORDER BY sequence_no ASC, id ASC`,
+          [runA.run_id, String(runA.id)],
         );
         for (let i = 0; i < remAStops.rows.length; i++) {
           await client.query(`UPDATE delivery_run_addresses SET sequence_no = $1 WHERE id = $2`, [i + 1, remAStops.rows[i].id]);
         }
         const remBStops = await client.query<any>(
-          `SELECT id FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL ORDER BY sequence_no ASC, id ASC`,
-          [runBId],
+          `SELECT id FROM delivery_run_addresses WHERE (run_id = $1 OR run_id = $2) AND deleted_at IS NULL ORDER BY sequence_no ASC, id ASC`,
+          [runB.run_id, String(runB.id)],
         );
         for (let i = 0; i < remBStops.rows.length; i++) {
           await client.query(`UPDATE delivery_run_addresses SET sequence_no = $1 WHERE id = $2`, [i + 1, remBStops.rows[i].id]);
         }
 
+        // Update total_addresses counter on both runs
         await client.query(
           `UPDATE delivery_runs
-           SET total_addresses = (SELECT COUNT(*)::int FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL),
+           SET total_addresses = (SELECT COUNT(*)::int FROM delivery_run_addresses WHERE (run_id = $1 OR run_id = $2) AND deleted_at IS NULL),
                updated_at = NOW()
-           WHERE run_id = $1`,
-          [runAId],
+           WHERE id = $2 OR run_id = $1`,
+          [runA.run_id, String(runA.id)],
         );
         await client.query(
           `UPDATE delivery_runs
-           SET total_addresses = (SELECT COUNT(*)::int FROM delivery_run_addresses WHERE run_id = $1 AND deleted_at IS NULL),
+           SET total_addresses = (SELECT COUNT(*)::int FROM delivery_run_addresses WHERE (run_id = $1 OR run_id = $2) AND deleted_at IS NULL),
                updated_at = NOW()
-           WHERE run_id = $1`,
-          [runBId],
+           WHERE id = $2 OR run_id = $1`,
+          [runB.run_id, String(runB.id)],
         );
 
         // 10. Operation ID for tracking response
@@ -2253,22 +2240,22 @@ export class DeliveryRunService {
           try {
             await this.pushNotificationService.sendNotificationToUsers(
               [runA.delivery_partner_id],
-              { title: 'Delivery Run Updated', body: `Orders have been swapped on your run.` },
+              { title: 'Delivery Run Updated', body: `Address stops have been swapped on your run.` },
             );
             await this.pushNotificationService.sendNotificationToUsers(
               [runB.delivery_partner_id],
-              { title: 'Delivery Run Updated', body: `Orders have been swapped on your run.` },
+              { title: 'Delivery Run Updated', body: `Address stops have been swapped on your run.` },
             );
           } catch (_) {}
         }
 
         return {
           status: true,
-          message: `Orders #${order_a_id} and #${order_b_id} swapped successfully between runs ${runAId} and ${runBId}`,
+          message: `Address stops swapped successfully between runs ${runA.run_id} and ${runB.run_id}`,
           data: {
             operation_id: operationId,
-            order_a: { order_id: order_a_id, from_run: runAId, to_run: runBId },
-            order_b: { order_id: order_b_id, from_run: runBId, to_run: runAId },
+            order_a: { order_id: order_a_id, from_run: runA.run_id, to_run: runB.run_id, orders_moved: allOrdersA },
+            order_b: { order_id: order_b_id, from_run: runB.run_id, to_run: runA.run_id, orders_moved: allOrdersB },
           },
         };
       });
@@ -2312,28 +2299,36 @@ export class DeliveryRunService {
           dr.branch_id,
           b.branch_name,
           dr.delivery_partner_id,
-          u.first_name || ' ' || u.last_name AS partner_name,
-          dp.phone AS partner_phone,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), dp.full_name, 'Partner') AS partner_name,
+          COALESCE(dp.phone, u.phone) AS partner_phone,
           dp.is_active AS partner_active,
-          dr.total_addresses,
-          dr.completed_addresses,
-          dr.failed_addresses,
+          COALESCE((SELECT COUNT(*)::int FROM delivery_run_addresses dra WHERE dra.run_id = dr.run_id AND dra.deleted_at IS NULL), dr.total_addresses, 0) AS total_addresses,
+          COALESCE((SELECT COUNT(*)::int FROM delivery_run_addresses dra WHERE dra.run_id = dr.run_id AND dra.delivery_status = 'delivered' AND dra.deleted_at IS NULL), dr.completed_addresses, 0) AS completed_addresses,
+          COALESCE((SELECT COUNT(*)::int FROM delivery_run_addresses dra WHERE dra.run_id = dr.run_id AND dra.delivery_status = 'failed' AND dra.deleted_at IS NULL), dr.failed_addresses, 0) AS failed_addresses,
           dr.created_at,
           COALESCE(
             (SELECT json_agg(
               json_build_object(
                 'order_id', o.order_id,
                 'customer_id', o.customer_id,
-                'customer_name', o.customer_name,
+                'customer_name', COALESCE(NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), o.customer_name, 'Customer'),
                 'address_id', o.address_id,
-                'address_line', o.address_line,
+                'address_line', COALESCE(o.address_line, ca.address_line1 || ' ' || COALESCE(ca.address_line2, ''), 'Customer Address'),
                 'delivery_slot', o.delivery_slot,
                 'status', o.status,
                 'total_amount', o.total_amount,
-                'run_sequence', o.run_sequence,
+                'run_sequence', COALESCE(dra.sequence_no, o.run_sequence, 1),
                 'created_at', o.created_at
-              ) ORDER BY o.run_sequence ASC NULLS LAST, o.created_at ASC
-            ) FROM orders o WHERE o.delivery_run_id = dr.run_id AND o.status NOT IN ('cancelled', 'failed')),
+              ) ORDER BY COALESCE(dra.sequence_no, o.run_sequence, 1) ASC, o.created_at ASC
+            )
+            FROM orders o
+            LEFT JOIN customer_addresses ca ON ca.address_id = o.address_id
+            LEFT JOIN users cu ON cu.user_id = o.customer_id
+            LEFT JOIN delivery_run_addresses dra ON dra.run_id = dr.run_id AND dra.address_id = o.address_id AND dra.deleted_at IS NULL
+            WHERE (o.delivery_run_id = dr.run_id OR o.delivery_run_id = dr.id::varchar)
+              AND o.status NOT IN ('cancelled', 'failed')
+              AND o.deleted_at IS NULL
+            ),
             '[]'::json
           ) AS orders
         FROM delivery_runs dr

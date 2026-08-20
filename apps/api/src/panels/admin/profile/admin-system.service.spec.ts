@@ -98,7 +98,7 @@ describe('AdminSystemService audit logs', () => {
     expect(insightSql).toContain(
       "al.created_at < (($6::date + INTERVAL '1 day') AT TIME ZONE 'Asia/Kolkata')",
     );
-    expect(insightParams).toEqual(rowsParams);
+    expect(insightParams).toEqual(rowsParams.slice(0, -2));
     expect(adminCall![0]).toContain(
       'ORDER BY admin_id, created_at DESC, id DESC',
     );

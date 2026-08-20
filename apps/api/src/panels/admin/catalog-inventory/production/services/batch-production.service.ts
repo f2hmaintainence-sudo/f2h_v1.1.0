@@ -334,7 +334,6 @@ export class BatchProductionService {
           (ob.total_quantity - ob.prepared_quantity)::numeric AS remaining_quantity,
           ob.total_orders,
           ob.order_ids,
-          ob.unit,
           ob.notes,
           ob.created_at,
           ob.updated_at,
@@ -452,7 +451,7 @@ export class BatchProductionService {
   // ────────────────────────────────────────────────
   async createManualBatch(body: any, adminId: string) {
     try {
-      const { branch_id, product_id, production_date, slot, total_quantity, notes, unit } = body;
+      const { branch_id, product_id, production_date, slot, total_quantity, notes } = body;
 
       if (!branch_id || !product_id || !production_date || !total_quantity) {
         return { status: false, message: 'branch_id, product_id, production_date and total_quantity are required' };
@@ -466,14 +465,13 @@ export class BatchProductionService {
       await this.db.query(
         `INSERT INTO order_batches
           (batch_id, branch_id, production_date, slot, product_id,
-           status, total_quantity, unit, notes, created_by, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, NOW(), NOW())
+           status, total_quantity, notes, created_by, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, NOW(), NOW())
         ON CONFLICT (batch_id) DO UPDATE SET
           total_quantity = order_batches.total_quantity + EXCLUDED.total_quantity,
-          unit = EXCLUDED.unit,
           notes = COALESCE(EXCLUDED.notes, order_batches.notes),
           updated_at = NOW()`,
-        [batchId, branch_id, production_date, slot || 'morning', product_id, total_quantity, unit || 'pcs', notes || null, adminId],
+        [batchId, branch_id, production_date, slot || 'morning', product_id, total_quantity, notes || null, adminId],
       );
 
       return {

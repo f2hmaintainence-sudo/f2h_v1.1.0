@@ -302,11 +302,16 @@ export class DashboardService {
 
       // Low stock alerts
       const lowStockSql = `
-        SELECT pv.variant_id, p.name AS product_name, pv.name AS variant_name, pv.stock, pv.low_stock_threshold
+        SELECT pv.variant_id, p.name AS product_name, pv.name AS variant_name,
+               COALESCE(SUM(sb.available_quantity), 0)::numeric AS stock,
+               pv.low_stock_threshold
         FROM product_variants pv
         JOIN products p ON p.product_id = pv.product_id
-        WHERE pv.status = 'active' AND pv.stock <= pv.low_stock_threshold AND pv.stock >= 0
-        ORDER BY pv.stock ASC
+        LEFT JOIN stock_balances sb ON sb.product_variant_id = pv.variant_id AND sb.deleted_at IS NULL
+        WHERE pv.status = 'active' AND pv.deleted_at IS NULL
+        GROUP BY pv.variant_id, p.name, pv.name, pv.low_stock_threshold
+        HAVING COALESCE(SUM(sb.available_quantity), 0) BETWEEN 0 AND pv.low_stock_threshold
+        ORDER BY stock ASC
         LIMIT 5
       `;
       const lowStock = await this.db.query(lowStockSql);

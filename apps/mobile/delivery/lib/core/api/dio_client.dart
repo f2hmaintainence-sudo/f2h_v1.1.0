@@ -68,6 +68,15 @@ class DioClient {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
+    if (!options.path.startsWith('http')) {
+      final activeBase = ApiEndpoints.apiBaseUrl;
+      if (options.path.startsWith('/api/v1')) {
+        options.path = '${ApiEndpoints.host}${options.path}';
+      } else {
+        final relPath = options.path.startsWith('/') ? options.path : '/${options.path}';
+        options.path = '$activeBase$relPath';
+      }
+    }
     final token = await TokenStorage.getAccessToken();
     if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';

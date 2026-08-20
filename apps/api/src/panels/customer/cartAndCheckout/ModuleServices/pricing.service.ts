@@ -48,15 +48,12 @@ export class PricingService {
                 COALESCE(csp.discount_percentage, csp.discount, 0) AS discount_percentage,
                 csp.special_price 
          FROM customer_special_prices csp
-         LEFT JOIN customers c ON (c.customer_id = csp.customer_id OR c.id = csp.customer_id OR c.user_id = csp.customer_id)
-         LEFT JOIN users u ON (u.user_id = csp.customer_id OR u.user_id = c.user_id)
+         LEFT JOIN customers c ON (c.customer_id = csp.customer_id OR c.id::text = csp.customer_id)
          WHERE (
            csp.customer_id = $1 
            OR LOWER(csp.customer_id) = LOWER($1) 
-           OR c.user_id = $1 
-           OR c.id = $1 
            OR c.customer_id = $1 
-           OR u.user_id = $1
+           OR c.id::text = $1 
          )
            AND csp.deleted_at IS NULL 
            AND (csp.discount_percentage > 0 OR csp.discount > 0 OR csp.special_price > 0)`,

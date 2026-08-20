@@ -147,7 +147,7 @@ export class RefundCandidatesRepository {
          s.subscription_number,
          p.name  AS product_name,
          pv.name AS variant_name,
-         o.order_number
+         o.order_id AS order_number
        FROM subscription_refund_candidates src
        LEFT JOIN subscriptions s        ON s.subscription_id = src.subscription_id
        LEFT JOIN users u                ON u.user_id = src.customer_id
@@ -200,7 +200,7 @@ export class RefundCandidatesRepository {
              'subscription_item_id', src.subscription_item_id,
              'subscription_number', s.subscription_number,
              'order_id', src.order_id,
-             'order_number', o.order_number,
+             'order_number', o.order_id,
              'scheduled_date', src.scheduled_date,
              'delivery_slot', src.delivery_slot,
              'quantity', src.quantity,
