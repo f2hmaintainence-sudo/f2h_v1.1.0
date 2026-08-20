@@ -347,8 +347,8 @@ export class DeliveryManagementController {
   }
 
   @Get('dispatch/available-variants')
-  async getAvailableVariants() {
-    return this.dispatchService.getAvailableVariants();
+  async getAvailableVariants(@Query() query: any) {
+    return this.dispatchService.getAvailableVariants(query);
   }
 
   @Get('dispatch/returns')

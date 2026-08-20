@@ -116,6 +116,106 @@ function EmptyState({ icon: Icon, title, desc }: { icon: any; title: string; des
 // Tab 1: Dispatch Requirements
 // ─────────────────────────────────────────────────────────
 
+/**
+ * Consolidated pick list for a day's runs — what the warehouse must pull from
+ * the shelves. Lives alongside the dispatch requirements because both answer
+ * "what has to leave the warehouse today".
+ */
+function WarehousePickList({ date }: { date: string }) {
+  const [plans, setPlans] = useState<DeliveryPartnerPlan[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [pickSearchQuery, setPickSearchQuery] = useState("");
+
+  useEffect(() => {
+    if (!date) return;
+    let cancelled = false;
+    setLoading(true);
+    DispatchPlanningService.fetchDispatchPlan(date)
+      .then((data) => { if (!cancelled) setPlans(data); })
+      .catch(() => { if (!cancelled) setPlans([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [date]);
+
+  const warehouseTotals = useMemo(() => DispatchPlanningService.compileWarehouseTotals(plans), [plans]);
+
+  const filteredPickList = useMemo(() =>
+    Object.values(warehouseTotals).filter((item) => {
+      const q = pickSearchQuery.toLowerCase();
+      return (item.product_name || "").toLowerCase().includes(q) || (item.variant_name || "").toLowerCase().includes(q);
+    }),
+    [warehouseTotals, pickSearchQuery]
+  );
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+      {loading ? (
+        <div className="p-10 text-center text-xs font-bold text-slate-400">Loading pick list…</div>
+      ) : (
+            <div className="animate-in fade-in duration-200">
+              <div className="flex items-center justify-between p-4 border-b border-slate-50 bg-slate-50/40">
+                <div>
+                  <h2 className="text-sm font-black text-slate-800">Consolidated Warehouse Pick List</h2>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Pull these quantities from the shelves to fulfil all today's runs</p>
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <input type="text" placeholder="Search product..." value={pickSearchQuery} onChange={(e) => setPickSearchQuery(e.target.value)}
+                    className="pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs outline-none bg-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-all w-56 font-medium" />
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50/60 text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                      <th className="px-5 py-3.5">#</th>
+                      <th className="px-5 py-3.5">Product Name</th>
+                      <th className="px-5 py-3.5">Variant / Size</th>
+                      <th className="px-5 py-3.5 text-center">Qty to Pull</th>
+                      <th className="px-5 py-3.5 text-center">Orders</th>
+                      <th className="px-5 py-3.5 text-center">Runs</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {filteredPickList.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-14 text-center">
+                          <Package size={32} className="mx-auto text-slate-200 mb-2" />
+                          <p className="text-sm font-bold text-slate-400">No items in pick list</p>
+                        </td>
+                      </tr>
+                    ) : filteredPickList.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/60 transition-colors group">
+                        <td className="px-5 py-4 text-slate-400 font-bold text-[11px]">{idx + 1}</td>
+                        <td className="px-5 py-4">
+                          <span className="font-bold text-slate-800 group-hover:text-emerald-800 transition-colors">{item.product_name}</span>
+                        </td>
+                        <td className="px-5 py-4 text-slate-500 font-medium">{item.variant_name || "—"}</td>
+                        <td className="px-5 py-4 text-center">
+                          <span className="inline-flex items-center justify-center px-2.5 py-1 bg-emerald-600 text-white rounded-lg font-black text-[12px]">×{item.quantity}</span>
+                        </td>
+                        <td className="px-5 py-4 text-center">
+                          <span className="px-2.5 py-1 bg-sky-50 text-sky-700 font-bold text-[11px] rounded-lg border border-sky-100">{item.orderCount || 1}</span>
+                        </td>
+                        <td className="px-5 py-4 text-center text-slate-400 font-medium text-[11px]">
+                          {plans.filter((p) => Object.values(p.totals || {}).some((t) => t.product_variant_id === (item as any).product_variant_id)).length}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {filteredPickList.length > 0 && (
+                <div className="px-5 py-3 bg-slate-50/40 border-t border-slate-100 text-[11px] text-slate-400 font-medium">
+                  {filteredPickList.length} product variants · {filteredPickList.reduce((s, i) => s + i.quantity, 0)} total units to pull
+                </div>
+              )}
+            </div>
+      )}
+    </div>
+  );
+}
+
 function DispatchRequirementsTab({ warehouses }: { warehouses: any[] }) {
   const [date, setDate] = useState(todayIST);
   const [warehouseFilter, setWarehouseFilter] = useState("");
@@ -322,6 +422,15 @@ function DispatchRequirementsTab({ warehouses }: { warehouses: any[] }) {
           </div>
         );
       })}
+
+      {/* Consolidated pick list for the same day */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 px-1">
+          <ClipboardList size={14} className="text-emerald-600" />
+          <h2 className="text-sm font-black text-slate-800">Consolidated Warehouse Pick List</h2>
+        </div>
+        <WarehousePickList date={date} />
+      </div>
     </div>
   );
 }
@@ -963,8 +1072,6 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
   const [plans, setPlans] = useState<DeliveryPartnerPlan[]>([]);
   const [selectedWarehouse, setSelectedWarehouse] = useState("");
 
-  const [currentTab, setCurrentTab] = useState<"bulk" | "riders">("bulk");
-  const [pickSearchQuery, setPickSearchQuery] = useState("");
 
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
   const [showOrderBreakdowns, setShowOrderBreakdowns] = useState<Record<string, boolean>>({});
@@ -977,6 +1084,7 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
   const [activePlanForModal, setActivePlanForModal] = useState<DeliveryPartnerPlan | null>(null);
   const [modalItems, setModalItems] = useState<any[]>([]);
   const [availableVariants, setAvailableVariants] = useState<any[]>([]);
+  const [loadingVariants, setLoadingVariants] = useState(false);
   const [selectedVariantToAdd, setSelectedVariantToAdd] = useState("");
   const [qtyToAdd, setQtyToAdd] = useState(1);
   const [searchQueryVariant, setSearchQueryVariant] = useState("");
@@ -1016,11 +1124,27 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
     if (warehouses.length > 0) setSelectedWarehouse(warehouses[0].warehouse_id || warehouses[0].id || "");
   }, [warehouses]);
 
+  // Stock on offer is whatever the run's own warehouse holds, so the picker
+  // cannot suggest something that is not on the shelf.
+  const modalWarehouseId = activePlanForModal?.warehouse_id || selectedWarehouse || "";
+
   useEffect(() => {
-    api.get<any>("/admin/delivery/dispatch/available-variants")
-      .then((res) => { if (res.data?.status && Array.isArray(res.data.data)) setAvailableVariants(res.data.data); })
-      .catch(() => {});
-  }, []);
+    if (!isApproveModalOpen) return;
+    let cancelled = false;
+    setAvailableVariants([]);
+    setLoadingVariants(true);
+    const params: Record<string, string> = {};
+    if (modalWarehouseId) params.warehouse_id = modalWarehouseId;
+    else if (activePlanForModal?.run_id) params.run_id = activePlanForModal.run_id;
+    api.get<any>("/admin/delivery/dispatch/available-variants", { params })
+      .then((res) => {
+        if (cancelled) return;
+        if (res.data?.status && Array.isArray(res.data.data)) setAvailableVariants(res.data.data);
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingVariants(false); });
+    return () => { cancelled = true; };
+  }, [isApproveModalOpen, modalWarehouseId, activePlanForModal?.run_id]);
 
   const loadPlan = async (date: string, quiet = false) => {
     if (!date) return;
@@ -1048,14 +1172,6 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
   useEffect(() => { loadPlan(targetDate, true); }, [targetDate]);
 
   const warehouseTotals = useMemo(() => DispatchPlanningService.compileWarehouseTotals(plans), [plans]);
-
-  const filteredPickList = useMemo(() =>
-    Object.values(warehouseTotals).filter((item) => {
-      const q = pickSearchQuery.toLowerCase();
-      return (item.product_name || "").toLowerCase().includes(q) || (item.variant_name || "").toLowerCase().includes(q);
-    }),
-    [warehouseTotals, pickSearchQuery]
-  );
 
   const statistics = useMemo(() => {
     let totalOrders = 0;
@@ -1087,8 +1203,24 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
     [plans, activeSearch, selectedSlot, riderFilter]
   );
 
+  const matchingVariants = useMemo(() => {
+    const q = searchQueryVariant.toLowerCase();
+    return availableVariants.filter((v) =>
+      `${v.product_name} ${v.variant_name} ${v.unit_value || ""} ${v.unit_type || ""}`.toLowerCase().includes(q),
+    );
+  }, [availableVariants, searchQueryVariant]);
+
+  /** Units on hand for the row currently chosen in the picker. */
+  const selectedVariantStock = useMemo(() => {
+    const v = availableVariants.find((x) => x.product_variant_id === selectedVariantToAdd);
+    return v ? Number(v.available_quantity ?? 0) : 0;
+  }, [availableVariants, selectedVariantToAdd]);
+
   const handleApproveDispatch = async (plan: DeliveryPartnerPlan) => {
-    if (!selectedWarehouse) { showErrorToast("Select a source warehouse first."); return; }
+    if (!plan.warehouse_id && !selectedWarehouse) {
+      showErrorToast("This run's branch has no warehouse — select a source warehouse first.");
+      return;
+    }
     setActivePlanForModal(plan);
     setModalItems(Object.values(plan.totals || {}).map((item) => ({ ...item, planned_qty: item.quantity, loaded_qty: item.quantity })));
     setSelectedVariantToAdd("");
@@ -1107,7 +1239,11 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
         const key = `${item.product_name.trim()}::${item.variant_name.trim()}`;
         updatedTotals[key] = { ...item, quantity: item.loaded_qty };
       });
-      const res = await DispatchPlanningService.approveDispatch(activePlanForModal.id, selectedWarehouse, updatedTotals);
+      const res = await DispatchPlanningService.approveDispatch(
+        activePlanForModal.id,
+        activePlanForModal.warehouse_id || selectedWarehouse,
+        updatedTotals,
+      );
       if (res && res.error) { showErrorToast(res.error); return; }
       showSuccessToast(`Dispatch approved for ${activePlanForModal.delivery_partner_name}!`);
       setPlans((prev) => prev.map((p) => p.run_id === activePlanForModal.run_id
@@ -1256,86 +1392,15 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
           {/* Sub-tabs: Bulk | Riders */}
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden no-print">
             <div className="flex border-b border-slate-100">
-              {[
-                { key: "bulk", label: "Warehouse Pick List", icon: ClipboardList },
-                { key: "riders", label: "Rider Handover Dispatches", icon: Truck },
-              ].map(({ key, label, icon: Icon }) => (
-                <button key={key} onClick={() => setCurrentTab(key as any)}
-                  className={`flex items-center gap-2 px-6 py-4 text-sm font-bold transition-all duration-200 relative ${
-                    currentTab === key ? "text-[#2E7D32]" : "text-slate-500 hover:text-slate-800"
-                  }`}>
-                  <Icon size={15} />
-                  {label}
-                  {currentTab === key && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2E7D32] rounded-t-full" />}
-                </button>
-              ))}
+              <div className="flex items-center gap-2 px-6 py-4 text-sm font-bold text-[#2E7D32] relative">
+                <Truck size={15} />
+                Rider Handover Dispatches
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2E7D32] rounded-t-full" />
+              </div>
             </div>
 
-            {/* Bulk Pick List Tab */}
-            {currentTab === "bulk" && (
-              <div className="animate-in fade-in duration-200">
-                <div className="flex items-center justify-between p-4 border-b border-slate-50 bg-slate-50/40">
-                  <div>
-                    <h2 className="text-sm font-black text-slate-800">Consolidated Warehouse Pick List</h2>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Pull these quantities from the shelves to fulfil all today's runs</p>
-                  </div>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                    <input type="text" placeholder="Search product..." value={pickSearchQuery} onChange={(e) => setPickSearchQuery(e.target.value)}
-                      className="pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs outline-none bg-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-all w-56 font-medium" />
-                  </div>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left">
-                    <thead>
-                      <tr className="border-b border-slate-100 bg-slate-50/60 text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                        <th className="px-5 py-3.5">#</th>
-                        <th className="px-5 py-3.5">Product Name</th>
-                        <th className="px-5 py-3.5">Variant / Size</th>
-                        <th className="px-5 py-3.5 text-center">Qty to Pull</th>
-                        <th className="px-5 py-3.5 text-center">Orders</th>
-                        <th className="px-5 py-3.5 text-center">Runs</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {filteredPickList.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="py-14 text-center">
-                            <Package size={32} className="mx-auto text-slate-200 mb-2" />
-                            <p className="text-sm font-bold text-slate-400">No items in pick list</p>
-                          </td>
-                        </tr>
-                      ) : filteredPickList.map((item, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50/60 transition-colors group">
-                          <td className="px-5 py-4 text-slate-400 font-bold text-[11px]">{idx + 1}</td>
-                          <td className="px-5 py-4">
-                            <span className="font-bold text-slate-800 group-hover:text-emerald-800 transition-colors">{item.product_name}</span>
-                          </td>
-                          <td className="px-5 py-4 text-slate-500 font-medium">{item.variant_name || "—"}</td>
-                          <td className="px-5 py-4 text-center">
-                            <span className="inline-flex items-center justify-center px-2.5 py-1 bg-emerald-600 text-white rounded-lg font-black text-[12px]">×{item.quantity}</span>
-                          </td>
-                          <td className="px-5 py-4 text-center">
-                            <span className="px-2.5 py-1 bg-sky-50 text-sky-700 font-bold text-[11px] rounded-lg border border-sky-100">{item.orderCount || 1}</span>
-                          </td>
-                          <td className="px-5 py-4 text-center text-slate-400 font-medium text-[11px]">
-                            {plans.filter((p) => Object.values(p.totals || {}).some((t) => t.product_variant_id === (item as any).product_variant_id)).length}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {filteredPickList.length > 0 && (
-                  <div className="px-5 py-3 bg-slate-50/40 border-t border-slate-100 text-[11px] text-slate-400 font-medium">
-                    {filteredPickList.length} product variants · {filteredPickList.reduce((s, i) => s + i.quantity, 0)} total units to pull
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Rider Dispatches Tab */}
-            {currentTab === "riders" && (
+            {/* Rider Dispatches */}
+            {(
               <div className="animate-in fade-in duration-200">
                 <div className="flex flex-wrap items-center gap-2 p-4 border-b border-slate-100 bg-slate-50/40">
                   <div className="relative">
@@ -1777,30 +1842,49 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
                     )}
                     {isSearchingVariantDropdownOpen && (
                       <div className="absolute z-50 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl divide-y divide-slate-50">
-                        {availableVariants.filter((v) => `${v.product_name} ${v.variant_name} ${v.unit_value || ""} ${v.unit_type || ""}`.toLowerCase().includes(searchQueryVariant.toLowerCase())).map((v) => {
+                        {loadingVariants && (
+                          <div className="px-4 py-3 text-xs text-slate-400 text-center">Loading stock…</div>
+                        )}
+                        {!loadingVariants && matchingVariants.map((v) => {
                           const size = v.unit_value && v.unit_type ? ` (${v.unit_value} ${v.unit_type})` : "";
                           const vn = v.variant_name && v.variant_name !== v.product_name ? ` – ${v.variant_name}` : "";
                           const label = `${v.product_name}${vn}${size}`;
+                          const inStock = Number(v.available_quantity ?? 0);
                           return (
-                            <div key={v.product_variant_id} onMouseDown={() => { setSelectedVariantToAdd(v.product_variant_id); setSearchQueryVariant(label); setIsSearchingVariantDropdownOpen(false); }}
-                              className="px-4 py-2.5 text-xs text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 cursor-pointer font-medium transition-colors">
-                              {label}
+                            <div key={v.product_variant_id} onMouseDown={() => { setSelectedVariantToAdd(v.product_variant_id); setSearchQueryVariant(label); setQtyToAdd(1); setIsSearchingVariantDropdownOpen(false); }}
+                              className="px-4 py-2.5 text-xs text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 cursor-pointer font-medium transition-colors flex items-center justify-between gap-3">
+                              <span className="truncate">{label}</span>
+                              <span className="shrink-0 text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-0.5">
+                                {inStock} in stock
+                              </span>
                             </div>
                           );
                         })}
-                        {availableVariants.filter((v) => `${v.product_name} ${v.variant_name} ${v.unit_value || ""} ${v.unit_type || ""}`.toLowerCase().includes(searchQueryVariant.toLowerCase())).length === 0 && (
-                          <div className="px-4 py-3 text-xs text-slate-400 text-center">No results</div>
+                        {!loadingVariants && matchingVariants.length === 0 && (
+                          <div className="px-4 py-3 text-xs text-slate-400 text-center">
+                            {availableVariants.length === 0 ? "No stock available at this warehouse" : "No results"}
+                          </div>
                         )}
                       </div>
                     )}
                   </div>
-                  <input type="number" min="1" value={qtyToAdd} onChange={(e) => setQtyToAdd(Math.max(1, parseInt(e.target.value) || 1))}
+                  <input type="number" min="1" max={selectedVariantStock || undefined} value={qtyToAdd}
+                    onChange={(e) => {
+                      const wanted = Math.max(1, parseInt(e.target.value) || 1);
+                      setQtyToAdd(selectedVariantStock ? Math.min(wanted, selectedVariantStock) : wanted);
+                    }}
                     className="w-24 shrink-0 px-3 py-2.5 border border-slate-200 rounded-xl text-xs outline-none bg-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 font-black text-center transition-all"
                     placeholder="Qty" />
                   <button type="button" onClick={() => {
                     if (!selectedVariantToAdd) { showErrorToast("Select a product first."); return; }
                     const v = availableVariants.find((x) => x.product_variant_id === selectedVariantToAdd);
                     if (!v) return;
+                    const onHand = Number(v.available_quantity ?? 0);
+                    const alreadyAdded = modalItems.find((mi) => mi.product_variant_id === selectedVariantToAdd)?.loaded_qty ?? 0;
+                    if (onHand && alreadyAdded + qtyToAdd > onHand) {
+                      showErrorToast(`Only ${onHand} in stock at this warehouse${alreadyAdded ? ` (${alreadyAdded} already on this handover)` : ""}.`);
+                      return;
+                    }
                     const exists = modalItems.find((mi) => mi.product_variant_id === selectedVariantToAdd);
                     if (exists) {
                       setModalItems((prev) => prev.map((mi) => mi.product_variant_id === selectedVariantToAdd ? { ...mi, loaded_qty: mi.loaded_qty + qtyToAdd } : mi));

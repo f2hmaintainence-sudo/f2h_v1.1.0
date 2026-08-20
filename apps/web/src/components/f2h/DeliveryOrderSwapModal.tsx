@@ -171,7 +171,10 @@ export default function DeliveryOrderSwapModal({
     try {
       if (mode === "move") {
         const res = await api.post<any>("/admin/delivery/runs/orders/move", {
+          address_id: sourceOrder.address_id,
           order_id: sourceOrder.order_id,
+          source_partner_id: sourceOrder.delivery_partner_id,
+          source_run_id: sourceOrder.delivery_run_id || undefined,
           target_partner_id: selectedPartner.delivery_partner_id,
           target_run_id: selectedPartner.run_id || undefined,
           reason: reason.trim() || undefined,
@@ -186,14 +189,17 @@ export default function DeliveryOrderSwapModal({
         }
       } else {
         // mode === "swap"
+        const targetAddressIdToSwap = selectedStop?.address_id;
         const targetOrderIdToSwap = selectedTargetOrderId || selectedStop?.orders?.[0]?.order_id;
-        if (!targetOrderIdToSwap) {
+        if (!targetAddressIdToSwap && !targetOrderIdToSwap) {
           showErrorToast("Please select a target address stop to swap with");
           setSubmitting(false);
           return;
         }
 
         const res = await api.post<any>("/admin/delivery/runs/orders/swap", {
+          address_a_id: sourceOrder.address_id,
+          address_b_id: targetAddressIdToSwap,
           order_a_id: sourceOrder.order_id,
           order_b_id: targetOrderIdToSwap,
           reason: reason.trim() || undefined,

@@ -176,16 +176,16 @@ export class BatchProductionService {
         // Filter and calculate totals only for new orders/items
         const uniqueNewOrderIds = new Set<string>();
         let addedQuantity = 0;
-        let baseUnit = 'pcs';
 
         for (const item of items) {
           // If order_id is already included in this batch, ignore it (avoid duplicate logic)
           if (existingOrderIds.has(item.order_id)) {
             continue;
           }
+          // order_batches carries no unit column; quantities are stored in the
+          // product's base unit.
           const converted = convertToBaseUnit(item.ordered_qty, item.unit_value, item.unit_type);
           addedQuantity += converted.value;
-          baseUnit = converted.unit;
           uniqueNewOrderIds.add(item.order_id);
         }
 
@@ -205,7 +205,6 @@ export class BatchProductionService {
                total_quantity = total_quantity + $2,
                total_orders = COALESCE(total_orders, 0) + $3,
                order_ids = $4,
-               unit = $5,
                updated_at = NOW()
              WHERE batch_id = $1`,
             [
@@ -213,7 +212,6 @@ export class BatchProductionService {
               addedQuantity,
               uniqueNewOrderIds.size,
               JSON.stringify(mergedOrderIds),
-              baseUnit
             ],
           );
           batchesUpdated++;
@@ -227,9 +225,9 @@ export class BatchProductionService {
           await this.db.query(
             `INSERT INTO order_batches
               (batch_id, branch_id, production_date, slot, product_id,
-               status, total_quantity, total_orders, order_ids, unit,
+               status, total_quantity, total_orders, order_ids,
                created_by, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, 'system', NOW(), NOW())`,
+            VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, 'system', NOW(), NOW())`,
             [
               batchId,
               branch_id,
@@ -239,7 +237,6 @@ export class BatchProductionService {
               addedQuantity,
               uniqueNewOrderIds.size,
               JSON.stringify(mergedOrderIds),
-              baseUnit
             ],
           );
           batchesCreated++;

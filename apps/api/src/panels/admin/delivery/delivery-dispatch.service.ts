@@ -345,28 +345,101 @@ WHERE ${where.join(' AND ')}
     }
   }
 
-  async getAvailableVariants() {
+  /**
+   * Variants that can actually be issued from a warehouse.
+   *
+   * Only rows with stock on hand are returned, and each carries the quantity
+   * available, so the handover screen cannot offer something the shelf does not
+   * have. Scope is resolved in this order: an explicit warehouse, the warehouse
+   * attached to a run, or the warehouse serving a branch.
+   */
+  async getAvailableVariants(query: any = {}) {
     try {
+      const warehouseId = await this.resolveWarehouseId(query);
+
+      const params: any[] = [];
+      const scope: string[] = ['sb.deleted_at IS NULL'];
+      if (warehouseId) {
+        params.push(warehouseId);
+        scope.push(`sb.warehouse_id = $${params.length}`);
+      }
+
       const sql = `
         SELECT
-          pv.variant_id as product_variant_id,
-          p.name as product_name,
-          pv.name as variant_name,
+          pv.variant_id       AS product_variant_id,
+          p.name              AS product_name,
+          pv.name             AS variant_name,
           pv.unit_value,
-          pv.unit_type
+          pv.unit_type,
+          stock.available_quantity::numeric AS available_quantity,
+          stock.warehouse_id
         FROM product_variants pv
         JOIN products p ON p.product_id = pv.product_id
+        JOIN (
+          SELECT
+            sb.product_variant_id,
+            SUM(sb.available_quantity)::numeric AS available_quantity,
+            MIN(sb.warehouse_id)                AS warehouse_id
+          FROM stock_balances sb
+          WHERE ${scope.join(' AND ')}
+          GROUP BY sb.product_variant_id
+          HAVING SUM(sb.available_quantity) > 0
+        ) stock ON stock.product_variant_id = pv.variant_id
         WHERE pv.status = 'active'
           AND pv.deleted_at IS NULL
           AND p.deleted_at IS NULL
         ORDER BY p.name, pv.name
       `;
-      const rows = await this.db.query(sql);
-      return { status: true, data: rows, message: 'Available variants fetched' };
+      const rows = await this.db.query(sql, params);
+      return {
+        status: true,
+        data: rows,
+        warehouse_id: warehouseId,
+        message: 'Available variants fetched',
+      };
     } catch (error) {
       this.developer.error('getAvailableVariants error', { error });
       throw new InternalServerErrorException('Failed to fetch available variants');
     }
+  }
+
+  /**
+   * Resolves which warehouse a stock question is being asked about.
+   * Returns null when nothing identifies one, in which case stock is counted
+   * across every warehouse.
+   */
+  private async resolveWarehouseId(query: {
+    warehouse_id?: string;
+    run_id?: string;
+    branch_id?: string;
+  }): Promise<string | null> {
+    if (query.warehouse_id) return query.warehouse_id;
+
+    if (query.run_id) {
+      const rows = await this.db.query(
+        `SELECT COALESCE(dr.warehouse_id, w.warehouse_id) AS warehouse_id
+         FROM delivery_runs dr
+         LEFT JOIN warehouses w
+           ON w.branch_id = dr.branch_id AND w.is_active = true AND w.deleted_at IS NULL
+         WHERE dr.run_id = $1 OR dr.id::varchar = $1
+         LIMIT 1`,
+        [String(query.run_id)],
+      );
+      if (rows?.[0]?.warehouse_id) return rows[0].warehouse_id;
+    }
+
+    if (query.branch_id) {
+      const rows = await this.db.query(
+        `SELECT warehouse_id FROM warehouses
+         WHERE branch_id = $1 AND is_active = true AND deleted_at IS NULL
+         ORDER BY created_at ASC
+         LIMIT 1`,
+        [query.branch_id],
+      );
+      if (rows?.[0]?.warehouse_id) return rows[0].warehouse_id;
+    }
+
+    return null;
   }
 
   // ────────────────────────────────────────────────
@@ -509,7 +582,9 @@ WHERE ${where.join(' AND ')}
 
       if (warehouse_id) {
         params.push(warehouse_id);
-        where.push(`dr.warehouse_id = $${params.length}`);
+        // Runs rarely carry a warehouse of their own — match the one serving
+        // the branch as well, or the filter silently returns nothing.
+        where.push(`COALESCE(dr.warehouse_id, w.warehouse_id) = $${params.length}`);
       }
       if (delivery_slot) {
         params.push(delivery_slot);
@@ -524,8 +599,8 @@ WHERE ${where.join(' AND ')}
           dr.delivery_slot,
           dr.run_date,
           dr.status AS run_status,
-          dr.warehouse_id,
-          w.name AS warehouse_name,
+          COALESCE(dr.warehouse_id, w.warehouse_id) AS warehouse_id,
+          COALESCE(w.name, b.branch_name) AS warehouse_name,
           dp.full_name AS delivery_partner_name,
           dp.delivery_partner_id,
           COUNT(ddi.id)::int AS total_items,
@@ -534,7 +609,11 @@ WHERE ${where.join(' AND ')}
           COALESCE(SUM(ddi.returned_qty), 0) AS total_returned,
           COALESCE(SUM(ddi.loaded_qty - COALESCE(ddi.delivered_qty,0) - COALESCE(ddi.returned_qty,0) - COALESCE(ddi.damaged_qty,0)), 0) AS pending_return_qty
         FROM delivery_runs dr
-        LEFT JOIN warehouses w ON w.warehouse_id = dr.warehouse_id
+        LEFT JOIN branches b ON b.branch_id = dr.branch_id
+        LEFT JOIN warehouses w ON (
+          w.warehouse_id = dr.warehouse_id
+          OR (dr.warehouse_id IS NULL AND w.branch_id = dr.branch_id AND w.is_active = true)
+        ) AND w.deleted_at IS NULL
         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
         LEFT JOIN delivery_dispatch_items ddi ON (
           ddi.delivery_run_id = dr.run_id::varchar
@@ -544,7 +623,8 @@ WHERE ${where.join(' AND ')}
           AND dr.deleted_at IS NULL
         GROUP BY
           dr.id, dr.run_id, dr.run_number, dr.delivery_slot, dr.run_date, dr.status,
-          dr.warehouse_id, w.name, dp.full_name, dp.delivery_partner_id
+          dr.warehouse_id, w.warehouse_id, w.name, b.branch_name,
+          dp.full_name, dp.delivery_partner_id
         HAVING COUNT(ddi.id) > 0
         ORDER BY dr.delivery_slot, dr.run_date DESC
       `;
@@ -600,9 +680,16 @@ WHERE ${where.join(' AND ')}
       `;
 
       const runSql = `
-        SELECT dr.*, w.name AS warehouse_name, dp.full_name AS delivery_partner_name
+        SELECT dr.*,
+               COALESCE(dr.warehouse_id, w.warehouse_id) AS resolved_warehouse_id,
+               COALESCE(w.name, b.branch_name) AS warehouse_name,
+               dp.full_name AS delivery_partner_name
         FROM delivery_runs dr
-        LEFT JOIN warehouses w ON w.warehouse_id = dr.warehouse_id
+        LEFT JOIN branches b ON b.branch_id = dr.branch_id
+        LEFT JOIN warehouses w ON (
+          w.warehouse_id = dr.warehouse_id
+          OR (dr.warehouse_id IS NULL AND w.branch_id = dr.branch_id AND w.is_active = true)
+        ) AND w.deleted_at IS NULL
         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
         WHERE dr.id::varchar = $1 OR dr.run_id = $1
         LIMIT 1

@@ -28,6 +28,10 @@ export interface DeliveryPartnerPlan {
   delivery_partner_name: string;
   phone: string;
   branch_name: string;
+  branch_id: string | null;
+  /** Warehouse serving this run — stock for the handover is scoped to it. */
+  warehouse_id: string | null;
+  warehouse_name: string | null;
   delivery_slot: string;
   status: string;
   orders: DispatchOrder[];
@@ -253,6 +257,9 @@ export class DispatchPlanningService {
         delivery_partner_name: run.partner_name || 'Unassigned Rider',
         phone: run.partner_phone || 'N/A',
         branch_name: run.branch_name || 'Default Branch',
+        branch_id: run.branch_id ?? null,
+        warehouse_id: run.warehouse_id ?? null,
+        warehouse_name: run.warehouse_name ?? null,
         delivery_slot: run.delivery_slot,
         status: run.status,
         orders,

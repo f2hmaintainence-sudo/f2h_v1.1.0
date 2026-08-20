@@ -236,9 +236,8 @@ export default function DeliveryPartnerDragBoard({
       return;
     }
 
-    const firstOrderId = stop.orders[0]?.order_id;
-    if (!firstOrderId) {
-      showErrorToast("Could not find order ID for this address stop");
+    if (!stop.address_id) {
+      showErrorToast("Could not find address ID for this stop");
       handleDragEnd();
       return;
     }
@@ -248,7 +247,10 @@ export default function DeliveryPartnerDragBoard({
 
     try {
       const res = await api.post<any>("/admin/delivery/runs/orders/move", {
-        order_id: firstOrderId,
+        address_id: stop.address_id,
+        order_id: stop.orders[0]?.order_id || undefined,
+        source_partner_id: sourcePartner.delivery_partner_id,
+        source_run_id: sourcePartner.run_id || undefined,
         target_partner_id: targetPartner.delivery_partner_id,
         target_run_id: targetPartner.run_id || undefined,
         reason: "Reassigned via 2-Partner Drag & Drop Board",
@@ -295,11 +297,8 @@ export default function DeliveryPartnerDragBoard({
       return;
     }
 
-    const orderAId = sourceStop.orders[0]?.order_id;
-    const orderBId = targetStop.orders[0]?.order_id;
-
-    if (!orderAId || !orderBId) {
-      showErrorToast("Could not resolve order IDs for both address stops");
+    if (!sourceStop.address_id || !targetStop.address_id) {
+      showErrorToast("Could not resolve address IDs for both address stops");
       handleDragEnd();
       return;
     }
@@ -309,8 +308,10 @@ export default function DeliveryPartnerDragBoard({
 
     try {
       const res = await api.post<any>("/admin/delivery/runs/orders/swap", {
-        order_a_id: orderAId,
-        order_b_id: orderBId,
+        address_a_id: sourceStop.address_id,
+        address_b_id: targetStop.address_id,
+        order_a_id: sourceStop.orders[0]?.order_id || undefined,
+        order_b_id: targetStop.orders[0]?.order_id || undefined,
         reason: "Swapped via 2-Partner Drag & Drop Board",
       });
 

@@ -328,8 +328,15 @@ export class DashboardService {
       // Out of stock alerts
       const outOfStockSql = `
         SELECT COUNT(*)::int AS count
-        FROM product_variants
-        WHERE status = 'active' AND stock <= 0
+        FROM (
+          SELECT pv.variant_id
+          FROM product_variants pv
+          LEFT JOIN stock_balances sb
+            ON sb.product_variant_id = pv.variant_id AND sb.deleted_at IS NULL
+          WHERE pv.status = 'active' AND pv.deleted_at IS NULL
+          GROUP BY pv.variant_id
+          HAVING COALESCE(SUM(sb.available_quantity), 0) <= 0
+        ) out_of_stock
       `;
       const outOfStock = await this.db.query(outOfStockSql);
       if ((outOfStock[0]?.count ?? 0) > 0) {

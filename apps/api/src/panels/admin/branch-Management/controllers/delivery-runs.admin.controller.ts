@@ -71,10 +71,16 @@ export class DeliveryRunsAdminController {
       }
 
       // 2. Insert into delivery_runs
+      // `id` is an auto-incrementing integer — the generated identifier is the
+      // varchar `run_id`. There is no route_json column; the stop list lives in
+      // delivery_run_addresses.
       await client.query(
-        `INSERT INTO delivery_runs (id, branch_id, delivery_partner_id, run_date, slot, status, route_json, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, 'pending', '[]'::jsonb, NOW(), NOW())`,
-        [runId, body.branch_id, body.delivery_partner_id, body.run_date, body.slot],
+        `INSERT INTO delivery_runs (
+           run_id, branch_id, delivery_partner_id, run_date, delivery_slot,
+           status, total_addresses, created_at, updated_at
+         )
+         VALUES ($1, $2, $3, $4, $5, 'pending', $6, NOW(), NOW())`,
+        [runId, body.branch_id, body.delivery_partner_id, body.run_date, body.slot, orders.length],
       );
 
       // 3. Insert into delivery_run_addresses (one row per order in the run)
@@ -105,7 +111,6 @@ export class DeliveryRunsAdminController {
       await client.query(
         `UPDATE orders
          SET delivery_partner_id = $1,
-             delivery_session_id = $2,
              delivery_run_id = $2,
              status = 'assigned',
              updated_at = NOW()
