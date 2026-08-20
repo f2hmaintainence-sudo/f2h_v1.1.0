@@ -767,8 +767,15 @@ export class AnalyticsService {
     const pct = (v: unknown) => Number(v ?? 0).toFixed(1);
     const lines: string[] = [];
 
-    lines.push(this.csvCell(`Revenue & Payments Report`));
-    lines.push(this.csvCell(`Period,${data.range.from} to ${data.range.to}`));
+    lines.push(this.csvCell('Revenue & Payments Report'));
+    lines.push(
+      ['Period', `${data.range.from} to ${data.range.to}`].map((c) => this.csvCell(c)).join(','),
+    );
+    const activeFilters = Object.entries(data.filters ?? {})
+      .filter(([, v]) => v)
+      .map(([k, v]) => `${k}=${v}`)
+      .join('; ');
+    lines.push(['Filters', activeFilters || 'none'].map((c) => this.csvCell(c)).join(','));
     lines.push('');
 
     lines.push(...this.csvSection('SUMMARY', ['Metric', 'Value'], [

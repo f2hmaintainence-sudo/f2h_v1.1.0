@@ -72,15 +72,15 @@ class ReferralInviteCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
                 child: Stack(
                   children: [
-                    // Base gradient
+                    // Base gradient matching profile card theme
                     Positioned.fill(
                       child: DecoratedBox(
                         decoration: const BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              Color(0xFF0B4628),
-                              Color(0xFF145C34),
-                              _deep,
+                              Color(0xFF0D331E),
+                              Color(0xFF16A34A),
+                              Color(0xFF15803D),
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -88,9 +88,18 @@ class ReferralInviteCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    // Soft light blooms, clipped by the card's corners
-                    Positioned(right: -34, top: -46, child: _glow(126, 0.10)),
-                    Positioned(right: 44, bottom: -58, child: _glow(112, 0.06)),
+                    // Leaf watermark background decor
+                    Positioned(
+                      right: -15,
+                      bottom: -20,
+                      child: Icon(
+                        Icons.eco_rounded,
+                        size: 140,
+                        color: Colors.white.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    // Soft light bloom
+                    Positioned(right: -34, top: -46, child: _glow(126, 0.08)),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 14, 16, 15),
                       child: Column(

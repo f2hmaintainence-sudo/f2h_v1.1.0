@@ -5,9 +5,10 @@ module.exports = {
     {
       name: 'api-f2hfresh',
       cwd: `${MONOREPO}/apps/api`,
-      script: 'dist/main.js',
+      script: 'npm',
+      args: 'run start:dev',
       env: {
-        NODE_ENV: 'production',
+        NODE_ENV: 'development',
         APP_PORT: 5001,
         PORT: 5001,
         PATH: `${MONOREPO}/node_modules/.bin:${process.env.PATH}`,
@@ -19,9 +20,9 @@ module.exports = {
       name: 'frontend-f2hfresh',
       cwd: `${MONOREPO}/apps/web`,
       script: `${MONOREPO}/node_modules/.bin/next`,
-      args: 'start -H 0.0.0.0 -p 5002',
+      args: 'dev -H 0.0.0.0 -p 5002',
       env: {
-        NODE_ENV: 'production',
+        NODE_ENV: 'development',
         PORT: 5002,
         PATH: `${MONOREPO}/node_modules/.bin:${process.env.PATH}`,
       },
@@ -30,3 +31,4 @@ module.exports = {
     },
   ],
 };
+
