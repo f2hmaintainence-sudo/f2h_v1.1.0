@@ -233,8 +233,9 @@ export class FinanceService {
 
     const doc = new PDFDocument({
       size: 'A4',
-      margins: { top: 30, bottom: 30, left: 35, right: 35 },
+      margins: { top: 28, bottom: 28, left: 32, right: 32 },
       bufferPages: true,
+      autoFirstPage: true,
     });
 
     const stream = new PassThrough();
@@ -242,88 +243,201 @@ export class FinanceService {
     stream.on('data', (chunk: Buffer) => chunks.push(chunk));
     doc.pipe(stream);
 
-    // Green brand banner
-    doc.rect(0, 0, 595, 75).fill('#16a34a');
-    doc.font('Helvetica-Bold').fontSize(20).fillColor('#ffffff').text('F2H FRESH (Farm to Home)', 35, 18);
-    doc.font('Helvetica').fontSize(10).fillColor('#dcfce7').text('Daily Farm Fresh Supply & Subscriptions', 35, 44);
-    doc.font('Helvetica-Bold').fontSize(10).fillColor('#ffffff').text('OFFICIAL TAX INVOICE', 35, 44, { align: 'right', width: 525 });
+    const fmtMoney = (amt: any) => `Rs. ${Number(amt || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const fmtDate = (d: any) => {
+      if (!d) return '—';
+      try {
+        const dt = new Date(d);
+        return isNaN(dt.getTime()) ? String(d) : dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      } catch {
+        return String(d);
+      }
+    };
 
-    // Details header box
-    const startY = 90;
-    doc.rect(35, startY, 525, 80).fillAndStroke('#f8fafc', '#e2e8f0');
-
-    // Customer info on left
-    doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a').text('BILLED CUSTOMER:', 45, startY + 10);
-    doc.font('Helvetica-Bold').fontSize(11).fillColor('#15803d').text(bill.customer_name || 'Customer', 45, startY + 24);
-    doc.font('Helvetica').fontSize(9).fillColor('#64748b').text(`Phone: ${bill.customer_phone || 'N/A'}  •  Email: ${bill.customer_email || 'N/A'}`, 45, startY + 38);
-    doc.font('Helvetica').fontSize(9).fillColor('#64748b').text(`Address: ${bill.customer_address || 'N/A'}`, 45, startY + 52, { width: 300 });
-
-    // Invoice meta on right
-    doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a').text(`Invoice #: ${bill.bill_number || bill.bill_id}`, 360, startY + 10, { width: 190, align: 'right' });
-    doc.font('Helvetica').fontSize(9).fillColor('#64748b').text(`Date: ${new Date(bill.created_at || Date.now()).toLocaleDateString('en-IN')}`, 360, startY + 24, { width: 190, align: 'right' });
-    doc.font('Helvetica').fontSize(9).fillColor('#64748b').text(`Mode: ${(bill.payment_method || 'WALLET').toUpperCase()}`, 360, startY + 38, { width: 190, align: 'right' });
     const isPaid = (bill.status || '').toLowerCase() === 'paid';
-    doc.font('Helvetica-Bold').fontSize(10).fillColor(isPaid ? '#16a34a' : '#dc2626').text(`Status: ${isPaid ? 'PAID' : 'DUE / PENDING'}`, 360, startY + 52, { width: 190, align: 'right' });
+    const dueAmount = Number(bill.due_amount || 0);
 
-    // Table Header
-    const tableTop = startY + 95;
-    doc.rect(35, tableTop, 525, 24).fill('#15803d');
-    doc.font('Helvetica-Bold').fontSize(9).fillColor('#ffffff');
-    doc.text('#', 45, tableTop + 7, { width: 25 });
-    doc.text('ITEM DESCRIPTION', 75, tableTop + 7, { width: 220 });
-    doc.text('REF / DATE', 300, tableTop + 7, { width: 80 });
-    doc.text('QTY', 385, tableTop + 7, { width: 35, align: 'center' });
-    doc.text('UNIT RATE', 425, tableTop + 7, { width: 60, align: 'right' });
-    doc.text('TOTAL', 490, tableTop + 7, { width: 60, align: 'right' });
+    // -------------------------------------------------------------
+    // TOP HEADER BAR (Modern Brand & Official Badge)
+    // -------------------------------------------------------------
+    doc.rect(32, 28, 531, 62).fill('#064e3b'); // Dark Forest Emerald
+
+    // Brand Name
+    doc.font('Helvetica-Bold').fontSize(18).fillColor('#ffffff').text('F2H FRESH', 46, 38);
+    doc.font('Helvetica').fontSize(8.5).fillColor('#a7f3d0').text('Farm to Home Supply & Subscription Services', 46, 59);
+    doc.font('Helvetica').fontSize(7.5).fillColor('#d1fae5').text('GSTIN: 33AAACF2928K1Z5  •  CIN: U01100TN2026PTC158920', 46, 70);
+
+    // Right Side: Tax Invoice Title
+    doc.font('Helvetica-Bold').fontSize(14).fillColor('#ffffff').text('TAX INVOICE', 350, 40, { width: 200, align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(8).fillColor('#6ee7b7').text(`INVOICE: #${bill.bill_number || bill.bill_id || id}`, 350, 58, { width: 200, align: 'right' });
+    doc.font('Helvetica').fontSize(8).fillColor('#e2e8f0').text(`Date: ${fmtDate(bill.created_at || Date.now())}`, 350, 70, { width: 200, align: 'right' });
+
+    // -------------------------------------------------------------
+    // BILLED TO & INVOICE METADATA (Two-card layout)
+    // -------------------------------------------------------------
+    const cardY = 98;
+    const cardH = 88;
+
+    // Card 1: Billed Customer
+    doc.roundedRect(32, cardY, 260, cardH, 6).fillAndStroke('#f8fafc', '#e2e8f0');
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#0f172a').text('BILLED TO:', 42, cardY + 8);
+    doc.font('Helvetica-Bold').fontSize(11).fillColor('#047857').text(String(bill.customer_name || 'Customer').slice(0, 32), 42, cardY + 22);
+    
+    doc.font('Helvetica').fontSize(8.5).fillColor('#475569');
+    doc.text(`Phone: ${bill.customer_phone || '—'}`, 42, cardY + 38);
+    doc.text(`Email: ${bill.customer_email || '—'}`, 42, cardY + 50);
+    const addr = String(bill.customer_address || 'Registered Delivery Address').trim();
+    doc.text(`Address: ${addr.length > 40 ? addr.slice(0, 37) + '...' : addr}`, 42, cardY + 62, { width: 240 });
+
+    // Card 2: Invoice & Payment Details
+    doc.roundedRect(303, cardY, 260, cardH, 6).fillAndStroke('#f8fafc', '#e2e8f0');
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#0f172a').text('PAYMENT DETAILS:', 315, cardY + 8);
+
+    doc.font('Helvetica').fontSize(8.5).fillColor('#475569');
+    doc.text('Bill Type:', 315, cardY + 24);
+    doc.font('Helvetica-Bold').fillColor('#0f172a').text(String(bill.bill_type || 'Subscription').toUpperCase(), 410, cardY + 24, { width: 145, align: 'right' });
+
+    doc.font('Helvetica').fillColor('#475569').text('Payment Mode:', 315, cardY + 38);
+    doc.font('Helvetica-Bold').fillColor('#0f172a').text(String(bill.payment_method || 'WALLET').toUpperCase(), 410, cardY + 38, { width: 145, align: 'right' });
+
+    doc.font('Helvetica').fillColor('#475569').text('Due Date:', 315, cardY + 52);
+    doc.font('Helvetica-Bold').fillColor('#0f172a').text(fmtDate(bill.due_date), 410, cardY + 52, { width: 145, align: 'right' });
+
+    doc.font('Helvetica').fillColor('#475569').text('Payment Status:', 315, cardY + 66);
+    doc.font('Helvetica-Bold').fillColor(isPaid ? '#059669' : '#dc2626').text(isPaid ? 'PAID' : (dueAmount > 0 ? `DUE (${fmtMoney(dueAmount)})` : 'PENDING'), 410, cardY + 66, { width: 145, align: 'right' });
+
+    // -------------------------------------------------------------
+    // LINE ITEMS TABLE HEADER
+    // -------------------------------------------------------------
+    const tableTop = 196;
+    doc.roundedRect(32, tableTop, 531, 24, 4).fill('#047857'); // Emerald header
+
+    doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff');
+    doc.text('SL', 40, tableTop + 7, { width: 20 });
+    doc.text('ITEM DESCRIPTION / PRODUCE', 65, tableTop + 7, { width: 230 });
+    doc.text('SCHEDULE / REF', 300, tableTop + 7, { width: 85 });
+    doc.text('QTY', 390, tableTop + 7, { width: 35, align: 'center' });
+    doc.text('RATE', 430, tableTop + 7, { width: 60, align: 'right' });
+    doc.text('TOTAL', 495, tableTop + 7, { width: 60, align: 'right' });
 
     let currentY = tableTop + 24;
     const itemList = Array.isArray(items) && items.length > 0 ? items : [{
-      item_name: bill.remarks || 'Subscription Daily Supply',
-      reference_id: bill.reference_id || bill.bill_id,
+      item_name: bill.remarks || 'Daily Fresh Produce / Subscription Supply',
+      reference_id: bill.reference_id || bill.bill_id || 'F2H-ITEM',
       quantity: 1,
       unit_price: bill.total_amount,
       total_amount: bill.total_amount,
     }];
 
     itemList.forEach((item: any, idx: number) => {
+      if (currentY > 670) {
+        doc.addPage();
+        currentY = 40;
+      }
+
       const isEven = idx % 2 === 0;
-      doc.rect(35, currentY, 525, 22).fill(isEven ? '#ffffff' : '#f8fafc');
-      doc.font('Helvetica').fontSize(8.5).fillColor('#334155');
-      doc.text(String(idx + 1), 45, currentY + 6, { width: 25 });
-      doc.font('Helvetica-Bold').text(String(item.item_name || item.product_name || 'Produce Item').slice(0, 35), 75, currentY + 6, { width: 220 });
-      doc.font('Helvetica').text(String(item.reference_id || item.scheduled_date || '—').slice(0, 15), 300, currentY + 6, { width: 80 });
-      doc.text(String(item.quantity || 1), 385, currentY + 6, { width: 35, align: 'center' });
-      doc.text(`₹${Number(item.unit_price || 0).toFixed(2)}`, 425, currentY + 6, { width: 60, align: 'right' });
-      doc.font('Helvetica-Bold').text(`₹${Number(item.total_amount || 0).toFixed(2)}`, 490, currentY + 6, { width: 60, align: 'right' });
+      doc.rect(32, currentY, 531, 22).fill(isEven ? '#ffffff' : '#f8fafc');
+      doc.rect(32, currentY + 21, 531, 0.5).fill('#e2e8f0');
+
+      doc.font('Helvetica').fontSize(8).fillColor('#64748b');
+      doc.text(String(idx + 1), 40, currentY + 6, { width: 20 });
+
+      doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#0f172a');
+      const itemName = String(item.item_name || item.product_name || 'Produce Item').trim();
+      doc.text(itemName.length > 38 ? itemName.slice(0, 36) + '...' : itemName, 65, currentY + 6, { width: 230 });
+
+      doc.font('Helvetica').fontSize(7.5).fillColor('#64748b');
+      const refOrDate = item.scheduled_date ? fmtDate(item.scheduled_date) : String(item.reference_id || item.order_id || '—');
+      doc.text(refOrDate.slice(0, 18), 300, currentY + 6, { width: 85 });
+
+      doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#334155');
+      doc.text(String(item.quantity || 1), 390, currentY + 6, { width: 35, align: 'center' });
+
+      doc.font('Helvetica').fontSize(8.5).fillColor('#475569');
+      doc.text(fmtMoney(item.unit_price || 0), 430, currentY + 6, { width: 60, align: 'right' });
+
+      doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#047857');
+      doc.text(fmtMoney(item.total_amount || 0), 495, currentY + 6, { width: 60, align: 'right' });
+
       currentY += 22;
     });
 
-    // Summary Box
-    currentY += 10;
-    doc.rect(320, currentY, 240, 95).fillAndStroke('#f8fafc', '#e2e8f0');
+    // -------------------------------------------------------------
+    // TOTALS CALCULATION BOX
+    // -------------------------------------------------------------
+    currentY += 12;
+    if (currentY > 640) {
+      doc.addPage();
+      currentY = 40;
+    }
 
-    doc.font('Helvetica').fontSize(9).fillColor('#64748b');
-    doc.text('Subtotal:', 330, currentY + 8);
-    doc.text(`₹${Number(bill.subtotal || bill.total_amount || 0).toFixed(2)}`, 450, currentY + 8, { width: 100, align: 'right' });
+    const totalsX = 310;
+    const totalsW = 253;
+    const totalsH = 114;
 
-    doc.text('Discount:', 330, currentY + 22);
-    doc.text(`-₹${Number(bill.discount_amount || 0).toFixed(2)}`, 450, currentY + 22, { width: 100, align: 'right' });
+    // Left Box: Notes / Bank Details
+    doc.roundedRect(32, currentY, 260, totalsH, 6).fillAndStroke('#f8fafc', '#e2e8f0');
+    doc.font('Helvetica-Bold').fontSize(8).fillColor('#0f172a').text('TERMS & INSTRUCTIONS:', 42, currentY + 8);
+    doc.font('Helvetica').fontSize(7.5).fillColor('#64748b');
+    doc.text('• Farm fresh produce supplied in prime condition.', 42, currentY + 22, { width: 240 });
+    doc.text('• For instant bill settlement, recharge your F2H Wallet via App.', 42, currentY + 34, { width: 240 });
+    doc.text('• UPI ID: f2hfresh@icici  |  Phone: +91 98765 43210', 42, currentY + 46, { width: 240 });
+    doc.text('• Any discrepancy must be reported within 24 hours of delivery.', 42, currentY + 58, { width: 240 });
+    doc.font('Helvetica-Oblique').fontSize(7).fillColor('#94a3b8').text('Thank you for choosing farm-fresh healthy living!', 42, currentY + 80, { width: 240 });
 
-    doc.text('Tax / GST:', 330, currentY + 36);
-    doc.text(`₹${Number(bill.tax_amount || 0).toFixed(2)}`, 450, currentY + 36, { width: 100, align: 'right' });
+    // Right Box: Financial Summary
+    doc.roundedRect(totalsX, currentY, totalsW, totalsH, 6).fillAndStroke('#f8fafc', '#cbd5e1');
 
-    doc.rect(330, currentY + 50, 220, 1).fill('#cbd5e1');
+    const subTotalVal = Number(bill.subtotal || bill.total_amount || 0);
+    const discountVal = Number(bill.discount_amount || 0);
+    const taxVal = Number(bill.tax_amount || 0);
+    const grandTotalVal = Number(bill.total_amount || 0);
+    const paidVal = Number(bill.paid_amount || 0);
+    const dueVal = Number(bill.due_amount || 0);
 
+    doc.font('Helvetica').fontSize(8.5).fillColor('#475569');
+    doc.text('Subtotal:', totalsX + 12, currentY + 8);
+    doc.text(fmtMoney(subTotalVal), totalsX + 130, currentY + 8, { width: 110, align: 'right' });
+
+    if (discountVal > 0) {
+      doc.text('Discount Applied:', totalsX + 12, currentY + 22);
+      doc.font('Helvetica-Bold').fillColor('#059669').text(`-${fmtMoney(discountVal)}`, totalsX + 130, currentY + 22, { width: 110, align: 'right' });
+    }
+
+    if (taxVal > 0) {
+      doc.font('Helvetica').fillColor('#475569').text('Taxes & GST (Included):', totalsX + 12, currentY + 36);
+      doc.text(`+${fmtMoney(taxVal)}`, totalsX + 130, currentY + 36, { width: 110, align: 'right' });
+    }
+
+    // Divider line
+    doc.rect(totalsX + 12, currentY + 52, totalsW - 24, 1).fill('#cbd5e1');
+
+    // Grand Total Row
     doc.font('Helvetica-Bold').fontSize(11).fillColor('#0f172a');
-    doc.text('Grand Total:', 330, currentY + 56);
-    doc.text(`₹${Number(bill.total_amount || 0).toFixed(2)}`, 450, currentY + 56, { width: 100, align: 'right' });
+    doc.text('Grand Total:', totalsX + 12, currentY + 60);
+    doc.text(fmtMoney(grandTotalVal), totalsX + 110, currentY + 60, { width: 130, align: 'right' });
 
-    doc.font('Helvetica-Bold').fontSize(9.5).fillColor('#16a34a');
-    doc.text('Paid Amount:', 330, currentY + 74);
-    doc.text(`₹${Number(bill.paid_amount || 0).toFixed(2)}`, 450, currentY + 74, { width: 100, align: 'right' });
+    // Paid Row
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#059669');
+    doc.text('Amount Paid:', totalsX + 12, currentY + 78);
+    doc.text(fmtMoney(paidVal), totalsX + 130, currentY + 78, { width: 110, align: 'right' });
 
-    // Footer note
-    doc.font('Helvetica').fontSize(8).fillColor('#94a3b8').text('This is a computer-generated tax invoice receipt from F2H Fresh. Support: support@f2hfresh.com | +91 9876543210', 35, 780, { align: 'center', width: 525 });
+    // Due Row
+    doc.font('Helvetica-Bold').fontSize(9).fillColor(dueVal > 0 ? '#dc2626' : '#64748b');
+    doc.text('Balance Due:', totalsX + 12, currentY + 94);
+    doc.text(fmtMoney(dueVal), totalsX + 130, currentY + 94, { width: 110, align: 'right' });
+
+    // -------------------------------------------------------------
+    // FOOTER (Page numbers & computer-generated note)
+    // -------------------------------------------------------------
+    const pageCount = doc.bufferedPageRange().count;
+    for (let i = 0; i < pageCount; i++) {
+      doc.switchToPage(i);
+      doc.rect(32, 800, 531, 0.5).fill('#e2e8f0');
+      doc.font('Helvetica').fontSize(7.5).fillColor('#94a3b8');
+      doc.text('This is a computer-generated tax invoice and requires no physical signature. Support: support@f2hfresh.com  •  www.f2hfresh.com', 32, 808, { width: 400, align: 'left' });
+      doc.text(`Page ${i + 1} of ${pageCount}`, 430, 808, { width: 133, align: 'right' });
+    }
 
     doc.end();
 

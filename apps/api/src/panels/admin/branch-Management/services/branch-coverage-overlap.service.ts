@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 
 export type BranchCoverageShape = 'circle' | 'square' | 'rectangle' | 'hexagon';
 
@@ -24,7 +24,7 @@ interface Point {
   y: number;
 }
 
-interface TransactionConnection {
+export interface BranchCoverageTransaction {
   query<T = unknown>(sql: string, params?: unknown[]): Promise<[T[]]>;
 }
 
@@ -304,18 +304,52 @@ export function coverageAreasOverlap(
 
 @Injectable()
 export class BranchCoverageOverlapService {
+  async lockCoverageChanges(
+    transaction: BranchCoverageTransaction,
+  ): Promise<void> {
+    await transaction.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+      COVERAGE_LOCK_KEY,
+    ]);
+  }
+
   async findConflict(
-    transaction: TransactionConnection,
+    transaction: BranchCoverageTransaction,
     candidate: BranchCoverageArea,
     excludeBranchId: string | null = null,
   ): Promise<BranchCoverageConflict | null> {
     if (!parseBoolean(candidate.is_active, true)) return null;
-    if (normalizeArea(candidate, { x: 0, y: 0 }) === null) return null;
-    if (centerOffsetKm(candidate, candidate) === null) return null;
 
-    await transaction.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
-      COVERAGE_LOCK_KEY,
-    ]);
+    const hasLatitude = candidate.lat !== null && candidate.lat !== undefined;
+    const hasLongitude = candidate.lng !== null && candidate.lng !== undefined;
+    if (!hasLatitude && !hasLongitude) return null;
+    if (!hasLatitude || !hasLongitude) {
+      throw new BadRequestException({
+        status: false,
+        message: 'Both branch latitude and longitude are required',
+      });
+    }
+
+    const latitude = Number(candidate.lat);
+    const longitude = Number(candidate.lng);
+    const radiusKm = Number(candidate.delivery_radius_km);
+    if (
+      !Number.isFinite(latitude) ||
+      latitude < -90 ||
+      latitude > 90 ||
+      !Number.isFinite(longitude) ||
+      longitude < -180 ||
+      longitude > 180 ||
+      !Number.isFinite(radiusKm) ||
+      radiusKm < 0.5 ||
+      radiusKm > 50
+    ) {
+      throw new BadRequestException({
+        status: false,
+        message: 'Invalid active branch coverage coordinates or radius',
+      });
+    }
+
+    await this.lockCoverageChanges(transaction);
     const [branches] = await transaction.query<
       BranchCoverageArea & {
         branch_id: string;

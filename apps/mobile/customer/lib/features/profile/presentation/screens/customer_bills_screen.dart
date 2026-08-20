@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
+import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/auth/token_storage.dart';
 import 'package:f2h_customer/features/wallet/presentation/screens/wallet_screen.dart';
@@ -795,52 +796,61 @@ class BillDetailSheet extends StatelessWidget {
 
     final isPaid = status == 'paid';
     final statusColor = isPaid
-        ? const Color(0xFF16A34A)
-        : (due > 0 ? const Color(0xFFDC2626) : const Color(0xFFEA580C));
+        ? const Color(0xFF059669)
+        : (due > 0 ? const Color(0xFFDC2626) : const Color(0xFFD97706));
     final statusBg = isPaid
-        ? const Color(0xFFDCFCE7)
-        : (due > 0 ? const Color(0xFFFEE2E2) : const Color(0xFFFFF7ED));
+        ? const Color(0xFFECFDF5)
+        : (due > 0 ? const Color(0xFFFEF2F2) : const Color(0xFFFFFBEB));
 
     return Container(
       decoration: const BoxDecoration(
-        color: kSurface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.85,
+        maxHeight: MediaQuery.of(context).size.height * 0.90,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Drag handle
           Center(
             child: Container(
-              width: 40,
+              width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: kBorderLt,
+                color: Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // Header row: icon + bill id + status badge + close button
+          // Header: Brand & Tax Invoice badge
           Row(
             children: [
               Container(
-                width: 42,
-                height: 42,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDF4),
-                  borderRadius: BorderRadius.circular(12),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF064E3B), Color(0xFF059669)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF059669).withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
-                child: Icon(
-                  billType.toLowerCase() == 'subscription'
-                      ? Icons.autorenew_rounded
-                      : Icons.shopping_bag_outlined,
-                  color: const Color(0xFF16653A),
+                child: const Icon(
+                  Icons.receipt_long_rounded,
+                  color: Colors.white,
                   size: 22,
                 ),
               ),
@@ -849,187 +859,382 @@ class BillDetailSheet extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      children: [
+                        const Text(
+                          'F2H FRESH',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF064E3B),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'TAX INVOICE',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF475569),
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
                     Text(
-                      billId,
+                      '#$billId',
                       style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: kText,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF64748B),
+                        fontFamily: 'monospace',
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${billType[0].toUpperCase()}${billType.substring(1)} Bill  •  ${paymentMethod.toUpperCase()}',
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        color: kTextSub,
-                        fontWeight: FontWeight.w500,
-                      ),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: statusBg,
                   borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.25)),
                 ),
-                child: Text(
-                  status.isNotEmpty
-                      ? '${status[0].toUpperCase()}${status.substring(1)}'
-                      : '',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: statusColor,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isPaid ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                      size: 13,
+                      color: statusColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      status.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                        color: statusColor,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               IconButton(
-                icon: const Icon(Icons.close, size: 20, color: kTextSub),
+                icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
                 onPressed: () => Navigator.pop(context),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
               ),
             ],
           ),
           const SizedBox(height: 14),
-          const Divider(height: 1, color: kBorderLt),
-          const SizedBox(height: 14),
 
-          // Amount summary box
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAF8),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: kBorderLt),
-            ),
-            child: Row(
-              children: [
-                _amountCol('TOTAL', '₹${total.toStringAsFixed(2)}', kText),
-                const SizedBox(width: 12),
-                _amountCol('PAID', '₹${paid.toStringAsFixed(2)}', const Color(0xFF16A34A)),
-                if (due > 0) ...[
-                  const SizedBox(width: 12),
-                  _amountCol('DUE', '₹${due.toStringAsFixed(2)}', const Color(0xFFDC2626)),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Details breakdown list
+          // Scrollable Voucher Body
           Flexible(
             child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (refId.isNotEmpty)
-                    _detailRow('Reference ID', refId),
-                  _detailRow(
-                    'Billing Period',
-                    '${_formatDate(billingFrom)} – ${_formatDate(billingTo)}',
-                  ),
-                  if (dueDate != null && dueDate.toString().isNotEmpty)
-                    _detailRow('Due Date', _formatDate(dueDate)),
-                  _detailRow(
-                    'Payment Mode',
-                    '${paymentMethod.toUpperCase()} (${paymentType.toUpperCase()})',
-                  ),
-                  _detailRow('Subtotal', '₹${subtotal.toStringAsFixed(2)}'),
-                  if (discount > 0)
-                    _detailRow(
-                      'Discount',
-                      '-₹${discount.toStringAsFixed(2)}',
-                      valueColor: const Color(0xFF16A34A),
-                    ),
-                  if (tax > 0)
-                    _detailRow('Tax', '₹${tax.toStringAsFixed(2)}'),
-                  if (createdAt != null)
-                    _detailRow('Bill Date', _formatDate(createdAt)),
-                  if (remarks.isNotEmpty)
-                    _detailRow('Remarks', remarks),
-
-                  if (rawItems.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Bill Items',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                        color: kText,
+                  // Hero Total Banner
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isPaid
+                            ? [const Color(0xFFF0FDF4), const Color(0xFFDCFCE7)]
+                            : [const Color(0xFFFFFBEB), const Color(0xFFFEF3C7)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: isPaid ? const Color(0xFFBBF7D0) : const Color(0xFFFDE68A),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    ...rawItems.map((item) {
-                      final itemMap = item is Map ? Map<String, dynamic>.from(item) : {};
-                      final name = itemMap['product_name'] ?? itemMap['name'] ?? 'Item';
-                      final variant = itemMap['variant_name'] ?? '';
-                      final price = double.tryParse(itemMap['final_price']?.toString() ?? itemMap['unit_price']?.toString() ?? '0') ?? 0.0;
-                      final qty = itemMap['quantity'] ?? itemMap['default_m_quantity'] ?? 1;
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Row(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    name.toString(),
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: kText,
-                                    ),
-                                  ),
-                                  if (variant.toString().isNotEmpty)
-                                    Text(
-                                      variant.toString(),
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        color: kTextSub,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
                             Text(
-                              '× $qty',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: kTextSub,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Text(
-                              '₹${(price * (qty is int ? qty : 1)).toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontSize: 13,
+                              isPaid ? 'INVOICE TOTAL PAID' : 'OUTSTANDING BALANCE DUE',
+                              style: TextStyle(
+                                fontSize: 10,
                                 fontWeight: FontWeight.w800,
-                                color: kText,
+                                color: isPaid ? const Color(0xFF166534) : const Color(0xFF92400E),
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '₹${(due > 0 ? due : total).toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900,
+                                color: isPaid ? const Color(0xFF047857) : const Color(0xFFDC2626),
                               ),
                             ),
                           ],
                         ),
-                      );
-                    }),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.04),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                'TOTAL: ₹${total.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF475569),
+                                ),
+                              ),
+                              Text(
+                                'PAID: ₹${paid.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF059669),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Metadata 2-Column Box
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      children: [
+                        _metaGridRow(
+                          '📅 Invoice Date',
+                          _formatDate(createdAt ?? billingFrom),
+                          '💳 Payment Mode',
+                          paymentMethod.toUpperCase(),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: Divider(height: 1, color: Color(0xFFE2E8F0)),
+                        ),
+                        _metaGridRow(
+                          '📦 Supply Period',
+                          '${_formatDate(billingFrom)}',
+                          '⏰ Due Date',
+                          dueDate != null ? _formatDate(dueDate) : '—',
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Delivered Items List
+                  if (rawItems.isNotEmpty) ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Supplied Produce & Items',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE2E8F0),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${rawItems.length} ITEMS',
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF475569),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: rawItems.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                        itemBuilder: (ctx, idx) {
+                          final itemMap = rawItems[idx] is Map ? Map<String, dynamic>.from(rawItems[idx]) : {};
+                          final name = itemMap['product_name'] ?? itemMap['item_name'] ?? itemMap['name'] ?? 'Fresh Produce';
+                          final variant = itemMap['variant_name'] ?? '';
+                          final price = double.tryParse(itemMap['final_price']?.toString() ?? itemMap['unit_price']?.toString() ?? '0') ?? 0.0;
+                          final qty = itemMap['quantity'] ?? itemMap['default_m_quantity'] ?? 1;
+                          final lineTotal = price * (qty is num ? qty.toDouble() : 1.0);
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFECFDF5),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(
+                                    Icons.eco_rounded,
+                                    size: 16,
+                                    color: Color(0xFF059669),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        name.toString(),
+                                        style: const TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                      if (variant.toString().isNotEmpty)
+                                        Text(
+                                          variant.toString(),
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Color(0xFF64748B),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    '×$qty',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF475569),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  '₹${lineTotal.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+
+                  // Financial Breakdown Box
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      children: [
+                        _calcRow('Subtotal', '₹${subtotal > 0 ? subtotal.toStringAsFixed(2) : total.toStringAsFixed(2)}'),
+                        if (discount > 0)
+                          _calcRow('Discounts & Offers', '-₹${discount.toStringAsFixed(2)}', valueColor: const Color(0xFF059669)),
+                        if (tax > 0)
+                          _calcRow('Taxes & GST (Included)', '+₹${tax.toStringAsFixed(2)}'),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 6),
+                          child: Divider(height: 1, color: Color(0xFFE2E8F0)),
+                        ),
+                        _calcRow('Total Invoiced Amount', '₹${total.toStringAsFixed(2)}', isBold: true),
+                        _calcRow('Amount Paid', '₹${paid.toStringAsFixed(2)}', valueColor: const Color(0xFF059669)),
+                        if (due > 0)
+                          _calcRow('Remaining Balance Due', '₹${due.toStringAsFixed(2)}', isBold: true, valueColor: const Color(0xFFDC2626)),
+                      ],
+                    ),
+                  ),
+                  if (remarks.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        'Note: $remarks',
+                        style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Color(0xFF94A3B8)),
+                      ),
+                    ),
                   ],
                 ],
               ),
             ),
           ),
 
-          // Bottom action buttons: PDF Download + Pay Due
+          // Bottom Action Bar: Download PDF & Pay Due
           const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
-                child: OutlinedButton.icon(
+                child: ElevatedButton.icon(
                   onPressed: () async {
                     try {
                       final token = await TokenStorage.getAccessToken();
@@ -1047,27 +1252,29 @@ class BillDetailSheet extends StatelessWidget {
                       debugPrint('Error downloading invoice PDF: $e');
                     }
                   },
-                  icon: const Icon(Icons.picture_as_pdf_rounded, size: 18, color: Color(0xFF16653A)),
+                  icon: const Icon(Icons.download_rounded, size: 18, color: Colors.white),
                   label: const Text(
-                    'DOWNLOAD PDF',
+                    'DOWNLOAD INVOICE PDF',
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF16653A),
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: 0.4,
                     ),
                   ),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF16A34A), width: 1.5),
-                    backgroundColor: const Color(0xFFF0FDF4),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF047857),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
               ),
               if (due > 0) ...[
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {
@@ -1090,12 +1297,15 @@ class BillDetailSheet extends StatelessWidget {
                         fontSize: 12,
                         fontWeight: FontWeight.w900,
                         color: Colors.white,
+                        letterSpacing: 0.4,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFDC2626),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
@@ -1103,6 +1313,76 @@ class BillDetailSheet extends StatelessWidget {
                 ),
               ],
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _metaGridRow(String label1, String val1, String label2, String val2) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label1,
+                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8)),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                val1,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label2,
+                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8)),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                val2,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _calcRow(String label, String value, {bool isBold = false, Color? valueColor}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3.5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: isBold ? 12.5 : 11.5,
+              fontWeight: isBold ? FontWeight.w900 : FontWeight.w600,
+              color: isBold ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: isBold ? 13 : 12,
+              fontWeight: isBold ? FontWeight.w900 : FontWeight.w800,
+              color: valueColor ?? (isBold ? const Color(0xFF0F172A) : const Color(0xFF334155)),
+            ),
           ),
         ],
       ),

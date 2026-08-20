@@ -15,10 +15,10 @@ import 'package:f2h_customer/features/orders/presentation/screens/order_history_
 import 'package:f2h_customer/features/address/presentation/widgets/address_selector_drawer.dart';
 import 'package:f2h_customer/features/profile/data/models/profile_model.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
+import 'package:f2h_customer/core/widgets/referral_invite_card.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/privacy_screen.dart';
 import 'package:f2h_customer/features/notifications/presentation/screens/notifications_screen.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
-import 'package:f2h_customer/features/profile/presentation/screens/referral_screen.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/customer_bills_screen.dart';
 
 // ----------------------------------------------------------
@@ -1017,8 +1017,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             customerName = displayName.isNotEmpty
                 ? displayName
                 : (profile.firstName.trim().isNotEmpty
-                    ? profile.firstName.trim()
-                    : (profile.mobile.isNotEmpty ? profile.mobile : 'Customer'));
+                      ? profile.firstName.trim()
+                      : (profile.mobile.isNotEmpty
+                            ? profile.mobile
+                            : 'Customer'));
             customerMobile = profile.mobile;
             customerEmail = profile.email.isNotEmpty
                 ? profile.email
@@ -1419,8 +1421,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
 
-                      
-
                       // Quick actions card - 3 items per row
                       Container(
                         margin: const EdgeInsets.symmetric(
@@ -1475,7 +1475,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => const OrderHistoryScreen(),
+                                      builder: (_) =>
+                                          const OrderHistoryScreen(),
                                     ),
                                   ),
                                 ),
@@ -1487,7 +1488,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   () async {
                                     if (isLoggedIn) {
                                       final selected =
-                                          await AddressSelectorDrawer.show(context);
+                                          await AddressSelectorDrawer.show(
+                                            context,
+                                          );
                                       if (selected != null &&
                                           selected.addressId != null &&
                                           context.mounted) {
@@ -1507,14 +1510,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       _showLoginDrawer(context);
                                     }
                                   },
-                                ),                                
+                                ),
                               ],
                             ),
                             const SizedBox(height: 12),
                             // Row 2: Notifications, Privacy,Rate App
                             Row(
                               children: [
-
                                 _quickAction(
                                   Icons.notifications_none_outlined,
                                   'Notifications',
@@ -1536,8 +1538,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) =>
-                                          const PrivacyScreen(),
+                                      builder: (_) => const PrivacyScreen(),
                                     ),
                                   ),
                                 ),
@@ -1608,16 +1609,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ),
                                     );
                                   },
-                                ),                                
+                                ),
                               ],
-                            ),                         
+                            ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 20),
 
                       // Referral Banner (Invite Friends & Earn Rewards!)
-                      const _HomeReferralBanner(),
+                      const ReferralInviteCard(),
                       // Support & Info Group
                       Padding(
                         padding: const EdgeInsets.symmetric(
@@ -2039,339 +2040,3 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _divider() =>
       const Divider(height: 1, thickness: 1, color: kBorderLt, indent: 76);
 }
-
-// ══════════════════════════════════════════════════════════
-//  HOME REFERRAL BANNER (Invite Friends, Earn Rewards!)
-// ══════════════════════════════════════════════════════════
-class _HomeReferralBanner extends StatelessWidget {
-  const _HomeReferralBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
-      builder: (context, sessionState) {
-        final profile = sessionState.profile;
-        final isLoggedIn = profile != null;
-        final rawCode =
-            profile?.referralCode ??
-            sessionState.wallet['referral_code']?.toString();
-        final rawStatus =
-            profile?.referralStatus ??
-            sessionState.wallet['referral_status']?.toString();
-        final isLocked = isLoggedIn && (rawStatus?.toLowerCase() == 'locked');
-        final code =
-            (isLoggedIn && !isLocked && rawCode != null && rawCode.isNotEmpty)
-                ? rawCode
-                : null;
-
-        final sw = MediaQuery.of(context).size.width;
-        final scale = (sw / 375).clamp(0.82, 1.15);
-
-        return GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ReferralScreen(
-                  referralCode: rawCode,
-                  referralStatus: rawStatus,
-                ),
-              ),
-            );
-          },
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            padding: EdgeInsets.symmetric(
-              horizontal: 14 * scale,
-              vertical: 12 * scale,
-            ),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [
-                  Color(0xFF0B4628),
-                  Color(0xFF145C34),
-                  Color(0xFF043927),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: const Color(0xFF34D399).withValues(alpha: 0.35),
-                width: 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF064E3B).withValues(alpha: 0.25),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40 * scale,
-                  height: 40 * scale,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFEF3C7), Color(0xFFFDE68A)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 1.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFD97706).withValues(alpha: 0.25),
-                        blurRadius: 5,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Icon(
-                      isLocked
-                          ? Icons.lock_outline_rounded
-                          : Icons.card_giftcard_rounded,
-                      color: const Color(0xFFB45309),
-                      size: 20 * scale,
-                    ),
-                  ),
-                ),
-                SizedBox(width: 10 * scale),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Invite Friends & Earn ₹50!',
-                        style: TextStyle(
-                          fontSize: 13.5 * scale,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          height: 1.2,
-                          letterSpacing: -0.2,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      SizedBox(height: 3 * scale),
-                      Text(
-                        isLocked
-                            ? 'Make your 1st order to unlock referral code.'
-                            : 'You & your friend both get ₹50 on first order.',
-                        style: TextStyle(
-                          fontSize: 10.5 * scale,
-                          fontWeight: FontWeight.w500,
-                          color: const Color(0xFFA7F3D0),
-                          height: 1.2,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(width: 8 * scale),
-                _buildCta(context, isLoggedIn, isLocked, code, scale),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildCta(
-    BuildContext ctx,
-    bool isLoggedIn,
-    bool isLocked,
-    String? code,
-    double scale,
-  ) {
-    if (!isLoggedIn) {
-      return Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: 14 * scale,
-          vertical: 8 * scale,
-        ),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.card_giftcard_rounded,
-              color: const Color(0xFF064E3B),
-              size: 14 * scale,
-            ),
-            SizedBox(width: 5 * scale),
-            Text(
-              'Refer',
-              style: TextStyle(
-                fontSize: 12 * scale,
-                fontWeight: FontWeight.w900,
-                color: const Color(0xFF064E3B),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (isLocked) {
-      return Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: 12 * scale,
-          vertical: 7 * scale,
-        ),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFFEF3C7), Color(0xFFFDE68A)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white, width: 1),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.lock_rounded,
-              color: const Color(0xFFB45309),
-              size: 13 * scale,
-            ),
-            SizedBox(width: 4 * scale),
-            Text(
-              'Unlock',
-              style: TextStyle(
-                fontSize: 11.5 * scale,
-                fontWeight: FontWeight.w900,
-                color: const Color(0xFFB45309),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (code != null) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: 8 * scale,
-              vertical: 3 * scale,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.45),
-                width: 1,
-              ),
-            ),
-            child: Text(
-              code,
-              style: TextStyle(
-                fontSize: 10 * scale,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                letterSpacing: 0.3,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          SizedBox(height: 4 * scale),
-          GestureDetector(
-            onTap: () => _shareCode(ctx, code),
-            child: Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: 10 * scale,
-                vertical: 4 * scale,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.share_rounded,
-                    color: const Color(0xFF064E3B),
-                    size: 11 * scale,
-                  ),
-                  SizedBox(width: 3 * scale),
-                  Text(
-                    'Share',
-                    style: TextStyle(
-                      fontSize: 10 * scale,
-                      fontWeight: FontWeight.w900,
-                      color: const Color(0xFF064E3B),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return const SizedBox.shrink();
-  }
-
-  static Future<void> _shareCode(BuildContext context, String code) async {
-    final message =
-        'Your F2H Invite is Ready\n\n'
-        'Get ₹100 on your first order!\n'
-        'Fresh farm products, delivered to your doorstep.\n\n'
-        'Invite Code: $code\n'
-        'https://f2h.app.link/$code\n\n'
-        'F2H — Farm To Home\n'
-        'Fresh. Smart. Rewarding.';
-    final encodedMsg = Uri.encodeComponent(message);
-    final whatsappUri = Uri.parse('https://wa.me/?text=$encodedMsg');
-
-    try {
-      if (await canLaunchUrl(whatsappUri)) {
-        await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
-      } else {
-        Clipboard.setData(ClipboardData(text: message));
-        if (context.mounted) {
-          F2HToast.success(context, 'Referral message copied to clipboard!');
-        }
-      }
-    } catch (_) {
-      Clipboard.setData(ClipboardData(text: message));
-      if (context.mounted) {
-        F2HToast.success(context, 'Referral message copied to clipboard!');
-      }
-    }
-  }
-}
-

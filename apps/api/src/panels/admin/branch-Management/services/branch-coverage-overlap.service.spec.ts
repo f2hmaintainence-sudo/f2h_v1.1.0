@@ -3,6 +3,7 @@ import {
   BranchCoverageOverlapService,
   coverageAreasOverlap,
 } from './branch-coverage-overlap.service';
+import { BadRequestException } from '@nestjs/common';
 
 const EARTH_RADIUS_KM = 6371;
 const TEST_LATITUDE = 12;
@@ -163,6 +164,16 @@ describe('BranchCoverageOverlapService', () => {
     );
 
     expect(conflict).toBeNull();
+    expect(transaction.query).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid radius for active coverage', async () => {
+    const transaction = { query: jest.fn() };
+    const service = new BranchCoverageOverlapService();
+
+    await expect(
+      service.findConflict(transaction, coverage({ delivery_radius_km: 0 })),
+    ).rejects.toBeInstanceOf(BadRequestException);
     expect(transaction.query).not.toHaveBeenCalled();
   });
 });

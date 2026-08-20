@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Patch, Query, Body, Param } from '@nestjs/common';
 import { BranchConfigService } from './branch-config.service';
 import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
+import { UpdateBranchRadiusDto } from './dto/branch.dto';
 
 @Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/branch-config', version: '1' })
@@ -17,7 +18,7 @@ export class BranchConfigController {
   @Patch('radius/:branchId')
   async updateRadiusConfig(
     @Param('branchId') branchId: string,
-    @Body() body: { radius_km?: number; center_lat?: number; center_lng?: number },
+    @Body() body: UpdateBranchRadiusDto,
   ) {
     return this.configService.updateRadiusConfig(branchId, body);
   }

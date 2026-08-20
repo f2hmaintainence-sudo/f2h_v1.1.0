@@ -17,6 +17,7 @@ import { DatabaseService } from '../../../shared/database/Database.service';
 import { DataService } from '../../../shared/database/Data.service';
 import { DeveloperService } from '../../../shared/logger/Developer.service';
 import { DeliveryManagementService } from '../delivery/delivery.service';
+import { UpdateBranchRadiusDto } from './dto/branch.dto';
 import { BranchCoverageOverlapService } from './services/branch-coverage-overlap.service';
 
 @Injectable()
@@ -55,9 +56,11 @@ export class BranchConfigService {
     }
   }
 
-  async updateRadiusConfig(branchId: string, body: any) {
+  async updateRadiusConfig(branchId: string, body: UpdateBranchRadiusDto) {
     try {
       return await this.dataService.executeTransaction(async (tx) => {
+        await this.coverageOverlapService.lockCoverageChanges(tx);
+
         const [currentRows] = await tx.query(
           `SELECT branch_id, branch_name, lat, lng, delivery_radius_km,
                   buffer_zone, allow_buffer_order, is_active, hex_shape
@@ -74,15 +77,19 @@ export class BranchConfigService {
         }
 
         const current = currentRows[0];
+        const requestedRadius =
+          body.radius_km ?? body.delivery_radius_km;
+        const requestedLat = body.center_lat ?? body.lat;
+        const requestedLng = body.center_lng ?? body.lng;
         const coverageConflict = await this.coverageOverlapService.findConflict(
           tx,
           {
             branch_id: branchId,
             branch_name: current.branch_name,
-            lat: body.lat ?? current.lat,
-            lng: body.lng ?? current.lng,
+            lat: requestedLat ?? current.lat,
+            lng: requestedLng ?? current.lng,
             delivery_radius_km:
-              body.delivery_radius_km ?? current.delivery_radius_km,
+              requestedRadius ?? current.delivery_radius_km,
             buffer_zone: current.buffer_zone,
             allow_buffer_order: current.allow_buffer_order,
             is_active: current.is_active,
@@ -103,16 +110,16 @@ export class BranchConfigService {
 
         const updateFields: string[] = ['updated_at = NOW()'];
         const params: unknown[] = [branchId];
-        if (body.delivery_radius_km !== undefined) {
-          params.push(body.delivery_radius_km);
+        if (requestedRadius !== undefined) {
+          params.push(requestedRadius);
           updateFields.push(`delivery_radius_km = $${params.length}`);
         }
-        if (body.lat !== undefined) {
-          params.push(body.lat);
+        if (requestedLat !== undefined) {
+          params.push(requestedLat);
           updateFields.push(`lat = $${params.length}`);
         }
-        if (body.lng !== undefined) {
-          params.push(body.lng);
+        if (requestedLng !== undefined) {
+          params.push(requestedLng);
           updateFields.push(`lng = $${params.length}`);
         }
 

@@ -54,8 +54,8 @@ export class BranchSaveAddService {
       const branch_id = this.idGenerator.generateId('BRANCH', 12);
       const isActive = body.is_active === true || String(body.is_active) === 'true';
       const allowBufferOrder = body.allow_buffer_order === true || String(body.allow_buffer_order) === 'true';
-      const radiusKm = body.delivery_radius_km || 5;
-      const bufferZone = body.buffer_zone || 0;
+      const radiusKm = body.delivery_radius_km ?? 5;
+      const bufferZone = body.buffer_zone ?? 0;
 
       return await this.Data.executeTransaction(async (tx) => {
         const branchData: Record<string, any> = {
@@ -66,8 +66,8 @@ export class BranchSaveAddService {
           state: body.state?.trim() || null,
           is_active: isActive,
           allow_buffer_order: allowBufferOrder,
-          lat: body.lat || null,
-          lng: body.lng || null,
+          lat: body.lat ?? null,
+          lng: body.lng ?? null,
           delivery_radius_km: radiusKm,
           buffer_zone: bufferZone,
           hex_shape: body.hex_shape || 'hexagon',

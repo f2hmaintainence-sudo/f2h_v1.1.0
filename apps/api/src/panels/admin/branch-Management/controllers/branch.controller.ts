@@ -17,7 +17,7 @@ import { BranchSaveAddService } from '../services/saveAdd.service';
 import { BranchShowEditService } from '../services/showEdit.service';
 import { BranchSaveEditService } from '../services/saveEdit.service';
 import { SectorService } from '../ModuleServices/sector.service';
-import { CreateBranchDto } from '../dto/branch.dto';
+import { CreateBranchDto, UpdateBranchDto } from '../dto/branch.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
@@ -94,7 +94,7 @@ export class BranchController {
   @Post(':id/saveEdit')
   async saveBranchEdit(
     @Param('id') id: string,
-    @Body() body: Partial<CreateBranchDto>,
+    @Body() body: UpdateBranchDto,
     @Req() req: any,
   ) {
     const adminId = req.user?.user_id ?? 'system';

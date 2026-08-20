@@ -18,7 +18,7 @@ import {
   CheckCircle2, Clock, AlertTriangle, X, PlusCircle,
   Eye, Loader2, ChevronLeft, Calendar, CreditCard, ShoppingBag, ShieldAlert,
   Download, Send, Bell, BellRing, Phone, Mail, Building, Printer,
-  Filter, CheckSquare, Square, DollarSign, ArrowUpRight, CheckCheck
+  Filter, CheckSquare, Square, DollarSign, ArrowUpRight, CheckCheck, Receipt
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -1060,168 +1060,203 @@ export default function OutstandingPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL: INVOICE / RECEIPT INSPECTION & PRINT MODAL */}
+      {/* MODAL: INSPECT / PREVIEW TAX INVOICE */}
       {/* ========================================================================= */}
       {inspectingBillId && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-3xl w-full p-6 md:p-8 animate-in fade-in zoom-in-95 duration-200 space-y-6 max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-100">
-                  <FileText size={24} />
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-3xl w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col">
+            {/* Header Brand Bar */}
+            <div className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-800 text-white p-5 md:px-7 md:py-6 flex items-center justify-between">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 bg-white/10 rounded-2xl flex items-center justify-center border border-white/20 shadow-inner">
+                  <Receipt size={22} className="text-emerald-300" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-slate-900">Tax Invoice &amp; Delivery Breakdown</h3>
-                  <p className="text-xs text-slate-500 font-medium">
-                    Invoice ID: <span className="font-mono font-bold text-slate-800">{inspectingBillId}</span>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-black tracking-tight text-white">F2H FRESH</h3>
+                    <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-emerald-700/60 border border-emerald-400/30 text-emerald-100 rounded-md">
+                      OFFICIAL TAX INVOICE
+                    </span>
+                  </div>
+                  <p className="text-xs text-emerald-200/80 font-medium">
+                    Invoice: <span className="font-mono font-bold text-white">#{inspectingBillId}</span>
                   </p>
                 </div>
               </div>
+
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => downloadBillPdf(inspectingBillId)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-2xs transition-all cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold rounded-xl shadow-md transition-all cursor-pointer"
+                  title="Download PDF Tax Invoice"
+                >
+                  <Download size={14} /> <span>Download PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInspectingBillId(null)}
+                  className="text-white/70 hover:text-white p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 md:p-7 overflow-y-auto space-y-5 text-xs flex-1">
+              {loadingReceipt ? (
+                <div className="py-20 flex flex-col items-center justify-center space-y-3 text-slate-400">
+                  <Loader2 size={36} className="animate-spin text-emerald-600" />
+                  <span className="text-xs font-bold text-slate-600">Generating live Tax Invoice preview...</span>
+                </div>
+              ) : receiptDetail?.bill ? (
+                <div className="space-y-5">
+                  {/* Two Column Details Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200/80 space-y-1.5 shadow-2xs">
+                      <span className="text-[10px] font-black text-emerald-700 uppercase tracking-wider block">Billed Customer</span>
+                      <p className="text-sm font-black text-slate-900">{receiptDetail.bill.customer_name || "Customer"}</p>
+                      <p className="text-slate-600 font-medium">Phone: <strong className="text-slate-800">{receiptDetail.bill.customer_phone || "N/A"}</strong></p>
+                      {receiptDetail.bill.customer_email && <p className="text-slate-600">Email: <strong className="text-slate-800">{receiptDetail.bill.customer_email}</strong></p>}
+                      <p className="text-slate-500 pt-0.5 leading-relaxed">{receiptDetail.bill.customer_address || "Registered Customer Address"}</p>
+                    </div>
+
+                    <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200/80 space-y-1.5 shadow-2xs">
+                      <span className="text-[10px] font-black text-emerald-700 uppercase tracking-wider block">Invoice &amp; Payment Summary</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Bill Type:</span>
+                        <span className="font-bold text-slate-800 uppercase">{receiptDetail.bill.bill_type || "Subscription"}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Payment Mode:</span>
+                        <span className="font-bold text-slate-900 uppercase">{receiptDetail.bill.payment_method || "Wallet"}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Invoice Date:</span>
+                        <span className="font-bold text-slate-800">{fmtDate(receiptDetail.bill.created_at || receiptDetail.bill.period_start)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Due Date:</span>
+                        <span className="font-bold text-rose-700">{fmtDate(receiptDetail.bill.due_date)}</span>
+                      </div>
+                      <div className="flex justify-between items-center pt-1 border-t border-slate-200">
+                        <span className="text-slate-500">Status:</span>
+                        <span>{getStatusBadge(receiptDetail.bill.status, receiptDetail.bill.due_date)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Delivered Items Table */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider">
+                        Delivered Produce &amp; Line Items ({receiptDetail.items?.length || 1})
+                      </h4>
+                      <span className="text-[11px] font-bold text-slate-500">F2H Supply Hub</span>
+                    </div>
+
+                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+                      <table className="w-full text-xs">
+                        <thead className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-wider">
+                          <tr>
+                            <th className="px-4 py-2.5 text-left">#</th>
+                            <th className="px-4 py-2.5 text-left">Item Description</th>
+                            <th className="px-4 py-2.5 text-center">Schedule / Ref</th>
+                            <th className="px-4 py-2.5 text-center">Qty</th>
+                            <th className="px-4 py-2.5 text-right">Unit Price</th>
+                            <th className="px-4 py-2.5 text-right">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {receiptDetail.items && receiptDetail.items.length > 0 ? (
+                            receiptDetail.items.map((it: any, i: number) => (
+                              <tr key={i} className="hover:bg-slate-50/70 transition-colors">
+                                <td className="px-4 py-2.5 text-slate-400 font-mono font-bold">{i + 1}</td>
+                                <td className="px-4 py-2.5 font-bold text-slate-900">{it.item_name}</td>
+                                <td className="px-4 py-2.5 text-center text-slate-500">{fmtDate(it.scheduled_date)}</td>
+                                <td className="px-4 py-2.5 text-center font-bold text-slate-700">
+                                  <span className="px-2 py-0.5 bg-slate-100 rounded-md font-mono">{it.quantity}</span>
+                                </td>
+                                <td className="px-4 py-2.5 text-right text-slate-600">{formatMoney(it.unit_price)}</td>
+                                <td className="px-4 py-2.5 text-right font-black text-slate-900">{formatMoney(it.total_amount)}</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td className="px-4 py-2.5 text-slate-400 font-mono font-bold">1</td>
+                              <td className="px-4 py-2.5 font-bold text-slate-900">{receiptDetail.bill.remarks || "Daily Subscription Supply"}</td>
+                              <td className="px-4 py-2.5 text-center text-slate-500">{fmtDate(receiptDetail.bill.created_at)}</td>
+                              <td className="px-4 py-2.5 text-center font-bold text-slate-700">
+                                <span className="px-2 py-0.5 bg-slate-100 rounded-md font-mono">1</span>
+                              </td>
+                              <td className="px-4 py-2.5 text-right text-slate-600">{formatMoney(receiptDetail.bill.total_amount)}</td>
+                              <td className="px-4 py-2.5 text-right font-black text-slate-900">{formatMoney(receiptDetail.bill.total_amount)}</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Calculations & Totals Box */}
+                  <div className="bg-slate-50/90 p-4.5 rounded-2xl border border-slate-200 space-y-2 shadow-2xs">
+                    <div className="flex justify-between text-slate-600">
+                      <span>Subtotal:</span>
+                      <span className="font-bold text-slate-800">{formatMoney(receiptDetail.bill.subtotal || receiptDetail.bill.total_amount)}</span>
+                    </div>
+                    {Number(receiptDetail.bill.discount_amount) > 0 && (
+                      <div className="flex justify-between text-emerald-700 font-bold">
+                        <span>Discounts &amp; Promos:</span>
+                        <span>-{formatMoney(receiptDetail.bill.discount_amount)}</span>
+                      </div>
+                    )}
+                    {Number(receiptDetail.bill.tax_amount) > 0 && (
+                      <div className="flex justify-between text-slate-600">
+                        <span>Taxes &amp; GST (Included):</span>
+                        <span>+{formatMoney(receiptDetail.bill.tax_amount)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t border-slate-200">
+                      <span>Total Invoiced Amount:</span>
+                      <span className="text-emerald-700 font-black">{formatMoney(receiptDetail.bill.total_amount)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-bold text-slate-700">
+                      <span>Amount Paid to Date:</span>
+                      <span className="text-emerald-600">{formatMoney(receiptDetail.bill.paid_amount)}</span>
+                    </div>
+                    {Number(receiptDetail.bill.due_amount) > 0 && (
+                      <div className="flex justify-between text-sm font-black text-rose-700 pt-1.5 border-t border-slate-200">
+                        <span>Remaining Balance Due:</span>
+                        <span>{formatMoney(receiptDetail.bill.due_amount)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 md:px-7 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+                Computer-generated official Tax Invoice • F2H Fresh
+              </span>
+              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={() => downloadBillPdf(inspectingBillId)}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl shadow-2xs transition-all cursor-pointer flex items-center gap-1.5"
                 >
                   <Download size={14} /> Download PDF
                 </button>
                 <button
                   type="button"
                   onClick={() => setInspectingBillId(null)}
-                  className="text-slate-400 hover:text-slate-600 p-2 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+                  className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-2xs transition-all cursor-pointer"
                 >
-                  <X size={20} />
+                  Close Preview
                 </button>
               </div>
-            </div>
-
-            {loadingReceipt ? (
-              <div className="py-20 flex flex-col items-center justify-center space-y-3 text-slate-400">
-                <Loader2 size={32} className="animate-spin text-emerald-600" />
-                <span className="text-xs font-bold">Loading invoice receipt details...</span>
-              </div>
-            ) : receiptDetail?.bill ? (
-              <div className="space-y-6">
-                {/* Customer & Branch Details Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-1.5 text-xs">
-                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">
-                      Customer Information
-                    </span>
-                    <p className="text-sm font-black text-slate-900">{receiptDetail.bill.customer_name}</p>
-                    <p className="text-slate-600 font-semibold">Phone: {receiptDetail.bill.customer_phone || "N/A"}</p>
-                    {receiptDetail.bill.customer_email && (
-                      <p className="text-slate-600">Email: {receiptDetail.bill.customer_email}</p>
-                    )}
-                    {receiptDetail.bill.customer_address && (
-                      <p className="text-slate-500 mt-1">{receiptDetail.bill.customer_address}</p>
-                    )}
-                  </div>
-
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-1.5 text-xs">
-                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">
-                      Billing &amp; Hub Details
-                    </span>
-                    <p className="text-sm font-black text-slate-900">{receiptDetail.bill.branch_name || "F2H Fresh Hub"}</p>
-                    <p className="text-slate-600">Period: {fmtDate(receiptDetail.bill.period_start)} to {fmtDate(receiptDetail.bill.period_end)}</p>
-                    <p className="text-slate-600">Due Date: <strong className="text-slate-900">{fmtDate(receiptDetail.bill.due_date)}</strong></p>
-                    <p className="text-slate-600">Payment Type: <strong className="capitalize">{receiptDetail.bill.payment_type || "Postpaid"}</strong></p>
-                  </div>
-                </div>
-
-                {/* Line Items Table */}
-                <div>
-                  <h4 className="font-extrabold text-xs text-slate-800 uppercase tracking-wider mb-2.5">
-                    Delivered Line Items ({receiptDetail.items?.length || 0})
-                  </h4>
-                  <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
-                        <tr>
-                          <th className="px-4 py-2.5">Date / Slot</th>
-                          <th className="px-4 py-2.5">Item Description</th>
-                          <th className="px-4 py-2.5 text-center">Qty</th>
-                          <th className="px-4 py-2.5 text-right">Unit Price</th>
-                          <th className="px-4 py-2.5 text-right">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 font-medium">
-                        {!receiptDetail.items || receiptDetail.items.length === 0 ? (
-                          <tr>
-                            <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
-                              No individual line items breakdown recorded.
-                            </td>
-                          </tr>
-                        ) : (
-                          receiptDetail.items.map((it: any, idx: number) => (
-                            <tr key={idx} className="hover:bg-slate-50/60">
-                              <td className="px-4 py-2.5 text-slate-600">
-                                {fmtDate(it.scheduled_date)}
-                                {it.delivery_slot ? ` · ${it.delivery_slot}` : ""}
-                              </td>
-                              <td className="px-4 py-2.5 font-bold text-slate-900">
-                                {it.item_name}
-                              </td>
-                              <td className="px-4 py-2.5 text-center font-bold text-slate-700">
-                                {it.quantity}
-                              </td>
-                              <td className="px-4 py-2.5 text-right text-slate-600">
-                                {formatMoney(it.unit_price)}
-                              </td>
-                              <td className="px-4 py-2.5 text-right font-bold text-slate-900">
-                                {formatMoney(it.total_amount)}
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Financial Totals Calculation Box */}
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2 text-xs">
-                  <div className="flex justify-between text-slate-600">
-                    <span>Subtotal:</span>
-                    <span>{formatMoney(receiptDetail.bill.subtotal || receiptDetail.bill.total_amount)}</span>
-                  </div>
-                  {Number(receiptDetail.bill.discount_amount) > 0 && (
-                    <div className="flex justify-between text-emerald-700 font-bold">
-                      <span>Discounts:</span>
-                      <span>-{formatMoney(receiptDetail.bill.discount_amount)}</span>
-                    </div>
-                  )}
-                  {Number(receiptDetail.bill.tax_amount) > 0 && (
-                    <div className="flex justify-between text-slate-600">
-                      <span>Taxes &amp; GST:</span>
-                      <span>+{formatMoney(receiptDetail.bill.tax_amount)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t border-slate-200">
-                    <span>Total Invoiced Amount:</span>
-                    <span className="text-emerald-700">{formatMoney(receiptDetail.bill.total_amount)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-bold text-slate-700">
-                    <span>Paid to Date:</span>
-                    <span className="text-emerald-600">{formatMoney(receiptDetail.bill.paid_amount)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm font-black text-rose-700 pt-1 border-t border-slate-200">
-                    <span>Remaining Balance Due:</span>
-                    <span>{formatMoney(receiptDetail.bill.due_amount)}</span>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setInspectingBillId(null)}
-                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-2xs transition-all cursor-pointer"
-              >
-                Close
-              </button>
             </div>
           </div>
         </div>
