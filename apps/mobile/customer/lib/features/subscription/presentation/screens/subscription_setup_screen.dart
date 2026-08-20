@@ -733,7 +733,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                               Icon(
                                 Icons.autorenew_rounded,
                                 size: 9,
-                                color: Color(0xFF1B4332),
+                                color: kPrimary,
                               ),
                               SizedBox(width: 3),
                               Text(
@@ -741,7 +741,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                                 style: TextStyle(
                                   fontSize: 8.5,
                                   fontWeight: FontWeight.w800,
-                                  color: Color(0xFF1B4332),
+                                  color: kPrimary,
                                 ),
                               ),
                             ],
@@ -782,11 +782,11 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                       vertical: 7,
                     ),
                     decoration: BoxDecoration(
-                      color: isSel ? const Color(0xFF1B4332) : Colors.white,
+                      color: isSel ? kPrimary : Colors.white,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: isSel
-                            ? const Color(0xFF1B4332)
+                            ? kPrimary
                             : const Color(0xFFE0E0E0),
                         width: isSel ? 1.5 : 1.0,
                       ),
@@ -808,7 +808,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                             fontWeight: FontWeight.w700,
                             color: isSel
                                 ? Colors.white70
-                                : const Color(0xFF1B4332),
+                                : kPrimary,
                           ),
                         ),
                       ],
@@ -1245,14 +1245,14 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8F5E9),
+            decoration: const BoxDecoration(
+              color: kPrimaryPl,
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.autorenew_rounded,
               size: 20,
-              color: Color(0xFF1B4332),
+              color: kPrimary,
             ),
           ),
           const SizedBox(width: 12),
@@ -1408,7 +1408,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
           ElevatedButton(
             onPressed: (_isLoading || total <= 0) ? null : _confirmSubscription,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1B4332),
+              backgroundColor: kPrimary,
               foregroundColor: Colors.white,
               disabledBackgroundColor: const Color(0xFFE5E7EB),
               disabledForegroundColor: const Color(0xFF9CA3AF),
@@ -1706,16 +1706,16 @@ class _FreqChip extends StatelessWidget {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 9),
           decoration: BoxDecoration(
-            color: isSel ? const Color(0xFF1B4332) : Colors.white,
+            color: isSel ? kPrimary : Colors.white,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isSel ? const Color(0xFF1B4332) : const Color(0xFFDDE1E6),
+              color: isSel ? kPrimary : const Color(0xFFDDE1E6),
               width: isSel ? 1.5 : 1.0,
             ),
             boxShadow: isSel
                 ? [
                     BoxShadow(
-                      color: const Color(0xFF1B4332).withValues(alpha: 0.2),
+                      color: kPrimary.withValues(alpha: 0.2),
                       blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
@@ -1760,7 +1760,7 @@ class _PaymentTypeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = const Color(0xFF1B4332);
+    final activeColor = kPrimary;
     final bg = !isEnabled
         ? const Color(0xFFF8FAFC)
         : (selected ? const Color(0xFFF0FDF4) : Colors.white);

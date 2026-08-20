@@ -49,10 +49,41 @@ export class DeliveryDispatchService {
       // Generate dispatch_id
       const dispatchId = `DDSP-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
 
+      // delivery_dispatch_items.dispatch_id is a foreign key, so the parent
+      // dispatch has to exist before any item is written.
+      const warehouseId =
+        items.find((i) => i.warehouse_id)?.warehouse_id ||
+        (await this.resolveWarehouseId({ run_id: run.run_id }));
+
+      if (!warehouseId) {
+        throw new BadRequestException(
+          'No warehouse to dispatch from — this run has no warehouse and its branch has none assigned.',
+        );
+      }
+
       return await this.db.transaction(async (client) => {
         const results: any[] = [];
 
-        // Cleanup any existing dispatch items and reset dispatch balances for this run to start fresh
+        // One dispatch per run: delivery_run_id is unique, so re-approving a
+        // handover updates the existing dispatch instead of creating another.
+        const dispatchRows = await client.query(
+          `INSERT INTO delivery_dispatch
+             (dispatch_id, warehouse_id, delivery_run_id, status,
+              loaded_at, loaded_by, created_by, created_at, updated_at)
+           VALUES ($1, $2, $3, 'loaded', NOW(), $4, $4, NOW(), NOW())
+           ON CONFLICT (delivery_run_id) DO UPDATE SET
+             warehouse_id = EXCLUDED.warehouse_id,
+             status       = 'loaded',
+             loaded_at    = NOW(),
+             loaded_by    = EXCLUDED.loaded_by,
+             updated_by   = EXCLUDED.loaded_by,
+             updated_at   = NOW()
+           RETURNING dispatch_id`,
+          [dispatchId, warehouseId, run.run_id, adminId],
+        );
+        const activeDispatchId = dispatchRows.rows[0].dispatch_id;
+
+        // Cleanup any existing dispatch items for this run to start fresh
         await client.query(
           `DELETE FROM delivery_dispatch_items WHERE delivery_run_id = $1`,
           [run.run_id],
@@ -92,7 +123,7 @@ export class DeliveryDispatchService {
               updated_at   = NOW()
             RETURNING *`,
             [
-              dispatchId, item.warehouse_id, run.run_id, item.product_variant_id,
+              activeDispatchId, item.warehouse_id, run.run_id, item.product_variant_id,
               item.planned_qty, loadedQty, item.unit || 'pcs',
             ],
           );
@@ -123,7 +154,7 @@ export class DeliveryDispatchService {
 
         return {
           status: true,
-          data: { dispatch_id: dispatchId, items: results, run_id: runId },
+          data: { dispatch_id: activeDispatchId, items: results, run_id: runId },
           message: `${items.length} items dispatched for delivery run`,
         };
       });

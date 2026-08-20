@@ -15,6 +15,28 @@ function todayIST(): string {
   return `${pick('year')}-${pick('month')}-${pick('day')}`;
 }
 
+function toISTDateString(d: any): string {
+  if (!d) return '';
+  if (typeof d === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    if (d.includes('T') || d.includes(' ')) {
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date(d));
+    }
+    return d.slice(0, 10);
+  }
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(d));
+}
+
 interface RunAssignment {
   order_id: string;
   customer_id: string;
@@ -1487,9 +1509,7 @@ export class DeliveryRunService {
               );
               if (fromRun) {
                 if (fromRun.run_date) {
-                  runDate = typeof fromRun.run_date === 'string'
-                    ? fromRun.run_date.split('T')[0]
-                    : new Date(fromRun.run_date).toISOString().split('T')[0];
+                  runDate = toISTDateString(fromRun.run_date);
                 }
                 if (fromRun.delivery_slot) deliverySlot = fromRun.delivery_slot;
                 if (fromRun.branch_id) branchId = fromRun.branch_id;
@@ -1662,9 +1682,7 @@ export class DeliveryRunService {
         throw new BadRequestException(`Address stop has status '${sourceStopStatus}' and cannot be moved or swapped. Only pending stops can be reassigned.`);
       }
 
-      const scheduledDateStr = typeof order.scheduled_date === 'string'
-        ? order.scheduled_date.slice(0, 10)
-        : new Date(order.scheduled_date).toISOString().slice(0, 10);
+      const scheduledDateStr = toISTDateString(order.scheduled_date);
 
       // Find ALL orders at this address stop in current run
       const addressOrders = await this.db.query(
@@ -1894,9 +1912,7 @@ export class DeliveryRunService {
           throw new BadRequestException(`Source delivery run ${sourceRun.run_id} is ${sourceRun.status} and cannot be modified`);
         }
 
-        const srcDateStr = typeof sourceRun.run_date === 'string'
-          ? sourceRun.run_date.slice(0, 10)
-          : new Date(sourceRun.run_date).toISOString().slice(0, 10);
+        const srcDateStr = toISTDateString(sourceRun.run_date);
 
         // 3. Resolve target run & target partner
         let targetRun: any = null;
@@ -1967,9 +1983,7 @@ export class DeliveryRunService {
         }
 
         // 4. Invariance validations
-        const tgtDateStr = typeof targetRun.run_date === 'string'
-          ? targetRun.run_date.slice(0, 10)
-          : new Date(targetRun.run_date).toISOString().slice(0, 10);
+        const tgtDateStr = toISTDateString(targetRun.run_date);
 
         if (srcDateStr !== tgtDateStr) {
           throw new BadRequestException(`Cannot move address across different dates (${srcDateStr} vs ${tgtDateStr})`);
@@ -2262,8 +2276,8 @@ export class DeliveryRunService {
         }
 
         // 4. Invariance validations
-        const dateAStr = typeof runA.run_date === 'string' ? runA.run_date.slice(0, 10) : new Date(runA.run_date).toISOString().slice(0, 10);
-        const dateBStr = typeof runB.run_date === 'string' ? runB.run_date.slice(0, 10) : new Date(runB.run_date).toISOString().slice(0, 10);
+        const dateAStr = toISTDateString(runA.run_date);
+        const dateBStr = toISTDateString(runB.run_date);
 
         if (dateAStr !== dateBStr) {
           throw new BadRequestException(`Cannot swap address stops across different dates (${dateAStr} vs ${dateBStr})`);
