@@ -153,92 +153,64 @@ function BannerVisualPreview({
 
   if (banner_type === "popup") {
     return (
-      <div className="mx-auto max-w-[340px] w-full rounded-3xl overflow-hidden shadow-2xl relative group animate-in zoom-in-95 duration-200">
+      <div className="mx-auto max-w-[340px] w-full bg-white rounded-3xl overflow-hidden shadow-2xl relative group border border-slate-100 animate-in zoom-in-95 duration-200">
         {/* Floating Close Button */}
-        <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/95 text-slate-800 flex items-center justify-center text-xs font-black shadow-lg z-30 border border-slate-200/50 cursor-pointer hover:bg-white transition hover:scale-105">
+        <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white/90 text-slate-700 flex items-center justify-center text-xs font-black shadow-md z-30 border border-slate-200/60 cursor-pointer hover:bg-white transition hover:scale-105">
           ✕
         </div>
 
+        {/* 1. TOP: Banner Image (Full width, edge-to-edge) */}
         {cleanSrc ? (
-          <div className="relative w-full overflow-hidden rounded-3xl bg-slate-900">
-            {/* Full-bleed edge-to-edge image without borders or surrounding padding */}
+          <div className="relative w-full h-[190px] overflow-hidden bg-slate-100 flex items-center justify-center">
             <img
               src={cleanSrc}
               alt={title || "App Launch Popup"}
-              className="w-full h-auto max-h-[420px] object-cover block"
+              className="w-full h-full object-cover"
               onError={(e) => {
                 (e.target as HTMLElement).style.display = "none";
               }}
             />
-            {/* Optional sleek bottom overlay for discount / title / description / CTA */}
-            {(discount_text || title || description) && (
-              <div className="p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent text-white absolute bottom-0 inset-x-0 space-y-1.5">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {discount_text && (
-                    <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] tracking-wide shadow-xs">
-                      {discount_text.toUpperCase()}
-                    </span>
-                  )}
-                  {category_name && (
-                    <span className="px-2 py-0.5 rounded-md bg-white/20 text-white font-bold text-[9px]">
-                      {category_name}
-                    </span>
-                  )}
-                </div>
-                {title && <h4 className="font-extrabold text-sm text-white leading-tight drop-shadow-xs">{title}</h4>}
-                {description && (
-                  <p className="text-[11px] text-white/90 line-clamp-2 leading-relaxed whitespace-pre-line drop-shadow-xs">
-                    {description}
-                  </p>
-                )}
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    style={{ backgroundColor: bg }}
-                    className="w-full py-2.5 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 hover:opacity-95 active:scale-[0.99]"
-                  >
-                    <span>{cta}</span>
-                    <ArrowRight size={13} />
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         ) : (
-          /* Fallback when no image URL is uploaded */
-          <div style={{ backgroundColor: bg }} className="p-6 text-white text-center rounded-3xl space-y-3 relative">
-            <div className="flex flex-col items-center justify-center gap-2">
-              <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-white">
-                <Smartphone size={32} />
-              </div>
-              <span className="text-[10px] font-black tracking-wider uppercase bg-black/20 px-2.5 py-0.5 rounded-md">
-                App Launch Popup
-              </span>
-            </div>
-            {discount_text && (
-              <span className="inline-block px-3 py-1 rounded-full bg-white text-slate-900 font-black text-xs">
-                {discount_text.toUpperCase()}
-              </span>
-            )}
-            <h4 className="font-extrabold text-base leading-snug break-words">{title || "Special Promotional Offer"}</h4>
-            {description ? (
-              <p className="text-xs text-white/90 leading-relaxed whitespace-pre-line bg-black/10 p-2.5 rounded-xl">
-                {description}
-              </p>
-            ) : (
-              <p className="text-xs text-white/70 italic">No description provided</p>
-            )}
-            <div className="pt-1">
-              <button
-                type="button"
-                className="w-full py-2.5 bg-white text-slate-900 font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5"
-              >
-                <span>{cta}</span>
-                <ArrowRight size={13} />
-              </button>
-            </div>
+          <div style={{ backgroundColor: bg }} className="h-[140px] w-full flex flex-col items-center justify-center text-white/80 gap-1.5">
+            <Smartphone size={36} />
+            <span className="text-[10px] font-extrabold uppercase tracking-wider">App Launch Popup</span>
           </div>
         )}
+
+        {/* 2. NEXT: Details Section */}
+        <div className="p-4 text-center space-y-2.5 bg-white">
+          {discount_text && (
+            <span className="inline-block px-3 py-0.5 rounded-full bg-amber-100 text-amber-950 font-black text-[10px] tracking-wide shadow-2xs border border-amber-300">
+              {discount_text.toUpperCase()}
+            </span>
+          )}
+          <h4 className="font-extrabold text-sm sm:text-base text-slate-900 leading-snug break-words">
+            {title || "Special Promotional Offer"}
+          </h4>
+          {description ? (
+            <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line break-words bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+              {description}
+            </p>
+          ) : (
+            <p className="text-xs text-slate-400 italic">No description provided</p>
+          )}
+          {category_name && (
+            <div className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md inline-block">
+              Target: {category_name}
+            </div>
+          )}
+          <div className="pt-1">
+            <button
+              type="button"
+              style={{ backgroundColor: bg }}
+              className="w-full py-2.5 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 hover:opacity-95 active:scale-[0.99]"
+            >
+              <span>{cta}</span>
+              <ArrowRight size={13} />
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1559,83 +1531,124 @@ export default function PromotionsCouponsOffersPage() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {filteredOffers.filter((o) => o.is_active).map((offer) => {
                   const bannerType = offer.banner_type || (offer.is_popup ? "popup" : (offer.category_id ? "category_slide" : "home_carousel"));
                   const isPopup = bannerType === "popup" || Boolean(offer.is_popup);
                   const isCatSlide = bannerType === "category_slide" || Boolean(offer.category_id);
                   const isCheckout = bannerType === "checkout_banner";
+                  const src = getImageSrc(offer.image_url);
 
                   return (
                     <div
                       key={offer.id}
-                      style={{ backgroundColor: offer.background_color || "#16a34a" }}
-                      className="p-4 rounded-3xl text-white relative overflow-hidden shadow-sm flex flex-col justify-between min-h-[180px] border border-black/5 group"
+                      className="bg-white rounded-3xl overflow-hidden border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col group"
                     >
-                      <div className="space-y-1.5 relative z-10">
-                        <div className="flex items-center gap-1.5 flex-wrap">
+                      {/* 1. TOP: Prominent Banner Image with Overlaid Badges */}
+                      <div
+                        style={{ backgroundColor: offer.background_color || "#16a34a" }}
+                        className="h-44 w-full relative overflow-hidden flex items-center justify-center shrink-0"
+                      >
+                        {src ? (
+                          <img
+                            src={src}
+                            alt={offer.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-white/80 gap-1.5">
+                            <Smartphone size={32} />
+                            <span className="text-[10px] font-bold tracking-wider uppercase">App Banner</span>
+                          </div>
+                        )}
+
+                        {/* Top Gradient scrim for badge readability */}
+                        <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
+
+                        {/* Overlaid Badges (Top-Left) */}
+                        <div className="absolute top-3 left-3 flex items-center gap-1.5 flex-wrap z-10">
                           {offer.discount_text && (
-                            <span className="px-2 py-0.5 rounded-md bg-white text-slate-900 text-[10px] font-black uppercase tracking-wider shadow-2xs">
+                            <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-wider shadow-sm">
                               {offer.discount_text}
                             </span>
                           )}
                           {isPopup ? (
-                            <span className="px-2 py-0.5 rounded-md bg-rose-500 text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1 shadow-xs">
+                            <span className="px-2.5 py-0.5 rounded-full bg-rose-600 text-white text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1 shadow-sm">
                               <Smartphone size={10} /> App Popup
                             </span>
                           ) : isCatSlide ? (
-                            <span className="px-2 py-0.5 rounded-md bg-purple-500/90 text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1 shadow-xs">
+                            <span className="px-2.5 py-0.5 rounded-full bg-purple-600 text-white text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1 shadow-sm">
                               <FolderTree size={10} /> {getCategoryName(offer.category_id)}
                             </span>
                           ) : isCheckout ? (
-                            <span className="px-2 py-0.5 rounded-md bg-amber-500 text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1 shadow-xs">
+                            <span className="px-2.5 py-0.5 rounded-full bg-amber-600 text-white text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1 shadow-sm">
                               <ShoppingBag size={10} /> Checkout Promo
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-md bg-black/25 text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1">
+                            <span className="px-2.5 py-0.5 rounded-full bg-slate-900/80 backdrop-blur-xs text-white text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1 shadow-sm">
                               <Tag size={10} /> Home Carousel
                             </span>
                           )}
                         </div>
 
-                        <h4 className="font-extrabold text-sm sm:text-base leading-snug drop-shadow-xs mt-1 break-words">{offer.title}</h4>
-                        {offer.description ? (
-                          <p className="text-xs text-white/90 line-clamp-2 leading-relaxed bg-black/10 p-1.5 rounded-lg whitespace-pre-line">
-                            {offer.description}
-                          </p>
-                        ) : (
-                          <p className="text-[11px] text-white/70 italic">No description</p>
-                        )}
+                        {/* Display Sequence Order (Top-Right) */}
+                        <div className="absolute top-3 right-3 z-10">
+                          <span className="px-2 py-0.5 rounded-lg bg-black/60 backdrop-blur-xs text-white text-[10px] font-mono font-bold shadow-xs">
+                            #{offer.display_order}
+                          </span>
+                        </div>
                       </div>
 
-                      <div className="flex items-center justify-between mt-3 relative z-10 pt-2 border-t border-white/10">
-                        <button
-                          onClick={() => {
-                            setPreviewOffer(offer);
-                            setPopupPreviewModalOpen(true);
-                          }}
-                          className="text-[10px] font-bold bg-white text-slate-900 px-3 py-1.5 rounded-xl hover:bg-slate-100 transition shadow-xs flex items-center gap-1.5"
-                        >
-                          <Eye size={12} />
-                          Live Mockup
-                        </button>
-                        <span className="text-[10px] text-white/90 font-mono font-bold">Order #{offer.display_order}</span>
-                      </div>
+                      {/* 2. NEXT: Details Section */}
+                      <div className="p-4 flex-1 flex flex-col justify-between space-y-3 bg-white">
+                        <div className="space-y-1.5">
+                          <h4 className="font-extrabold text-sm sm:text-base text-slate-900 leading-snug line-clamp-1 group-hover:text-emerald-700 transition">
+                            {offer.title}
+                          </h4>
+                          {offer.description ? (
+                            <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed whitespace-pre-line bg-slate-50 p-2 rounded-xl border border-slate-100/80">
+                              {offer.description}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-slate-400 italic">No description provided</p>
+                          )}
+                        </div>
 
-                      {/* Image Preview Thumbnail */}
-                      {(() => {
-                        const src = getImageSrc(offer.image_url);
-                        return src ? (
-                          <img
-                            src={src}
-                            alt={offer.title}
-                            className="w-20 h-20 object-contain absolute right-2 bottom-8 drop-shadow-md z-0 opacity-85 group-hover:scale-105 transition rounded-lg"
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = "none";
-                            }}
-                          />
-                        ) : null;
-                      })()}
+                        {/* Footer Info & Action Buttons */}
+                        <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
+                            <span className="font-bold text-slate-700">{offer.action_type || "BROWSE"}</span>
+                            {offer.category_id && (
+                              <span className="text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded font-bold text-[10px]">
+                                {getCategoryName(offer.category_id)}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setPreviewOffer(offer);
+                                setPopupPreviewModalOpen(true);
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs"
+                            >
+                              <Eye size={12} />
+                              Live Mockup
+                            </button>
+                            <button
+                              onClick={() => openEditOffer(offer)}
+                              className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold transition flex items-center gap-1 border border-amber-200/50"
+                            >
+                              <Edit3 size={12} />
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   );
                 })}

@@ -153,9 +153,9 @@ class PopupBannerWidget {
               resolveAspectRatio();
             }
 
-            final maxImageHeight = MediaQuery.of(context).size.height * 0.75;
-            final screenWidth = MediaQuery.of(context).size.width - 32;
-            final containerWidth = screenWidth.clamp(0.0, 420.0);
+            final maxImageHeight = MediaQuery.of(context).size.height * 0.45;
+            final screenWidth = MediaQuery.of(context).size.width - 36;
+            final containerWidth = screenWidth.clamp(0.0, 380.0);
 
             final hasCustomImage = imageUrl.isNotEmpty;
 
@@ -171,33 +171,31 @@ class PopupBannerWidget {
                     imageUrl,
                     fit: BoxFit.cover,
                     errorBuilder: (_, _, e) => Container(
-                      height: 200,
+                      height: 160,
                       color: bannerBgColor.withValues(alpha: 0.15),
                       child: Center(
-                        child: Icon(Icons.local_offer_rounded, size: 54, color: bannerBgColor),
+                        child: Icon(Icons.local_offer_rounded, size: 48, color: bannerBgColor),
                       ),
                     ),
                   ),
                 );
               } else {
-                // Loading placeholder while resolving aspect ratio
                 imageWidget = Container(
-                  height: 240,
+                  height: 180,
                   width: double.infinity,
-                  color: const Color(0xFF1E293B),
+                  color: const Color(0xFFF1F5F9),
                   child: const Center(
                     child: SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary),
                     ),
                   ),
                 );
               }
             } else {
-              // No image URL: show rich gradient card
               imageWidget = Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                height: 140,
                 width: double.infinity,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -206,71 +204,8 @@ class PopupBannerWidget {
                     end: Alignment.bottomRight,
                   ),
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.stars_rounded, size: 56, color: Colors.white),
-                    const SizedBox(height: 16),
-                    if (discountText != null && discountText.isNotEmpty) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          discountText.toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            color: bannerBgColor,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    if (description != null && description.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        description,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.white70,
-                          height: 1.4,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 46,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(dialogContext);
-                          _handleRedirection(context, actionType, actionValue);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: bannerBgColor,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                        child: Text(
-                          ctaLabel,
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
-                        ),
-                      ),
-                    ),
-                  ],
+                child: const Center(
+                  child: Icon(Icons.stars_rounded, size: 54, color: Colors.white),
                 ),
               );
             }
@@ -283,30 +218,127 @@ class PopupBannerWidget {
                 clipBehavior: Clip.none,
                 alignment: Alignment.center,
                 children: [
-                  // Full-bleed edge-to-edge banner card with NO borders or empty white space
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.pop(dialogContext);
-                      _handleRedirection(context, actionType, actionValue);
-                    },
-                    child: Container(
-                      width: double.infinity,
-                      constraints: BoxConstraints(maxWidth: containerWidth),
-                      decoration: BoxDecoration(
-                        color: Colors.transparent,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.35),
-                            blurRadius: 30,
-                            offset: const Offset(0, 12),
+                  // Main Banner Card Container: Top Image -> Next Details
+                  Container(
+                    width: double.infinity,
+                    constraints: BoxConstraints(maxWidth: containerWidth),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.25),
+                          blurRadius: 28,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // 1. TOP: Banner Image (Full width, edge-to-edge)
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.pop(dialogContext);
+                            _handleRedirection(context, actionType, actionValue);
+                          },
+                          child: ClipRRect(
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                            child: imageWidget,
                           ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(24),
-                        child: imageWidget,
-                      ),
+                        ),
+
+                        // 2. NEXT: Banner Details Section
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (discountText != null && discountText.isNotEmpty) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF3C7),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFF59E0B), width: 1),
+                                  ),
+                                  child: Text(
+                                    discountText.toUpperCase(),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFFB45309),
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                              ],
+
+                              Text(
+                                title,
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                  color: kText,
+                                  height: 1.25,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+
+                              if (description != null && description.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  description,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: kTextSub,
+                                    height: 1.4,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+
+                              const SizedBox(height: 16),
+
+                              // Full-width CTA Button
+                              SizedBox(
+                                width: double.infinity,
+                                height: 46,
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.pop(dialogContext);
+                                    _handleRedirection(context, actionType, actionValue);
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: bannerBgColor,
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        ctaLabel,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 0.3,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      const Icon(Icons.arrow_forward_rounded, size: 16),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
 
@@ -324,9 +356,9 @@ class PopupBannerWidget {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.3),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
+                              color: Colors.black.withValues(alpha: 0.25),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
                             ),
                           ],
                         ),
