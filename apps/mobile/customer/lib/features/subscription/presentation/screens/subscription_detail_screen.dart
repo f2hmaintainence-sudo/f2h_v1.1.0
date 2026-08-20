@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
@@ -58,11 +59,24 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
   List<SubscriptionBillModel> _bills = [];
   bool _loadingBills = true;
 
+  /// Collapsed/expanded state of the Delivery Details panel.
+  bool _deliveryExpanded = false;
+
   String _getMonthName(int month) {
     const names = [
       '',
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return month >= 1 && month <= 12 ? names[month] : '';
   }
@@ -78,9 +92,14 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
 
   Future<void> _loadDetailInfo() async {
     try {
-      final info = await sl<SubscriptionRepository>()
-          .getSubscriptionDetail(widget.subscription.id);
-      if (mounted) setState(() { _detailInfo = info; _loadingDetail = false; });
+      final info = await sl<SubscriptionRepository>().getSubscriptionDetail(
+        widget.subscription.id,
+      );
+      if (mounted)
+        setState(() {
+          _detailInfo = info;
+          _loadingDetail = false;
+        });
     } catch (_) {
       if (mounted) setState(() => _loadingDetail = false);
     }
@@ -88,9 +107,14 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
 
   Future<void> _loadBills() async {
     try {
-      final bills = await sl<SubscriptionRepository>()
-          .getSubscriptionBills(widget.subscription.id);
-      if (mounted) setState(() { _bills = bills; _loadingBills = false; });
+      final bills = await sl<SubscriptionRepository>().getSubscriptionBills(
+        widget.subscription.id,
+      );
+      if (mounted)
+        setState(() {
+          _bills = bills;
+          _loadingBills = false;
+        });
     } catch (_) {
       if (mounted) setState(() => _loadingBills = false);
     }
@@ -141,30 +165,47 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
   void _showResumeDialog() {
     final s = widget.subscription;
     final pauseFromDate = s.pauseFromDate;
-    final pauseToDate   = s.pauseToDate;
+    final pauseToDate = s.pauseToDate;
 
     if (pauseFromDate == null || pauseToDate == null) return;
 
-    final today    = DateTime.now();
-    final todayStr = '${today.year}-${today.month.toString().padLeft(2,'0')}-${today.day.toString().padLeft(2,'0')}';
+    final today = DateTime.now();
+    final todayStr =
+        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
     if (todayStr.compareTo(pauseFromDate) < 0) {
       // ── SCENARIO 1: Pause hasn't started yet — simple confirm ──
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Cancel Upcoming Pause?',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: kText)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text(
+            'Cancel Upcoming Pause?',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
+              color: kText,
+            ),
+          ),
           content: Text(
             'Your pause is scheduled to start on $pauseFromDate. '
             'Cancelling it will restore normal deliveries immediately.',
-            style: const TextStyle(fontSize: 13, color: kTextSub, fontWeight: FontWeight.w500, height: 1.5),
+            style: const TextStyle(
+              fontSize: 13,
+              color: kTextSub,
+              fontWeight: FontWeight.w500,
+              height: 1.5,
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Keep Pause', style: TextStyle(color: kTextSub, fontWeight: FontWeight.w700)),
+              child: const Text(
+                'Keep Pause',
+                style: TextStyle(color: kTextSub, fontWeight: FontWeight.w700),
+              ),
             ),
             TextButton(
               onPressed: () {
@@ -175,148 +216,198 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                 widget.onPauseResume();
                 if (mounted) Navigator.pop(context);
               },
-              child: const Text('Resume Now',
-                  style: TextStyle(color: Color(0xFF15803D), fontWeight: FontWeight.w800)),
+              child: const Text(
+                'Resume Now',
+                style: TextStyle(
+                  color: Color(0xFF15803D),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             ),
           ],
         ),
       );
     } else {
       // ── SCENARIO 2 / 3: Pause is active — date picker ──
-      final tomorrow    = today.add(const Duration(days: 1));
-      final pauseEndDay = DateTime.tryParse(pauseToDate) ?? today.add(const Duration(days: 30));
+      final tomorrow = today.add(const Duration(days: 1));
+      final pauseEndDay =
+          DateTime.tryParse(pauseToDate) ?? today.add(const Duration(days: 30));
 
       showDialog(
         context: context,
         barrierDismissible: true,
         builder: (ctx) {
           DateTime? selectedDate;
-          return StatefulBuilder(builder: (ctx, setS) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.play_circle_outline_rounded,
-                        size: 20, color: Color(0xFF15803D)),
-                  ),
-                  const SizedBox(width: 10),
-                  const Text('Resume Subscription',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: kText)),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Resume Date',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kTextSub)),
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: ctx,
-                        initialDate: tomorrow,
-                        firstDate: tomorrow,
-                        lastDate: pauseEndDay,
-                        helpText: 'Select resume date',
-                      );
-                      if (picked != null) {
-                        setS(() => selectedDate = picked);
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF9FAFB),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: selectedDate != null ? const Color(0xFF15803D) : kBorderLt),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.calendar_today_rounded,
-                            size: 16,
-                            color: selectedDate != null ? const Color(0xFF15803D) : kMuted,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            selectedDate != null
-                                ? '${selectedDate!.day} ${_getMonthName(selectedDate!.month)} ${selectedDate!.year}'
-                                : 'Tap to select date',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: selectedDate != null ? kText : kMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Deliveries will resume from the selected date.\n'
-                    'Allowed: Tomorrow → ${_formatDate(pauseToDate)}',
-                    style: const TextStyle(fontSize: 11, color: kMuted, height: 1.4),
-                  ),
-                ],
-              ),
-              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              actions: [
-                Row(
+          return StatefulBuilder(
+            builder: (ctx, setS) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                title: Row(
                   children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          side: const BorderSide(color: kBorderLt),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: const Text('Cancel',
-                            style: TextStyle(color: kTextSub, fontWeight: FontWeight.w700)),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.play_circle_outline_rounded,
+                        size: 20,
+                        color: Color(0xFF15803D),
                       ),
                     ),
                     const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: selectedDate == null
-                            ? null
-                            : () {
-                                final resumeStr =
-                                    '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2,'0')}-${selectedDate!.day.toString().padLeft(2,'0')}';
-                                Navigator.pop(ctx);
-                                context.read<SubscriptionBloc>().add(
-                                  ResumeSubscriptionRequested(
-                                    subscriptionId: s.id,
-                                    resumeDate: resumeStr,
-                                  ),
-                                );
-                                widget.onPauseResume();
-                                if (mounted) Navigator.pop(context);
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF15803D),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          disabledBackgroundColor: kBorderLt,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: const Text('Resume', style: TextStyle(fontWeight: FontWeight.w800)),
+                    const Text(
+                      'Resume Subscription',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: kText,
                       ),
                     ),
                   ],
                 ),
-              ],
-            );
-          });
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Resume Date',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: kTextSub,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: ctx,
+                          initialDate: tomorrow,
+                          firstDate: tomorrow,
+                          lastDate: pauseEndDay,
+                          helpText: 'Select resume date',
+                        );
+                        if (picked != null) {
+                          setS(() => selectedDate = picked);
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF9FAFB),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: selectedDate != null
+                                ? const Color(0xFF15803D)
+                                : kBorderLt,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today_rounded,
+                              size: 16,
+                              color: selectedDate != null
+                                  ? const Color(0xFF15803D)
+                                  : kMuted,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              selectedDate != null
+                                  ? '${selectedDate!.day} ${_getMonthName(selectedDate!.month)} ${selectedDate!.year}'
+                                  : 'Tap to select date',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: selectedDate != null ? kText : kMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Deliveries will resume from the selected date.\n'
+                      'Allowed: Tomorrow → ${_formatDate(pauseToDate)}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: kMuted,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+                actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                actions: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            side: const BorderSide(color: kBorderLt),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              color: kTextSub,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: selectedDate == null
+                              ? null
+                              : () {
+                                  final resumeStr =
+                                      '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}';
+                                  Navigator.pop(ctx);
+                                  context.read<SubscriptionBloc>().add(
+                                    ResumeSubscriptionRequested(
+                                      subscriptionId: s.id,
+                                      resumeDate: resumeStr,
+                                    ),
+                                  );
+                                  widget.onPauseResume();
+                                  if (mounted) Navigator.pop(context);
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF15803D),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            disabledBackgroundColor: kBorderLt,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'Resume',
+                            style: TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          );
         },
       );
     }
@@ -327,8 +418,12 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     final firstItem = sub.items.isNotEmpty ? sub.items.first : null;
     final variantId = firstItem?.productVariantId ?? sub.id;
     final productName = firstItem?.productName ?? sub.productName;
-    final variantName = (firstItem?.variantName.isNotEmpty ?? false) ? firstItem!.variantName : 'Standard';
-    final price = (firstItem != null && firstItem.finalPrice > 0) ? firstItem.finalPrice : (firstItem?.unitPrice ?? sub.pricePerDay);
+    final variantName = (firstItem?.variantName.isNotEmpty ?? false)
+        ? firstItem!.variantName
+        : 'Standard';
+    final price = (firstItem != null && firstItem.finalPrice > 0)
+        ? firstItem.finalPrice
+        : (firstItem?.unitPrice ?? sub.pricePerDay);
 
     final cartItem = CartItemEntity(
       productId: variantId,
@@ -366,7 +461,11 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text(
           'Cancel Subscription',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: kText),
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w900,
+            color: kText,
+          ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -374,7 +473,11 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
           children: [
             const Text(
               'Are you sure you want to cancel this subscription? This action cannot be undone.',
-              style: TextStyle(fontSize: 13, color: kTextSub, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                fontSize: 13,
+                color: kTextSub,
+                fontWeight: FontWeight.w500,
+              ),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -403,8 +506,10 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Keep Subscription',
-                style: TextStyle(color: kTextSub, fontWeight: FontWeight.w700)),
+            child: const Text(
+              'Keep Subscription',
+              style: TextStyle(color: kTextSub, fontWeight: FontWeight.w700),
+            ),
           ),
           TextButton(
             onPressed: () {
@@ -416,15 +521,19 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
               context.read<SubscriptionBloc>().add(
                 CancelSubscriptionRequested(
                   subscriptionId: widget.subscription.id,
-                  cancelReason: reason.isNotEmpty ? reason : 'Cancelled by customer',
+                  cancelReason: reason.isNotEmpty
+                      ? reason
+                      : 'Cancelled by customer',
                   endDate: endDate,
                 ),
               );
               widget.onDelete();
               if (mounted) Navigator.pop(context);
             },
-            child: const Text('Cancel Subscription',
-                style: TextStyle(color: kRed, fontWeight: FontWeight.w800)),
+            child: const Text(
+              'Cancel Subscription',
+              style: TextStyle(color: kRed, fontWeight: FontWeight.w800),
+            ),
           ),
         ],
       ),
@@ -477,6 +586,170 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     }
   }
 
+  // ─── Delivery address (own card) ────────────────────────────
+
+  Widget _buildDeliveryAddressCard(String addressString) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kBorderLt, width: 1.5),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: kPrimaryPl,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.location_on_rounded,
+              size: 16,
+              color: kPrimary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Delivery Address',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: kTextSub,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  addressString,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: kText,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Delivery details (collapsible) ─────────────────────────
+
+  Widget _buildDeliveryDetailsSection(Subscription s) {
+    final slot = s.slot.isNotEmpty ? s.slot : 'Morning';
+    final frequency = s.frequency.isNotEmpty ? s.frequency : 'Daily';
+    final hasEndDate = s.endDate != null && s.endDate!.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kBorderLt, width: 1.5),
+      ),
+      child: Column(
+        children: [
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              setState(() => _deliveryExpanded = !_deliveryExpanded);
+            },
+            behavior: HitTestBehavior.opaque,
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.local_shipping_rounded,
+                  size: 16,
+                  color: kPrimary,
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Delivery Details',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    color: kText,
+                  ),
+                ),
+                const Spacer(),
+                // Summary while collapsed
+                if (!_deliveryExpanded)
+                  Flexible(
+                    child: Text(
+                      '$frequency · $slot',
+                      textAlign: TextAlign.end,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: kPrimary,
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 6),
+                AnimatedRotation(
+                  turns: _deliveryExpanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 20,
+                    color: kTextSub,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.fastOutSlowIn,
+            alignment: Alignment.topCenter,
+            child: _deliveryExpanded
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSelectedDaysWidget(s),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          _InfoPill(
+                            icon: Icons.wb_sunny_rounded,
+                            label: slot,
+                            color: const Color(0xFFD97706),
+                          ),
+                          if (s.autoRenew)
+                            _InfoPill(
+                              icon: Icons.autorenew_rounded,
+                              label: 'Auto Renew',
+                              color: const Color(0xFF0077B6),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      _buildDetailRow('Frequency', frequency),
+                      _buildDetailRow('Delivery Slot', slot),
+                      _buildDetailRow('Start Date', _formatDate(s.startDate)),
+                      if (hasEndDate)
+                        _buildDetailRow('End Date', _formatDate(s.endDate)),
+                    ],
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSelectedDaysWidget(Subscription s) {
     final dayQtys = s.getSelectedDayQuantities();
     if (dayQtys.isEmpty) return const SizedBox.shrink();
@@ -498,7 +771,11 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
               SizedBox(width: 6),
               Text(
                 'Delivery Schedule:',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: kTextSub),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: kTextSub,
+                ),
               ),
             ],
           ),
@@ -527,11 +804,17 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                     children: [
                       TextSpan(
                         text: '${dq.dayName} ',
-                        style: const TextStyle(fontWeight: FontWeight.w600, color: kTextSub),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: kTextSub,
+                        ),
                       ),
                       TextSpan(
                         text: '${dq.quantity}',
-                        style: const TextStyle(fontWeight: FontWeight.w900, color: kPrimary),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          color: kPrimary,
+                        ),
                       ),
                     ],
                   ),
@@ -549,7 +832,8 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
   Widget _buildAlertBanners() {
     final info = _detailInfo;
     if (_loadingDetail || info == null) return const SizedBox.shrink();
-    if (!info.alertLowBalance && !info.alertOutstandingBills) return const SizedBox.shrink();
+    if (!info.alertLowBalance && !info.alertOutstandingBills)
+      return const SizedBox.shrink();
 
     return Column(
       children: [
@@ -618,11 +902,19 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
         ),
         child: Row(
           children: [
-            Icon(Icons.receipt_long_rounded, size: 28, color: kMuted.withValues(alpha: 0.5)),
+            Icon(
+              Icons.receipt_long_rounded,
+              size: 28,
+              color: kMuted.withValues(alpha: 0.5),
+            ),
             const SizedBox(width: 14),
             const Text(
               'No bills found for this subscription.',
-              style: TextStyle(fontSize: 13, color: kTextSub, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                fontSize: 13,
+                color: kTextSub,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
@@ -633,7 +925,9 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     final displayBills = _bills.take(3).toList();
     return Column(
       children: [
-        ...displayBills.map((bill) => _BillCard(bill: bill, formatDate: _formatDate)),
+        ...displayBills.map(
+          (bill) => _BillCard(bill: bill, formatDate: _formatDate),
+        ),
         if (_bills.length > 3) ...[
           const SizedBox(height: 8),
           GestureDetector(
@@ -657,7 +951,11 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                     ),
                   ),
                   const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right_rounded, size: 16, color: kPrimary),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: kPrimary,
+                  ),
                 ],
               ),
             ),
@@ -734,14 +1032,22 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                 border: Border.all(color: kBorderLt),
               ),
               child: IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: kText),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  size: 16,
+                  color: kText,
+                ),
                 onPressed: () => Navigator.pop(context),
               ),
             ),
           ),
           title: const Text(
             'Subscription Details',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: kText),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: kText,
+            ),
           ),
           centerTitle: true,
         ),
@@ -753,19 +1059,35 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
               orElse: () => list.isNotEmpty
                   ? list.first
                   : AddressModel(
-                      customerId: '', addressType: '', contactName: '',
-                      contactMobile: '', flatNo: '', floorNo: '',
-                      buildingName: '', landmark: '', street: '',
-                      area: '', city: '', state: '', pincode: '',
-                      latitude: 0.0, longitude: 0.0, deliveryNote: '',
-                      isDefault: false, zoneId: '', routeId: '',
-                      branchId: '', status: '',
+                      customerId: '',
+                      addressType: '',
+                      contactName: '',
+                      contactMobile: '',
+                      flatNo: '',
+                      floorNo: '',
+                      buildingName: '',
+                      landmark: '',
+                      street: '',
+                      area: '',
+                      city: '',
+                      state: '',
+                      pincode: '',
+                      latitude: 0.0,
+                      longitude: 0.0,
+                      deliveryNote: '',
+                      isDefault: false,
+                      zoneId: '',
+                      routeId: '',
+                      branchId: '',
+                      status: '',
                     ),
             );
 
             final contactInfo = [
-              if (defaultAddress.contactName.isNotEmpty) defaultAddress.contactName,
-              if (defaultAddress.contactMobile.isNotEmpty) defaultAddress.contactMobile,
+              if (defaultAddress.contactName.isNotEmpty)
+                defaultAddress.contactName,
+              if (defaultAddress.contactMobile.isNotEmpty)
+                defaultAddress.contactMobile,
             ].join(' · ');
 
             final addressString = defaultAddress.id == null
@@ -773,7 +1095,8 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                 : [
                     if (contactInfo.isNotEmpty) contactInfo,
                     if (defaultAddress.flatNo.isNotEmpty) defaultAddress.flatNo,
-                    if (defaultAddress.buildingName.isNotEmpty) defaultAddress.buildingName,
+                    if (defaultAddress.buildingName.isNotEmpty)
+                      defaultAddress.buildingName,
                     if (defaultAddress.street.isNotEmpty) defaultAddress.street,
                     if (defaultAddress.area.isNotEmpty) defaultAddress.area,
                     '${defaultAddress.city} - ${defaultAddress.pincode}',
@@ -794,7 +1117,9 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                       color: kSurface,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: isCancelled ? kRed.withValues(alpha: 0.15) : kBorderLt,
+                        color: isCancelled
+                            ? kRed.withValues(alpha: 0.15)
+                            : kBorderLt,
                         width: 1.5,
                       ),
                       boxShadow: [
@@ -863,10 +1188,14 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                                       color: isCancelled ? kTextSub : kText,
                                     ),
                                   ),
-                                  if (s.pauseFromDate != null && s.pauseToDate != null) ...[
+                                  if (s.pauseFromDate != null &&
+                                      s.pauseToDate != null) ...[
                                     const SizedBox(height: 6),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: kAccentLt.withValues(alpha: 0.5),
                                         borderRadius: BorderRadius.circular(8),
@@ -889,7 +1218,10 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                             const SizedBox(width: 8),
                             // Status badge
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
                               decoration: BoxDecoration(
                                 color: statusBg,
                                 borderRadius: BorderRadius.circular(100),
@@ -913,34 +1245,6 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                             ),
                           ],
                         ),
-                        // Delivery schedule chips
-                        _buildSelectedDaysWidget(s),
-                        // Delivery slot & payment type pill row
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            _InfoPill(
-                              icon: Icons.wb_sunny_rounded,
-                              label: s.slot.isNotEmpty ? s.slot : 'Morning',
-                              color: const Color(0xFFD97706),
-                            ),
-                            _InfoPill(
-                              icon: s.paymentType == 'postpaid'
-                                  ? Icons.credit_card_rounded
-                                  : Icons.account_balance_wallet_rounded,
-                              label: s.paymentType == 'postpaid' ? 'Postpaid' : 'Prepaid',
-                              color: s.paymentType == 'postpaid' ? const Color(0xFF7C3AED) : kPrimary,
-                            ),
-                            if (s.autoRenew)
-                              _InfoPill(
-                                icon: Icons.autorenew_rounded,
-                                label: 'Auto Renew',
-                                color: const Color(0xFF0077B6),
-                              ),
-                          ],
-                        ),
                       ],
                     ),
                   ),
@@ -957,7 +1261,8 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => SubscriptionCalendarScreen(subscription: s),
+                              builder: (_) =>
+                                  SubscriptionCalendarScreen(subscription: s),
                             ),
                           ),
                         ),
@@ -981,7 +1286,9 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                           label: 'Pauses',
                           color: kAccent,
                           onTap: _showPauseHistorySheet,
-                          badge: _pauseHistory.isNotEmpty ? '${_pauseHistory.length}' : null,
+                          badge: _pauseHistory.isNotEmpty
+                              ? '${_pauseHistory.length}'
+                              : null,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -998,34 +1305,40 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 16),
+
+                  // ── 3. Delivery Address ────────────────────────
+                  _buildDeliveryAddressCard(addressString),
+                  const SizedBox(height: 12),
+
+                  // ── 4. Delivery Details (collapsible) ──────────
+                  _buildDeliveryDetailsSection(s),
                   const SizedBox(height: 20),
 
-                  // ── 3. Subscription Details ────────────────────
+                  // ── 5. Subscription Details ────────────────────
                   const Text(
                     'Subscription Details',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: kText),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      color: kText,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   _buildDetailRow('Sub Number', s.displayLabel),
-                  _buildDetailRow('Start Date', _formatDate(s.startDate)),
-                  _buildDetailRow(
-                    'Delivery Address',
-                    addressString,
-                    showChevron: true,
-                  ),
                   _buildDetailRow(
                     'Payment Method',
                     s.paymentType == 'postpaid' ? 'Postpaid' : 'Wallet',
                   ),
-                  if (s.endDate != null && s.endDate!.isNotEmpty)
-                    _buildDetailRow('End Date', _formatDate(s.endDate)),
                   if (isCancelled)
                     _buildDetailRow('Status', 'Cancelled', valueColor: kRed),
                   if (_detailInfo != null && !_loadingDetail) ...[
                     _buildDetailRow(
                       'Wallet Balance',
                       '₹${_detailInfo!.walletBalance.toStringAsFixed(2)}',
-                      valueColor: _detailInfo!.alertLowBalance ? kRed : kPrimary,
+                      valueColor: _detailInfo!.alertLowBalance
+                          ? kRed
+                          : kPrimary,
                     ),
                     if (_detailInfo!.nextRenewalEstimate > 0)
                       _buildDetailRow(
@@ -1035,20 +1348,28 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   ],
                   const SizedBox(height: 20),
 
-                  // ── 4. Bills section ────────────────────────────
+                  // ── 6. Bills section ────────────────────────────
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
                         'Bills',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: kText),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: kText,
+                        ),
                       ),
                       if (_bills.isNotEmpty)
                         GestureDetector(
                           onTap: _showBillsSheet,
                           child: const Text(
                             'View All',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kPrimary),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: kPrimary,
+                            ),
                           ),
                         ),
                     ],
@@ -1078,9 +1399,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     required bool isTerminal,
   }) {
     final s = widget.subscription;
-    final isExpired =
-        s.status == 'expaired' ||
-        s.status == 'expired';
+    final isExpired = s.status == 'expaired' || s.status == 'expired';
     final isCompleted = s.status == 'completed';
 
     if (isCompleted) {
@@ -1104,16 +1423,26 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: _handleRenew,
-              icon: const Icon(Icons.replay_rounded, size: 18, color: Colors.white),
+              icon: const Icon(
+                Icons.replay_rounded,
+                size: 18,
+                color: Colors.white,
+              ),
               label: const Text(
                 'RENEW SUBSCRIPTION',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.5,
+                ),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: kPrimary,
                 foregroundColor: Colors.white,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
             ),
           ),
@@ -1147,16 +1476,26 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   MaterialPageRoute(builder: (_) => const WalletScreen()),
                 );
               },
-              icon: const Icon(Icons.account_balance_wallet_rounded, size: 18, color: Colors.white),
+              icon: const Icon(
+                Icons.account_balance_wallet_rounded,
+                size: 18,
+                color: Colors.white,
+              ),
               label: const Text(
                 'PAY OUTSTANDING BILLS',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.5,
+                ),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: kRed,
                 foregroundColor: Colors.white,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
             ),
           ),
@@ -1165,9 +1504,10 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     }
 
     // Determine if pause is current/future (disable Pause, show Resume)
-    final today    = DateTime.now();
-    final todayStr = '${today.year}-${today.month.toString().padLeft(2,'0')}-${today.day.toString().padLeft(2,'0')}';
-    final pTo      = s.pauseToDate;
+    final today = DateTime.now();
+    final todayStr =
+        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    final pTo = s.pauseToDate;
     final isCurrentlyPaused = pTo != null && pTo.compareTo(todayStr) >= 0;
 
     return Container(
@@ -1191,7 +1531,10 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
             // ── Auto Renew toggle row ───────────────────────────
             if (!isTerminal) ...[
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 margin: const EdgeInsets.only(bottom: 10),
                 decoration: BoxDecoration(
                   color: kBg,
@@ -1203,7 +1546,9 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                     Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: s.autoRenew ? const Color(0xFFDCFCE7) : kBorderLt,
+                        color: s.autoRenew
+                            ? const Color(0xFFDCFCE7)
+                            : kBorderLt,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(
@@ -1219,13 +1564,21 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                         children: [
                           const Text(
                             'Auto Renew',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: kText),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: kText,
+                            ),
                           ),
                           Text(
                             s.autoRenew
                                 ? 'Subscription renews automatically'
                                 : 'Ends on current end date',
-                            style: const TextStyle(fontSize: 10.5, color: kTextSub, fontWeight: FontWeight.w500),
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              color: kTextSub,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ],
                       ),
@@ -1234,7 +1587,10 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                       value: s.autoRenew,
                       onChanged: (val) {
                         context.read<SubscriptionBloc>().add(
-                          UpdateAutoRenewRequested(subscriptionId: s.id, autoRenew: val),
+                          UpdateAutoRenewRequested(
+                            subscriptionId: s.id,
+                            autoRenew: val,
+                          ),
                         );
                       },
                       activeColor: const Color(0xFF15803D),
@@ -1259,21 +1615,31 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                                 height: 46,
                                 child: ElevatedButton.icon(
                                   onPressed: null,
-                                  icon: const Icon(Icons.pause_circle_outline_rounded, size: 17),
+                                  icon: const Icon(
+                                    Icons.pause_circle_outline_rounded,
+                                    size: 17,
+                                  ),
                                   label: FittedBox(
                                     fit: BoxFit.scaleDown,
                                     child: Text(
                                       'Paused until ${_formatDate(pTo!)}',
-                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                      ),
                                       maxLines: 1,
                                     ),
                                   ),
                                   style: ElevatedButton.styleFrom(
                                     disabledBackgroundColor: kBorderLt,
                                     disabledForegroundColor: kMuted,
-                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
                                     elevation: 0,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -1281,23 +1647,34 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                           )
                         : ElevatedButton.icon(
                             onPressed: isTerminal ? null : _handlePause,
-                            icon: const Icon(Icons.pause_circle_outline_rounded, size: 17, color: Colors.white),
+                            icon: const Icon(
+                              Icons.pause_circle_outline_rounded,
+                              size: 17,
+                              color: Colors.white,
+                            ),
                             label: const FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Text(
                                 'Pause Subscription',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                ),
                                 maxLines: 1,
                               ),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: isTerminal ? kMuted : kPrimary,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
                               disabledBackgroundColor: kBorderLt,
                               disabledForegroundColor: kMuted,
                               elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                           ),
                   ),
@@ -1312,18 +1689,30 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                         height: 46,
                         child: ElevatedButton.icon(
                           onPressed: _showResumeDialog,
-                          icon: const Icon(Icons.play_circle_outline_rounded, size: 17, color: Colors.white),
+                          icon: const Icon(
+                            Icons.play_circle_outline_rounded,
+                            size: 17,
+                            color: Colors.white,
+                          ),
                           label: const FittedBox(
                             fit: BoxFit.scaleDown,
-                            child: Text('Resume',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900), maxLines: 1),
+                            child: Text(
+                              'Resume',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                              ),
+                              maxLines: 1,
+                            ),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF15803D),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(horizontal: 8),
                             elevation: 0,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         ),
                       ),
@@ -1337,15 +1726,24 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                         onPressed: _handleCancel,
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 4),
-                          side: BorderSide(color: kRed.withValues(alpha: 0.5), width: 1.2),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          side: BorderSide(
+                            color: kRed.withValues(alpha: 0.5),
+                            width: 1.2,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           backgroundColor: kRed.withValues(alpha: 0.04),
                         ),
                         child: const FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
                             'Cancel',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: kRed),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              color: kRed,
+                            ),
                             maxLines: 1,
                           ),
                         ),
@@ -1378,7 +1776,11 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                 flex: 3,
                 child: Text(
                   label,
-                  style: const TextStyle(fontSize: 13, color: kTextSub, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: kTextSub,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               Expanded(
@@ -1404,7 +1806,11 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                     ),
                     if (showChevron) ...[
                       const SizedBox(width: 4),
-                      const Icon(Icons.chevron_right_rounded, size: 15, color: kTextSub),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        size: 15,
+                        color: kTextSub,
+                      ),
                     ],
                   ],
                 ),
@@ -1426,7 +1832,11 @@ class _InfoPill extends StatelessWidget {
   final String label;
   final Color color;
 
-  const _InfoPill({required this.icon, required this.label, required this.color});
+  const _InfoPill({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1444,7 +1854,11 @@ class _InfoPill extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             label,
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
           ),
         ],
       ),
@@ -1490,7 +1904,12 @@ class _AlertBanner extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600, height: 1.4),
+              style: TextStyle(
+                fontSize: 12,
+                color: color,
+                fontWeight: FontWeight.w600,
+                height: 1.4,
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -1504,7 +1923,11 @@ class _AlertBanner extends StatelessWidget {
               ),
               child: Text(
                 actionLabel,
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
@@ -1524,19 +1947,27 @@ class _BillCard extends StatelessWidget {
 
   Color get _statusColor {
     switch (bill.status.toLowerCase()) {
-      case 'paid': return kPrimary;
-      case 'unpaid': return kRed;
-      case 'cancelled': return kMuted;
-      default: return kAccent;
+      case 'paid':
+        return kPrimary;
+      case 'unpaid':
+        return kRed;
+      case 'cancelled':
+        return kMuted;
+      default:
+        return kAccent;
     }
   }
 
   String get _statusLabel {
     switch (bill.status.toLowerCase()) {
-      case 'paid': return 'Paid';
-      case 'unpaid': return 'Unpaid';
-      case 'cancelled': return 'Cancelled';
-      default: return bill.status.toUpperCase();
+      case 'paid':
+        return 'Paid';
+      case 'unpaid':
+        return 'Unpaid';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return bill.status.toUpperCase();
     }
   }
 
@@ -1560,12 +1991,16 @@ class _BillCard extends StatelessWidget {
       'status': bill.status,
       'remarks': bill.remarks,
       'created_at': bill.dueDate,
-      'items': bill.items.map((i) => {
-        'product_name': i.productVariantId,
-        'unit_price': i.unitPrice,
-        'final_price': i.totalAmount,
-        'quantity': i.quantity,
-      }).toList(),
+      'items': bill.items
+          .map(
+            (i) => {
+              'product_name': i.productVariantId,
+              'unit_price': i.unitPrice,
+              'final_price': i.totalAmount,
+              'quantity': i.quantity,
+            },
+          )
+          .toList(),
     };
 
     return GestureDetector(
@@ -1573,99 +2008,130 @@ class _BillCard extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: kSurface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: bill.dueAmount > 0 ? kRed.withValues(alpha: 0.15) : kBorderLt,
+        decoration: BoxDecoration(
+          color: kSurface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: bill.dueAmount > 0
+                ? kRed.withValues(alpha: 0.15)
+                : kBorderLt,
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: _statusColor.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(Icons.receipt_long_rounded, size: 18, color: _statusColor),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      bill.billId,
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w800,
-                        color: kText,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    if (bill.billingFrom != null && bill.billingTo != null)
-                      Text(
-                        '${formatDate(bill.billingFrom)} → ${formatDate(bill.billingTo)}',
-                        style: const TextStyle(fontSize: 10.5, color: kTextSub, fontWeight: FontWeight.w500),
-                      ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _statusColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  _statusLabel,
-                  style: TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w900,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _statusColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.receipt_long_rounded,
+                    size: 18,
                     color: _statusColor,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          const Divider(height: 1, color: kBorderLt),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _BillStat(label: 'Total', value: '₹${bill.totalAmount.toStringAsFixed(0)}'),
-              _BillStat(label: 'Paid', value: '₹${bill.paidAmount.toStringAsFixed(0)}', color: kPrimary),
-              if (bill.dueAmount > 0)
-                _BillStat(label: 'Due', value: '₹${bill.dueAmount.toStringAsFixed(0)}', color: kRed),
-              if (bill.dueDate != null && bill.dueDate!.isNotEmpty)
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Due Date', style: TextStyle(fontSize: 9.5, color: kMuted, fontWeight: FontWeight.w500)),
-                      const SizedBox(height: 2),
                       Text(
-                        formatDate(bill.dueDate),
-                        style: TextStyle(
-                          fontSize: 11,
+                        bill.billId,
+                        style: const TextStyle(
+                          fontSize: 12.5,
                           fontWeight: FontWeight.w800,
-                          color: bill.dueAmount > 0 ? kRed : kTextSub,
+                          color: kText,
                         ),
                       ),
+                      const SizedBox(height: 2),
+                      if (bill.billingFrom != null && bill.billingTo != null)
+                        Text(
+                          '${formatDate(bill.billingFrom)} → ${formatDate(bill.billingTo)}',
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            color: kTextSub,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                     ],
                   ),
                 ),
-            ],
-          ),
-        ],
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _statusColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    _statusLabel,
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w900,
+                      color: _statusColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            const Divider(height: 1, color: kBorderLt),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _BillStat(
+                  label: 'Total',
+                  value: '₹${bill.totalAmount.toStringAsFixed(0)}',
+                ),
+                _BillStat(
+                  label: 'Paid',
+                  value: '₹${bill.paidAmount.toStringAsFixed(0)}',
+                  color: kPrimary,
+                ),
+                if (bill.dueAmount > 0)
+                  _BillStat(
+                    label: 'Due',
+                    value: '₹${bill.dueAmount.toStringAsFixed(0)}',
+                    color: kRed,
+                  ),
+                if (bill.dueDate != null && bill.dueDate!.isNotEmpty)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        const Text(
+                          'Due Date',
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            color: kMuted,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          formatDate(bill.dueDate),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: bill.dueAmount > 0 ? kRed : kTextSub,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 class _BillStat extends StatelessWidget {
@@ -1681,7 +2147,14 @@ class _BillStat extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontSize: 9.5, color: kMuted, fontWeight: FontWeight.w500)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 9.5,
+              color: kMuted,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
           const SizedBox(height: 2),
           Text(
             value,
@@ -1737,7 +2210,10 @@ class _QuickActionButton extends StatelessWidget {
                     right: -8,
                     child: Container(
                       padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
                       child: Text(
                         badge!,
                         style: const TextStyle(
@@ -1755,7 +2231,11 @@ class _QuickActionButton extends StatelessWidget {
               fit: BoxFit.scaleDown,
               child: Text(
                 label,
-                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: color),
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
                 textAlign: TextAlign.center,
                 maxLines: 1,
               ),
@@ -1785,18 +2265,24 @@ class _PauseHistorySheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final today = DateTime.now();
-    final todayStr = '${today.year}-${today.month.toString().padLeft(2,'0')}-${today.day.toString().padLeft(2,'0')}';
+    final todayStr =
+        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
     // Find the one latest active pause (status=paused AND endDate not passed)
     final latestActivePauseId = pauses.isNotEmpty
-        ? pauses.firstWhere(
-            (p) =>
-                (p.status == 'paused' || p.status == null) &&
-                (p.endDate == null ||
-                    p.endDate == '2099-12-31' ||
-                    (p.endDate?.compareTo(todayStr) ?? -1) >= 0),
-            orElse: () => const SubscriptionPauseModel(id: '__none__', subscriptionId: ''),
-          ).id
+        ? pauses
+              .firstWhere(
+                (p) =>
+                    (p.status == 'paused' || p.status == null) &&
+                    (p.endDate == null ||
+                        p.endDate == '2099-12-31' ||
+                        (p.endDate?.compareTo(todayStr) ?? -1) >= 0),
+                orElse: () => const SubscriptionPauseModel(
+                  id: '__none__',
+                  subscriptionId: '',
+                ),
+              )
+              .id
         : '__none__';
 
     return Container(
@@ -1805,15 +2291,21 @@ class _PauseHistorySheet extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.72),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.72,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Center(
             child: Container(
-              width: 40, height: 4,
-              decoration: BoxDecoration(color: kBorderLt, borderRadius: BorderRadius.circular(2)),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: kBorderLt,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -1825,13 +2317,21 @@ class _PauseHistorySheet extends StatelessWidget {
                   color: kAccentLt.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.history_rounded, color: kAccent, size: 18),
+                child: const Icon(
+                  Icons.history_rounded,
+                  color: kAccent,
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 10),
               const Expanded(
                 child: Text(
                   'Pause History',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: kText),
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    color: kText,
+                  ),
                 ),
               ),
               IconButton(
@@ -1844,17 +2344,35 @@ class _PauseHistorySheet extends StatelessWidget {
           const Divider(color: kBorderLt),
           const SizedBox(height: 8),
           if (isLoading)
-            const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator(strokeWidth: 2, color: kAccent)))
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: kAccent,
+                ),
+              ),
+            )
           else if (pauses.isEmpty)
             Padding(
               padding: const EdgeInsets.all(24),
               child: Center(
                 child: Column(
                   children: [
-                    Icon(Icons.pause_circle_outline_rounded, size: 40, color: kMuted.withValues(alpha: 0.5)),
+                    Icon(
+                      Icons.pause_circle_outline_rounded,
+                      size: 40,
+                      color: kMuted.withValues(alpha: 0.5),
+                    ),
                     const SizedBox(height: 10),
-                    const Text('No pause history yet.',
-                        style: TextStyle(fontSize: 13, color: kTextSub, fontWeight: FontWeight.w600)),
+                    const Text(
+                      'No pause history yet.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: kTextSub,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1866,7 +2384,8 @@ class _PauseHistorySheet extends StatelessWidget {
                 itemCount: pauses.length,
                 itemBuilder: (_, i) {
                   final pause = pauses[i];
-                  final isLatestActive = pause.id == latestActivePauseId && pause.id != '__none__';
+                  final isLatestActive =
+                      pause.id == latestActivePauseId && pause.id != '__none__';
                   final isResumed = pause.status == 'resumed';
                   final statusColor = isResumed
                       ? const Color(0xFF15803D)
@@ -1878,7 +2397,11 @@ class _PauseHistorySheet extends StatelessWidget {
                       : isLatestActive
                       ? kAccentLt.withValues(alpha: 0.4)
                       : const Color(0xFFF0F0F0);
-                  final statusLabel = isResumed ? 'Resumed' : isLatestActive ? 'Active' : 'Ended';
+                  final statusLabel = isResumed
+                      ? 'Resumed'
+                      : isLatestActive
+                      ? 'Active'
+                      : 'Ended';
                   final iconData = isResumed
                       ? Icons.play_circle_outline_rounded
                       : Icons.pause_circle_outline_rounded;
@@ -1887,10 +2410,14 @@ class _PauseHistorySheet extends StatelessWidget {
                     margin: const EdgeInsets.only(bottom: 10),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isLatestActive ? kAccentLt.withValues(alpha: 0.15) : kBg,
+                      color: isLatestActive
+                          ? kAccentLt.withValues(alpha: 0.15)
+                          : kBg,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: isLatestActive ? kAccentLt.withValues(alpha: 0.5) : kBorderLt,
+                        color: isLatestActive
+                            ? kAccentLt.withValues(alpha: 0.5)
+                            : kBorderLt,
                       ),
                     ),
                     child: Column(
@@ -1904,7 +2431,11 @@ class _PauseHistorySheet extends StatelessWidget {
                                 color: statusBg,
                                 shape: BoxShape.circle,
                               ),
-                              child: Icon(iconData, size: 13, color: statusColor),
+                              child: Icon(
+                                iconData,
+                                size: 13,
+                                color: statusColor,
+                              ),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
@@ -1913,25 +2444,43 @@ class _PauseHistorySheet extends StatelessWidget {
                                 children: [
                                   Text(
                                     '${formatDate(pause.startDate)} → ${formatDate(pause.endDate)}',
-                                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: kText),
+                                    style: const TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: kText,
+                                    ),
                                   ),
-                                  if (pause.reason != null && pause.reason!.isNotEmpty) ...[
+                                  if (pause.reason != null &&
+                                      pause.reason!.isNotEmpty) ...[
                                     const SizedBox(height: 2),
-                                    Text(pause.reason!,
-                                        style: const TextStyle(fontSize: 11, color: kTextSub, fontWeight: FontWeight.w500)),
+                                    Text(
+                                      pause.reason!,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: kTextSub,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
                                   ],
                                 ],
                               ),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 3,
+                              ),
                               decoration: BoxDecoration(
                                 color: statusBg,
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
                                 statusLabel,
-                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: statusColor),
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800,
+                                  color: statusColor,
+                                ),
                               ),
                             ),
                           ],
@@ -1946,15 +2495,28 @@ class _PauseHistorySheet extends StatelessWidget {
                                 Navigator.pop(context);
                                 onResume();
                               },
-                              icon: const Icon(Icons.play_circle_outline_rounded, size: 15, color: Colors.white),
-                              label: const Text('Resume Subscription',
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                              icon: const Icon(
+                                Icons.play_circle_outline_rounded,
+                                size: 15,
+                                color: Colors.white,
+                              ),
+                              label: const Text(
+                                'Resume Subscription',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF15803D),
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                ),
                                 elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
                               ),
                             ),
                           ),
@@ -1979,7 +2541,11 @@ class _BillsSheet extends StatelessWidget {
   final bool isLoading;
   final String Function(String?) formatDate;
 
-  const _BillsSheet({required this.bills, required this.isLoading, required this.formatDate});
+  const _BillsSheet({
+    required this.bills,
+    required this.isLoading,
+    required this.formatDate,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1989,15 +2555,21 @@ class _BillsSheet extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Center(
             child: Container(
-              width: 40, height: 4,
-              decoration: BoxDecoration(color: kBorderLt, borderRadius: BorderRadius.circular(2)),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: kBorderLt,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -2009,18 +2581,32 @@ class _BillsSheet extends StatelessWidget {
                   color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF7C3AED), size: 18),
+                child: const Icon(
+                  Icons.receipt_long_rounded,
+                  color: Color(0xFF7C3AED),
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Bills',
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: kText)),
+                    const Text(
+                      'Bills',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        color: kText,
+                      ),
+                    ),
                     Text(
                       '${bills.length} bill${bills.length != 1 ? 's' : ''} for this subscription',
-                      style: const TextStyle(fontSize: 11, color: kTextSub, fontWeight: FontWeight.w500),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: kTextSub,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
@@ -2035,17 +2621,35 @@ class _BillsSheet extends StatelessWidget {
           const Divider(color: kBorderLt),
           const SizedBox(height: 8),
           if (isLoading)
-            const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary)))
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: kPrimary,
+                ),
+              ),
+            )
           else if (bills.isEmpty)
             Padding(
               padding: const EdgeInsets.all(24),
               child: Center(
                 child: Column(
                   children: [
-                    Icon(Icons.receipt_long_outlined, size: 40, color: kMuted.withValues(alpha: 0.5)),
+                    Icon(
+                      Icons.receipt_long_outlined,
+                      size: 40,
+                      color: kMuted.withValues(alpha: 0.5),
+                    ),
                     const SizedBox(height: 10),
-                    const Text('No bills found yet.',
-                        style: TextStyle(fontSize: 13, color: kTextSub, fontWeight: FontWeight.w600)),
+                    const Text(
+                      'No bills found yet.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: kTextSub,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -2056,7 +2660,8 @@ class _BillsSheet extends StatelessWidget {
                 shrinkWrap: true,
                 padding: const EdgeInsets.only(bottom: 16),
                 itemCount: bills.length,
-                itemBuilder: (_, i) => _BillCard(bill: bills[i], formatDate: formatDate),
+                itemBuilder: (_, i) =>
+                    _BillCard(bill: bills[i], formatDate: formatDate),
               ),
             ),
         ],
@@ -2073,10 +2678,14 @@ class _OrdersHistorySheet extends StatelessWidget {
 
   Color _statusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'delivered': return kPrimary;
-      case 'pending': return kAccent;
-      case 'cancelled': return kRed;
-      default: return kTextSub;
+      case 'delivered':
+        return kPrimary;
+      case 'pending':
+        return kAccent;
+      case 'cancelled':
+        return kRed;
+      default:
+        return kTextSub;
     }
   }
 
@@ -2088,15 +2697,21 @@ class _OrdersHistorySheet extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.75,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Center(
             child: Container(
-              width: 40, height: 4,
-              decoration: BoxDecoration(color: kBorderLt, borderRadius: BorderRadius.circular(2)),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: kBorderLt,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -2108,18 +2723,32 @@ class _OrdersHistorySheet extends StatelessWidget {
                   color: const Color(0xFF0077B6).withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF0077B6), size: 18),
+                child: const Icon(
+                  Icons.receipt_long_rounded,
+                  color: Color(0xFF0077B6),
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Delivery Orders',
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: kText)),
+                    const Text(
+                      'Delivery Orders',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        color: kText,
+                      ),
+                    ),
                     Text(
                       '${orders.length} order${orders.length != 1 ? 's' : ''} for this subscription',
-                      style: const TextStyle(fontSize: 11, color: kTextSub, fontWeight: FontWeight.w500),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: kTextSub,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
@@ -2139,10 +2768,20 @@ class _OrdersHistorySheet extends StatelessWidget {
               child: Center(
                 child: Column(
                   children: [
-                    Icon(Icons.inbox_outlined, size: 40, color: kMuted.withValues(alpha: 0.5)),
+                    Icon(
+                      Icons.inbox_outlined,
+                      size: 40,
+                      color: kMuted.withValues(alpha: 0.5),
+                    ),
                     const SizedBox(height: 10),
-                    const Text('No delivery orders yet.',
-                        style: TextStyle(fontSize: 13, color: kTextSub, fontWeight: FontWeight.w600)),
+                    const Text(
+                      'No delivery orders yet.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: kTextSub,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -2166,25 +2805,44 @@ class _OrdersHistorySheet extends StatelessWidget {
                     child: Row(
                       children: [
                         Container(
-                          width: 40, height: 40,
+                          width: 40,
+                          height: 40,
                           decoration: BoxDecoration(
                             color: color.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Center(child: Text(order.emoji, style: const TextStyle(fontSize: 18))),
+                          child: Center(
+                            child: Text(
+                              order.emoji,
+                              style: const TextStyle(fontSize: 18),
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(order.productName,
-                                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: kText),
-                                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                              Text(
+                                order.productName,
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: kText,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                               const SizedBox(height: 2),
                               Text(
-                                order.scheduledDate.isNotEmpty ? order.scheduledDate : order.date,
-                                style: const TextStyle(fontSize: 10.5, color: kTextSub, fontWeight: FontWeight.w500),
+                                order.scheduledDate.isNotEmpty
+                                    ? order.scheduledDate
+                                    : order.date,
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  color: kTextSub,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ],
                           ),
@@ -2192,17 +2850,32 @@ class _OrdersHistorySheet extends StatelessWidget {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Text('₹${order.amount.toStringAsFixed(0)}',
-                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: kText)),
+                            Text(
+                              '₹${order.amount.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                                color: kText,
+                              ),
+                            ),
                             const SizedBox(height: 3),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: color.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: Text(order.status.toUpperCase(),
-                                  style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900, color: color)),
+                              child: Text(
+                                order.status.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: color,
+                                ),
+                              ),
                             ),
                           ],
                         ),

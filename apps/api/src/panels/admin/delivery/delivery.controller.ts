@@ -200,6 +200,11 @@ export class DeliveryManagementController {
     return this.runService.getRunsWithOrders(query);
   }
 
+  @Get('runs/partners-with-stops')
+  async getPartnersWithStops(@Query() query: any) {
+    return this.runService.getPartnersWithStops(query);
+  }
+
   @Get('runs/eligible-targets')
   async getEligibleTargetRuns(@Query('order_id') orderId: string) {
     return this.runService.getEligibleTargetRuns(orderId);

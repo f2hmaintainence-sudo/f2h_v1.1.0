@@ -2591,6 +2591,116 @@ export class DeliveryRunService {
       throw new InternalServerErrorException('Failed to fetch delivery runs with orders');
     }
   }
+
+  // ────────────────────────────────────────────────
+  // All Available Partners with Address Stops
+  // (For Interactive 2-Partner Drag & Drop Board)
+  // ────────────────────────────────────────────────
+  async getPartnersWithStops(query: { date?: string; branch_id?: string; slot?: string }) {
+    try {
+      const targetDate = query?.date || todayIST();
+      const slot = query?.slot || null;
+      const branchId = query?.branch_id || null;
+
+      const sql = `
+        SELECT
+          dp.delivery_partner_id,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), dp.full_name, 'Partner') AS partner_name,
+          COALESCE(dp.phone, u.phone) AS partner_phone,
+          dp.branch_id,
+          b.branch_name,
+          dp.is_active,
+          dp.is_available,
+          dr.id AS run_db_id,
+          dr.run_id,
+          dr.run_number,
+          dr.run_date,
+          COALESCE(dr.delivery_slot, $2) AS delivery_slot,
+          dr.status AS run_status,
+          COALESCE((SELECT COUNT(*)::int FROM delivery_run_addresses dra WHERE dra.run_id = dr.run_id AND dra.deleted_at IS NULL), dr.total_addresses, 0) AS total_addresses,
+          COALESCE((SELECT COUNT(*)::int FROM delivery_run_addresses dra WHERE dra.run_id = dr.run_id AND dra.delivery_status = 'delivered' AND dra.deleted_at IS NULL), dr.completed_addresses, 0) AS completed_addresses,
+          COALESCE((SELECT COUNT(*)::int FROM delivery_run_addresses dra WHERE dra.run_id = dr.run_id AND dra.delivery_status = 'failed' AND dra.deleted_at IS NULL), dr.failed_addresses, 0) AS failed_addresses,
+          COALESCE(
+            (SELECT json_agg(
+              json_build_object(
+                'run_address_id', dra.id,
+                'sequence_no', dra.sequence_no,
+                'address_id', dra.address_id,
+                'customer_id', dra.customer_id,
+                'customer_name', COALESCE(NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), c.full_name, 'Customer'),
+                'address_line', COALESCE(NULLIF(TRIM(ca.address_line), ''), ca.landmark, 'Customer Address'),
+                'delivery_status', COALESCE(dra.delivery_status, 'pending'),
+                'orders', COALESCE(
+                  (SELECT json_agg(
+                    json_build_object(
+                      'order_id', o.order_id,
+                      'customer_id', o.customer_id,
+                      'customer_name', COALESCE(NULLIF(TRIM(COALESCE(ocu.first_name, '') || ' ' || COALESCE(ocu.last_name, '')), ''), o.customer_name, 'Customer'),
+                      'address_id', o.address_id,
+                      'address_line', COALESCE(o.address_line, NULLIF(TRIM(oca.address_line), ''), 'Customer Address'),
+                      'delivery_slot', o.delivery_slot,
+                      'status', o.status,
+                      'total_amount', o.total_amount,
+                      'run_sequence', COALESCE(dra.sequence_no, o.run_sequence, 1),
+                      'created_at', o.created_at
+                    ) ORDER BY o.created_at ASC
+                  )
+                  FROM orders o
+                  LEFT JOIN customer_addresses oca ON oca.address_id = o.address_id
+                  LEFT JOIN users ocu ON ocu.user_id = o.customer_id
+                  WHERE (o.delivery_run_id = dr.run_id OR o.delivery_run_id = dr.id::varchar)
+                    AND o.address_id = dra.address_id
+                    AND o.status NOT IN ('cancelled', 'failed')
+                    AND o.deleted_at IS NULL
+                  ),
+                  '[]'::json
+                )
+              ) ORDER BY dra.sequence_no ASC
+            )
+            FROM delivery_run_addresses dra
+            LEFT JOIN customer_addresses ca ON ca.address_id = dra.address_id
+            LEFT JOIN customers c ON c.customer_id = dra.customer_id
+            LEFT JOIN users cu ON cu.user_id = dra.customer_id
+            WHERE (dra.run_id = dr.run_id OR dra.run_id = dr.id::varchar)
+              AND dra.deleted_at IS NULL
+            ),
+            '[]'::json
+          ) AS address_stops
+        FROM delivery_partners dp
+        LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
+        LEFT JOIN branches b ON b.branch_id = dp.branch_id
+        LEFT JOIN delivery_runs dr ON (
+          dr.delivery_partner_id = dp.delivery_partner_id
+          AND dr.run_date = $1
+          AND ($2::varchar IS NULL OR dr.delivery_slot = $2)
+          AND dr.status NOT IN ('cancelled')
+          AND dr.deleted_at IS NULL
+        )
+        WHERE dp.is_active = true
+          AND dp.deleted_at IS NULL
+          AND ($3::varchar IS NULL OR dp.branch_id = $3)
+          AND NOT EXISTS (
+            SELECT 1 FROM delivery_leave_requests dlr
+            WHERE dlr.delivery_partner_id = dp.delivery_partner_id
+              AND dlr.status = 'approved'
+              AND dlr.deleted_at IS NULL
+              AND dlr.leave_date <= $1::date
+              AND (dlr.end_date IS NULL OR dlr.end_date >= $1::date)
+          )
+        ORDER BY b.branch_name ASC, (dr.run_id IS NOT NULL) DESC, partner_name ASC
+      `;
+
+      const rows = await this.db.query(sql, [targetDate, slot, branchId]);
+      return {
+        status: true,
+        data: Array.isArray(rows) ? rows : [],
+        message: 'Partners with address stops fetched successfully',
+      };
+    } catch (error: any) {
+      this.developer.error('getPartnersWithStops error', { error, query });
+      throw new InternalServerErrorException('Failed to fetch partners with address stops');
+    }
+  }
 }
 
 

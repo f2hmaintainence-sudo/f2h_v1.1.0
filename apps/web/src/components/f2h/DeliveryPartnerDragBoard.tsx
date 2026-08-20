@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { api } from "@/services/api.client";
 import {
   ArrowRightLeft,
@@ -19,7 +19,9 @@ import {
   Calendar,
   Clock,
   Sparkles,
+  Building2,
   HelpCircle,
+  PlusCircle,
 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/components/Toast";
 
@@ -46,117 +48,134 @@ interface AddressStop {
   orders: AddressOrder[];
 }
 
-interface DeliveryRunDetailed {
-  id: string;
-  run_id: string;
-  run_number: string;
-  run_date: string;
-  delivery_slot: string;
-  status: string;
-  branch_id: string;
-  branch_name: string;
+export interface PartnerWithStops {
   delivery_partner_id: string;
   partner_name: string;
   partner_phone: string;
-  partner_active: boolean;
+  branch_id: string;
+  branch_name: string;
+  is_active: boolean;
+  is_available: boolean;
+  run_db_id?: string | number;
+  run_id?: string;
+  run_number?: string;
+  run_date?: string;
+  delivery_slot?: string;
+  run_status?: string;
   total_addresses: number;
   completed_addresses: number;
   failed_addresses: number;
-  created_at: string;
-  orders: AddressOrder[];
   address_stops?: AddressStop[];
 }
 
 interface DeliveryPartnerDragBoardProps {
-  runsList: DeliveryRunDetailed[];
   selectedDate: string;
   selectedBranch: string;
   selectedSlot: string;
   branches: Array<{ branch_id: string; branch_name: string }>;
-  onRefresh: () => Promise<void> | void;
+  onRefreshParent?: () => Promise<void> | void;
 }
 
 export default function DeliveryPartnerDragBoard({
-  runsList,
   selectedDate,
   selectedBranch,
   selectedSlot,
   branches,
-  onRefresh,
+  onRefreshParent,
 }: DeliveryPartnerDragBoardProps) {
+  const [loading, setLoading] = useState(true);
+  const [allPartners, setAllPartners] = useState<PartnerWithStops[]>([]);
   const [partnerAId, setPartnerAId] = useState<string>("");
   const [partnerBId, setPartnerBId] = useState<string>("");
   const [searchA, setSearchA] = useState<string>("");
   const [searchB, setSearchB] = useState<string>("");
   const [draggedStop, setDraggedStop] = useState<{
     stop: AddressStop;
-    sourcePartnerId: string;
-    sourceRunId: string;
+    sourcePartner: PartnerWithStops;
   } | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<"A" | "B" | null>(null);
   const [dragOverStopId, setDragOverStopId] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
-  // Available runs for selection filtered by branch and slot
-  const availableRuns = useMemo(() => {
-    return runsList.filter((r) => {
-      if (selectedBranch && r.branch_id !== selectedBranch) return false;
-      if (selectedSlot && r.delivery_slot !== selectedSlot) return false;
-      return true;
-    });
-  }, [runsList, selectedBranch, selectedSlot]);
+  // Fetch all partners with their runs & stops
+  const fetchPartners = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: any = { date: selectedDate };
+      if (selectedBranch) params.branch_id = selectedBranch;
+      if (selectedSlot) params.slot = selectedSlot;
 
-  // Set default Partner A and Partner B if available and not set
-  useEffect(() => {
-    if (availableRuns.length > 0) {
-      if (!partnerAId || !availableRuns.some((r) => r.delivery_partner_id === partnerAId)) {
-        setPartnerAId(availableRuns[0].delivery_partner_id);
+      const res = await api.get<any>("/admin/delivery/runs/partners-with-stops", { params });
+      if (res.data?.status && Array.isArray(res.data.data)) {
+        setAllPartners(res.data.data);
       }
-      if (availableRuns.length > 1) {
-        if (!partnerBId || partnerBId === partnerAId || !availableRuns.some((r) => r.delivery_partner_id === partnerBId)) {
-          const second = availableRuns.find((r) => r.delivery_partner_id !== availableRuns[0].delivery_partner_id);
-          if (second) setPartnerBId(second.delivery_partner_id);
+    } catch (err) {
+      console.error("fetchPartners error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedDate, selectedBranch, selectedSlot]);
+
+  useEffect(() => {
+    fetchPartners();
+  }, [fetchPartners]);
+
+  // Determine Partner A data
+  const partnerA = useMemo(() => {
+    return allPartners.find((p) => p.delivery_partner_id === partnerAId) || null;
+  }, [allPartners, partnerAId]);
+
+  // Filter available partners for Partner B:
+  // MUST be in the SAME branch as Partner A and not equal to Partner A
+  const eligiblePartnersForB = useMemo(() => {
+    if (!partnerA) return [];
+    return allPartners.filter(
+      (p) =>
+        p.delivery_partner_id !== partnerA.delivery_partner_id &&
+        (!partnerA.branch_id || p.branch_id === partnerA.branch_id)
+    );
+  }, [allPartners, partnerA]);
+
+  // Auto-select Partner A & B defaults when partners load
+  useEffect(() => {
+    if (allPartners.length > 0) {
+      if (!partnerAId || !allPartners.some((p) => p.delivery_partner_id === partnerAId)) {
+        // Prefer partner with an active run
+        const withRun = allPartners.find((p) => p.run_id);
+        setPartnerAId(withRun ? withRun.delivery_partner_id : allPartners[0].delivery_partner_id);
+      }
+    }
+  }, [allPartners, partnerAId]);
+
+  // Adjust Partner B when Partner A changes or when eligible partners update
+  useEffect(() => {
+    if (partnerA) {
+      if (!partnerBId || !eligiblePartnersForB.some((p) => p.delivery_partner_id === partnerBId)) {
+        if (eligiblePartnersForB.length > 0) {
+          // Prefer another partner in same branch with a run or first available
+          const withRun = eligiblePartnersForB.find((p) => p.run_id);
+          setPartnerBId(withRun ? withRun.delivery_partner_id : eligiblePartnersForB[0].delivery_partner_id);
+        } else {
+          setPartnerBId("");
         }
       }
+    } else {
+      setPartnerBId("");
     }
-  }, [availableRuns, partnerAId, partnerBId]);
+  }, [partnerA, eligiblePartnersForB, partnerBId]);
 
-  const runA = useMemo(() => {
-    return runsList.find((r) => r.delivery_partner_id === partnerAId) || null;
-  }, [runsList, partnerAId]);
+  const partnerB = useMemo(() => {
+    return allPartners.find((p) => p.delivery_partner_id === partnerBId) || null;
+  }, [allPartners, partnerBId]);
 
-  const runB = useMemo(() => {
-    return runsList.find((r) => r.delivery_partner_id === partnerBId) || null;
-  }, [runsList, partnerBId]);
-
-  const getStopsForRun = (run: DeliveryRunDetailed | null): AddressStop[] => {
-    if (!run) return [];
-    if (run.address_stops && run.address_stops.length > 0) {
-      return run.address_stops;
-    }
-    // Fallback: group orders by address_id
-    const stopMap = new Map<string, AddressStop>();
-    (run.orders || []).forEach((ord, idx) => {
-      const key = ord.address_id || `addr-${idx}`;
-      if (!stopMap.has(key)) {
-        stopMap.set(key, {
-          sequence_no: ord.run_sequence || stopMap.size + 1,
-          address_id: ord.address_id || key,
-          customer_id: ord.customer_id || "",
-          customer_name: ord.customer_name || "Customer",
-          address_line: ord.address_line || "—",
-          delivery_status: ord.status === "delivered" ? "delivered" : ord.status === "failed" ? "failed" : "pending",
-          orders: [],
-        });
-      }
-      stopMap.get(key)!.orders.push(ord);
-    });
-    return Array.from(stopMap.values());
+  const getStops = (partner: PartnerWithStops | null): AddressStop[] => {
+    if (!partner || !partner.address_stops) return [];
+    return partner.address_stops;
   };
 
   const stopsA = useMemo(() => {
-    const list = getStopsForRun(runA);
+    const list = getStops(partnerA);
     if (!searchA.trim()) return list;
     const q = searchA.toLowerCase();
     return list.filter(
@@ -165,10 +184,10 @@ export default function DeliveryPartnerDragBoard({
         s.address_line.toLowerCase().includes(q) ||
         s.orders.some((o) => o.order_id.toLowerCase().includes(q))
     );
-  }, [runA, searchA]);
+  }, [partnerA, searchA]);
 
   const stopsB = useMemo(() => {
-    const list = getStopsForRun(runB);
+    const list = getStops(partnerB);
     if (!searchB.trim()) return list;
     const q = searchB.toLowerCase();
     return list.filter(
@@ -177,15 +196,10 @@ export default function DeliveryPartnerDragBoard({
         s.address_line.toLowerCase().includes(q) ||
         s.orders.some((o) => o.order_id.toLowerCase().includes(q))
     );
-  }, [runB, searchB]);
+  }, [partnerB, searchB]);
 
   // Handle Drag Start
-  const handleDragStart = (
-    e: React.DragEvent,
-    stop: AddressStop,
-    sourcePartnerId: string,
-    sourceRunId: string
-  ) => {
+  const handleDragStart = (e: React.DragEvent, stop: AddressStop, sourcePartner: PartnerWithStops) => {
     const isPending = (stop.delivery_status || "pending") === "pending";
     if (!isPending) {
       e.preventDefault();
@@ -193,14 +207,14 @@ export default function DeliveryPartnerDragBoard({
       return;
     }
 
-    setDraggedStop({ stop, sourcePartnerId, sourceRunId });
+    setDraggedStop({ stop, sourcePartner });
     e.dataTransfer.setData(
       "text/plain",
       JSON.stringify({
         addressId: stop.address_id,
         firstOrderId: stop.orders[0]?.order_id,
-        sourcePartnerId,
-        sourceRunId,
+        sourcePartnerId: sourcePartner.delivery_partner_id,
+        sourceRunId: sourcePartner.run_id,
       })
     );
     e.dataTransfer.effectAllowed = "move";
@@ -212,12 +226,12 @@ export default function DeliveryPartnerDragBoard({
     setDragOverStopId(null);
   };
 
-  // Move Address Stop to Target Run
-  const executeMove = async (targetPartnerId: string, targetRunId?: string) => {
+  // Move Address Stop to Target Partner
+  const executeMove = async (targetPartner: PartnerWithStops) => {
     if (!draggedStop) return;
-    const { stop, sourcePartnerId } = draggedStop;
+    const { stop, sourcePartner } = draggedStop;
 
-    if (sourcePartnerId === targetPartnerId) {
+    if (sourcePartner.delivery_partner_id === targetPartner.delivery_partner_id) {
       handleDragEnd();
       return;
     }
@@ -230,19 +244,20 @@ export default function DeliveryPartnerDragBoard({
     }
 
     setProcessing(true);
-    setActionNotice(`Moving address stop for ${stop.customer_name}...`);
+    setActionNotice(`Moving address stop to ${targetPartner.partner_name}...`);
 
     try {
       const res = await api.post<any>("/admin/delivery/runs/orders/move", {
         order_id: firstOrderId,
-        target_partner_id: targetPartnerId,
-        target_run_id: targetRunId || undefined,
-        reason: "Reassigned via Drag & Drop Partner Board",
+        target_partner_id: targetPartner.delivery_partner_id,
+        target_run_id: targetPartner.run_id || undefined,
+        reason: "Reassigned via 2-Partner Drag & Drop Board",
       });
 
       if (res.data?.status) {
-        showSuccessToast(res.data?.message || `Address stop moved to partner run!`);
-        await onRefresh();
+        showSuccessToast(res.data?.message || `Address stop moved to ${targetPartner.partner_name}!`);
+        await fetchPartners();
+        if (onRefreshParent) onRefreshParent();
       } else {
         showErrorToast(res.data?.message || "Failed to move address stop");
       }
@@ -255,12 +270,18 @@ export default function DeliveryPartnerDragBoard({
     }
   };
 
-  // Swap Address Stops Between Two Partners
-  const executeSwap = async (targetStop: AddressStop) => {
+  // Swap Address Stops Between Partner A and Partner B
+  const executeSwap = async (targetStop: AddressStop, targetPartner: PartnerWithStops) => {
     if (!draggedStop) return;
-    const { stop: sourceStop, sourcePartnerId } = draggedStop;
+    const { stop: sourceStop, sourcePartner } = draggedStop;
 
     if (sourceStop.address_id === targetStop.address_id) {
+      handleDragEnd();
+      return;
+    }
+
+    if (sourcePartner.delivery_partner_id === targetPartner.delivery_partner_id) {
+      showErrorToast("Both address stops already belong to the same delivery partner.");
       handleDragEnd();
       return;
     }
@@ -278,24 +299,25 @@ export default function DeliveryPartnerDragBoard({
     const orderBId = targetStop.orders[0]?.order_id;
 
     if (!orderAId || !orderBId) {
-      showErrorToast("Could not resolve orders for both address stops");
+      showErrorToast("Could not resolve order IDs for both address stops");
       handleDragEnd();
       return;
     }
 
     setProcessing(true);
-    setActionNotice(`Swapping ${sourceStop.customer_name} with ${targetStop.customer_name}...`);
+    setActionNotice(`Swapping stops between ${sourcePartner.partner_name} and ${targetPartner.partner_name}...`);
 
     try {
       const res = await api.post<any>("/admin/delivery/runs/orders/swap", {
         order_a_id: orderAId,
         order_b_id: orderBId,
-        reason: "Swapped via Drag & Drop Partner Board",
+        reason: "Swapped via 2-Partner Drag & Drop Board",
       });
 
       if (res.data?.status) {
         showSuccessToast(res.data?.message || "Address stops swapped successfully!");
-        await onRefresh();
+        await fetchPartners();
+        if (onRefreshParent) onRefreshParent();
       } else {
         showErrorToast(res.data?.message || "Failed to swap address stops");
       }
@@ -310,19 +332,19 @@ export default function DeliveryPartnerDragBoard({
 
   const handleDropOnColumn = (targetColumn: "A" | "B") => {
     if (!draggedStop) return;
-    if (targetColumn === "A" && runA) {
-      if (draggedStop.sourcePartnerId === runA.delivery_partner_id) return;
-      executeMove(runA.delivery_partner_id, runA.run_id);
-    } else if (targetColumn === "B" && runB) {
-      if (draggedStop.sourcePartnerId === runB.delivery_partner_id) return;
-      executeMove(runB.delivery_partner_id, runB.run_id);
+    if (targetColumn === "A" && partnerA) {
+      if (draggedStop.sourcePartner.delivery_partner_id === partnerA.delivery_partner_id) return;
+      executeMove(partnerA);
+    } else if (targetColumn === "B" && partnerB) {
+      if (draggedStop.sourcePartner.delivery_partner_id === partnerB.delivery_partner_id) return;
+      executeMove(partnerB);
     }
   };
 
-  const handleDropOnStopCard = (e: React.DragEvent, targetStop: AddressStop) => {
+  const handleDropOnStopCard = (e: React.DragEvent, targetStop: AddressStop, targetPartner: PartnerWithStops) => {
     e.stopPropagation();
     if (!draggedStop) return;
-    executeSwap(targetStop);
+    executeSwap(targetStop, targetPartner);
   };
 
   return (
@@ -341,18 +363,18 @@ export default function DeliveryPartnerDragBoard({
               </span>
             </h2>
             <p className="text-xs text-slate-500 mt-0.5 max-w-2xl leading-relaxed">
-              Select two delivery partners below to compare their routes. Drag any <strong className="text-amber-700 font-bold">pending</strong> address card across to move it to the other partner, or drop directly onto another card to swap stops atomically.
+              Select <strong className="text-slate-800 font-bold">Partner A</strong> to view their run. Partner B will automatically list all delivery partners from the <strong className="text-indigo-700 font-bold">same branch</strong>. Drag any <strong className="text-amber-700 font-bold">pending</strong> address card across to move or swap stops.
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
           <button
-            onClick={() => onRefresh()}
-            disabled={processing}
+            onClick={() => fetchPartners()}
+            disabled={loading || processing}
             className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-700 transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
           >
-            <RefreshCw size={13} className={processing ? "animate-spin text-indigo-600" : "text-slate-500"} />
+            <RefreshCw size={13} className={loading || processing ? "animate-spin text-indigo-600" : "text-slate-500"} />
             <span>Refresh Board</span>
           </button>
         </div>
@@ -372,7 +394,7 @@ export default function DeliveryPartnerDragBoard({
         <div
           onDragOver={(e) => {
             e.preventDefault();
-            if (draggedStop && draggedStop.sourcePartnerId !== partnerAId) {
+            if (draggedStop && draggedStop.sourcePartner.delivery_partner_id !== partnerAId) {
               setDragOverColumn("A");
             }
           }}
@@ -388,18 +410,27 @@ export default function DeliveryPartnerDragBoard({
           <div className="p-4 bg-slate-50/80 border-b border-slate-200 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <span className="px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-800 text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5">
-                <Truck size={13} /> Partner A (Source / Target)
+                <Truck size={13} /> Partner A
               </span>
-              {runA && (
+              {partnerA?.run_id ? (
                 <span className="font-mono text-xs font-black text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200">
-                  {runA.run_id}
+                  {partnerA.run_id}
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60">
+                  No Run Assigned
                 </span>
               )}
             </div>
 
-            {/* Partner Selector Dropdown */}
+            {/* Partner A Selector Dropdown (All Active Partners) */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-500">Select Partner A:</label>
+              <label className="text-[11px] font-bold text-slate-600 flex items-center justify-between">
+                <span>Select Partner A:</span>
+                <span className="text-[10px] font-semibold text-slate-400">
+                  {allPartners.length} Total Partner{allPartners.length === 1 ? "" : "s"}
+                </span>
+              </label>
               <select
                 value={partnerAId}
                 onChange={(e) => setPartnerAId(e.target.value)}
@@ -408,29 +439,38 @@ export default function DeliveryPartnerDragBoard({
                 <option value="" disabled>
                   Select a delivery partner
                 </option>
-                {availableRuns.map((r) => (
-                  <option key={r.delivery_partner_id} value={r.delivery_partner_id} disabled={r.delivery_partner_id === partnerBId}>
-                    {r.partner_name} ({r.delivery_slot} • {r.total_addresses || r.orders?.length || 0} stops)
-                  </option>
-                ))}
+                {allPartners.map((p) => {
+                  const hasRun = Boolean(p.run_id);
+                  const stopsCount = p.address_stops?.length || 0;
+                  return (
+                    <option key={p.delivery_partner_id} value={p.delivery_partner_id}>
+                      {p.partner_name} ({p.branch_name || "No Branch"}) {hasRun ? `• ${stopsCount} stops` : "• No run"}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
-            {/* Run Stats Ribbon */}
-            {runA ? (
+            {/* Partner A Info Ribbon */}
+            {partnerA ? (
               <div className="flex items-center justify-between text-xs pt-1">
                 <div className="flex items-center gap-2 text-slate-600">
                   <Users size={12} className="text-slate-400" />
-                  <span className="font-bold text-slate-800">{runA.partner_name}</span>
-                  {runA.partner_phone && <span className="text-slate-400 font-mono text-[11px]">• {runA.partner_phone}</span>}
+                  <span className="font-bold text-slate-800">{partnerA.partner_name}</span>
+                  <span className="text-slate-400">• {partnerA.branch_name}</span>
+                  {partnerA.partner_phone && (
+                    <span className="text-slate-400 font-mono text-[11px]">• {partnerA.partner_phone}</span>
+                  )}
                 </div>
-                <div className="flex items-center gap-2 font-bold">
+                <div className="flex items-center gap-1.5 font-bold">
                   <span className="text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full text-[10px]">
                     {stopsA.length} Stops
                   </span>
-                  <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full text-[10px]">
-                    {runA.completed_addresses || 0} Done
-                  </span>
+                  {partnerA.run_id && (
+                    <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full text-[10px]">
+                      {partnerA.completed_addresses || 0} Done
+                    </span>
+                  )}
                 </div>
               </div>
             ) : (
@@ -438,7 +478,7 @@ export default function DeliveryPartnerDragBoard({
             )}
 
             {/* Search within stops */}
-            {runA && stopsA.length > 3 && (
+            {partnerA && stopsA.length > 3 && (
               <div className="relative pt-1">
                 <Search size={13} className="absolute left-2.5 top-3.5 text-slate-400" />
                 <input
@@ -454,17 +494,25 @@ export default function DeliveryPartnerDragBoard({
 
           {/* Column Body: Address Cards */}
           <div className="p-4 flex-1 space-y-2.5 min-h-[380px] max-h-[560px] overflow-y-auto bg-slate-50/30">
-            {!runA ? (
+            {!partnerA ? (
               <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400 space-y-2">
                 <Users size={32} className="stroke-1 text-slate-300" />
                 <p className="text-xs font-semibold">Select Partner A to load assigned address stops.</p>
               </div>
+            ) : !partnerA.run_id ? (
+              <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400 space-y-2 border-2 border-dashed border-slate-200 rounded-xl bg-white/50">
+                <PlusCircle size={28} className="text-indigo-400 stroke-1" />
+                <p className="text-xs font-bold text-slate-700">No Run Assigned to {partnerA.partner_name}</p>
+                <p className="text-[11px] text-slate-400 max-w-xs">
+                  Drag any pending address stop from Partner B and drop it here to automatically create a new delivery run for {partnerA.partner_name}!
+                </p>
+              </div>
             ) : stopsA.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400 space-y-2 border-2 border-dashed border-slate-200 rounded-xl">
                 <Package size={28} className="text-slate-300 stroke-1" />
-                <p className="text-xs font-bold text-slate-500">No Address Stops Assigned</p>
+                <p className="text-xs font-bold text-slate-500">No Address Stops in Run</p>
                 <p className="text-[11px] text-slate-400">
-                  Drag an address stop from Partner B and drop it here to assign it to {runA.partner_name}.
+                  Drag an address stop from Partner B and drop it here to assign it to {partnerA.partner_name}.
                 </p>
               </div>
             ) : (
@@ -477,7 +525,7 @@ export default function DeliveryPartnerDragBoard({
                   <div
                     key={stop.address_id || idx}
                     draggable={isPending && !processing}
-                    onDragStart={(e) => handleDragStart(e, stop, runA.delivery_partner_id, runA.run_id)}
+                    onDragStart={(e) => handleDragStart(e, stop, partnerA)}
                     onDragEnd={handleDragEnd}
                     onDragOver={(e) => {
                       e.preventDefault();
@@ -486,7 +534,7 @@ export default function DeliveryPartnerDragBoard({
                       }
                     }}
                     onDragLeave={() => setDragOverStopId(null)}
-                    onDrop={(e) => handleDropOnStopCard(e, stop)}
+                    onDrop={(e) => handleDropOnStopCard(e, stop, partnerA)}
                     className={`p-3.5 rounded-xl border transition-all select-none ${
                       isBeingDragged
                         ? "opacity-40 border-indigo-400 bg-indigo-50/50"
@@ -553,7 +601,7 @@ export default function DeliveryPartnerDragBoard({
         <div
           onDragOver={(e) => {
             e.preventDefault();
-            if (draggedStop && draggedStop.sourcePartnerId !== partnerBId) {
+            if (draggedStop && draggedStop.sourcePartner.delivery_partner_id !== partnerBId) {
               setDragOverColumn("B");
             }
           }}
@@ -569,57 +617,86 @@ export default function DeliveryPartnerDragBoard({
           <div className="p-4 bg-slate-50/80 border-b border-slate-200 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <span className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5">
-                <Truck size={13} /> Partner B (Target / Source)
+                <Truck size={13} /> Partner B (Same Branch)
               </span>
-              {runB && (
+              {partnerB?.run_id ? (
                 <span className="font-mono text-xs font-black text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200">
-                  {runB.run_id}
+                  {partnerB.run_id}
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
+                  Ready for Drop / Auto-Create Run
                 </span>
               )}
             </div>
 
-            {/* Partner Selector Dropdown */}
+            {/* Partner B Selector Dropdown (Filtered to Partner A's Branch) */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-500">Select Partner B:</label>
+              <label className="text-[11px] font-bold text-slate-600 flex items-center justify-between">
+                <span>Select Partner B:</span>
+                <span className="text-[10px] font-semibold text-indigo-600">
+                  {partnerA ? `${partnerA.branch_name || "Branch"} Partners (${eligiblePartnersForB.length})` : "Choose Partner A first"}
+                </span>
+              </label>
               <select
                 value={partnerBId}
+                disabled={!partnerA || eligiblePartnersForB.length === 0}
                 onChange={(e) => setPartnerBId(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:border-indigo-600 shadow-2xs"
+                className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:border-indigo-600 shadow-2xs disabled:bg-slate-100 disabled:text-slate-400"
               >
-                <option value="" disabled>
-                  Select a delivery partner
-                </option>
-                {availableRuns.map((r) => (
-                  <option key={r.delivery_partner_id} value={r.delivery_partner_id} disabled={r.delivery_partner_id === partnerAId}>
-                    {r.partner_name} ({r.delivery_slot} • {r.total_addresses || r.orders?.length || 0} stops)
-                  </option>
-                ))}
+                {!partnerA ? (
+                  <option value="">Please select Partner A first</option>
+                ) : eligiblePartnersForB.length === 0 ? (
+                  <option value="">No other partners in {partnerA.branch_name || "this"} branch</option>
+                ) : (
+                  <>
+                    <option value="" disabled>
+                      Select a partner in {partnerA.branch_name}
+                    </option>
+                    {eligiblePartnersForB.map((p) => {
+                      const hasRun = Boolean(p.run_id);
+                      const stopsCount = p.address_stops?.length || 0;
+                      return (
+                        <option key={p.delivery_partner_id} value={p.delivery_partner_id}>
+                          {p.partner_name} {hasRun ? `(Run: ${p.run_id} • ${stopsCount} stops)` : "(Ready for New Run)"}
+                        </option>
+                      );
+                    })}
+                  </>
+                )}
               </select>
             </div>
 
-            {/* Run Stats Ribbon */}
-            {runB ? (
+            {/* Partner B Info Ribbon */}
+            {partnerB ? (
               <div className="flex items-center justify-between text-xs pt-1">
                 <div className="flex items-center gap-2 text-slate-600">
                   <Users size={12} className="text-slate-400" />
-                  <span className="font-bold text-slate-800">{runB.partner_name}</span>
-                  {runB.partner_phone && <span className="text-slate-400 font-mono text-[11px]">• {runB.partner_phone}</span>}
+                  <span className="font-bold text-slate-800">{partnerB.partner_name}</span>
+                  <span className="text-slate-400">• {partnerB.branch_name}</span>
+                  {partnerB.partner_phone && (
+                    <span className="text-slate-400 font-mono text-[11px]">• {partnerB.partner_phone}</span>
+                  )}
                 </div>
-                <div className="flex items-center gap-2 font-bold">
+                <div className="flex items-center gap-1.5 font-bold">
                   <span className="text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full text-[10px]">
                     {stopsB.length} Stops
                   </span>
-                  <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full text-[10px]">
-                    {runB.completed_addresses || 0} Done
-                  </span>
+                  {partnerB.run_id && (
+                    <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full text-[10px]">
+                      {partnerB.completed_addresses || 0} Done
+                    </span>
+                  )}
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-slate-400 italic">Please select a delivery partner</p>
+              <p className="text-xs text-slate-400 italic">
+                {partnerA ? `Select a partner from ${partnerA.branch_name}` : "Select Partner A first"}
+              </p>
             )}
 
             {/* Search within stops */}
-            {runB && stopsB.length > 3 && (
+            {partnerB && stopsB.length > 3 && (
               <div className="relative pt-1">
                 <Search size={13} className="absolute left-2.5 top-3.5 text-slate-400" />
                 <input
@@ -635,17 +712,27 @@ export default function DeliveryPartnerDragBoard({
 
           {/* Column Body: Address Cards */}
           <div className="p-4 flex-1 space-y-2.5 min-h-[380px] max-h-[560px] overflow-y-auto bg-slate-50/30">
-            {!runB ? (
+            {!partnerB ? (
               <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400 space-y-2">
                 <Users size={32} className="stroke-1 text-slate-300" />
-                <p className="text-xs font-semibold">Select Partner B to load assigned address stops.</p>
+                <p className="text-xs font-semibold">
+                  {partnerA ? `Select Partner B from ${partnerA.branch_name}` : "Select Partner A first"}
+                </p>
+              </div>
+            ) : !partnerB.run_id ? (
+              <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400 space-y-2 border-2 border-dashed border-emerald-200 rounded-xl bg-emerald-50/20">
+                <PlusCircle size={28} className="text-emerald-500 stroke-1" />
+                <p className="text-xs font-bold text-slate-700">Ready for New Run Creation</p>
+                <p className="text-[11px] text-slate-500 max-w-xs leading-relaxed">
+                  {partnerB.partner_name} does not have a run yet. Drag any pending address stop from {partnerA?.partner_name} and drop it here to automatically generate a new delivery run!
+                </p>
               </div>
             ) : stopsB.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400 space-y-2 border-2 border-dashed border-slate-200 rounded-xl">
                 <Package size={28} className="text-slate-300 stroke-1" />
-                <p className="text-xs font-bold text-slate-500">No Address Stops Assigned</p>
+                <p className="text-xs font-bold text-slate-500">No Address Stops in Run</p>
                 <p className="text-[11px] text-slate-400">
-                  Drag an address stop from Partner A and drop it here to assign it to {runB.partner_name}.
+                  Drag an address stop from Partner A and drop it here to assign it to {partnerB.partner_name}.
                 </p>
               </div>
             ) : (
@@ -658,7 +745,7 @@ export default function DeliveryPartnerDragBoard({
                   <div
                     key={stop.address_id || idx}
                     draggable={isPending && !processing}
-                    onDragStart={(e) => handleDragStart(e, stop, runB.delivery_partner_id, runB.run_id)}
+                    onDragStart={(e) => handleDragStart(e, stop, partnerB)}
                     onDragEnd={handleDragEnd}
                     onDragOver={(e) => {
                       e.preventDefault();
@@ -667,7 +754,7 @@ export default function DeliveryPartnerDragBoard({
                       }
                     }}
                     onDragLeave={() => setDragOverStopId(null)}
-                    onDrop={(e) => handleDropOnStopCard(e, stop)}
+                    onDrop={(e) => handleDropOnStopCard(e, stop, partnerB)}
                     className={`p-3.5 rounded-xl border transition-all select-none ${
                       isBeingDragged
                         ? "opacity-40 border-indigo-400 bg-indigo-50/50"

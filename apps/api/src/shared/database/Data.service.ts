@@ -1752,13 +1752,20 @@ export function applyJoins(
       throw new Error("Join must specify a 'table' key");
     }
 
-    const joinTable = join.table;
+    // A join may carry an alias — 'branches b' or 'branches AS b'. Columns must
+    // be qualified with the alias, while the soft-delete rule is looked up
+    // against the real table name.
+    const joinMatch = join.table
+      .trim()
+      .match(/^([a-zA-Z_][\w$]*(?:\.[a-zA-Z_][\w$]*)?)(?:\s+(?:[Aa][Ss]\s+)?([a-zA-Z_][\w$]*))?$/);
+    const joinBaseTable = joinMatch ? joinMatch[1] : join.table.trim();
+    const joinTable = joinMatch && joinMatch[2] ? joinMatch[2] : joinBaseTable;
     const joinType = (join.type ?? 'INNER').toUpperCase();
 
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // JOIN TABLE EXPRESSION
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    const tableExpr = joinTable;
+    const tableExpr = join.table.trim();
     // PostgreSQL does not support USE INDEX hints - removed
 
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1779,7 +1786,7 @@ export function applyJoins(
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // SOFT DELETE (JOIN SCOPE, SAFE)
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    if (!AVOID_DELETED_AT.includes(joinTable)) {
+    if (!AVOID_DELETED_AT.includes(joinBaseTable)) {
       if (onSql) {
         onSql += ` AND ${joinTable}.deleted_at IS NULL`;
       } else {
@@ -1812,7 +1819,7 @@ export function applyJoins(
         break;
 
       case 'SELF':
-        sql += ` INNER JOIN ${table} AS ${joinTable}${onSql}`;
+        sql += ` INNER JOIN ${tableExpr}${onSql}`;
         break;
 
       case 'NATURAL':

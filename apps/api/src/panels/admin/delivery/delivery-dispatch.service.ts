@@ -417,8 +417,12 @@ WHERE ${where.join(' AND ')}
         LEFT JOIN products p ON p.product_id = pv.product_id
         WHERE ${where.join(' AND ')}
         GROUP BY
-          COALESCE(w.warehouse_id, b.branch_id),
-          COALESCE(w.name, b.branch_name, 'Unknown Warehouse'),
+          -- w.warehouse_id and b.branch_id are grouped in their own right so the
+          -- correlated stock lookup above can reference them.
+          w.warehouse_id,
+          b.branch_id,
+          w.name,
+          b.branch_name,
           o.delivery_slot,
           oi.variant_id,
           p.name,
