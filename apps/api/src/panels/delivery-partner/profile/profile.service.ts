@@ -678,11 +678,9 @@ export class ProfileService {
            cu.phone AS customer_phone,
            COALESCE(ca.flat_no, '') || ' ' || COALESCE(ca.building_name, '') || ' ' || COALESCE(ca.street, '') || ' ' || COALESCE(ca.area, '') AS customer_address,
            o.status AS log_status,
-           COALESCE((
-             SELECT SUM(quantity)
-             FROM container_transactions
-             WHERE reference_id = o.order_id AND transaction_type = 'return'
-           ), 0) AS bottles_collected,
+           -- Per-order container collection is no longer recorded; the
+           -- reconciliation table tracks it per run, not per order.
+           0 AS bottles_collected,
            CASE WHEN o.payment_mode = 'cod' AND o.payment_status = 'paid' THEN o.total_amount ELSE 0 END AS cash_collected,
            COALESCE(o.special_instructions, '') AS remarks,
            o.delivery_image AS proof_photo_url,

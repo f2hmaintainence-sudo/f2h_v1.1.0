@@ -1207,10 +1207,15 @@ export class DeliveryManagementService {
         [partnerId, partner.user_id || partnerId],
       ).catch(() => []);
 
-      const vehicles = await this.db.query(
-        `SELECT * FROM delivery_partner_vehicles WHERE delivery_partner_id = $1 OR delivery_partner_id = $2`,
-        [partnerId, partner.user_id || partnerId],
-      ).catch(() => []);
+      // Vehicle details live on delivery_partners itself.
+      const vehicles = partner?.vehicle_type
+        ? [{
+            id: 1,
+            vehicle_type: partner.vehicle_type,
+            vehicle_number: partner.vehicle_number,
+            verification_status: partner.is_verified ? 'verified' : 'pending',
+          }]
+        : [];
 
       const completedOrders = (orders || []).filter((o: any) => o.status === 'delivered');
       const totalDelivered = completedOrders.length;

@@ -320,27 +320,6 @@ export class CustomersService {
             total_price: Number(item.final_price || item.total_price || item.total_amount || 0),
           });
         }
-
-        const containerLinesRes = await this.databaseService.query(
-          `SELECT dcl.*, pt.name as packaging_name, pt.unit as packaging_unit, pt.is_returnable
-           FROM delivery_container_lines dcl
-           LEFT JOIN packaging_types pt ON pt.id = dcl.packaging_type_id
-           WHERE dcl.reference_id = ANY(?) OR dcl.customer_id = ?`,
-          [orderIds, customerId]
-        ).catch(() => []);
-        for (const line of containerLinesRes) {
-          const key = line.reference_id;
-          if (key) {
-            if (!orderContainerMap[key]) orderContainerMap[key] = [];
-            orderContainerMap[key].push({
-              id: line.id,
-              packaging_name: line.packaging_name || 'Container / Bottle',
-              quantity: Number(line.quantity || 0),
-              packaging_type_id: line.packaging_type_id,
-              is_returnable: line.is_returnable ?? true,
-            });
-          }
-        }
       }
 
       const formattedOrders = ordersRes.map(o => {
@@ -598,31 +577,16 @@ export class CustomersService {
       timelineEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       const containerBalancesRes = await this.databaseService.query(
-        `SELECT ccb.*, COALESCE(cnt.name, pt.name, ccb.packaging_type_id) as packaging_name, COALESCE(pt.unit, 'PCS') as packaging_unit, COALESCE(pt.deposit_amount, 0) as deposit_amount
+        `SELECT ccb.*, COALESCE(cnt.name, ccb.container_id) as packaging_name, 'PCS' as packaging_unit, 0 as deposit_amount
          FROM customer_container_balances ccb
-         LEFT JOIN packaging_types pt ON pt.id::text = ccb.packaging_type_id AND pt.deleted_at IS NULL
-         LEFT JOIN containers cnt ON cnt.container_id = ccb.packaging_type_id AND cnt.deleted_at IS NULL
+         LEFT JOIN containers cnt ON cnt.container_id = ccb.container_id AND cnt.deleted_at IS NULL
          WHERE ccb.customer_id = ? AND ccb.deleted_at IS NULL`,
-        [customerId]
-      ).catch(() => []);
-
-      const containerTxnsRes = await this.databaseService.query(
-        `SELECT ct.*, COALESCE(cnt.name, pt.name, ct.packaging_type_id) as packaging_name
-         FROM container_transactions ct
-         LEFT JOIN packaging_types pt ON pt.id::text = ct.packaging_type_id AND pt.deleted_at IS NULL
-         LEFT JOIN containers cnt ON cnt.container_id = ct.packaging_type_id AND cnt.deleted_at IS NULL
-         WHERE ct.customer_id = ? AND ct.deleted_at IS NULL
-         ORDER BY ct.created_at DESC`,
         [customerId]
       ).catch(() => []);
 
       const packagingTypesRes = await this.databaseService.query(
         `SELECT container_id as id, name, 1 as capacity, 'PCS' as unit, is_returnable, 0 as deposit_amount 
          FROM containers 
-         WHERE (status = 'active' OR status IS NULL) AND deleted_at IS NULL
-         UNION ALL
-         SELECT id::text, name, capacity, unit, is_returnable, deposit_amount 
-         FROM packaging_types 
          WHERE (status = 'active' OR status IS NULL) AND deleted_at IS NULL
          ORDER BY name ASC`
       ).catch(() => []);
@@ -771,10 +735,6 @@ export class CustomersService {
               damaged_quantity: Number(b.damaged_quantity || 0),
               lost_quantity: Number(b.lost_quantity || 0),
               balance_quantity: Number(b.balance_quantity ?? (Number(b.issued_quantity || 0) - Number(b.returned_quantity || 0) - Number(b.damaged_quantity || 0) - Number(b.lost_quantity || 0))),
-            })),
-            transactions: containerTxnsRes.map(t => ({
-              ...t,
-              quantity: Number(t.quantity || 0),
             })),
             packaging_types: packagingTypesRes,
           },
@@ -1705,36 +1665,40 @@ export class CustomersService {
       }
       const customerId = custRes[0].customer_id;
 
-      const { packaging_type_id, transaction_type, quantity, remarks, reference_type = 'manual', reference_id } = body;
+      const { packaging_type_id, transaction_type, quantity } = body;
       const qty = Math.abs(Number(quantity || 0));
       if (!packaging_type_id || !transaction_type || qty <= 0) {
         throw new BadRequestException('Packaging type, valid transaction type, and quantity > 0 are required');
       }
-
-      await this.databaseService.query(
-        `INSERT INTO container_transactions 
-         (customer_id, packaging_type_id, reference_type, reference_id, transaction_type, quantity, remarks, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [customerId, packaging_type_id, reference_type, reference_id || null, transaction_type, qty, remarks || null, adminId]
-      );
 
       const issueAdd = transaction_type === 'issue' ? qty : 0;
       const returnAdd = transaction_type === 'return' ? qty : 0;
       const damagedAdd = transaction_type === 'damaged' ? qty : 0;
       const lostAdd = transaction_type === 'lost' ? qty : 0;
 
-      await this.databaseService.query(
-        `INSERT INTO customer_container_balances 
-         (customer_id, packaging_type_id, issued_quantity, returned_quantity, damaged_quantity, lost_quantity)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT (customer_id, packaging_type_id) DO UPDATE SET
-           issued_quantity = customer_container_balances.issued_quantity + EXCLUDED.issued_quantity,
-           returned_quantity = customer_container_balances.returned_quantity + EXCLUDED.returned_quantity,
-           damaged_quantity = customer_container_balances.damaged_quantity + EXCLUDED.damaged_quantity,
-           lost_quantity = customer_container_balances.lost_quantity + EXCLUDED.lost_quantity,
-           updated_at = NOW()`,
-        [customerId, packaging_type_id, issueAdd, returnAdd, damagedAdd, lostAdd]
+      // Only the running balance is kept now; there is no per-transaction
+      // ledger table. No unique key covers (customer_id, container_id), so
+      // this is an update-then-insert rather than an upsert.
+      const updated = await this.databaseService.query(
+        `UPDATE customer_container_balances
+            SET issued_quantity   = COALESCE(issued_quantity, 0) + ?,
+                returned_quantity = COALESCE(returned_quantity, 0) + ?,
+                damaged_quantity  = COALESCE(damaged_quantity, 0) + ?,
+                lost_quantity     = COALESCE(lost_quantity, 0) + ?,
+                updated_at = NOW()
+          WHERE customer_id = ? AND container_id = ? AND deleted_at IS NULL
+          RETURNING id`,
+        [issueAdd, returnAdd, damagedAdd, lostAdd, customerId, packaging_type_id]
       );
+
+      if (!updated?.length) {
+        await this.databaseService.query(
+          `INSERT INTO customer_container_balances 
+           (customer_id, container_id, issued_quantity, returned_quantity, damaged_quantity, lost_quantity)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [customerId, packaging_type_id, issueAdd, returnAdd, damagedAdd, lostAdd]
+        );
+      }
 
       return { status: true, message: 'Container transaction logged successfully' };
     } catch (error) {

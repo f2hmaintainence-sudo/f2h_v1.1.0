@@ -1630,9 +1630,7 @@ export class DeliveryRunService {
       this.developer.error('swapAddresses error', { error });
       throw new InternalServerErrorException('Failed to swap delivery addresses');
     }
-  }
-
-  // ────────────────────────────────────────────────
+  }  // ────────────────────────────────────────────────
   // Order Swap & Move API Support
   // ────────────────────────────────────────────────
 
@@ -1677,65 +1675,132 @@ export class DeliveryRunService {
         ? order.scheduled_date.slice(0, 10)
         : new Date(order.scheduled_date).toISOString().slice(0, 10);
 
-      // Find all target runs for the same branch, date, slot that are eligible
-      const runsRes = await this.db.query(
-        `SELECT dr.id, dr.run_id, dr.run_date, dr.delivery_slot, dr.status,
-                dr.branch_id, b.branch_name,
-                dr.delivery_partner_id,
+      // Find ALL orders at this address stop in current run
+      const addressOrders = await this.db.query(
+        `SELECT o.order_id, o.customer_id,
+                COALESCE(NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), o.customer_name, 'Customer') AS customer_name,
+                o.address_id,
+                COALESCE(o.address_line, NULLIF(TRIM(ca.address_line), ''), 'Customer Address') AS address_line,
+                o.delivery_slot, o.status, o.total_amount,
+                o.created_at
+         FROM orders o
+         LEFT JOIN customer_addresses ca ON ca.address_id = o.address_id
+         LEFT JOIN users cu ON cu.user_id = o.customer_id
+         WHERE (o.delivery_run_id = $1 OR o.delivery_run_id = (SELECT id::varchar FROM delivery_runs WHERE run_id = $1))
+           AND o.address_id = $2
+           AND o.status NOT IN ('cancelled', 'failed')
+           AND o.deleted_at IS NULL
+         ORDER BY o.created_at ASC`,
+        [order.delivery_run_id, order.address_id],
+      );
+
+      // Find all eligible delivery partners for the same branch, date, slot (excluding current partner)
+      const partnersRes = await this.db.query(
+        `SELECT dp.delivery_partner_id,
                 COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), dp.full_name, 'Partner') AS partner_name,
                 COALESCE(dp.phone, u.phone) AS partner_phone,
                 dp.is_active AS partner_active,
                 dp.is_available AS partner_available,
-                dr.total_addresses,
-                (SELECT COUNT(*)::int FROM orders ord WHERE (ord.delivery_run_id = dr.run_id OR ord.delivery_run_id = dr.id::varchar) AND ord.status NOT IN ('cancelled', 'failed')) AS current_orders_count
-         FROM delivery_runs dr
-         LEFT JOIN branches b ON b.branch_id = dr.branch_id
-         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
+                dr.id AS run_db_id,
+                dr.run_id,
+                dr.status AS run_status,
+                COALESCE(dr.total_addresses, 0) AS total_addresses,
+                COALESCE(
+                  (SELECT COUNT(*)::int FROM orders ord
+                   WHERE (ord.delivery_run_id = dr.run_id OR ord.delivery_run_id = dr.id::varchar)
+                     AND ord.status NOT IN ('cancelled', 'failed')
+                     AND ord.deleted_at IS NULL),
+                  0
+                ) AS current_orders_count
+         FROM delivery_partners dp
          LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
-         WHERE dr.run_date = $1
+         LEFT JOIN delivery_runs dr ON (
+           dr.delivery_partner_id = dp.delivery_partner_id
+           AND dr.run_date = $1
            AND dr.delivery_slot = $2
            AND ($3::varchar IS NULL OR dr.branch_id = $3)
-           AND dr.run_id != $4
-           AND dr.id::varchar != $4
            AND dr.status IN ('planned', 'assigned')
            AND dr.deleted_at IS NULL
+         )
+         WHERE ($3::varchar IS NULL OR dp.branch_id = $3)
+           AND dp.delivery_partner_id != $4
            AND dp.is_active = true
            AND dp.is_available = true
+           AND dp.deleted_at IS NULL
            AND NOT EXISTS (
              SELECT 1 FROM delivery_leave_requests dlr
-             WHERE dlr.delivery_partner_id = dr.delivery_partner_id
+             WHERE dlr.delivery_partner_id = dp.delivery_partner_id
                AND dlr.status = 'approved'
                AND dlr.deleted_at IS NULL
                AND dlr.leave_date <= $1::date
                AND (dlr.end_date IS NULL OR dlr.end_date >= $1::date)
            )
-         ORDER BY dr.run_id ASC`,
-        [scheduledDateStr, order.delivery_slot, order.branch_id, order.delivery_run_id],
+         ORDER BY (dr.run_id IS NOT NULL) DESC, partner_name ASC`,
+        [scheduledDateStr, order.delivery_slot, order.branch_id, order.delivery_partner_id],
       );
 
-      // For each run, fetch its orders so admin can pick an order to swap with
-      const runsWithOrders = await Promise.all(
-        runsRes.map(async (run: any) => {
-          const runOrders = await this.db.query(
-            `SELECT o.order_id, o.customer_id,
-                    COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), o.customer_name, 'Customer') AS customer_name,
-                    o.address_id,
-                    COALESCE(o.address_line, NULLIF(TRIM(ca.address_line), ''), 'Customer Address') AS address_line,
-                    o.delivery_slot, o.status, o.total_amount,
-                    COALESCE(dra.sequence_no, o.run_sequence, 1) AS run_sequence
-             FROM orders o
-             LEFT JOIN customer_addresses ca ON ca.address_id = o.address_id
-             LEFT JOIN users u ON u.user_id = o.customer_id
-             LEFT JOIN delivery_run_addresses dra ON dra.run_id = o.delivery_run_id AND dra.address_id = o.address_id AND dra.deleted_at IS NULL
-             WHERE (o.delivery_run_id = $1 OR o.delivery_run_id = (SELECT id::varchar FROM delivery_runs WHERE run_id = $1))
-               AND o.status NOT IN ('delivered', 'cancelled', 'failed')
-               AND o.deleted_at IS NULL
-             ORDER BY COALESCE(dra.sequence_no, o.run_sequence, 1) ASC, o.created_at ASC`,
-            [run.run_id],
-          );
+      // For each partner, if they have a run, fetch address stops and orders
+      const eligiblePartners = await Promise.all(
+        partnersRes.map(async (p: any) => {
+          const hasExistingRun = Boolean(p.run_id);
+          let addressStops: any[] = [];
+          let runOrders: any[] = [];
+
+          if (hasExistingRun) {
+            addressStops = await this.db.query(
+              `SELECT dra.id AS run_address_id,
+                      dra.address_id,
+                      dra.customer_id,
+                      dra.sequence_no,
+                      COALESCE(NULLIF(TRIM(ca.address_line), ''), ca.landmark, 'Customer Address') AS address_line,
+                      COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), c.full_name, 'Customer') AS customer_name,
+                      COALESCE(
+                        (SELECT json_agg(json_build_object(
+                          'order_id', o.order_id,
+                          'customer_id', o.customer_id,
+                          'customer_name', o.customer_name,
+                          'status', o.status,
+                          'total_amount', o.total_amount,
+                          'delivery_slot', o.delivery_slot
+                        ) ORDER BY o.created_at ASC)
+                        FROM orders o
+                        WHERE (o.delivery_run_id = $1 OR o.delivery_run_id = $2)
+                          AND o.address_id = dra.address_id
+                          AND o.status NOT IN ('cancelled', 'failed')
+                          AND o.deleted_at IS NULL),
+                        '[]'::json
+                      ) AS orders
+               FROM delivery_run_addresses dra
+               LEFT JOIN customer_addresses ca ON ca.address_id = dra.address_id
+               LEFT JOIN customers c ON c.customer_id = dra.customer_id
+               LEFT JOIN users u ON u.user_id = dra.customer_id
+               WHERE (dra.run_id = $1 OR dra.run_id = $2)
+                 AND dra.deleted_at IS NULL
+               ORDER BY dra.sequence_no ASC`,
+              [p.run_id, String(p.run_db_id || '')],
+            );
+
+            runOrders = (addressStops || []).flatMap((stop: any) => stop.orders || []);
+          }
+
           return {
-            ...run,
-            orders: runOrders || [],
+            id: p.run_db_id ? String(p.run_db_id) : p.delivery_partner_id,
+            run_id: p.run_id,
+            run_date: scheduledDateStr,
+            delivery_slot: order.delivery_slot,
+            status: p.run_status || 'available',
+            branch_id: order.branch_id,
+            branch_name: order.branch_name,
+            delivery_partner_id: p.delivery_partner_id,
+            partner_name: p.partner_name,
+            partner_phone: p.partner_phone,
+            partner_active: p.partner_active,
+            partner_available: p.partner_available,
+            has_existing_run: hasExistingRun,
+            total_addresses: Number(p.total_addresses || 0),
+            current_orders_count: Number(p.current_orders_count || 0),
+            address_stops: addressStops || [],
+            orders: runOrders,
           };
         }),
       );
@@ -1746,8 +1811,10 @@ export class DeliveryRunService {
           order: {
             ...order,
             scheduled_date: scheduledDateStr,
+            address_orders: addressOrders || [],
           },
-          eligible_runs: runsWithOrders,
+          eligible_runs: eligiblePartners,
+          eligible_partners: eligiblePartners,
         },
       };
     } catch (error: any) {
@@ -1759,15 +1826,19 @@ export class DeliveryRunService {
 
   async moveOrderBetweenRuns(body: {
     order_id: string;
-    target_run_id: string;
+    target_partner_id?: string;
+    target_run_id?: string;
     reason?: string;
     admin_id?: string;
   }) {
-    const { order_id, target_run_id, reason, admin_id } = body;
-    this.developer.debug('DeliveryRunService.moveOrderBetweenRuns called', { order_id, target_run_id });
+    const { order_id, target_partner_id, target_run_id, reason, admin_id } = body;
+    this.developer.debug('DeliveryRunService.moveOrderBetweenRuns called', { order_id, target_partner_id, target_run_id });
 
-    if (!order_id || !target_run_id) {
-      throw new BadRequestException('order_id and target_run_id are required');
+    if (!order_id) {
+      throw new BadRequestException('order_id is required');
+    }
+    if (!target_run_id && !target_partner_id) {
+      throw new BadRequestException('Either target_run_id or target_partner_id is required');
     }
 
     try {
@@ -1788,9 +1859,6 @@ export class DeliveryRunService {
         if (!sourceRunId) {
           throw new BadRequestException(`Order ${order_id} is not currently assigned to any delivery run`);
         }
-        if (sourceRunId === target_run_id) {
-          throw new BadRequestException(`Order ${order_id} is already in delivery run ${target_run_id}`);
-        }
 
         // 2. Lock and fetch source run
         const srcRunRes = await client.query<any>(
@@ -1803,21 +1871,79 @@ export class DeliveryRunService {
           throw new BadRequestException(`Source delivery run ${sourceRunId} is ${sourceRun.status} and cannot be modified`);
         }
 
-        // 3. Lock and fetch target run
-        const tgtRunRes = await client.query<any>(
-          `SELECT * FROM delivery_runs WHERE run_id = $1 OR id::varchar = $1 FOR UPDATE`,
-          [target_run_id],
-        );
-        const targetRun = tgtRunRes.rows[0];
-        if (!targetRun) throw new BadRequestException(`Target delivery run ${target_run_id} not found`);
-        if (['completed', 'cancelled'].includes(targetRun.status)) {
-          throw new BadRequestException(`Target delivery run ${target_run_id} is ${targetRun.status} and cannot accept orders`);
-        }
-
-        // 4. Invariance validations: Same branch, date, slot
         const srcDateStr = typeof sourceRun.run_date === 'string'
           ? sourceRun.run_date.slice(0, 10)
           : new Date(sourceRun.run_date).toISOString().slice(0, 10);
+
+        // 3. Resolve target run & target partner
+        let targetRun: any = null;
+        let resolvedTargetPartnerId = target_partner_id;
+
+        if (target_run_id) {
+          const tgtRunRes = await client.query<any>(
+            `SELECT * FROM delivery_runs WHERE run_id = $1 OR id::varchar = $1 FOR UPDATE`,
+            [target_run_id],
+          );
+          targetRun = tgtRunRes.rows[0];
+          if (targetRun) {
+            resolvedTargetPartnerId = targetRun.delivery_partner_id;
+          }
+        }
+
+        // If targetRun not found or not provided, check if partner already has a run or create a new run
+        if (!targetRun && resolvedTargetPartnerId) {
+          const existingRunRes = await client.query<any>(
+            `SELECT * FROM delivery_runs
+             WHERE delivery_partner_id = $1
+               AND run_date = $2
+               AND delivery_slot = $3
+               AND ($4::varchar IS NULL OR branch_id = $4)
+               AND status NOT IN ('completed', 'cancelled')
+               AND deleted_at IS NULL
+             ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
+            [resolvedTargetPartnerId, srcDateStr, sourceRun.delivery_slot, sourceRun.branch_id],
+          );
+
+          if (existingRunRes.rows.length > 0) {
+            targetRun = existingRunRes.rows[0];
+          } else {
+            // Create a new delivery run for this partner
+            const dateStr = srcDateStr.replace(/-/g, '');
+            const slotPrefix = (sourceRun.delivery_slot || 'MOR').substring(0, 3).toUpperCase();
+            const nextRes = await client.query<any>(
+              `SELECT COALESCE(MAX(CAST(SPLIT_PART(run_id, '-', 4) AS INTEGER)), 0) + 1 AS next_no
+               FROM delivery_runs
+               WHERE run_date = $1 AND delivery_slot = $2`,
+              [srcDateStr, sourceRun.delivery_slot],
+            );
+            const nextNo = Number(nextRes.rows?.[0]?.next_no ?? 1);
+            const newRunId = `RUN-${dateStr}-${slotPrefix}-${String(nextNo).padStart(3, '0')}`;
+
+            const newRunInsert = await client.query<any>(
+              `INSERT INTO delivery_runs
+                 (run_id, delivery_partner_id, branch_id, run_date, delivery_slot,
+                  status, assignment_method, total_addresses, assigned_by, created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, 'assigned', 'manual', 0, $6, NOW(), NOW())
+               RETURNING *`,
+              [newRunId, resolvedTargetPartnerId, sourceRun.branch_id, srcDateStr, sourceRun.delivery_slot, admin_id || 'system'],
+            );
+            targetRun = newRunInsert.rows[0];
+          }
+        }
+
+        if (!targetRun) {
+          throw new BadRequestException('Target delivery run could not be determined');
+        }
+
+        if (sourceRun.run_id === targetRun.run_id) {
+          throw new BadRequestException(`Address stop is already assigned to delivery run ${targetRun.run_id}`);
+        }
+
+        if (['completed', 'cancelled'].includes(targetRun.status)) {
+          throw new BadRequestException(`Target delivery run ${targetRun.run_id} is ${targetRun.status} and cannot accept orders`);
+        }
+
+        // 4. Invariance validations: Same branch, date, slot
         const tgtDateStr = typeof targetRun.run_date === 'string'
           ? targetRun.run_date.slice(0, 10)
           : new Date(targetRun.run_date).toISOString().slice(0, 10);
@@ -1862,6 +1988,7 @@ export class DeliveryRunService {
           `SELECT order_id FROM orders
            WHERE (delivery_run_id = $1 OR delivery_run_id = $2)
              AND address_id = $3
+             AND status NOT IN ('cancelled', 'failed')
              AND deleted_at IS NULL`,
           [sourceRun.run_id, String(sourceRun.id), order.address_id],
         );

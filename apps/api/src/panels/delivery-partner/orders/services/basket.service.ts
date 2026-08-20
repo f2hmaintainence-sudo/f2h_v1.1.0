@@ -586,60 +586,15 @@ export class BasketService {
   }
 
   /**
-   * Generates container status summary strictly for the active run_id from delivery_container_reconciliation.
-   * Auto-syncs live container_transactions into delivery_container_reconciliation if missing.
+   * Generates container status summary strictly for the active run_id from
+   * delivery_container_reconciliation, which is now the sole record of what a
+   * run collected.
    */
   async getContainerSummary(partnerId: string, runId?: string): Promise<any> {
     const basket = await this.getOrCreateActiveBasket(partnerId, runId);
     const activeRunId = runId || basket.delivery_run_id;
 
-    // 1. Fetch warehouse_id and partner_id for the active delivery run
-    const runRes = await this.db.query(
-      `SELECT warehouse_id, delivery_partner_id FROM delivery_runs WHERE run_id = $1 LIMIT 1`,
-      [activeRunId],
-    );
-    const warehouseId = runRes?.[0]?.warehouse_id || 'WH-MRXD13W8PWMMON';
-    const runPartnerId = runRes?.[0]?.delivery_partner_id || partnerId;
-
-    // 2. Aggregate live container_transactions for this active run
-    const liveTxRes = await this.db.query(
-      `SELECT
-         ct.container_id,
-         SUM(CASE WHEN ct.transaction_type = 'return' THEN ct.quantity ELSE 0 END)::int AS collected_quantity,
-         SUM(CASE WHEN ct.transaction_type = 'damage' THEN ct.quantity ELSE 0 END)::int AS damaged_quantity
-       FROM container_transactions ct
-       JOIN orders o ON o.order_id = ct.reference_id
-       WHERE (o.delivery_run_id = $1 OR o.delivery_partner_id = $2 OR o.delivery_partner_id = $3)
-         AND ct.deleted_at IS NULL
-       GROUP BY ct.container_id`,
-      [activeRunId, partnerId, runPartnerId],
-    );
-
-    // 3. Upsert live collected & damaged quantities into delivery_container_reconciliation
-    if (liveTxRes && liveTxRes.length > 0) {
-      for (const r of liveTxRes) {
-        const coll = Number(r.collected_quantity || 0);
-        const dam = Number(r.damaged_quantity || 0);
-        if (coll > 0 || dam > 0) {
-          await this.db.query(
-            `INSERT INTO delivery_container_reconciliation (
-               warehouse_id, run_id, container_id,
-               collected_quantity, submitted_quantity, damaged_quantity, lost_quantity,
-               status, created_by, created_at, updated_at
-             )
-             VALUES ($1, $2, $3, $4, 0, $5, 0, 'pending', $6, NOW(), NOW())
-             ON CONFLICT (run_id, container_id) DO UPDATE
-             SET
-               collected_quantity = GREATEST(delivery_container_reconciliation.collected_quantity, EXCLUDED.collected_quantity),
-               damaged_quantity = GREATEST(delivery_container_reconciliation.damaged_quantity, EXCLUDED.damaged_quantity),
-               updated_at = NOW()`,
-            [warehouseId, activeRunId, r.container_id, coll, dam, partnerId],
-          );
-        }
-      }
-    }
-
-    // 4. Query overall summary metrics from delivery_container_reconciliation
+    // Summary metrics come straight from delivery_container_reconciliation.
     const summaryRows = await this.db.query(
       `SELECT
          COALESCE(SUM(collected_quantity), 0)::int AS total_collected,

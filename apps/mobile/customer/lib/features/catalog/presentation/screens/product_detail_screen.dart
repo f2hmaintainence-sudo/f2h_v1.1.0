@@ -26,7 +26,7 @@ import 'package:f2h_customer/theme/app_colors.dart';
 const double _kBottomInset = 104;
 
 /// How far above the navigation bar the floating cart pill sits.
-const double _kCartBarLift = 72;
+const double _kCartBarLift = 12;
 
 class BrowseScreen extends StatefulWidget {
   final String? initialCategory;

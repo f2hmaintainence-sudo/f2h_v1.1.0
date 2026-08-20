@@ -134,29 +134,8 @@ export class DeliveryOrderService {
       }
     }
 
-    // 3. Fetch actual returned counts in this order
-    const collectedContainersRes = await this.db.query(
-      `SELECT reference_id AS order_id, container_id, COALESCE(SUM(quantity), 0)::int AS collected
-       FROM container_transactions
-       WHERE reference_type = 'order'
-         AND reference_id = ANY($1)
-         AND transaction_type = 'return'
-       GROUP BY reference_id, container_id`,
-      [orderIds],
-    );
-
     const collectedContainersMap: Record<string, Record<string, number>> = {};
     const collectedBottlesByOrder: Record<string, number> = {};
-    for (const row of collectedContainersRes || []) {
-      const oid = String(row.order_id);
-      const cid = String(row.container_id);
-      if (!collectedContainersMap[oid]) collectedContainersMap[oid] = {};
-      collectedContainersMap[oid][cid] = row.collected;
-
-      if (cid === 'CONT-001') {
-        collectedBottlesByOrder[oid] = row.collected;
-      }
-    }
 
     return orders.map((o: any, idx: number) => {
       const ordId = String(o.order_id);
@@ -372,49 +351,53 @@ export class DeliveryOrderService {
       );
     }
 
-    if (params.returned > 0) {
-      await executor.query(
-        `INSERT INTO container_transactions (
-           customer_id, container_id, reference_type, reference_id,
-           transaction_type, quantity, remarks, transaction_date, created_by
-         ) VALUES ($1, $2, 'order', $3, 'return', $4, $5, CURRENT_DATE, $6)`,
-        [params.customerId, params.containerId, params.referenceOrderId, params.returned,
-        params.remarks || 'Collected by delivery boy', params.createdBy],
-      );
-    }
+    await this.applyBalanceDelta(executor, params.customerId, params.containerId, {
+      returned: params.returned,
+      damaged: params.damaged,
+      lost: params.lost,
+    });
+  }
 
-    if (params.damaged > 0) {
-      await executor.query(
-        `INSERT INTO container_transactions (
-           customer_id, container_id, reference_type, reference_id,
-           transaction_type, quantity, remarks, transaction_date, created_by
-         ) VALUES ($1, $2, 'order', $3, 'damaged', $4, 'Damaged during delivery', CURRENT_DATE, $5)`,
-        [params.customerId, params.containerId, params.referenceOrderId, params.damaged, params.createdBy],
-      );
-    }
+  /**
+   * Adds a delta to a customer's running container balance.
+   *
+   * `customer_container_balances` carries no unique key on
+   * (customer_id, container_id), so this updates first and only inserts when
+   * no row was there. `balance_quantity` is a generated column and is never
+   * written directly.
+   */
+  private async applyBalanceDelta(
+    executor: { query: (sql: string, params?: any[]) => Promise<any> },
+    customerId: string,
+    containerId: string,
+    delta: { issued?: number; returned?: number; damaged?: number; lost?: number },
+  ): Promise<void> {
+    const issued = delta.issued ?? 0;
+    const returned = delta.returned ?? 0;
+    const damaged = delta.damaged ?? 0;
+    const lost = delta.lost ?? 0;
 
-    if (params.lost > 0) {
-      await executor.query(
-        `INSERT INTO container_transactions (
-           customer_id, container_id, reference_type, reference_id,
-           transaction_type, quantity, remarks, transaction_date, created_by
-         ) VALUES ($1, $2, 'order', $3, 'lost', $4, 'Lost during delivery', CURRENT_DATE, $5)`,
-        [params.customerId, params.containerId, params.referenceOrderId, params.lost, params.createdBy],
-      );
-    }
+    const updated = await executor.query(
+      `UPDATE customer_container_balances
+          SET issued_quantity   = COALESCE(issued_quantity, 0) + $3,
+              returned_quantity = COALESCE(returned_quantity, 0) + $4,
+              damaged_quantity  = COALESCE(damaged_quantity, 0) + $5,
+              lost_quantity     = COALESCE(lost_quantity, 0) + $6,
+              updated_at = NOW()
+        WHERE customer_id = $1 AND container_id = $2 AND deleted_at IS NULL
+        RETURNING id`,
+      [customerId, containerId, issued, returned, damaged, lost],
+    );
+
+    const affected = Array.isArray(updated) ? updated.length : (updated?.rowCount ?? 0);
+    if (affected) return;
 
     await executor.query(
       `INSERT INTO customer_container_balances (
          customer_id, container_id, issued_quantity, returned_quantity,
          damaged_quantity, lost_quantity, updated_at
-       ) VALUES ($1, $2, 0, $3, $4, $5, NOW())
-       ON CONFLICT (customer_id, container_id)
-       DO UPDATE SET
-         returned_quantity = customer_container_balances.returned_quantity + EXCLUDED.returned_quantity,
-         damaged_quantity = customer_container_balances.damaged_quantity + EXCLUDED.damaged_quantity,
-         lost_quantity = customer_container_balances.lost_quantity + EXCLUDED.lost_quantity,
-         updated_at = NOW()`,
-      [params.customerId, params.containerId, params.returned, params.damaged, params.lost],
+       ) VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+      [customerId, containerId, issued, returned, damaged, lost],
     );
   }
 
@@ -454,25 +437,9 @@ export class DeliveryOrderService {
   ): Promise<void> {
     if (params.quantity <= 0) return;
 
-    await executor.query(
-      `INSERT INTO container_transactions (
-         customer_id, container_id, reference_type, reference_id,
-         transaction_type, quantity, remarks, transaction_date, created_by
-       ) VALUES ($1, $2, 'order', $3, 'issue', $4, 'Issued during delivery', CURRENT_DATE, $5)`,
-      [params.customerId, params.containerId, params.referenceOrderId, params.quantity, params.createdBy],
-    );
-
-    await executor.query(
-      `INSERT INTO customer_container_balances (
-         customer_id, container_id, issued_quantity, returned_quantity,
-         damaged_quantity, lost_quantity, updated_at
-       ) VALUES ($1, $2, $3, 0, 0, 0, NOW())
-       ON CONFLICT (customer_id, container_id)
-       DO UPDATE SET
-         issued_quantity = customer_container_balances.issued_quantity + EXCLUDED.issued_quantity,
-         updated_at = NOW()`,
-      [params.customerId, params.containerId, params.quantity],
-    );
+    await this.applyBalanceDelta(executor, params.customerId, params.containerId, {
+      issued: params.quantity,
+    });
   }
 
 
@@ -805,10 +772,9 @@ export class DeliveryOrderService {
     }
 
     const bottlesRes = await this.db.query(
-      `SELECT COALESCE(SUM(ct.quantity), 0) AS total_bottles
-       FROM container_transactions ct
-       JOIN orders o ON o.order_id = ct.reference_id
-       WHERE o.delivery_run_id = ANY($1) AND ct.transaction_type = 'return'`,
+      `SELECT COALESCE(SUM(dcr.collected_quantity), 0) AS total_bottles
+       FROM delivery_container_reconciliation dcr
+       WHERE dcr.run_id = ANY($1) AND dcr.deleted_at IS NULL`,
       [runIds],
     );
     const totalBottles = Number(bottlesRes[0]?.total_bottles || 0);

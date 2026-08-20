@@ -33,6 +33,7 @@ import '../widgets/image_banner.dart';
 import '../widgets/promo_banner.dart';
 import 'cart_screen.dart';
 import 'product_detail_view_screen.dart';
+import '../../../../core/widgets/floating_cart_bar.dart';
 import 'product_detail_screen.dart';
 import '../bloc/cart/cart_bloc.dart';
 import '../bloc/cart/cart_state.dart';
@@ -417,9 +418,15 @@ class _HomeScreenState extends State<HomeScreen>
                 // 7. The F2H Promise
                 SliverToBoxAdapter(child: _promiseStrip()),
 
-                const SliverToBoxAdapter(child: SizedBox(height: 20)),
+                const SliverToBoxAdapter(child: SizedBox(height: 104)),
               ],
             ),
+          ),
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: 12,
+            child: FloatingCartBar(),
           ),
         ],
       ),
