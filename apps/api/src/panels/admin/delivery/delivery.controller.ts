@@ -217,6 +217,7 @@ export class DeliveryManagementController {
 
   @Get('runs/:id')
   async getRunDetails(@Param('id') id: string) {
+    console.log("getRunDetails run Id", { id });
     return this.runService.getRunDetails(id);
   }
 

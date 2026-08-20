@@ -37,7 +37,7 @@ export class DeliveryDispatchService {
     try {
       // Verify run exists
       const runRows = await this.db.query(
-        `SELECT * FROM delivery_runs WHERE id = $1`,
+        `SELECT * FROM delivery_runs WHERE id::varchar = $1 OR run_id = $1`,
         [runId],
       );
       if (!runRows[0]) {
@@ -173,7 +173,7 @@ export class DeliveryDispatchService {
     try {
       // Verify run exists
       const runRows = await this.db.query(
-        `SELECT * FROM delivery_runs WHERE id = $1`,
+        `SELECT * FROM delivery_runs WHERE id::varchar = $1 OR run_id = $1`,
         [runId],
       );
       if (!runRows[0]) {
