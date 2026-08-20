@@ -712,7 +712,80 @@ export default function DeliveryRunsPage() {
         </div>
       )}
 
-      {/* TAB 2: RUN CREATION ENGINE */}
+      {/* TAB 2: 2-PARTNER DRAG & DROP BOARD */}
+      {activeTab === "drag_board" && (
+        <div className="space-y-4 animate-in fade-in duration-300">
+          {/* Top Filter for Drag Board */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 flex-1">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Run Date
+                </label>
+                <input
+                  type="date"
+                  value={manageDate}
+                  onChange={(e) => setManageDate(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-600 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Branch
+                </label>
+                <select
+                  value={manageBranch}
+                  onChange={(e) => setManageBranch(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-600 focus:outline-none"
+                >
+                  <option value="">All Branches</option>
+                  {branches.map((b: any) => (
+                    <option key={b.branch_id} value={b.branch_id}>
+                      {b.branch_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Slot
+                </label>
+                <select
+                  value={manageSlot}
+                  onChange={(e) => setManageSlot(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-600 focus:outline-none"
+                >
+                  <option value="">All Slots</option>
+                  <option value="morning">Morning</option>
+                  <option value="evening">Evening</option>
+                </select>
+              </div>
+            </div>
+
+            <button
+              onClick={() => fetchRunsWithOrders()}
+              disabled={runsLoading}
+              className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+            >
+              <RefreshCw size={13} className={runsLoading ? "animate-spin" : ""} />
+              <span>Refresh Runs</span>
+            </button>
+          </div>
+
+          <DeliveryPartnerDragBoard
+            runsList={runsList}
+            selectedDate={manageDate}
+            selectedBranch={manageBranch}
+            selectedSlot={manageSlot}
+            branches={branches}
+            onRefresh={fetchRunsWithOrders}
+          />
+        </div>
+      )}
+
+      {/* TAB 3: RUN CREATION ENGINE */}
       {activeTab === "generate" && (
         <div className="space-y-6 animate-in fade-in duration-300">
           <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-6 shadow-sm">
