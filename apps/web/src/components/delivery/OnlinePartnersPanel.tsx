@@ -21,6 +21,12 @@ interface AvailabilityPartner {
   on_leave_today?: boolean;
 }
 
+interface PartnerAvailabilityResponse {
+  status: boolean;
+  data: AvailabilityPartner[];
+  message?: string;
+}
+
 type AvailabilityStatus = "on_leave" | "online" | "offline";
 
 function getAvailabilityStatus(
@@ -72,7 +78,7 @@ export default function OnlinePartnersPanel({
       : "";
 
     try {
-      const response = await api.get(
+      const response = await api.get<PartnerAvailabilityResponse>(
         `/admin/delivery/partners/online${query}`,
       );
       const data = response.data?.data;
