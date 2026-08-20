@@ -71,24 +71,6 @@ export class CatalogShowAddService {
         { label: 'Pack', value: 'pack' },
       ];
 
-      // Fetch active packaging types
-      const packagingTypesResult = await this.dataService.query('packaging_types', {
-        select: ['id', 'name'],
-        where: [
-          { column: 'status', operator: '=', value: 'active' },
-        ],
-        orderBy: 'name',
-        orderDirection: 'ASC',
-      });
-
-      const packagingOptions = [
-        { value: '', label: 'No Returnable Packaging (Disposable)' },
-        ...(packagingTypesResult.data || []).map((pkg: any) => ({
-          value: String(pkg.id),
-          label: pkg.name,
-        })),
-      ];
-
       // Fetch active containers
       const containersResult = await this.dataService.query('containers', {
         select: ['container_id', 'name', 'quantity'],
@@ -112,7 +94,7 @@ export class CatalogShowAddService {
       // GENERATE FIELDS
       // =====================================================
 
-      const fields = this.catalogFields(categoryOptions, packagingOptions, containerOptions);
+      const fields = this.catalogFields(categoryOptions, containerOptions);
 
       // =====================================================
       // RESPONSE
@@ -144,17 +126,6 @@ export class CatalogShowAddService {
         orderDirection: 'ASC',
       });
 
-      // Fetch active packaging types
-      const packagingTypesResult = await this.dataService.query('packaging_types', {
-        select: ['id', 'name'],
-        where: [
-          { column: 'status', operator: '=', value: 'active' },
-          { column: 'deleted_at', operator: 'IS', value: null },
-        ],
-        orderBy: 'name',
-        orderDirection: 'ASC',
-      });
-
       // Build dropdown options
       const productOptions = [
         { value: '', label: 'Select Product', is_subscribable: false },
@@ -162,14 +133,6 @@ export class CatalogShowAddService {
           value: String(product.product_id),
           label: product.name,
           is_subscribable: product.is_subscribable === true || product.is_subscribable === 1 || product.is_subscribable === '1' || product.is_subscribable === 'true',
-        })),
-      ];
-
-      const packagingOptions = [
-        { value: '', label: 'No Returnable Packaging (Disposable)' },
-        ...(packagingTypesResult.data || []).map((pkg: any) => ({
-          value: String(pkg.id),
-          label: pkg.name,
         })),
       ];
 
@@ -192,7 +155,7 @@ export class CatalogShowAddService {
         })),
       ];
 
-      const fields = this.variantFields(productOptions, packagingOptions, containerOptions);
+      const fields = this.variantFields(productOptions, containerOptions);
 
       return this.formHelper.generateResponse({
         title: 'Add Product Variant',
@@ -235,7 +198,6 @@ export class CatalogShowAddService {
   /** Shared field definitions — used by both showAdd and showEdit */
   catalogFields(
     categoryOptions: any[] = [],
-    packagingOptions: any[] = [],
     containerOptions: any[] = [],
   ): FieldDef[] {
     return [
@@ -254,7 +216,6 @@ export class CatalogShowAddService {
   /** Variant field definitions */
   variantFields(
     productOptions: any[] = [],
-    packagingOptions: any[] = [],
     containerOptions: any[] = [],
   ): FieldDef[] {
     return [
@@ -291,208 +252,6 @@ export class CatalogShowAddService {
       { name: 'image', label: 'Or Upload Category Image', type: 'file', required: false, width: 'half', group: 'Additional Info', accept: 'image/png,image/jpeg,image/webp', crop: true, aspectRatio: 1, cropWidth: 800, cropHeight: 800 },
       { name: 'sort_order', label: 'Sort Order', type: 'number', required: false, width: 'half', group: 'Configuration', defaultValue: 0, placeholder: '0', validation: { min: 0, max: 9999 }, },
       { name: 'is_active', label: 'Active', type: 'toggle', required: false, width: 'half', group: 'Configuration', defaultValue: true, },
-    ];
-  }
-
-  async getDeliverySlotForm(): Promise<FormResponse> {
-    try {
-      const fields = this.deliverySlotFields();
-      return this.formHelper.generateResponse({
-        title: 'Add Delivery Slot',
-        submitLabel: 'Create Slot',
-        fields,
-        script: '',
-      });
-    } catch (error) {
-      this.developer.error('getDeliverySlotForm error', { error });
-      throw new Error('Failed to load delivery slot form');
-    }
-  }
-
-  /** Delivery Slot field definitions */
-  deliverySlotFields(): FieldDef[] {
-    return [
-      {
-        name: 'code',
-        label: 'Internal Code',
-        type: 'text',
-        required: true,
-        width: 'full',
-        group: 'Basic Identity',
-        placeholder: 'e.g., MORNING_PRIME',
-        validation: { minLength: 2, maxLength: 50 },
-      },
-      {
-        name: 'name',
-        label: 'Display Name',
-        type: 'text',
-        required: true,
-        width: 'full',
-        group: 'Basic Identity',
-        placeholder: 'e.g., Morning Delivery (8AM - 12PM)',
-        validation: { minLength: 2, maxLength: 100 },
-      },
-      {
-        name: 'start_time',
-        label: 'Start Time',
-        type: 'time',
-        required: true,
-        width: 'half',
-        group: 'Delivery Window',
-      },
-      {
-        name: 'end_time',
-        label: 'End Time',
-        type: 'time',
-        required: true,
-        width: 'half',
-        group: 'Delivery Window',
-      },
-      {
-        name: 'is_active',
-        label: 'Is Active',
-        type: 'toggle',
-        required: false,
-        width: 'half',
-        group: 'Status',
-        defaultValue: true,
-      },
-    ];
-  }
-
-  async getProductRuleForm(): Promise<FormResponse> {
-    try {
-      const fields = this.productRuleFields();
-      return this.formHelper.generateResponse({
-        title: 'Add Product Rule',
-        submitLabel: 'Create Rule',
-        fields,
-        script: '',
-      });
-    } catch (error) {
-      this.developer.error('getProductRuleForm error', { error });
-      throw new Error('Failed to load product rule form');
-    }
-  }
-
-  /** Product Rule field definitions */
-  productRuleFields(): FieldDef[] {
-    return [
-      {
-        name: 'product_id',
-        label: 'Product ID',
-        type: 'number',
-        required: true,
-        width: 'full',
-        group: 'Product Identity',
-        placeholder: 'e.g., 1001',
-      },
-      {
-        name: 'subscription_allowed',
-        label: 'Allow Subscription',
-        type: 'toggle',
-        required: false,
-        width: 'half',
-        group: 'Permissions & Status',
-        defaultValue: true,
-      },
-      {
-        name: 'subscription_only',
-        label: 'Subscription Only',
-        type: 'toggle',
-        required: false,
-        width: 'half',
-        group: 'Permissions & Status',
-        defaultValue: false,
-      },
-      {
-        name: 'inventory_reserved',
-        label: 'Reserve Stock',
-        type: 'toggle',
-        required: false,
-        width: 'half',
-        group: 'Permissions & Status',
-        defaultValue: true,
-      },
-      {
-        name: 'is_active',
-        label: 'Active Status',
-        type: 'toggle',
-        required: false,
-        width: 'half',
-        group: 'Permissions & Status',
-        defaultValue: true,
-      },
-      {
-        name: 'min_quantity',
-        label: 'Min Quantity',
-        type: 'number',
-        required: true,
-        width: 'half',
-        group: 'Quantity Rules',
-        defaultValue: 1,
-      },
-      {
-        name: 'max_quantity',
-        label: 'Max Quantity',
-        type: 'number',
-        required: true,
-        width: 'half',
-        group: 'Quantity Rules',
-        defaultValue: 10,
-      },
-      {
-        name: 'quantity_step',
-        label: 'Step Value',
-        type: 'number',
-        required: true,
-        width: 'half',
-        group: 'Quantity Rules',
-        defaultValue: 1,
-      },
-      {
-        name: 'default_quantity',
-        label: 'Default Quantity',
-        type: 'number',
-        required: true,
-        width: 'half',
-        group: 'Quantity Rules',
-        defaultValue: 1,
-      },
-      {
-        name: 'default_frequency',
-        label: 'Default Frequency',
-        type: 'select',
-        required: true,
-        width: 'full',
-        group: 'Scheduling',
-        options: [
-          { value: 'daily', label: 'Daily' },
-          { value: 'weekly', label: 'Weekly' },
-          { value: 'biweekly', label: 'Biweekly' },
-          { value: 'monthly', label: 'Monthly' },
-          { value: 'custom', label: 'Custom' },
-        ],
-        defaultValue: 'monthly',
-      },
-      {
-        name: 'morning_slot_allowed',
-        label: 'Morning Slot',
-        type: 'toggle',
-        required: false,
-        width: 'half',
-        group: 'Scheduling',
-        defaultValue: true,
-      },
-      {
-        name: 'evening_slot_allowed',
-        label: 'Evening Slot',
-        type: 'toggle',
-        required: false,
-        width: 'half',
-        group: 'Scheduling',
-        defaultValue: false,
-      },
     ];
   }
 

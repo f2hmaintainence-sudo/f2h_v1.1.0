@@ -1,10 +1,85 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_bloc.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_state.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/cart_screen.dart';
 import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
+
+/// Wrap a screen's body with this so any [FloatingCartBar] inside it collapses
+/// to a compact pill while the user scrolls down, and expands again when they
+/// scroll back up. Without the scope the bar simply stays expanded.
+class CartBarScrollScope extends StatefulWidget {
+  final Widget child;
+  const CartBarScrollScope({required this.child, super.key});
+
+  static ValueListenable<bool>? maybeOf(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<_CartBarScrollScopeMarker>()
+      ?.isCompact;
+
+  @override
+  State<CartBarScrollScope> createState() => _CartBarScrollScopeState();
+}
+
+class _CartBarScrollScopeState extends State<CartBarScrollScope> {
+  /// Content scrolled past this offset before the bar is allowed to collapse,
+  /// so a tiny drag at the top of a list does not shrink it.
+  static const double _collapseThreshold = 40;
+
+  final ValueNotifier<bool> _isCompact = ValueNotifier<bool>(false);
+
+  @override
+  void dispose() {
+    _isCompact.dispose();
+    super.dispose();
+  }
+
+  bool _onScroll(UserScrollNotification notification) {
+    // Horizontal carousels (and their auto-scroll) must not touch the bar.
+    if (notification.metrics.axis != Axis.vertical) return false;
+
+    switch (notification.direction) {
+      case ScrollDirection.reverse:
+        _isCompact.value = notification.metrics.pixels > _collapseThreshold;
+        break;
+      case ScrollDirection.forward:
+        _isCompact.value = false;
+        break;
+      case ScrollDirection.idle:
+        if (notification.metrics.pixels <= _collapseThreshold) {
+          _isCompact.value = false;
+        }
+        break;
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return NotificationListener<UserScrollNotification>(
+      onNotification: _onScroll,
+      child: _CartBarScrollScopeMarker(
+        isCompact: _isCompact,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+class _CartBarScrollScopeMarker extends InheritedWidget {
+  final ValueListenable<bool> isCompact;
+
+  const _CartBarScrollScopeMarker({
+    required this.isCompact,
+    required super.child,
+  });
+
+  @override
+  bool updateShouldNotify(_CartBarScrollScopeMarker oldWidget) =>
+      oldWidget.isCompact != isCompact;
+}
 
 class FloatingCartBar extends StatefulWidget {
   const FloatingCartBar({super.key});
@@ -15,6 +90,9 @@ class FloatingCartBar extends StatefulWidget {
 
 class _FloatingCartBarState extends State<FloatingCartBar>
     with SingleTickerProviderStateMixin {
+  static const Duration _resizeDuration = Duration(milliseconds: 220);
+  static const Curve _resizeCurve = Curves.easeOutCubic;
+
   late final AnimationController _animCtrl;
   late final Animation<double> _scaleAnim;
   int _prevCount = 0;
@@ -28,13 +106,17 @@ class _FloatingCartBarState extends State<FloatingCartBar>
     );
     _scaleAnim = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.0, end: 1.12)
-            .chain(CurveTween(curve: Curves.easeOutCubic)),
+        tween: Tween<double>(
+          begin: 1.0,
+          end: 1.12,
+        ).chain(CurveTween(curve: Curves.easeOutCubic)),
         weight: 40,
       ),
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1.12, end: 1.0)
-            .chain(CurveTween(curve: Curves.easeOutBack)),
+        tween: Tween<double>(
+          begin: 1.12,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.easeOutBack)),
         weight: 60,
       ),
     ]).animate(_animCtrl);
@@ -101,8 +183,10 @@ class _FloatingCartBarState extends State<FloatingCartBar>
         final visibleItems = items.take(maxVisibleAvatars).toList();
         final remainingCount = items.length - maxVisibleAvatars;
 
-        final totalAvatarCircles = visibleItems.length + (showRemaining ? 1 : 0);
-        final avatarStackWidth = totalAvatarCircles == 1 ? 34.0 : 34.0 + (totalAvatarCircles - 1) * 16.0;
+        final totalAvatarCircles =
+            visibleItems.length + (showRemaining ? 1 : 0);
+
+        final compactListenable = CartBarScrollScope.maybeOf(context);
 
         return SafeArea(
           top: false,
@@ -120,149 +204,213 @@ class _FloatingCartBarState extends State<FloatingCartBar>
                       MaterialPageRoute(builder: (_) => const CartScreen()),
                     );
                   },
-                  child: Container(
-                    height: 48,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(
-                      color: kPrimary,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: kPrimary.withValues(alpha: 0.35),
-                          blurRadius: 14,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Product Image Avatars (Up to 3 images + optional remaining count badge)
-                        if (visibleItems.isNotEmpty)
-                          SizedBox(
-                            width: avatarStackWidth,
-                            height: 34,
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                 for (int idx = 0; idx < visibleItems.length; idx++)
-                                  Positioned(
-                                    left: idx * 16.0,
-                                    child: Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: Colors.white.withValues(alpha: 0.2),
-                                        border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.0),
-                                      ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(16),
-                                        child: buildProductImage(
-                                          visibleItems[idx].productName,
-                                          imageAsset: visibleItems[idx].imageAsset,
-                                          width: 32,
-                                          height: 32,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                if (showRemaining)
-                                  Positioned(
-                                    left: visibleItems.length * 16.0,
-                                    child: Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: kPrimaryMid,
-                                        border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.0),
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          '+$remainingCount',
-                                          style: const TextStyle(
-                                            fontSize: 9.5,
-                                            fontWeight: FontWeight.w900,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          )
-                        else
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.shopping_bag_outlined,
-                              color: Colors.white,
-                              size: 17,
+                  child: compactListenable == null
+                      ? _buildPill(
+                          isCompact: false,
+                          visibleItems: visibleItems,
+                          showRemaining: showRemaining,
+                          remainingCount: remainingCount,
+                          totalAvatarCircles: totalAvatarCircles,
+                          totalCount: totalCount,
+                        )
+                      : ValueListenableBuilder<bool>(
+                          valueListenable: compactListenable,
+                          builder: (context, isCompact, _) => AnimatedSize(
+                            duration: _resizeDuration,
+                            curve: _resizeCurve,
+                            alignment: Alignment.bottomCenter,
+                            child: _buildPill(
+                              isCompact: isCompact,
+                              visibleItems: visibleItems,
+                              showRemaining: showRemaining,
+                              remainingCount: remainingCount,
+                              totalAvatarCircles: totalAvatarCircles,
+                              totalCount: totalCount,
                             ),
                           ),
-
-                        const SizedBox(width: 10),
-
-                        // "View cart" Title & Subtitle
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'View cart',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                                height: 1.1,
-                              ),
-                            ),
-                            const SizedBox(height: 1),
-                            Text(
-                              '$totalCount ${totalCount == 1 ? 'item' : 'items'}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.white.withValues(alpha: 0.85),
-                                height: 1.1,
-                              ),
-                            ),
-                          ],
                         ),
-
-                        const SizedBox(width: 12),
-
-                        // Right Chevron Arrow Button
-                        Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.22),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.chevron_right_rounded,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ),
               ),
             ),
           ),
         );
       },
+    );
+  }
+
+  /// The cart pill itself. In compact mode it drops the labels and keeps only
+  /// the avatar stack, the item count and the chevron.
+  Widget _buildPill({
+    required bool isCompact,
+    required List<dynamic> visibleItems,
+    required bool showRemaining,
+    required int remainingCount,
+    required int totalAvatarCircles,
+    required int totalCount,
+  }) {
+    final avatarSize = isCompact ? 20.0 : 32.0;
+    final avatarOverlap = isCompact ? 10.0 : 16.0;
+    final avatarSlotSize = avatarSize + 2;
+    final avatarStackWidth = totalAvatarCircles == 1
+        ? avatarSlotSize
+        : avatarSlotSize + (totalAvatarCircles - 1) * avatarOverlap;
+
+    return AnimatedContainer(
+      duration: _resizeDuration,
+      curve: _resizeCurve,
+      height: isCompact ? 30 : 48,
+      padding: EdgeInsets.symmetric(horizontal: isCompact ? 6 : 14),
+      decoration: BoxDecoration(
+        color: kPrimary,
+        borderRadius: BorderRadius.circular(isCompact ? 15 : 24),
+        boxShadow: [
+          BoxShadow(
+            color: kPrimary.withValues(alpha: isCompact ? 0.28 : 0.35),
+            blurRadius: isCompact ? 8 : 14,
+            offset: Offset(0, isCompact ? 2 : 5),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Product Image Avatars (Up to 3 images + optional remaining count badge)
+          if (visibleItems.isNotEmpty)
+            SizedBox(
+              width: avatarStackWidth,
+              height: avatarSlotSize,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  for (int idx = 0; idx < visibleItems.length; idx++)
+                    Positioned(
+                      left: idx * avatarOverlap,
+                      child: Container(
+                        width: avatarSize,
+                        height: avatarSize,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withValues(alpha: 0.2),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.4),
+                            width: 1.0,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(avatarSize / 2),
+                          child: buildProductImage(
+                            visibleItems[idx].productName,
+                            imageAsset: visibleItems[idx].imageAsset,
+                            width: avatarSize,
+                            height: avatarSize,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (showRemaining)
+                    Positioned(
+                      left: visibleItems.length * avatarOverlap,
+                      child: Container(
+                        width: avatarSize,
+                        height: avatarSize,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: kPrimaryMid,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.4),
+                            width: 1.0,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '+$remainingCount',
+                            style: TextStyle(
+                              fontSize: isCompact ? 8.5 : 9.5,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            )
+          else
+            Container(
+              width: avatarSize,
+              height: avatarSize,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.shopping_bag_outlined,
+                color: Colors.white,
+                size: isCompact ? 12 : 17,
+              ),
+            ),
+
+          SizedBox(width: isCompact ? 6 : 10),
+
+          // "View cart" Title & Subtitle — the labels give way in compact mode.
+          if (isCompact)
+            Text(
+              '$totalCount',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                height: 1.1,
+              ),
+            )
+          else
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'View cart',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  '$totalCount ${totalCount == 1 ? 'item' : 'items'}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white.withValues(alpha: 0.85),
+                    height: 1.1,
+                  ),
+                ),
+              ],
+            ),
+
+          // Right Chevron Arrow Button — dropped while compact.
+          if (!isCompact) ...[
+            const SizedBox(width: 12),
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.22),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

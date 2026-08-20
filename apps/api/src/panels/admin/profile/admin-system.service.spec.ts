@@ -3,7 +3,20 @@ import { AdminSystemService } from './admin-system.service';
 
 describe('AdminSystemService audit logs', () => {
   it('binds every filter and maps the complete audit response', async () => {
-    const rows = [{ id: 101, action: 'product_update' }];
+    const rows = [
+      {
+        id: 101,
+        admin_id: 'ADM001',
+        admin_name: 'Anita Rao',
+        action: 'product_update',
+      },
+      {
+        id: 102,
+        admin_id: 'ORPHAN',
+        admin_name: 'ORPHAN',
+        action: 'product_update',
+      },
+    ];
     const insightRows = [
       {
         total_events: 7,
@@ -23,12 +36,16 @@ describe('AdminSystemService audit logs', () => {
     const adminRows = [
       {
         admin_id: 'ADM001',
-        admin_name: 'Admin One',
+        admin_name: 'Anita Rao',
+      },
+      {
+        admin_id: 'ORPHAN',
+        admin_name: 'ORPHAN',
       },
     ];
     const db = {
       query: jest.fn(async (sql: string, _params?: unknown[]) => {
-        if (sql.includes('SELECT al.*')) return rows;
+        if (sql.includes('al.user_agent')) return rows;
         if (sql.includes('WITH filtered_logs')) return insightRows;
         if (sql.includes('ARRAY_AGG(DISTINCT action')) return filterRows;
         if (sql.includes('DISTINCT ON (admin_id)')) return adminRows;
@@ -53,7 +70,7 @@ describe('AdminSystemService audit logs', () => {
     });
 
     const rowsCall = db.query.mock.calls.find(([sql]) =>
-      sql.includes('SELECT al.*'),
+      sql.includes('al.user_agent'),
     );
     const insightCall = db.query.mock.calls.find(([sql]) =>
       sql.includes('WITH filtered_logs'),
@@ -69,11 +86,17 @@ describe('AdminSystemService audit logs', () => {
     const rowsParams = rowsCall![1] ?? [];
     const insightSql = insightCall![0];
     const insightParams = insightCall![1] ?? [];
-    const normalizedRowsSql = rowsSql.replace(/\s+/g, ' ');
-    const normalizedInsightSql = insightSql.replace(/\s+/g, ' ');
-    const normalizedAdminSql = adminCall![0].replace(/\s+/g, ' ');
+    const normalizeSql = (sql: string) =>
+      sql
+        .replace(/\s+/g, ' ')
+        .replace(/\(\s+/g, '(')
+        .replace(/\s+\)/g, ')')
+        .trim();
+    const normalizedRowsSql = normalizeSql(rowsSql);
+    const normalizedInsightSql = normalizeSql(insightSql);
+    const normalizedAdminSql = normalizeSql(adminCall![0]);
     const resolvedAdminNameSql =
-      "COALESCE(NULLIF(BTRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), NULLIF(u.user_name, ''), NULLIF(al.admin_name, ''), al.admin_id)";
+      "COALESCE(NULLIF(BTRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), NULLIF(BTRIM(u.user_name), ''), NULLIF(BTRIM(al.admin_name), ''), al.admin_id)";
 
     expect(normalizedRowsSql).toContain(
       'LEFT JOIN users u ON u.user_id = al.admin_id',
@@ -85,6 +108,7 @@ describe('AdminSystemService audit logs', () => {
     expect(normalizedInsightSql).toContain(
       'LEFT JOIN users u ON u.user_id = al.admin_id',
     );
+    expect(normalizedInsightSql).toContain(resolvedAdminNameSql + ' ILIKE $4');
     expect(normalizedAdminSql).toContain(
       'LEFT JOIN users u ON u.user_id = al.admin_id',
     );
@@ -101,6 +125,7 @@ describe('AdminSystemService audit logs', () => {
     expect(rowsSql).toContain(
       "al.created_at < (($6::date + INTERVAL '1 day') AT TIME ZONE 'Asia/Kolkata')",
     );
+    expect(rowsSql).toContain('al.deleted_at');
     expect(rowsSql).toContain('ORDER BY al.created_at DESC, al.id DESC');
     expect(rowsParams).toEqual([
       'ADM001',
@@ -159,7 +184,7 @@ describe('AdminSystemService audit logs', () => {
   it('skips global filter-option scans after options have loaded', async () => {
     const db = {
       query: jest.fn(async (sql: string, _params?: unknown[]) => {
-        if (sql.includes('SELECT al.*')) return [];
+        if (sql.includes('al.user_agent')) return [];
         if (sql.includes('WITH filtered_logs')) {
           return [
             {

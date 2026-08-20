@@ -165,47 +165,4 @@ export class SubscriptionSnapshotCron {
       );
     }
   }
-
-  /**
-   * Low Wallet Balance Warning Cron
-   * Runs daily at 21:00 (9:00 PM) IST — 1 hour before 10:00 PM cutoff
-   *
-   * Finds active subscribers whose wallet balance is lower than 3 days of subscription cost,
-   * and sends an in-app notification & log warning.
-   */
-  // @Cron('0 0 21 * * *', {
-  //   timeZone: 'Asia/Kolkata',
-  // })
-  // async handleLowBalanceWarning(): Promise<void> {
-  //   this.logger.log('[CRON] Starting Low Wallet Balance Check (9:00 PM IST)...');
-  //   try {
-  //     // Find customers with active subscriptions whose wallet_balance < estimated 3 days cost
-  //     const lowBalCustomers = await this.db.query(
-  //       `SELECT s.customer_id, c.full_name, c.wallet_balance,
-  //               SUM(si.final_price * COALESCE(si.default_m_quantity + si.default_e_quantity, 1)) * 3 AS est_3day_cost
-  //        FROM subscriptions s
-  //        JOIN customers c ON c.customer_id = s.customer_id
-  //        JOIN subscription_items si ON si.subscription_id = s.subscription_id AND si.status = 'active'
-  //        WHERE s.status = 'active'
-  //        GROUP BY s.customer_id, c.full_name, c.wallet_balance
-  //        HAVING c.wallet_balance < SUM(si.final_price * COALESCE(si.default_m_quantity + si.default_e_quantity, 1)) * 3`,
-  //       [],
-  //     );
-
-  //     if (lowBalCustomers?.length) {
-  //       const userIds = lowBalCustomers.map((row: any) => row.customer_id);
-  //       await this.notificationService.sendNotification({
-  //         title: '⚠️ Low Wallet Balance',
-  //         message: 'Your wallet balance is low! Recharge now to ensure uninterrupted daily milk & fresh product delivery.',
-  //         type: 'warning',
-  //         priority: 'high',
-  //         recipientIds: userIds,
-  //         senderId: 'system',
-  //       });
-  //       this.logger.log(`[CRON] Sent low balance notification to ${userIds.length} customers.`);
-  //     }
-  //   } catch (error) {
-  //     this.logger.error('[CRON] Low balance check failed', error instanceof Error ? error.stack : String(error));
-  //   }
-  // }
 }

@@ -45,6 +45,7 @@ interface AddressStop {
   address_id: string;
   customer_id: string;
   sequence_no: number;
+  delivery_status?: string;
   address_line: string;
   customer_name: string;
   orders: AddressOrder[];
@@ -317,8 +318,6 @@ export default function DeliveryOrderSwapModal({
                         >
                           <Package size={11} className="text-indigo-600" />
                           <span className="font-mono">{ord.order_id}</span>
-                          <span className="text-slate-400 font-normal">|</span>
-                          <span className="font-black text-slate-900">₹{ord.total_amount || 0}</span>
                         </div>
                       ))}
                     </div>
@@ -489,19 +488,23 @@ export default function DeliveryOrderSwapModal({
                           {selectedPartner.address_stops.map((stop) => {
                             const isSelected = selectedAddressId === stop.address_id;
                             const stopOrders = stop.orders || [];
-                            const totalVal = stopOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+                            const stopStatus = stop.delivery_status || "pending";
+                            const isPending = stopStatus === "pending";
 
                             return (
                               <div
                                 key={stop.address_id}
                                 onClick={() => {
+                                  if (!isPending) return;
                                   setSelectedAddressId(stop.address_id);
                                   setSelectedTargetOrderId(stopOrders[0]?.order_id || "");
                                 }}
-                                className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
-                                  isSelected
-                                    ? "border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-500/20"
-                                    : "border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50/50"
+                                className={`p-3 rounded-xl border transition-all flex items-center justify-between ${
+                                  !isPending
+                                    ? "border-slate-100 bg-slate-50/60 opacity-60 cursor-not-allowed"
+                                    : isSelected
+                                    ? "border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-500/20 cursor-pointer"
+                                    : "border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50/50 cursor-pointer"
                                 }`}
                               >
                                 <div className="space-y-1">
@@ -522,7 +525,17 @@ export default function DeliveryOrderSwapModal({
                                   </div>
                                 </div>
                                 <div className="text-right shrink-0">
-                                  <span className="text-xs font-black text-slate-900">₹{totalVal}</span>
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${
+                                      stopStatus === "delivered"
+                                        ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                        : stopStatus === "failed"
+                                        ? "bg-rose-100 text-rose-800 border border-rose-200"
+                                        : "bg-amber-50 text-amber-800 border border-amber-200"
+                                    }`}
+                                  >
+                                    {stopStatus}
+                                  </span>
                                 </div>
                               </div>
                             );

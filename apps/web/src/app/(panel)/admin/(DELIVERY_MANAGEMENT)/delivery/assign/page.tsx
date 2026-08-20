@@ -69,6 +69,17 @@ interface OrderItem {
   created_at: string;
 }
 
+interface AddressStopItem {
+  run_address_id?: string;
+  sequence_no: number;
+  address_id: string;
+  customer_id: string;
+  customer_name: string;
+  address_line: string;
+  delivery_status: string;
+  orders: OrderItem[];
+}
+
 interface DeliveryRunDetailed {
   id: string;
   run_id: string;
@@ -87,6 +98,7 @@ interface DeliveryRunDetailed {
   failed_addresses: number;
   created_at: string;
   orders: OrderItem[];
+  address_stops?: AddressStopItem[];
 }
 
 export default function DeliveryRunsPage() {
@@ -484,6 +496,29 @@ export default function DeliveryRunsPage() {
               {filteredRuns.map((run) => {
                 const isExpanded = !!expandedRunIds[run.run_id];
                 const ordersCount = run.orders?.length || 0;
+                const addressStops = (run.address_stops && run.address_stops.length > 0)
+                  ? run.address_stops
+                  : (() => {
+                      const stopMap = new Map<string, AddressStopItem>();
+                      (run.orders || []).forEach((ord, idx) => {
+                        const key = ord.address_id || `addr-${idx}`;
+                        if (!stopMap.has(key)) {
+                          stopMap.set(key, {
+                            sequence_no: ord.run_sequence || stopMap.size + 1,
+                            address_id: ord.address_id,
+                            customer_id: ord.customer_id,
+                            customer_name: ord.customer_name,
+                            address_line: ord.address_line,
+                            delivery_status: ord.status === 'delivered' ? 'delivered' : ord.status === 'failed' ? 'failed' : 'pending',
+                            orders: [],
+                          });
+                        }
+                        stopMap.get(key)!.orders.push(ord);
+                      });
+                      return Array.from(stopMap.values());
+                    })();
+
+                const stopsCount = addressStops.length || Number(run.total_addresses || ordersCount);
                 const statusColorMap: Record<string, string> = {
                   planned: "bg-slate-100 text-slate-700",
                   assigned: "bg-sky-100 text-sky-700",
@@ -537,10 +572,10 @@ export default function DeliveryRunsPage() {
                         <div className="text-left md:text-right">
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-bold text-slate-800">
-                              {ordersCount} order{ordersCount === 1 ? "" : "s"}
+                              {stopsCount} {stopsCount === 1 ? "Stop" : "Stops"}
                             </span>
                             <span className="text-xs text-slate-400 font-normal">
-                              ({run.total_addresses || ordersCount} stops)
+                              ({ordersCount} {ordersCount === 1 ? "order" : "orders"})
                             </span>
                           </div>
                           <div className="flex items-center gap-1.5 mt-1">
@@ -561,62 +596,84 @@ export default function DeliveryRunsPage() {
                       </div>
                     </div>
 
-                    {/* Expandable Order List */}
+                    {/* Expandable Address Stops List */}
                     {isExpanded && (
                       <div className="border-t border-slate-100 p-4 bg-slate-50/40 animate-in fade-in duration-200">
-                        {ordersCount === 0 ? (
+                        {addressStops.length === 0 ? (
                           <p className="text-xs text-slate-400 italic py-2 text-center">
-                            No orders currently assigned to this delivery run.
+                            No address stops currently assigned to this delivery run.
                           </p>
                         ) : (
                           <div className="overflow-x-auto">
                             <table className="w-full text-left text-xs">
                               <thead>
                                 <tr className="text-[10px] text-slate-400 uppercase tracking-wider border-b border-slate-200">
-                                  <th className="pb-2 pl-2 font-bold">Stop #</th>
-                                  <th className="pb-2 font-bold">Order ID</th>
-                                  <th className="pb-2 font-bold">Customer</th>
+                                  <th className="pb-2 pl-2 font-bold w-16">Stop #</th>
+                                  <th className="pb-2 font-bold w-36">Customer</th>
                                   <th className="pb-2 font-bold">Address</th>
-                                  <th className="pb-2 font-bold">Amount</th>
-                                  <th className="pb-2 font-bold">Status</th>
-                                  <th className="pb-2 pr-2 text-right font-bold">Action</th>
+                                  <th className="pb-2 font-bold">Orders</th>
+                                  <th className="pb-2 font-bold w-24">Status</th>
+                                  <th className="pb-2 pr-2 text-right font-bold w-32">Action</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
-                                {run.orders.map((ord, idx) => {
-                                  const canSwap = !["delivered", "cancelled", "failed"].includes(ord.status) && !["completed", "cancelled"].includes(run.status);
+                                {addressStops.map((stop, idx) => {
+                                  const stopOrders = stop.orders || [];
+                                  const stopStatus = stop.delivery_status || "pending";
+                                  const isPending = stopStatus === "pending";
+                                  const canSwap = isPending && !["completed", "cancelled"].includes(run.status);
+                                  const firstOrderId = stopOrders[0]?.order_id;
 
                                   return (
-                                    <tr key={ord.order_id} className="hover:bg-white transition-colors group">
-                                      <td className="py-2.5 pl-2 font-mono font-bold text-slate-500">
-                                        #{ord.run_sequence ?? idx + 1}
-                                      </td>
-                                      <td className="py-2.5 font-mono font-black text-indigo-700">
-                                        #{ord.order_id}
+                                    <tr key={stop.address_id || idx} className="hover:bg-white transition-colors group">
+                                      <td className="py-2.5 pl-2 font-mono font-bold text-slate-600">
+                                        #{stop.sequence_no ?? idx + 1}
                                       </td>
                                       <td className="py-2.5 font-bold text-slate-800">
-                                        {ord.customer_name || "Customer"}
+                                        {stop.customer_name || "Customer"}
                                       </td>
-                                      <td className="py-2.5 text-slate-500 max-w-xs truncate" title={ord.address_line}>
-                                        {ord.address_line || "—"}
-                                      </td>
-                                      <td className="py-2.5 font-black text-slate-800">
-                                        ₹{ord.total_amount}
+                                      <td className="py-2.5 text-slate-600 max-w-xs truncate" title={stop.address_line}>
+                                        {stop.address_line || "—"}
                                       </td>
                                       <td className="py-2.5">
-                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold capitalize bg-slate-100 text-slate-700">
-                                          {ord.status}
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/50">
+                                            {stopOrders.length} {stopOrders.length === 1 ? "Order" : "Orders"}
+                                          </span>
+                                          {stopOrders.map((ord) => (
+                                            <span
+                                              key={ord.order_id}
+                                              className="px-1.5 py-0.5 rounded bg-slate-100 font-mono text-[10px] text-slate-600 border border-slate-200"
+                                              title={`Order: ${ord.order_id}`}
+                                            >
+                                              #{ord.order_id}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </td>
+                                      <td className="py-2.5">
+                                        <span
+                                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${
+                                            stopStatus === "delivered"
+                                              ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                              : stopStatus === "failed"
+                                              ? "bg-rose-100 text-rose-800 border border-rose-200"
+                                              : "bg-amber-50 text-amber-800 border border-amber-200"
+                                          }`}
+                                        >
+                                          {stopStatus}
                                         </span>
                                       </td>
                                       <td className="py-2.5 pr-2 text-right">
                                         <button
-                                          disabled={!canSwap}
-                                          onClick={() => setSwapModalOrderId(ord.order_id)}
+                                          disabled={!canSwap || !firstOrderId}
+                                          onClick={() => firstOrderId && setSwapModalOrderId(firstOrderId)}
                                           className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ml-auto ${
-                                            canSwap
-                                              ? "bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white border border-indigo-200/60 shadow-sm"
-                                              : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                                            canSwap && firstOrderId
+                                              ? "bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white border border-indigo-200/60 shadow-sm cursor-pointer"
+                                              : "bg-slate-100 text-slate-400 cursor-not-allowed opacity-60"
                                           }`}
+                                          title={!isPending ? `Cannot swap stop with status '${stopStatus}'` : undefined}
                                         >
                                           <ArrowRightLeft size={12} />
                                           <span>Swap / Move</span>

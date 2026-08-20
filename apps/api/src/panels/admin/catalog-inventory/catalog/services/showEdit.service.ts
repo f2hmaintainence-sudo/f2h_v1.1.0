@@ -88,23 +88,6 @@ export class CatalogShowEditService {
       ];
 
       // Fetch active packaging types
-      const packagingTypesResult = await this.dataService.query('packaging_types', {
-        select: ['id', 'name'],
-        where: [
-          { column: 'status', operator: '=', value: 'active' },
-        ],
-        orderBy: 'name',
-        orderDirection: 'ASC',
-      });
-
-      const packagingOptions = [
-        { value: '', label: 'No Returnable Packaging (Disposable)' },
-        ...(packagingTypesResult.data || []).map((pkg: any) => ({
-          value: String(pkg.id),
-          label: pkg.name,
-        })),
-      ];
-
       // Fetch active containers
       const containersResult = await this.dataService.query('containers', {
         select: ['container_id', 'name'],
@@ -130,7 +113,6 @@ export class CatalogShowEditService {
 
       const fields = this.showAddService.catalogFields(
         categoryOptions,
-        packagingOptions,
         containerOptions,
       );
 
@@ -215,24 +197,6 @@ export class CatalogShowEditService {
       ];
 
       // Fetch active packaging types
-      const packagingTypesResult = await this.dataService.query('packaging_types', {
-        select: ['id', 'name'],
-        where: [
-          { column: 'status', operator: '=', value: 'active' },
-          { column: 'deleted_at', operator: 'IS', value: null },
-        ],
-        orderBy: 'name',
-        orderDirection: 'ASC',
-      });
-
-      const packagingOptions = [
-        { value: '', label: 'No Returnable Packaging (Disposable)' },
-        ...(packagingTypesResult.data || []).map((pkg: any) => ({
-          value: String(pkg.id),
-          label: pkg.name,
-        })),
-      ];
-
       // Fetch active containers
       const containersResult = await this.dataService.query('containers', {
         select: ['container_id', 'name'],
@@ -252,7 +216,7 @@ export class CatalogShowEditService {
         })),
       ];
 
-      let fields = this.showAddService.variantFields(productOptions, packagingOptions, containerOptions);
+      let fields = this.showAddService.variantFields(productOptions, containerOptions);
 
       // Hide Subscription Price if the variant's product does not allow subscription
       const parentProduct = (productsResult.data || []).find(
@@ -361,68 +325,6 @@ export class CatalogShowEditService {
       this.developer.error('getCategoryEditForm error', { error, id });
       throw new InternalServerErrorException(
         'Failed to load category edit form',
-      );
-    }
-  }
-
-  async getDeliverySlotEditForm(id: string): Promise<FormResponse> {
-    try {
-      const result = await this.dataService.query('delivery_slots', {
-        select: ['*'],
-        where: [{ column: 'id', operator: '=', value: Number(id) }],
-        limit: 1,
-      });
-
-      if (!result?.data?.length) {
-        throw new BadRequestException('Delivery slot not found');
-      }
-
-      const fields = this.showAddService.deliverySlotFields();
-
-      return this.formHelper.generateResponse({
-        title: 'Edit Delivery Slot',
-        submitLabel: 'Update Slot',
-        fields,
-        data: result.data[0],
-        script: '',
-      });
-    } catch (error) {
-      if (error instanceof BadRequestException) throw error;
-      this.developer.error('getDeliverySlotEditForm error', { error, id });
-      throw new InternalServerErrorException(
-        'Failed to load delivery slot edit form',
-      );
-    }
-  }
-  async getProductRuleEditForm(productId: string): Promise<FormResponse> {
-    try {
-      const result = await this.dataService.query('product_subscription_rules', {
-        select: ['*'],
-        where: [{ column: 'product_id', operator: '=', value: Number(productId) }],
-        limit: 1,
-      });
-
-      if (!result?.data?.length) {
-        throw new BadRequestException('Product subscription rule not found');
-      }
-
-      const fields = this.showAddService.productRuleFields();
-
-      // Disable product_id field in edit mode
-      const updatedFields = fields.map(f => f.name === 'product_id' ? { ...f, disabled: true } : f);
-
-      return this.formHelper.generateResponse({
-        title: 'Edit Product Rule',
-        submitLabel: 'Update Rule',
-        fields: updatedFields,
-        data: result.data[0],
-        script: '',
-      });
-    } catch (error) {
-      if (error instanceof BadRequestException) throw error;
-      this.developer.error('getProductRuleEditForm error', { error, productId });
-      throw new InternalServerErrorException(
-        'Failed to load product rule edit form',
       );
     }
   }

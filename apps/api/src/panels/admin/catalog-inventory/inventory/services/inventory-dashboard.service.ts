@@ -28,7 +28,6 @@ export class InventoryDashboardService {
         warehouseSummary,
         branchSummary,
         lowStockAlerts,
-        dispatchStatus,
         transferStatus,
         productionReqs,
         recentMovements,
@@ -36,7 +35,6 @@ export class InventoryDashboardService {
         this.getWarehouseStockSummary(),
         this.getBranchStockSummary(),
         this.getLowStockAlerts(warehouseId),
-        this.getDispatchStatusSummary(today),
         this.getTransferStatusSummary(),
         this.getProductionRequirements(today),
         this.getRecentStockMovements(warehouseId),
@@ -48,7 +46,6 @@ export class InventoryDashboardService {
           warehouse_summary: warehouseSummary,
           branch_summary: branchSummary,
           low_stock_alerts: lowStockAlerts,
-          dispatch_status: dispatchStatus,
           transfer_status: transferStatus,
           production_requirements: productionReqs,
           recent_movements: recentMovements,
@@ -99,25 +96,13 @@ export class InventoryDashboardService {
       const sql = `
         SELECT
           b.branch_id, b.branch_name,
-          COALESCE(forecast.total_predicted, 0)::int AS predicted_demand,
-          COALESCE(orders.total_ordered, 0)::int AS orders_today,
-          COALESCE(dispatched.total_dispatched, 0)::int AS dispatched_today
+          COALESCE(orders.total_ordered, 0)::int AS orders_today
         FROM branches b
-        LEFT JOIN (
-          SELECT branch_id, SUM(predicted_quantity)::int AS total_predicted
-          FROM consumption_forecasts WHERE forecast_date = $1
-          GROUP BY branch_id
-        ) forecast ON forecast.branch_id = b.branch_id
         LEFT JOIN (
           SELECT branch_id, COUNT(*)::int AS total_ordered
           FROM orders WHERE scheduled_date = $1 AND status NOT IN ('cancelled', 'failed')
           GROUP BY branch_id
         ) orders ON orders.branch_id = b.branch_id
-        LEFT JOIN (
-          SELECT target_branch_id AS branch_id, SUM(total_quantity)::int AS total_dispatched
-          FROM dispatch_plans WHERE dispatch_date = $1 AND status IN ('dispatched', 'in_transit', 'received')
-          GROUP BY target_branch_id
-        ) dispatched ON dispatched.branch_id = b.branch_id
         WHERE b.is_active = true AND b.deleted_at IS NULL
         ORDER BY b.branch_name
       `;
@@ -158,38 +143,6 @@ export class InventoryDashboardService {
       return await this.db.query(sql, params);
     } catch (error) {
       this.developer.error('getLowStockAlerts error', { error });
-      return [];
-    }
-  }
-
-  // ────────────────────────────────────────────────
-  // Dispatch Status Summary
-  // ────────────────────────────────────────────────
-  async getDispatchStatusSummary(date?: string) {
-    try {
-      const targetDate = date || todayIST();
-      const sql = `
-        SELECT
-          status,
-          COUNT(*)::int AS count,
-          COALESCE(SUM(total_quantity), 0)::int AS total_qty
-        FROM dispatch_plans
-        WHERE dispatch_date = $1
-        GROUP BY status
-        ORDER BY
-          CASE status
-            WHEN 'draft' THEN 1
-            WHEN 'approved' THEN 2
-            WHEN 'picking' THEN 3
-            WHEN 'dispatched' THEN 4
-            WHEN 'in_transit' THEN 5
-            WHEN 'received' THEN 6
-            WHEN 'cancelled' THEN 7
-          END
-      `;
-      return await this.db.query(sql, [targetDate]);
-    } catch (error) {
-      this.developer.error('getDispatchStatusSummary error', { error });
       return [];
     }
   }

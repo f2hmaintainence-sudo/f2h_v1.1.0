@@ -309,6 +309,12 @@ export class AdminSystemService {
       const offset = (page - 1) * limit;
       const params: string[] = [];
       const where: string[] = [];
+      const resolvedAdminNameSql = `COALESCE(
+        NULLIF(BTRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''),
+        NULLIF(BTRIM(u.user_name), ''),
+        NULLIF(BTRIM(al.admin_name), ''),
+        al.admin_id
+      )`;
 
       if (admin_id) {
         params.push(admin_id);
@@ -325,7 +331,7 @@ export class AdminSystemService {
       if (search) {
         params.push(`%${search}%`);
         where.push(`(
-          al.admin_name ILIKE $${params.length}
+          ${resolvedAdminNameSql} ILIKE $${params.length}
           OR al.action ILIKE $${params.length}
           OR al.target_type ILIKE $${params.length}
           OR COALESCE(al.target_id, '') ILIKE $${params.length}
@@ -349,8 +355,20 @@ export class AdminSystemService {
         where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
 
       const rowsSql = `
-        SELECT al.*
+        SELECT
+          al.id,
+          al.admin_id,
+          ${resolvedAdminNameSql} AS admin_name,
+          al.action,
+          al.target_type,
+          al.target_id,
+          al.details,
+          al.ip_address,
+          al.user_agent,
+          al.created_at,
+          al.deleted_at
         FROM admin_audit_logs al
+        LEFT JOIN users u ON u.user_id = al.admin_id
         ${whereClause}
         ORDER BY al.created_at DESC, al.id DESC
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
@@ -360,6 +378,7 @@ export class AdminSystemService {
         WITH filtered_logs AS (
           SELECT al.action, al.admin_id, al.target_type, al.created_at
           FROM admin_audit_logs al
+          LEFT JOIN users u ON u.user_id = al.admin_id
           ${whereClause}
         )
         SELECT
@@ -403,16 +422,19 @@ export class AdminSystemService {
       `;
 
       const adminOptionsSql = `
-        SELECT admin_id, admin_name
+        SELECT
+          al.admin_id,
+          ${resolvedAdminNameSql} AS admin_name
         FROM (
           SELECT DISTINCT ON (admin_id)
             admin_id,
-            COALESCE(NULLIF(admin_name, ''), admin_id) AS admin_name
+            admin_name
           FROM admin_audit_logs
           WHERE admin_id IS NOT NULL AND admin_id <> ''
           ORDER BY admin_id, created_at DESC, id DESC
-        ) latest_admin_names
-        ORDER BY admin_name ASC, admin_id ASC
+        ) al
+        LEFT JOIN users u ON u.user_id = al.admin_id
+        ORDER BY admin_name ASC, al.admin_id ASC
       `;
 
       const shouldLoadFilterOptions = include_filter_options === 'true';

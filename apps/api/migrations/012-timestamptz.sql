@@ -252,11 +252,6 @@
 --   ALTER COLUMN recorded_at TYPE timestamptz
 --   USING recorded_at AT TIME ZONE :'SOURCE_TZ';
 
--- ── delivery_logs ───────────────────────────────────────────────────────
--- ALTER TABLE public.delivery_logs
---   ALTER COLUMN deleted_at TYPE timestamptz
---   USING deleted_at AT TIME ZONE :'SOURCE_TZ';
-
 -- ── delivery_partner_locations ──────────────────────────────────────────
 -- ALTER TABLE public.delivery_partner_locations
 --   ALTER COLUMN recorded_at TYPE timestamptz
@@ -278,21 +273,6 @@
 
 -- ── device_sessions ─────────────────────────────────────────────────────
 -- ALTER TABLE public.device_sessions
---   ALTER COLUMN deleted_at TYPE timestamptz
---   USING deleted_at AT TIME ZONE :'SOURCE_TZ';
-
--- ── dispatch_balances ───────────────────────────────────────────────────
--- ALTER TABLE public.dispatch_balances
---   ALTER COLUMN deleted_at TYPE timestamptz
---   USING deleted_at AT TIME ZONE :'SOURCE_TZ';
-
--- ── dispatch_plans ──────────────────────────────────────────────────────
--- ALTER TABLE public.dispatch_plans
---   ALTER COLUMN deleted_at TYPE timestamptz
---   USING deleted_at AT TIME ZONE :'SOURCE_TZ';
-
--- ── dispatch_requirements ───────────────────────────────────────────────
--- ALTER TABLE public.dispatch_requirements
 --   ALTER COLUMN deleted_at TYPE timestamptz
 --   USING deleted_at AT TIME ZONE :'SOURCE_TZ';
 
@@ -395,16 +375,6 @@
 --   ALTER COLUMN updated_at TYPE timestamptz
 --   USING updated_at AT TIME ZONE :'SOURCE_TZ';
 
--- ── product_subscription_frequencies ────────────────────────────────────
--- ALTER TABLE public.product_subscription_frequencies
---   ALTER COLUMN deleted_at TYPE timestamptz
---   USING deleted_at AT TIME ZONE :'SOURCE_TZ';
-
--- ── product_subscription_rules ──────────────────────────────────────────
--- ALTER TABLE public.product_subscription_rules
---   ALTER COLUMN deleted_at TYPE timestamptz
---   USING deleted_at AT TIME ZONE :'SOURCE_TZ';
-
 -- ── product_subscription_slot_rules ─────────────────────────────────────
 -- ALTER TABLE public.product_subscription_slot_rules
 --   ALTER COLUMN deleted_at TYPE timestamptz
@@ -457,11 +427,6 @@
 --   ALTER COLUMN deleted_at TYPE timestamptz
 --   USING deleted_at AT TIME ZONE :'SOURCE_TZ';
 
--- ── subscription_delivery_slots ─────────────────────────────────────────
--- ALTER TABLE public.subscription_delivery_slots
---   ALTER COLUMN deleted_at TYPE timestamptz
---   USING deleted_at AT TIME ZONE :'SOURCE_TZ';
-
 -- ── subscription_global_config ──────────────────────────────────────────
 -- ALTER TABLE public.subscription_global_config
 --   ALTER COLUMN deleted_at TYPE timestamptz
@@ -469,11 +434,6 @@
 
 -- ── subscription_logs ───────────────────────────────────────────────────
 -- ALTER TABLE public.subscription_logs
---   ALTER COLUMN deleted_at TYPE timestamptz
---   USING deleted_at AT TIME ZONE :'SOURCE_TZ';
-
--- ── subscription_overrides ──────────────────────────────────────────────
--- ALTER TABLE public.subscription_overrides
 --   ALTER COLUMN deleted_at TYPE timestamptz
 --   USING deleted_at AT TIME ZONE :'SOURCE_TZ';
 
@@ -510,23 +470,3 @@
 -- ALTER TABLE public.user_devices
 --   ALTER COLUMN revoked_at TYPE timestamptz
 --   USING revoked_at AT TIME ZONE :'SOURCE_TZ';
-
--- ── vendor_intakes ──────────────────────────────────────────────────────
--- ALTER TABLE public.vendor_intakes
---   ALTER COLUMN deleted_at TYPE timestamptz
---   USING deleted_at AT TIME ZONE :'SOURCE_TZ';
-
--- ── vendors ─────────────────────────────────────────────────────────────
--- ALTER TABLE public.vendors
---   ALTER COLUMN deleted_at TYPE timestamptz
---   USING deleted_at AT TIME ZONE :'SOURCE_TZ';
-
--- ── zone_hexagons ───────────────────────────────────────────────────────
--- ALTER TABLE public.zone_hexagons
---   ALTER COLUMN deleted_at TYPE timestamptz
---   USING deleted_at AT TIME ZONE :'SOURCE_TZ';
-
--- ── zones ───────────────────────────────────────────────────────────────
--- ALTER TABLE public.zones
---   ALTER COLUMN deleted_at TYPE timestamptz
---   USING deleted_at AT TIME ZONE :'SOURCE_TZ';

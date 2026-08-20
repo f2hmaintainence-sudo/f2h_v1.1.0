@@ -119,22 +119,24 @@ class _BrowseState extends State<BrowseScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: _buildSearchBar(),
-      body: Stack(
-        children: [
-          Row(
-            children: [
-              // Hidden while searching so results span the full width.
-              if (!_isSearching) _buildSidebar(),
-              Expanded(child: _buildGrid()),
-            ],
-          ),
-          const Positioned(
-            left: 0,
-            right: 0,
-            bottom: _kCartBarLift,
-            child: FloatingCartBar(),
-          ),
-        ],
+      body: CartBarScrollScope(
+        child: Stack(
+          children: [
+            Row(
+              children: [
+                // Hidden while searching so results span the full width.
+                if (!_isSearching) _buildSidebar(),
+                Expanded(child: _buildGrid()),
+              ],
+            ),
+            const Positioned(
+              left: 0,
+              right: 0,
+              bottom: _kCartBarLift,
+              child: FloatingCartBar(),
+            ),
+          ],
+        ),
       ),
     );
   }

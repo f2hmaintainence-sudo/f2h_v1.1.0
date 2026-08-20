@@ -89,58 +89,6 @@ export class SubscriptionsController {
     return this.subscriptionsService.deleteSubscription(subscriptionId, adminId);
   }
 
-  @Get('overrides/table')
-  async getSubscriptionOverridesTable(@Query() query: any) {
-    return this.tableService.getSubscriptionOverridesTable(query);
-  }
-
-  @Get('overrides/showAdd')
-  async showSubscriptionOverrideAdd() {
-    return this.showAddService.getSubscriptionsOverrideForm();
-  }
-
-  @Post('overrides/saveAdd')
-  async saveSubscriptionOverrideAdd(@Body() body: any, @Req() req: any) {
-    const adminId = req.user?.user_id ?? 'system';
-    return this.saveAddService.saveSubscriptionOverride(body, adminId);
-  }
-
-  @Get('overrides/:overrideId/view')
-  async getSubscriptionOverrideView(@Param('overrideId') overrideId: string) {
-    return this.subscriptionsService.getSubscriptionOverrideView(overrideId);
-  }
-
-  @Get('overrides/:overrideId/showEdit')
-  async showSubscriptionOverrideEdit(@Param('overrideId') overrideId: string) {
-    return this.showEditService.getSubscriptionsOverrideEditForm(overrideId);
-  }
-
-  @Post('overrides/:overrideId/saveEdit')
-  async saveSubscriptionOverrideEdit(
-    @Param('overrideId') overrideId: string,
-    @Body() body: any,
-    @Req() req: any,
-  ) {
-    const adminId = req.user?.user_id ?? 'system';
-    return this.saveEditService.saveSubscriptionOverride(
-      overrideId,
-      body,
-      adminId,
-    );
-  }
-
-  @Delete('overrides/:overrideId/delete')
-  async deleteSubscriptionOverride(
-    @Param('overrideId') overrideId: string,
-    @Req() req: any,
-  ) {
-    const adminId = req.user?.user_id ?? 'system';
-    return this.subscriptionsService.deleteSubscriptionOverride(
-      overrideId,
-      adminId,
-    );
-  }
-
   @Get('logs/table')
   async getSubscriptionLogsTable(@Query() query: any) {
     return this.tableService.getSubscriptionLogsTable(query);

@@ -79,18 +79,6 @@ export class InventoryController {
     return this.inventoryService.getProductionPlansTable(query);
   }
 
-  // ── Consumption Forecast ──
-
-  @Get('forecast')
-  async getConsumptionForecast(@Query() query: any) {
-    return this.reportsService.getConsumptionForecast(query);
-  }
-
-  @Post('forecast/compute')
-  async computeForecast(@Body() body: { branch_id?: string; days?: number }) {
-    return this.reportsService.computeForecast(body.branch_id, body.days);
-  }
-
   // ── Stock Adjustments ──
 
   @Get('adjustments/table')
@@ -133,11 +121,6 @@ export class InventoryController {
   @Get('dashboard/branch-summary')
   async getBranchStockSummary() {
     return { status: true, data: await this.dashboardService.getBranchStockSummary() };
-  }
-
-  @Get('dashboard/dispatch-status')
-  async getDispatchStatus(@Query('date') date?: string) {
-    return { status: true, data: await this.dashboardService.getDispatchStatusSummary(date) };
   }
 
   @Get('dashboard/transfer-status')

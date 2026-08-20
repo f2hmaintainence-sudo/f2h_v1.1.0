@@ -355,16 +355,6 @@ export class CatalogSaveEditService {
         orderDirection: 'ASC',
       });
 
-      // Fetch active packaging types
-      const packagingTypesResult = await this.dataService.query('packaging_types', {
-        select: ['id', 'name'],
-        where: [
-          { column: 'status', operator: '=', value: 'active' },
-        ],
-        orderBy: 'name',
-        orderDirection: 'ASC',
-      });
-
       // 2. Build product dropdown options
       const productOptions = [
         { value: '', label: 'Select Product' },
@@ -374,16 +364,8 @@ export class CatalogSaveEditService {
         })),
       ];
 
-      const packagingOptions = [
-        { value: '', label: 'No Returnable Packaging (Disposable)' },
-        ...(packagingTypesResult.data || []).map((pkg: any) => ({
-          value: String(pkg.id),
-          label: pkg.name,
-        })),
-      ];
-
       // 3. Validate using dynamic fields
-      const fields = this.showAddService.variantFields(productOptions, packagingOptions);
+      const fields = this.showAddService.variantFields(productOptions);
 
       if (!body || typeof body !== 'object') body = {};
       const NUMBER_FIELDS = [

@@ -281,11 +281,6 @@ function AuditDetailsDialog({ log, onClose }: AuditDetailsDialogProps) {
               <p className="mt-1 text-sm font-bold text-slate-800">
                 {log.admin_name || log.admin_id || "—"}
               </p>
-              {log.admin_name && (
-                <p className="mt-0.5 break-all font-mono text-[10px] text-slate-400">
-                  {log.admin_id}
-                </p>
-              )}
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -669,9 +664,6 @@ export default function AuditLogPage() {
                 {filterOptions.admins.map((admin) => (
                   <option key={admin.admin_id} value={admin.admin_id}>
                     {admin.admin_name}
-                    {admin.admin_name !== admin.admin_id
-                      ? " — " + admin.admin_id
-                      : ""}
                   </option>
                 ))}
               </select>
@@ -826,11 +818,6 @@ export default function AuditLogPage() {
                         <p className="text-xs font-bold text-slate-800">
                           {log.admin_name || log.admin_id || "—"}
                         </p>
-                        {log.admin_name && (
-                          <p className="mt-0.5 font-mono text-[9px] text-slate-400">
-                            {log.admin_id}
-                          </p>
-                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span

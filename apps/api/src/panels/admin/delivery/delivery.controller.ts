@@ -151,8 +151,10 @@ export class DeliveryManagementController {
   @Post('runs/create')
   async createOptimizedRuns(
     @Body() body: { date?: string; branch_id?: string; slot?: string },
+    @Req() req: any,
   ) {
-    return this.runService.createOptimizedRuns(body.date, body.branch_id, body.slot);
+    const adminId = req.user?.user_id ?? req.user?.id ?? 'system';
+    return this.runService.createOptimizedRuns(body.date, body.branch_id, body.slot, adminId);
   }
 
   @Get('runs')
@@ -327,11 +329,6 @@ export class DeliveryManagementController {
   ) {
     const adminId = req.user?.user_id ?? req.user?.id ?? 'system';
     return this.dispatchService.processDeliveryReturn(runId, body.items, adminId);
-  }
-
-  @Get('dispatch/requirements/dates')
-  async getRequirementDates() {
-    return this.dispatchService.getRequirementDates();
   }
 
   @Get('dispatch/requirements')

@@ -22,15 +22,6 @@ export class SubscriptionsShowAddService {
     });
   }
 
-  async getSubscriptionsOverrideForm(): Promise<FormResponse> {
-    return this.formHelper.generateResponse({
-      title: 'Add Subscription Override',
-      submitLabel: 'Create Override',
-      fields: await this.subscriptionOverrideFields(),
-      script: '',
-    });
-  }
-
   subscriptionsFields(): FieldDef[] {
     return [
       {

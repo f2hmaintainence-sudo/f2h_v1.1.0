@@ -566,13 +566,9 @@ export class CatalogSaveAddService {
     try {
       await this.ensureVariantColumns();
       // 1. Fetch dynamic options
-      const [productsRes, packagingRes, containersRes] = await Promise.all([
+      const [productsRes, containersRes] = await Promise.all([
         this.dataService.query('products', {
           select: ['id', 'product_id', 'name'],
-          where: [{ column: 'deleted_at', operator: 'IS', value: null }],
-        }),
-        this.dataService.query('packaging_types', {
-          select: ['id', 'packaging_id', 'name'],
           where: [{ column: 'deleted_at', operator: 'IS', value: null }],
         }),
         this.dataService.query('containers', {
@@ -586,18 +582,13 @@ export class CatalogSaveAddService {
         label: `${p.name} (${p.product_id})`,
       }));
 
-      const packagingOptions = (packagingRes.data || []).map((p: any) => ({
-        value: String(p.packaging_id),
-        label: p.name,
-      }));
-
       const containerOptions = (containersRes.data || []).map((c: any) => ({
         value: String(c.container_id),
         label: `${c.name} (${c.container_id})`,
       }));
 
       // 2. Validate using dynamic fields
-      const fields = this.showAddService.variantFields(productOptions, packagingOptions, containerOptions);
+      const fields = this.showAddService.variantFields(productOptions, containerOptions);
       const validation = this.formHelper.validateFields(fields, body);
 
       if (!validation.valid) {
