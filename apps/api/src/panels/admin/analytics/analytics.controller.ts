@@ -14,6 +14,34 @@ export class AnalyticsController {
     return this.analyticsService.getRevenueReport(query);
   }
 
+  /**
+   * Full revenue & payments report: branch-wise, payment-type-wise,
+   * subscription vs one-time, and billing collection status.
+   * Filters: from/to (or days), branch_id, order_source, payment_mode.
+   */
+  @Get('revenue/report')
+  async getRevenuePaymentsReport(@Query() query: any) {
+    return this.analyticsService.getRevenuePaymentsReport(query);
+  }
+
+  @Get('revenue/report/export/csv')
+  async exportRevenueReportCsv(@Query() query: any, @Res() res: Response) {
+    const csv = await this.analyticsService.exportRevenueCsv(query);
+    const stamp = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="revenue-report-${stamp}.csv"`);
+    res.send(csv);
+  }
+
+  @Get('revenue/report/export/pdf')
+  async exportRevenueReportPdf(@Query() query: any, @Res() res: Response) {
+    const buffer = await this.analyticsService.exportRevenueReportPdf(query);
+    const stamp = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="revenue-report-${stamp}.pdf"`);
+    res.end(buffer);
+  }
+
   @Get('subscription-revenue')
   async getSubscriptionRevenue(@Query() query: any) {
     return this.analyticsService.getSubscriptionRevenue(query);

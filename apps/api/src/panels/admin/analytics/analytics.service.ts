@@ -740,6 +740,136 @@ export class AnalyticsService {
     }
   }
 
+  // ── Revenue report exports ────────────────────────────────────────────────
+
+  /** Quotes a value for CSV: doubles inner quotes, wraps when it must. */
+  private csvCell(value: unknown): string {
+    const s = value === null || value === undefined ? '' : String(value);
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }
+
+  private csvSection(title: string, headers: string[], rows: unknown[][]): string[] {
+    return [
+      title,
+      headers.map((h) => this.csvCell(h)).join(','),
+      ...rows.map((r) => r.map((c) => this.csvCell(c)).join(',')),
+      '',
+    ];
+  }
+
+  /**
+   * One CSV carrying every section of the report, so a finance user opens a
+   * single file rather than stitching six downloads together.
+   */
+  async exportRevenueCsv(query: any): Promise<string> {
+    const { data } = (await this.getRevenuePaymentsReport(query)) as any;
+    const money = (v: unknown) => Number(v ?? 0).toFixed(2);
+    const pct = (v: unknown) => Number(v ?? 0).toFixed(1);
+    const lines: string[] = [];
+
+    lines.push(this.csvCell(`Revenue & Payments Report`));
+    lines.push(this.csvCell(`Period,${data.range.from} to ${data.range.to}`));
+    lines.push('');
+
+    lines.push(...this.csvSection('SUMMARY', ['Metric', 'Value'], [
+      ['Gross revenue', money(data.totals.gross_revenue)],
+      ['Collected', money(data.totals.collected)],
+      ['Outstanding', money(data.totals.outstanding)],
+      ['Collection rate %', pct(data.totals.collection_rate)],
+      ['Discounts', money(data.totals.discounts)],
+      ['Tax', money(data.totals.tax)],
+      ['Orders', data.totals.orders],
+      ['Paying customers', data.totals.customers],
+      ['Average order value', money(data.totals.avg_order_value)],
+      ['Subscription revenue', money(data.totals.subscription_revenue)],
+      ['One-time revenue', money(data.totals.onetime_revenue)],
+    ]));
+
+    lines.push(...this.csvSection(
+      'BRANCH WISE',
+      ['Branch', 'Orders', 'Customers', 'Revenue', 'Collected', 'Outstanding', 'Subscription', 'One-time', 'Share %'],
+      data.by_branch.map((r: any) => [
+        r.branch_name, r.orders, r.customers, money(r.revenue), money(r.collected),
+        money(r.outstanding), money(r.subscription_revenue), money(r.onetime_revenue), pct(r.share_pct),
+      ]),
+    ));
+
+    lines.push(...this.csvSection(
+      'PAYMENT TYPE WISE',
+      ['Payment mode', 'Orders', 'Revenue', 'Collected', 'Outstanding', 'Share %'],
+      data.by_payment_mode.map((r: any) => [
+        r.payment_mode, r.orders, money(r.revenue), money(r.collected), money(r.outstanding), pct(r.share_pct),
+      ]),
+    ));
+
+    lines.push(...this.csvSection(
+      'SUBSCRIPTION VS ONE-TIME',
+      ['Source', 'Orders', 'Customers', 'Revenue', 'Collected', 'Avg order value', 'Share %'],
+      data.by_source.map((r: any) => [
+        r.source, r.orders, r.customers, money(r.revenue), money(r.collected),
+        money(r.avg_order_value), pct(r.share_pct),
+      ]),
+    ));
+
+    lines.push(...this.csvSection(
+      'BILLING BY PAYMENT TYPE',
+      ['Payment type', 'Bill type', 'Bills', 'Billed', 'Paid', 'Due'],
+      data.billing.by_payment_type.map((r: any) => [
+        r.payment_type, r.bill_type, r.bills, money(r.billed), money(r.paid), money(r.due),
+      ]),
+    ));
+
+    const c = data.billing.collection;
+    lines.push(...this.csvSection('COLLECTION STATUS', ['Bucket', 'Bills', 'Amount'], [
+      ['Settled', c.settled_bills, money(c.settled_amount)],
+      ['Due (not yet overdue)', c.due_bills, money(c.due_amount)],
+      ['Overdue', c.overdue_bills, money(c.overdue_amount)],
+    ]));
+
+    lines.push(...this.csvSection(
+      'DAILY TREND',
+      ['Date', 'Orders', 'Revenue', 'Collected', 'Subscription', 'One-time'],
+      data.daily.map((r: any) => [
+        r.day, r.orders, money(r.revenue), money(r.collected),
+        money(r.subscription_revenue), money(r.onetime_revenue),
+      ]),
+    ));
+
+    // BOM so Excel opens the ₹-free numeric CSV in the right encoding
+    return '﻿' + lines.join('\r\n');
+  }
+
+  /** Branch-wise PDF with the headline numbers on top. */
+  async exportRevenueReportPdf(query: any): Promise<Buffer> {
+    const { data } = (await this.getRevenuePaymentsReport(query)) as any;
+    const now = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+    return this.pdfService.generateReport({
+      title: 'Revenue & Payments Report',
+      subtitle: `${data.range.from} to ${data.range.to}`,
+      generatedAt: now,
+      summaryCards: [
+        { label: 'Gross Revenue', value: formatMoney(data.totals.gross_revenue), color: '#f0fdf4' },
+        { label: 'Collected', value: formatMoney(data.totals.collected), color: '#eff6ff' },
+        { label: 'Outstanding', value: formatMoney(data.totals.outstanding), color: '#fef2f2' },
+        { label: 'Subscription', value: formatMoney(data.totals.subscription_revenue), color: '#faf5ff' },
+        { label: 'One-time', value: formatMoney(data.totals.onetime_revenue), color: '#fefce8' },
+      ],
+      columns: [
+        { header: 'Branch', key: 'branch_name', width: 130 },
+        { header: 'Orders', key: 'orders', width: 55, align: 'right' },
+        { header: 'Revenue', key: 'revenue', width: 90, align: 'right', format: (v) => formatMoney(v) },
+        { header: 'Collected', key: 'collected', width: 90, align: 'right', format: (v) => formatMoney(v) },
+        { header: 'Outstanding', key: 'outstanding', width: 90, align: 'right', format: (v) => formatMoney(v) },
+        { header: 'Subscription', key: 'subscription_revenue', width: 90, align: 'right', format: (v) => formatMoney(v) },
+        { header: 'One-time', key: 'onetime_revenue', width: 90, align: 'right', format: (v) => formatMoney(v) },
+      ],
+      rows: data.by_branch,
+      footer: `Generated at ${now}`,
+      orientation: 'landscape',
+    });
+  }
+
   async exportRevenuePdf(query: any): Promise<Buffer> {
     const report = await this.getRevenueReport(query);
     const rows = (report.data as any).daily || [];
