@@ -31,6 +31,15 @@ import {
   CheckCircle,
   XCircle,
   Building,
+  RotateCcw,
+  ShieldAlert,
+  ClipboardCheck,
+  ArrowDownToLine,
+  CheckCheck,
+  Calendar,
+  Phone,
+  User,
+  Filter,
 } from 'lucide-react';
 import Link from 'next/link';
 import { api } from '@/services/api.client';
@@ -63,7 +72,7 @@ type AdjustState = {
 };
 
 export default function ContainersPage() {
-  const [activeMainTab, setActiveMainTab] = useState<'containers' | 'balances'>('containers');
+  const [activeMainTab, setActiveMainTab] = useState<'containers' | 'balances' | 'recollections'>('containers');
 
   // Containers Master State
   const [containersMaster, setContainersMaster] = useState<any[]>([]);
@@ -98,8 +107,44 @@ export default function ContainersPage() {
   const [dashboardSummary, setDashboardSummary] = useState<any>(null);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
 
+  // Warehouse Container Recollections State
+  const [recollectionsList, setRecollectionsList] = useState<any[]>([]);
+  const [recollectionsSummary, setRecollectionsSummary] = useState<any>(null);
+  const [recollectionsTotal, setRecollectionsTotal] = useState(0);
+  const [loadingRecollections, setLoadingRecollections] = useState(false);
+  const [recollectionSearch, setRecollectionSearch] = useState('');
+  const [recollectionWarehouseId, setRecollectionWarehouseId] = useState('all');
+  const [recollectionStatus, setRecollectionStatus] = useState('all');
+  const [recollectionDate, setRecollectionDate] = useState('');
+  const [recollectionPage, setRecollectionPage] = useState(1);
+  const [selectedRecollectionDetail, setSelectedRecollectionDetail] = useState<any | null>(null);
+
+  // Verification Modal State
+  const [verifyingRecollection, setVerifyingRecollection] = useState<any | null>(null);
+  const [verifyAcceptedQty, setVerifyAcceptedQty] = useState<string>('0');
+  const [verifyDamagedQty, setVerifyDamagedQty] = useState<string>('0');
+  const [verifyLostQty, setVerifyLostQty] = useState<string>('0');
+  const [verifyNotes, setVerifyNotes] = useState<string>('');
+  const [submittingVerify, setSubmittingVerify] = useState<boolean>(false);
+
+  // Direct Intake Modal State
+  const [isDirectModalOpen, setIsDirectModalOpen] = useState(false);
+  const [directWarehouseId, setDirectWarehouseId] = useState('');
+  const [directContainerId, setDirectContainerId] = useState('');
+  const [directRunId, setDirectRunId] = useState('');
+  const [directPartnerId, setDirectPartnerId] = useState('');
+  const [directCustomerId, setDirectCustomerId] = useState('');
+  const [directQuantity, setDirectQuantity] = useState('10');
+  const [directDamagedQuantity, setDirectDamagedQuantity] = useState('0');
+  const [directLostQuantity, setDirectLostQuantity] = useState('0');
+  const [directNotes, setDirectNotes] = useState('');
+  const [submittingDirect, setSubmittingDirect] = useState(false);
+  const [directFormError, setDirectFormError] = useState('');
+  const [pendingRuns, setPendingRuns] = useState<any[]>([]);
+
   const limit = 20;
   const searchRef = useRef<NodeJS.Timeout | null>(null);
+  const recSearchRef = useRef<NodeJS.Timeout | null>(null);
 
   const showToast = (msg: string, ok: boolean) => {
     setToast({ msg, ok });
@@ -170,12 +215,58 @@ export default function ContainersPage() {
     }
   }, [search, page]);
 
+  // Fetch Warehouse Container Recollections
+  const fetchRecollections = useCallback(async (p = recollectionPage) => {
+    setLoadingRecollections(true);
+    try {
+      const res = await api.get<any>('/admin/package/recollections', {
+        params: {
+          warehouse_id: recollectionWarehouseId !== 'all' ? recollectionWarehouseId : undefined,
+          status: recollectionStatus !== 'all' ? recollectionStatus : undefined,
+          search: recollectionSearch.trim() || undefined,
+          date: recollectionDate || undefined,
+          page: p,
+          limit,
+        },
+      });
+      if (res.data) {
+        setRecollectionsList(res.data.data || []);
+        setRecollectionsTotal(res.data.total || 0);
+        if (res.data.summary) {
+          setRecollectionsSummary(res.data.summary);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load container recollections:', err);
+      setRecollectionsList([]);
+    } finally {
+      setLoadingRecollections(false);
+    }
+  }, [recollectionWarehouseId, recollectionStatus, recollectionSearch, recollectionDate, recollectionPage]);
+
+  // Fetch Pending Delivery Runs for Intake
+  const fetchPendingRuns = useCallback(async (whId = '') => {
+    try {
+      const res = await api.get<any>('/admin/package/recollections/runs-pending', {
+        params: {
+          warehouse_id: whId || undefined,
+        },
+      });
+      if (res.data?.data) {
+        setPendingRuns(res.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load pending runs:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchWarehouses();
     fetchMasterContainers();
     fetchDashboardSummary();
     loadBalances();
-  }, [fetchDashboardSummary, fetchMasterContainers, fetchWarehouses, loadBalances]);
+    fetchRecollections();
+  }, [fetchDashboardSummary, fetchMasterContainers, fetchWarehouses, loadBalances, fetchRecollections]);
 
   const onSearchBalances = (v: string) => {
     setSearch(v);
@@ -278,6 +369,102 @@ export default function ContainersPage() {
     }
   };
 
+  // Recollection Handlers
+  const onSearchRecollections = (v: string) => {
+    setRecollectionSearch(v);
+    if (recSearchRef.current) clearTimeout(recSearchRef.current);
+    recSearchRef.current = setTimeout(() => {
+      setRecollectionPage(1);
+      fetchRecollections(1);
+    }, 400);
+  };
+
+  const openVerifyModal = (rec: any) => {
+    setVerifyingRecollection(rec);
+    const defaultAccepted = rec.submitted_quantity > 0 ? rec.submitted_quantity : (rec.collected_quantity || 0);
+    setVerifyAcceptedQty(String(defaultAccepted));
+    setVerifyDamagedQty(String(rec.damaged_quantity || 0));
+    setVerifyLostQty(String(rec.lost_quantity || 0));
+    setVerifyNotes(rec.submission_notes || '');
+  };
+
+  const handleConfirmVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!verifyingRecollection) return;
+    setSubmittingVerify(true);
+    try {
+      const res = await api.post<any>('/admin/package/recollections/verify', {
+        id: verifyingRecollection.id,
+        submitted_quantity: Number(verifyAcceptedQty),
+        damaged_quantity: Number(verifyDamagedQty) || 0,
+        lost_quantity: Number(verifyLostQty) || 0,
+        notes: verifyNotes || undefined,
+      });
+      showToast(res.data?.message || 'Recollection verified and warehouse stock updated!', true);
+      setVerifyingRecollection(null);
+      fetchRecollections();
+      fetchMasterContainers();
+      fetchDashboardSummary();
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Failed to verify recollection', false);
+    } finally {
+      setSubmittingVerify(false);
+    }
+  };
+
+  const openDirectModal = () => {
+    setDirectWarehouseId(warehousesList.length > 0 ? (warehousesList[0].warehouse_id || warehousesList[0].id) : '');
+    setDirectContainerId(containersMaster.length > 0 ? containersMaster[0].container_id : '');
+    setDirectQuantity('10');
+    setDirectDamagedQuantity('0');
+    setDirectLostQuantity('0');
+    setDirectRunId('');
+    setDirectPartnerId('');
+    setDirectCustomerId('');
+    setDirectNotes('');
+    setDirectFormError('');
+    fetchPendingRuns(warehousesList.length > 0 ? (warehousesList[0].warehouse_id || warehousesList[0].id) : '');
+    setIsDirectModalOpen(true);
+  };
+
+  const handleSaveDirectRecollection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDirectFormError('');
+    if (!directContainerId) {
+      setDirectFormError('Please select a container type');
+      return;
+    }
+    if (!directQuantity || Number(directQuantity) <= 0) {
+      setDirectFormError('Please enter a valid received quantity');
+      return;
+    }
+    setSubmittingDirect(true);
+    try {
+      const res = await api.post<any>('/admin/package/recollections/direct', {
+        warehouse_id: directWarehouseId || undefined,
+        container_id: directContainerId,
+        delivery_partner_id: directPartnerId || undefined,
+        run_id: directRunId || undefined,
+        customer_id: directCustomerId || undefined,
+        quantity: Number(directQuantity),
+        damaged_quantity: Number(directDamagedQuantity) || 0,
+        lost_quantity: Number(directLostQuantity) || 0,
+        notes: directNotes || undefined,
+      });
+      showToast(res.data?.message || 'Direct intake recorded and inventory restocked!', true);
+      setIsDirectModalOpen(false);
+      fetchRecollections();
+      fetchMasterContainers();
+      fetchDashboardSummary();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Failed to record direct container recollection';
+      setDirectFormError(msg);
+      showToast(msg, false);
+    } finally {
+      setSubmittingDirect(false);
+    }
+  };
+
   const filteredMasterContainers = containersMaster.filter((item: any) => {
     if (!containerSearch.trim()) return true;
     const q = containerSearch.toLowerCase().trim();
@@ -290,6 +477,7 @@ export default function ContainersPage() {
 
   const totalWarehouseStock = containersMaster.reduce((acc, c) => acc + Number(c.quantity || 0), 0);
   const totalPages = Math.ceil(total / limit);
+  const totalRecollectionPages = Math.ceil(recollectionsTotal / limit);
 
   const renderKpiCards = () => {
     const totalIssued = dashboardSummary?.issued_quantity ?? rows.reduce((acc, r) => acc + Number(r.issued_quantity || 0), 0);
@@ -335,6 +523,54 @@ export default function ContainersPage() {
     );
   };
 
+  const renderRecollectionKpiCards = () => {
+    const totalRecs = recollectionsSummary?.total_records ?? 0;
+    const pendingVer = recollectionsSummary?.pending_verification ?? 0;
+    const closedVer = recollectionsSummary?.closed_count ?? 0;
+    const totalAccepted = recollectionsSummary?.total_accepted_units ?? 0;
+    const totalDamaged = recollectionsSummary?.total_damaged_units ?? 0;
+    const totalLost = recollectionsSummary?.total_lost_units ?? 0;
+    const discrepancies = recollectionsSummary?.discrepancy_count ?? 0;
+
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
+          <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Recollections Logged</p>
+          <p className="text-xl font-black text-slate-900">{totalRecs}</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">Intake batches</p>
+        </div>
+        <div className="bg-white p-3.5 rounded-xl border border-amber-200 bg-amber-50/30 shadow-2xs">
+          <p className="text-[10px] font-extrabold text-amber-700 uppercase tracking-wider mb-1">Awaiting Verification</p>
+          <p className="text-xl font-black text-amber-800 flex items-center gap-1.5">
+            {pendingVer}
+            {pendingVer > 0 && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />}
+          </p>
+          <p className="text-[10px] text-amber-600 mt-0.5">Submitted by riders</p>
+        </div>
+        <div className="bg-white p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/30 shadow-2xs">
+          <p className="text-[10px] font-extrabold text-emerald-700 uppercase tracking-wider mb-1">Verified & Restocked</p>
+          <p className="text-xl font-black text-emerald-800">{closedVer}</p>
+          <p className="text-[10px] text-emerald-600 font-bold mt-0.5">+{totalAccepted} Units Restocked</p>
+        </div>
+        <div className="bg-white p-3.5 rounded-xl border border-rose-100 bg-rose-50/20 shadow-2xs">
+          <p className="text-[10px] font-extrabold text-rose-600 uppercase tracking-wider mb-1">Damaged on Return</p>
+          <p className="text-xl font-black text-rose-700">{totalDamaged}</p>
+          <p className="text-[10px] text-rose-600/70 mt-0.5">Broken bottles / crates</p>
+        </div>
+        <div className="bg-white p-3.5 rounded-xl border border-purple-100 bg-purple-50/20 shadow-2xs">
+          <p className="text-[10px] font-extrabold text-purple-600 uppercase tracking-wider mb-1">Lost / Missing</p>
+          <p className="text-xl font-black text-purple-700">{totalLost}</p>
+          <p className="text-[10px] text-purple-600/70 mt-0.5">Unaccounted units</p>
+        </div>
+        <div className="bg-white p-3.5 rounded-xl border border-indigo-100 bg-indigo-50/20 shadow-2xs">
+          <p className="text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider mb-1">Discrepancies</p>
+          <p className="text-xl font-black text-indigo-700">{discrepancies}</p>
+          <p className="text-[10px] text-indigo-600/70 mt-0.5">Mismatched counts</p>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4 p-1 md:p-3 font-sans min-h-screen">
       {/* Toast Notification */}
@@ -365,7 +601,7 @@ export default function ContainersPage() {
           >
             <Plus size={16} /> Add Container
           </button>
-        ) : (
+        ) : activeMainTab === 'balances' ? (
           <button
             type="button"
             onClick={() => loadBalances()}
@@ -373,14 +609,31 @@ export default function ContainersPage() {
           >
             <RefreshCw size={15} className={loadingBalances ? 'animate-spin' : ''} /> Refresh Balances
           </button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={openDirectModal}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-xl shadow-md shadow-emerald-600/20 hover:bg-emerald-700 transition-all cursor-pointer"
+            >
+              <Plus size={16} /> Direct Intake
+            </button>
+            <button
+              type="button"
+              onClick={() => fetchRecollections()}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-deep-green text-sm font-bold rounded-xl shadow-sm hover:border-fresh-green transition-all cursor-pointer"
+            >
+              <RefreshCw size={15} className={loadingRecollections ? 'animate-spin' : ''} /> Refresh
+            </button>
+          </div>
         )}
       </div>
 
-      {/* Main 2-Tab Bar */}
-      <div className="flex items-center gap-2 border-b border-gray-200 bg-white px-3 pt-2 rounded-t-2xl">
+      {/* Main 3-Tab Bar */}
+      <div className="flex items-center gap-2 border-b border-gray-200 bg-white px-3 pt-2 rounded-t-2xl overflow-x-auto">
         <button
           onClick={() => setActiveMainTab('containers')}
-          className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeMainTab === 'containers'
               ? 'border-emerald-600 text-emerald-700 bg-emerald-50/60 rounded-t-xl'
               : 'border-transparent text-gray-500 hover:text-gray-800'
@@ -391,13 +644,29 @@ export default function ContainersPage() {
 
         <button
           onClick={() => setActiveMainTab('balances')}
-          className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeMainTab === 'balances'
               ? 'border-emerald-600 text-emerald-700 bg-emerald-50/60 rounded-t-xl'
               : 'border-transparent text-gray-500 hover:text-gray-800'
           }`}
         >
           <Container size={16} /> Container Balances
+        </button>
+
+        <button
+          onClick={() => setActiveMainTab('recollections')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            activeMainTab === 'recollections'
+              ? 'border-emerald-600 text-emerald-700 bg-emerald-50/60 rounded-t-xl'
+              : 'border-transparent text-gray-500 hover:text-gray-800'
+          }`}
+        >
+          <RotateCcw size={16} /> Warehouse Recollection
+          {(recollectionsSummary?.pending_verification || 0) > 0 && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white">
+              {recollectionsSummary.pending_verification}
+            </span>
+          )}
         </button>
       </div>
 
@@ -681,6 +950,742 @@ export default function ContainersPage() {
                   Next →
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 3: WAREHOUSE CONTAINER RECOLLECTIONS TAB */}
+      {/* ========================================================================= */}
+      {activeMainTab === 'recollections' && (
+        <div className="space-y-4">
+          {/* Recollection KPI Cards */}
+          {renderRecollectionKpiCards()}
+
+          {/* Controls & Filter Bar */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3 shadow-sm">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              {/* Search Box */}
+              <div className="relative max-w-sm w-full">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by Run ID, Partner, Container..."
+                  value={recollectionSearch}
+                  onChange={(e) => onSearchRecollections(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:bg-white focus:border-emerald-600 focus:outline-none transition-all"
+                />
+                {recollectionSearch && (
+                  <button
+                    type="button"
+                    onClick={() => { setRecollectionSearch(''); setRecollectionPage(1); fetchRecollections(1); }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 rounded-full"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Filters & Actions */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Warehouse Dropdown */}
+                <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-xl">
+                  <Building size={14} className="text-gray-400 shrink-0" />
+                  <select
+                    value={recollectionWarehouseId}
+                    onChange={(e) => {
+                      setRecollectionWarehouseId(e.target.value);
+                      setRecollectionPage(1);
+                    }}
+                    className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer"
+                  >
+                    <option value="all">All Warehouses</option>
+                    {warehousesList.map((w: any) => (
+                      <option key={w.id || w.warehouse_id} value={w.warehouse_id || w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Date Picker Filter */}
+                <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-xl">
+                  <Calendar size={14} className="text-gray-400 shrink-0" />
+                  <input
+                    type="date"
+                    value={recollectionDate}
+                    onChange={(e) => {
+                      setRecollectionDate(e.target.value);
+                      setRecollectionPage(1);
+                    }}
+                    className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer"
+                  />
+                  {recollectionDate && (
+                    <button
+                      onClick={() => { setRecollectionDate(''); setRecollectionPage(1); }}
+                      className="text-gray-400 hover:text-gray-600 p-0.5"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Direct Intake Action */}
+                <button
+                  type="button"
+                  onClick={openDirectModal}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-emerald-600/20 transition-all cursor-pointer"
+                >
+                  <Plus size={14} /> Log Direct Intake
+                </button>
+              </div>
+            </div>
+
+            {/* Status Filter Tabs */}
+            <div className="flex items-center gap-1.5 pt-2 border-t border-gray-100 overflow-x-auto">
+              {[
+                { id: 'all', label: 'All Records', count: recollectionsSummary?.total_records },
+                { id: 'submitted', label: 'Awaiting Verification', count: recollectionsSummary?.pending_verification, badgeColor: 'bg-amber-500 text-white' },
+                { id: 'closed', label: 'Verified & Restocked', count: recollectionsSummary?.closed_count, badgeColor: 'bg-emerald-600 text-white' },
+                { id: 'discrepancy', label: 'Discrepancies', count: recollectionsSummary?.discrepancy_count, badgeColor: 'bg-rose-500 text-white' },
+              ].map((st) => (
+                <button
+                  key={st.id}
+                  onClick={() => {
+                    setRecollectionStatus(st.id);
+                    setRecollectionPage(1);
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    recollectionStatus === st.id
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200'
+                  }`}
+                >
+                  {st.label}
+                  {st.count !== undefined && (
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${st.badgeColor || (recollectionStatus === st.id ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700')}`}>
+                      {st.count}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Recollections Data Table */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-gray-50 border-b border-gray-100 text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">
+                  <tr>
+                    <th className="px-4 py-3.5">Run / Batch ID</th>
+                    <th className="px-4 py-3.5">Warehouse</th>
+                    <th className="px-4 py-3.5">Delivery Partner / Source</th>
+                    <th className="px-4 py-3.5">Container Type</th>
+                    <th className="px-4 py-3.5 text-center">Collected</th>
+                    <th className="px-4 py-3.5 text-center">Accepted</th>
+                    <th className="px-4 py-3.5 text-center">Damaged / Lost</th>
+                    <th className="px-4 py-3.5 text-center">Status</th>
+                    <th className="px-4 py-3.5">Verified By</th>
+                    <th className="px-4 py-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 font-medium">
+                  {loadingRecollections ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <tr key={i}>
+                        {Array.from({ length: 10 }).map((_, j) => (
+                          <td key={j} className="px-4 py-3.5">
+                            <div className="h-4 bg-gray-100 rounded animate-pulse" />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : recollectionsList.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="px-4 py-12 text-center">
+                        <RotateCcw size={36} className="mx-auto mb-3 text-slate-300" />
+                        <p className="font-bold text-slate-600 text-sm">No container recollection records found</p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          When delivery partners complete their runs or submit returns, they will appear here for hub verification.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    recollectionsList.map((row) => {
+                      const isPending = row.status === 'submitted' || row.status === 'pending';
+                      const isDiscrepancy = row.status === 'discrepancy';
+                      const isClosed = row.status === 'closed';
+
+                      return (
+                        <tr key={row.id} className={`hover:bg-slate-50/60 transition-colors ${isPending ? 'bg-amber-50/20' : ''}`}>
+                          <td className="px-4 py-3.5 align-middle">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-mono font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-[11px] w-fit">
+                                {row.run_id}
+                              </span>
+                              {row.run_date && (
+                                <span className="text-[10px] text-slate-500">
+                                  {new Date(row.run_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                                  {row.delivery_slot ? ` · ${row.delivery_slot}` : ''}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3.5 text-slate-700 font-semibold align-middle">
+                            {row.warehouse_name}
+                          </td>
+                          <td className="px-4 py-3.5 align-middle">
+                            <div className="font-bold text-slate-900">{row.delivery_partner_name}</div>
+                            {row.delivery_partner_phone && row.delivery_partner_phone !== 'N/A' && (
+                              <div className="text-[10px] text-slate-400">{row.delivery_partner_phone}</div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5 align-middle">
+                            <div className="font-bold text-slate-800">{row.container_name}</div>
+                            <div className="text-[10px] font-mono text-slate-400">{row.container_id}</div>
+                          </td>
+                          <td className="px-4 py-3.5 text-center font-bold text-slate-700 align-middle">
+                            <span className="inline-flex px-2 py-0.5 bg-slate-100 text-slate-800 rounded-lg text-xs font-black">
+                              {row.collected_quantity}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 text-center font-bold align-middle">
+                            <span className="inline-flex px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-black">
+                              {row.submitted_quantity}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 text-center text-[11px] align-middle">
+                            {(row.damaged_quantity > 0 || row.lost_quantity > 0) ? (
+                              <div className="flex items-center justify-center gap-1.5 font-bold">
+                                {row.damaged_quantity > 0 && (
+                                  <span className="text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100">
+                                    Dmg: {row.damaged_quantity}
+                                  </span>
+                                )}
+                                {row.lost_quantity > 0 && (
+                                  <span className="text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-100">
+                                    Lost: {row.lost_quantity}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-slate-300 font-bold">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5 text-center align-middle">
+                            {isPending && (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                Awaiting Hub Review
+                              </span>
+                            )}
+                            {isClosed && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                <CheckCircle2 size={11} className="text-emerald-700" />
+                                Verified & Restocked
+                              </span>
+                            )}
+                            {isDiscrepancy && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                                <ShieldAlert size={11} className="text-rose-700" />
+                                Discrepancy ({row.discrepancy_quantity > 0 ? `+${row.discrepancy_quantity}` : row.discrepancy_quantity})
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5 align-middle">
+                            {row.reviewer_name ? (
+                              <div className="flex flex-col">
+                                <span className="font-bold text-slate-800 text-[11px]">{row.reviewer_name}</span>
+                                {row.reviewed_at && (
+                                  <span className="text-[10px] text-slate-400">
+                                    {new Date(row.reviewed_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 text-[11px] italic">Not verified yet</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5 text-right align-middle">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {(!isClosed || isDiscrepancy) ? (
+                                <button
+                                  type="button"
+                                  onClick={() => openVerifyModal(row)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold shadow-2xs transition-all cursor-pointer"
+                                  title="Verify and accept containers into warehouse inventory"
+                                >
+                                  <CheckCheck size={12} /> Verify & Accept
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => setSelectedRecollectionDetail(row)}
+                                className="p-1.5 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer"
+                                title="View recollection details"
+                              >
+                                <Eye size={13} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Recollections Pagination */}
+            <div className="px-4 py-3 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-gray-50/50">
+              <p className="text-xs text-slate-500 font-medium">
+                Showing <strong className="text-slate-800">{recollectionsTotal > 0 ? (recollectionPage - 1) * limit + 1 : 0}</strong> to <strong className="text-slate-800">{Math.min(recollectionPage * limit, recollectionsTotal)}</strong> of <strong className="text-slate-800">{recollectionsTotal}</strong> recollection entries
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={recollectionPage <= 1 || loadingRecollections}
+                  onClick={() => { const p = recollectionPage - 1; setRecollectionPage(p); fetchRecollections(p); }}
+                  className="px-3.5 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs transition-all cursor-pointer"
+                >
+                  ← Previous
+                </button>
+                <span className="text-xs font-bold text-slate-600 px-2 py-1 bg-white border border-slate-200 rounded-lg shadow-2xs">
+                  Page {recollectionPage} of {Math.max(1, totalRecollectionPages)}
+                </span>
+                <button
+                  disabled={recollectionPage >= totalRecollectionPages || loadingRecollections}
+                  onClick={() => { const p = recollectionPage + 1; setRecollectionPage(p); fetchRecollections(p); }}
+                  className="px-3.5 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs transition-all cursor-pointer"
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: VERIFY & ACCEPT RECOLLECTION MODAL */}
+      {/* ========================================================================= */}
+      {verifyingRecollection && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <form
+            onSubmit={handleConfirmVerify}
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200 space-y-4"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl">
+                  <ClipboardCheck size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">Verify Container Intake</h3>
+                  <p className="text-xs text-slate-500 font-medium">Run: {verifyingRecollection.run_id}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVerifyingRecollection(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Run & Container Information Card */}
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500 font-semibold">Delivery Partner:</span>
+                <span className="font-bold text-slate-800">{verifyingRecollection.delivery_partner_name}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500 font-semibold">Warehouse:</span>
+                <span className="font-bold text-slate-800">{verifyingRecollection.warehouse_name}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500 font-semibold">Container Type:</span>
+                <span className="font-bold text-emerald-800">{verifyingRecollection.container_name}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-200">
+                <span className="text-slate-600 font-bold">Collected on Run:</span>
+                <span className="font-black text-slate-900 text-sm">{verifyingRecollection.collected_quantity} units</span>
+              </div>
+            </div>
+
+            {/* Intake Input Fields */}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Accepted Good Units (Restock to Warehouse)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={verifyAcceptedQty}
+                  onChange={(e) => setVerifyAcceptedQty(e.target.value)}
+                  className="w-full py-2.5 px-3 bg-emerald-50/40 border border-emerald-300 text-emerald-950 rounded-xl text-sm font-black focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  required
+                />
+                <p className="text-[11px] text-emerald-700 font-medium mt-1">
+                  ✓ This quantity will be added directly into <strong>{verifyingRecollection.container_name}</strong> warehouse inventory.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-rose-700 uppercase tracking-wider mb-1">
+                    Damaged Units
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={verifyDamagedQty}
+                    onChange={(e) => setVerifyDamagedQty(e.target.value)}
+                    className="w-full py-2 px-3 bg-rose-50/40 border border-rose-200 text-rose-900 rounded-xl text-xs font-bold focus:outline-none focus:border-rose-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-purple-700 uppercase tracking-wider mb-1">
+                    Lost Units
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={verifyLostQty}
+                    onChange={(e) => setVerifyLostQty(e.target.value)}
+                    className="w-full py-2 px-3 bg-purple-50/40 border border-purple-200 text-purple-900 rounded-xl text-xs font-bold focus:outline-none focus:border-purple-400"
+                  />
+                </div>
+              </div>
+
+              {/* Live Discrepancy Preview */}
+              {(() => {
+                const col = Number(verifyingRecollection.collected_quantity || 0);
+                const acc = Number(verifyAcceptedQty || 0);
+                const dmg = Number(verifyDamagedQty || 0);
+                const lst = Number(verifyLostQty || 0);
+                const disc = col - (acc + dmg + lst);
+                return (
+                  <div className={`p-2.5 rounded-xl border text-xs flex items-center justify-between font-bold ${
+                    disc === 0 ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'
+                  }`}>
+                    <span>Discrepancy / Unaccounted:</span>
+                    <span>{disc === 0 ? '0 (Balanced)' : `${disc > 0 ? `-${disc} Missing` : `+${Math.abs(disc)} Extra`}`}</span>
+                  </div>
+                );
+              })()}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Hub Verification Notes
+                </label>
+                <input
+                  type="text"
+                  value={verifyNotes}
+                  onChange={(e) => setVerifyNotes(e.target.value)}
+                  placeholder="e.g. Verified and returned to crate storage"
+                  className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-emerald-600"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setVerifyingRecollection(null)}
+                className="px-4 py-2 text-slate-600 text-xs font-bold hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submittingVerify}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-emerald-600/20 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {submittingVerify ? 'Verifying...' : 'Confirm & Restock Warehouse'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: DIRECT WAREHOUSE CONTAINER INTAKE */}
+      {/* ========================================================================= */}
+      {isDirectModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <form
+            onSubmit={handleSaveDirectRecollection}
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200 space-y-4"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl">
+                  <ArrowDownToLine size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">Direct Warehouse Intake</h3>
+                  <p className="text-xs text-slate-500 font-medium">Record returned containers directly at hub</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDirectModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {directFormError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-xl">
+                {directFormError}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {/* Warehouse Dropdown */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Target Warehouse
+                </label>
+                <select
+                  value={directWarehouseId}
+                  onChange={(e) => {
+                    setDirectWarehouseId(e.target.value);
+                    fetchPendingRuns(e.target.value);
+                  }}
+                  className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600 cursor-pointer"
+                >
+                  {warehousesList.map((w: any) => (
+                    <option key={w.id || w.warehouse_id} value={w.warehouse_id || w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Container Select */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Container Type
+                </label>
+                <select
+                  value={directContainerId}
+                  onChange={(e) => setDirectContainerId(e.target.value)}
+                  className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600 cursor-pointer"
+                  required
+                >
+                  <option value="">-- Select Container Type --</option>
+                  {containersMaster.map((c: any) => (
+                    <option key={c.container_id || c.id} value={c.container_id}>
+                      {c.name} ({c.container_id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Quantity */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Recollected Good Quantity (Units to Restock)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={directQuantity}
+                  onChange={(e) => setDirectQuantity(e.target.value)}
+                  placeholder="e.g. 20"
+                  className="w-full py-2.5 px-3 bg-emerald-50/40 border border-emerald-300 text-emerald-950 rounded-xl text-sm font-black focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  required
+                />
+              </div>
+
+              {/* Optional Damaged / Lost */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                    Damaged (Optional)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={directDamagedQuantity}
+                    onChange={(e) => setDirectDamagedQuantity(e.target.value)}
+                    className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                    Lost (Optional)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={directLostQuantity}
+                    onChange={(e) => setDirectLostQuantity(e.target.value)}
+                    className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+              </div>
+
+              {/* Optional Run Select */}
+              {pendingRuns.length > 0 && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                    Link to Delivery Run (Optional)
+                  </label>
+                  <select
+                    value={directRunId}
+                    onChange={(e) => {
+                      setDirectRunId(e.target.value);
+                      const selectedRun = pendingRuns.find(r => r.run_id === e.target.value);
+                      if (selectedRun?.delivery_partner_id) {
+                        setDirectPartnerId(selectedRun.delivery_partner_id);
+                      }
+                    }}
+                    className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-emerald-600 cursor-pointer"
+                  >
+                    <option value="">-- Direct Counter / Unlinked Intake --</option>
+                    {pendingRuns.map((r: any) => (
+                      <option key={r.run_id} value={r.run_id}>
+                        {r.run_id} ({r.delivery_partner_name} · {r.delivery_slot})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Customer ID (Optional) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                  Customer ID (Optional — will credit customer balance)
+                </label>
+                <input
+                  type="text"
+                  value={directCustomerId}
+                  onChange={(e) => setDirectCustomerId(e.target.value)}
+                  placeholder="e.g. CUST-1048 or customer phone"
+                  className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-emerald-600"
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                  Intake Notes
+                </label>
+                <input
+                  type="text"
+                  value={directNotes}
+                  onChange={(e) => setDirectNotes(e.target.value)}
+                  placeholder="e.g. Returned by customer directly at hub counter"
+                  className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-emerald-600"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsDirectModalOpen(false)}
+                className="px-4 py-2 text-slate-600 text-xs font-bold hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submittingDirect}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-emerald-600/20 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {submittingDirect ? 'Recording...' : 'Accept & Restock Inventory'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: RECOLLECTION DETAILS MODAL */}
+      {/* ========================================================================= */}
+      {selectedRecollectionDetail && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 animate-in fade-in zoom-in-95 duration-200 space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
+                  <RotateCcw size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base">Recollection Batch Details</h3>
+                  <p className="text-xs text-slate-500 font-medium">Batch #{selectedRecollectionDetail.id} · {selectedRecollectionDetail.run_id}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedRecollectionDetail(null)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-semibold">Warehouse:</span>
+                <span className="font-bold text-slate-900">{selectedRecollectionDetail.warehouse_name}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-semibold">Delivery Partner:</span>
+                <span className="font-bold text-slate-900">{selectedRecollectionDetail.delivery_partner_name} ({selectedRecollectionDetail.delivery_partner_phone || 'N/A'})</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-semibold">Container Type:</span>
+                <span className="font-bold text-emerald-800">{selectedRecollectionDetail.container_name} ({selectedRecollectionDetail.container_id})</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-white p-3 rounded-xl border border-slate-200 text-center shadow-2xs">
+                <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Collected</p>
+                <p className="text-lg font-black text-slate-800">{selectedRecollectionDetail.collected_quantity}</p>
+              </div>
+              <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-200 text-center shadow-2xs">
+                <p className="text-[10px] font-extrabold text-emerald-700 uppercase tracking-wider mb-1">Accepted</p>
+                <p className="text-lg font-black text-emerald-800">{selectedRecollectionDetail.submitted_quantity}</p>
+              </div>
+              <div className="bg-rose-50/50 p-3 rounded-xl border border-rose-200 text-center shadow-2xs">
+                <p className="text-[10px] font-extrabold text-rose-700 uppercase tracking-wider mb-1">Damaged / Lost</p>
+                <p className="text-lg font-black text-rose-800">{Number(selectedRecollectionDetail.damaged_quantity || 0) + Number(selectedRecollectionDetail.lost_quantity || 0)}</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-semibold">Current Status:</span>
+                <span className="font-bold uppercase tracking-wider text-slate-800">{selectedRecollectionDetail.status}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-semibold">Reviewed By:</span>
+                <span className="font-bold text-slate-800">{selectedRecollectionDetail.reviewer_name || 'Pending Review'}</span>
+              </div>
+              {selectedRecollectionDetail.submission_notes && (
+                <div className="pt-1.5 border-t border-slate-200">
+                  <span className="text-slate-500 font-semibold block mb-0.5">Notes:</span>
+                  <span className="text-slate-800 italic">{selectedRecollectionDetail.submission_notes}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                onClick={() => setSelectedRecollectionDetail(null)}
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-2xs transition-all cursor-pointer"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

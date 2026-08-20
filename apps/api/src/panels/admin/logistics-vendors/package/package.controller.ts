@@ -42,4 +42,27 @@ export class PackageController {
   customerTable(@Query() query: any) {
     return this.packageService.customerBalancesTable(query);
   }
+
+  // ─── Warehouse Container Recollections ───
+  @Get('recollections')
+  getRecollections(@Query() query: any) {
+    return this.packageService.getRecollections(query);
+  }
+
+  @Post('recollections/verify')
+  verifyRecollection(@Body() body: any, @Req() req: any) {
+    const adminId = req.user?.user_id ?? req.user?.id ?? 'system';
+    return this.packageService.verifyRecollection(body, adminId);
+  }
+
+  @Post('recollections/direct')
+  directRecollection(@Body() body: any, @Req() req: any) {
+    const adminId = req.user?.user_id ?? req.user?.id ?? 'system';
+    return this.packageService.directRecollection(body, adminId);
+  }
+
+  @Get('recollections/runs-pending')
+  getPendingRunsForRecollection(@Query() query: any) {
+    return this.packageService.getPendingRunsForRecollection(query);
+  }
 }

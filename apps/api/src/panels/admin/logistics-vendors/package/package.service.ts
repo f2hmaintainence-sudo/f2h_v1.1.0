@@ -297,6 +297,401 @@ export class PackageService {
     });
   }
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // GET /admin/package/recollections
+  // Returns warehouse container recollection records with partner & run details
+  // ──────────────────────────────────────────────────────────────────────────
+  async getRecollections(query: any) {
+    try {
+      const warehouseId = query.warehouse_id ? String(query.warehouse_id).trim() : '';
+      const status = query.status ? String(query.status).trim() : 'all';
+      const search = query.search ? String(query.search).trim() : '';
+      const date = query.date ? String(query.date).trim() : '';
+      const page = Math.max(1, parseInt(query.page) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(query.limit) || 20));
+      const offset = (page - 1) * limit;
+
+      const whereClauses: string[] = ['dcr.deleted_at IS NULL'];
+      const params: any[] = [];
+
+      if (warehouseId && warehouseId !== 'all') {
+        params.push(warehouseId);
+        whereClauses.push(`(dcr.warehouse_id = $${params.length} OR w.warehouse_id = $${params.length})`);
+      }
+
+      if (status && status !== 'all') {
+        params.push(status);
+        whereClauses.push(`dcr.status = $${params.length}`);
+      }
+
+      if (date) {
+        params.push(date);
+        whereClauses.push(`(dcr.created_at::date = $${params.length}::date OR dr.run_date = $${params.length}::date)`);
+      }
+
+      if (search) {
+        params.push(`%${search}%`);
+        const pIdx = params.length;
+        whereClauses.push(`(
+          dcr.run_id ILIKE $${pIdx}
+          OR cnt.name ILIKE $${pIdx}
+          OR dcr.container_id ILIKE $${pIdx}
+          OR u.first_name ILIKE $${pIdx}
+          OR u.last_name ILIKE $${pIdx}
+          OR dp.full_name ILIKE $${pIdx}
+          OR w.name ILIKE $${pIdx}
+        )`);
+      }
+
+      const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+      const baseFromSql = `
+        FROM delivery_container_reconciliation dcr
+        LEFT JOIN containers cnt ON cnt.container_id = dcr.container_id AND cnt.deleted_at IS NULL
+        LEFT JOIN warehouses w ON (w.warehouse_id = dcr.warehouse_id OR w.id::varchar = dcr.warehouse_id) AND w.deleted_at IS NULL
+        LEFT JOIN delivery_runs dr ON (dr.run_id = dcr.run_id OR dr.id::varchar = dcr.run_id)
+        LEFT JOIN delivery_partners dp ON (dp.delivery_partner_id = dr.delivery_partner_id OR dp.delivery_partner_id = dcr.submitted_by OR dp.id::varchar = dr.delivery_partner_id)
+        LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
+        LEFT JOIN users ru ON ru.user_id = dcr.review_by
+        ${whereSql}
+      `;
+
+      const selectSql = `
+        SELECT
+          dcr.id,
+          dcr.warehouse_id,
+          COALESCE(w.name, 'Main Warehouse') AS warehouse_name,
+          dcr.run_id,
+          dr.run_date,
+          dr.delivery_slot,
+          COALESCE(dr.delivery_partner_id, dcr.submitted_by) AS delivery_partner_id,
+          COALESCE(
+            NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''),
+            NULLIF(TRIM(dp.full_name), ''),
+            'Delivery Partner'
+          ) AS delivery_partner_name,
+          COALESCE(NULLIF(TRIM(u.phone), ''), NULLIF(TRIM(dp.phone), ''), 'N/A') AS delivery_partner_phone,
+          dcr.container_id,
+          COALESCE(cnt.name, dcr.container_id) AS container_name,
+          COALESCE(dcr.collected_quantity, 0) AS collected_quantity,
+          COALESCE(dcr.submitted_quantity, 0) AS submitted_quantity,
+          COALESCE(dcr.damaged_quantity, 0) AS damaged_quantity,
+          COALESCE(dcr.lost_quantity, 0) AS lost_quantity,
+          COALESCE(dcr.discrepancy_quantity, 0) AS discrepancy_quantity,
+          dcr.status,
+          dcr.review_by,
+          COALESCE(NULLIF(TRIM(CONCAT_WS(' ', ru.first_name, ru.last_name)), ''), dcr.review_by) AS reviewer_name,
+          dcr.reviewed_at,
+          dcr.collection_notes,
+          dcr.submission_notes,
+          dcr.created_at,
+          dcr.updated_at
+        ${baseFromSql}
+        ORDER BY dcr.created_at DESC
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+      `;
+
+      const countSql = `SELECT COUNT(*)::int AS total ${baseFromSql}`;
+
+      const [countRes, rows] = await Promise.all([
+        this.db.query(countSql, params),
+        this.db.query(selectSql, [...params, limit, offset]),
+      ]);
+
+      const total = parseInt(countRes[0]?.total || '0', 10);
+
+      // Summary metrics for KPI tiles
+      const [summaryRes] = await this.db.query(
+        `
+        SELECT
+          COUNT(*)::int AS total_records,
+          COALESCE(SUM(CASE WHEN dcr.status = 'submitted' OR dcr.status = 'pending' THEN 1 ELSE 0 END), 0)::int AS pending_verification,
+          COALESCE(SUM(CASE WHEN dcr.status = 'closed' THEN 1 ELSE 0 END), 0)::int AS closed_count,
+          COALESCE(SUM(CASE WHEN dcr.status = 'discrepancy' THEN 1 ELSE 0 END), 0)::int AS discrepancy_count,
+          COALESCE(SUM(dcr.collected_quantity), 0)::int AS total_collected_units,
+          COALESCE(SUM(dcr.submitted_quantity), 0)::int AS total_accepted_units,
+          COALESCE(SUM(dcr.damaged_quantity), 0)::int AS total_damaged_units,
+          COALESCE(SUM(dcr.lost_quantity), 0)::int AS total_lost_units
+        FROM delivery_container_reconciliation dcr
+        WHERE dcr.deleted_at IS NULL
+        ${warehouseId && warehouseId !== 'all' ? `AND dcr.warehouse_id = '${warehouseId}'` : ''}
+        `,
+      );
+
+      return {
+        status: true,
+        data: rows,
+        total,
+        summary: summaryRes || {
+          total_records: 0,
+          pending_verification: 0,
+          closed_count: 0,
+          discrepancy_count: 0,
+          total_collected_units: 0,
+          total_accepted_units: 0,
+          total_damaged_units: 0,
+          total_lost_units: 0,
+        },
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    } catch (error) {
+      this.developer.error('getRecollections error', { error });
+      throw new InternalServerErrorException('Failed to load container recollections');
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // POST /admin/package/recollections/verify
+  // Reviewer accepts & verifies submitted containers at warehouse
+  // ──────────────────────────────────────────────────────────────────────────
+  async verifyRecollection(
+    body: {
+      id: number | string;
+      submitted_quantity: number;
+      damaged_quantity?: number;
+      lost_quantity?: number;
+      notes?: string;
+    },
+    adminId: string,
+  ) {
+    try {
+      const recId = body.id;
+      if (!recId) throw new BadRequestException('Recollection ID is required');
+
+      const submittedQty = Math.max(0, Number(body.submitted_quantity) || 0);
+      const damagedQty = Math.max(0, Number(body.damaged_quantity) || 0);
+      const lostQty = Math.max(0, Number(body.lost_quantity) || 0);
+      const notes = body.notes ? String(body.notes).trim() : null;
+
+      let resultRecord: any = null;
+
+      await this.db.transaction(async (client) => {
+        const checkRes = await client.query(
+          `SELECT * FROM delivery_container_reconciliation WHERE id = $1 AND deleted_at IS NULL`,
+          [recId],
+        );
+        const existing = checkRes.rows[0];
+
+        if (!existing) {
+          throw new BadRequestException('Container recollection record not found');
+        }
+
+        const collectedQty = Number(existing.collected_quantity || 0);
+        const discrepancyQty = collectedQty - (submittedQty + damagedQty + lostQty);
+        const newStatus = discrepancyQty !== 0 ? 'discrepancy' : 'closed';
+
+        const updateRes = await client.query(
+          `UPDATE delivery_container_reconciliation
+           SET submitted_quantity = $1,
+               damaged_quantity = $2,
+               lost_quantity = $3,
+               discrepancy_quantity = $4,
+               status = $5,
+               review_by = $6,
+               reviewed_at = NOW(),
+               submission_notes = COALESCE($7, submission_notes),
+               updated_at = NOW()
+           WHERE id = $8
+           RETURNING *`,
+          [
+            submittedQty,
+            damagedQty,
+            lostQty,
+            discrepancyQty,
+            newStatus,
+            adminId,
+            notes,
+            recId,
+          ],
+        );
+
+        resultRecord = updateRes.rows[0];
+
+        // Restock warehouse container inventory with good accepted units
+        if (submittedQty > 0 && existing.container_id) {
+          await client.query(
+            `UPDATE containers
+             SET quantity = quantity + $1,
+                 updated_at = NOW()
+             WHERE container_id = $2 AND deleted_at IS NULL`,
+            [submittedQty, existing.container_id],
+          );
+        }
+      });
+
+      return {
+        status: true,
+        message: 'Container recollection verified and warehouse stock updated successfully',
+        data: resultRecord,
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      this.developer.error('verifyRecollection error', { error });
+      throw new InternalServerErrorException('Failed to verify container recollection');
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // POST /admin/package/recollections/direct
+  // Direct warehouse intake of returnable containers (from partner/customer/branch)
+  // ──────────────────────────────────────────────────────────────────────────
+  async directRecollection(
+    body: {
+      warehouse_id: string;
+      container_id: string;
+      delivery_partner_id?: string;
+      run_id?: string;
+      customer_id?: string;
+      quantity: number;
+      damaged_quantity?: number;
+      lost_quantity?: number;
+      notes?: string;
+    },
+    adminId: string,
+  ) {
+    try {
+      const warehouseId = String(body.warehouse_id || '').trim();
+      const containerId = String(body.container_id || '').trim();
+      const qty = Math.max(1, Number(body.quantity) || 0);
+      const damagedQty = Math.max(0, Number(body.damaged_quantity) || 0);
+      const lostQty = Math.max(0, Number(body.lost_quantity) || 0);
+      const runId = body.run_id ? String(body.run_id).trim() : `INTAKE-${Date.now().toString(36).toUpperCase()}`;
+      const partnerId = body.delivery_partner_id ? String(body.delivery_partner_id).trim() : null;
+      const customerId = body.customer_id ? String(body.customer_id).trim() : null;
+      const notes = body.notes ? String(body.notes).trim() : 'Direct warehouse container recollection';
+
+      if (!containerId) throw new BadRequestException('Container ID is required');
+
+      let insertedId: any = null;
+
+      await this.db.transaction(async (client) => {
+        // 1. Create reconciliation entry
+        const res = await client.query(
+          `INSERT INTO delivery_container_reconciliation (
+            warehouse_id, run_id, container_id,
+            collected_quantity, submitted_quantity,
+            damaged_quantity, lost_quantity, discrepancy_quantity,
+            status, review_by, reviewed_at,
+            collection_notes, submission_notes,
+            created_by, submitted_by, created_at, updated_at
+          ) VALUES (
+            $1, $2, $3,
+            $4, $4,
+            $5, $6, 0,
+            'closed', $7, NOW(),
+            $8, $8,
+            $7, $9, NOW(), NOW()
+          ) RETURNING id`,
+          [
+            warehouseId || null,
+            runId,
+            containerId,
+            qty,
+            damagedQty,
+            lostQty,
+            adminId,
+            notes,
+            partnerId || adminId,
+          ],
+        );
+        insertedId = res.rows[0]?.id;
+
+        // 2. If customer_id was specified, adjust customer balance
+        if (customerId) {
+          await client.query(
+            `INSERT INTO customer_container_balances (
+              customer_id, container_id, issued_quantity, returned_quantity,
+              damaged_quantity, lost_quantity, updated_at
+            ) VALUES ($1, $2, 0, $3, $4, $5, NOW())
+            ON CONFLICT (customer_id, container_id) DO UPDATE SET
+              returned_quantity = customer_container_balances.returned_quantity + EXCLUDED.returned_quantity,
+              damaged_quantity = customer_container_balances.damaged_quantity + EXCLUDED.damaged_quantity,
+              lost_quantity = customer_container_balances.lost_quantity + EXCLUDED.lost_quantity,
+              updated_at = NOW()`,
+            [customerId, containerId, qty, damagedQty, lostQty],
+          );
+        }
+
+        // 3. Restock container inventory
+        await client.query(
+          `UPDATE containers
+           SET quantity = quantity + $1,
+               updated_at = NOW()
+           WHERE container_id = $2 AND deleted_at IS NULL`,
+          [qty, containerId],
+        );
+      });
+
+      return {
+        status: true,
+        message: `Successfully recollected and restocked ${qty} container(s) at warehouse`,
+        data: { id: insertedId },
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      this.developer.error('directRecollection error', { error });
+      throw new InternalServerErrorException('Failed to record direct container recollection');
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // GET /admin/package/runs-pending
+  // Fetch active/recent runs with delivery partner details for recollection intake
+  // ──────────────────────────────────────────────────────────────────────────
+  async getPendingRunsForRecollection(query: any) {
+    try {
+      const warehouseId = query.warehouse_id ? String(query.warehouse_id).trim() : '';
+      const date = query.date ? String(query.date).trim() : new Date().toISOString().slice(0, 10);
+
+      const params: any[] = [date];
+      let whClause = '';
+      if (warehouseId && warehouseId !== 'all') {
+        params.push(warehouseId);
+        whClause = `AND (dr.warehouse_id = $${params.length} OR dr.branch_id = $${params.length})`;
+      }
+
+      const rows = await this.db.query(
+        `
+        SELECT
+          dr.run_id,
+          dr.run_date,
+          dr.delivery_slot,
+          dr.status AS run_status,
+          dr.delivery_partner_id,
+          COALESCE(
+            NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''),
+            NULLIF(TRIM(dp.full_name), ''),
+            'Delivery Partner'
+          ) AS delivery_partner_name,
+          COALESCE(NULLIF(TRIM(u.phone), ''), NULLIF(TRIM(dp.phone), ''), 'N/A') AS delivery_partner_phone,
+          w.warehouse_id,
+          COALESCE(w.name, b.name, 'Main Warehouse') AS warehouse_name
+        FROM delivery_runs dr
+        LEFT JOIN delivery_partners dp ON (dp.delivery_partner_id = dr.delivery_partner_id OR dp.id::varchar = dr.delivery_partner_id)
+        LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
+        LEFT JOIN warehouses w ON (w.warehouse_id = dr.warehouse_id OR w.id::varchar = dr.warehouse_id)
+        LEFT JOIN branches b ON (b.branch_id = dr.branch_id OR b.id::varchar = dr.branch_id)
+        WHERE dr.deleted_at IS NULL
+          AND dr.run_date >= ($1::date - INTERVAL '7 days')
+          ${whClause}
+        ORDER BY dr.run_date DESC, dr.created_at DESC
+        LIMIT 50
+        `,
+        params,
+      );
+
+      return {
+        status: true,
+        data: rows,
+      };
+    } catch (error) {
+      this.developer.error('getPendingRunsForRecollection error', { error });
+      throw new InternalServerErrorException('Failed to load pending delivery runs');
+    }
+  }
+
   private async tableResponse(config: {
     query: any;
     columns: Record<string, string>;
