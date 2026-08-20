@@ -68,11 +68,7 @@ export interface OnlinePartner {
   is_location_stale?: boolean;
   vehicle_type?: string | null;
   vehicle_number?: string | null;
-  driving_license_number?: string | null;
-  salary_type?: string | null;
-  monthly_fixed_salary?: number | null;
-  per_order_commission?: number | null;
-  fuel_allowance_daily?: number | null;
+  daily_salary?: number | null;
   joining_date?: string | null;
   average_rating?: number | null;
   total_deliveries?: number | null;
@@ -463,7 +459,6 @@ function OnlinePartnerDetailedCard({ partner }: { partner: OnlinePartner }) {
                 <DetailItem label="Email" value={partner.email} icon={Mail} />
                 <DetailItem label="Vehicle Type" value={partner.vehicle_type} />
                 <DetailItem label="Vehicle Plate" value={partner.vehicle_number} mono />
-                <DetailItem label="Driving License" value={partner.driving_license_number} mono />
                 <DetailItem label="Assigned Branch" value={partner.branch_name || partner.branch_id} icon={MapPin} />
                 <DetailItem
                   label="GPS Coordinates"
@@ -487,20 +482,9 @@ function OnlinePartnerDetailedCard({ partner }: { partner: OnlinePartner }) {
                 Compensation & Salary Setup
               </h4>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <DetailItem label="Salary Model" value={partner.salary_type || "Per Order / Commission"} />
                 <DetailItem
-                  label="Monthly Fixed Salary"
-                  value={partner.monthly_fixed_salary ? `₹${partner.monthly_fixed_salary.toLocaleString()}` : "N/A"}
-                  icon={IndianRupee}
-                />
-                <DetailItem
-                  label="Per Order Commission"
-                  value={partner.per_order_commission ? `₹${partner.per_order_commission}` : "N/A"}
-                  icon={IndianRupee}
-                />
-                <DetailItem
-                  label="Daily Fuel Allowance"
-                  value={partner.fuel_allowance_daily ? `₹${partner.fuel_allowance_daily}/day` : "N/A"}
+                  label="Daily Salary"
+                  value={partner.daily_salary ? `₹${partner.daily_salary.toLocaleString()}` : "N/A"}
                   icon={IndianRupee}
                 />
               </div>

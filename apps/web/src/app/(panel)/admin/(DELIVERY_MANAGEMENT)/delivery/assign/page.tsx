@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 import { showSuccessToast } from "@/components/Toast";
 import DeliveryOrderSwapModal from "@/components/f2h/DeliveryOrderSwapModal";
+import DeliveryPartnerDragBoard from "@/components/f2h/DeliveryPartnerDragBoard";
 
 function getTodayIST(): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -102,7 +103,7 @@ interface DeliveryRunDetailed {
 }
 
 export default function DeliveryRunsPage() {
-  const [activeTab, setActiveTab] = useState<"generate" | "manage">("manage");
+  const [activeTab, setActiveTab] = useState<"manage" | "drag_board" | "generate">("manage");
   const [summary, setSummary] = useState<RunSummary | null>(null);
   const [result, setResult] = useState<RunResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -352,10 +353,25 @@ export default function DeliveryRunsPage() {
               : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
           }`}
         >
-          <ArrowRightLeft size={14} className={activeTab === "manage" ? "text-indigo-400" : ""} />
-          <span>Active Runs & Order Swap</span>
+          <Route size={14} className={activeTab === "manage" ? "text-indigo-400" : ""} />
+          <span>Address Stops by Run</span>
           <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${activeTab === "manage" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"}`}>
             {runsList.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("drag_board")}
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+            activeTab === "drag_board"
+              ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
+          }`}
+        >
+          <ArrowRightLeft size={14} className={activeTab === "drag_board" ? "text-white" : "text-indigo-600"} />
+          <span>2-Partner Drag & Drop Board</span>
+          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-400 text-slate-950 uppercase">
+            New
           </span>
         </button>
 

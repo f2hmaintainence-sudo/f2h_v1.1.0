@@ -55,7 +55,7 @@ interface CalendarDayRow {
 
 interface CalendarResponse {
   month: string;
-  source: "subscription_calendar_cache";
+  source: string;
   days: CalendarDayRow[];
   totals: {
     total_m_qty: number;

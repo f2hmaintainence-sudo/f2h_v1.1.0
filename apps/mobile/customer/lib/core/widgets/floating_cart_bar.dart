@@ -36,29 +36,32 @@ class _CartBarScrollScopeState extends State<CartBarScrollScope> {
     super.dispose();
   }
 
-  bool _onScroll(UserScrollNotification notification) {
+  bool _onScroll(ScrollNotification notification) {
     // Horizontal carousels (and their auto-scroll) must not touch the bar.
     if (notification.metrics.axis != Axis.vertical) return false;
 
-    switch (notification.direction) {
-      case ScrollDirection.reverse:
-        _isCompact.value = notification.metrics.pixels > _collapseThreshold;
-        break;
-      case ScrollDirection.forward:
-        _isCompact.value = false;
-        break;
-      case ScrollDirection.idle:
-        if (notification.metrics.pixels <= _collapseThreshold) {
-          _isCompact.value = false;
-        }
-        break;
+    if (notification is ScrollUpdateNotification) {
+      final delta = notification.scrollDelta ?? 0;
+      if (delta > 1.0 && notification.metrics.pixels > _collapseThreshold) {
+        if (!_isCompact.value) _isCompact.value = true;
+      } else if (delta < -1.0 || notification.metrics.pixels <= _collapseThreshold) {
+        if (_isCompact.value) _isCompact.value = false;
+      }
+    } else if (notification is UserScrollNotification) {
+      if (notification.direction == ScrollDirection.reverse &&
+          notification.metrics.pixels > _collapseThreshold) {
+        if (!_isCompact.value) _isCompact.value = true;
+      } else if (notification.direction == ScrollDirection.forward ||
+          notification.metrics.pixels <= _collapseThreshold) {
+        if (_isCompact.value) _isCompact.value = false;
+      }
     }
     return false;
   }
 
   @override
   Widget build(BuildContext context) {
-    return NotificationListener<UserScrollNotification>(
+    return NotificationListener<ScrollNotification>(
       onNotification: _onScroll,
       child: _CartBarScrollScopeMarker(
         isCompact: _isCompact,
@@ -238,8 +241,8 @@ class _FloatingCartBarState extends State<FloatingCartBar>
     );
   }
 
-  /// The cart pill itself. In compact mode it drops the labels and keeps only
-  /// the avatar stack, the item count and the chevron.
+  /// The cart pill itself. In compact mode (while scrolling down) it shrinks
+  /// into a sleek, smaller capsule. On scroll up it expands back to full size.
   Widget _buildPill({
     required bool isCompact,
     required List<dynamic> visibleItems,
@@ -248,8 +251,8 @@ class _FloatingCartBarState extends State<FloatingCartBar>
     required int totalAvatarCircles,
     required int totalCount,
   }) {
-    final avatarSize = isCompact ? 20.0 : 32.0;
-    final avatarOverlap = isCompact ? 10.0 : 16.0;
+    final avatarSize = isCompact ? 22.0 : 32.0;
+    final avatarOverlap = isCompact ? 11.0 : 16.0;
     final avatarSlotSize = avatarSize + 2;
     final avatarStackWidth = totalAvatarCircles == 1
         ? avatarSlotSize
@@ -258,11 +261,11 @@ class _FloatingCartBarState extends State<FloatingCartBar>
     return AnimatedContainer(
       duration: _resizeDuration,
       curve: _resizeCurve,
-      height: isCompact ? 30 : 48,
-      padding: EdgeInsets.symmetric(horizontal: isCompact ? 6 : 14),
+      height: isCompact ? 36 : 48,
+      padding: EdgeInsets.symmetric(horizontal: isCompact ? 10 : 14),
       decoration: BoxDecoration(
         color: kPrimary,
-        borderRadius: BorderRadius.circular(isCompact ? 15 : 24),
+        borderRadius: BorderRadius.circular(isCompact ? 18 : 24),
         boxShadow: [
           BoxShadow(
             color: kPrimary.withValues(alpha: isCompact ? 0.28 : 0.35),
@@ -274,7 +277,7 @@ class _FloatingCartBarState extends State<FloatingCartBar>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Product Image Avatars (Up to 3 images + optional remaining count badge)
+          // Product Image Avatars
           if (visibleItems.isNotEmpty)
             SizedBox(
               width: avatarStackWidth,
@@ -348,22 +351,33 @@ class _FloatingCartBarState extends State<FloatingCartBar>
               child: Icon(
                 Icons.shopping_bag_outlined,
                 color: Colors.white,
-                size: isCompact ? 12 : 17,
+                size: isCompact ? 13 : 17,
               ),
             ),
 
-          SizedBox(width: isCompact ? 6 : 10),
+          SizedBox(width: isCompact ? 8 : 10),
 
-          // "View cart" Title & Subtitle — the labels give way in compact mode.
+          // "View cart" Label
           if (isCompact)
-            Text(
-              '$totalCount',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                height: 1.1,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'View cart • $totalCount',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ],
             )
           else
             Column(
@@ -392,7 +406,6 @@ class _FloatingCartBarState extends State<FloatingCartBar>
               ],
             ),
 
-          // Right Chevron Arrow Button — dropped while compact.
           if (!isCompact) ...[
             const SizedBox(width: 12),
             Container(
