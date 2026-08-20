@@ -10,7 +10,6 @@ import {
 } from '@nestjs/common';
 import { DatabaseService } from '../../../../shared/database/Database.service';
 import { DeveloperService } from '../../../../shared/logger/Developer.service';
-import { DeliveryRouteCron } from '../services/delivery-route.cron';
 import { RedisService } from 'src/shared/redis/redis.service';
 import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
@@ -59,7 +58,6 @@ export class MigrationController {
   constructor(
     private readonly db: DatabaseService,
     private readonly developer: DeveloperService,
-    private readonly cronService: DeliveryRouteCron,
     private readonly redis: RedisService,
   ) {}
 
@@ -181,20 +179,14 @@ export class MigrationController {
             customer.address_lng,
           );
 
-          // Look up sector_index from branch_zone_hexes
-          const hexRow = await this.db.query(
-            `SELECT sector_index FROM branch_zone_hexes
-             WHERE branch_id = $1 AND h3_index = $2`,
-            [customer.branch_id, addressHex],
-          );
-          const sectorIndex = hexRow?.[0]?.sector_index ?? null;
-
-          // Update customer
+          // Update customer. Only the hex is seeded here — the hex→sector map
+          // it used to be resolved against no longer exists, and sector_index
+          // is assigned through branch_sectors instead.
           await this.db.query(
             `UPDATE customers
-             SET address_hex = $1, sector_index = $2
-             WHERE id = $3`,
-            [addressHex, sectorIndex, customer.id],
+             SET address_hex = $1
+             WHERE id = $2`,
+            [addressHex, customer.id],
           );
 
           job.processed++;
@@ -321,84 +313,6 @@ export class MigrationController {
     } catch (error) {
       this.developer.error('getPoolBSummary error', { error });
       throw new InternalServerErrorException('Failed to fetch Pool B summary');
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // GET /zone/waitlist/:branchId
-  // Returns out-of-area customer waitlist grouped by pincode
-  // Sorted by count DESC (highest demand pincodes first)
-  // ═══════════════════════════════════════════════════════════════
-
-  @Get('waitlist/:branchId')
-  async getWaitlistByBranch(@Param('branchId') branchId: string) {
-    try {
-      const byPincode = await this.db.query(
-        `SELECT
-          pincode,
-          COUNT(*)::int AS customer_count,
-          MIN(requested_at) AS first_request,
-          MAX(requested_at) AS latest_request
-         FROM customer_waitlist
-         WHERE branch_id = $1
-         GROUP BY pincode
-         ORDER BY customer_count DESC`,
-        [branchId],
-      );
-
-      const total = await this.db.query(
-        `SELECT COUNT(*)::int AS total FROM customer_waitlist WHERE branch_id = $1`,
-        [branchId],
-      );
-
-      return {
-        status: true,
-        data: {
-          total_waitlisted: total?.[0]?.total || 0,
-          by_pincode: byPincode || [],
-          expansion_ready: (byPincode || []).filter((r: any) => r.customer_count >= 20),
-          message:
-            (byPincode || []).filter((r: any) => r.customer_count >= 20).length > 0
-              ? 'Some pincodes have 20+ customers waiting — ready for new branch!'
-              : null,
-        },
-      };
-    } catch (error) {
-      this.developer.error('getWaitlistByBranch error', { error });
-      throw new InternalServerErrorException('Failed to fetch waitlist');
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // POST /zone/admin/trigger-snapshot
-  // Manually fires the delivery snapshot (bypasses cron schedule)
-  // Use for: testing, emergency re-runs, or initial data seeding
-  // Body: { date?: 'YYYY-MM-DD', shift_type: 'morning' | 'evening' }
-  // ═══════════════════════════════════════════════════════════════
-
-  @Post('trigger-snapshot')
-  async triggerDeliverySnapshot(
-    @Body() body: { date?: string; shift_type?: 'morning' | 'evening' },
-  ) {
-    try {
-      const date = body.date || new Date().toISOString().split('T')[0];
-      const shiftType = body.shift_type || 'morning';
-
-      if (!['morning', 'evening'].includes(shiftType)) {
-        throw new BadRequestException('shift_type must be morning or evening');
-      }
-
-      const result = await this.cronService.triggerManual(date, shiftType as 'morning' | 'evening');
-
-      return {
-        status: true,
-        message: `Snapshot triggered for ${date} (${shiftType}).`,
-        data: result,
-      };
-    } catch (error) {
-      if (error instanceof BadRequestException) throw error;
-      this.developer.error('triggerDeliverySnapshot error', { error });
-      throw new InternalServerErrorException('Failed to trigger snapshot');
     }
   }
 }

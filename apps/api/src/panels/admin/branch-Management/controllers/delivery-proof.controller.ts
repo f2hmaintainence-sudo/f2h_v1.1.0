@@ -91,26 +91,4 @@ export class DeliveryProofController {
   }) {
     return this.proofService.submitBulkProofs(body.proofs);
   }
-
-  // ─── Admin: Route proof view ───────────────────────────────────
-  @Get('route/:routeId')
-  async getRouteProofs(
-    @Param('routeId') routeId: string,
-    @Query('date') date?: string,
-    @Query('shift_type') shiftType?: 'morning' | 'evening',
-  ) {
-    const targetDate = date || new Date().toISOString().split('T')[0];
-    return this.proofService.getRouteProofs(routeId, targetDate, shiftType);
-  }
-
-  // ─── Admin: Branch-wide daily delivery summary ─────────────────
-  @Get('branch/:branchId/summary')
-  async getBranchDeliverySummary(
-    @Param('branchId') branchId: string,
-    @Query('date') date?: string,
-    @Query('shift_type') shiftType?: 'morning' | 'evening',
-  ) {
-    const targetDate = date || new Date().toISOString().split('T')[0];
-    return this.proofService.getBranchDeliverySummary(branchId, targetDate, shiftType);
-  }
 }

@@ -102,68 +102,6 @@ export class CustomerTableService {
     }
   }
 
-  async getZoneTable(query: any) {
-    try {
-      const conditions: any[] = [];
-
-      if (query.is_active !== undefined) {
-        conditions.push({
-          column: 'zones.is_active',
-          operator: '=',
-          value: query.is_active === 'true',
-        });
-      }
-
-      const reqSet: ReqSet = {
-        key: 'zones',
-        table: 'zones',
-        actions: 'ved',
-        act: 'id',
-        filters: {
-          search: query.search || '',
-          dateRange: extractFilters(query).dateRange,
-          columns: extractFilters(query).columns,
-          sort: query.sortBy
-            ? { [query.sortBy]: query.sortDir || 'ASC' }
-            : { 'zones.created_at': 'DESC' },
-          pagination: {
-            type: 'offset',
-            page: parseInt(query.page) || 1,
-            limit: parseInt(query.limit) || 10,
-          },
-        },
-      };
-
-      const set: TableSet = {
-        columns: {
-          id: ['zones.id', true],
-          name: ['zones.name', true],
-          description: ['zones.description', true],
-          is_active: ['zones.is_active', true],
-          created_at: ['zones.created_at', true],
-        },
-        joins: [],
-        conditions,
-        custom: [
-          {
-            type: 'modify',
-            column: 'is_active',
-            view:
-              '::IF(is_active = true, <span class="badge badge-success">Active</span>)::' +
-              'ELSE(<span class="badge badge-danger">Inactive</span>)::',
-            renderHtml: true,
-          },
-        ],
-        req_set: reqSet,
-      };
-
-      return await this.tableHelper.generateResponse(set);
-    } catch (error) {
-      this.developer.error('getZoneTable error', { error });
-      throw new InternalServerErrorException('Failed to retrieve zones table');
-    }
-  }
-
   // ═══════════════════════════════════════════════════════════════
   // WALLET TRANSACTIONS TABLE (kept for backwards compat if needed, but not used for branches)
   // ═══════════════════════════════════════════════════════════════
@@ -189,10 +127,10 @@ export class CustomerTableService {
         });
       }
 
-      // Filter by branch_id if provided (through zones join)
+      // Filter by branch_id if provided
       if (query.branch_id) {
         conditions.push({
-          column: 'zones.branch_id',
+          column: 'customers.branch_id',
           operator: '=',
           value: query.branch_id,
         });
@@ -232,9 +170,7 @@ export class CustomerTableService {
           full_name: ["CONCAT_WS(' ', users.first_name, users.last_name)", true],
           phone: ['users.phone', true],
           email: ['users.email', true],
-          zone_name: ['zones.name', true],
           branch_name: ['branches.branch_name', true],
-          total_orders: ['customers.total_orders', true],
           created_at: ['customers.created_at', true],
         },
         joins: [
@@ -245,13 +181,8 @@ export class CustomerTableService {
           },
           {
             type: 'LEFT',
-            table: 'zones',
-            on: [['zones.id', 'customers.zone_id']],
-          },
-          {
-            type: 'LEFT',
             table: 'branches',
-            on: [['branches.branch_id', 'zones.branch_id']],
+            on: [['branches.branch_id', 'customers.branch_id']],
           }
         ],
         conditions,

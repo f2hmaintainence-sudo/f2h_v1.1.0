@@ -7,7 +7,6 @@ import { BranchSaveAddService, StaffsSaveAddService } from './services/saveAdd.s
 import { BranchShowEditService, StaffsShowEditService } from './services/showEdit.service';
 import { BranchSaveEditService, StaffsSaveEditService } from './services/saveEdit.service';
 import { SectorService } from './ModuleServices/sector.service';
-import { RouteService } from './services/route.service';
 import { HelpersModule } from '../../../helpers/Helpers.module';
 import { DataService } from 'src/shared/database/Data.service';
 import { DatabaseService } from 'src/shared/database/Database.service';
@@ -19,7 +18,6 @@ import { CustomerController } from './controllers/customer.controller';
 import { MigrationController } from './controllers/migration.controller';
 import { DeliveryProofController } from './controllers/delivery-proof.controller';
 import { DeliveryProofService } from './services/delivery-proof.service';
-import { DeliveryRouteCron } from './services/delivery-route.cron';
 import { DeliveryRunsAdminController } from './controllers/delivery-runs.admin.controller';
 import { StaffsrController } from './controllers/staff.controller';
 import { BranchConfigController } from './branch-config.controller';
@@ -54,9 +52,7 @@ import { DeliveryManagementModule } from '../delivery/delivery.module';
     BranchSaveEditService,
     StaffsSaveEditService,
     SectorService,
-    RouteService,
     DeliveryProofService,
-    DeliveryRouteCron,
     BranchConfigService,
     DeveloperService,
     IdGeneratorService],

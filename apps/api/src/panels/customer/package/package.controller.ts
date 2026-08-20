@@ -55,46 +55,4 @@ export class PackageController {
     };
   }
 
-  @Get('transactions')
-  @UseGuards(AuthGuard('jwt'))
-  async getPackageTransactions(@Req() req: Request) {
-    const user = req.user as any;
-    const userId = user?.user_id;
-    const email = user?.email;
-
-    // Resolve customer via JOIN users
-    const custRows = await this.db.query(
-      `SELECT c.customer_id
-       FROM customers c
-       JOIN users u ON u.user_id = c.customer_id
-       WHERE c.customer_id = $1 OR (u.email IS NOT NULL AND u.email = $2 AND u.email != '')
-       LIMIT 1`,
-      [userId, email || userId],
-    );
-    const customer = custRows?.[0];
-    if (!customer) {
-      throw new BadRequestException('Customer profile not found');
-    }
-
-    const txResult = await this.Data.query('container_transactions', {
-      select: [
-        'container_transactions.*',
-        'packaging_types.name AS package_name',
-      ],
-      joins: [
-        {
-          type: 'left',
-          table: 'packaging_types',
-          on: [['container_transactions.packaging_type_id', 'packaging_types.id']],
-        },
-      ],
-      where: [{ column: 'container_transactions.customer_id', operator: '=', value: customer.customer_id }],
-      orderBy: [{ column: 'container_transactions.created_at', direction: 'DESC' }],
-    });
-
-    return {
-      status: true,
-      data: txResult?.data || [],
-    };
-  }
 }

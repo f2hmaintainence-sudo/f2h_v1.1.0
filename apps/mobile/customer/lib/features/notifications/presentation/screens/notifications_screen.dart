@@ -7,6 +7,11 @@ import 'package:f2h_customer/features/notifications/presentation/bloc/notificati
 import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_state.dart';
 import 'package:f2h_customer/core/widgets/scrolling_items_loader.dart';
 import 'package:f2h_customer/features/subscription/presentation/screens/my_subscriptions_screen.dart';
+import 'package:f2h_customer/features/orders/presentation/screens/order_history_screen.dart';
+import 'package:f2h_customer/features/profile/presentation/screens/customer_bills_screen.dart';
+import 'package:f2h_customer/features/profile/presentation/screens/referral_screen.dart';
+import 'package:f2h_customer/features/profile/presentation/screens/pakage_screen.dart';
+import 'package:f2h_customer/features/wallet/presentation/screens/wallet_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -387,20 +392,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       },
       child: GestureDetector(
         onTap: () {
-          final isUnread = item.isUnread;
-          if (isUnread) {
+          if (item.isUnread) {
             context.read<NotificationsBloc>().add(MarkAsRead(item.id));
           }
-          final isPostpaidNotif = item.title.toLowerCase().contains('postpaid') ||
-              item.message.toLowerCase().contains('postpaid');
-          if (isPostpaidNotif && isUnread) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const SubsScreen(showConfetti: true),
-              ),
-            );
-          }
+          _handleNotificationRouting(context, item);
         },
         child: Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -757,5 +752,105 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ],
       ),
     );
+  }
+
+  void _handleNotificationRouting(BuildContext context, NotificationItem item) {
+    final title = item.title.toLowerCase();
+    final message = item.message.toLowerCase();
+    final combined = '$title $message';
+
+    // 1. Subscriptions / Daily Milk / Postpaid
+    if (combined.contains('postpaid') ||
+        combined.contains('subscription') ||
+        combined.contains('subs') ||
+        combined.contains('daily') ||
+        combined.contains('milk') ||
+        combined.contains('pause') ||
+        combined.contains('resume') ||
+        combined.contains('plan')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const SubsScreen(showConfetti: false),
+        ),
+      );
+      return;
+    }
+
+    // 2. Bills / Invoices / Statements / Payment Due
+    if (combined.contains('bill') ||
+        combined.contains('invoice') ||
+        combined.contains('due') ||
+        combined.contains('statement')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const CustomerBillsScreen(),
+        ),
+      );
+      return;
+    }
+
+    // 3. Wallet / Cashbacks / Balance Alerts / Recharges
+    if (combined.contains('wallet') ||
+        combined.contains('cashback') ||
+        combined.contains('credited') ||
+        combined.contains('debited') ||
+        combined.contains('topup') ||
+        combined.contains('balance')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const WalletScreen(),
+        ),
+      );
+      return;
+    }
+
+    // 4. Referral / Invite & Earn
+    if (combined.contains('refer') ||
+        combined.contains('invite') ||
+        combined.contains('referral')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const ReferralScreen(),
+        ),
+      );
+      return;
+    }
+
+    // 5. Container Balance / Packages
+    if (combined.contains('package') ||
+        combined.contains('container') ||
+        combined.contains('pkg')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const ContainerBalanceScreen(),
+        ),
+      );
+      return;
+    }
+
+    // 6. Orders / Order History / Delivery Tracking
+    if (combined.contains('order') ||
+        combined.contains('track') ||
+        combined.contains('dispatch') ||
+        combined.contains('out for delivery') ||
+        combined.contains('delivered') ||
+        combined.contains('shipped') ||
+        combined.contains('placed')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const OrderHistoryScreen(),
+        ),
+      );
+      return;
+    }
+
+    // 7. Offers / Promos / Coupons / Store Catalog Default
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 }

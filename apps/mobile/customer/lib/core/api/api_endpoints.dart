@@ -81,8 +81,6 @@ class ApiEndpoints {
   static const String customerWallet = wallet;
   static const String packages = '$_customer/package/balance';
   static const String customerPakages = packages;
-  static const String packageTransactions = '$_customer/package/transactions';
-  static const String customerPakagesTransactions = packageTransactions;
   static const String categories = '$_customer/categories';
   static const String banners = '$_customer/banners';
   static const String promoBanners = '$_customer/promo-banners';

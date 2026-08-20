@@ -152,105 +152,10 @@ export class BranchShowEditService {
   // ZONE — Edit Form
   // ═══════════════════════════════════════════════════════════════
 
-  async getZoneEditForm(id: string): Promise<FormResponse> {
-    try {
-      const result = await this.dataService.query('zones', {
-        select: ['zones.*'],
-        where: [{ column: 'zones.id', operator: '=', value: id }],
-        limit: 1,
-      });
-
-      if (!result?.data?.length) {
-        throw new BadRequestException('Zone not found');
-      }
-
-      // Fetch associated hexagons
-      const hexagons = await this.db.query(
-        `SELECT h3_index, h3_resolution FROM zone_hexagons WHERE zone_id = $1`,
-        [id],
-      );
-
-      const fields: FieldDef[] = [
-        {
-          name: 'name',
-          label: 'Zone Name',
-          type: 'text',
-          required: true,
-          width: 'half',
-          placeholder: 'e.g. KR Puram',
-          validation: { minLength: 2, maxLength: 100 },
-        },
-        {
-          name: 'description',
-          label: 'Description',
-          type: 'textarea',
-          required: false,
-          width: 'full',
-          placeholder: 'Brief description of the zone area',
-          validation: { maxLength: 500 },
-        },
-        {
-          name: 'is_active',
-          label: 'Is Active',
-          type: 'toggle',
-          required: false,
-          width: 'half',
-          defaultValue: true,
-        },
-      ];
-      const zoneData = {
-        ...result.data[0],
-        h3_indexes: hexagons.map((h: any) => h.h3_index),
-      };
-
-      return this.formHelper.generateResponse({
-        title: 'Edit Zone',
-        submitLabel: 'Update Zone',
-        fields,
-        data: zoneData,
-        script: '',
-      });
-    } catch (error) {
-      if (error instanceof BadRequestException) throw error;
-      this.developer.error('getZoneEditForm error', { error, id });
-      throw new InternalServerErrorException('Failed to load zone edit form');
-    }
-  }
-
   // ═══════════════════════════════════════════════════════════════
   // ZONE — Raw Edit Data (for EditZonePopup frontend)
   // ═══════════════════════════════════════════════════════════════
 
-  async getZoneEditData(id: string) {
-    try {
-      const result = await this.dataService.query('zones', {
-        select: ['zones.*'],
-        where: [{ column: 'zones.id', operator: '=', value: id }],
-        limit: 1,
-      });
-
-      if (!result?.data?.length) {
-        return { status: false, message: 'Zone not found' };
-      }
-
-      const hexagons = await this.db.query(
-        `SELECT h3_index, h3_resolution FROM zone_hexagons WHERE zone_id = $1`,
-        [id],
-      );
-
-      return {
-        status: true,
-        data: {
-          ...result.data[0],
-          h3_indexes: (hexagons || []).map((h: any) => h.h3_index),
-          h3_resolution: hexagons?.[0]?.h3_resolution || 9,
-        },
-      };
-    } catch (error) {
-      this.developer.error('getZoneEditData error', { error, id });
-      return { status: false, message: 'Failed to load zone data' };
-    }
-  }
 }
 
 @Injectable()

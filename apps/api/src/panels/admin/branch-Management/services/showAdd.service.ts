@@ -112,69 +112,6 @@ export class BranchShowAddService {
   // ZONE — Show Add Form (legacy)
   // ═══════════════════════════════════════════════════════════════
 
-  async zoneShowAddForm(): Promise<FormResponse> {
-    // Fetch branches for dropdown
-    const branchesResult = await this.Data.query('branches', {
-      select: ['branch_id', 'branch_name', 'city', 'state'],
-      where: [{ column: 'is_active', operator: '=', value: true }],
-    });
-
-    const branchOptions = (branchesResult?.data || []).map((b: any) => ({
-      label: `${b.branch_name}${b.city ? ` — ${b.city}` : ''}`,
-      value: b.branch_id,
-    }));
-
-    const fields: FieldDef[][] = [
-      [
-        {
-          name: 'name',
-          label: 'Zone Name',
-          type: 'text',
-          required: true,
-          width: 'half',
-          placeholder: 'e.g. KR Puram',
-          validation: { minLength: 2, maxLength: 100 },
-        },
-        {
-          name: 'branch_id',
-          label: 'Branch',
-          type: 'select',
-          required: true,
-          width: 'half',
-          options: branchOptions,
-          placeholder: 'Select Branch',
-        },
-        {
-          name: 'description',
-          label: 'Description',
-          type: 'textarea',
-          required: false,
-          width: 'full',
-          placeholder: 'Brief description of the zone area',
-          validation: { maxLength: 500 },
-        },
-        {
-          name: 'is_active',
-          label: 'Is Active',
-          type: 'toggle',
-          required: false,
-          width: 'half',
-          defaultValue: true,
-        },
-      ],
-    ];
-
-    const response = this.formHelper.generateResponse({
-      title: 'Add Zone',
-      fields,
-      script: '',
-    });
-    return {
-      ...response,
-      submitUrl: '/admin/zone/saveAdd',
-      submitMethod: 'POST',
-    } as any;
-  }
 }
 
 @Injectable()

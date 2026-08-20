@@ -322,13 +322,8 @@ export class SectorService {
         // Delete old sectors
         await this.db.query(`DELETE FROM branch_sectors WHERE branch_id = $1`, [branchId]);
 
-        // Clean up routes
+        // Clear stale route assignments on the customers themselves
         await this.db.query(`UPDATE customers SET route_id = NULL WHERE branch_id = $1`, [branchId]);
-        await this.db.query(
-          `DELETE FROM delivery_route_customers WHERE route_id IN (SELECT id FROM delivery_routes WHERE branch_id = $1)`,
-          [branchId],
-        );
-        await this.db.query(`DELETE FROM delivery_routes WHERE branch_id = $1`, [branchId]);
 
         // Create new sectors
         await this.createSectors(branchId, newSectorCount);
@@ -558,12 +553,10 @@ export class SectorService {
           dp.phone AS delivery_partner_phone,
           COUNT(DISTINCT c.id)::int AS total_customers,
           COUNT(DISTINCT CASE WHEN c.route_id IS NOT NULL THEN c.id END)::int AS routed_customers,
-          COUNT(DISTINCT CASE WHEN c.route_id IS NULL THEN c.id END)::int AS unrouted_customers,
-          COUNT(DISTINCT r.id)::int AS route_count
+          COUNT(DISTINCT CASE WHEN c.route_id IS NULL THEN c.id END)::int AS unrouted_customers
         FROM branch_sectors bs
         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = bs.delivery_partner_id
         LEFT JOIN customers c ON c.branch_id = bs.branch_id AND c.sector_index = bs.sector_index
-        LEFT JOIN delivery_routes r ON r.branch_id = bs.branch_id AND r.sector_index = bs.sector_index AND r.is_active = true
         WHERE bs.branch_id = $1
         GROUP BY bs.sector_index, dp.full_name, dp.phone
         ORDER BY bs.sector_index`,
@@ -575,9 +568,8 @@ export class SectorService {
           total_customers: acc.total_customers + (r.total_customers || 0),
           routed_customers: acc.routed_customers + (r.routed_customers || 0),
           unrouted_customers: acc.unrouted_customers + (r.unrouted_customers || 0),
-          route_count: acc.route_count + (r.route_count || 0),
         }),
-        { total_customers: 0, routed_customers: 0, unrouted_customers: 0, route_count: 0 },
+        { total_customers: 0, routed_customers: 0, unrouted_customers: 0 },
       );
 
       return {

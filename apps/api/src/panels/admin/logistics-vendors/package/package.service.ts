@@ -63,19 +63,6 @@ export class PackageService {
         `,
       );
 
-      const transactions = await this.db.query(
-        `
-        SELECT
-          transaction_type,
-          COALESCE(SUM(quantity), 0)::int AS quantity
-        FROM container_transactions
-        WHERE deleted_at IS NULL AND transaction_date >= $1::date
-        GROUP BY transaction_type
-        ORDER BY transaction_type
-        `,
-        [from],
-      );
-
       const packaging = await this.db.query(
         `
         SELECT
@@ -86,28 +73,10 @@ export class PackageService {
           COALESCE(SUM(ccb.lost_quantity), 0)::int AS lost_quantity
         FROM containers c
         LEFT JOIN customer_container_balances ccb
-          ON (ccb.packaging_type_id = c.container_id OR ccb.packaging_type_id = c.id::text) AND ccb.deleted_at IS NULL
+          ON ccb.container_id = c.container_id AND ccb.deleted_at IS NULL
         WHERE c.deleted_at IS NULL
         GROUP BY c.container_id, c.id, c.name
         ORDER BY c.name ASC
-        `,
-      );
-
-      const recent = await this.db.query(
-        `
-        SELECT
-          ct.id,
-          ct.customer_id,
-          COALESCE(cnt.name, ct.packaging_type_id) AS packaging_type,
-          ct.transaction_type,
-          ct.quantity,
-          ct.transaction_date::text,
-          ct.created_at::text
-        FROM container_transactions ct
-        LEFT JOIN containers cnt ON (cnt.container_id = ct.packaging_type_id OR cnt.id::text = ct.packaging_type_id) AND cnt.deleted_at IS NULL
-        WHERE ct.deleted_at IS NULL
-        ORDER BY ct.created_at DESC
-        LIMIT 8
         `,
       );
 
@@ -115,9 +84,7 @@ export class PackageService {
         status: true,
         data: {
           summary,
-          transactions,
           packaging,
-          recent,
           from_date: from,
         },
       };
