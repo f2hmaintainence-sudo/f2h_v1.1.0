@@ -78,8 +78,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
    * been migrated fails loudly instead of quietly repairing itself.
    */
   private static readonly REQUIRED_TABLES = [
-    'dispatch_requirements',
-    'dispatch_balances',
+    'delivery_dispatch',
+    'delivery_dispatch_items',
     'management_staff',
   ];
 
