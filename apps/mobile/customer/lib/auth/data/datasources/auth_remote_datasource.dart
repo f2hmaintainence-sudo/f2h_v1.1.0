@@ -48,6 +48,28 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   AuthRemoteDataSourceImpl({required this.dioClient});
 
   String _extractError(DioException e, String fallback) {
+    if (e.response?.statusCode == 401) {
+      final data = e.response?.data;
+      if (data is Map && data['message'] != null) {
+        final text = data['message'].toString();
+        if (text.isNotEmpty && text != 'Unauthorized') {
+          return text;
+        }
+      }
+      return 'Invalid email, phone or password. Please check your login details.';
+    }
+
+    if (e.response?.statusCode == 403) {
+      final data = e.response?.data;
+      if (data is Map && data['message'] != null) {
+        final text = data['message'].toString();
+        if (text.isNotEmpty && text != 'Forbidden') {
+          return text;
+        }
+      }
+      return 'Access denied. Account is restricted or role is invalid.';
+    }
+
     final data = e.response?.data;
     if (data is Map) {
       final message = data['message'];
@@ -66,12 +88,18 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         return error.toString();
       }
     }
-    if (e.response?.statusCode == 401) {
-      return 'Invalid email, phone or password. Please check your login details.';
+
+    if (e.response?.statusCode != null && e.response!.statusCode! >= 500) {
+      return 'Server error (${e.response?.statusCode}). Please try again later.';
     }
-    if (e.response?.statusCode == 403) {
-      return 'Access denied. Account is restricted or role is invalid.';
+
+    if (e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.sendTimeout ||
+        e.type == DioExceptionType.receiveTimeout ||
+        e.type == DioExceptionType.connectionError) {
+      return 'Connection failed. Please check your internet connection and try again.';
     }
+
     return e.message ?? fallback;
   }
 

@@ -235,31 +235,43 @@ async function bootstrap() {
   passport.serializeUser((user: any, done: any) => done(null, user));
   passport.deserializeUser((user: any, done: any) => done(null, user));
 
-  // Explicit whitelist from CORS_ORIGINS. The previous callback allowed every
-  // origin while sending credentials, so any site a logged-in admin visited could
-  // issue authenticated cross-origin requests and read the responses.
+  // Explicit whitelist from CORS_ORIGINS + domain-based wildcard matching
   const allowedOrigins = (env.CORS_ORIGINS ?? '')
     .split(',')
     .map((value: string) => value.trim())
     .filter(Boolean);
 
-  if (env.NODE_ENV !== 'production' && allowedOrigins.length === 0) {
-    // Local development convenience only — never reached in production, where an
-    // empty whitelist means "no browser origin is allowed" rather than "all are".
-    allowedOrigins.push(
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://127.0.0.1:3000',
-    );
-  }
-
   app.enableCors({
     origin: (origin, callback) => {
       // No Origin header = a native mobile app or a server-side call, not a browser
       // cross-site request, so there is nothing for CORS to protect against.
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin) {
         return callback(null, true);
       }
+
+      // Explicit whitelist
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // Allow all f2hfresh.com subdomains (e.g. customer.f2hfresh.com, partner.f2hfresh.com)
+      // and localhost / local development network origins
+      try {
+        const parsed = new URL(origin);
+        const host = parsed.hostname.toLowerCase();
+        if (
+          host === 'f2hfresh.com' ||
+          host.endsWith('.f2hfresh.com') ||
+          host === 'localhost' ||
+          host === '127.0.0.1' ||
+          host.startsWith('192.168.') ||
+          host.startsWith('10.') ||
+          host.startsWith('172.')
+        ) {
+          return callback(null, true);
+        }
+      } catch {}
+
       return callback(new Error(`Origin not allowed by CORS: ${origin}`));
     },
     methods: 'GET,POST,PUT,PATCH,DELETE,OPTIONS',

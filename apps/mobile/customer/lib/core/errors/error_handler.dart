@@ -35,7 +35,7 @@ String extractErrorMessage(Object error, {String fallback = 'Something went wron
       errorStr.contains('No route to host') ||
       errorStr.contains('Connection timed out') ||
       errorStr.contains('HandshakeException') ||
-      errorStr.contains('connection error')) {
+      errorStr.toLowerCase().contains('connection error')) {
     return 'Connection failed. Please check your internet connection and try again.';
   }
 
