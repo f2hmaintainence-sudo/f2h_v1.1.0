@@ -44,6 +44,279 @@ export class AnalyticsService {
     }
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // Full revenue & payments report
+  //
+  // Money is recognised from `orders` (the row that carries branch, source and
+  // payment mode) and reconciled against `customer_bills` for collection and
+  // ageing. Cancelled, failed and rejected orders never count as revenue.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /** Resolves the reporting window from either explicit dates or a day count. */
+  private resolveRange(query: any): { from: string; to: string } {
+    const isDate = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+    if (isDate(query?.from) && isDate(query?.to)) {
+      return query.from <= query.to
+        ? { from: query.from, to: query.to }
+        : { from: query.to, to: query.from };
+    }
+    const days = Math.min(Math.max(parseInt(query?.days ?? '30', 10) || 30, 1), 366);
+    const to = new Date();
+    const from = new Date(to.getTime() - (days - 1) * 86400000);
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    return { from: iso(from), to: iso(to) };
+  }
+
+  async getRevenuePaymentsReport(query: any) {
+    try {
+      const { from, to } = this.resolveRange(query);
+
+      // Shared filters. $1/$2 are always the window; the rest are appended.
+      const params: any[] = [from, to];
+      const where: string[] = [
+        'o.deleted_at IS NULL',
+        'o.scheduled_date BETWEEN $1 AND $2',
+        "o.status NOT IN ('cancelled', 'failed', 'rejected')",
+      ];
+
+      if (query?.branch_id) {
+        params.push(query.branch_id);
+        where.push(`o.branch_id = $${params.length}`);
+      }
+      if (query?.order_source) {
+        params.push(query.order_source);
+        where.push(`o.order_source = $${params.length}`);
+      }
+      if (query?.payment_mode) {
+        params.push(query.payment_mode);
+        where.push(
+          `COALESCE(NULLIF(TRIM(o.payment_mode), ''), 'unspecified') = $${params.length}`,
+        );
+      }
+      const scope = where.join(' AND ');
+
+      // Reusable money expressions
+      const PAID = "o.payment_status = 'paid'";
+      const MODE = "COALESCE(NULLIF(TRIM(o.payment_mode), ''), 'unspecified')";
+      const SOURCE = "COALESCE(NULLIF(TRIM(o.order_source), ''), 'one-time')";
+
+      const [totalsRows, daily, byBranch, byMode, bySource, billRows, ageingRows] =
+        await Promise.all([
+          // ── Headline totals ──
+          this.db.query(
+            `SELECT
+               COALESCE(SUM(o.total_amount), 0)::numeric                                  AS gross_revenue,
+               COALESCE(SUM(o.total_amount) FILTER (WHERE ${PAID}), 0)::numeric           AS collected,
+               COALESCE(SUM(o.total_amount) FILTER (WHERE NOT (${PAID})), 0)::numeric     AS outstanding,
+               COALESCE(SUM(o.discount_amount), 0)::numeric                               AS discounts,
+               COALESCE(SUM(o.gst_amount), 0)::numeric                                    AS tax,
+               COUNT(*)::int                                                              AS orders,
+               COUNT(DISTINCT o.customer_id)::int                                         AS customers,
+               COALESCE(SUM(o.total_amount) FILTER (WHERE ${SOURCE} = 'subscription'), 0)::numeric AS subscription_revenue,
+               COALESCE(SUM(o.total_amount) FILTER (WHERE ${SOURCE} <> 'subscription'), 0)::numeric AS onetime_revenue,
+               COUNT(*) FILTER (WHERE ${SOURCE} = 'subscription')::int                    AS subscription_orders,
+               COUNT(*) FILTER (WHERE ${SOURCE} <> 'subscription')::int                   AS onetime_orders
+             FROM orders o
+             WHERE ${scope}`,
+            params,
+          ),
+
+          // ── Daily trend ──
+          this.db.query(
+            `SELECT
+               o.scheduled_date::text                                                     AS day,
+               COUNT(*)::int                                                              AS orders,
+               COALESCE(SUM(o.total_amount), 0)::numeric                                  AS revenue,
+               COALESCE(SUM(o.total_amount) FILTER (WHERE ${PAID}), 0)::numeric           AS collected,
+               COALESCE(SUM(o.total_amount) FILTER (WHERE ${SOURCE} = 'subscription'), 0)::numeric AS subscription_revenue,
+               COALESCE(SUM(o.total_amount) FILTER (WHERE ${SOURCE} <> 'subscription'), 0)::numeric AS onetime_revenue
+             FROM orders o
+             WHERE ${scope}
+             GROUP BY o.scheduled_date
+             ORDER BY o.scheduled_date ASC`,
+            params,
+          ),
+
+          // ── Branch-wise ──
+          this.db.query(
+            `SELECT
+               o.branch_id,
+               COALESCE(b.branch_name, 'Unassigned')                                      AS branch_name,
+               COUNT(*)::int                                                              AS orders,
+               COUNT(DISTINCT o.customer_id)::int                                         AS customers,
+               COALESCE(SUM(o.total_amount), 0)::numeric                                  AS revenue,
+               COALESCE(SUM(o.total_amount) FILTER (WHERE ${PAID}), 0)::numeric           AS collected,
+               COALESCE(SUM(o.total_amount) FILTER (WHERE NOT (${PAID})), 0)::numeric     AS outstanding,
+               COALESCE(SUM(o.total_amount) FILTER (WHERE ${SOURCE} = 'subscription'), 0)::numeric AS subscription_revenue,
+               COALESCE(SUM(o.total_amount) FILTER (WHERE ${SOURCE} <> 'subscription'), 0)::numeric AS onetime_revenue
+             FROM orders o
+             LEFT JOIN branches b ON b.branch_id = o.branch_id
+             WHERE ${scope}
+             GROUP BY o.branch_id, b.branch_name
+             ORDER BY revenue DESC`,
+            params,
+          ),
+
+          // ── Payment-type-wise ──
+          this.db.query(
+            `SELECT
+               ${MODE}                                                                    AS payment_mode,
+               COUNT(*)::int                                                              AS orders,
+               COALESCE(SUM(o.total_amount), 0)::numeric                                  AS revenue,
+               COALESCE(SUM(o.total_amount) FILTER (WHERE ${PAID}), 0)::numeric           AS collected,
+               COALESCE(SUM(o.total_amount) FILTER (WHERE NOT (${PAID})), 0)::numeric     AS outstanding
+             FROM orders o
+             WHERE ${scope}
+             GROUP BY ${MODE}
+             ORDER BY revenue DESC`,
+            params,
+          ),
+
+          // ── Subscription vs one-time ──
+          this.db.query(
+            `SELECT
+               ${SOURCE}                                                                  AS source,
+               COUNT(*)::int                                                              AS orders,
+               COUNT(DISTINCT o.customer_id)::int                                         AS customers,
+               COALESCE(SUM(o.total_amount), 0)::numeric                                  AS revenue,
+               COALESCE(SUM(o.total_amount) FILTER (WHERE ${PAID}), 0)::numeric           AS collected,
+               COALESCE(AVG(o.total_amount), 0)::numeric                                  AS avg_order_value
+             FROM orders o
+             WHERE ${scope}
+             GROUP BY ${SOURCE}
+             ORDER BY revenue DESC`,
+            params,
+          ),
+
+          // ── Billing: prepaid vs postpaid ──
+          this.db.query(
+            `SELECT
+               COALESCE(NULLIF(TRIM(cb.payment_type), ''), 'unspecified')                 AS payment_type,
+               COALESCE(NULLIF(TRIM(cb.bill_type), ''), 'other')                          AS bill_type,
+               COUNT(*)::int                                                              AS bills,
+               COALESCE(SUM(cb.total_amount), 0)::numeric                                 AS billed,
+               COALESCE(SUM(cb.paid_amount), 0)::numeric                                  AS paid,
+               COALESCE(SUM(cb.due_amount), 0)::numeric                                   AS due
+             FROM customer_bills cb
+             WHERE cb.deleted_at IS NULL
+               AND cb.created_at::date BETWEEN $1 AND $2
+             GROUP BY 1, 2
+             ORDER BY billed DESC`,
+            [from, to],
+          ),
+
+          // ── Collection ageing: settled on time vs overdue ──
+          this.db.query(
+            `SELECT
+               COUNT(*) FILTER (WHERE cb.due_amount <= 0)::int                            AS settled_bills,
+               COALESCE(SUM(cb.paid_amount) FILTER (WHERE cb.due_amount <= 0), 0)::numeric AS settled_amount,
+               COUNT(*) FILTER (WHERE cb.due_amount > 0 AND cb.due_date >= CURRENT_DATE)::int AS due_bills,
+               COALESCE(SUM(cb.due_amount) FILTER (WHERE cb.due_amount > 0 AND cb.due_date >= CURRENT_DATE), 0)::numeric AS due_amount,
+               COUNT(*) FILTER (WHERE cb.due_amount > 0 AND cb.due_date < CURRENT_DATE)::int AS overdue_bills,
+               COALESCE(SUM(cb.due_amount) FILTER (WHERE cb.due_amount > 0 AND cb.due_date < CURRENT_DATE), 0)::numeric AS overdue_amount
+             FROM customer_bills cb
+             WHERE cb.deleted_at IS NULL
+               AND cb.created_at::date BETWEEN $1 AND $2`,
+            [from, to],
+          ),
+        ]);
+
+      const num = (v: unknown) => Number(v ?? 0);
+      const t = totalsRows?.[0] ?? {};
+      const gross = num(t.gross_revenue);
+
+      const totals = {
+        gross_revenue: gross,
+        collected: num(t.collected),
+        outstanding: num(t.outstanding),
+        discounts: num(t.discounts),
+        tax: num(t.tax),
+        orders: num(t.orders),
+        customers: num(t.customers),
+        subscription_revenue: num(t.subscription_revenue),
+        onetime_revenue: num(t.onetime_revenue),
+        subscription_orders: num(t.subscription_orders),
+        onetime_orders: num(t.onetime_orders),
+        avg_order_value: num(t.orders) ? gross / num(t.orders) : 0,
+        collection_rate: gross ? (num(t.collected) / gross) * 100 : 0,
+      };
+
+      const shareOf = (v: unknown) => (gross ? (num(v) / gross) * 100 : 0);
+
+      return {
+        status: true,
+        data: {
+          range: { from, to },
+          filters: {
+            branch_id: query?.branch_id ?? null,
+            order_source: query?.order_source ?? null,
+            payment_mode: query?.payment_mode ?? null,
+          },
+          totals,
+          daily: (daily ?? []).map((r: any) => ({
+            day: r.day,
+            orders: num(r.orders),
+            revenue: num(r.revenue),
+            collected: num(r.collected),
+            subscription_revenue: num(r.subscription_revenue),
+            onetime_revenue: num(r.onetime_revenue),
+          })),
+          by_branch: (byBranch ?? []).map((r: any) => ({
+            branch_id: r.branch_id,
+            branch_name: r.branch_name,
+            orders: num(r.orders),
+            customers: num(r.customers),
+            revenue: num(r.revenue),
+            collected: num(r.collected),
+            outstanding: num(r.outstanding),
+            subscription_revenue: num(r.subscription_revenue),
+            onetime_revenue: num(r.onetime_revenue),
+            share_pct: shareOf(r.revenue),
+          })),
+          by_payment_mode: (byMode ?? []).map((r: any) => ({
+            payment_mode: r.payment_mode,
+            orders: num(r.orders),
+            revenue: num(r.revenue),
+            collected: num(r.collected),
+            outstanding: num(r.outstanding),
+            share_pct: shareOf(r.revenue),
+          })),
+          by_source: (bySource ?? []).map((r: any) => ({
+            source: r.source,
+            orders: num(r.orders),
+            customers: num(r.customers),
+            revenue: num(r.revenue),
+            collected: num(r.collected),
+            avg_order_value: num(r.avg_order_value),
+            share_pct: shareOf(r.revenue),
+          })),
+          billing: {
+            by_payment_type: (billRows ?? []).map((r: any) => ({
+              payment_type: r.payment_type,
+              bill_type: r.bill_type,
+              bills: num(r.bills),
+              billed: num(r.billed),
+              paid: num(r.paid),
+              due: num(r.due),
+            })),
+            collection: {
+              settled_bills: num(ageingRows?.[0]?.settled_bills),
+              settled_amount: num(ageingRows?.[0]?.settled_amount),
+              due_bills: num(ageingRows?.[0]?.due_bills),
+              due_amount: num(ageingRows?.[0]?.due_amount),
+              overdue_bills: num(ageingRows?.[0]?.overdue_bills),
+              overdue_amount: num(ageingRows?.[0]?.overdue_amount),
+            },
+          },
+        },
+        message: 'Revenue and payments report fetched',
+      };
+    } catch (error) {
+      this.developer.error('getRevenuePaymentsReport error', { error, query });
+      throw new InternalServerErrorException('Failed to retrieve revenue report');
+    }
+  }
+
   async getSubscriptionRevenue(query: any) {
     try {
       const days = parseInt(query.days || '30', 10);
