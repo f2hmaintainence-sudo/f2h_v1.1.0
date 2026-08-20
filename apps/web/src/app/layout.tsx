@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Poppins, Inter, IBM_Plex_Mono, Fraunces } from "next/font/google";
 import { AlertProvider } from "@/context/AlertContext";
 import { ToastContainer } from "@/components/Toast";
+import ChunkLoadRecovery from "@/components/common/ChunkLoadRecovery";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -94,6 +95,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body suppressHydrationWarning>
+        <ChunkLoadRecovery />
         <AlertProvider>
           {children}
           <ToastContainer />
