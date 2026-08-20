@@ -4,7 +4,7 @@
 //
 // Project     : F2H Fresh
 // File        : partner-availability/page.tsx
-// Description : Dedicated Delivery Partner Availability & Live Fleet View
+// Description : Dedicated Delivery Partner Availability View
 //               Displays real-time online status, shift metrics, GPS pings,
 //               approved leave standing, and pending leave requests.
 // ============================================================================
@@ -58,10 +58,10 @@ export default function PartnerAvailabilityPage() {
             </div>
             <div>
               <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
-                Partner Availability & Live Fleet
+                Partner Availability
               </h1>
               <p className="text-xs text-slate-500">
-                Real-time operational visibility into active delivery personnel, duty status, GPS tracking, and leave standing.
+                Active delivery partners by branch with their current availability status.
               </p>
             </div>
           </div>
@@ -72,11 +72,12 @@ export default function PartnerAvailabilityPage() {
           <div className="flex items-center gap-1.5 bg-white border border-slate-200/90 rounded-2xl px-3 py-2 shadow-2xs">
             <Building2 size={14} className="text-slate-400 shrink-0" />
             <select
+              aria-label="Filter by branch"
               value={selectedBranchId}
               onChange={(e) => setSelectedBranchId(e.target.value)}
               className="text-xs font-bold text-slate-700 bg-transparent focus:outline-none cursor-pointer"
             >
-              <option value="">All Branches / Hubs</option>
+              <option value="">All Branches</option>
               {branches.map((b) => (
                 <option key={b.branch_id || b.id} value={b.branch_id || b.id}>
                   {b.branch_name || b.name}
