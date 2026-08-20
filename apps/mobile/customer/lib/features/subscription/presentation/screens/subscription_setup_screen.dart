@@ -628,16 +628,8 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                   _buildFrequencySection(),
                   const SizedBox(height: 16),
 
-                  // ── Start Date Card ───────────────────────────
-                  _buildStartDateCard(),
-                  const SizedBox(height: 16),
-
-                  // ── Auto Renewal Card ─────────────────────────
-                  _buildAutoRenewalCard(),
-                  const SizedBox(height: 16),
-
-                  // ── Payment Type ──────────────────────────────
-                  _buildPaymentTypeSection(),
+                  // ── Start Date + Auto Renewal + Payment Type ──
+                  _buildPlanOptionsCard(),
                   const SizedBox(height: 24),
 
                   // ── Collapsible Estimation Section ────────────
@@ -785,9 +777,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                       color: isSel ? kPrimary : Colors.white,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: isSel
-                            ? kPrimary
-                            : const Color(0xFFE0E0E0),
+                        color: isSel ? kPrimary : const Color(0xFFE0E0E0),
                         width: isSel ? 1.5 : 1.0,
                       ),
                     ),
@@ -806,9 +796,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
-                            color: isSel
-                                ? Colors.white70
-                                : kPrimary,
+                            color: isSel ? Colors.white70 : kPrimary,
                           ),
                         ),
                       ],
@@ -861,11 +849,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            const Icon(
-              Icons.chevron_right_rounded,
-              size: 20,
-              color: kTextSub,
-            ),
+            const Icon(Icons.chevron_right_rounded, size: 20, color: kTextSub),
           ],
         ),
       ),
@@ -885,7 +869,10 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
           // ── Frequency title and Daily/Weekly buttons in a single row ──
           Row(
             children: [
-              const _SectionTitle(icon: Icons.repeat_rounded, label: 'Frequency'),
+              const _SectionTitle(
+                icon: Icons.repeat_rounded,
+                label: 'Frequency',
+              ),
               const Spacer(),
               _FreqChip(
                 label: 'Daily',
@@ -1141,10 +1128,104 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     return map[abbr] ?? abbr;
   }
 
-  // ── Start Date Card (Standalone Card) ─────────────────────
+  // ── Plan Options: start date + auto renewal + payment type ─
 
-  Widget _buildStartDateCard() {
-    final monthNames = [
+  Widget _buildPlanOptionsCard() {
+    return _SectionCard(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionTitle(
+            icon: Icons.tune_rounded,
+            label: 'Plan & Payment',
+          ),
+          const SizedBox(height: 12),
+          _buildStartDateRow(),
+          const SizedBox(height: 10),
+          _buildAutoRenewalRow(),
+          const SizedBox(height: 14),
+          const Divider(color: Color(0xFFE5E7EB), height: 1),
+          const SizedBox(height: 14),
+          _buildPaymentTypeContent(),
+        ],
+      ),
+    );
+  }
+
+  /// Shared layout for the two option rows so their icons, titles and
+  /// controls line up no matter how long the copy is.
+  Widget _buildPlanRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Widget trailing,
+    VoidCallback? onTap,
+  }) {
+    final row = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: kPrimaryPl,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 17, color: kPrimary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    color: kText,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    color: kTextSub,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          trailing,
+        ],
+      ),
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFFBFCFB),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFEFF2F0)),
+      ),
+      child: onTap == null
+          ? row
+          : InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(14),
+              child: row,
+            ),
+    );
+  }
+
+  // ── Start Date row (inside the plan options card) ─────────
+
+  Widget _buildStartDateRow() {
+    const monthNames = [
       'Jan',
       'Feb',
       'Mar',
@@ -1159,76 +1240,35 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       'Dec',
     ];
 
-    return _SectionCard(
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          _pickStartDate();
-        },
-        borderRadius: BorderRadius.circular(12),
+    return _buildPlanRow(
+      icon: Icons.play_circle_fill_rounded,
+      title: 'Start From',
+      subtitle: 'First delivery date',
+      onTap: () {
+        HapticFeedback.selectionClick();
+        _pickStartDate();
+      },
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: kPrimaryPl,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: kPrimary.withValues(alpha: 0.35),
+            width: 1.2,
+          ),
+        ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: kPrimaryPl,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.play_circle_fill_rounded,
-                size: 20,
+            const Icon(Icons.calendar_today_rounded, size: 13, color: kPrimary),
+            const SizedBox(width: 6),
+            Text(
+              '${_startDate.day} ${monthNames[_startDate.month - 1]} ${_startDate.year}',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
                 color: kPrimary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Start From',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      color: kText,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  const Text(
-                    'First delivery will start on this date',
-                    style: TextStyle(fontSize: 11, color: kTextSub),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 7,
-              ),
-              decoration: BoxDecoration(
-                color: kPrimaryPl,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kPrimary.withOpacity(0.35), width: 1.2),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.calendar_today_rounded,
-                    size: 14,
-                    color: kPrimary,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${_startDate.day} ${monthNames[_startDate.month - 1]} ${_startDate.year}',
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w900,
-                      color: kPrimary,
-                    ),
-                  ),
-                ],
               ),
             ),
           ],
@@ -1237,61 +1277,31 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     );
   }
 
-  // ── Auto Renewal Card (Standalone Card) ───────────────────
+  // ── Auto Renewal row (inside the plan options card) ───────
 
-  Widget _buildAutoRenewalCard() {
-    return _SectionCard(
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(
-              color: kPrimaryPl,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.autorenew_rounded,
-              size: 20,
-              color: kPrimary,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Auto Renewal',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    color: kText,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                const Text(
-                  'Subscription renews automatically each month',
-                  style: TextStyle(fontSize: 11, color: kTextSub),
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: _autoRenew,
-            onChanged: (v) {
-              HapticFeedback.lightImpact();
-              setState(() => _autoRenew = v);
-            },
-            activeColor: kPrimary,
-          ),
-        ],
+  Widget _buildAutoRenewalRow() {
+    return _buildPlanRow(
+      icon: Icons.autorenew_rounded,
+      title: 'Auto Renewal',
+      subtitle: _autoRenew
+          ? 'Renews automatically each month'
+          : 'Ends after the first month',
+      trailing: Switch(
+        value: _autoRenew,
+        onChanged: (v) {
+          HapticFeedback.lightImpact();
+          setState(() => _autoRenew = v);
+        },
+        activeThumbColor: Colors.white,
+        activeTrackColor: kPrimary,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
     );
   }
 
-  // ── Payment Type Section ──────────────────────────────
+  // ── Payment Type block (inside the plan options card) ─────
 
-  Widget _buildPaymentTypeSection() {
+  Widget _buildPaymentTypeContent() {
     final profile = context.read<CustomerSessionCubit>().state.profile;
     final isPostpaidEnabled = profile?.isPostpaidEnabled ?? false;
     final creditLimit = profile?.postpaidCreditLimit ?? 0.0;
@@ -1303,48 +1313,70 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       });
     }
 
-    return _SectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _SectionTitle(
-            icon: Icons.payments_outlined,
-            label: 'Payment Type',
+    final isPostpaid = isPostpaidEnabled && _paymentType == 'postpaid';
+
+    final String helper;
+    if (isPostpaid) {
+      helper = creditLimit > 0
+          ? 'Pay at the end of the billing cycle. Credit limit ₹${creditLimit.toStringAsFixed(0)}.'
+          : 'Pay at the end of the billing cycle.';
+    } else if (!isPostpaidEnabled) {
+      helper =
+          'Paid upfront from your wallet. Postpaid is for approved accounts only.';
+    } else {
+      helper =
+          'Paid upfront from your wallet — deliveries never pause for billing.';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const _SectionTitle(
+              icon: Icons.payments_outlined,
+              label: 'Payment Type',
+            ),
+            const Spacer(),
+            Text(
+              'No COD',
+              style: TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w800,
+                color: kTextSub.withValues(alpha: 0.8),
+                letterSpacing: 0.3,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        // Segmented selector — keeps both labels readable at any width.
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(14),
           ),
-          const SizedBox(height: 4),
-          // No COD for subscriptions
-          const Text(
-            'COD is not available for subscriptions',
-            style: TextStyle(fontSize: 10, color: kTextSub),
-          ),
-          const SizedBox(height: 12),
-          Row(
+          child: Row(
             children: [
               Expanded(
-                child: _PaymentTypeCard(
+                child: _PaymentSegment(
                   label: 'Prepaid',
-                  icon: Icons.payment_rounded,
-                  description:
-                      'Pay upfront from wallet. Ensures uninterrupted delivery.',
-                  selected: _paymentType == 'prepaid',
-                  isEnabled: true,
+                  icon: Icons.account_balance_wallet_rounded,
+                  selected: !isPostpaid,
                   onTap: () => setState(() => _paymentType = 'prepaid'),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 4),
               Expanded(
-                child: _PaymentTypeCard(
+                child: _PaymentSegment(
                   label: 'Postpaid',
-                  icon: Icons.schedule_outlined,
-                  description: isPostpaidEnabled
-                      ? (creditLimit > 0
-                            ? 'Pay at end of billing cycle. Limit: ₹${creditLimit.toStringAsFixed(0)}.'
-                            : 'Pay at end of billing cycle (approved accounts only).')
-                      : 'Postpaid facility is not activated for your account.',
-                  selected: isPostpaidEnabled && _paymentType == 'postpaid',
+                  icon: isPostpaidEnabled
+                      ? Icons.schedule_rounded
+                      : Icons.lock_outline_rounded,
+                  selected: isPostpaid,
                   isEnabled: isPostpaidEnabled,
-                  isVip: isPostpaidEnabled,
-                  creditLimit: creditLimit,
+                  showVipBadge: isPostpaidEnabled,
                   onTap: isPostpaidEnabled
                       ? () => setState(() => _paymentType = 'postpaid')
                       : null,
@@ -1352,8 +1384,13 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
               ),
             ],
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          helper,
+          style: const TextStyle(fontSize: 10.5, color: kTextSub, height: 1.35),
+        ),
+      ],
     );
   }
 
@@ -1625,7 +1662,8 @@ class _SectionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: backgroundColor ?? Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: border ?? Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
+        border:
+            border ?? Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
         boxShadow: const [
           BoxShadow(
             color: Color(0x0A000000),
@@ -1737,36 +1775,28 @@ class _FreqChip extends StatelessWidget {
   }
 }
 
-class _PaymentTypeCard extends StatelessWidget {
+class _PaymentSegment extends StatelessWidget {
   final String label;
   final IconData icon;
-  final String description;
   final bool selected;
   final bool isEnabled;
-  final bool isVip;
-  final double creditLimit;
+  final bool showVipBadge;
   final VoidCallback? onTap;
 
-  const _PaymentTypeCard({
+  const _PaymentSegment({
     required this.label,
     required this.icon,
-    required this.description,
     required this.selected,
     this.isEnabled = true,
-    this.isVip = false,
-    this.creditLimit = 0.0,
+    this.showVipBadge = false,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = kPrimary;
-    final bg = !isEnabled
-        ? const Color(0xFFF8FAFC)
-        : (selected ? const Color(0xFFF0FDF4) : Colors.white);
-    final borderColor = !isEnabled
-        ? const Color(0xFFE2E8F0)
-        : (selected ? activeColor : const Color(0xFFE2E8F0));
+    final Color contentColor = !isEnabled
+        ? const Color(0xFF94A3B8)
+        : (selected ? kPrimary : kTextSub);
 
     return GestureDetector(
       onTap: isEnabled
@@ -1776,124 +1806,66 @@ class _PaymentTypeCard extends StatelessWidget {
             }
           : null,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeInOut,
-        padding: const EdgeInsets.all(12),
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: borderColor, width: selected ? 2.0 : 1.0),
+          color: selected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(
+            color: selected ? kPrimary : Colors.transparent,
+            width: 1.4,
+          ),
           boxShadow: selected
               ? [
                   BoxShadow(
-                    color: activeColor.withValues(alpha: 0.12),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  )
+                    color: kPrimary.withValues(alpha: 0.12),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
                 ]
               : null,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: !isEnabled
-                        ? const Color(0xFFE2E8F0)
-                        : (selected
-                            ? activeColor.withValues(alpha: 0.12)
-                            : const Color(0xFFF1F5F9)),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 15,
-                    color: !isEnabled
-                        ? const Color(0xFF94A3B8)
-                        : (selected ? activeColor : kTextSub),
-                  ),
+            Icon(icon, size: 15, color: contentColor),
+            const SizedBox(width: 7),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w900,
+                  color: contentColor,
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      color: !isEnabled
-                          ? const Color(0xFF94A3B8)
-                          : (selected ? activeColor : kText),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (!isEnabled) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE2E8F0),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      'Locked',
-                      style: TextStyle(
-                        fontSize: 8.5,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
-                  ),
-                ] else if (isVip) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: const Color(0xFFF59E0B),
-                        width: 0.6,
-                      ),
-                    ),
-                    child: const Text(
-                      '👑 VIP',
-                      style: TextStyle(
-                        fontSize: 8.5,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFFB45309),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                ],
-                if (selected && isEnabled)
-                  Icon(
-                    Icons.check_circle_rounded,
-                    size: 16,
-                    color: activeColor,
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              description,
-              style: TextStyle(
-                fontSize: 10,
-                color: !isEnabled ? const Color(0xFF94A3B8) : kTextSub,
-                height: 1.35,
-                fontWeight: FontWeight.w500,
               ),
             ),
+            if (showVipBadge) ...[
+              const SizedBox(width: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'VIP',
+                  style: TextStyle(
+                    fontSize: 8,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFFB45309),
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+            ],
+            if (selected) ...[
+              const SizedBox(width: 5),
+              const Icon(Icons.check_circle_rounded, size: 14, color: kPrimary),
+            ],
           ],
         ),
       ),

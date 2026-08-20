@@ -1478,11 +1478,17 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
                                   { label: "Orders", value: plan.totalOrders },
                                   { label: "Customers", value: plan.totalCustomers },
                                   { label: "Products", value: plan.totalProducts },
-                                  { label: "Qty", value: plan.totalQuantity },
-                                ].map(({ label, value }) => (
-                                  <div key={label} className="flex flex-col items-center justify-center px-3 py-2">
-                                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">{label}</span>
-                                    <span className="font-black text-slate-700 mt-0.5">{value}</span>
+                                  ...((plan.totalExtraQty || 0) > 0 ? [
+                                    { label: "Planned", value: plan.totalPlannedQty ?? plan.totalQuantity },
+                                    { label: "Extra", value: `+${plan.totalExtraQty}`, highlight: true },
+                                    { label: "Total Qty", value: plan.totalQuantity },
+                                  ] : [
+                                    { label: "Qty", value: plan.totalQuantity },
+                                  ]),
+                                ].map(({ label, value, highlight }: any) => (
+                                  <div key={label} className={`flex flex-col items-center justify-center px-3 py-2 ${highlight ? "bg-amber-50" : ""}`}>
+                                    <span className={`text-[9px] font-black uppercase tracking-wider ${highlight ? "text-amber-700" : "text-slate-400"}`}>{label}</span>
+                                    <span className={`font-black mt-0.5 ${highlight ? "text-amber-900" : "text-slate-700"}`}>{value}</span>
                                   </div>
                                 ))}
                               </div>
@@ -1505,26 +1511,65 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
                           {isExpanded && (
                             <div className="border-t border-slate-100 bg-slate-50/30 p-4 md:p-5 animate-in fade-in slide-in-from-top-1 duration-200 space-y-4">
                               <div className="space-y-2">
-                                <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">Handover Items</h4>
+                                <div className="flex items-center justify-between">
+                                  <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">Handover Items</h4>
+                                  {(plan.totalExtraQty || 0) > 0 && (
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300/80 shadow-2xs">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                      +{plan.totalExtraQty} Extra Units Loaded
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="bg-white border border-slate-200/80 rounded-xl overflow-hidden shadow-xs">
                                   <table className="w-full text-xs text-left">
                                     <thead>
                                       <tr className="border-b border-slate-100 bg-slate-50/80 text-[10px] font-black text-slate-500 uppercase tracking-wider">
                                         <th className="px-4 py-3">Product</th>
                                         <th className="px-4 py-3">Variant</th>
-                                        <th className="px-4 py-3 text-center w-20">Qty</th>
+                                        <th className="px-4 py-3 text-center w-20">Planned</th>
+                                        <th className="px-4 py-3 text-center w-24">Extra Load</th>
+                                        <th className="px-4 py-3 text-center w-24">Total Loaded</th>
                                         <th className="px-4 py-3 text-center w-16">Orders</th>
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
-                                      {Object.values(plan.totals).map((t, idx) => (
-                                        <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                                          <td className="px-4 py-3 font-semibold text-slate-800">{t.product_name}</td>
-                                          <td className="px-4 py-3 text-slate-500 font-medium">{t.variant_name || "—"}</td>
-                                          <td className="px-4 py-3 text-center"><span className="inline-flex px-2 py-0.5 bg-emerald-600 text-white rounded-lg font-black text-[11px]">×{t.quantity}</span></td>
-                                          <td className="px-4 py-3 text-center font-bold text-slate-500">{t.orderCount || 1}</td>
-                                        </tr>
-                                      ))}
+                                      {Object.values(plan.totals).map((t, idx) => {
+                                        const hasExtra = (t.extra_qty || 0) > 0;
+                                        const plannedVal = t.planned_qty !== undefined ? t.planned_qty : t.quantity;
+                                        return (
+                                          <tr key={idx} className={`hover:bg-slate-50/50 transition-colors ${hasExtra ? "bg-amber-50/20" : ""}`}>
+                                            <td className="px-4 py-3 font-semibold text-slate-800">
+                                              <div className="flex items-center gap-1.5">
+                                                <span>{t.product_name}</span>
+                                                {hasExtra && (
+                                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-amber-200 text-amber-900 uppercase">
+                                                    Extra
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-500 font-medium">{t.variant_name || "—"}</td>
+                                            <td className="px-4 py-3 text-center font-bold text-slate-600">
+                                              {plannedVal}
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                              {hasExtra ? (
+                                                <span className="inline-flex px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-lg font-black text-[11px]">
+                                                  +{t.extra_qty}
+                                                </span>
+                                              ) : (
+                                                <span className="text-slate-300 font-bold">—</span>
+                                              )}
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                              <span className="inline-flex px-2.5 py-0.5 bg-emerald-600 text-white rounded-lg font-black text-[11px] shadow-2xs">
+                                                ×{t.quantity}
+                                              </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-center font-bold text-slate-500">{t.orderCount || (hasExtra && plannedVal === 0 ? 0 : 1)}</td>
+                                          </tr>
+                                        );
+                                      })}
                                     </tbody>
                                   </table>
                                 </div>
@@ -1534,7 +1579,7 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
                                 <div className="flex items-center justify-between">
                                   <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">Customer Orders ({plan.orders.length})</h4>
                                   <button onClick={() => setShowOrderBreakdowns((prev) => ({ ...prev, [plan.run_id]: !prev[plan.run_id] }))}
-                                    className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 hover:text-emerald-900 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-100 transition-all no-print">
+                                    className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 hover:text-emerald-900 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-100 transition-all no-print cursor-pointer">
                                     {showBreakdown ? <><EyeOff size={10} /> Hide Orders</> : <><Eye size={10} /> View Orders</>}
                                   </button>
                                 </div>
@@ -1586,12 +1631,7 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
                                       )}
                                     </div>
                                   );
-                                })() : (
-                                  <div className="bg-white border border-dashed border-slate-200 rounded-2xl p-6 text-center">
-                                    <ShoppingBag size={22} className="mx-auto text-slate-300 mb-2" />
-                                    <p className="text-[11px] text-slate-400 font-semibold">Click "View Orders" to see customer breakdown</p>
-                                  </div>
-                                )}
+                                })() : null}
                               </div>
                             </div>
                           )}

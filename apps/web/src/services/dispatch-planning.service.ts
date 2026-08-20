@@ -7,6 +7,9 @@ export interface DispatchItem {
   unit_value: number | null;
   unit_type: string;
   quantity: number;
+  planned_qty?: number;
+  loaded_qty?: number;
+  extra_qty?: number;
   /** Warehouse-friendly display string, e.g. "1000 ml Milk × 3" */
   displayLabel: string;
   orderCount?: number;
@@ -36,6 +39,9 @@ export interface DeliveryPartnerPlan {
   status: string;
   orders: DispatchOrder[];
   totals: Record<string, DispatchItem>;
+  extraItems?: DispatchItem[];
+  totalExtraQty?: number;
+  totalPlannedQty?: number;
   totalOrders: number;
   totalCustomers: number;
   totalQuantity: number;
@@ -167,12 +173,14 @@ export class DispatchPlanningService {
 
       const isDispatched = ['dispatched', 'in_progress', 'completed', 'partial'].includes(run.status);
       if (isHistorical || isDispatched) {
-        // Count orders that contain each product group for this run
+        // Count orders and customer quantities that contain each product group for this run
         const orderCounts: Record<string, number> = {};
+        const orderQuantities: Record<string, number> = {};
         orders.forEach(order => {
           const seen = new Set<string>();
           order.items.forEach(item => {
             const groupKey = `${item.product_name.trim()}::${item.variant_name.trim()}`;
+            orderQuantities[groupKey] = (orderQuantities[groupKey] || 0) + item.quantity;
             if (!seen.has(groupKey)) {
               orderCounts[groupKey] = (orderCounts[groupKey] || 0) + 1;
               seen.add(groupKey);
@@ -181,32 +189,69 @@ export class DispatchPlanningService {
         });
 
         // Populate totals directly from table data (delivery_dispatch_items)
-        dispatchItems.forEach((row: any) => {
-          const unitType = row.unit || row.unit_type || 'pcs';
-          const unitValue = row.unit_value ? Number(row.unit_value) : null;
-          
-          // Real proper product name is row.variant_name (corresponds to pv.name in DB)
-          const productName = row.variant_name || row.product_name || 'Unknown Product';
-          
-          // Variant details is unit representation
-          const variantName = unitValue && unitType ? `${unitValue} ${unitType}` : (row.variant_name || '');
-          const groupKey = `${productName.trim()}::${variantName.trim()}`;
-          const qty = Number(row.loaded_qty) || Number(row.planned_qty) || 0;
+        if (dispatchItems.length > 0) {
+          dispatchItems.forEach((row: any) => {
+            const unitType = row.unit || row.unit_type || 'pcs';
+            const unitValue = row.unit_value ? Number(row.unit_value) : null;
+            
+            // Real proper product name is row.variant_name (corresponds to pv.name in DB)
+            const productName = row.variant_name || row.product_name || 'Unknown Product';
+            
+            // Variant details is unit representation
+            const variantName = unitValue && unitType ? `${unitValue} ${unitType}` : (row.variant_name || '');
+            const groupKey = `${productName.trim()}::${variantName.trim()}`;
+            const plannedQty = Number(row.planned_qty || 0);
+            const loadedQty = Number(row.loaded_qty) || plannedQty || 0;
+            // Extra is any loaded units beyond planned orders
+            const effectivePlanned = plannedQty > 0 ? plannedQty : (orderQuantities[groupKey] || 0);
+            const extraQty = Math.max(0, loadedQty - effectivePlanned);
 
-          if (!totals[groupKey]) {
-            totals[groupKey] = {
-              product_variant_id: row.product_variant_id,
-              product_name: productName,
-              variant_name: variantName,
-              unit_value: unitValue,
-              unit_type: unitType,
-              quantity: 0,
-              displayLabel: '',
-              orderCount: orderCounts[groupKey] || 1
-            };
-          }
-          totals[groupKey].quantity += qty;
-        });
+            if (!totals[groupKey]) {
+              totals[groupKey] = {
+                product_variant_id: row.product_variant_id,
+                product_name: productName,
+                variant_name: variantName,
+                unit_value: unitValue,
+                unit_type: unitType,
+                quantity: 0,
+                planned_qty: 0,
+                loaded_qty: 0,
+                extra_qty: 0,
+                displayLabel: '',
+                orderCount: orderCounts[groupKey] || (effectivePlanned > 0 ? 1 : 0)
+              };
+            }
+            totals[groupKey].quantity += loadedQty;
+            totals[groupKey].planned_qty = (totals[groupKey].planned_qty || 0) + effectivePlanned;
+            totals[groupKey].loaded_qty = (totals[groupKey].loaded_qty || 0) + loadedQty;
+            totals[groupKey].extra_qty = (totals[groupKey].extra_qty || 0) + extraQty;
+          });
+        } else {
+          // Fallback if dispatchItems row not populated: use customer orders
+          orders.forEach(order => {
+            order.items.forEach(item => {
+              const groupKey = `${item.product_name.trim()}::${item.variant_name.trim()}`;
+              if (!totals[groupKey]) {
+                totals[groupKey] = {
+                  product_variant_id: item.product_variant_id,
+                  product_name: item.product_name,
+                  variant_name: item.variant_name,
+                  unit_value: item.unit_value,
+                  unit_type: item.unit_type,
+                  quantity: 0,
+                  planned_qty: 0,
+                  loaded_qty: 0,
+                  extra_qty: 0,
+                  displayLabel: '',
+                  orderCount: orderCounts[groupKey] || 1
+                };
+              }
+              totals[groupKey].quantity += item.quantity;
+              totals[groupKey].planned_qty = (totals[groupKey].planned_qty || 0) + item.quantity;
+              totals[groupKey].loaded_qty = (totals[groupKey].loaded_qty || 0) + item.quantity;
+            });
+          });
+        }
 
         // Compute display labels
         Object.keys(totals).forEach(key => {
@@ -228,11 +273,16 @@ export class DispatchPlanningService {
                 unit_value: item.unit_value,
                 unit_type: item.unit_type,
                 quantity: 0,
+                planned_qty: 0,
+                loaded_qty: 0,
+                extra_qty: 0,
                 displayLabel: '',
                 orderCount: 0
               };
             }
             totals[groupKey].quantity += item.quantity;
+            totals[groupKey].planned_qty = (totals[groupKey].planned_qty || 0) + item.quantity;
+            totals[groupKey].loaded_qty = (totals[groupKey].loaded_qty || 0) + item.quantity;
             if (!seenInOrder.has(groupKey)) {
               totals[groupKey].orderCount = (totals[groupKey].orderCount || 0) + 1;
               seenInOrder.add(groupKey);
@@ -248,6 +298,9 @@ export class DispatchPlanningService {
       }
 
       const totalQty = Object.values(totals).reduce((sum, item) => sum + item.quantity, 0);
+      const totalPlannedQty = Object.values(totals).reduce((sum, item) => sum + (item.planned_qty ?? item.quantity), 0);
+      const totalExtraQty = Object.values(totals).reduce((sum, item) => sum + (item.extra_qty || 0), 0);
+      const extraItems = Object.values(totals).filter(item => (item.extra_qty || 0) > 0 || (item.orderCount === 0 && item.quantity > 0));
 
       return {
         id: run.id, // Primary key
@@ -264,6 +317,9 @@ export class DispatchPlanningService {
         status: run.status,
         orders,
         totals,
+        extraItems,
+        totalExtraQty,
+        totalPlannedQty,
         totalOrders: orders.length,
         totalCustomers: new Set(orders.map(o => o.customer_name)).size,
         totalQuantity: totalQty,
