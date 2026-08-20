@@ -57,14 +57,6 @@ export class DeliveryDispatchService {
           `DELETE FROM delivery_dispatch_items WHERE delivery_run_id = $1`,
           [run.run_id],
         );
-        await client.query(
-          `UPDATE dispatch_balances 
-           SET dispatched_qty = 0,
-               balance_qty = - delivered_qty - returned_qty - damaged_qty,
-               updated_at = NOW()
-           WHERE delivery_partner_id = $1 AND run_date = $2 AND delivery_slot = $3`,
-          [run.delivery_partner_id, run.run_date, run.delivery_slot],
-        );
 
         for (const item of items) {
           const loadedQty = item.loaded_qty || item.planned_qty;
@@ -111,25 +103,6 @@ export class DeliveryDispatchService {
             notes: `Dispatch to delivery boy for run ${run.run_id || runId}`,
             created_by: adminId,
           });
-
-          // 3a. Record to dispatch_balances
-          await client.query(
-            `INSERT INTO dispatch_balances (
-              delivery_partner_id, product_variant_id, run_date, delivery_slot,
-              dispatched_qty, balance_qty, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $5, NOW(), NOW())
-            ON CONFLICT (delivery_partner_id, product_variant_id, run_date, delivery_slot) DO UPDATE SET
-              dispatched_qty = EXCLUDED.dispatched_qty,
-              balance_qty = EXCLUDED.dispatched_qty - dispatch_balances.delivered_qty - dispatch_balances.returned_qty - dispatch_balances.damaged_qty,
-              updated_at = NOW()`,
-            [
-              run.delivery_partner_id,
-              item.product_variant_id,
-              run.run_date,
-              run.delivery_slot,
-              loadedQty
-            ]
-          );
 
           results.push(insertResult.rows[0]);
         }
@@ -221,28 +194,6 @@ export class DeliveryDispatchService {
             ],
           );
 
-          // 2a. Update dispatch_balances
-          await client.query(
-            `UPDATE dispatch_balances SET
-              delivered_qty = $5,
-              returned_qty = $6,
-              damaged_qty = $7,
-              balance_qty = dispatched_qty - $5 - $6 - $7,
-              updated_at = NOW()
-            WHERE delivery_partner_id = $1
-              AND product_variant_id = $2
-              AND run_date = $3
-              AND delivery_slot = $4`,
-            [
-              run.delivery_partner_id,
-              item.product_variant_id,
-              run.run_date,
-              run.delivery_slot,
-              item.delivered_qty,
-              item.returned_qty,
-              item.damaged_qty
-            ]
-          );
 
           // 3. Create stock IN movement for returned items
           if (item.returned_qty > 0) {
@@ -385,60 +336,12 @@ WHERE ${where.join(' AND ')}
         WHERE dr.id::varchar = $1 OR dr.run_id = $1
         ORDER BY p.name, pv.name
       `;
-      let rows = await this.db.query(sql, [runId]);
-      if (rows.length === 0) {
-        const fallbackSql = `
-          SELECT
-            drq.id,
-            drq.run_id AS delivery_run_id,
-            drq.product_variant_id,
-            drq.required_quantity AS planned_qty,
-            0::numeric AS loaded_qty,
-            0::numeric AS delivered_qty,
-            0::numeric AS returned_qty,
-            0::numeric AS damaged_qty,
-            0::numeric AS extra_sold_qty,
-            drq.unit,
-            NULL AS remarks,
-            drq.created_at,
-            drq.updated_at,
-            pv.name AS variant_name, pv.sku,
-            pv.unit_value,
-            pv.unit_type,
-            p.name AS product_name,
-            NULL AS warehouse_name,
-            0::numeric AS warehouse_stock
-          FROM dispatch_requirements drq
-          LEFT JOIN product_variants pv ON pv.variant_id = drq.product_variant_id
-          LEFT JOIN products p ON p.product_id = pv.product_id
-          JOIN delivery_runs dr ON dr.run_id = drq.run_id
-          WHERE dr.id::varchar = $1 OR dr.run_id = $1
-          ORDER BY p.name, pv.name
-        `;
-        rows = await this.db.query(fallbackSql, [runId]);
-      }
+      const rows = await this.db.query(sql, [runId]);
 
       return { status: true, data: rows, message: 'Run dispatch items fetched' };
     } catch (error) {
       this.developer.error('getRunDispatchItems error', { error });
       throw new InternalServerErrorException('Failed to retrieve run dispatch items');
-    }
-  }
-
-  async getRequirementDates() {
-    try {
-      const sql = `
-        SELECT DISTINCT run_date::varchar
-        FROM dispatch_requirements
-        ORDER BY run_date::varchar DESC
-        LIMIT 30
-      `;
-      const rows = await this.db.query(sql);
-      const dates = rows.map(r => r.run_date);
-      return { status: true, data: dates, message: 'Requirement dates fetched' };
-    } catch (error) {
-      this.developer.error('getRequirementDates error', { error });
-      throw new InternalServerErrorException('Failed to fetch requirement dates');
     }
   }
 

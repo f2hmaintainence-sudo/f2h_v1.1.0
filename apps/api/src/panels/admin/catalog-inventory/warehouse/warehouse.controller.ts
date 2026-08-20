@@ -379,34 +379,8 @@ export class WarehouseController {
   }
 
   // =====================================================
-  // DISPATCH PLANS
+  // DISPATCH REQUIREMENTS
   // =====================================================
-
-  @Get('dispatch/table')
-  async getDispatchPlans(@Query() query: any) {
-    return this.dispatchService.getDispatchPlans(query);
-  }
-
-  @Get('dispatch/:id')
-  async getDispatchPlanDetails(@Param('id') id: string) {
-    return this.dispatchService.getDispatchPlanDetails(id);
-  }
-
-  @Post('dispatch/saveAdd')
-  async createDispatchPlan(@Body() body: any, @Req() req: any) {
-    const adminId = req.user?.user_id ?? req.user?.id ?? 'system';
-    return this.dispatchService.createDispatchPlan(body, adminId);
-  }
-
-  @Post('dispatch/:id/status')
-  async updateDispatchPlanStatus(
-    @Param('id') id: string,
-    @Body() body: { status: string },
-    @Req() req: any,
-  ) {
-    const adminId = req.user?.user_id ?? req.user?.id ?? 'system';
-    return this.dispatchService.updateDispatchPlanStatus(id, body.status, adminId);
-  }
 
   @Get('dispatch/requirements/:branchId')
   async computeDispatchRequirements(

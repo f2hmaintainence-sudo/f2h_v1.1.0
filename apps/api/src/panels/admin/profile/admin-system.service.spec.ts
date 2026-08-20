@@ -69,6 +69,28 @@ describe('AdminSystemService audit logs', () => {
     const rowsParams = rowsCall![1] ?? [];
     const insightSql = insightCall![0];
     const insightParams = insightCall![1] ?? [];
+    const normalizedRowsSql = rowsSql.replace(/\s+/g, ' ');
+    const normalizedInsightSql = insightSql.replace(/\s+/g, ' ');
+    const normalizedAdminSql = adminCall![0].replace(/\s+/g, ' ');
+    const resolvedAdminNameSql =
+      "COALESCE(NULLIF(BTRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), NULLIF(u.user_name, ''), NULLIF(al.admin_name, ''), al.admin_id)";
+
+    expect(normalizedRowsSql).toContain(
+      'LEFT JOIN users u ON u.user_id = al.admin_id',
+    );
+    expect(normalizedRowsSql).toContain(
+      resolvedAdminNameSql + ' AS admin_name',
+    );
+    expect(normalizedRowsSql).toContain(resolvedAdminNameSql + ' ILIKE $4');
+    expect(normalizedInsightSql).toContain(
+      'LEFT JOIN users u ON u.user_id = al.admin_id',
+    );
+    expect(normalizedAdminSql).toContain(
+      'LEFT JOIN users u ON u.user_id = al.admin_id',
+    );
+    expect(normalizedAdminSql).toContain(
+      resolvedAdminNameSql + ' AS admin_name',
+    );
     expect(rowsSql).toContain('al.admin_id = $1');
     expect(rowsSql).toContain('al.action = $2');
     expect(rowsSql).toContain('al.target_type = $3');
