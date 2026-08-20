@@ -1,4 +1,4 @@
-.PHONY: help customer partner customer-run customer-bg customer-attach partner-run partner-bg partner-attach api web build-customer build-partner build-all dev-all stop status
+.PHONY: help customer partner customer-run customer-bg customer-attach partner-run partner-bg partner-attach api web build-customer build-partner build-all dev-all stop status run dev
 
 DART_API = https://f2hfresh.com
 
@@ -21,6 +21,8 @@ help:
 	@echo "  make stop            - Stop background services"
 	@echo "═══════════════════════════════════════════════════════════════════════════════"
 	@echo ""
+
+run: customer-run
 
 customer:
 	./build-flutter.sh customer

@@ -51,11 +51,11 @@ export class ProfileService {
       const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
       const sql = `
         SELECT u.user_id, u.email, u.first_name, u.last_name, u.phone, u.account_status, u.created_at,
-          ARRAY_AGG(r.role_name) AS roles
+          ARRAY_AGG(r.name) AS roles
         FROM users u
-        JOIN user_roles ur ON ur.user_id = u.user_id
-        JOIN roles r ON r.role_id = ur.role_id
-        WHERE r.role_name = 'ADMIN'
+        JOIN role_assignments ra ON ra.user_id = u.user_id AND ra.is_active = 1 AND ra.deleted_at IS NULL
+        JOIN roles r ON UPPER(r.role_id) = UPPER(ra.role_id)
+        WHERE UPPER(ra.role_id) = 'ADMIN'
         GROUP BY u.user_id, u.email, u.first_name, u.last_name, u.phone, u.account_status, u.created_at
         ORDER BY u.created_at DESC
         LIMIT $1 OFFSET $2
@@ -70,7 +70,7 @@ export class ProfileService {
 
   async getRoles() {
     try {
-      const rows = await this.db.query('SELECT * FROM roles ORDER BY role_name ASC');
+      const rows = await this.db.query('SELECT * FROM roles ORDER BY name ASC');
       return { status: true, data: rows, message: 'Roles fetched' };
     } catch (error) {
       this.developer.error('getRoles error', { error });

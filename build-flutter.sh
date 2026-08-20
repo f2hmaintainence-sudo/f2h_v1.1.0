@@ -10,7 +10,7 @@ build_app() {
   local NAME="$1"
   local DIR="$2"
   echo -e "${C}▶  Building Flutter ${NAME} (Fast Mode)…${NC}"
-  cd "$DIR" && flutter build web --no-pub --no-tree-shake-icons --no-wasm-dry-run
+  cd "$DIR" && flutter build web --no-pub --no-tree-shake-icons --no-wasm-dry-run --dart-define=F2H_API_BASE_URL="${DART_API}"
   echo -e "${G}  ✓ ${NAME} built! Live preview updated on domain (<0.1s page load).${NC}"
 }
 

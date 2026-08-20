@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { DatabaseService } from '../../../shared/database/Database.service';
 import { DeveloperService } from '../../../shared/logger/Developer.service';
 import { AuditLogQueryDto } from './admin-system.dto';
@@ -231,6 +235,14 @@ export class AdminSystemService {
   // Audit Logs
   // ────────────────────────────────────────────────
   async getAuditLogs(query: AuditLogQueryDto) {
+    if (
+      query.from_date &&
+      query.to_date &&
+      query.from_date > query.to_date
+    ) {
+      throw new BadRequestException('from_date cannot be after to_date');
+    }
+
     try {
       const {
         admin_id,
@@ -239,6 +251,7 @@ export class AdminSystemService {
         search,
         from_date,
         to_date,
+        include_filter_options = 'true',
         page = 1,
         limit = 50,
       } = query;
@@ -248,15 +261,15 @@ export class AdminSystemService {
 
       if (admin_id) {
         params.push(admin_id);
-        where.push(`al.admin_id = ${params.length}`);
+        where.push(`al.admin_id = $${params.length}`);
       }
       if (action) {
         params.push(action);
-        where.push(`al.action = ${params.length}`);
+        where.push(`al.action = $${params.length}`);
       }
       if (target_type) {
         params.push(target_type);
-        where.push(`al.target_type = ${params.length}`);
+        where.push(`al.target_type = $${params.length}`);
       }
       if (search) {
         params.push(`%${search}%`);
@@ -271,13 +284,13 @@ export class AdminSystemService {
       if (from_date) {
         params.push(from_date);
         where.push(
-          `al.created_at >= (${params.length}::date::timestamp AT TIME ZONE 'Asia/Kolkata')`,
+          `al.created_at >= ($${params.length}::date::timestamp AT TIME ZONE 'Asia/Kolkata')`,
         );
       }
       if (to_date) {
         params.push(to_date);
         where.push(
-          `al.created_at < ((${params.length}::date + INTERVAL '1 day') AT TIME ZONE 'Asia/Kolkata')`,
+          `al.created_at < (($${params.length}::date + INTERVAL '1 day') AT TIME ZONE 'Asia/Kolkata')`,
         );
       }
 
@@ -346,11 +359,12 @@ export class AdminSystemService {
             COALESCE(NULLIF(admin_name, ''), admin_id) AS admin_name
           FROM admin_audit_logs
           WHERE admin_id IS NOT NULL AND admin_id <> ''
-          ORDER BY admin_id, created_at DESC
+          ORDER BY admin_id, created_at DESC, id DESC
         ) latest_admin_names
         ORDER BY admin_name ASC, admin_id ASC
       `;
 
+      const shouldLoadFilterOptions = include_filter_options === 'true';
       const [rows, insightRows, filterOptionRows, adminOptions] =
         await Promise.all([
           this.db.query<Record<string, unknown>>(rowsSql, [
@@ -359,8 +373,12 @@ export class AdminSystemService {
             offset,
           ]),
           this.db.query<AuditInsightRow>(insightSql, params),
-          this.db.query<AuditFilterOptionsRow>(filterOptionsSql),
-          this.db.query<AuditAdminOption>(adminOptionsSql),
+          shouldLoadFilterOptions
+            ? this.db.query<AuditFilterOptionsRow>(filterOptionsSql)
+            : Promise.resolve([]),
+          shouldLoadFilterOptions
+            ? this.db.query<AuditAdminOption>(adminOptionsSql)
+            : Promise.resolve([]),
         ]);
 
       const insightRow = insightRows[0];
@@ -381,11 +399,15 @@ export class AdminSystemService {
         data: rows,
         total: insights.total_events,
         insights,
-        filter_options: {
-          actions: filterOptionRow?.actions ?? [],
-          target_types: filterOptionRow?.target_types ?? [],
-          admins: adminOptions,
-        },
+        ...(shouldLoadFilterOptions
+          ? {
+              filter_options: {
+                actions: filterOptionRow?.actions ?? [],
+                target_types: filterOptionRow?.target_types ?? [],
+                admins: adminOptions,
+              },
+            }
+          : {}),
         message: 'Audit logs fetched',
       };
     } catch (error) {

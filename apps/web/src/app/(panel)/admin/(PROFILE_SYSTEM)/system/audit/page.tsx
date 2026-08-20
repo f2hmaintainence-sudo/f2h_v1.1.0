@@ -67,7 +67,7 @@ interface AuditLogResponse {
   data: AuditLog[];
   total: number;
   insights: AuditInsights;
-  filter_options: AuditFilterOptions;
+  filter_options?: AuditFilterOptions;
   message?: string;
 }
 
@@ -118,6 +118,7 @@ function formatTimestamp(value?: string | null): string {
   if (Number.isNaN(date.getTime())) return "—";
 
   return date.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -179,6 +180,8 @@ function AuditDetailsDialog({ log, onClose }: AuditDetailsDialogProps) {
         ? document.activeElement
         : null;
     closeButtonRef.current?.focus();
+    const previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
 
     const handleEscape = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -187,6 +190,7 @@ function AuditDetailsDialog({ log, onClose }: AuditDetailsDialogProps) {
 
     return () => {
       document.removeEventListener("keydown", handleEscape);
+      document.body.style.overflow = previousBodyOverflow;
       previousFocus?.focus();
     };
   }, [onClose]);
@@ -354,6 +358,7 @@ export default function AuditLogPage() {
   const [filterError, setFilterError] = useState("");
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+  const filterOptionsLoadedRef = useRef(false);
 
   useEffect(() => {
     let ignore = false;
@@ -365,6 +370,7 @@ export default function AuditLogPage() {
       const params = new URLSearchParams({
         page: String(page),
         limit: String(PAGE_SIZE),
+        include_filter_options: String(!filterOptionsLoadedRef.current),
       });
       for (const [key, value] of Object.entries(appliedFilters)) {
         if (value) params.set(key, value);
@@ -376,16 +382,29 @@ export default function AuditLogPage() {
       if (ignore) return;
 
       if (response.error || !response.data?.status) {
+        setLogs([]);
+        setTotal(0);
+        setInsights(EMPTY_INSIGHTS);
         setError("Audit activity could not be loaded. Please try again.");
         setLoading(false);
         return;
       }
 
       const payload = response.data;
+      const nextTotal = Number(payload.total ?? 0);
+      const lastPage = Math.max(1, Math.ceil(nextTotal / PAGE_SIZE));
+      if (page > lastPage) {
+        setPage(lastPage);
+        return;
+      }
+
       setLogs(Array.isArray(payload.data) ? payload.data : []);
-      setTotal(Number(payload.total ?? 0));
+      setTotal(nextTotal);
       setInsights(payload.insights ?? EMPTY_INSIGHTS);
-      setFilterOptions(payload.filter_options ?? EMPTY_FILTER_OPTIONS);
+      if (payload.filter_options) {
+        setFilterOptions(payload.filter_options);
+        filterOptionsLoadedRef.current = true;
+      }
       setLoading(false);
     };
 

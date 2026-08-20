@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsDateString,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -36,19 +37,26 @@ export class AuditLogQueryDto {
   @IsOptional()
   @IsString()
   @Matches(DATE_PATTERN, { message: 'from_date must be YYYY-MM-DD' })
-  @IsDateString({}, { message: 'from_date must be a valid date' })
+  @IsDateString(
+    { strict: true, strictSeparator: true },
+    { message: 'from_date must be a valid date' },
+  )
   from_date?: string;
 
   @IsOptional()
   @IsString()
   @Matches(DATE_PATTERN, { message: 'to_date must be YYYY-MM-DD' })
-  @IsDateString({}, { message: 'to_date must be a valid date' })
+  @IsDateString(
+    { strict: true, strictSeparator: true },
+    { message: 'to_date must be a valid date' },
+  )
   to_date?: string;
 
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(10000)
   page?: number = 1;
 
   @IsOptional()
@@ -57,4 +65,8 @@ export class AuditLogQueryDto {
   @Min(1)
   @Max(100)
   limit?: number = 50;
+
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  include_filter_options?: string = 'true';
 }
