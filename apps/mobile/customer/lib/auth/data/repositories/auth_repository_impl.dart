@@ -179,6 +179,9 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<bool> hasLocalSession() => TokenStorage.hasSession();
+
+  @override
   Future<User?> getCachedUser() async {
     return (await localDataSource.getLastUser())?.toEntity();
   }

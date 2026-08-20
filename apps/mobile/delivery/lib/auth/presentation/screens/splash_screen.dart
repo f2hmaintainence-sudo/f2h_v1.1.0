@@ -22,6 +22,10 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
 
+  /// Splash routes exactly once — the listener and the mount-time check below
+  /// can both see the same resolved state.
+  bool _routed = false;
+
   @override
   void initState() {
     super.initState();
@@ -49,6 +53,23 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
     _fadeController.forward();
     _scaleController.forward();
+
+    // The session check may already have resolved before this listener was
+    // attached; a BlocListener only reports changes, so read the state once.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _onAuthStateResolved(context.read<AuthBloc>().state);
+    });
+  }
+
+  /// Routes off the splash once the session is known either way.
+  void _onAuthStateResolved(AuthState state) {
+    if (_routed) return;
+    if (state is AuthInitial || state is AuthLoading) return;
+    _routed = true;
+    Future.delayed(const Duration(milliseconds: 800), () {
+      _checkOnboardingAndNavigate(state);
+    });
   }
 
   @override
@@ -98,11 +119,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         // Once AuthCheckRequested completes and resolves the state, execute routing
-        if (state is! AuthInitial && state is! AuthLoading) {
-          Future.delayed(const Duration(milliseconds: 800), () {
-            _checkOnboardingAndNavigate(state);
-          });
-        }
+        _onAuthStateResolved(state);
       },
       child: Scaffold(
         backgroundColor: kBg,

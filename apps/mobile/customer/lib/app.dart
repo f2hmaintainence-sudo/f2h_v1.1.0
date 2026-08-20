@@ -38,7 +38,10 @@ class F2HApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MultiBlocProvider(
     providers: [
+      // Eager: the session check has to start with the app, not when the splash
+      // screen finally mounts its child, or a signed-in user waits twice.
       BlocProvider<AuthBloc>(
+        lazy: false,
         create: (_) => sl<AuthBloc>()..add(const AuthCheckRequested()),
       ),
       BlocProvider<CustomerSessionCubit>(
@@ -78,6 +81,11 @@ class F2HApp extends StatelessWidget {
             builder: (context, state) {
               if (state is Authenticated) {
                 return const CustomerSessionGate();
+              }
+              // Session still unknown — hold a loading screen rather than
+              // showing a login form to someone who is already signed in.
+              if (state is AuthInitial || state is AuthCheckInProgress) {
+                return const InitialLoadingScreen();
               }
               return const LoginScreen();
             },

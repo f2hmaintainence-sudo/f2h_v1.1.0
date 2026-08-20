@@ -26,5 +26,10 @@ abstract class AuthRepository {
   });
   Future<void> logout();
   Future<bool> checkAuthStatus();
+
+  /// Whether tokens for a previous session are still on the device.
+  /// Used as the offline answer when [checkAuthStatus] cannot reach the server.
+  Future<bool> hasLocalSession();
+
   Future<User?> getCachedUser();
 }

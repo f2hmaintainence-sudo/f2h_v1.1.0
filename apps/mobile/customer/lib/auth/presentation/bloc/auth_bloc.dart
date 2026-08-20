@@ -123,11 +123,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     AuthCheckRequested event,
     Emitter<AuthState> emit,
   ) async {
-    emit(AuthLoading());
+    emit(AuthCheckInProgress());
     try {
+      // A slow or unreachable server must not sign anyone out: fall back to the
+      // stored session so the app still opens on Home.
       final isAuthenticated = await authRepository
           .checkAuthStatus()
-          .timeout(const Duration(seconds: 5), onTimeout: () => false);
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: authRepository.hasLocalSession,
+          );
       if (isAuthenticated) {
         final user = await authRepository.getCachedUser();
         emit(
@@ -139,7 +144,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(const Unauthenticated());
       }
     } catch (_) {
-      emit(const Unauthenticated());
+      emit(
+        await authRepository.hasLocalSession()
+            ? Authenticated(
+                user: await authRepository.getCachedUser() ??
+                    User(userId: 'session', email: ''),
+              )
+            : const Unauthenticated(),
+      );
     }
   }
 }

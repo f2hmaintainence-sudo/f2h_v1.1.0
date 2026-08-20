@@ -12,6 +12,14 @@ class AuthInitial extends AuthState {}
 
 class AuthLoading extends AuthState {}
 
+/// Startup session check in flight.
+///
+/// Kept apart from [AuthLoading] because the two mean different things to the
+/// UI: this one must hold a loading screen (we do not yet know whether the user
+/// is signed in), while [AuthLoading] happens while the login form is already
+/// on screen and handles its own spinner.
+class AuthCheckInProgress extends AuthState {}
+
 class Authenticated extends AuthState {
   final User user;
 

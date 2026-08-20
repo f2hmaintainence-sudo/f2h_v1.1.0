@@ -98,6 +98,7 @@ export default function DeliveryRunsPage() {
   const [selectedSlot, setSelectedSlot] = useState("");
   const [branches, setBranches] = useState<any[]>([]);
   const [selectedBranch, setSelectedBranch] = useState("");
+  const [generateDate, setGenerateDate] = useState<string>(getTodayIST());
   const [error, setError] = useState<string | null>(null);
   const [availability, setAvailability] = useState<{
     total_partners: number;
@@ -127,13 +128,14 @@ export default function DeliveryRunsPage() {
     } catch { } finally { setLoading(false); }
   }, []);
 
-  const fetchAvailability = useCallback(async (branchId: string) => {
+  const fetchAvailability = useCallback(async (branchId: string, dateStr: string = generateDate) => {
     setValidatingAvailability(true);
     try {
-      const url = branchId
-        ? `/admin/delivery/runs/check-availability?branch_id=${branchId}`
-        : `/admin/delivery/runs/check-availability`;
-      const res = await api.get<any>(url);
+      const params = new URLSearchParams();
+      if (branchId) params.set("branch_id", branchId);
+      if (dateStr) params.set("date", dateStr);
+      const query = params.toString() ? `?${params.toString()}` : "";
+      const res = await api.get<any>(`/admin/delivery/runs/check-availability${query}`);
       if (res.data?.data) {
         setAvailability(res.data.data);
       }
@@ -142,7 +144,7 @@ export default function DeliveryRunsPage() {
     } finally {
       setValidatingAvailability(false);
     }
-  }, []);
+  }, [generateDate]);
 
   const fetchRunsWithOrders = useCallback(async () => {
     setRunsLoading(true);
@@ -212,7 +214,9 @@ export default function DeliveryRunsPage() {
     setError(null);
     setResult(null);
     try {
-      const body: any = {};
+      const body: any = {
+        date: generateDate,
+      };
       if (selectedBranch) body.branch_id = selectedBranch;
       if (selectedSlot) body.slot = selectedSlot;
 
@@ -220,13 +224,13 @@ export default function DeliveryRunsPage() {
       if (res.data?.data) {
         const data = res.data.data;
         if (data.runs_created === 0 && data.total_assigned === 0) {
-          setError("No unassigned orders found for this date/criteria.");
+          setError(`No unassigned orders found for date ${generateDate} / selected criteria.`);
         } else {
           setResult(data);
-          showSuccessToast(`${data.runs_created} delivery runs created with ${data.total_assigned} orders!`);
+          showSuccessToast(`${data.runs_created} delivery runs created with ${data.total_assigned} orders for ${generateDate}!`);
         }
         fetchSummary();
-        fetchAvailability(selectedBranch);
+        fetchAvailability(selectedBranch, generateDate);
         fetchRunsWithOrders();
       } else {
         setError(res.data?.message || "Failed to generate delivery runs");
@@ -706,6 +710,23 @@ export default function DeliveryRunsPage() {
                   <h3 className="font-bold text-slate-900 mb-4">Generate Delivery Runs</h3>
 
                   <div className="space-y-4 flex-1">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1 flex items-center justify-between">
+                        <span>Run / Target Date</span>
+                        <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">Testing Date</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={generateDate}
+                        onChange={(e) => {
+                          const newDate = e.target.value;
+                          setGenerateDate(newDate);
+                          fetchAvailability(selectedBranch, newDate);
+                        }}
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus:border-emerald-500 focus:outline-none"
+                      />
+                    </div>
+
                     {branches.length > 0 && (
                       <div>
                         <label className="block text-xs font-semibold text-slate-500 mb-1">
@@ -713,7 +734,11 @@ export default function DeliveryRunsPage() {
                         </label>
                         <select
                           value={selectedBranch}
-                          onChange={(e) => setSelectedBranch(e.target.value)}
+                          onChange={(e) => {
+                            const newBranch = e.target.value;
+                            setSelectedBranch(newBranch);
+                            fetchAvailability(newBranch, generateDate);
+                          }}
                           className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                         >
                           <option value="">All Branches</option>
@@ -910,6 +935,12 @@ export default function DeliveryRunsPage() {
               </p>
 
               <div className="rounded-xl bg-slate-50 border p-4 mb-6 text-left space-y-2.5">
+                <div className="flex justify-between text-xs">
+                  <span className="font-semibold text-slate-400 uppercase tracking-wider">Run Date:</span>
+                  <span className="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                    {generateDate}
+                  </span>
+                </div>
                 <div className="flex justify-between text-xs">
                   <span className="font-semibold text-slate-400 uppercase tracking-wider">Branch:</span>
                   <span className="font-bold text-slate-800">

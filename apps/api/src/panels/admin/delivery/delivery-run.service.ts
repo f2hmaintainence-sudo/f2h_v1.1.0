@@ -612,10 +612,12 @@ export class DeliveryRunService {
         FROM delivery_runs dr
         LEFT JOIN delivery_partners db ON db.delivery_partner_id = dr.delivery_partner_id
         LEFT JOIN branches b ON b.branch_id = dr.branch_id
-        WHERE dr.id = $1
+        WHERE dr.id::varchar = $1 OR dr.run_id = $1 OR dr.run_number = $1
       `;
       const runRows = await this.db.query(runSql, [runId]);
       if (!runRows[0]) return { status: false, message: 'Run not found' };
+
+      const actualRunId = runRows[0].run_id || String(runRows[0].id);
 
       // Get addresses
       const addressesSql = `
@@ -625,19 +627,19 @@ export class DeliveryRunService {
           o.order_source
         FROM delivery_run_addresses dra
         LEFT JOIN orders o ON o.order_id = dra.order_id
-        WHERE dra.run_id = $1
+        WHERE dra.run_id = $1 OR dra.run_id = $2
         ORDER BY dra.sequence_no ASC
       `;
-      const addresses = await this.db.query(addressesSql, [runId]);
+      const addresses = await this.db.query(addressesSql, [actualRunId, String(runRows[0].id)]);
 
       // Get recent logs
       const logsSql = `
         SELECT * FROM delivery_logs
-        WHERE run_id = $1
+        WHERE run_id = $1 OR run_id = $2
         ORDER BY created_at DESC
         LIMIT 50
       `;
-      const logs = await this.db.query(logsSql, [runId]);
+      const logs = await this.db.query(logsSql, [actualRunId, String(runRows[0].id)]);
 
       return {
         status: true,
@@ -754,9 +756,10 @@ export class DeliveryRunService {
 
       // Get current status
       const currentRow = await this.db.query(
-        'SELECT status FROM delivery_runs WHERE id = $1', [runId],
+        'SELECT id, run_id, status FROM delivery_runs WHERE id::varchar = $1 OR run_id = $1', [runId],
       );
       const fromStatus = currentRow[0]?.status;
+      const actualId = currentRow[0]?.id;
 
       const updateFields: string[] = ['status = $2', 'updated_at = NOW()'];
       const params: any[] = [runId, newStatus];
@@ -781,7 +784,7 @@ export class DeliveryRunService {
       }
 
       await this.db.query(
-        `UPDATE delivery_runs SET ${updateFields.join(', ')} WHERE id = $1`,
+        `UPDATE delivery_runs SET ${updateFields.join(', ')} WHERE id::varchar = $1 OR run_id = $1`,
         params,
       );
 
@@ -815,7 +818,7 @@ export class DeliveryRunService {
       }
 
       const currentRow = await this.db.query(
-        'SELECT run_id, status, order_id FROM delivery_run_addresses WHERE id = $1', [addressId],
+        'SELECT run_id, status, order_id FROM delivery_run_addresses WHERE id::varchar = $1', [addressId],
       );
       if (!currentRow[0]) return { status: false, message: 'Address not found' };
 
@@ -839,7 +842,7 @@ export class DeliveryRunService {
       }
 
       await this.db.query(
-        `UPDATE delivery_run_addresses SET ${updateFields.join(', ')} WHERE id = $1`,
+        `UPDATE delivery_run_addresses SET ${updateFields.join(', ')} WHERE id::varchar = $1`,
         params,
       );
 
@@ -890,7 +893,7 @@ export class DeliveryRunService {
           completed_addresses = (SELECT COUNT(*) FROM delivery_run_addresses WHERE run_id = $1 AND status = 'delivered'),
           failed_addresses = (SELECT COUNT(*) FROM delivery_run_addresses WHERE run_id = $1 AND status = 'failed'),
           updated_at = NOW()
-        WHERE id = $1`,
+        WHERE id::varchar = $1 OR run_id = $1`,
         [runId],
       );
 
@@ -907,27 +910,28 @@ export class DeliveryRunService {
   async reassignRun(runId: string, toPartnerId: string, reason?: string, adminId?: string) {
     try {
       const currentRun = await this.db.query(
-        'SELECT delivery_partner_id, status FROM delivery_runs WHERE id = $1', [runId],
+        'SELECT id, run_id, delivery_partner_id, status FROM delivery_runs WHERE id::varchar = $1 OR run_id = $1', [runId],
       );
       if (!currentRun[0]) return { status: false, message: 'Run not found' };
 
       const fromPartnerId = currentRun[0].delivery_partner_id;
+      const actualRunId = currentRun[0].run_id || runId;
 
       // Update run
       await this.db.query(
         `UPDATE delivery_runs SET
-          delivery_partner_id = $2::uuid, assignment_method = 'manual', updated_at = NOW()
-        WHERE id = $1`,
+          delivery_partner_id = $2, assignment_method = 'manual', updated_at = NOW()
+        WHERE id::varchar = $1 OR run_id = $1`,
         [runId, toPartnerId],
       );
 
       // Update all orders in this run
       await this.db.query(
         `UPDATE orders SET
-          delivery_partner_id = $2::uuid, assignment_method = 'manual',
+          delivery_partner_id = $2, assignment_method = 'manual',
           assigned_at = NOW(), updated_at = NOW()
-        WHERE delivery_run_id = $1`,
-        [runId, toPartnerId],
+        WHERE delivery_run_id = $1 OR delivery_run_id = $3`,
+        [actualRunId, toPartnerId, runId],
       );
 
       // Log reassignment
