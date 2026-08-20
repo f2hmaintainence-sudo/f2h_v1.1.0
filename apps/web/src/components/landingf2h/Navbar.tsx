@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { F2H_PUBLIC } from "@/constants/f2hPublicAssets";
 
+import { usePublicCompany } from "./PublicCompanyProvider";
+
 const navLinks = [
   { name: "Home", href: "#home" },
   { name: "Products", href: "#products" },
@@ -12,6 +14,7 @@ const navLinks = [
 ];
 
 export function Navbar() {
+  const company = usePublicCompany();
   const [scrolled, setScrolled] = useState(false);
   const [visible, setVisible] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -58,15 +61,15 @@ export function Navbar() {
           <div className="flex items-center justify-between h-14 md:h-16">
             <a href="#home" className="flex items-center gap-2.5 group shrink-0 f2h-media-reset">
               <img
-                src={F2H_PUBLIC.logo}
-                alt="F2H"
+                src={company.logo_url || F2H_PUBLIC.logo}
+                alt={company.company_name || "F2H"}
                 width={72}
                 height={72}
                 fetchPriority="high"
                 className="h-10 w-auto max-h-10 shrink-0 group-hover:scale-105 transition-transform object-contain"
               />
               <span className="hidden sm:block text-sm font-semibold text-deep-green">
-                Farm to Home
+                {company.company_name || "Farm to Home"}
               </span>
             </a>
 

@@ -1,51 +1,72 @@
-import { Phone, Clock, MapPin } from "lucide-react";
+"use client";
+
+import { Phone, Clock, MapPin, Mail } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa";
 import { EyebrowPill } from "./EyebrowPill";
-
-const contacts = [
-  {
-    icon: Phone,
-    emoji: null,
-    label: "Primary Phone",
-    href: "tel:+919148773591",
-    linkLabel: "+91 91487 73591",
-    accent: "#2d8a45",
-    bg: "rgba(45,138,69,0.09)",
-    border: "rgba(45,138,69,0.18)",
-  },
-  {
-    icon: Phone,
-    emoji: null,
-    label: "Secondary Phone",
-    href: "tel:+917989368142",
-    linkLabel: "+91 79893 68142",
-    accent: "#2d8a45",
-    bg: "rgba(45,138,69,0.09)",
-    border: "rgba(45,138,69,0.18)",
-  },
-  {
-    icon: FaWhatsapp,
-    emoji: null,
-    label: "WhatsApp",
-    href: "https://wa.me/919148773591",
-    linkLabel: "Message on WhatsApp",
-    accent: "#25d366",
-    bg: "rgba(37,211,102,0.09)",
-    border: "rgba(37,211,102,0.2)",
-  },
-  {
-    icon: Clock,
-    emoji: null,
-    label: "Delivery Shifts",
-    href: null,
-    linkLabel: "Morning & Evening · Every Day",
-    accent: "#f0a500",
-    bg: "rgba(240,165,0,0.09)",
-    border: "rgba(240,165,0,0.2)",
-  },
-];
+import { usePublicCompany } from "./PublicCompanyProvider";
 
 export function ContactUs() {
+  const company = usePublicCompany();
+
+  const contacts = [
+    ...(company.phone
+      ? [
+          {
+            icon: Phone,
+            label: "Primary Phone",
+            href: company.phone_url || `tel:${company.phone.replace(/\s/g, "")}`,
+            linkLabel: company.phone,
+            accent: "#2d8a45",
+            bg: "rgba(45,138,69,0.09)",
+            border: "rgba(45,138,69,0.18)",
+          },
+        ]
+      : []),
+    ...(company.secondary_phone
+      ? [
+          {
+            icon: Phone,
+            label: "Secondary Phone",
+            href: company.secondary_phone_url || `tel:${company.secondary_phone.replace(/\s/g, "")}`,
+            linkLabel: company.secondary_phone,
+            accent: "#2d8a45",
+            bg: "rgba(45,138,69,0.09)",
+            border: "rgba(45,138,69,0.18)",
+          },
+        ]
+      : []),
+    {
+      icon: FaWhatsapp,
+      label: "WhatsApp Support",
+      href: company.whatsapp_url || `https://wa.me/${(company.whatsapp || company.phone || "").replace(/\D/g, "")}`,
+      linkLabel: "Message on WhatsApp",
+      accent: "#25d366",
+      bg: "rgba(37,211,102,0.09)",
+      border: "rgba(37,211,102,0.2)",
+    },
+    ...(company.email
+      ? [
+          {
+            icon: Mail,
+            label: "Support Email",
+            href: `mailto:${company.email}`,
+            linkLabel: company.email,
+            accent: "#0284c7",
+            bg: "rgba(2,132,199,0.09)",
+            border: "rgba(2,132,199,0.2)",
+          },
+        ]
+      : []),
+    {
+      icon: Clock,
+      label: "Delivery Shifts",
+      href: null,
+      linkLabel: "Morning & Evening · Every Day",
+      accent: "#f0a500",
+      bg: "rgba(240,165,0,0.09)",
+      border: "rgba(240,165,0,0.2)",
+    },
+  ];
   return (
     <>
       <style>{`
@@ -341,14 +362,13 @@ export function ContactUs() {
                 <div className="cu-address-card">
                   <div className="cu-address-title">
                     <MapPin size={14} strokeWidth={2.3} />
-                    Our Address
+                    Registered Office Address
                   </div>
                   <p className="cu-address-text">
-                    1st Cross, SJP Layout, Nagondanahalli,<br />
-                    Whitefield, Bangalore – 560066
+                    {company.address || "1st Cross, SJP Layout, Nagondanahalli, Whitefield, Bangalore – 560066"}
                   </p>
                   <span className="cu-address-badge">
-                    🇮🇳 Made in India &nbsp;·&nbsp; Delivering since 2018
+                    🇮🇳 Made in India &nbsp;·&nbsp; {company.company_name || "F2H Fresh"}
                   </span>
                 </div>
               </div>

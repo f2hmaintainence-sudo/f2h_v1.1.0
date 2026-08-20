@@ -38,17 +38,12 @@ const DEFAULT_CONTACT = {
   youtube_url: "#",
 };
 
-type SiteSettings = typeof DEFAULT_CONTACT;
-
-function buildApiUrl(path: string): string {
-  const base = (process.env.NEXT_PUBLIC_API_URL || "").trim().replace(/\/$/, "");
-  return base ? base + path : path;
-}
+import { usePublicCompany } from "./PublicCompanyProvider";
 
 export function Footer() {
   const footerRef = useRef<HTMLElement>(null);
   const [visible, setVisible] = useState(false);
-  const [contact, setContact] = useState<SiteSettings>(DEFAULT_CONTACT);
+  const company = usePublicCompany();
 
   // Intersection Observer for entrance animation
   useEffect(() => {
@@ -60,42 +55,18 @@ export function Footer() {
     return () => observer.disconnect();
   }, []);
 
-  // Fetch site settings from admin-configured API
-  useEffect(() => {
-    let cancelled = false;
-    fetch(buildApiUrl("/api/v1/auth/public/site-settings"))
-      .then((r) => r.json())
-      .then((json) => {
-        if (!cancelled && json.status && json.data) {
-          const d = json.data as Partial<SiteSettings>;
-          setContact((prev) => ({
-            phone: d.phone || prev.phone,
-            phone_url: d.phone_url || (d.phone ? `tel:${d.phone.replace(/\s/g, "")}` : prev.phone_url),
-            whatsapp: d.whatsapp || d.phone || prev.whatsapp,
-            whatsapp_url: d.whatsapp_url || (d.whatsapp ? `https://wa.me/${d.whatsapp.replace(/[^0-9]/g, "")}` : prev.whatsapp_url),
-            email: d.email || prev.email,
-            address: d.address || prev.address,
-            instagram_url: d.instagram_url || prev.instagram_url,
-            facebook_url: d.facebook_url || prev.facebook_url,
-            youtube_url: d.youtube_url || prev.youtube_url,
-          }));
-        }
-      })
-      .catch(() => { /* silent — fall back to defaults */ });
-    return () => { cancelled = true; };
-  }, []);
-
   const socialLinks = [
-    { name: "instagram", icon: FaInstagram, href: contact.instagram_url, hoverClass: "hover:bg-pink-500" },
-    { name: "whatsapp", icon: FaWhatsapp, href: contact.whatsapp_url, hoverClass: "hover:bg-green-500" },
-    { name: "facebook", icon: FaFacebookF, href: contact.facebook_url, hoverClass: "hover:bg-blue-600" },
-    { name: "youtube", icon: FaYoutube, href: contact.youtube_url, hoverClass: "hover:bg-red-600" },
+    { name: "instagram", icon: FaInstagram, href: company.instagram_url || "#", hoverClass: "hover:bg-pink-500", active: Boolean(company.instagram_url && company.instagram_url !== "#") },
+    { name: "whatsapp", icon: FaWhatsapp, href: company.whatsapp_url || `https://wa.me/${(company.whatsapp || company.phone || "").replace(/\D/g, "")}`, hoverClass: "hover:bg-green-500", active: Boolean(company.whatsapp || company.phone) },
+    { name: "facebook", icon: FaFacebookF, href: company.facebook_url || "#", hoverClass: "hover:bg-blue-600", active: Boolean(company.facebook_url && company.facebook_url !== "#") },
+    { name: "youtube", icon: FaYoutube, href: company.youtube_url || "#", hoverClass: "hover:bg-red-600", active: Boolean(company.youtube_url && company.youtube_url !== "#") },
   ];
 
   const contactItems = [
-    { href: contact.phone_url, Icon: FiPhone, label: contact.phone },
-    { href: contact.whatsapp_url, Icon: FaWhatsapp, label: "WhatsApp Us" },
-    { href: `mailto:${contact.email}`, Icon: FiMail, label: contact.email },
+    { href: company.phone_url || `tel:${company.phone.replace(/\s/g, "")}`, Icon: FiPhone, label: company.phone || "+91 91487 73591" },
+    ...(company.secondary_phone ? [{ href: company.secondary_phone_url || `tel:${company.secondary_phone.replace(/\s/g, "")}`, Icon: FiPhone, label: company.secondary_phone }] : []),
+    { href: company.whatsapp_url || `https://wa.me/${(company.whatsapp || company.phone || "").replace(/\D/g, "")}`, Icon: FaWhatsapp, label: "WhatsApp Us" },
+    { href: `mailto:${company.email || "support@f2hfresh.com"}`, Icon: FiMail, label: company.email || "support@f2hfresh.com" },
   ];
 
   return (
@@ -310,22 +281,28 @@ export function Footer() {
             <div className="flex items-center gap-3 mb-5">
               <div className="relative">
                 <div className="absolute inset-0 rounded-full bg-green-400/20 blur-md animate-pulse" />
-                <img src={F2H_PUBLIC.logo} alt="F2H" className="relative h-12 w-12 rounded-full ring-2 ring-green-500/30" />
+                <img
+                  src={company.logo_url || F2H_PUBLIC.logo}
+                  alt={company.company_name || "F2H"}
+                  className="relative h-12 w-12 rounded-full ring-2 ring-green-500/30 object-contain bg-white/10"
+                />
               </div>
               <div>
-                <p className="text-white font-bold text-base leading-tight tracking-wide">Farm to Home</p>
+                <p className="text-white font-bold text-base leading-tight tracking-wide">{company.company_name || "Farm to Home"}</p>
                 <p className="text-green-400 text-[10px] tracking-[0.25em] uppercase font-medium">Fresh Milk Daily</p>
               </div>
             </div>
             <p className="text-white/65 text-sm leading-relaxed mb-3" style={{ fontFamily: "Poppins, sans-serif" }}>
               Pure, farm-fresh milk delivered to your doorstep every morning before 7 AM.
             </p>
-            <div className="flex gap-2 text-white/55 text-xs leading-relaxed mb-3">
-              <FiMapPin className="mt-0.5 shrink-0 text-green-400" size={12} />
-              <span>{contact.address}</span>
-            </div>
+            {company.address && (
+              <div className="flex gap-2 text-white/55 text-xs leading-relaxed mb-3">
+                <FiMapPin className="mt-0.5 shrink-0 text-green-400" size={12} />
+                <span>{company.address}</span>
+              </div>
+            )}
             <div className="flex gap-2.5">
-              {socialLinks.map(({ name, icon: Icon, href, hoverClass }) => (
+              {socialLinks.filter(s => s.active).map(({ name, icon: Icon, href, hoverClass }) => (
                 <a key={name} href={href} target="_blank" rel="noopener noreferrer"
                   className={`w-9 h-9 flex items-center justify-center rounded-full bg-white/8 border border-white/10 text-white/50 hover:text-white ${hoverClass} hover:border-transparent hover:scale-110 transition-all duration-200`}>
                   <Icon size={14} />
@@ -367,12 +344,14 @@ export function Footer() {
                   </a>
                 </li>
               ))}
-              <li className="group flex items-center gap-3 text-white/65 hover:text-green-400 transition-colors duration-200">
-                <span className="w-8 h-8 flex items-center justify-center rounded-full bg-white/6 border border-white/8 group-hover:border-green-500/40 group-hover:bg-green-500/10 transition-all duration-200 shrink-0">
-                  <FiMapPin size={13} />
-                </span>
-                <span className="text-xs leading-relaxed">{contact.address}</span>
-              </li>
+              {company.address && (
+                <li className="group flex items-center gap-3 text-white/65 hover:text-green-400 transition-colors duration-200">
+                  <span className="w-8 h-8 flex items-center justify-center rounded-full bg-white/6 border border-white/8 group-hover:border-green-500/40 group-hover:bg-green-500/10 transition-all duration-200 shrink-0">
+                    <FiMapPin size={13} />
+                  </span>
+                  <span className="text-xs leading-relaxed">{company.address}</span>
+                </li>
+              )}
             </ul>
           </div>
 
