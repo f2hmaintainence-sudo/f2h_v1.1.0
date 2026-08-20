@@ -153,59 +153,92 @@ function BannerVisualPreview({
 
   if (banner_type === "popup") {
     return (
-      <div className="mx-auto max-w-[340px] w-full bg-white rounded-3xl overflow-hidden shadow-xl border border-slate-200 animate-in zoom-in-95 duration-200">
-        <div style={{ backgroundColor: bg }} className="min-h-[150px] max-h-[220px] w-full flex items-center justify-center p-3 relative overflow-hidden">
-          <div className="absolute top-2.5 right-2.5 w-6 h-6 rounded-full bg-white/90 text-slate-700 flex items-center justify-center text-[10px] font-bold shadow-xs z-20">
-            ✕
-          </div>
-          {cleanSrc ? (
+      <div className="mx-auto max-w-[340px] w-full rounded-3xl overflow-hidden shadow-2xl relative group animate-in zoom-in-95 duration-200">
+        {/* Floating Close Button */}
+        <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/95 text-slate-800 flex items-center justify-center text-xs font-black shadow-lg z-30 border border-slate-200/50 cursor-pointer hover:bg-white transition hover:scale-105">
+          ✕
+        </div>
+
+        {cleanSrc ? (
+          <div className="relative w-full overflow-hidden rounded-3xl bg-slate-900">
+            {/* Full-bleed edge-to-edge image without borders or surrounding padding */}
             <img
               src={cleanSrc}
-              alt=""
-              className="max-h-[180px] w-auto max-w-full object-contain drop-shadow-md rounded-xl"
+              alt={title || "App Launch Popup"}
+              className="w-full h-auto max-h-[420px] object-cover block"
               onError={(e) => {
                 (e.target as HTMLElement).style.display = "none";
               }}
             />
-          ) : (
-            <div className="flex flex-col items-center justify-center gap-1.5 text-white/80">
-              <Smartphone size={38} />
-              <span className="text-[10px] font-bold tracking-wide uppercase">App Launch Popup</span>
-            </div>
-          )}
-        </div>
-        <div className="p-4 text-center space-y-2.5">
-          {discount_text && (
-            <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-950 font-black text-[11px] tracking-wide shadow-2xs border border-amber-300">
-              {discount_text.toUpperCase()}
-            </span>
-          )}
-          <h4 className="font-black text-sm sm:text-base text-slate-900 leading-snug break-words">
-            {title || "Special Promotional Offer"}
-          </h4>
-          {description ? (
-            <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line break-words bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-              {description}
-            </p>
-          ) : (
-            <p className="text-xs text-slate-400 italic">No description provided</p>
-          )}
-          {category_name && (
-            <div className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md inline-block">
-              Target: {category_name}
-            </div>
-          )}
-          <div className="pt-1">
-            <button
-              type="button"
-              style={{ backgroundColor: bg }}
-              className="w-full py-2.5 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 hover:opacity-95 active:scale-[0.99]"
-            >
-              <span>{cta}</span>
-              <ArrowRight size={13} />
-            </button>
+            {/* Optional sleek bottom overlay for discount / title / description / CTA */}
+            {(discount_text || title || description) && (
+              <div className="p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent text-white absolute bottom-0 inset-x-0 space-y-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {discount_text && (
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] tracking-wide shadow-xs">
+                      {discount_text.toUpperCase()}
+                    </span>
+                  )}
+                  {category_name && (
+                    <span className="px-2 py-0.5 rounded-md bg-white/20 text-white font-bold text-[9px]">
+                      {category_name}
+                    </span>
+                  )}
+                </div>
+                {title && <h4 className="font-extrabold text-sm text-white leading-tight drop-shadow-xs">{title}</h4>}
+                {description && (
+                  <p className="text-[11px] text-white/90 line-clamp-2 leading-relaxed whitespace-pre-line drop-shadow-xs">
+                    {description}
+                  </p>
+                )}
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    style={{ backgroundColor: bg }}
+                    className="w-full py-2.5 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 hover:opacity-95 active:scale-[0.99]"
+                  >
+                    <span>{cta}</span>
+                    <ArrowRight size={13} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
+        ) : (
+          /* Fallback when no image URL is uploaded */
+          <div style={{ backgroundColor: bg }} className="p-6 text-white text-center rounded-3xl space-y-3 relative">
+            <div className="flex flex-col items-center justify-center gap-2">
+              <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-white">
+                <Smartphone size={32} />
+              </div>
+              <span className="text-[10px] font-black tracking-wider uppercase bg-black/20 px-2.5 py-0.5 rounded-md">
+                App Launch Popup
+              </span>
+            </div>
+            {discount_text && (
+              <span className="inline-block px-3 py-1 rounded-full bg-white text-slate-900 font-black text-xs">
+                {discount_text.toUpperCase()}
+              </span>
+            )}
+            <h4 className="font-extrabold text-base leading-snug break-words">{title || "Special Promotional Offer"}</h4>
+            {description ? (
+              <p className="text-xs text-white/90 leading-relaxed whitespace-pre-line bg-black/10 p-2.5 rounded-xl">
+                {description}
+              </p>
+            ) : (
+              <p className="text-xs text-white/70 italic">No description provided</p>
+            )}
+            <div className="pt-1">
+              <button
+                type="button"
+                className="w-full py-2.5 bg-white text-slate-900 font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5"
+              >
+                <span>{cta}</span>
+                <ArrowRight size={13} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

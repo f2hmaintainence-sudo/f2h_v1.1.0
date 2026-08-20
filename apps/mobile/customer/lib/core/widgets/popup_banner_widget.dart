@@ -153,15 +153,17 @@ class PopupBannerWidget {
               resolveAspectRatio();
             }
 
-            final maxImageHeight = MediaQuery.of(context).size.height * 0.55;
-            final screenWidth = MediaQuery.of(context).size.width - 40;
-            final containerWidth = screenWidth.clamp(0.0, 360.0);
+            final maxImageHeight = MediaQuery.of(context).size.height * 0.75;
+            final screenWidth = MediaQuery.of(context).size.width - 32;
+            final containerWidth = screenWidth.clamp(0.0, 420.0);
+
+            final hasCustomImage = imageUrl.isNotEmpty;
 
             Widget imageWidget;
-            if (imageUrl.isNotEmpty) {
+            if (hasCustomImage) {
               if (imageAspectRatio != null) {
                 final naturalHeight = containerWidth / imageAspectRatio!;
-                final clampedHeight = naturalHeight.clamp(80.0, maxImageHeight);
+                final clampedHeight = naturalHeight.clamp(120.0, maxImageHeight);
                 imageWidget = SizedBox(
                   width: double.infinity,
                   height: clampedHeight,
@@ -169,10 +171,10 @@ class PopupBannerWidget {
                     imageUrl,
                     fit: BoxFit.cover,
                     errorBuilder: (_, _, e) => Container(
-                      height: 140,
+                      height: 200,
                       color: bannerBgColor.withValues(alpha: 0.15),
                       child: Center(
-                        child: Icon(Icons.local_offer_rounded, size: 48, color: bannerBgColor),
+                        child: Icon(Icons.local_offer_rounded, size: 54, color: bannerBgColor),
                       ),
                     ),
                   ),
@@ -180,194 +182,161 @@ class PopupBannerWidget {
               } else {
                 // Loading placeholder while resolving aspect ratio
                 imageWidget = Container(
-                  height: 160,
+                  height: 240,
                   width: double.infinity,
-                  color: const Color(0xFFF1F5F9),
+                  color: const Color(0xFF1E293B),
                   child: const Center(
                     child: SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary),
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
                     ),
                   ),
                 );
               }
             } else {
-              // No image URL: show top gradient header
+              // No image URL: show rich gradient card
               imageWidget = Container(
-                height: 120,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                 width: double.infinity,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [bannerBgColor, bannerBgColor.withValues(alpha: 0.8)],
+                    colors: [bannerBgColor, bannerBgColor.withValues(alpha: 0.85)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                 ),
-                child: const Center(
-                  child: Icon(Icons.stars_rounded, size: 54, color: Colors.white),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.stars_rounded, size: 56, color: Colors.white),
+                    const SizedBox(height: 16),
+                    if (discountText != null && discountText.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          discountText.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            color: bannerBgColor,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    if (description != null && description.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        description,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.white70,
+                          height: 1.4,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 46,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(dialogContext);
+                          _handleRedirection(context, actionType, actionValue);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: bannerBgColor,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: Text(
+                          ctaLabel,
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               );
             }
 
-
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.center,
-            children: [
-              // Main Banner Container
-              Container(
-                width: double.infinity,
-                constraints: const BoxConstraints(maxWidth: 360),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.25),
-                      blurRadius: 24,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Banner Image — auto-sized to natural aspect ratio
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.pop(dialogContext);
-                        _handleRedirection(context, actionType, actionValue);
-                      },
-                      child: ClipRRect(
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-                        child: imageWidget,
-                      ),
-                    ),
-
-                    // Content details
-                    Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (discountText != null && discountText.isNotEmpty) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFEF3C7),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: const Color(0xFFF59E0B), width: 1),
-                              ),
-                              child: Text(
-                                discountText.toUpperCase(),
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFFB45309),
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                          ],
-
-                          Text(
-                            title,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              color: kText,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-
-                          if (description != null && description.isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              description,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: kTextSub,
-                                height: 1.4,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-
-                          const SizedBox(height: 20),
-
-                          // CTA Button
-                          SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: ElevatedButton(
-                              onPressed: () {
-                                Navigator.pop(dialogContext);
-                                _handleRedirection(context, actionType, actionValue);
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: kPrimary,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    ctaLabel,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.3,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  const Icon(Icons.arrow_forward_rounded, size: 16),
-                                ],
-                              ),
-                            ),
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              elevation: 0,
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.center,
+                children: [
+                  // Full-bleed edge-to-edge banner card with NO borders or empty white space
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.pop(dialogContext);
+                      _handleRedirection(context, actionType, actionValue);
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      constraints: BoxConstraints(maxWidth: containerWidth),
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.35),
+                            blurRadius: 30,
+                            offset: const Offset(0, 12),
                           ),
                         ],
                       ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: imageWidget,
+                      ),
                     ),
-                  ],
-                ),
-              ),
-
-              // Close 'X' Button on Top-Right Corner
-              Positioned(
-                top: 10,
-                right: 10,
-                child: GestureDetector(
-                  onTap: () => Navigator.pop(dialogContext),
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.25),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(Icons.close_rounded, size: 18, color: kText),
                   ),
-                ),
+
+                  // Floating circular Close 'X' button on top-right corner
+                  Positioned(
+                    top: -12,
+                    right: -12,
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(dialogContext),
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF1E293B)),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        );
+            );
           }, // end StatefulBuilder builder
         ); // end StatefulBuilder
       }, // end showDialog builder
