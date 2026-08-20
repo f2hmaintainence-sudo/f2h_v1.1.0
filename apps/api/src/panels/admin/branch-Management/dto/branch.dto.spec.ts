@@ -41,6 +41,18 @@ describe('branch coverage update DTOs', () => {
   });
 
   it.each([
+    ['is_active', 'true', true],
+    ['is_active', 'false', false],
+    ['allow_buffer_order', 'true', true],
+    ['allow_buffer_order', 'false', false],
+  ])('strictly transforms %s=%s', async (property, value, expectedValue) => {
+    const dto = plainToInstance(UpdateBranchDto, { [property]: value });
+
+    await expect(validate(dto)).resolves.toEqual([]);
+    expect(dto[property as keyof UpdateBranchDto]).toBe(expectedValue);
+  });
+
+  it.each([
     ['zero radius', { delivery_radius_km: 0 }, 'delivery_radius_km'],
     ['negative radius', { delivery_radius_km: -1 }, 'delivery_radius_km'],
     ['latitude above 90', { lat: 91 }, 'lat'],

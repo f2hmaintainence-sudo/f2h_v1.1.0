@@ -11,7 +11,13 @@ import {
   Min,
   Max,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+
+function transformBoolean(value: unknown): unknown {
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  return value;
+}
 
 export class CreateBranchDto {
   @IsString()
@@ -37,12 +43,12 @@ export class CreateBranchDto {
 
   @IsOptional()
   @IsBoolean()
-  @Type(() => Boolean)
+  @Transform(({ value }) => transformBoolean(value))
   is_active?: boolean;
 
   @IsOptional()
   @IsBoolean()
-  @Type(() => Boolean)
+  @Transform(({ value }) => transformBoolean(value))
   allow_buffer_order?: boolean;
 
   @IsOptional()
@@ -117,12 +123,12 @@ export class UpdateBranchDto {
 
   @IsOptional()
   @IsBoolean()
-  @Type(() => Boolean)
+  @Transform(({ value }) => transformBoolean(value))
   is_active?: boolean;
 
   @IsOptional()
   @IsBoolean()
-  @Type(() => Boolean)
+  @Transform(({ value }) => transformBoolean(value))
   allow_buffer_order?: boolean;
 
   @IsOptional()
