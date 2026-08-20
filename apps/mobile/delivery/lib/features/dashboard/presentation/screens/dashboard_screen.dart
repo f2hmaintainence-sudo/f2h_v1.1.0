@@ -22,6 +22,7 @@ import 'package:f2h_delivery/features/orders/presentation/screens/pickup_selecti
 import 'package:f2h_delivery/features/profile/presentation/screens/notifications_screen.dart';
 import 'package:f2h_delivery/features/profile/presentation/screens/support_screen.dart';
 import 'package:f2h_delivery/core/widgets/f2h_hero_header.dart';
+import 'package:f2h_delivery/features/notifications/services/notification_api_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -32,8 +33,10 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final LocationService _locationService = LocationService();
+  final NotificationApiService _notificationService = NotificationApiService();
   int _selectedTab = 0;
   bool _isReloading = false;
+  int _unreadNotificationsCount = 0;
   Position? _currentPosition;
   Timer? _locationUpdateTimer;
 
@@ -43,12 +46,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
     AppSnackBar.info(context, 'Reloading orders and shift status...');
     try {
       _getCurrentLocation();
+      _loadUnreadNotifications();
       context.read<DeliverySessionBloc>().add(ReloadSessionEvent());
     } catch (e) {
       if (mounted) AppSnackBar.error(context, 'Failed to reload: $e');
     } finally {
       if (mounted) setState(() => _isReloading = false);
     }
+  }
+
+  Future<void> _loadUnreadNotifications() async {
+    try {
+      final res = await _notificationService.getNotificationsWithCount();
+      if (mounted) {
+        setState(() => _unreadNotificationsCount = res['unreadCount'] as int? ?? 0);
+      }
+    } catch (_) {}
   }
 
   Future<void> _getCurrentLocation() async {
@@ -73,6 +86,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _getCurrentLocation();
+    _loadUnreadNotifications();
     _locationUpdateTimer = Timer.periodic(const Duration(seconds: 30), (_) => _getCurrentLocation());
   }
 
@@ -408,11 +422,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
               F2hHeroHeader(
                 driverName: session.driverName,
                 isOnline: session.isOnline,
+                unreadCount: _unreadNotificationsCount,
                 onToggleOnline: _handleOnlineToggle,
-                onNotifications: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-                ),
+                onNotifications: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                  );
+                  _loadUnreadNotifications();
+                },
               ),
 
               // ── SCROLLABLE DASHBOARD BODY ───────────────────────────

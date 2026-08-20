@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
@@ -11,6 +12,12 @@ import 'package:f2h_delivery/features/delivery_session/presentation/bloc/deliver
 import 'package:f2h_delivery/features/tracking/presentation/widgets/map_delivery_sheet.dart';
 import 'package:f2h_delivery/core/config/app_config.dart';
 
+enum MapLayerType {
+  googleRoadmap,
+  googleSatellite,
+  googleTerrain,
+}
+
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
 
@@ -19,15 +26,16 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
-  
   bool _voiceNavEnabled = true;
   bool _showTraffic = true;
   bool _isRefreshing = false;
+  MapLayerType _currentLayer = MapLayerType.googleRoadmap;
+
   late AnimationController _pulsateController;
   late Animation<double> _pulsateAnimation;
   late AnimationController _refreshController;
   late Animation<double> _refreshAnimation;
-  
+
   final MapController _mapController = MapController();
   LatLng? _currentPosition;
   GroupedStop? _selectedStop;
@@ -40,6 +48,18 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   List<GroupedStop> _searchResults = [];
   String _searchQuery = '';
 
+  String get _currentTileUrl {
+    switch (_currentLayer) {
+      case MapLayerType.googleSatellite:
+        return 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
+      case MapLayerType.googleTerrain:
+        return 'https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}';
+      case MapLayerType.googleRoadmap:
+      default:
+        return 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+    }
+  }
+
   Future<void> _goToCurrentLocation() async {
     try {
       final locationService = sl<LocationService>();
@@ -49,12 +69,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         setState(() {
           _currentPosition = newPos;
         });
-        _mapController.move(newPos, 15.0);
+        _mapController.move(newPos, 16.0);
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Failed to get current location. Please check GPS permissions.'),
+            content: const Text('Failed to get current GPS location.'),
             backgroundColor: kDanger,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -65,12 +85,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       print('Error getting current location: $e');
     }
   }
-  
-
 
   List<Marker> _buildMarkers(List<GroupedStop> groupedStops) {
     final List<Marker> markers = [];
-    
+
     // Add client stop markers
     for (int i = 0; i < groupedStops.length; i++) {
       final stop = groupedStops[i];
@@ -80,88 +98,71 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
       Color pinColor;
       if (stop.status == 'delivered') {
-        pinColor = kSuccess;
+        pinColor = const Color(0xFF16A34A);
       } else if (stop.status == 'failed') {
-        pinColor = kDanger;
+        pinColor = const Color(0xFFEF4444);
       } else if (stop.status == 'out_for_delivery') {
-        pinColor = kAccent;
+        pinColor = const Color(0xFFD97706);
       } else {
-        pinColor = kMuted;
+        pinColor = const Color(0xFF2563EB);
       }
-      
-      final isActive = stop.status == 'out_for_delivery' || 
+
+      final isCurrentSelected = _selectedStop?.stop == stop.stop;
+      final isActive = stop.status == 'out_for_delivery' ||
           (stop.status == 'pending' && i == groupedStops.indexWhere((s) => s.status == 'pending'));
-      
+
       markers.add(
         Marker(
           point: LatLng(stop.addressLat, stop.addressLng),
-          width: 50,
-          height: 50,
+          width: isCurrentSelected ? 56 : 46,
+          height: isCurrentSelected ? 56 : 46,
           child: GestureDetector(
             onTap: () {
               setState(() {
                 _selectedStop = stop;
               });
-              _mapController.move(LatLng(stop.addressLat, stop.addressLng), 16.0);
+              _mapController.move(LatLng(stop.addressLat, stop.addressLng), 16.5);
             },
             child: Stack(
-               alignment: Alignment.center,
+              alignment: Alignment.center,
               children: [
-                if (isActive)
+                if (isActive || isCurrentSelected)
                   AnimatedBuilder(
                     animation: _pulsateAnimation,
                     builder: (context, child) {
                       return Container(
-                        width: 22 + 12 * _pulsateAnimation.value,
-                        height: 22 + 12 * _pulsateAnimation.value,
+                        width: 24 + 14 * _pulsateAnimation.value,
+                        height: 24 + 14 * _pulsateAnimation.value,
                         decoration: BoxDecoration(
-                          color: pinColor.withValues(alpha: 0.25 * (1 - _pulsateAnimation.value)),
+                          color: pinColor.withOpacity(0.3 * (1 - _pulsateAnimation.value)),
                           shape: BoxShape.circle,
                         ),
                       );
                     },
                   ),
-                // Shadow
-                Positioned(
-                  bottom: 6,
-                  child: Container(
-                    width: 16,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
-                          blurRadius: 4,
-                          spreadRadius: 1,
-                        )
-                      ],
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
                 // Pin body
                 Container(
-                  width: 22,
-                  height: 22,
+                  width: isCurrentSelected ? 30 : 26,
+                  height: isCurrentSelected ? 30 : 26,
                   decoration: BoxDecoration(
                     color: pinColor,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                    boxShadow: [
+                    border: Border.all(color: Colors.white, width: 2.5),
+                    boxShadow: const [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.15),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
+                        color: Color(0x33000000),
+                        blurRadius: 6,
+                        offset: Offset(0, 3),
                       )
                     ],
                   ),
                   child: Center(
                     child: Text(
                       '${stop.stop}',
-                      style: const TextStyle(
+                      style: GoogleFonts.poppins(
                         color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        fontSize: isCurrentSelected ? 12 : 10,
                       ),
                     ),
                   ),
@@ -172,27 +173,42 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         ),
       );
     }
-    
+
     // Add current position marker if available
     if (_currentPosition != null) {
       markers.add(
         Marker(
           point: _currentPosition!,
-          width: 30,
-          height: 30,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.blue,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.blue.withValues(alpha: 0.4),
-                  blurRadius: 8,
-                  spreadRadius: 2,
-                )
-              ],
-            ),
+          width: 36,
+          height: 36,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2563EB).withOpacity(0.25),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2563EB),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 3),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x402563EB),
+                      blurRadius: 8,
+                      spreadRadius: 2,
+                    )
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       );
@@ -203,7 +219,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    
+
     _pulsateController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -217,6 +233,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     _refreshAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _refreshController, curve: Curves.easeInOut),
     );
+
+    _goToCurrentLocation();
   }
 
   @override
@@ -243,59 +261,134 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
   }
 
+  void _showLayerSelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Map View Style',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  _buildLayerOption(
+                    title: 'Google Default',
+                    icon: Icons.map_outlined,
+                    type: MapLayerType.googleRoadmap,
+                  ),
+                  const SizedBox(width: 12),
+                  _buildLayerOption(
+                    title: 'Satellite Hybrid',
+                    icon: Icons.satellite_alt_outlined,
+                    type: MapLayerType.googleSatellite,
+                  ),
+                  const SizedBox(width: 12),
+                  _buildLayerOption(
+                    title: 'Terrain',
+                    icon: Icons.terrain_outlined,
+                    type: MapLayerType.googleTerrain,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
+  Widget _buildLayerOption({
+    required String title,
+    required IconData icon,
+    required MapLayerType type,
+  }) {
+    final isSelected = _currentLayer == type;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() => _currentLayer = type);
+          Navigator.pop(context);
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFFDCFCE7) : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected ? const Color(0xFF16A34A) : const Color(0xFFE2E8F0),
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                color: isSelected ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+                size: 26,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                  color: isSelected ? const Color(0xFF15803D) : const Color(0xFF475569),
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   void _showConfirmation(BuildContext context, GroupedStop stop) async {
     final locationService = sl<LocationService>();
     final position = await locationService.getCurrentPosition();
-    if (position != null) {
-      final dist = locationService.haversineDistanceKm(
-        position.latitude,
-        position.longitude,
-        stop.addressLat,
-        stop.addressLng,
-      );
-      print('[DEBUG] Rider is $dist km away from stop.');
-      // Bypassed 300 meters check to allow testing locally
-      /*
-      if (dist > 0.3) { // 300 meters threshold
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Please reach the location to mark as delivered.'),
-              backgroundColor: kDanger,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          );
-        }
-        return;
-      }
-      */
-    }
 
-    if (!mounted) return;
+    if (!context.mounted) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => DeliveryConfirmationSheet(
+      builder: (sheetContext) => DeliveryConfirmationSheet(
         stop: stop,
-        onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns) {
-          if (stop.orders.isEmpty) return;
-          final orderId = stop.orders.first.orderId;
-
-          // Show loading dialog
+        onConfirm: (
+          status,
+          emptyBottles,
+          returnedContainers,
+          damagedContainers,
+          lostContainers,
+          notes,
+          paymentMode,
+          paymentStatus,
+          deliveryImage,
+          containerReturns,
+        ) {
           showDialog(
             context: context,
             barrierDismissible: false,
-            builder: (_) => const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
-              ),
-            ),
+            builder: (ctx) => const Center(child: CircularProgressIndicator(color: kPrimary)),
           );
 
+          final orderId = stop.orders.isNotEmpty ? stop.orders.first.orderId : stop.stop.toString();
           context.read<DeliverySessionBloc>().add(UpdateStopStatusEvent(
             orderId: orderId,
             newStatus: status,
@@ -340,7 +433,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     return BlocListener<DeliverySessionBloc, DeliverySessionState>(
@@ -369,7 +461,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   _mapController.fitCamera(
                     CameraFit.bounds(
                       bounds: LatLngBounds.fromPoints(points),
-                      padding: const EdgeInsets.all(50.0),
+                      padding: const EdgeInsets.all(60.0),
                     ),
                   );
                 } catch (e) {
@@ -385,18 +477,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           if (state is! DeliverySessionLoaded) {
             return const Scaffold(
               body: Center(
-                child: CircularProgressIndicator(),
+                child: CircularProgressIndicator(color: kPrimary),
               ),
             );
           }
 
           final groupedStops = state.groupedStops;
           final pendingCount = state.pendingGroupedStopsCount;
-          final distanceRemaining = (pendingCount * 0.7).toStringAsFixed(1);
-          
-          final now = DateTime.now();
-          final finishTime = now.add(Duration(minutes: pendingCount * 6));
-          final finishStr = "${finishTime.hour.toString().padLeft(2, '0')}:${finishTime.minute.toString().padLeft(2, '0')} ${finishTime.hour >= 12 ? 'PM' : 'AM'}";
 
           final List<LatLng> routePoints = [];
           if (groupedStops.isNotEmpty) {
@@ -405,18 +492,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 routePoints.add(LatLng(stop.addressLat, stop.addressLng));
               }
             }
-          }
-          if (routePoints.isEmpty) {
-            routePoints.addAll([
-              const LatLng(12.9085, 77.6390),
-              const LatLng(12.9105, 77.6420),
-              const LatLng(12.9135, 77.6465),
-              const LatLng(12.9158, 77.6398),
-              const LatLng(12.9180, 77.6432),
-              const LatLng(12.9120, 77.6495),
-              const LatLng(12.9145, 77.6415),
-              const LatLng(12.9160, 77.6480),
-            ]);
           }
 
           LatLng mapCenter = const LatLng(12.9125, 77.6430);
@@ -434,24 +509,34 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           return Scaffold(
             body: Stack(
               children: [
-                // 1. Full-screen Vector Route Painter Map
+                // 1. Google Maps raster tile layer with route polylines and markers
                 Positioned.fill(
                   child: FlutterMap(
                     mapController: _mapController,
                     options: MapOptions(
                       initialCenter: mapCenter,
-                      initialCameraFit: CameraFit.bounds(
-                        bounds: LatLngBounds.fromPoints(routePoints),
-                        padding: const EdgeInsets.all(50.0),
-                      ),
-                      maxZoom: 18.0,
+                      initialZoom: 14.0,
+                      maxZoom: 19.0,
                       minZoom: 4.0,
                     ),
                     children: [
                       TileLayer(
-                        urlTemplate: AppConfig.mapTileUrlTemplate,
+                        urlTemplate: _currentTileUrl,
                         userAgentPackageName: 'com.f2h.delivery',
+                        subdomains: const ['mt0', 'mt1', 'mt2', 'mt3'],
                       ),
+                      if (routePoints.length > 1)
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: routePoints,
+                              strokeWidth: 4.0,
+                              color: const Color(0xFF16A34A),
+                              borderStrokeWidth: 2.0,
+                              borderColor: Colors.white,
+                            ),
+                          ],
+                        ),
                       MarkerLayer(
                         markers: _buildMarkers(groupedStops),
                       ),
@@ -459,7 +544,36 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   ),
                 ),
 
-                // 2. Floating Search Bar
+                // 2. Google Maps Attribution / Watermark pill
+                Positioned(
+                  bottom: 230,
+                  left: 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.85),
+                      borderRadius: BorderRadius.circular(6),
+                      boxShadow: const [
+                        BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Google Maps',
+                          style: GoogleFonts.poppins(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF475569),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // 3. Floating Search Bar
                 Positioned(
                   top: MediaQuery.of(context).padding.top + 12,
                   left: 16,
@@ -467,7 +581,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   child: _buildSearchBar(groupedStops),
                 ),
 
-                // 3. Floating Side Map Options
+                // 4. Floating Side Map Options
                 Positioned(
                   right: 16,
                   top: MediaQuery.of(context).padding.top + 12,
@@ -475,7 +589,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     children: [
                       _buildMapOptionCircle(
                         icon: _showSearch ? Icons.search_off_rounded : Icons.search_rounded,
-                        color: _showSearch ? kPrimary : kTextSub,
+                        color: _showSearch ? const Color(0xFF16A34A) : const Color(0xFF475569),
                         onTap: () {
                           setState(() {
                             _showSearch = !_showSearch;
@@ -495,24 +609,24 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       ),
                       const SizedBox(height: 10),
                       _buildMapOptionCircle(
-                        icon: _showTraffic ? Icons.traffic_rounded : Icons.traffic_outlined,
-                        color: _showTraffic ? kPrimary : kTextSub,
-                        onTap: () => setState(() => _showTraffic = !_showTraffic),
-                        tooltip: 'Traffic Density',
+                        icon: Icons.layers_outlined,
+                        color: const Color(0xFF16A34A),
+                        onTap: _showLayerSelector,
+                        tooltip: 'Map Layer Style',
                       ),
                       const SizedBox(height: 10),
-                       _buildMapOptionCircle(
+                      _buildMapOptionCircle(
                         icon: _voiceNavEnabled ? Icons.volume_up_rounded : Icons.volume_off_rounded,
-                        color: _voiceNavEnabled ? kPrimary : kTextSub,
+                        color: _voiceNavEnabled ? const Color(0xFF16A34A) : const Color(0xFF64748B),
                         onTap: () => setState(() => _voiceNavEnabled = !_voiceNavEnabled),
                         tooltip: 'Voice Navigation',
                       ),
                       const SizedBox(height: 10),
                       _buildMapOptionCircle(
                         icon: Icons.my_location_rounded,
-                        color: kPrimary,
+                        color: const Color(0xFF2563EB),
                         onTap: _goToCurrentLocation,
-                        tooltip: 'Get Current Location',
+                        tooltip: 'Current GPS Location',
                       ),
                       const SizedBox(height: 10),
                       _buildRefreshCircle(),
@@ -520,7 +634,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   ),
                 ),
 
-                // 4. Bottom Active Delivery Details HUD (if any pending)
+                // 5. Bottom Active Delivery Details HUD
                 _buildBottomHUD(state),
               ],
             ),
@@ -540,12 +654,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       decoration: BoxDecoration(
         color: Colors.white,
         shape: BoxShape.circle,
-        border: Border.all(color: kBorder),
-        boxShadow: [
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Color(0x14000000),
             blurRadius: 8,
-            offset: const Offset(0, 3),
+            offset: Offset(0, 3),
           )
         ],
       ),
@@ -564,14 +678,14 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         onTap: _isRefreshing ? null : _refreshMap,
         child: Container(
           decoration: BoxDecoration(
-            color: _isRefreshing ? kPrimary.withValues(alpha: 0.12) : Colors.white,
+            color: _isRefreshing ? const Color(0xFFDCFCE7) : Colors.white,
             shape: BoxShape.circle,
-            border: Border.all(color: _isRefreshing ? kPrimary : kBorder),
-            boxShadow: [
+            border: Border.all(color: _isRefreshing ? const Color(0xFF16A34A) : const Color(0xFFE2E8F0)),
+            boxShadow: const [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
+                color: Color(0x14000000),
                 blurRadius: 8,
-                offset: const Offset(0, 3),
+                offset: Offset(0, 3),
               )
             ],
           ),
@@ -582,7 +696,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               turns: _refreshAnimation,
               child: Icon(
                 Icons.refresh_rounded,
-                color: _isRefreshing ? kPrimary : kTextSub,
+                color: _isRefreshing ? const Color(0xFF16A34A) : const Color(0xFF64748B),
                 size: 20,
               ),
             ),
@@ -595,32 +709,21 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   Widget _buildSearchBar(List<GroupedStop> groupedStops) {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 250),
-      transitionBuilder: (child, animation) => FadeTransition(
-        opacity: animation,
-        child: SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0, -0.3),
-            end: Offset.zero,
-          ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut)),
-          child: child,
-        ),
-      ),
       child: _showSearch
           ? Column(
               key: const ValueKey('search_open'),
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Search input
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: kPrimary.withValues(alpha: 0.3)),
-                    boxShadow: [
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF16A34A)),
+                    boxShadow: const [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
+                        color: Color(0x1A000000),
                         blurRadius: 12,
-                        offset: const Offset(0, 4),
+                        offset: Offset(0, 4),
                       )
                     ],
                   ),
@@ -645,15 +748,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                         }
                       });
                     },
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: kText,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13.5,
+                      color: const Color(0xFF0F172A),
                       fontWeight: FontWeight.w600,
                     ),
                     decoration: InputDecoration(
-                      hintText: 'Search by name, address, stop #...',
-                      hintStyle: const TextStyle(color: kTextSub, fontSize: 13),
-                      prefixIcon: const Icon(Icons.search_rounded, color: kPrimary, size: 20),
+                      hintText: 'Search customer name, stop #...',
+                      hintStyle: GoogleFonts.poppins(color: const Color(0xFF94A3B8), fontSize: 13),
+                      prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF16A34A), size: 20),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? GestureDetector(
                               onTap: () {
@@ -663,7 +766,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                                   _searchResults = [];
                                 });
                               },
-                              child: const Icon(Icons.close_rounded, color: kTextSub, size: 18),
+                              child: const Icon(Icons.close_rounded, color: Color(0xFF94A3B8), size: 18),
                             )
                           : null,
                       border: InputBorder.none,
@@ -671,160 +774,105 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-                // Results dropdown
-                if (_searchResults.isNotEmpty) ...
-                  [
-                    const SizedBox(height: 6),
-                    Container(
-                      constraints: const BoxConstraints(maxHeight: 240),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: kBorder),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          )
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
-                        child: ListView.separated(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          shrinkWrap: true,
-                          itemCount: _searchResults.length,
-                          separatorBuilder: (_, _) => const Divider(height: 1, indent: 16, endIndent: 16),
-                          itemBuilder: (context, index) {
-                            final stop = _searchResults[index];
-                            Color statusColor;
-                            IconData statusIcon;
-                            switch (stop.status) {
-                              case 'delivered':
-                                statusColor = kSuccess;
-                                statusIcon = Icons.check_circle_rounded;
-                                break;
-                              case 'failed':
-                                statusColor = kDanger;
-                                statusIcon = Icons.cancel_rounded;
-                                break;
-                              case 'out_for_delivery':
-                                statusColor = kAccent;
-                                statusIcon = Icons.local_shipping_rounded;
-                                break;
-                              default:
-                                statusColor = kMuted;
-                                statusIcon = Icons.circle_outlined;
-                            }
-                            return InkWell(
-                              onTap: () {
-                                setState(() {
-                                  _selectedStop = stop;
-                                  _showSearch = false;
-                                  _searchController.clear();
-                                  _searchQuery = '';
-                                  _searchResults = [];
-                                  _searchFocusNode.unfocus();
-                                });
-                                _mapController.move(
-                                  LatLng(stop.addressLat, stop.addressLng),
-                                  17.0,
-                                );
-                              },
-                              borderRadius: BorderRadius.circular(8),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                child: Row(
-                                  children: [
-                                    // Stop number badge
-                                    Container(
-                                      width: 28,
-                                      height: 28,
-                                      decoration: BoxDecoration(
-                                        color: statusColor.withValues(alpha: 0.12),
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: statusColor.withValues(alpha: 0.5)),
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          '${stop.stop}',
-                                          style: TextStyle(
-                                            color: statusColor,
-                                            fontWeight: FontWeight.w900,
-                                            fontSize: 10,
-                                          ),
+                if (_searchResults.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 240),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x14000000),
+                          blurRadius: 10,
+                          offset: Offset(0, 4),
+                        )
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: ListView.separated(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        shrinkWrap: true,
+                        itemCount: _searchResults.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                        itemBuilder: (context, index) {
+                          final stop = _searchResults[index];
+                          return InkWell(
+                            onTap: () {
+                              setState(() {
+                                _selectedStop = stop;
+                                _showSearch = false;
+                                _searchController.clear();
+                                _searchQuery = '';
+                                _searchResults = [];
+                                _searchFocusNode.unfocus();
+                              });
+                              _mapController.move(
+                                LatLng(stop.addressLat, stop.addressLng),
+                                17.0,
+                              );
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 28,
+                                    height: 28,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFDCFCE7),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: const Color(0xFF16A34A)),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        '${stop.stop}',
+                                        style: GoogleFonts.poppins(
+                                          color: const Color(0xFF15803D),
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 10,
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            stop.customerName,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 13,
-                                              color: kText,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          stop.customerName,
+                                          style: GoogleFonts.poppins(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 13,
+                                            color: const Color(0xFF0F172A),
                                           ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            stop.address,
-                                            style: const TextStyle(
-                                              color: kTextSub,
-                                              fontSize: 11,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        Text(
+                                          stop.address,
+                                          style: GoogleFonts.poppins(
+                                            color: const Color(0xFF64748B),
+                                            fontSize: 11,
                                           ),
-                                        ],
-                                      ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 8),
-                                    Icon(statusIcon, color: statusColor, size: 16),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                            );
-                          },
-                        ),
+                            ),
+                          );
+                        },
                       ),
                     ),
-                  ]
-                else if (_searchQuery.isNotEmpty) ...
-                  [
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: kBorder),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.06),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          )
-                        ],
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.search_off_rounded, color: kTextSub, size: 16),
-                          SizedBox(width: 8),
-                          Text(
-                            'No stops found',
-                            style: TextStyle(color: kTextSub, fontSize: 13),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
+                ],
               ],
             )
           : const SizedBox.shrink(key: ValueKey('search_closed')),
@@ -846,64 +894,37 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         bottom: 96,
         left: 16,
         right: 16,
-        child: Stack(
-          children: [
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: kSurface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: kBorder),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                  )
-                ],
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFBBF7D0)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x1A000000),
+                blurRadius: 16,
+                offset: Offset(0, 4),
+              )
+            ],
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 44),
+              const SizedBox(height: 12),
+              Text(
+                'All Deliveries Cleared!',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: 17, color: const Color(0xFF0F172A)),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-              child: const Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.check_circle_rounded, color: kSuccess, size: 40),
-                  SizedBox(height: 12),
-                  Text(
-                    'All Deliveries Cleared!',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: kText),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'No pending orders in your route sheet.',
-                    style: TextStyle(color: kTextSub, fontSize: 12),
-                  ),
-                ],
+              const SizedBox(height: 4),
+              Text(
+                'No pending orders remaining on your route sheet.',
+                style: GoogleFonts.poppins(color: const Color(0xFF64748B), fontSize: 12.5),
               ),
-            ),
-            Positioned(
-              top: 12,
-              right: 12,
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _hideAllClearedCard = true;
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: kBorder.withValues(alpha: 0.3),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.close_rounded,
-                    size: 16,
-                    color: kTextSub,
-                  ),
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
@@ -915,10 +936,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         setState(() {
           _selectedStop = stop;
         });
-        _mapController.move(LatLng(stop.addressLat, stop.addressLng), 16.0);
+        _mapController.move(LatLng(stop.addressLat, stop.addressLng), 16.5);
       },
       onShowConfirmation: (stop) => _showConfirmation(context, stop),
     );
   }
 }
-

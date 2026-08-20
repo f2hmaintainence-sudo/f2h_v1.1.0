@@ -128,4 +128,14 @@ class ApiEndpoints {
   static String handoverRun(String runId) => '/delivery/orders/run/$runId/handover';
   static const String updateOrderStatus = '/delivery/orders';
   static const String supportTickets = '/support-tickets';
+
+  // ---------------------------------------------------------------------------
+  // Notifications
+  // ---------------------------------------------------------------------------
+  static const String notifications             = '/notifications';
+  static const String notificationsWithCount    = '/notifications/with-count';
+  static const String notificationsMarkRead     = '/notifications/mark-read';
+  static const String notificationsMarkAllRead  = '/notifications/mark-all-read';
+  static const String notificationsDismissAll   = '/notifications/dismiss-all';
+  static String notificationItem(String id)     => '/notifications/$id';
 }
