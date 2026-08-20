@@ -1,8 +1,31 @@
-import { Injectable, InternalServerErrorException, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { DatabaseService } from '../../../shared/database/Database.service';
 import { DeveloperService } from '../../../shared/logger/Developer.service';
 import { RedisService } from '../../../shared/redis/redis.service';
 import * as bcrypt from 'bcrypt';
+import { UpdateCompanyProfileDto } from './company-profile.dto';
+import {
+  buildEditableCompanyProfile,
+  buildTelephoneUrl,
+  buildWhatsAppUrl,
+  CompanyProfileRecord,
+  formatCompanyAddress,
+  parseSiteSettings,
+  SiteSettingRow,
+} from '../../../shared/company-profile/company-profile';
+
+const COMPANY_PROFILE_COLUMNS = `
+  id, name, legal_name, gst_number, pan_number, email, phone,
+  secondary_phone, whatsapp, address, city, state, pincode, logo_url,
+  website, instagram_url, facebook_url, youtube_url, created_at, updated_at
+`;
+
+const COMPANY_PROFILE_LOCK = 'admin-company-profile-singleton';
 
 @Injectable()
 export class ProfileService {
@@ -14,34 +37,136 @@ export class ProfileService {
 
   async getCompanyProfile() {
     try {
-      const rows = await this.db.query('SELECT * FROM company_profile LIMIT 1');
-      return { status: true, data: rows[0] ?? null, message: 'Company profile fetched' };
+      const [profiles, settingRows] = await Promise.all([
+        this.db.query<CompanyProfileRecord>(`
+          SELECT ${COMPANY_PROFILE_COLUMNS}
+          FROM company_profile
+          ORDER BY created_at ASC NULLS LAST, id ASC
+          LIMIT 1
+        `),
+        this.db.query<SiteSettingRow>(
+          'SELECT key, value FROM site_settings ORDER BY key ASC',
+        ),
+      ]);
+      const data = buildEditableCompanyProfile(
+        profiles[0],
+        parseSiteSettings(settingRows),
+      );
+      return { status: true, data, message: 'Company profile fetched' };
     } catch (error) {
       this.developer.error('getCompanyProfile error', { error });
-      throw new InternalServerErrorException('Failed to retrieve company profile');
+      throw new InternalServerErrorException(
+        'Failed to retrieve company profile',
+      );
     }
   }
 
-  async updateCompanyProfile(body: any) {
+  async updateCompanyProfile(body: UpdateCompanyProfileDto) {
     try {
-      const { name, legal_name, gst_number, pan_number, email, phone, address, city, state, pincode, website } = body;
-      const existing = await this.db.query('SELECT id FROM company_profile LIMIT 1');
+      const values = [
+        body.name,
+        body.legal_name ?? '',
+        body.gst_number ?? '',
+        body.pan_number ?? '',
+        body.email ?? '',
+        body.phone ?? '',
+        body.secondary_phone ?? '',
+        body.whatsapp ?? '',
+        body.address ?? '',
+        body.city ?? '',
+        body.state ?? '',
+        body.pincode ?? '',
+        body.logo_url ?? '',
+        body.website ?? '',
+        body.instagram_url ?? '',
+        body.facebook_url ?? '',
+        body.youtube_url ?? '',
+      ];
 
-      if (existing.length > 0) {
-        await this.db.query(
-          `UPDATE company_profile SET name=$1, legal_name=$2, gst_number=$3, pan_number=$4, email=$5, phone=$6, address=$7, city=$8, state=$9, pincode=$10, website=$11, updated_at=NOW() WHERE id=$12`,
-          [name, legal_name, gst_number, pan_number, email, phone, address, city, state, pincode, website, existing[0].id],
+      const saved = await this.db.transaction(async (client) => {
+        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+          COMPANY_PROFILE_LOCK,
+        ]);
+        const existing = await client.query(`
+          SELECT id
+          FROM company_profile
+          ORDER BY created_at ASC NULLS LAST, id ASC
+          LIMIT 1
+        `);
+
+        let savedResult;
+        if (existing.rows.length > 0) {
+          savedResult = await client.query(
+            `UPDATE company_profile
+                SET name = $1, legal_name = $2, gst_number = $3,
+                    pan_number = $4, email = $5, phone = $6,
+                    secondary_phone = $7, whatsapp = $8, address = $9,
+                    city = $10, state = $11, pincode = $12, logo_url = $13,
+                    website = $14, instagram_url = $15, facebook_url = $16,
+                    youtube_url = $17, updated_at = NOW()
+              WHERE id = $18
+              RETURNING ${COMPANY_PROFILE_COLUMNS}`,
+            [...values, existing.rows[0].id],
+          );
+        } else {
+          savedResult = await client.query(
+            `INSERT INTO company_profile (
+                name, legal_name, gst_number, pan_number, email, phone,
+                secondary_phone, whatsapp, address, city, state, pincode,
+                logo_url, website, instagram_url, facebook_url, youtube_url
+              ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9,
+                $10, $11, $12, $13, $14, $15, $16, $17
+              )
+              RETURNING ${COMPANY_PROFILE_COLUMNS}`,
+            values,
+          );
+        }
+
+        const profile = savedResult.rows[0] as CompanyProfileRecord;
+        const legacySettings: Array<[string, string]> = [
+          ['company_name', String(profile.name ?? '')],
+          ['logo_url', String(profile.logo_url ?? '')],
+          ['website', String(profile.website ?? '')],
+          ['email', String(profile.email ?? '')],
+          ['phone', String(profile.phone ?? '')],
+          ['phone_url', buildTelephoneUrl(profile.phone)],
+          ['secondary_phone', String(profile.secondary_phone ?? '')],
+          ['secondary_phone_url', buildTelephoneUrl(profile.secondary_phone)],
+          ['whatsapp', String(profile.whatsapp ?? '')],
+          ['whatsapp_url', buildWhatsAppUrl(profile.whatsapp)],
+          ['address', formatCompanyAddress(profile)],
+          ['city', String(profile.city ?? '')],
+          ['state', String(profile.state ?? '')],
+          ['pincode', String(profile.pincode ?? '')],
+          ['instagram_url', String(profile.instagram_url ?? '')],
+          ['facebook_url', String(profile.facebook_url ?? '')],
+          ['youtube_url', String(profile.youtube_url ?? '')],
+        ];
+        const placeholders = legacySettings
+          .map((_, index) => `($${index * 2 + 1}, $${index * 2 + 2}, NOW())`)
+          .join(', ');
+        await client.query(
+          `INSERT INTO site_settings (key, value, updated_at)
+           VALUES ${placeholders}
+           ON CONFLICT (key) DO UPDATE
+             SET value = EXCLUDED.value, updated_at = NOW()`,
+          legacySettings.flat(),
         );
-      } else {
-        await this.db.query(
-          `INSERT INTO company_profile (name, legal_name, gst_number, pan_number, email, phone, address, city, state, pincode, website) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-          [name, legal_name, gst_number, pan_number, email, phone, address, city, state, pincode, website],
-        );
-      }
-      return { status: true, message: 'Company profile updated' };
+
+        return profile;
+      });
+
+      return {
+        status: true,
+        data: buildEditableCompanyProfile(saved, {}),
+        message: 'Company profile updated',
+      };
     } catch (error) {
       this.developer.error('updateCompanyProfile error', { error });
-      throw new InternalServerErrorException('Failed to update company profile');
+      throw new InternalServerErrorException(
+        'Failed to update company profile',
+      );
     }
   }
 
@@ -80,8 +205,14 @@ export class ProfileService {
 
   async getNotificationSettings() {
     try {
-      const rows = await this.db.query('SELECT * FROM notification_settings WHERE is_active = true ORDER BY setting_key ASC');
-      return { status: true, data: rows, message: 'Notification settings fetched' };
+      const rows = await this.db.query(
+        'SELECT * FROM notification_settings WHERE is_active = true ORDER BY setting_key ASC',
+      );
+      return {
+        status: true,
+        data: rows,
+        message: 'Notification settings fetched',
+      };
     } catch (error) {
       this.developer.error('getNotificationSettings error', { error });
       throw new InternalServerErrorException('Failed');
@@ -139,11 +270,24 @@ export class ProfileService {
   async updateMyProfile(userId: string, body: any) {
     try {
       const {
-        first_name, last_name, phone, email,
-        gender, date_of_birth, marital_status, bio,
-        department, designation, education,
-        address_line1, address_line2, city, state, postal_code,
-        alt_phone, branch_id,
+        first_name,
+        last_name,
+        phone,
+        email,
+        gender,
+        date_of_birth,
+        marital_status,
+        bio,
+        department,
+        designation,
+        education,
+        address_line1,
+        address_line2,
+        city,
+        state,
+        postal_code,
+        alt_phone,
+        branch_id,
       } = body;
 
       // 1) Update users table
@@ -170,17 +314,31 @@ export class ProfileService {
                phone = $16, user_name = $17, updated_at = NOW()
            WHERE user_id = $1`,
           [
-            userId, gender, date_of_birth || null, marital_status, bio,
-            department, designation, education,
-            address_line1, address_line2, city, state,
-            postal_code, alt_phone, branch_id || null,
-            phone, [first_name, last_name].filter(Boolean).join(' '),
+            userId,
+            gender,
+            date_of_birth || null,
+            marital_status,
+            bio,
+            department,
+            designation,
+            education,
+            address_line1,
+            address_line2,
+            city,
+            state,
+            postal_code,
+            alt_phone,
+            branch_id || null,
+            phone,
+            [first_name, last_name].filter(Boolean).join(' '),
           ],
         );
       } else {
         // Generate a management_id and next sequence id for management_staff
         const mgmtId = `MGMT-${userId.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20)}`;
-        const maxIdRes = await this.db.query(`SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM management_staff`);
+        const maxIdRes = await this.db.query(
+          `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM management_staff`,
+        );
         const nextId = parseInt(maxIdRes[0]?.next_id ?? 1, 10);
 
         await this.db.query(
@@ -192,13 +350,25 @@ export class ProfileService {
               alt_phone, phone)
            VALUES ($1,$2,$3,'ADMIN',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
           [
-            nextId, mgmtId, userId,
+            nextId,
+            mgmtId,
+            userId,
             [first_name, last_name].filter(Boolean).join(' '),
             branch_id || null,
-            gender, date_of_birth || null, marital_status, bio,
-            department, designation, education,
-            address_line1, address_line2, city, state, postal_code,
-            alt_phone, phone,
+            gender,
+            date_of_birth || null,
+            marital_status,
+            bio,
+            department,
+            designation,
+            education,
+            address_line1,
+            address_line2,
+            city,
+            state,
+            postal_code,
+            alt_phone,
+            phone,
           ],
         );
       }
@@ -212,11 +382,15 @@ export class ProfileService {
 
   async updateEmail(userId: string, body: any) {
     try {
-      const email = String(body?.email ?? '').toLowerCase().trim();
+      const email = String(body?.email ?? '')
+        .toLowerCase()
+        .trim();
       const verificationToken = String(body?.verification_token ?? '').trim();
 
       if (!email || !verificationToken) {
-        throw new BadRequestException('Email and verification token are required');
+        throw new BadRequestException(
+          'Email and verification token are required',
+        );
       }
 
       // Verify OTP token from Redis
@@ -224,20 +398,37 @@ export class ProfileService {
       let stored = await this.redisService.fetch(key);
       if (!stored) {
         // Fallback check for hashed key if any client hashed the token
-        const hashedToken = require('crypto').createHash('sha256').update(verificationToken).digest('hex');
-        stored = await this.redisService.fetch(`customer_auth_otp_verified:${hashedToken}`);
+        const hashedToken = require('crypto')
+          .createHash('sha256')
+          .update(verificationToken)
+          .digest('hex');
+        stored = await this.redisService.fetch(
+          `customer_auth_otp_verified:${hashedToken}`,
+        );
       }
       const parsed = typeof stored === 'string' ? JSON.parse(stored) : stored;
 
-      const targetEmail = (parsed?.email || parsed?.contact || parsed?.phone || '').toLowerCase().trim();
+      const targetEmail = (
+        parsed?.email ||
+        parsed?.contact ||
+        parsed?.phone ||
+        ''
+      )
+        .toLowerCase()
+        .trim();
       if (!parsed || targetEmail !== email) {
         throw new BadRequestException('Invalid or expired verification token');
       }
 
       // Check if email is already in use by another user
-      const users = await this.db.query('SELECT user_id FROM users WHERE email = $1 AND user_id != $2 LIMIT 1', [email, userId]);
+      const users = await this.db.query(
+        'SELECT user_id FROM users WHERE email = $1 AND user_id != $2 LIMIT 1',
+        [email, userId],
+      );
       if (users.length > 0) {
-        throw new BadRequestException('Email already registered by another account');
+        throw new BadRequestException(
+          'Email already registered by another account',
+        );
       }
 
       // Mark OTP as consumed in auth_otp_challenges
@@ -250,15 +441,21 @@ export class ProfileService {
            WHERE contact = $1 AND purpose = 'email_change' AND verified_at IS NOT NULL
            ORDER BY created_at DESC LIMIT 1
          )`,
-        [email]
+        [email],
       );
 
       // Update email
-      await this.db.query('UPDATE users SET email = $1, updated_at = NOW() WHERE user_id = $2', [email, userId]);
+      await this.db.query(
+        'UPDATE users SET email = $1, updated_at = NOW() WHERE user_id = $2',
+        [email, userId],
+      );
 
       return { status: true, message: 'Email updated successfully' };
     } catch (error) {
-      if (error instanceof BadRequestException || error instanceof UnauthorizedException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof UnauthorizedException
+      ) {
         throw error;
       }
       this.developer.error('updateEmail error', { error });
@@ -270,22 +467,31 @@ export class ProfileService {
     try {
       const { currentPassword, newPassword } = body;
       if (!currentPassword || !newPassword) {
-        throw new BadRequestException('Current password and new password are required');
+        throw new BadRequestException(
+          'Current password and new password are required',
+        );
       }
 
       // 1) Verify current password matches
-      const user = await this.db.query('SELECT password FROM users WHERE user_id = $1', [userId]);
+      const user = await this.db.query(
+        'SELECT password FROM users WHERE user_id = $1',
+        [userId],
+      );
       if (!user.length) {
         throw new UnauthorizedException('User not found');
       }
 
-      const matchesCurrent = await bcrypt.compare(currentPassword, user[0].password);
+      const matchesCurrent = await bcrypt.compare(
+        currentPassword,
+        user[0].password,
+      );
       if (!matchesCurrent) {
         throw new BadRequestException('Incorrect current password');
       }
 
       // 2) Validate new password strength
-      const strengthRegex = /((?=.*\d)|(?=.*\W+))(?![.\n])(?=.*[A-Z])(?=.*[a-z]).*$/;
+      const strengthRegex =
+        /((?=.*\d)|(?=.*\W+))(?![.\n])(?=.*[A-Z])(?=.*[a-z]).*$/;
       if (newPassword.length < 8 || !strengthRegex.test(newPassword)) {
         throw new BadRequestException(
           'Password must be at least 8 characters long and contain uppercase, lowercase, number, and special character',
@@ -293,7 +499,10 @@ export class ProfileService {
       }
 
       // 3) Check reuse of current password
-      const reuseOfCurrent = await bcrypt.compare(newPassword, user[0].password);
+      const reuseOfCurrent = await bcrypt.compare(
+        newPassword,
+        user[0].password,
+      );
       if (reuseOfCurrent) {
         throw new BadRequestException(
           'Cannot reuse your current password. Please choose a different password.',
@@ -307,7 +516,9 @@ export class ProfileService {
       );
       for (const h of history) {
         if (await bcrypt.compare(newPassword, h.password_hash)) {
-          throw new BadRequestException('Cannot reuse last 5 passwords. Please choose a new password.');
+          throw new BadRequestException(
+            'Cannot reuse last 5 passwords. Please choose a new password.',
+          );
         }
       }
 
@@ -326,7 +537,10 @@ export class ProfileService {
 
       return { status: true, message: 'Password updated successfully' };
     } catch (error) {
-      if (error instanceof BadRequestException || error instanceof UnauthorizedException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof UnauthorizedException
+      ) {
         throw error;
       }
       this.developer.error('changePassword error', { error });

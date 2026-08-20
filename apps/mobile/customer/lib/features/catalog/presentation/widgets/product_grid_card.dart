@@ -98,13 +98,23 @@ class ProductGridCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Expanded(
-              child: Center(
-                child: Hero(
-                  tag: 'product-v-${product.id}',
-                  child: buildProductImage(
-                    product.name,
-                    imageAsset: product.imageAsset,
-                    fit: BoxFit.contain,
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F7F6),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Center(
+                    child: Hero(
+                      tag: 'product-v-${product.id}',
+                      child: buildProductImage(
+                        product.name,
+                        imageAsset: product.imageAsset,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -600,7 +610,7 @@ class _ActionShell extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 4),
     decoration: BoxDecoration(
       color: color,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(20),
     ),
     child: fill ? child : FittedBox(fit: BoxFit.scaleDown, child: child),
   );

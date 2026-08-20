@@ -1,7 +1,17 @@
-import { Controller, Get, Post, Put, Body, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Body,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { ProfileService } from './profile.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
+import { UpdateCompanyProfileDto } from './company-profile.dto';
 
 @Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/profile', version: '1' })
@@ -38,7 +48,7 @@ export class ProfileController {
   }
 
   @Put('company')
-  async updateCompanyProfile(@Body() body: any) {
+  async updateCompanyProfile(@Body() body: UpdateCompanyProfileDto) {
     return this.profileService.updateCompanyProfile(body);
   }
 

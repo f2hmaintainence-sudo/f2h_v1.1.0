@@ -18,12 +18,23 @@ import { JwtService } from '@nestjs/jwt';
 import { RedisService } from 'src/shared/redis/redis.service';
 import { DeviceFingerprintService } from './device-fingerprint.service';
 import { AuditLoggerService } from './audit-logger.service';
-import { RegisterDto, LoginDto, SendOtpDto, VerifyOtpDto } from './dto/auth.dto';
+import {
+  RegisterDto,
+  LoginDto,
+  SendOtpDto,
+  VerifyOtpDto,
+} from './dto/auth.dto';
 import { Public } from './decorators/public.decorator';
 import { Roles, ROLE } from './decorators/roles.decorator';
 import { GoogleOAuthService } from './google-oauth.service';
 import { Throttle } from '@nestjs/throttler';
 import { DatabaseService } from 'src/shared/database/Database.service';
+import {
+  buildPublicCompanyProfile,
+  CompanyProfileRecord,
+  parseSiteSettings,
+  SiteSettingRow,
+} from 'src/shared/company-profile/company-profile';
 
 @Controller({ path: 'auth', version: '1' })
 export class AuthController {
@@ -37,25 +48,34 @@ export class AuthController {
     private readonly auditLogger: AuditLoggerService,
     private readonly db: DatabaseService,
     private readonly googleOAuthService: GoogleOAuthService,
-  ) { }
+  ) {}
 
   @Public()
   @Post('login')
-  @Throttle({ short: { limit: 10, ttl: 60_000 }, medium: { limit: 30, ttl: 900_000 } })
+  @Throttle({
+    short: { limit: 10, ttl: 60_000 },
+    medium: { limit: 30, ttl: 900_000 },
+  })
   @HttpCode(HttpStatus.OK)
   async login(
     @Body() body: LoginDto,
     @Res({ passthrough: true }) res: Response,
     @Req() req: Request,
   ) {
-
-    const ip = req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
+    const ip =
+      req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
     const userAgent = req.headers['user-agent'] || 'unknown';
     // 1. Extract x-role strictly from header (ignore any role sent in request body)
     const rawClientRole = req.headers['x-role'];
-    const clientRole = typeof rawClientRole === 'string' ? rawClientRole.trim().toUpperCase() : '';
+    const clientRole =
+      typeof rawClientRole === 'string'
+        ? rawClientRole.trim().toUpperCase()
+        : '';
 
-    if (!clientRole || !['CUSTOMER', 'DELIVERY_PARTNER', 'ADMIN'].includes(clientRole)) {
+    if (
+      !clientRole ||
+      !['CUSTOMER', 'DELIVERY_PARTNER', 'ADMIN'].includes(clientRole)
+    ) {
       this.logger.log(
         `[AuthController:login] Login rejected: Missing or invalid x-role header: "${rawClientRole}"`,
       );
@@ -91,7 +111,9 @@ export class AuthController {
 
       case 'DELIVERY_PARTNER':
         // Delivery Partner App: allow DELIVERY_PARTNER, ADMIN, SUPER_ADMIN
-        isRoleAllowed = ['DELIVERY_PARTNER', 'ADMIN', 'SUPER_ADMIN'].includes(userRole);
+        isRoleAllowed = ['DELIVERY_PARTNER', 'ADMIN', 'SUPER_ADMIN'].includes(
+          userRole,
+        );
         break;
 
       case 'ADMIN':
@@ -104,18 +126,24 @@ export class AuthController {
       this.logger.log(
         `[AuthController:login] Client Role: ${clientRole}, Resolved User Role: ${userRole}, Result: FAILED - Unauthorized role`,
       );
-      throw new UnauthorizedException(`Unauthorized role for ${clientRole} application`);
+      throw new UnauthorizedException(
+        `Unauthorized role for ${clientRole} application`,
+      );
     }
 
     // 4. Check is_active in the satellite table for the app being accessed (not the user's role table)
-    const isSatelliteActive = await this.authService.checkSatelliteIsActive(user.user_id, clientRole);
+    const isSatelliteActive = await this.authService.checkSatelliteIsActive(
+      user.user_id,
+      clientRole,
+    );
     if (!isSatelliteActive) {
       this.logger.log(
         `[AuthController:login] User ID: ${user.user_id}, App: ${clientRole}, UserRole: ${userRole}, Result: FAILED - Inactive account in satellite table`,
       );
-      throw new UnauthorizedException('Your account is inactive. Please contact support.');
+      throw new UnauthorizedException(
+        'Your account is inactive. Please contact support.',
+      );
     }
-
 
     const incomingFcmToken = body.fcm_token || (body as any).fcmToken;
     if (incomingFcmToken) {
@@ -177,7 +205,8 @@ export class AuthController {
     @Req() req: Request,
   ) {
     const regResult = await this.authService.register(body);
-    const ip = req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
+    const ip =
+      req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
     const userAgent = req.headers['user-agent'] || 'unknown';
 
     const userId = regResult.userId;
@@ -213,35 +242,50 @@ export class AuthController {
 
   @Public()
   @Post('forgot-password')
-  @Throttle({ short: { limit: 5, ttl: 60_000 }, medium: { limit: 20, ttl: 900_000 } })
+  @Throttle({
+    short: { limit: 5, ttl: 60_000 },
+    medium: { limit: 20, ttl: 900_000 },
+  })
   @HttpCode(HttpStatus.OK)
   async forgotPassword(
     @Body() body: { email?: string; phone?: string; identifier?: string },
     @Req() req: Request,
   ) {
     const rawClientRole = req.headers['x-role'];
-    const clientRole = typeof rawClientRole === 'string' ? rawClientRole.trim().toUpperCase() : undefined;
+    const clientRole =
+      typeof rawClientRole === 'string'
+        ? rawClientRole.trim().toUpperCase()
+        : undefined;
     const identifier = body.email || body.phone || body.identifier || '';
     return this.authService.forgotPassword(identifier, clientRole);
   }
 
   @Public()
   @Post('forgot-password-sms')
-  @Throttle({ short: { limit: 5, ttl: 60_000 }, medium: { limit: 20, ttl: 900_000 } })
+  @Throttle({
+    short: { limit: 5, ttl: 60_000 },
+    medium: { limit: 20, ttl: 900_000 },
+  })
   @HttpCode(HttpStatus.OK)
   async forgotPasswordSms(
     @Body() body: { phone?: string; identifier?: string },
     @Req() req: Request,
   ) {
     const rawClientRole = req.headers['x-role'];
-    const clientRole = typeof rawClientRole === 'string' ? rawClientRole.trim().toUpperCase() : undefined;
+    const clientRole =
+      typeof rawClientRole === 'string'
+        ? rawClientRole.trim().toUpperCase()
+        : undefined;
     const identifier = body.phone || body.identifier || '';
     return this.authService.forgotPassword(identifier, clientRole);
   }
 
   @Public()
   @Post('reset-password')
-  @Throttle({ short: { limit: 5, ttl: 60_000 }, medium: { limit: 20, ttl: 900_000 } })
+  @Throttle({
+    short: { limit: 5, ttl: 60_000 },
+    medium: { limit: 20, ttl: 900_000 },
+  })
   @HttpCode(HttpStatus.OK)
   async resetPassword(
     @Body()
@@ -260,12 +304,21 @@ export class AuthController {
 
   @Public()
   @Post('send-otp')
-  @Throttle({ short: { limit: 5, ttl: 60_000 }, medium: { limit: 20, ttl: 900_000 } })
+  @Throttle({
+    short: { limit: 5, ttl: 60_000 },
+    medium: { limit: 20, ttl: 900_000 },
+  })
   @HttpCode(HttpStatus.OK)
-  async sendOtp(@Body() body: SendOtpDto & { purpose?: string }, @Req() req: Request) {
+  async sendOtp(
+    @Body() body: SendOtpDto & { purpose?: string },
+    @Req() req: Request,
+  ) {
     if (body.purpose === 'forgot_password') {
       const rawClientRole = req.headers['x-role'];
-      const clientRole = typeof rawClientRole === 'string' ? rawClientRole.trim().toUpperCase() : undefined;
+      const clientRole =
+        typeof rawClientRole === 'string'
+          ? rawClientRole.trim().toUpperCase()
+          : undefined;
       const identifier = body.phone || body.email || '';
       return this.authService.forgotPassword(identifier, clientRole);
     }
@@ -274,7 +327,10 @@ export class AuthController {
 
   @Public()
   @Post('send-email-otp')
-  @Throttle({ short: { limit: 5, ttl: 60_000 }, medium: { limit: 20, ttl: 900_000 } })
+  @Throttle({
+    short: { limit: 5, ttl: 60_000 },
+    medium: { limit: 20, ttl: 900_000 },
+  })
   @HttpCode(HttpStatus.OK)
   async sendEmailOtp(
     @Body() body: { email?: string; phone?: string; purpose?: string },
@@ -282,39 +338,63 @@ export class AuthController {
   ) {
     if (body.purpose === 'forgot_password') {
       const rawClientRole = req.headers['x-role'];
-      const clientRole = typeof rawClientRole === 'string' ? rawClientRole.trim().toUpperCase() : undefined;
+      const clientRole =
+        typeof rawClientRole === 'string'
+          ? rawClientRole.trim().toUpperCase()
+          : undefined;
       const identifier = body.email || body.phone || '';
       return this.authService.forgotPassword(identifier, clientRole);
     }
-    return this.authService.requestMobileOtp({ email: body.email, phone: body.phone });
+    return this.authService.requestMobileOtp({
+      email: body.email,
+      phone: body.phone,
+    });
   }
 
   @Public()
   @Post('verify-otp')
-  @Throttle({ short: { limit: 5, ttl: 60_000 }, medium: { limit: 20, ttl: 900_000 } })
+  @Throttle({
+    short: { limit: 5, ttl: 60_000 },
+    medium: { limit: 20, ttl: 900_000 },
+  })
   @HttpCode(HttpStatus.OK)
   async verifyOtp(@Body() body: VerifyOtpDto, @Req() req: Request) {
-    const ip = req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
+    const ip =
+      req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
     return this.authService.verifyMobileOtp(body, ip);
   }
 
   @Public()
   @Post('verify-email-otp')
-  @Throttle({ short: { limit: 5, ttl: 60_000 }, medium: { limit: 20, ttl: 900_000 } })
+  @Throttle({
+    short: { limit: 5, ttl: 60_000 },
+    medium: { limit: 20, ttl: 900_000 },
+  })
   @HttpCode(HttpStatus.OK)
-  async verifyEmailOtp(@Body() body: { email?: string; phone?: string; otp: string; purpose?: string }, @Req() req: Request) {
-    const ip = req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
-    const purpose = (body.purpose as 'registration' | 'forgot_password' | 'email_change') || 'registration';
-    return this.authService.verifyMobileOtp({ email: body.email, phone: body.phone, otp: body.otp, purpose }, ip);
+  async verifyEmailOtp(
+    @Body()
+    body: { email?: string; phone?: string; otp: string; purpose?: string },
+    @Req() req: Request,
+  ) {
+    const ip =
+      req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
+    const purpose =
+      (body.purpose as 'registration' | 'forgot_password' | 'email_change') ||
+      'registration';
+    return this.authService.verifyMobileOtp(
+      { email: body.email, phone: body.phone, otp: body.otp, purpose },
+      ip,
+    );
   }
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const authHeader = req.headers['authorization'];
-    const bearerToken = typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
-      ? authHeader.substring(7)
-      : undefined;
+    const bearerToken =
+      typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+        ? authHeader.substring(7)
+        : undefined;
     const token = req.cookies?.access_token || bearerToken;
     if (token) {
       try {
@@ -355,15 +435,19 @@ export class AuthController {
 
   @Post('fcm-token')
   @HttpCode(HttpStatus.OK)
-  async saveFcmToken(@Req() req: Request, @Body() body: { fcm_token?: string; fcmToken?: string }) {
+  async saveFcmToken(
+    @Req() req: Request,
+    @Body() body: { fcm_token?: string; fcmToken?: string },
+  ) {
     const token = body.fcm_token || body.fcmToken;
     if (!token) {
       return { success: false, message: 'No FCM token provided' };
     }
     const authHeader = req.headers['authorization'];
-    const bearerToken = typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
-      ? authHeader.substring(7)
-      : undefined;
+    const bearerToken =
+      typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+        ? authHeader.substring(7)
+        : undefined;
     const accessToken = req.cookies?.access_token || bearerToken;
     let userId: string | null = null;
     if (accessToken) {
@@ -385,7 +469,10 @@ export class AuthController {
 
   @Post('update-fcm-token')
   @HttpCode(HttpStatus.OK)
-  async updateFcmTokenEndpoint(@Req() req: Request, @Body() body: { fcm_token?: string; fcmToken?: string }) {
+  async updateFcmTokenEndpoint(
+    @Req() req: Request,
+    @Body() body: { fcm_token?: string; fcmToken?: string },
+  ) {
     return this.saveFcmToken(req, body);
   }
 
@@ -461,13 +548,16 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async getPublicBranches() {
     try {
-      const rows = await this.db.query(`
+      const rows = await this.db.query(
+        `
         SELECT branch_id, branch_name, city, state,
                lat, lng, delivery_radius_km
         FROM branches
         WHERE is_active = true
         ORDER BY branch_name ASC
-      `, []);
+      `,
+        [],
+      );
       return { status: true, data: rows };
     } catch {
       return { status: false, data: [] };
@@ -479,13 +569,25 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async getPublicSiteSettings() {
     try {
-      const rows: { key: string; value: string }[] = await this.db.query(
-        'SELECT key, value FROM site_settings ORDER BY key ASC', []
+      const [settingRows, profiles] = await Promise.all([
+        this.db.query<SiteSettingRow>(
+          'SELECT key, value FROM site_settings ORDER BY key ASC',
+          [],
+        ),
+        this.db.query<CompanyProfileRecord>(
+          `SELECT id, name, email, phone, secondary_phone, whatsapp,
+                  address, city, state, pincode, logo_url, website,
+                  instagram_url, facebook_url, youtube_url
+             FROM company_profile
+            ORDER BY created_at ASC NULLS LAST, id ASC
+            LIMIT 1`,
+          [],
+        ),
+      ]);
+      const data = buildPublicCompanyProfile(
+        profiles[0],
+        parseSiteSettings(settingRows),
       );
-      const data: Record<string, any> = {};
-      for (const row of rows) {
-        try { data[row.key] = JSON.parse(row.value); } catch { data[row.key] = row.value; }
-      }
       return { status: true, data };
     } catch {
       return { status: false, data: {} };
@@ -499,7 +601,8 @@ export class AuthController {
     const accessMaxAge =
       parseDurationToSeconds(process.env.JWT_ACCESS_EXPIRES_IN || '15m') * 1000;
     const refreshMaxAge =
-      parseDurationToSeconds(process.env.JWT_REFRESH_EXPIRES_IN || '30d') * 1000;
+      parseDurationToSeconds(process.env.JWT_REFRESH_EXPIRES_IN || '30d') *
+      1000;
 
     res.cookie('access_token', accessToken, {
       maxAge: accessMaxAge,

@@ -4,6 +4,7 @@ import { ReactNode } from "react";
 import "./globals.css";
 import { Navbar } from "@/components/landingf2h/Navbar";
 import { Footer } from "@/components/landingf2h/Footer";
+import { PublicCompanyProvider } from "@/components/landingf2h/PublicCompanyProvider";
 
 const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-plus-jakarta",
@@ -34,9 +35,11 @@ export default function LandingLayout({ children }: LandingLayoutProps) {
     <div
       className={`${plusJakarta.variable} ${plusJakarta.className} min-h-screen antialiased`}
     >
-      <Navbar />
-      {children}
-      <Footer />
+      <PublicCompanyProvider>
+        <Navbar />
+        {children}
+        <Footer />
+      </PublicCompanyProvider>
     </div>
   );
 }
