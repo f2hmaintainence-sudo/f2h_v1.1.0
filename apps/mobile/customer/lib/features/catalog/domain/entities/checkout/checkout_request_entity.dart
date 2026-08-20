@@ -9,6 +9,7 @@ class CheckoutRequestEntity {
   final String? subscriptionStartDate;
   final String? subscriptionEndDate;
   final bool? subscriptionAutoRenew;
+  final String? couponCode;
 
   CheckoutRequestEntity({
     required this.userId,
@@ -19,5 +20,6 @@ class CheckoutRequestEntity {
     this.subscriptionStartDate,
     this.subscriptionEndDate,
     this.subscriptionAutoRenew,
+    this.couponCode,
   });
 }

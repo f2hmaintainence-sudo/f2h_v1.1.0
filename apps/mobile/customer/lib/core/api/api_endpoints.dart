@@ -88,6 +88,8 @@ class ApiEndpoints {
   static const String products = '$_customer/products';
   static const String orders = '$_customer/orders';
   static const String checkOut = '$_customer/checkout/payment';
+  static const String validateCoupon = '$_customer/coupon/validate';
+  static const String previewDiscounts = '$_customer/checkout/preview-discounts';
 
   // Razorpay checkout. These routes exist on the API (customer/payment/*) but
   // the constants were missing, so payment_service.dart did not compile.

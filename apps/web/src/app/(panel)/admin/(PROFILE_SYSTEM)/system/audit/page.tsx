@@ -112,6 +112,16 @@ function formatLabel(value: string): string {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function getAdministratorDisplayName(
+  adminName?: string | null,
+  adminId?: string | null,
+): string {
+  const normalizedName = adminName?.trim();
+  return normalizedName && normalizedName !== adminId
+    ? normalizedName
+    : "Unknown administrator";
+}
+
 function formatTimestamp(value?: string | null): string {
   if (!value) return "—";
   const date = new Date(value);
@@ -279,7 +289,10 @@ function AuditDetailsDialog({ log, onClose }: AuditDetailsDialogProps) {
                 Administrator
               </p>
               <p className="mt-1 text-sm font-bold text-slate-800">
-                {log.admin_name || log.admin_id || "—"}
+                {getAdministratorDisplayName(log.admin_name, log.admin_id)}
+              </p>
+              <p className="mt-0.5 break-all font-mono text-[10px] text-slate-400">
+                Actor ID: {log.admin_id || "—"}
               </p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -663,7 +676,7 @@ export default function AuditLogPage() {
                 <option value="">All administrators</option>
                 {filterOptions.admins.map((admin) => (
                   <option key={admin.admin_id} value={admin.admin_id}>
-                    {admin.admin_name}
+                    {getAdministratorDisplayName(admin.admin_name, admin.admin_id)}
                   </option>
                 ))}
               </select>
@@ -816,7 +829,7 @@ export default function AuditLogPage() {
                       </td>
                       <td className="px-4 py-3">
                         <p className="text-xs font-bold text-slate-800">
-                          {log.admin_name || log.admin_id || "—"}
+                          {getAdministratorDisplayName(log.admin_name, log.admin_id)}
                         </p>
                       </td>
                       <td className="px-4 py-3">

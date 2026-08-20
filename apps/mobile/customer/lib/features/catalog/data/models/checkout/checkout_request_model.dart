@@ -10,6 +10,7 @@ class CheckoutRequestModel extends CheckoutRequestEntity {
     super.subscriptionStartDate,
     super.subscriptionEndDate,
     super.subscriptionAutoRenew,
+    super.couponCode,
   });
 
   Map<String, dynamic> toJson() {
@@ -53,6 +54,8 @@ class CheckoutRequestModel extends CheckoutRequestEntity {
       if (addressId != null) 'address_id': addressId,
       if (paymentMethod != null) 'payment_method': paymentMethod,
       if (paymentType != null) 'payment_type': paymentType,
+      if (couponCode != null && couponCode!.trim().isNotEmpty)
+        'coupon_code': couponCode!.trim(),
     };
   }
 }

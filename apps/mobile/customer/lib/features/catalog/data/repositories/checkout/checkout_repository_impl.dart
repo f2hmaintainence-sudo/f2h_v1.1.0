@@ -19,8 +19,34 @@ class CheckoutRepositoryImpl implements CheckoutRepository {
       subscriptionStartDate: request.subscriptionStartDate,
       subscriptionEndDate: request.subscriptionEndDate,
       subscriptionAutoRenew: request.subscriptionAutoRenew,
+      couponCode: request.couponCode,
     );
 
     return remoteDataSource.placeCheckout(requestModel);
+  }
+
+  @override
+  Future<Map<String, dynamic>> validateCoupon({
+    required String couponCode,
+    required double subtotal,
+  }) {
+    return remoteDataSource.validateCoupon(
+      couponCode: couponCode,
+      subtotal: subtotal,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> previewDiscounts(CheckoutRequestEntity request) {
+    final requestModel = CheckoutRequestModel(
+      userId: request.userId,
+      items: request.items,
+      addressId: request.addressId,
+      paymentMethod: request.paymentMethod,
+      paymentType: request.paymentType,
+      couponCode: request.couponCode,
+    );
+
+    return remoteDataSource.previewDiscounts(requestModel);
   }
 }

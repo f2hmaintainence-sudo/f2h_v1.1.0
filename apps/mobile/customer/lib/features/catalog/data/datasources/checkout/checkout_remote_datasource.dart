@@ -4,6 +4,13 @@ import 'package:f2h_customer/features/catalog/data/models/checkout/checkout_requ
 
 abstract class CheckoutRemoteDataSource {
   Future<Map<String, dynamic>> placeCheckout(CheckoutRequestModel requestModel);
+
+  Future<Map<String, dynamic>> validateCoupon({
+    required String couponCode,
+    required double subtotal,
+  });
+
+  Future<Map<String, dynamic>> previewDiscounts(CheckoutRequestModel requestModel);
 }
 
 class CheckoutRemoteDataSourceImpl implements CheckoutRemoteDataSource {
@@ -31,5 +38,34 @@ class CheckoutRemoteDataSourceImpl implements CheckoutRemoteDataSource {
       print('=== [Checkout API Debug] Error placing checkout: $e');
       rethrow;
     }
+  }
+
+  @override
+  Future<Map<String, dynamic>> validateCoupon({
+    required String couponCode,
+    required double subtotal,
+  }) async {
+    final response = await dioClient.dio.post(
+      ApiEndpoints.validateCoupon,
+      data: {'coupon_code': couponCode, 'subtotal': subtotal},
+    );
+
+    final data = response.data;
+    if (data is Map<String, dynamic>) return data;
+    throw Exception('Empty response from coupon validation API');
+  }
+
+  @override
+  Future<Map<String, dynamic>> previewDiscounts(
+    CheckoutRequestModel requestModel,
+  ) async {
+    final response = await dioClient.dio.post(
+      ApiEndpoints.previewDiscounts,
+      data: requestModel.toJson(),
+    );
+
+    final data = response.data;
+    if (data is Map<String, dynamic>) return data;
+    throw Exception('Empty response from discount preview API');
   }
 }

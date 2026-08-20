@@ -93,8 +93,8 @@ class FloatingCartBar extends StatefulWidget {
 
 class _FloatingCartBarState extends State<FloatingCartBar>
     with SingleTickerProviderStateMixin {
-  static const Duration _resizeDuration = Duration(milliseconds: 220);
-  static const Curve _resizeCurve = Curves.easeOutCubic;
+  static const Duration _resizeDuration = Duration(milliseconds: 320);
+  static const Curve _resizeCurve = Curves.fastOutSlowIn;
 
   late final AnimationController _animCtrl;
   late final Animation<double> _scaleAnim;
@@ -241,8 +241,8 @@ class _FloatingCartBarState extends State<FloatingCartBar>
     );
   }
 
-  /// The cart pill itself. In compact mode (while scrolling down) it shrinks
-  /// into a sleek, smaller capsule. On scroll up it expands back to full size.
+  /// The cart pill itself. Smoothly animates size, avatars, text and chevron
+  /// between full and compact states.
   Widget _buildPill({
     required bool isCompact,
     required List<dynamic> visibleItems,
@@ -279,16 +279,23 @@ class _FloatingCartBarState extends State<FloatingCartBar>
         children: [
           // Product Image Avatars
           if (visibleItems.isNotEmpty)
-            SizedBox(
+            AnimatedContainer(
+              duration: _resizeDuration,
+              curve: _resizeCurve,
               width: avatarStackWidth,
               height: avatarSlotSize,
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
                   for (int idx = 0; idx < visibleItems.length; idx++)
-                    Positioned(
+                    AnimatedPositioned(
+                      duration: _resizeDuration,
+                      curve: _resizeCurve,
                       left: idx * avatarOverlap,
-                      child: Container(
+                      top: 0,
+                      child: AnimatedContainer(
+                        duration: _resizeDuration,
+                        curve: _resizeCurve,
                         width: avatarSize,
                         height: avatarSize,
                         decoration: BoxDecoration(
@@ -312,9 +319,14 @@ class _FloatingCartBarState extends State<FloatingCartBar>
                       ),
                     ),
                   if (showRemaining)
-                    Positioned(
+                    AnimatedPositioned(
+                      duration: _resizeDuration,
+                      curve: _resizeCurve,
                       left: visibleItems.length * avatarOverlap,
-                      child: Container(
+                      top: 0,
+                      child: AnimatedContainer(
+                        duration: _resizeDuration,
+                        curve: _resizeCurve,
                         width: avatarSize,
                         height: avatarSize,
                         decoration: BoxDecoration(
@@ -341,7 +353,9 @@ class _FloatingCartBarState extends State<FloatingCartBar>
               ),
             )
           else
-            Container(
+            AnimatedContainer(
+              duration: _resizeDuration,
+              curve: _resizeCurve,
               width: avatarSize,
               height: avatarSize,
               decoration: BoxDecoration(
@@ -357,32 +371,19 @@ class _FloatingCartBarState extends State<FloatingCartBar>
 
           SizedBox(width: isCompact ? 8 : 10),
 
-          // "View cart" Label
-          if (isCompact)
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'View cart • $totalCount',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    height: 1.1,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: Colors.white,
-                  size: 16,
-                ),
-              ],
-            )
-          else
-            Column(
+          // Fluid Cross-Fade between Expanded and Compact text formats
+          AnimatedCrossFade(
+            duration: _resizeDuration,
+            firstCurve: Curves.easeOutCubic,
+            secondCurve: Curves.easeOutCubic,
+            sizeCurve: Curves.fastOutSlowIn,
+            crossFadeState: isCompact
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            firstChild: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
                   'View cart',
@@ -405,23 +406,51 @@ class _FloatingCartBarState extends State<FloatingCartBar>
                 ),
               ],
             ),
-
-          if (!isCompact) ...[
-            const SizedBox(width: 12),
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.22),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.chevron_right_rounded,
-                color: Colors.white,
-                size: 20,
-              ),
+            secondChild: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'View cart • $totalCount',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ],
             ),
-          ],
+          ),
+
+          // Smoothly animate the right chevron circle
+          AnimatedSize(
+            duration: _resizeDuration,
+            curve: _resizeCurve,
+            child: isCompact
+                ? const SizedBox.shrink()
+                : Padding(
+                    padding: const EdgeInsets.only(left: 12),
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.22),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+          ),
         ],
       ),
     );
