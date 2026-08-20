@@ -198,7 +198,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             Expanded(
                               child: Text(item.productName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: kText), maxLines: 1, overflow: TextOverflow.ellipsis),
                             ),
-                            Text('${item.totalQuantity} Units', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: kPrimary)),
+                            Text('${item.quantity.toInt()} ${item.unit}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: kPrimary)),
                           ],
                         ),
                       )).toList(),
@@ -236,26 +236,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => DeliveryConfirmationSheet(
         stop: stop,
-        onDelivered: (deliveredOrders, returnedOrders, returnReason, emptyBottles, customerUnavailable) {
+        onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns) {
+          if (stop.orders.isEmpty) return;
+          final orderId = stop.orders.first.orderId;
+
           showDialog(
             context: context,
             barrierDismissible: false,
-            builder: (ctx) => const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(kPrimary))),
+            builder: (ctx) => const Center(
+              child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(kPrimary)),
+            ),
           );
 
-          context.read<DeliverySessionBloc>().add(MarkDeliveredEvent(
-            orderIds: deliveredOrders.map((o) => o.orderId).toList(),
+          context.read<DeliverySessionBloc>().add(UpdateStopStatusEvent(
+            orderId: orderId,
+            newStatus: status,
             emptyBottles: emptyBottles,
-            returnedOrders: returnedOrders.map((o) => o.orderId).toList(),
-            returnReason: returnReason,
-            customerUnavailable: customerUnavailable,
-            onSuccess: (isLastDelivery) {
+            returnedContainers: returnedContainers,
+            damagedContainers: damagedContainers,
+            lostContainers: lostContainers,
+            notes: notes,
+            paymentMode: paymentMode,
+            paymentStatus: paymentStatus,
+            deliveryImage: deliveryImage,
+            containerReturns: containerReturns,
+            onSuccess: () {
               if (mounted) {
                 Navigator.pop(context); // pop loading dialog
-                AppSnackBar.success(context, 'Delivery marked successfully!');
-                if (isLastDelivery) {
-                  MockDataService().tabNavigationNotifier.value = 2;
-                }
+                AppSnackBar.success(context, 'Stop #${stop.stop} marked as $status!');
               }
             },
             onError: (errorMsg) {

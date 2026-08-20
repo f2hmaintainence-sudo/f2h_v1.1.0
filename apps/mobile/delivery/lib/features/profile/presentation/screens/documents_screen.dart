@@ -513,7 +513,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
 
           // Document Number
           Text(
-            'No: ${doc.documentNumber.isNotEmpty ? doc.documentNumber : "Not provided"}',
+            'No: ${doc.documentNumber != null && doc.documentNumber!.isNotEmpty ? doc.documentNumber! : "Not provided"}',
             style: GoogleFonts.poppins(
               fontSize: 13,
               fontWeight: FontWeight.w600,

@@ -209,7 +209,7 @@ class ProfileScreen extends StatelessWidget {
 
               final profile = state.profile;
               final partnerName = profile.fullName.isNotEmpty ? profile.fullName : 'Delivery Partner';
-              final partnerId = profile.deliveryPartnerId.isNotEmpty ? profile.deliveryPartnerId : 'F2H${profile.id.substring(0, 6).toUpperCase()}';
+              final partnerId = profile.deliveryPartnerId.isNotEmpty ? profile.deliveryPartnerId : 'F2H001';
               final isVerified = profile.isVerified;
 
               return RefreshIndicator(
@@ -227,7 +227,7 @@ class ProfileScreen extends StatelessWidget {
                       partnerId: partnerId,
                       isVerified: isVerified,
                       photoUrl: profile.profilePhotoUrl,
-                      deliveriesCount: profile.totalDeliveriesCompleted ?? 0,
+                      deliveriesCount: profile.totalDeliveries ?? 0,
                       onPhotoTap: () => _pickAndUploadPhoto(context),
                       onCardTap: () => Navigator.push(
                         context,
