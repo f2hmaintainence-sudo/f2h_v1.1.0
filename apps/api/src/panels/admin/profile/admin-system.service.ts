@@ -36,7 +36,7 @@ export class AdminSystemService {
   constructor(
     private readonly db: DatabaseService,
     private readonly developer: DeveloperService,
-  ) { }
+  ) {}
 
   // ────────────────────────────────────────────────
   // Admin Users
@@ -107,8 +107,14 @@ export class AdminSystemService {
       const updateFields: string[] = ['updated_at = NOW()'];
       const params: any[] = [userId];
 
-      if (body.role) { params.push(body.role); updateFields.push(`role_id = $${params.length}`); }
-      if (body.is_active !== undefined) { params.push(body.is_active); updateFields.push(`is_active = $${params.length}`); }
+      if (body.role) {
+        params.push(body.role);
+        updateFields.push(`role_id = $${params.length}`);
+      }
+      if (body.is_active !== undefined) {
+        params.push(body.is_active);
+        updateFields.push(`is_active = $${params.length}`);
+      }
 
       await this.db.query(
         `UPDATE management_staff SET ${updateFields.join(', ')} WHERE user_id = $1`,
@@ -128,7 +134,8 @@ export class AdminSystemService {
   async getRoles() {
     try {
       const rows = await this.db.query(
-        'SELECT * FROM admin_roles ORDER BY created_at ASC', [],
+        'SELECT * FROM admin_roles ORDER BY created_at ASC',
+        [],
       );
       return { status: true, data: rows, message: 'Roles fetched' };
     } catch (error) {
@@ -145,8 +152,10 @@ export class AdminSystemService {
         RETURNING *
       `;
       const rows = await this.db.query(sql, [
-        body.role_name, body.description,
-        JSON.stringify(body.permissions || []), body.is_active !== false,
+        body.role_name,
+        body.description,
+        JSON.stringify(body.permissions || []),
+        body.is_active !== false,
       ]);
       return { status: true, data: rows[0], message: 'Role created' };
     } catch (error) {
@@ -160,12 +169,27 @@ export class AdminSystemService {
       const updateFields: string[] = ['updated_at = NOW()'];
       const params: any[] = [id];
 
-      if (body.role_name) { params.push(body.role_name); updateFields.push(`role_name = $${params.length}`); }
-      if (body.description !== undefined) { params.push(body.description); updateFields.push(`description = $${params.length}`); }
-      if (body.permissions) { params.push(JSON.stringify(body.permissions)); updateFields.push(`permissions = $${params.length}`); }
-      if (body.is_active !== undefined) { params.push(body.is_active); updateFields.push(`is_active = $${params.length}`); }
+      if (body.role_name) {
+        params.push(body.role_name);
+        updateFields.push(`role_name = $${params.length}`);
+      }
+      if (body.description !== undefined) {
+        params.push(body.description);
+        updateFields.push(`description = $${params.length}`);
+      }
+      if (body.permissions) {
+        params.push(JSON.stringify(body.permissions));
+        updateFields.push(`permissions = $${params.length}`);
+      }
+      if (body.is_active !== undefined) {
+        params.push(body.is_active);
+        updateFields.push(`is_active = $${params.length}`);
+      }
 
-      await this.db.query(`UPDATE admin_roles SET ${updateFields.join(', ')} WHERE id = $1`, params);
+      await this.db.query(
+        `UPDATE admin_roles SET ${updateFields.join(', ')} WHERE id = $1`,
+        params,
+      );
       return { status: true, message: 'Role updated' };
     } catch (error) {
       this.developer.error('updateRole error', { error });
@@ -179,31 +203,53 @@ export class AdminSystemService {
   async getNotificationSettings() {
     try {
       const rows = await this.db.query(
-        'SELECT * FROM notification_settings ORDER BY setting_key ASC', [],
+        'SELECT * FROM notification_settings ORDER BY setting_key ASC',
+        [],
       );
-      return { status: true, data: rows, message: 'Notification settings fetched' };
+      return {
+        status: true,
+        data: rows,
+        message: 'Notification settings fetched',
+      };
     } catch (error) {
       this.developer.error('getNotificationSettings error', { error });
-      throw new InternalServerErrorException('Failed to retrieve notification settings');
+      throw new InternalServerErrorException(
+        'Failed to retrieve notification settings',
+      );
     }
   }
 
   async updateNotificationSetting(id: string, body: any, adminId: string) {
     try {
-      const updateFields: string[] = ['updated_at = NOW()', `updated_by = '${adminId}'`];
+      const updateFields: string[] = [
+        'updated_at = NOW()',
+        `updated_by = '${adminId}'`,
+      ];
       const params: any[] = [id];
 
-      if (body.setting_value) { params.push(JSON.stringify(body.setting_value)); updateFields.push(`setting_value = $${params.length}`); }
-      if (body.is_active !== undefined) { params.push(body.is_active); updateFields.push(`is_active = $${params.length}`); }
-      if (body.description) { params.push(body.description); updateFields.push(`description = $${params.length}`); }
+      if (body.setting_value) {
+        params.push(JSON.stringify(body.setting_value));
+        updateFields.push(`setting_value = $${params.length}`);
+      }
+      if (body.is_active !== undefined) {
+        params.push(body.is_active);
+        updateFields.push(`is_active = $${params.length}`);
+      }
+      if (body.description) {
+        params.push(body.description);
+        updateFields.push(`description = $${params.length}`);
+      }
 
       await this.db.query(
-        `UPDATE notification_settings SET ${updateFields.join(', ')} WHERE id = $1`, params,
+        `UPDATE notification_settings SET ${updateFields.join(', ')} WHERE id = $1`,
+        params,
       );
       return { status: true, message: 'Notification setting updated' };
     } catch (error) {
       this.developer.error('updateNotificationSetting error', { error });
-      throw new InternalServerErrorException('Failed to update notification setting');
+      throw new InternalServerErrorException(
+        'Failed to update notification setting',
+      );
     }
   }
 
@@ -221,13 +267,22 @@ export class AdminSystemService {
         RETURNING *
       `;
       const rows = await this.db.query(sql, [
-        body.setting_key, JSON.stringify(body.setting_value || {}),
-        body.description, body.is_active !== false, adminId,
+        body.setting_key,
+        JSON.stringify(body.setting_value || {}),
+        body.description,
+        body.is_active !== false,
+        adminId,
       ]);
-      return { status: true, data: rows[0], message: 'Notification setting saved' };
+      return {
+        status: true,
+        data: rows[0],
+        message: 'Notification setting saved',
+      };
     } catch (error) {
       this.developer.error('createNotificationSetting error', { error });
-      throw new InternalServerErrorException('Failed to create notification setting');
+      throw new InternalServerErrorException(
+        'Failed to create notification setting',
+      );
     }
   }
 
@@ -235,11 +290,7 @@ export class AdminSystemService {
   // Audit Logs
   // ────────────────────────────────────────────────
   async getAuditLogs(query: AuditLogQueryDto) {
-    if (
-      query.from_date &&
-      query.to_date &&
-      query.from_date > query.to_date
-    ) {
+    if (query.from_date && query.to_date && query.from_date > query.to_date) {
       throw new BadRequestException('from_date cannot be after to_date');
     }
 
@@ -417,9 +468,14 @@ export class AdminSystemService {
   }
 
   async createAuditLog(data: {
-    admin_id: string; admin_name?: string; action: string;
-    target_type: string; target_id?: string; details?: any;
-    ip_address?: string; user_agent?: string;
+    admin_id: string;
+    admin_name?: string;
+    action: string;
+    target_type: string;
+    target_id?: string;
+    details?: any;
+    ip_address?: string;
+    user_agent?: string;
   }) {
     try {
       await this.db.query(
@@ -427,9 +483,14 @@ export class AdminSystemService {
           (admin_id, admin_name, action, target_type, target_id, details, ip_address, user_agent)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
-          data.admin_id, data.admin_name, data.action, data.target_type,
-          data.target_id, JSON.stringify(data.details || {}),
-          data.ip_address, data.user_agent,
+          data.admin_id,
+          data.admin_name,
+          data.action,
+          data.target_type,
+          data.target_id,
+          JSON.stringify(data.details || {}),
+          data.ip_address,
+          data.user_agent,
         ],
       );
     } catch (error) {
@@ -446,7 +507,7 @@ export class AdminSystemService {
       const rows = await this.db.query(
         `SELECT id, platform, latest_version, min_version, force_update, store_url, update_message, updated_at 
          FROM app_configs 
-         ORDER BY platform`
+         ORDER BY platform`,
       );
       return {
         status: true,
@@ -461,12 +522,25 @@ export class AdminSystemService {
 
   async updateAppConfig(platform: string, body: any) {
     try {
-      const { latest_version, min_version, force_update, store_url, update_message } = body;
+      const {
+        latest_version,
+        min_version,
+        force_update,
+        store_url,
+        update_message,
+      } = body;
       await this.db.query(
         `UPDATE app_configs 
          SET latest_version = $2, min_version = $3, force_update = $4, store_url = $5, update_message = $6, updated_at = NOW() 
          WHERE platform = $1`,
-        [platform, latest_version, min_version, force_update, store_url, update_message]
+        [
+          platform,
+          latest_version,
+          min_version,
+          force_update,
+          store_url,
+          update_message,
+        ],
       );
       return {
         status: true,
@@ -474,7 +548,9 @@ export class AdminSystemService {
       };
     } catch (error) {
       this.developer.error('updateAppConfig error', { error });
-      throw new InternalServerErrorException('Failed to update app configuration');
+      throw new InternalServerErrorException(
+        'Failed to update app configuration',
+      );
     }
   }
 
@@ -483,49 +559,72 @@ export class AdminSystemService {
   // ────────────────────────────────────────────────
 
   /** Ensure the site_settings table exists, then return all settings as a key-value map. */
-  async getSiteSettings(): Promise<{ status: boolean; data: Record<string, any> }> {
+  async getSiteSettings(): Promise<{
+    status: boolean;
+    data: Record<string, any>;
+  }> {
     try {
-      await this.db.query(`
+      await this.db.query(
+        `
         CREATE TABLE IF NOT EXISTS site_settings (
           key   VARCHAR(120) PRIMARY KEY,
           value TEXT NOT NULL DEFAULT '',
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
-      `, []);
+      `,
+        [],
+      );
 
       const rows: { key: string; value: string }[] = await this.db.query(
-        'SELECT key, value FROM site_settings ORDER BY key ASC', []
+        'SELECT key, value FROM site_settings ORDER BY key ASC',
+        [],
       );
 
       const data: Record<string, any> = {};
       for (const row of rows) {
-        try { data[row.key] = JSON.parse(row.value); } catch { data[row.key] = row.value; }
+        try {
+          data[row.key] = JSON.parse(row.value);
+        } catch {
+          data[row.key] = row.value;
+        }
       }
       return { status: true, data };
     } catch (error) {
       this.developer.error('getSiteSettings error', { error });
-      throw new InternalServerErrorException('Failed to retrieve site settings');
+      throw new InternalServerErrorException(
+        'Failed to retrieve site settings',
+      );
     }
   }
 
   /** Insert or update one site setting. */
-  async upsertSiteSetting(key: string, value: any): Promise<{ status: boolean; message: string }> {
+  async upsertSiteSetting(
+    key: string,
+    value: any,
+  ): Promise<{ status: boolean; message: string }> {
     try {
-      await this.db.query(`
+      await this.db.query(
+        `
         CREATE TABLE IF NOT EXISTS site_settings (
           key   VARCHAR(120) PRIMARY KEY,
           value TEXT NOT NULL DEFAULT '',
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
-      `, []);
+      `,
+        [],
+      );
 
-      const serialized = typeof value === 'string' ? value : JSON.stringify(value);
-      await this.db.query(`
+      const serialized =
+        typeof value === 'string' ? value : JSON.stringify(value);
+      await this.db.query(
+        `
         INSERT INTO site_settings (key, value, updated_at)
         VALUES ($1, $2, NOW())
         ON CONFLICT (key) DO UPDATE
           SET value = EXCLUDED.value, updated_at = NOW()
-      `, [key, serialized]);
+      `,
+        [key, serialized],
+      );
 
       return { status: true, message: 'Site setting saved' };
     } catch (error) {
@@ -535,7 +634,9 @@ export class AdminSystemService {
   }
 
   /** Bulk upsert — body is a plain object { key: value, ... } */
-  async upsertSiteSettings(body: Record<string, any>): Promise<{ status: boolean; message: string }> {
+  async upsertSiteSettings(
+    body: Record<string, any>,
+  ): Promise<{ status: boolean; message: string }> {
     try {
       for (const [key, value] of Object.entries(body)) {
         await this.upsertSiteSetting(key, value);
@@ -552,13 +653,16 @@ export class AdminSystemService {
   // ────────────────────────────────────────────────
   async getPublicBranches(): Promise<{ status: boolean; data: any[] }> {
     try {
-      const rows = await this.db.query(`
+      const rows = await this.db.query(
+        `
         SELECT branch_id, branch_name, city, state,
                lat, lng, delivery_radius_km
         FROM branches
         WHERE is_active = true
         ORDER BY branch_name ASC
-      `, []);
+      `,
+        [],
+      );
       return { status: true, data: rows };
     } catch (error) {
       this.developer.error('getPublicBranches error', { error });
