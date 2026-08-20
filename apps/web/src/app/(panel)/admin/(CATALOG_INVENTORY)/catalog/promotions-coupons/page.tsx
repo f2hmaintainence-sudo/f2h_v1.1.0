@@ -1236,7 +1236,7 @@ export default function PromotionsCouponsOffersPage() {
                               className="text-[11px] font-bold text-[#16a34a] hover:underline flex items-center gap-1"
                             >
                               <Package size={12} />
-                              {p.products_count || 0} Targeted Variants (Edit)
+                              {p.targeted_products?.length ?? p.products_count ?? 0} Targeted Variants (Edit)
                             </button>
                           )}
                         </div>
