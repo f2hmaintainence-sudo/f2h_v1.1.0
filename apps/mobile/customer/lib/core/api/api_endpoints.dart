@@ -23,7 +23,13 @@ class ApiEndpoints {
 
   static const String _envBaseUrl = String.fromEnvironment('F2H_API_BASE_URL');
   static String get _devBaseUrl {
-    if (kIsWeb || kReleaseMode || _envBaseUrl.isEmpty) {
+    if (kIsWeb) {
+      if (Uri.base.origin.isNotEmpty && !Uri.base.origin.startsWith('null')) {
+        return Uri.base.origin;
+      }
+      return 'https://f2hfresh.com';
+    }
+    if (kReleaseMode || _envBaseUrl.isEmpty) {
       return 'https://f2hfresh.com';
     }
     return 'http://192.168.1.6:5001';
