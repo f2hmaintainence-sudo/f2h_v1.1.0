@@ -6,8 +6,7 @@
 -- File        : 007-missing-operational-tables.sql
 -- Description : Second drift pass. Creates the operational tables that admin
 --               endpoints query but that were never present in the live
---               database, and reconciles packaging_types with the column names
---               the packaging CRUD writes.
+--               database.
 --
 --               Found by sweeping every parameterless GET endpoint against a
 --               build of the current source and collecting the SQL failures.

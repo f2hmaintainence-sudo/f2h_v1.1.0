@@ -1,7 +1,9 @@
 -- 007_dispatch_tables_and_management_staff.sql
 --
--- Baselines the three tables that DatabaseService.createRequiredTables() used to
--- create at application boot, plus the columns it added with ALTER ... IF NOT EXISTS.
+-- Baselines the management_staff table that DatabaseService.createRequiredTables()
+-- used to create at application boot, plus the columns it added with
+-- ALTER ... IF NOT EXISTS. The dispatch tables this file also created are gone
+-- from the live schema and have been removed here.
 --
 -- Generated from the LIVE database with `pg_dump --schema-only`, not from the
 -- TypeScript that created them: the boot code declared foreign keys and a
