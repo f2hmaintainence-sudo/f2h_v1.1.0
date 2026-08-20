@@ -576,6 +576,7 @@ export class DeliveryRunService {
   // ────────────────────────────────────────────────
   async getRunDetails(runId: string) {
     try {
+      this.developer.info("getRunDetails run Id", { runId });
       const runSql = `
         SELECT
           dr.*,
@@ -586,7 +587,7 @@ export class DeliveryRunService {
         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
         LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
         LEFT JOIN branches b ON b.branch_id = dr.branch_id
-        WHERE dr.id::varchar = $1 OR dr.run_id = $1 OR dr.run_number = $1
+        WHERE dr.run_id = $1 OR dr.id::varchar = $1
       `;
       const runRows = await this.db.query(runSql, [runId]);
       if (!runRows[0]) return { status: false, message: 'Run not found' };
@@ -1617,7 +1618,7 @@ export class DeliveryRunService {
               body: 'Your delivery run addresses have been updated by the admin.',
             },
           );
-        } catch (_) {}
+        } catch (_) { }
       }
 
       return {
@@ -1979,7 +1980,7 @@ export class DeliveryRunService {
                   body: `Address stop and ${allOrderIdsToMove.length} order(s) have been reassigned.`,
                 },
               );
-            } catch (_) {}
+            } catch (_) { }
           }
           if (targetRun.delivery_partner_id) {
             try {
@@ -1990,7 +1991,7 @@ export class DeliveryRunService {
                   body: `Address stop and ${allOrderIdsToMove.length} order(s) added to your delivery run.`,
                 },
               );
-            } catch (_) {}
+            } catch (_) { }
           }
         }
 
@@ -2246,7 +2247,7 @@ export class DeliveryRunService {
               [runB.delivery_partner_id],
               { title: 'Delivery Run Updated', body: `Address stops have been swapped on your run.` },
             );
-          } catch (_) {}
+          } catch (_) { }
         }
 
         return {

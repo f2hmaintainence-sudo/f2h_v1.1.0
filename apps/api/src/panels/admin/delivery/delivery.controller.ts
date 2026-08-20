@@ -26,7 +26,7 @@ export class DeliveryManagementController {
     private readonly leaveTableService: DeliveryLeaveTableService,
     private readonly leaveShowEditService: DeliveryLeaveShowEditService,
     private readonly leaveSaveEditService: DeliveryLeaveSaveEditService,
-  ) {}
+  ) { }
 
   // ── Delivery Partners ──
 
