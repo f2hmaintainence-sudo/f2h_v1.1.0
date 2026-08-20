@@ -33,6 +33,8 @@ import {
   PlayCircle,
   PauseCircle,
   Clock,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import Link from 'next/link';
 import CustomerSpecialPriceModal from '@/components/f2h/CustomerSpecialPriceModal';
@@ -61,6 +63,25 @@ export default function CustomerDetailsPage() {
   const [isSpecialPriceModalOpen, setIsSpecialPriceModalOpen] = useState(false);
   const [postpaidInput, setPostpaidInput] = useState('');
   const [savingPostpaid, setSavingPostpaid] = useState(false);
+  const [showSensitive, setShowSensitive] = useState(false);
+
+  const maskPhone = (phone?: string) => {
+    if (!phone || phone === '' || phone.startsWith('NO_PHONE_')) return 'No Phone';
+    const clean = phone.trim();
+    if (clean.length <= 4) return '••••';
+    if (clean.length <= 7) return clean.slice(0, 2) + '••••' + clean.slice(-2);
+    return clean.slice(0, 3) + '••••' + clean.slice(-3);
+  };
+
+  const maskEmail = (email?: string) => {
+    if (!email || email === '' || email.startsWith('noemail_')) return 'No Email';
+    const parts = email.split('@');
+    if (parts.length !== 2) return '••••••••';
+    const name = parts[0];
+    const domain = parts[1];
+    if (name.length <= 2) return `${name.charAt(0)}••••@${domain}`;
+    return `${name.slice(0, 2)}••••${name.slice(-1)}@${domain}`;
+  };
 
   useEffect(() => {
     if (id && !['allcustomers', 'add', 'postpaidcustomers', 'groups', 'wallets', 'branch-customers'].includes(id)) {
@@ -161,8 +182,27 @@ export default function CustomerDetailsPage() {
             </div>
             
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-600 mb-3">
-              <div className="flex items-center gap-1.5"><Phone size={14} className="text-fresh-green" /> {customer.phone || 'N/A'}</div>
-              <div className="flex items-center gap-1.5"><Mail size={14} className="text-fresh-green" /> {customer.email || 'N/A'}</div>
+              <div className="flex items-center gap-1.5">
+                <Phone size={14} className="text-fresh-green" />
+                <span className="font-mono text-gray-700">
+                  {showSensitive ? (customer.phone || 'N/A') : maskPhone(customer.phone)}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Mail size={14} className="text-fresh-green" />
+                <span>
+                  {showSensitive ? (customer.email || 'N/A') : maskEmail(customer.email)}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSensitive(!showSensitive)}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold text-gray-500 hover:text-fresh-green hover:bg-emerald-50 border border-gray-200 transition-colors cursor-pointer"
+                title={showSensitive ? "Hide sensitive contact info" : "Show full phone & email"}
+              >
+                {showSensitive ? <EyeOff size={12} /> : <Eye size={12} />}
+                <span>{showSensitive ? 'Mask' : 'View Full'}</span>
+              </button>
               {primaryAddress && (
                 <div className="flex items-center gap-1.5"><MapPin size={14} className="text-fresh-green" /> {primaryAddress.address_line_1 || primaryAddress.city || 'N/A'}</div>
               )}

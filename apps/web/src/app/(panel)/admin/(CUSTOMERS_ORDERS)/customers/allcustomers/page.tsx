@@ -17,11 +17,36 @@ import {
   TrendingUp,
   AlertTriangle,
   ShieldAlert,
-  ArrowDownUp
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/services/api.client';
+
+function maskPhone(phone?: string): string {
+  if (!phone || phone === '' || phone.startsWith('NO_PHONE_')) {
+    return 'No Phone';
+  }
+  const clean = phone.trim();
+  if (clean.length <= 4) return '••••';
+  if (clean.length <= 7) return clean.slice(0, 2) + '••••' + clean.slice(-2);
+  return clean.slice(0, 3) + '••••' + clean.slice(-3);
+}
+
+function maskEmail(email?: string): string {
+  if (!email || email === '' || email.startsWith('noemail_')) {
+    return 'No Email';
+  }
+  const parts = email.split('@');
+  if (parts.length !== 2) return '••••••••';
+  const name = parts[0];
+  const domain = parts[1];
+  if (name.length <= 2) {
+    return `${name.charAt(0)}••••@${domain}`;
+  }
+  return `${name.slice(0, 2)}••••${name.slice(-1)}@${domain}`;
+}
 
 export default function AllCustomersPage() {
   const router = useRouter();
@@ -41,6 +66,23 @@ export default function AllCustomersPage() {
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedWallet, setSelectedWallet] = useState('');
   const [selectedDue, setSelectedDue] = useState('');
+
+  // Sensitive data mask/reveal states
+  const [showAllSensitive, setShowAllSensitive] = useState(false);
+  const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
+
+  const toggleCustomerReveal = (e: React.MouseEvent, customerId: string) => {
+    e.stopPropagation();
+    setRevealedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(customerId)) {
+        next.delete(customerId);
+      } else {
+        next.add(customerId);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     fetchCustomers();
@@ -142,8 +184,31 @@ export default function AllCustomersPage() {
                 {tab}
               </button>
             ))}
+
+            {/* Global Sensitive Info Toggle Button */}
+            <button
+              type="button"
+              onClick={() => {
+                const next = !showAllSensitive;
+                setShowAllSensitive(next);
+                if (next) {
+                  setRevealedIds(new Set(data.map(c => c.customer_id)));
+                } else {
+                  setRevealedIds(new Set());
+                }
+              }}
+              title={showAllSensitive ? "Hide sensitive details for all" : "Reveal sensitive details for all"}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                showAllSensitive 
+                  ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                  : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              {showAllSensitive ? <EyeOff size={14} className="text-amber-600" /> : <Eye size={14} className="text-gray-500" />}
+              <span className="hidden sm:inline">{showAllSensitive ? 'Mask Sensitive' : 'Reveal All'}</span>
+            </button>
             
-            <div className="flex items-center bg-gray-50 p-1 rounded-xl ml-2">
+            <div className="flex items-center bg-gray-50 p-1 rounded-xl ml-1">
               <button 
                 onClick={() => setViewMode('grid')}
                 className={`p-1.5 rounded-lg ${viewMode === 'grid' ? 'bg-white shadow-sm text-fresh-green' : 'text-gray-400'}`}
@@ -241,87 +306,194 @@ export default function AllCustomersPage() {
         </div>
       </div>
 
-      {/* Customers Grid */}
+      {/* Customers Content */}
       {loading ? (
         <div className="flex justify-center py-20"><div className="animate-spin w-8 h-8 border-4 border-fresh-green border-t-transparent rounded-full"></div></div>
       ) : data.length === 0 ? (
         <div className="text-center py-20 text-gray-500">No customers found.</div>
+      ) : viewMode === 'list' ? (
+        /* List View */
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50/80 border-b border-gray-100 text-gray-500 font-semibold uppercase tracking-wider">
+                <tr>
+                  <th className="p-3.5 pl-4">Customer</th>
+                  <th className="p-3.5">Contact Info</th>
+                  <th className="p-3.5">Status</th>
+                  <th className="p-3.5 text-right">Revenue</th>
+                  <th className="p-3.5 text-right">Wallet</th>
+                  <th className="p-3.5 text-right">Due</th>
+                  <th className="p-3.5 text-center pr-4">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {data.map((c, i) => {
+                  const isRevealed = showAllSensitive || revealedIds.has(c.customer_id);
+                  return (
+                    <tr 
+                      key={i} 
+                      onClick={() => router.push(`/admin/customers/${c.customer_id}`)}
+                      className="hover:bg-slate-50/60 cursor-pointer transition-colors"
+                    >
+                      <td className="p-3.5 pl-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${getAvatarColors(c.full_name)}`}>
+                            {c.full_name?.charAt(0)?.toUpperCase() || 'U'}
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="font-semibold text-gray-900 truncate">{c.full_name || 'Customer'}</h4>
+                            <p className="text-[10px] font-mono text-gray-400">#{c.customer_id}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-3.5">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <Phone size={11} className="text-fresh-green shrink-0" />
+                            <span className="text-[11px] text-gray-700 font-mono">
+                              {(!c.phone || c.phone === '' || c.phone.startsWith('NO_PHONE_'))
+                                ? <span className="text-gray-400 italic">No Phone</span>
+                                : (isRevealed ? c.phone : maskPhone(c.phone))
+                              }
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => toggleCustomerReveal(e, c.customer_id)}
+                              className="p-1 rounded text-gray-400 hover:text-fresh-green hover:bg-emerald-50 transition-colors ml-0.5"
+                              title={isRevealed ? "Hide contact info" : "Show full phone & email"}
+                            >
+                              {isRevealed ? <EyeOff size={12} /> : <Eye size={12} />}
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Mail size={11} className="text-fresh-green shrink-0" />
+                            <span className="text-[11px] text-gray-500 truncate max-w-[200px]" title={isRevealed ? c.email : maskEmail(c.email)}>
+                              {(!c.email || c.email === '')
+                                ? <span className="text-gray-400 italic">No Email</span>
+                                : (isRevealed ? c.email : maskEmail(c.email))
+                              }
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-3.5">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          c.customer_status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+                        }`}>
+                          <div className={`w-1.5 h-1.5 rounded-full ${c.customer_status === 'active' ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                          <span className="capitalize">{c.customer_status || 'active'}</span>
+                        </span>
+                      </td>
+                      <td className="p-3.5 text-right font-bold text-gray-800">₹{Number(c.lifetime_revenue || 0).toLocaleString()}</td>
+                      <td className="p-3.5 text-right font-bold text-gray-800">₹{Number(c.wallet_balance || 0).toLocaleString()}</td>
+                      <td className="p-3.5 text-right font-bold text-gray-800">₹{Number(c.outstanding_due || 0).toLocaleString()}</td>
+                      <td className="p-3.5 text-center pr-4">
+                        <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gray-100 text-gray-400 group-hover:bg-fresh-green group-hover:text-white transition-colors">
+                          <ArrowRight size={13} />
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : (
-        <div className={`grid gap-3 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}>
-          {data.map((c, i) => (
-            <div
-              key={i}
-              onClick={() => router.push(`/admin/customers/${c.customer_id}`)}
-              className="bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-fresh-green/20 transition-all cursor-pointer relative overflow-hidden group"
-            >
-              {/* Arrow — absolutely positioned, never overflows */}
-              <div className="absolute top-2.5 right-2.5 w-6 h-6 rounded-md bg-gray-100 group-hover:bg-fresh-green flex items-center justify-center transition-colors z-10 pointer-events-none">
-                <ArrowRight size={12} className="text-gray-400 group-hover:text-white transition-colors" />
-              </div>
+        /* Grid View */
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {data.map((c, i) => {
+            const isRevealed = showAllSensitive || revealedIds.has(c.customer_id);
 
-              <div className="p-3.5">
-                {/* Header — pr-8 keeps text away from the arrow */}
-                <div className="flex items-center gap-2 mb-2.5 pr-8">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${getAvatarColors(c.full_name)}`}>
-                    {c.full_name?.charAt(0)?.toUpperCase() || 'U'}
-                  </div>
-                  <div className="min-w-0 flex-1 overflow-hidden">
-                    <h3 className="font-semibold text-gray-900 text-xs truncate" title={c.full_name || 'Customer'}>
-                      {c.full_name || 'Customer'}
-                    </h3>
-                    <p className="text-[9px] font-mono text-gray-400 truncate" title={`#${c.customer_id}`}>
-                      #{c.customer_id}
-                    </p>
-                  </div>
+            return (
+              <div
+                key={i}
+                onClick={() => router.push(`/admin/customers/${c.customer_id}`)}
+                className="bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-fresh-green/20 transition-all cursor-pointer relative overflow-hidden group"
+              >
+                {/* Arrow — absolutely positioned, never overflows */}
+                <div className="absolute top-2.5 right-2.5 w-6 h-6 rounded-md bg-gray-100 group-hover:bg-fresh-green flex items-center justify-center transition-colors z-10 pointer-events-none">
+                  <ArrowRight size={12} className="text-gray-400 group-hover:text-white transition-colors" />
                 </div>
 
-                {/* Contact Details */}
-                <div className="space-y-1 mb-2.5">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <Phone size={11} className="text-fresh-green shrink-0" />
-                    <span className="text-[11px] text-gray-600 truncate">
-                      {(!c.phone || c.phone === '' || c.phone.startsWith('NO_PHONE_'))
-                        ? <span className="text-gray-400 italic">No Phone</span>
-                        : c.phone
-                      }
+                <div className="p-3.5">
+                  {/* Header — pr-8 keeps text away from the arrow */}
+                  <div className="flex items-center gap-2 mb-2.5 pr-8">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${getAvatarColors(c.full_name)}`}>
+                      {c.full_name?.charAt(0)?.toUpperCase() || 'U'}
+                    </div>
+                    <div className="min-w-0 flex-1 overflow-hidden">
+                      <h3 className="font-semibold text-gray-900 text-xs truncate" title={c.full_name || 'Customer'}>
+                        {c.full_name || 'Customer'}
+                      </h3>
+                      <p className="text-[9px] font-mono text-gray-400 truncate" title={`#${c.customer_id}`}>
+                        #{c.customer_id}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Contact Details with Eye Toggle */}
+                  <div className="space-y-1 mb-2.5">
+                    <div className="flex items-center justify-between min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <Phone size={11} className="text-fresh-green shrink-0" />
+                        <span className="text-[11px] text-gray-700 truncate font-mono">
+                          {(!c.phone || c.phone === '' || c.phone.startsWith('NO_PHONE_'))
+                            ? <span className="text-gray-400 italic font-sans">No Phone</span>
+                            : (isRevealed ? c.phone : maskPhone(c.phone))
+                          }
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => toggleCustomerReveal(e, c.customer_id)}
+                        className="p-1 rounded-md text-gray-400 hover:text-fresh-green hover:bg-emerald-50 transition-colors shrink-0 ml-1 cursor-pointer"
+                        title={isRevealed ? "Hide contact info" : "Show full phone & email"}
+                      >
+                        {isRevealed ? <EyeOff size={12} /> : <Eye size={12} />}
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Mail size={11} className="text-fresh-green shrink-0" />
+                      <span className="text-[11px] text-gray-500 truncate" title={isRevealed ? (c.email || '') : maskEmail(c.email)}>
+                        {(!c.email || c.email === '')
+                          ? <span className="text-gray-400 italic">No Email</span>
+                          : (isRevealed ? c.email : maskEmail(c.email))
+                        }
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Status Badge */}
+                  <div className="mb-2.5">
+                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                      c.customer_status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+                    }`}>
+                      <div className={`w-1 h-1 rounded-full shrink-0 ${c.customer_status === 'active' ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                      <span className="capitalize">{c.customer_status || 'active'}</span>
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <Mail size={11} className="text-fresh-green shrink-0" />
-                    <span className="text-[11px] text-gray-500 truncate" title={c.email || ''}>
-                      {c.email || <span className="text-gray-400 italic">No Email</span>}
-                    </span>
-                  </div>
-                </div>
 
-                {/* Status Badge */}
-                <div className="mb-2.5">
-                  <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                    c.customer_status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
-                  }`}>
-                    <div className={`w-1 h-1 rounded-full shrink-0 ${c.customer_status === 'active' ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
-                    <span className="capitalize">{c.customer_status || 'active'}</span>
-                  </span>
-                </div>
-
-                {/* KPI Footer */}
-                <div className="grid grid-cols-3 gap-1 pt-2 border-t border-gray-100 text-center">
-                  <div className="min-w-0">
-                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wide truncate">Revenue</p>
-                    <p className="font-bold text-gray-800 text-[11px] truncate">₹{Number(c.lifetime_revenue || 0).toLocaleString()}</p>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wide truncate">Wallet</p>
-                    <p className="font-bold text-gray-800 text-[11px] truncate">₹{Number(c.wallet_balance || 0).toLocaleString()}</p>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wide truncate">Due</p>
-                    <p className="font-bold text-gray-800 text-[11px] truncate">₹{Number(c.outstanding_due || 0).toLocaleString()}</p>
+                  {/* KPI Footer */}
+                  <div className="grid grid-cols-3 gap-1 pt-2 border-t border-gray-100 text-center">
+                    <div className="min-w-0">
+                      <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wide truncate">Revenue</p>
+                      <p className="font-bold text-gray-800 text-[11px] truncate">₹{Number(c.lifetime_revenue || 0).toLocaleString()}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wide truncate">Wallet</p>
+                      <p className="font-bold text-gray-800 text-[11px] truncate">₹{Number(c.wallet_balance || 0).toLocaleString()}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wide truncate">Due</p>
+                      <p className="font-bold text-gray-800 text-[11px] truncate">₹{Number(c.outstanding_due || 0).toLocaleString()}</p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -339,15 +511,6 @@ function StatCard({ title, value, icon, bg }: { title: string, value: string | n
         <p className="text-lg font-black text-gray-900 truncate">{value}</p>
       </div>
     </div>
-  );
-}
-
-function FilterDropdown({ label, onChange }: { label: string, onChange?: (val: string) => void }) {
-  return (
-    <button className="flex items-center justify-between min-w-[140px] gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-fresh-green hover:bg-gray-50 transition-colors">
-      <span>{label}</span>
-      <ChevronDown size={14} className="text-gray-400" />
-    </button>
   );
 }
 

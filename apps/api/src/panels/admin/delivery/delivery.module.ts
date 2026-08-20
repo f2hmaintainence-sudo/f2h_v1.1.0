@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { DeliveryManagementController } from './delivery.controller';
 import { DeliveryManagementService } from './delivery.service';
 import { DeliveryRunService } from './delivery-run.service';
+import { RouteOptimizerService } from './services/route-optimizer.service';
 import { DeliveryDispatchService } from './delivery-dispatch.service';
 import { StockMovementCoreService } from '../catalog-inventory/inventory/services/stock-movement-core.service';
 import { HelpersModule } from '../../../helpers/Helpers.module';
@@ -27,6 +28,7 @@ import { ReferralModule } from '../../customer/referral/referral.module';
   providers: [
     DeliveryManagementService,
     DeliveryRunService,
+    RouteOptimizerService,
     DeliveryDispatchService,
     StockMovementCoreService,
     DeveloperService,

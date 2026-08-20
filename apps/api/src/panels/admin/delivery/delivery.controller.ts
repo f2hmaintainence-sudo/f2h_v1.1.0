@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Patch, Delete, Query, Body, Param, Req, UseGuards } from '@nestjs/common';
 import { DeliveryManagementService } from './delivery.service';
 import { DeliveryRunService } from './delivery-run.service';
+import { RouteOptimizerService } from './services/route-optimizer.service';
 import { DeliveryDispatchService } from './delivery-dispatch.service';
 import { DeliveryShowAddService } from './services/showAdd.service';
 import { DeliverySaveAddService } from './services/saveAdd.service';
@@ -18,6 +19,7 @@ export class DeliveryManagementController {
   constructor(
     private readonly deliveryService: DeliveryManagementService,
     private readonly runService: DeliveryRunService,
+    private readonly routeOptimizer: RouteOptimizerService,
     private readonly dispatchService: DeliveryDispatchService,
     private readonly showAddService: DeliveryShowAddService,
     private readonly saveAddService: DeliverySaveAddService,
@@ -344,6 +346,20 @@ export class DeliveryManagementController {
   @Get('dispatch/summary')
   async getDispatchSummary(@Query() query: any) {
     return this.dispatchService.getDispatchSummary(query);
+  }
+
+  /**
+   * Shortest-path re-sequencing for a run's stops (Dijkstra + 2-opt).
+   * GET previews without writing; POST persists the new sequence.
+   */
+  @Get('runs/:runId/optimize-sequence')
+  async previewOptimisedSequence(@Param('runId') runId: string) {
+    return this.routeOptimizer.optimiseRun(runId, { persist: false });
+  }
+
+  @Post('runs/:runId/optimize-sequence')
+  async optimiseSequence(@Param('runId') runId: string) {
+    return this.routeOptimizer.optimiseRun(runId, { persist: true });
   }
 
   @Get('dispatch/available-variants')
