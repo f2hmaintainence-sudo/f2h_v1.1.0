@@ -10,9 +10,13 @@
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:f2h_customer/features/profile/presentation/screens/customer_bills_screen.dart';
+
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 class NotificationService {
   final _messageController = StreamController<Map<String, dynamic>>.broadcast();
@@ -34,6 +38,32 @@ class NotificationService {
   }
 
   String? _cachedFcmToken;
+
+  static void handleNotificationRouting(Map<String, dynamic> data, {String? rawPayload}) {
+    final type = data['type']?.toString().toLowerCase() ?? '';
+    final route = data['route']?.toString().toLowerCase() ?? '';
+    final url = data['url']?.toString() ?? rawPayload ?? '';
+
+    if (type == 'customer_bills' ||
+        type == 'bills' ||
+        type == 'billing' ||
+        route == '/customer_bills' ||
+        route == 'customer_bills' ||
+        url.contains('customer_bills')) {
+      appNavigatorKey.currentState?.push(
+        MaterialPageRoute(
+          builder: (_) => const CustomerBillsScreen(),
+        ),
+      );
+      return;
+    }
+
+    if (url.isNotEmpty && (url.startsWith('http://') || url.startsWith('https://'))) {
+      try {
+        launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      } catch (_) {}
+    }
+  }
 
   Future<void> initialize() async {
     if (kIsWeb) return;
@@ -60,9 +90,7 @@ class NotificationService {
         onDidReceiveNotificationResponse: (response) {
           final payload = response.payload;
           if (payload != null && payload.isNotEmpty) {
-            try {
-              launchUrl(Uri.parse(payload));
-            } catch (_) {}
+            handleNotificationRouting({'url': payload, 'route': payload}, rawPayload: payload);
           }
         },
       );
@@ -84,6 +112,18 @@ class NotificationService {
         await fcm.requestPermission(alert: true, badge: true, sound: true);
       } catch (e) {
         debugPrint('[NotificationService] Permission request notice: $e');
+      }
+
+      // Check initial message if launched from terminated state via notification click
+      try {
+        final initialMessage = await fcm.getInitialMessage();
+        if (initialMessage != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            handleNotificationRouting(initialMessage.data, rawPayload: initialMessage.data['url']);
+          });
+        }
+      } catch (e) {
+        debugPrint('[NotificationService] getInitialMessage notice: $e');
       }
 
       // Retrieve and log FCM device token
@@ -112,9 +152,9 @@ class NotificationService {
             message.notification?.body ??
             message.data['body'] ??
             'New notification received';
-        final url = message.data['url'];
+        final routePayload = message.data['route'] ?? message.data['type'] ?? message.data['url'];
 
-        showLocalNotification(title: title, body: body, payload: url);
+        showLocalNotification(title: title, body: body, payload: routePayload);
 
         final Map<String, dynamic> payload = {
           'title': title,
@@ -128,10 +168,7 @@ class NotificationService {
       FirebaseMessaging.onMessageOpenedApp.listen((
         RemoteMessage message,
       ) async {
-        final url = message.data['url'];
-        if (url != null) {
-          await launchUrl(Uri.parse(url));
-        }
+        handleNotificationRouting(message.data, rawPayload: message.data['url']);
       });
     } catch (e) {
       debugPrint('[NotificationService] Initialization skipped: $e');

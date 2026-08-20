@@ -119,13 +119,19 @@ export class FinanceService {
 
     const dueAmountStr = `₹${Number(bill.due_amount || bill.total_amount || 0).toFixed(2)}`;
     const dueDateStr = bill.due_date ? new Date(bill.due_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'immediate';
-    const bodyText = customMessage || `Dear ${bill.customer_name || 'Customer'}, your bill #${bill.bill_number || bill.id} of ${dueAmountStr} is pending (Due: ${dueDateStr}). Settle now via F2H App to maintain uninterrupted deliveries.`;
+    const bodyText = customMessage || `Dear ${bill.customer_name || 'Customer'}, your subscription bill #${bill.bill_number || bill.id} of ${dueAmountStr} is pending (Due: ${dueDateStr}). Please tap to view and pay your bill.`;
 
     await this.pushNotificationService.sendNotificationToUsers(
       [bill.customer_id],
       {
-        title: '🔔 F2H Bill Due Date Intimation',
+        title: '🔔 Subscription Bill Payment Due',
         body: bodyText,
+        data: {
+          type: 'customer_bills',
+          route: '/customer_bills',
+          bill_id: String(bill.bill_number || bill.id || ''),
+          click_action: 'FLUTTER_NOTIFICATION_CLICK',
+        },
       },
     ).catch(() => {});
 
@@ -153,7 +159,7 @@ export class FinanceService {
       return {
         status: true,
         sentCount: 0,
-        message: 'No pending customer bills found to intimate.',
+        message: 'No pending subscriber bills found to intimate.',
       };
     }
 
@@ -164,13 +170,19 @@ export class FinanceService {
       if (!bill.customer_id || notifiedCustomers.has(bill.customer_id)) continue;
       const dueAmountStr = `₹${Number(bill.due_amount || bill.total_amount || 0).toFixed(2)}`;
       const dueDateStr = bill.due_date ? new Date(bill.due_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'immediate';
-      const bodyText = customMessage || `Dear ${bill.customer_name || 'Customer'}, your pending bill #${bill.bill_number || bill.id} of ${dueAmountStr} is awaiting payment (Due: ${dueDateStr}). Please settle now via F2H App.`;
+      const bodyText = customMessage || `Dear ${bill.customer_name || 'Customer'}, your pending subscription bill #${bill.bill_number || bill.id} of ${dueAmountStr} is awaiting payment (Due: ${dueDateStr}). Please tap to pay now.`;
 
       await this.pushNotificationService.sendNotificationToUsers(
         [bill.customer_id],
         {
-          title: '🔔 F2H Bill Payment Due Reminder',
+          title: '🔔 Subscription Bill Payment Due',
           body: bodyText,
+          data: {
+            type: 'customer_bills',
+            route: '/customer_bills',
+            bill_id: String(bill.bill_number || bill.id || ''),
+            click_action: 'FLUTTER_NOTIFICATION_CLICK',
+          },
         },
       ).catch(() => {});
 

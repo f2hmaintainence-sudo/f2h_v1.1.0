@@ -81,7 +81,7 @@ export class PushNotificationService implements OnModuleInit {
         }
     }
 
-    async sendToMultipleDevices(tokens: string[], title: string, body: string) {
+    async sendToMultipleDevices(tokens: string[], title: string, body: string, data?: Record<string, string>) {
         if (!tokens || tokens.length === 0)
             return { success: false, error: 'No tokens provided' };
 
@@ -89,9 +89,14 @@ export class PushNotificationService implements OnModuleInit {
             return { success: false, error: 'Firebase messaging not initialized' };
         }
 
+        const messageData: Record<string, string> = {
+            click_action: 'FLUTTER_NOTIFICATION_CLICK',
+            ...(data || {}),
+        };
+
         const message = {
             notification: { title, body },
-            data: { click_action: 'FLUTTER_NOTIFICATION_CLICK' },
+            data: messageData,
             tokens: tokens,
         };
         try {
@@ -126,7 +131,7 @@ export class PushNotificationService implements OnModuleInit {
      */
     async sendNotificationToUsers(
         user_id: any[],
-        message: { title: string; body: string }
+        message: { title: string; body: string; data?: Record<string, string> }
     ) {
         if (!user_id || user_id.length === 0) {
             return { success: false, error: 'No user IDs provided' };
@@ -152,6 +157,6 @@ export class PushNotificationService implements OnModuleInit {
             return { success: false, error: 'No user IDs provided or no valid tokens found' };
         }
 
-        return await this.sendToMultipleDevices(tokenList, message.title, message.body);
+        return await this.sendToMultipleDevices(tokenList, message.title, message.body, message.data);
     }
 }

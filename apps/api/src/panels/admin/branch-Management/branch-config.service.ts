@@ -8,17 +8,25 @@
 //
 // ============================================================================
 
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { DatabaseService } from '../../../shared/database/Database.service';
+import { DataService } from '../../../shared/database/Data.service';
 import { DeveloperService } from '../../../shared/logger/Developer.service';
 import { DeliveryManagementService } from '../delivery/delivery.service';
+import { BranchCoverageOverlapService } from './services/branch-coverage-overlap.service';
 
 @Injectable()
 export class BranchConfigService {
   constructor(
     private readonly db: DatabaseService,
+    private readonly dataService: DataService,
     private readonly developer: DeveloperService,
     private readonly deliveryService: DeliveryManagementService,
+    private readonly coverageOverlapService: BranchCoverageOverlapService,
   ) {}
 
   // ────────────────────────────────────────────────
@@ -49,18 +57,73 @@ export class BranchConfigService {
 
   async updateRadiusConfig(branchId: string, body: any) {
     try {
-      const updateFields: string[] = ['updated_at = NOW()'];
-      const params: any[] = [branchId];
+      return await this.dataService.executeTransaction(async (tx) => {
+        const [currentRows] = await tx.query(
+          `SELECT branch_id, branch_name, lat, lng, delivery_radius_km,
+                  buffer_zone, allow_buffer_order, is_active, hex_shape
+             FROM branches
+            WHERE branch_id = $1
+              AND deleted_at IS NULL`,
+          [branchId],
+        );
+        if (!currentRows.length) {
+          throw new BadRequestException({
+            status: false,
+            message: 'Branch not found',
+          });
+        }
 
-      if (body.delivery_radius_km !== undefined) { params.push(body.delivery_radius_km); updateFields.push(`delivery_radius_km = $${params.length}`); }
-      if (body.lat !== undefined) { params.push(body.lat); updateFields.push(`lat = $${params.length}`); }
-      if (body.lng !== undefined) { params.push(body.lng); updateFields.push(`lng = $${params.length}`); }
+        const current = currentRows[0];
+        const coverageConflict = await this.coverageOverlapService.findConflict(
+          tx,
+          {
+            branch_id: branchId,
+            branch_name: current.branch_name,
+            lat: body.lat ?? current.lat,
+            lng: body.lng ?? current.lng,
+            delivery_radius_km:
+              body.delivery_radius_km ?? current.delivery_radius_km,
+            buffer_zone: current.buffer_zone,
+            allow_buffer_order: current.allow_buffer_order,
+            is_active: current.is_active,
+            hex_shape: current.hex_shape,
+          },
+          branchId,
+        );
+        if (coverageConflict) {
+          throw new BadRequestException({
+            status: false,
+            code: 'branch_coverage_overlap',
+            message: `Coverage overlaps with ${coverageConflict.branch_name}. Move the map pin or reduce the radius or buffer.`,
+            errors: {
+              coverage: `Conflicts with ${coverageConflict.branch_name}`,
+            },
+          });
+        }
 
-      await this.db.query(
-        `UPDATE branches SET ${updateFields.join(', ')} WHERE branch_id = $1`, params,
-      );
-      return { status: true, message: 'Radius config updated' };
+        const updateFields: string[] = ['updated_at = NOW()'];
+        const params: unknown[] = [branchId];
+        if (body.delivery_radius_km !== undefined) {
+          params.push(body.delivery_radius_km);
+          updateFields.push(`delivery_radius_km = $${params.length}`);
+        }
+        if (body.lat !== undefined) {
+          params.push(body.lat);
+          updateFields.push(`lat = $${params.length}`);
+        }
+        if (body.lng !== undefined) {
+          params.push(body.lng);
+          updateFields.push(`lng = $${params.length}`);
+        }
+
+        await tx.query(
+          `UPDATE branches SET ${updateFields.join(', ')} WHERE branch_id = $1`,
+          params,
+        );
+        return { status: true, message: 'Radius config updated' };
+      });
     } catch (error) {
+      if (error instanceof BadRequestException) throw error;
       this.developer.error('updateRadiusConfig error', { error });
       throw new InternalServerErrorException('Failed to update radius config');
     }

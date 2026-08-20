@@ -22,6 +22,7 @@ import { DeliveryRunsAdminController } from './controllers/delivery-runs.admin.c
 import { StaffsrController } from './controllers/staff.controller';
 import { BranchConfigController } from './branch-config.controller';
 import { BranchConfigService } from './branch-config.service';
+import { BranchCoverageOverlapService } from './services/branch-coverage-overlap.service';
 import { RedisModule } from 'src/shared/redis/redis.module';
 import { DeliveryManagementModule } from '../delivery/delivery.module';
 
@@ -54,6 +55,7 @@ import { DeliveryManagementModule } from '../delivery/delivery.module';
     SectorService,
     DeliveryProofService,
     BranchConfigService,
+    BranchCoverageOverlapService,
     DeveloperService,
     IdGeneratorService],
   exports: [BranchManagementService, BranchConfigService],

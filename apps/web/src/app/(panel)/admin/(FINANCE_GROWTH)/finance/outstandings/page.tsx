@@ -767,24 +767,25 @@ export default function OutstandingPage() {
 
                       <td className="px-4 py-3.5 text-right align-middle">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Intimate Due Reminder */}
+                          {/* Preview & Download Invoice */}
+                          <button
+                            type="button"
+                            onClick={() => openInspectReceipt(billId)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors font-bold text-[11px] cursor-pointer"
+                            title="Preview Invoice Breakdown & Download PDF"
+                          >
+                            <Eye size={13} />
+                            <span>Preview</span>
+                          </button>
+
+                          {/* Intimate Due Reminder Alert */}
                           <button
                             type="button"
                             onClick={() => openSingleReminderModal(bill)}
                             className="p-1.5 text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors cursor-pointer"
-                            title="Send Due Date Intimation Notification"
+                            title="Send Due Alert Notification to Customer App"
                           >
-                            <Bell size={13} />
-                          </button>
-
-                          {/* Download PDF */}
-                          <button
-                            type="button"
-                            onClick={() => downloadBillPdf(billId)}
-                            className="p-1.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors cursor-pointer"
-                            title="Download Invoice PDF"
-                          >
-                            <Download size={13} />
+                            <BellRing size={13} />
                           </button>
 
                           {/* Record Payment */}
@@ -792,19 +793,9 @@ export default function OutstandingPage() {
                             type="button"
                             onClick={() => openPaymentModal(bill)}
                             className="p-1.5 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-                            title="Record Payment"
+                            title="Record Payment Settlement"
                           >
                             <DollarSign size={13} />
-                          </button>
-
-                          {/* Inspect Receipt */}
-                          <button
-                            type="button"
-                            onClick={() => openInspectReceipt(billId)}
-                            className="p-1.5 text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer"
-                            title="View Invoice & Line Items"
-                          >
-                            <Eye size={13} />
                           </button>
                         </div>
                       </td>

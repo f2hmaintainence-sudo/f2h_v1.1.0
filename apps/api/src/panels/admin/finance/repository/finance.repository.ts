@@ -14,18 +14,10 @@ export class FinanceRepository {
       `pb.deleted_at IS NULL`,
       `pb.due_amount > 0`,
       `LOWER(pb.status::text) NOT IN ('paid', 'cancelled')`,
+      `(pb.bill_type IN ('subscription', 'postpaid', 'subscriber') OR pb.payment_type = 'postpaid')`,
     ];
     const params: any[] = [];
     let paramIndex = 1;
-
-    if (query.type && query.type !== 'all') {
-      const t = String(query.type).toLowerCase();
-      if (t === 'subscription' || t === 'postpaid' || t === 'subscriber') {
-        conditions.push(`(pb.bill_type IN ('subscription', 'postpaid', 'subscriber') OR pb.payment_type = 'postpaid')`);
-      } else if (t === 'order' || t === 'prepaid' || t === 'one-time') {
-        conditions.push(`((pb.bill_type IN ('order', 'prepaid') OR pb.payment_type = 'prepaid') AND pb.bill_type NOT IN ('subscription', 'postpaid'))`);
-      }
-    }
 
     if (query.status) {
       const st = String(query.status).toLowerCase();

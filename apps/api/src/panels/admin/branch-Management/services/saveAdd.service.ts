@@ -10,6 +10,7 @@ import { DeveloperService } from '../../../../shared/logger/Developer.service';
 import { CreateBranchDto } from '../dto/branch.dto';
 import { IdGeneratorService } from '../../../../shared/services/idGenerator.service';
 import { SectorService } from '../ModuleServices/sector.service';
+import { BranchCoverageOverlapService } from './branch-coverage-overlap.service';
 
 @Injectable()
 export class BranchSaveAddService {
@@ -20,6 +21,7 @@ export class BranchSaveAddService {
     private readonly Developer: DeveloperService,
     private readonly idGenerator: IdGeneratorService,
     private readonly sectorService: SectorService,
+    private readonly coverageOverlapService: BranchCoverageOverlapService,
   ) { }
 
   // ═══════════════════════════════════════════════════════════════
@@ -70,6 +72,30 @@ export class BranchSaveAddService {
           buffer_zone: bufferZone,
           hex_shape: body.hex_shape || 'hexagon',
         };
+        const coverageConflict = await this.coverageOverlapService.findConflict(
+          tx,
+          {
+            branch_id,
+            branch_name: body.branch_name.trim(),
+            lat: body.lat ?? null,
+            lng: body.lng ?? null,
+            delivery_radius_km: radiusKm,
+            buffer_zone: bufferZone,
+            allow_buffer_order: allowBufferOrder,
+            is_active: isActive,
+            hex_shape: body.hex_shape || 'hexagon',
+          },
+        );
+        if (coverageConflict) {
+          throw new BadRequestException({
+            status: false,
+            code: 'branch_coverage_overlap',
+            message: `Coverage overlaps with ${coverageConflict.branch_name}. Move the map pin or reduce the radius or buffer.`,
+            errors: {
+              coverage: `Conflicts with ${coverageConflict.branch_name}`,
+            },
+          });
+        }
         this.Developer.log('Branch data', { branchData });
         const branchResult = await this.Data.insert('branches', branchData, { transaction: tx });
         if (!branchResult.status) throw new Error(branchResult.message || 'Branch insert failed');

@@ -30,6 +30,7 @@ import 'package:f2h_customer/features/notifications/presentation/bloc/notificati
 import 'package:f2h_customer/features/orders/presentation/bloc/order_history_bloc.dart';
 
 import 'package:f2h_customer/features/orders/presentation/bloc/order_history_event.dart';
+import 'package:f2h_customer/core/services/notification_service.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
 
 class F2HApp extends StatelessWidget {
@@ -57,6 +58,7 @@ class F2HApp extends StatelessWidget {
       BlocProvider<OrderHistoryBloc>(create: (_) => sl<OrderHistoryBloc>()),
     ],
     child: MaterialApp(
+      navigatorKey: appNavigatorKey,
       title: 'F2H Fresh',
       debugShowCheckedModeBanner: false,
       builder: (context, child) => NetworkOverlay(child: child!),

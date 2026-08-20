@@ -11,6 +11,7 @@ import { BranchShowAddService } from './showAdd.service';
 import { BranchShowEditService } from './showEdit.service';
 import { SectorService } from '../ModuleServices/sector.service';
 import { CreateBranchDto } from '../dto/branch.dto';
+import { BranchCoverageOverlapService } from './branch-coverage-overlap.service';
 
 const BRANCH_COVERAGE_SHAPES = new Set(['hexagon', 'circle', 'square', 'rectangle']);
 
@@ -24,6 +25,7 @@ export class BranchSaveEditService {
     private readonly showAddService: BranchShowAddService,
     private readonly showEditService: BranchShowEditService,
     private readonly sectorService: SectorService,
+    private readonly coverageOverlapService: BranchCoverageOverlapService,
   ) { }
 
   // ═══════════════════════════════════════════════════════════════
@@ -39,7 +41,7 @@ export class BranchSaveEditService {
       // 1. Fetch current branch data to detect geo changes
       const currentRows = await this.db.query(
         `SELECT branch_id, branch_name, branch_code, city, state, is_active, allow_buffer_order,
-                lat, lng, delivery_radius_km, buffer_zone
+                lat, lng, delivery_radius_km, buffer_zone, hex_shape
          FROM branches WHERE branch_id = $1`,
         [branchId],
       );
@@ -75,6 +77,20 @@ export class BranchSaveEditService {
       const newRadiusKm = body.delivery_radius_km !== undefined
         ? body.delivery_radius_km
         : Number(current.delivery_radius_km);
+      const newBufferZone = body.buffer_zone !== undefined
+        ? body.buffer_zone
+        : Number(current.buffer_zone || 0);
+      const currentAllowBufferOrder = current.allow_buffer_order === true
+        || String(current.allow_buffer_order) === 'true';
+      const newAllowBufferOrder = body.allow_buffer_order !== undefined
+        ? body.allow_buffer_order === true || String(body.allow_buffer_order) === 'true'
+        : currentAllowBufferOrder;
+      const currentIsActive = current.is_active === true
+        || String(current.is_active) === 'true';
+      const newIsActive = body.is_active !== undefined
+        ? body.is_active === true || String(body.is_active) === 'true'
+        : currentIsActive;
+      const newShape = body.hex_shape ?? current.hex_shape ?? 'hexagon';
       const geoChanged = (
         (newLat !== null && newLat !== undefined) &&
         (newLng !== null && newLng !== undefined) &&
@@ -86,11 +102,18 @@ export class BranchSaveEditService {
       );
 
       const coordinatesNowProvided = (
-        newLat && newLng &&
-        (!current.lat || !current.lng)
+        newLat !== null && newLat !== undefined
+        && newLng !== null && newLng !== undefined
+        && (current.lat === null || current.lat === undefined
+          || current.lng === null || current.lng === undefined)
       );
 
       const geoUpdated = geoChanged || coordinatesNowProvided;
+      const coverageChanged = geoUpdated
+        || Number(newBufferZone) !== Number(current.buffer_zone || 0)
+        || newAllowBufferOrder !== currentAllowBufferOrder
+        || newIsActive !== currentIsActive
+        || newShape !== (current.hex_shape ?? 'hexagon');
 
       // 4. Build simple fields update
       const updateData: Record<string, any> = {};
@@ -126,10 +149,41 @@ export class BranchSaveEditService {
       updateData.updated_at = new Date().toISOString();
 
       if (Object.keys(updateData).length > 1) { // > 1 because updated_at is always there
-        await this.db.query(
-          `UPDATE branches SET ${Object.keys(updateData).map((k, i) => `"${k}" = $${i + 1}`).join(', ')} WHERE branch_id = $${Object.keys(updateData).length + 1}`,
-          [...Object.values(updateData), branchId],
-        );
+        const updateSql = `UPDATE branches SET ${Object.keys(updateData).map((k, i) => `"${k}" = $${i + 1}`).join(', ')} WHERE branch_id = $${Object.keys(updateData).length + 1}`;
+        const updateParams = [...Object.values(updateData), branchId];
+
+        if (coverageChanged) {
+          await this.dataService.executeTransaction(async (tx) => {
+            const coverageConflict = await this.coverageOverlapService.findConflict(
+              tx,
+              {
+                branch_id: branchId,
+                branch_name: body.branch_name?.trim() || current.branch_name,
+                lat: newLat,
+                lng: newLng,
+                delivery_radius_km: newRadiusKm,
+                buffer_zone: newBufferZone,
+                allow_buffer_order: newAllowBufferOrder,
+                is_active: newIsActive,
+                hex_shape: newShape,
+              },
+              branchId,
+            );
+            if (coverageConflict) {
+              throw new BadRequestException({
+                status: false,
+                code: 'branch_coverage_overlap',
+                message: `Coverage overlaps with ${coverageConflict.branch_name}. Move the map pin or reduce the radius or buffer.`,
+                errors: {
+                  coverage: `Conflicts with ${coverageConflict.branch_name}`,
+                },
+              });
+            }
+            await tx.query(updateSql, updateParams);
+          });
+        } else {
+          await this.db.query(updateSql, updateParams);
+        }
       }
 
       // 6. Audit log (non-fatal)
@@ -142,6 +196,7 @@ export class BranchSaveEditService {
           details: JSON.stringify({
             changes: Object.keys(updateData),
             geo_updated: geoUpdated,
+            coverage_updated: coverageChanged,
           }),
         });
       } catch (auditError) {

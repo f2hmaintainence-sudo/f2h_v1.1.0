@@ -594,28 +594,22 @@ export default function CustomerBillingPage() {
 
                       <td className="px-4 py-3.5 text-right align-middle">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => downloadBillPdf(billId)}
-                            className="p-1.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors cursor-pointer"
-                            title="Download PDF Invoice"
-                          >
-                            <Download size={13} />
-                          </button>
+                          {/* Preview & Download Invoice */}
                           <button
                             type="button"
                             onClick={() => openInspectReceipt(billId)}
-                            className="p-1.5 text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer"
-                            title="View Invoice Breakdown"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors font-bold text-[11px] cursor-pointer"
+                            title="Preview Tax Invoice & Download PDF"
                           >
                             <Eye size={13} />
+                            <span>Preview</span>
                           </button>
                           {Number(bill.due_amount) > 0 && (
                             <button
                               type="button"
                               onClick={() => openPaymentModal(bill)}
                               className="p-1.5 text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors cursor-pointer"
-                              title="Record Payment"
+                              title="Record Payment Settlement"
                             >
                               <DollarSign size={13} />
                             </button>
