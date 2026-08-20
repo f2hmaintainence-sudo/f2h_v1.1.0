@@ -69,8 +69,10 @@ import { ReferralModule } from './panels/customer/referral/referral.module';
 import { AdminReferralModule } from './panels/admin/referrals/admin-referral.module';
 import { PromotionsCouponsModule } from './panels/admin/promotions-coupons/promotions-coupons.module';
 import { CustomerAppAssetsModule } from './panels/customer/app_assets/app_assets.module';
+import { FinanceModule } from './panels/admin/finance/finance.module';
 @Module({
   imports: [
+    FinanceModule,
     ApiIntegrationsModule,
     ConfigModule.forRoot({
       isGlobal: true,

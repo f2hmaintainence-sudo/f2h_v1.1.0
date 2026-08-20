@@ -416,8 +416,8 @@ export class FinanceRepository {
     return { bills: Array.isArray(bills) ? bills : [], total };
   }
 
-  async getBillingStats(days = 30): Promise<any> {
-    const daysNum = Math.max(1, Number(days));
+  async getBillingStats(days?: number): Promise<any> {
+    const dateClause = days && Number(days) > 0 ? `AND pb.created_at >= (CURRENT_DATE - (${Number(days)} || ' days')::interval)` : '';
 
     const sqlGeneral = `
       SELECT 
@@ -445,7 +445,7 @@ export class FinanceRepository {
         COALESCE(SUM(CASE WHEN LOWER(pb.payment_method) = 'cash' OR LOWER(pb.payment_method) = 'cod' THEN pb.paid_amount ELSE 0 END), 0)::numeric AS cash_collected
       FROM public.customer_bills pb
       WHERE pb.deleted_at IS NULL
-        AND pb.created_at >= (CURRENT_DATE - (${daysNum} || ' days')::interval)
+        ${dateClause}
     `;
     const rows = await this.db.query(sqlGeneral, []);
     const general = rows?.[0] || {};
@@ -458,7 +458,7 @@ export class FinanceRepository {
         COALESCE(SUM(pb.total_amount), 0)::numeric AS total_amount
       FROM public.customer_bills pb
       WHERE pb.deleted_at IS NULL
-        AND pb.created_at >= (CURRENT_DATE - (${daysNum} || ' days')::interval)
+        ${dateClause}
       GROUP BY COALESCE(NULLIF(LOWER(pb.payment_method), ''), 'other')
       ORDER BY paid_amount DESC
     `;
@@ -468,7 +468,7 @@ export class FinanceRepository {
     return {
       general,
       methods,
-      days: daysNum,
+      days: days || 'all',
     };
   }
 
