@@ -300,6 +300,7 @@ export class ProductionShowAddService {
       select: [
         'product_variants.id',
         'product_variants.name',
+        'product_variants.product_id',
         'products.name AS product_name',
       ],
       joins: [
@@ -322,6 +323,8 @@ export class ProductionShowAddService {
       ...(result?.data || []).map((variant: any) => ({
         value: String(variant.id),
         label: `${variant.product_name || 'Product'} - ${variant.name}`,
+        product_id: String(variant.product_id),
+        parent_id: String(variant.product_id),
       })),
     ];
   }

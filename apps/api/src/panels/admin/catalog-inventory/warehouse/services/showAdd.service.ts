@@ -308,6 +308,8 @@ export class WarehouseShowAddService {
           .map((v: any) => ({
             value: String(v.variant_id ?? v.id),
             label: v.name,
+            product_id: String(v.product_id),
+            parent_id: String(v.product_id),
           })),
       ];
 
@@ -723,7 +725,12 @@ export class WarehouseShowAddService {
           required: true,
           width: 'half',
           group: 'Item Details',
-          options: (variantsRes.data || []).map((v: any) => ({ value: v.id, label: v.name })),
+          options: (variantsRes.data || []).map((v: any) => ({
+            value: v.id,
+            label: v.name,
+            product_id: String(v.product_id),
+            parent_id: String(v.product_id),
+          })),
         },
         {
           name: 'quantity',

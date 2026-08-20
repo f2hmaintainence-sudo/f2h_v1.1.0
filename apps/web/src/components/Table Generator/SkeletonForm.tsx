@@ -1499,6 +1499,13 @@ export default function SkeletonForm({
     setFormData((prev) => {
       const next = { ...prev, [name]: value };
 
+      // When product changes, reset variant and batch selections
+      if (name === 'product_id') {
+        next.variant_id = '';
+        next.product_variant_id = '';
+        next.batch_id = '';
+      }
+
       // Selling price <= Original Price (MRP) enforcement & realtime discount calculation
       if (name === 'price') {
         const orig = parseFloat(next.original_price);
@@ -1676,23 +1683,78 @@ export default function SkeletonForm({
         );
         break;
 
-      case 'select':
+      case 'select': {
+        const isVariantField =
+          field.name === 'variant_id' ||
+          field.name === 'product_variant_id' ||
+          field.name === 'variant';
+
+        let availableOptions = (field.options ?? []) as any[];
+
+        if (isVariantField) {
+          const selectedProductId = formData.product_id ? String(formData.product_id).trim() : '';
+
+          if (selectedProductId) {
+            const allFormFields: any[] = isStepper ? fields.flat() : fields;
+            const productField = allFormFields.find((f: any) => f.name === 'product_id');
+            const selectedProductOpt = productField?.options?.find(
+              (o: any) => String(o.value).trim() === selectedProductId
+            );
+            const selectedProductName = selectedProductOpt?.label?.trim()?.toLowerCase() || '';
+
+            availableOptions = availableOptions.filter((opt: any) => {
+              if (!opt.value || opt.value === '') return true;
+
+              // 1. Direct product_id or parent_id match
+              if (opt.product_id !== undefined && opt.product_id !== null && String(opt.product_id).trim() !== '') {
+                return String(opt.product_id).trim() === selectedProductId;
+              }
+              if (opt.parent_id !== undefined && opt.parent_id !== null && String(opt.parent_id).trim() !== '') {
+                return String(opt.parent_id).trim() === selectedProductId;
+              }
+
+              // 2. Fallback matching: if option label contains product name or matches prefix
+              if (selectedProductName && opt.label) {
+                const optLabelLower = opt.label.toLowerCase();
+                const prefixPart = optLabelLower.split('-')[0]?.trim();
+                if (optLabelLower.includes(selectedProductName) || (prefixPart && selectedProductName.includes(prefixPart))) {
+                  return true;
+                }
+              }
+
+              return false;
+            });
+          } else {
+            // No product selected -> show only empty option
+            availableOptions = availableOptions.filter((opt: any) => !opt.value || opt.value === '');
+          }
+        }
+
+        const uniqueOptions = Array.from(
+          new Map(availableOptions.map((opt) => [String(opt.value), opt])).values()
+        );
+
         input = (
           <select
             className={`skf-select${errorClass}`}
             value={formData[field.name] ?? ''}
             onChange={(e) => handleChange(field.name, e.target.value)}
-            disabled={field.disabled}
+            disabled={field.disabled || (isVariantField && !formData.product_id)}
           >
-            <option value="">— Select —</option>
-            {Array.from(new Map((field.options ?? []).map((opt) => [String(opt.value), opt])).values()).map((opt, idx) => (
-              <option key={`${opt.value}-${idx}`} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
+            <option value="">
+              {isVariantField && !formData.product_id ? '— Select Product first —' : '— Select —'}
+            </option>
+            {uniqueOptions
+              .filter((opt) => opt.value !== '')
+              .map((opt, idx) => (
+                <option key={`${opt.value}-${idx}`} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
           </select>
         );
         break;
+      }
 
       case 'radio':
         input = (
