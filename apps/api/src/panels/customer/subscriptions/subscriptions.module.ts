@@ -6,13 +6,14 @@ import { DeveloperService } from 'src/shared/logger/Developer.service';
 import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
 import { MailService } from 'src/mail/mail.service';
 import { NotificationModule } from 'src/notifications/notification.module';
+import { CustomerPaymentModule } from '../payment/payment.module';
 import {
   SubscriptionsController,
 } from './controllers/subscriptions.controller';
 import { SubscriptionsService } from './ModuleServices/subscriptions.service';
 
 @Module({
-  imports: [ConfigModule, NotificationModule],
+  imports: [ConfigModule, NotificationModule, CustomerPaymentModule],
   controllers: [SubscriptionsController],
   providers: [
     DatabaseService,

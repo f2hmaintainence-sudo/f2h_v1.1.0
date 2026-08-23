@@ -11,6 +11,7 @@ import {
 import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
 import { NotificationService } from 'src/notifications/notification.service';
 import { MailService } from 'src/mail/mail.service';
+import { CustomerPaymentService } from '../../payment/payment.service';
 
 const DEFAULT_BRANCH_ID = 'ALL';
 const DEFAULT_ADDRESS_ID = 'ADDR_DEFAULT';
@@ -35,6 +36,7 @@ export class SubscriptionsService {
     private readonly pushNotificationService: PushNotificationService,
     private readonly notificationService: NotificationService,
     private readonly mailService: MailService,
+    private readonly customerPaymentService: CustomerPaymentService,
   ) { }
 
   async checkout(body: CreateSubscriptionDto, req?: any) {
@@ -154,7 +156,8 @@ export class SubscriptionsService {
       };
     }
 
-    // 2. PREPAID validation & wallet deduction
+    // 2. PREPAID validation & payment gate
+    let consumedOnlineTxn: any = null;
     if (paymentType === 'prepaid') {
       if (paymentMethod === 'wallet') {
         if (walletBalance < estimatedTotal) {
@@ -171,9 +174,22 @@ export class SubscriptionsService {
             required: estimatedTotal,
           };
         }
-
-      } else {
-        // TODO: Implement other payment methods
+      } else if (['online', 'upi', 'razorpay'].includes(paymentMethod)) {
+        if (!body.razorpay_order_id) {
+          return {
+            status: false,
+            error_code: 'missing_razorpay_order',
+            message: 'razorpay_order_id is required for online subscription checkout.',
+          };
+        }
+        consumedOnlineTxn = await this.customerPaymentService.consumeOrderPayment({
+          customerId,
+          razorpayOrderId: body.razorpay_order_id,
+          razorpayPaymentId: body.razorpay_payment_id,
+          razorpaySignature: body.razorpay_signature,
+          expectedAmount: estimatedTotal,
+          orderReference: 'SUBSCRIPTION_PENDING',
+        });
       }
     }
 
@@ -229,72 +245,107 @@ export class SubscriptionsService {
     const createResult = await this.create(body);
 
     // 5. Post-creation ledger & billing updates for prepaid payments
-    if (paymentType === 'prepaid' && paymentMethod === 'wallet' && createResult?.subscription_id) {
-      this.developer.debug('SubscriptionsService.checkout updating wallet reference and adding prepaid bill', {
-        subscription_id: createResult.subscription_id,
-        customerId,
-      });
+    if (paymentType === 'prepaid' && createResult?.subscription_id) {
+      if (paymentMethod === 'wallet') {
+        this.developer.debug('SubscriptionsService.checkout updating wallet reference and adding prepaid bill', {
+          subscription_id: createResult.subscription_id,
+          customerId,
+        });
 
-      // Deduct from wallet atomically
-      const updateRes = await this.db.query(
-        `UPDATE customers SET wallet_balance = COALESCE(wallet_balance, 0) - $1, updated_at = NOW() WHERE customer_id = $2 RETURNING wallet_balance`,
-        [estimatedTotal, customerId],
-      );
-      const newBalance = Number(updateRes?.[0]?.wallet_balance ?? (walletBalance - estimatedTotal));
+        // Deduct from wallet atomically
+        const updateRes = await this.db.query(
+          `UPDATE customers SET wallet_balance = COALESCE(wallet_balance, 0) - $1, updated_at = NOW() WHERE customer_id = $2 RETURNING wallet_balance`,
+          [estimatedTotal, customerId],
+        );
+        const newBalance = Number(updateRes?.[0]?.wallet_balance ?? (walletBalance - estimatedTotal));
 
-      this.developer.debug('SubscriptionsService.checkout deducting wallet balance', {
-        customerId,
-        walletBalance,
-        estimatedTotal,
-        newBalance,
-      });
+        this.developer.debug('SubscriptionsService.checkout deducting wallet balance', {
+          customerId,
+          walletBalance,
+          estimatedTotal,
+          newBalance,
+        });
 
-      // Record wallet transaction ledger entry
-      const ts = Math.floor(Date.now() / 1000).toString(36);
-      const rnd = Math.floor(Math.random() * 9000 + 1000);
-      const txId = `WT${ts}${rnd}`;
+        // Record wallet transaction ledger entry
+        const ts = Math.floor(Date.now() / 1000).toString(36);
+        const rnd = Math.floor(Math.random() * 9000 + 1000);
+        const txId = `WT${ts}${rnd}`;
 
-      await this.data.insert(
-        'customer_wallet_transactions',
-        {
-          transaction_id: txId,
+        await this.data.insert(
+          'customer_wallet_transactions',
+          {
+            transaction_id: txId,
+            customer_id: customerId,
+            transaction_type: 'debit',
+            amount: estimatedTotal,
+            balance_after: newBalance,
+            remarks: 'Subscription prepaid wallet payment',
+            reference_type: 'subscription',
+            reference_id: createResult.subscription_id,
+            created_by: customerId,
+            created_at: new Date(),
+          },
+        );
+
+        const billId = `BILL_${Date.now().toString(36).toUpperCase()}`;
+        const startDateStr = body.start_date;
+        const endDateStr = body.end_date || calcMonthEndDate(startDateStr);
+
+        await this.data.insert('customer_bills', {
+          bill_id: billId,
           customer_id: customerId,
-          transaction_type: 'debit',
-          amount: estimatedTotal,
-          balance_after: newBalance,
-          remarks: 'Subscription prepaid wallet payment',
-          reference_type: 'subscription',
+          bill_type: 'subscription',
           reference_id: createResult.subscription_id,
-          created_by: customerId,
+          payment_type: 'prepaid',
+          payment_method: paymentMethod,
+          billing_from: startDateStr,
+          billing_to: endDateStr,
+          due_date: startDateStr,
+          subtotal: estimatedTotal,
+          discount_amount: 0,
+          tax_amount: 0,
+          total_amount: estimatedTotal,
+          paid_amount: estimatedTotal,
+          due_amount: 0,
+          status: 'paid',
+          remarks: 'Prepaid subscription checkout',
           created_at: new Date(),
-        },
-      );
+          updated_at: new Date(),
+        });
+      } else if (['online', 'upi', 'razorpay'].includes(paymentMethod)) {
+        if (consumedOnlineTxn?.transaction_id) {
+          await this.customerPaymentService.attachOrderReference(
+            consumedOnlineTxn.transaction_id,
+            createResult.subscription_id,
+          );
+        }
 
-      const billId = `BILL_${Date.now().toString(36).toUpperCase()}`;
-      const startDateStr = body.start_date;
-      const endDateStr = body.end_date || calcMonthEndDate(startDateStr);
+        const billId = `BILL_${Date.now().toString(36).toUpperCase()}`;
+        const startDateStr = body.start_date;
+        const endDateStr = body.end_date || calcMonthEndDate(startDateStr);
 
-      await this.data.insert('customer_bills', {
-        bill_id: billId,
-        customer_id: customerId,
-        bill_type: 'subscription',
-        reference_id: createResult.subscription_id,
-        payment_type: 'prepaid',
-        payment_method: paymentMethod,
-        billing_from: startDateStr,
-        billing_to: endDateStr,
-        due_date: startDateStr,
-        subtotal: estimatedTotal,
-        discount_amount: 0,
-        tax_amount: 0,
-        total_amount: estimatedTotal,
-        paid_amount: estimatedTotal,
-        due_amount: 0,
-        status: 'paid',
-        remarks: 'Prepaid subscription checkout',
-        created_at: new Date(),
-        updated_at: new Date(),
-      });
+        await this.data.insert('customer_bills', {
+          bill_id: billId,
+          customer_id: customerId,
+          bill_type: 'subscription',
+          reference_id: createResult.subscription_id,
+          payment_type: 'prepaid',
+          payment_method: paymentMethod,
+          billing_from: startDateStr,
+          billing_to: endDateStr,
+          due_date: startDateStr,
+          subtotal: estimatedTotal,
+          discount_amount: 0,
+          tax_amount: 0,
+          total_amount: estimatedTotal,
+          paid_amount: estimatedTotal,
+          due_amount: 0,
+          status: 'paid',
+          remarks: `Prepaid subscription online payment (${body.razorpay_payment_id || body.razorpay_order_id || 'Razorpay'})`,
+          created_at: new Date(),
+          updated_at: new Date(),
+        });
+      }
     }
 
     const response = {

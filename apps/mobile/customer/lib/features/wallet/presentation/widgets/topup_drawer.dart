@@ -228,7 +228,51 @@ class _TopupDrawerState extends State<TopupDrawer> {
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+
+              // ── Payment methods badge ──
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF9FAFB),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.verified_user_outlined,
+                      color: Color(0xFF16A34A),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'Instant UPI & Cards via Razorpay',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: kText,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Google Pay, PhonePe, Paytm, BHIM, NetBanking & Cards',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: kTextSub,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
 
               ElevatedButton(
                 onPressed: (_isSubmitting || _validationError != null)

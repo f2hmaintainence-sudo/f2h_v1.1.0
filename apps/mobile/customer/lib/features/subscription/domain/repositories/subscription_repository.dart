@@ -44,10 +44,13 @@ abstract class SubscriptionRepository {
     required double unitPrice,
     required List<String> customDays,
     required String paymentType,
-    required String paymentMethod, // 'wallet' | 'upi' | 'postpaid'
+    required String paymentMethod, // 'wallet' | 'upi' | 'online' | 'postpaid'
     required bool autoRenew,
     required double estimatedTotal,
     double? monthlyEstimate,
+    String? razorpayOrderId,
+    String? razorpayPaymentId,
+    String? razorpaySignature,
   });
 
 

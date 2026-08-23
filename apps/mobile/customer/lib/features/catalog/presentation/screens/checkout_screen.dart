@@ -1027,22 +1027,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                       ),
                                       const SizedBox(height: 14),
                                       _buildPaymentOption(
+                                        id: 'online',
+                                        icon: Icons.bolt_rounded,
+                                        title: 'Instant UPI & Online Payment',
+                                        subtitle:
+                                            'Google Pay, PhonePe, Paytm, BHIM, Cards & NetBanking',
+                                        badgeText: 'FAST & SECURE',
+                                        badgeColor: const Color(0xFF16A34A),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      _buildPaymentOption(
                                         id: 'wallet',
-                                        icon: Icons.credit_card_outlined,
+                                        icon: Icons.account_balance_wallet_outlined,
                                         title:
                                             'F2H Wallet (₹${walletBalance.toStringAsFixed(2)} available)',
                                         subtitle: grandTotal <= walletBalance
                                             ? 'Sufficient balance'
                                             : 'Insufficient balance (Top-up required)',
                                         disabled: grandTotal > walletBalance,
-                                      ),
-                                      const SizedBox(height: 10),
-                                      _buildPaymentOption(
-                                        id: 'online',
-                                        icon: Icons.bolt_outlined,
-                                        title: 'Instant UPI',
-                                        subtitle:
-                                            'Pay via Google Pay, PhonePe, or Paytm',
                                       ),
                                       const SizedBox(height: 10),
                                       _buildPaymentOption(
@@ -1206,7 +1208,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 final customerId =
                                     sessionState.profile?.customerId ?? '';
 
-                                if (_selectedPayment == 'online') {
+                                if (_selectedPayment == 'online' ||
+                                    _selectedPayment == 'upi') {
                                   _handleOnlinePaymentAndCheckout(
                                     grandTotal: grandTotal,
                                     checkoutItems: checkoutItems,
@@ -1608,6 +1611,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     required String title,
     required String subtitle,
     bool disabled = false,
+    String? badgeText,
+    Color? badgeColor,
   }) {
     final isSelected = _selectedPayment == id;
     // [ADDED BY ANTIGRAVITY FOR WALLET TOPUP] Show Top-up button if it is the wallet option and has insufficient balance
@@ -1622,7 +1627,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               });
             },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected
               ? kPrimaryPl.withOpacity(0.4)
@@ -1650,13 +1655,41 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: disabled ? kMuted : kText,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            title,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: disabled ? kMuted : kText,
+                            ),
+                          ),
+                        ),
+                        if (badgeText != null) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: (badgeColor ?? kPrimary).withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              badgeText,
+                              style: TextStyle(
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w800,
+                                color: badgeColor ?? kPrimary,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(

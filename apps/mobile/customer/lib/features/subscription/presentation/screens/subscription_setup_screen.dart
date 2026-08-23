@@ -29,6 +29,7 @@ import '../widgets/monthly_estimation_card.dart';
 import '../widgets/subscription_payment_sheet.dart';
 import 'subscription_success_screen.dart';
 import '../../../wallet/presentation/screens/wallet_screen.dart';
+import '../../../../core/payments/payment_service.dart';
 
 // ── Day abbreviations ─────────────────────────────────────
 const _kDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -364,10 +365,10 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     );
   }
 
-  void _executeCheckout({
+  Future<void> _executeCheckout({
     required String paymentType,
     required String paymentMethod,
-  }) {
+  }) async {
     final session = context.read<CustomerSessionCubit>().state;
     final customerId = session.profile?.customerId ?? '';
     final addressId = _selectedAddress?.addressId ?? '';
@@ -412,6 +413,49 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
           }).toList()
         : _kDays;
 
+    final double effectiveEstimatedTotal = paymentType == 'postpaid'
+        ? _fullMonthEstimate.total
+        : _currentMonthEstimate.total;
+
+    String? razorpayOrderId;
+    String? razorpayPaymentId;
+    String? razorpaySignature;
+
+    if (paymentType == 'prepaid' &&
+        (paymentMethod == 'upi' || paymentMethod == 'online' || paymentMethod == 'razorpay')) {
+      final payResult = await PaymentService.instance.payForOrder(
+        amount: effectiveEstimatedTotal,
+        notes: {
+          'customer_id': customerId,
+          'purpose': 'subscription',
+          'variant_id': _variant.id,
+        },
+      );
+
+      if (!mounted) return;
+
+      if (payResult.cancelled) {
+        F2HToast.show(context, 'Payment cancelled');
+        return;
+      }
+
+      if (!payResult.success) {
+        F2HToast.error(
+          context,
+          payResult.message.isNotEmpty
+              ? payResult.message
+              : 'Payment failed. Please try again.',
+        );
+        return;
+      }
+
+      razorpayOrderId = payResult.razorpayOrderId;
+      razorpayPaymentId = payResult.razorpayPaymentId;
+      razorpaySignature = payResult.razorpaySignature;
+    }
+
+    if (!mounted) return;
+
     context.read<SubscriptionBloc>().add(
       SubscriptionCheckoutRequested(
         customerId: customerId,
@@ -432,10 +476,11 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
         // For postpaid: send full-month estimate so backend credit limit
         // check uses monthly commitment, not the partial-month charge.
         // For prepaid: send partial-month amount for correct wallet deduction.
-        estimatedTotal: paymentType == 'postpaid'
-            ? _fullMonthEstimate.total
-            : _currentMonthEstimate.total,
+        estimatedTotal: effectiveEstimatedTotal,
         monthlyEstimate: _fullMonthEstimate.total,
+        razorpayOrderId: razorpayOrderId,
+        razorpayPaymentId: razorpayPaymentId,
+        razorpaySignature: razorpaySignature,
       ),
     );
   }

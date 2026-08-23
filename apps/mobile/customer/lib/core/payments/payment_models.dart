@@ -9,7 +9,7 @@
 // ============================================================================
 
 /// What a payment is for. Mirrors the API's `purpose` enum.
-enum PaymentPurpose { walletTopup, bill, order }
+enum PaymentPurpose { walletTopup, bill, order, subscription }
 
 extension PaymentPurposeApi on PaymentPurpose {
   String get apiValue {
@@ -20,6 +20,8 @@ extension PaymentPurposeApi on PaymentPurpose {
         return 'bill';
       case PaymentPurpose.order:
         return 'order';
+      case PaymentPurpose.subscription:
+        return 'subscription';
     }
   }
 
@@ -31,6 +33,8 @@ extension PaymentPurposeApi on PaymentPurpose {
         return 'Bill Payment';
       case PaymentPurpose.order:
         return 'Order Payment';
+      case PaymentPurpose.subscription:
+        return 'Subscription Payment';
     }
   }
 }

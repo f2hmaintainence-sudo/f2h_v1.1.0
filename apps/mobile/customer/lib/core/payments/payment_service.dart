@@ -146,12 +146,16 @@ class PaymentService {
   /// through to `/customer/checkout/payment`.
   Future<PaymentResult> payForOrder({
     required double amount,
+    PaymentPurpose purpose = PaymentPurpose.order,
     Map<String, dynamic>? notes,
   }) async {
     final CheckoutOutcome outcome;
     try {
+      final effectivePurpose = notes?['purpose'] == 'subscription'
+          ? PaymentPurpose.subscription
+          : purpose;
       final order = await createOrder(
-        purpose: PaymentPurpose.order,
+        purpose: effectivePurpose,
         amount: amount,
         notes: notes,
       );

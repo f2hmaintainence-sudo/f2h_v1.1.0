@@ -174,10 +174,13 @@ class SubscriptionCheckoutRequested extends SubscriptionEvent {
   // { 'Mon': {'morning': 1, 'evening': 0}, 'Wed': {'morning': 3, 'evening': 0}, ... }
   final Map<String, Map<String, int>> weeklySchedule;
   final String paymentType;   // 'prepaid' | 'postpaid'
-  final String paymentMethod; // 'wallet' | 'upi' | 'postpaid'
+  final String paymentMethod; // 'wallet' | 'upi' | 'online' | 'postpaid'
   final bool autoRenew;
   final double estimatedTotal;
   final double? monthlyEstimate;
+  final String? razorpayOrderId;
+  final String? razorpayPaymentId;
+  final String? razorpaySignature;
 
   const SubscriptionCheckoutRequested({
     required this.customerId,
@@ -197,6 +200,9 @@ class SubscriptionCheckoutRequested extends SubscriptionEvent {
     this.autoRenew = true,
     this.estimatedTotal = 0.0,
     this.monthlyEstimate,
+    this.razorpayOrderId,
+    this.razorpayPaymentId,
+    this.razorpaySignature,
   });
 
   int get quantity => (morningQty + eveningQty).clamp(1, 999);
@@ -206,5 +212,6 @@ class SubscriptionCheckoutRequested extends SubscriptionEvent {
         customerId, branchId, variantId, scheduleType, deliverySlot,
         startDate, unitPrice, customDays, morningQty, eveningQty,
         weeklySchedule, paymentType, paymentMethod, autoRenew, estimatedTotal, monthlyEstimate,
+        razorpayOrderId, razorpayPaymentId, razorpaySignature,
       ];
 }

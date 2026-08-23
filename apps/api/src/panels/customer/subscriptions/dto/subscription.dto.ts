@@ -149,4 +149,17 @@ export class CreateSubscriptionDto {
   @IsArray()
   @IsString({ each: true })
   custom_dates?: string[];
+
+  // ── Online / Razorpay payment identifiers ──
+  @IsOptional()
+  @IsString()
+  razorpay_order_id?: string;
+
+  @IsOptional()
+  @IsString()
+  razorpay_payment_id?: string;
+
+  @IsOptional()
+  @IsString()
+  razorpay_signature?: string;
 }

@@ -261,6 +261,9 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
     required bool autoRenew,
     required double estimatedTotal,
     double? monthlyEstimate,
+    String? razorpayOrderId,
+    String? razorpayPaymentId,
+    String? razorpaySignature,
   }) async {
     try {
       final List<Map<String, dynamic>> schedules;
@@ -319,6 +322,12 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
         'auto_renew': autoRenew,
         'estimated_total': estimatedTotal,
         'monthly_estimate': monthlyEstimate ?? estimatedTotal,
+        if (razorpayOrderId != null && razorpayOrderId.isNotEmpty)
+          'razorpay_order_id': razorpayOrderId,
+        if (razorpayPaymentId != null && razorpayPaymentId.isNotEmpty)
+          'razorpay_payment_id': razorpayPaymentId,
+        if (razorpaySignature != null && razorpaySignature.isNotEmpty)
+          'razorpay_signature': razorpaySignature,
 
         'custom_dates': scheduleType == 'custom' ? customDays : <String>[],
         'items': [

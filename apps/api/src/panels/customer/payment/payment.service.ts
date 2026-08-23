@@ -665,14 +665,14 @@ export class CustomerPaymentService {
         'This payment does not belong to the current customer',
       );
     }
-    if (txn.purpose !== 'order') {
+    if (txn.purpose !== 'order' && txn.purpose !== 'subscription') {
       throw new BadRequestException(
-        'This payment was not initiated for an order checkout',
+        'This payment was not initiated for an order checkout or subscription',
       );
     }
     if (txn.status === 'fulfilled') {
       throw new BadRequestException(
-        'This payment has already been used for another order',
+        'This payment has already been used for another order/subscription',
       );
     }
 

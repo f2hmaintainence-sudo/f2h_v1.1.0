@@ -123,6 +123,9 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
         autoRenew: event.autoRenew,
         estimatedTotal: event.estimatedTotal,
         monthlyEstimate: event.monthlyEstimate,
+        razorpayOrderId: event.razorpayOrderId,
+        razorpayPaymentId: event.razorpayPaymentId,
+        razorpaySignature: event.razorpaySignature,
       );
 
 
