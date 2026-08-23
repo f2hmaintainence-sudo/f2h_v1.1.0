@@ -71,7 +71,12 @@ class _CartScreenState extends State<CartScreen> {
       }
       final catBloc = context.read<CatalogBloc>();
       if (catBloc.state is! CatalogLoaded) {
-        catBloc.add(LoadCatalog());
+        String? branchId;
+        try {
+          final def = sessionState.addresses.firstWhere((a) => a.isDefault);
+          if (def.branchId.isNotEmpty) branchId = def.branchId;
+        } catch (_) {}
+        catBloc.add(LoadCatalog(branchId: branchId));
       }
     });
   }

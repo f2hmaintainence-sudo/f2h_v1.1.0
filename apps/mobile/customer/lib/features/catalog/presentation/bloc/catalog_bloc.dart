@@ -18,12 +18,17 @@ class CatalogBloc extends Bloc<CatalogEvent, CatalogState> {
     emit(CatalogLoading());
     try {
       final results = await Future.wait([
-        catalogRepository.getProducts(),
+        catalogRepository.getProducts(branchId: event.branchId),
         catalogRepository.getCategories(),
       ]);
       final products = results[0] as List<Product>;
       final categories = results[1] as List<Map<String, dynamic>>;
-      emit(CatalogLoaded(products: products, filteredProducts: products, categories: categories));
+      emit(CatalogLoaded(
+        products: products,
+        filteredProducts: products,
+        categories: categories,
+        branchId: event.branchId,
+      ));
     } catch (e) {
       emit(CatalogError(extractErrorMessage(e)));
     }
@@ -43,9 +48,14 @@ class CatalogBloc extends Bloc<CatalogEvent, CatalogState> {
       try {
         List<Product> categoryProducts;
         if (event.categoryId == 'All') {
-          categoryProducts = await catalogRepository.getProducts();
+          categoryProducts = await catalogRepository.getProducts(
+            branchId: currentState.branchId,
+          );
         } else {
-          categoryProducts = await catalogRepository.getProductsByCategoryId(event.categoryId);
+          categoryProducts = await catalogRepository.getProductsByCategoryId(
+            event.categoryId,
+            branchId: currentState.branchId,
+          );
           if (categoryProducts.isEmpty && allProducts.isNotEmpty) {
             categoryProducts = allProducts.where((p) =>
               p.category.toLowerCase() == event.categoryId.toLowerCase() ||

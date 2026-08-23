@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
@@ -220,16 +220,18 @@ export class CategoriesController {
 
   @Public()
   @Get('products')
-  async getProducts(@Req() req: Request) {
+  async getProducts(@Req() req: Request, @Query('branch_id') branchId?: string) {
     const customerId = this.extractCustomerId(req);
-    return this.service.getProducts(customerId);
+    const warehouseId = branchId ? await this.service.resolveWarehouseId(branchId) : null;
+    return this.service.getProducts(customerId, warehouseId);
   }
 
   @Public()
   @Get('category/:category_id')
-  async getProductsByCategoryId(@Req() req: Request) {
+  async getProductsByCategoryId(@Req() req: Request, @Query('branch_id') branchId?: string) {
     const customerId = this.extractCustomerId(req);
-    return this.service.getProductsByCategoryId(req.params.category_id as string, customerId);
+    const warehouseId = branchId ? await this.service.resolveWarehouseId(branchId) : null;
+    return this.service.getProductsByCategoryId(req.params.category_id as string, customerId, warehouseId);
   }
 
   // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]

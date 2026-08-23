@@ -7,7 +7,13 @@ abstract class CatalogEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class LoadCatalog extends CatalogEvent {}
+class LoadCatalog extends CatalogEvent {
+  final String? branchId;
+  const LoadCatalog({this.branchId});
+
+  @override
+  List<Object?> get props => [branchId];
+}
 
 class SearchCatalog extends CatalogEvent {
   final String query;

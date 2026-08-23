@@ -2,8 +2,8 @@ import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 
 abstract class CatalogRemoteDataSource {
-  Future<List<dynamic>> getProductVariants();
-  Future<List<dynamic>> getProductsByCategoryId(String categoryId);
+  Future<List<dynamic>> getProductVariants({String? branchId});
+  Future<List<dynamic>> getProductsByCategoryId(String categoryId, {String? branchId});
   Future<List<dynamic>> getCategories();
   // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
   Future<List<dynamic>> getProductReviews(String productId);
@@ -14,9 +14,12 @@ class CatalogRemoteDataSourceImpl implements CatalogRemoteDataSource {
   CatalogRemoteDataSourceImpl({required this.dioClient});
 
   @override
-  Future<List<dynamic>> getProductVariants() async {
+  Future<List<dynamic>> getProductVariants({String? branchId}) async {
     try {
-      final response = await dioClient.dio.get(ApiEndpoints.products);
+      final url = (branchId != null && branchId.isNotEmpty)
+          ? '${ApiEndpoints.products}?branch_id=${Uri.encodeComponent(branchId)}'
+          : ApiEndpoints.products;
+      final response = await dioClient.dio.get(url);
       if (response.data != null && response.data['data'] != null) {
         return response.data['data'] as List<dynamic>;
       }
@@ -28,11 +31,13 @@ class CatalogRemoteDataSourceImpl implements CatalogRemoteDataSource {
   }
 
   @override
-  Future<List<dynamic>> getProductsByCategoryId(String categoryId) async {
+  Future<List<dynamic>> getProductsByCategoryId(String categoryId, {String? branchId}) async {
     try {
-      final response = await dioClient.dio.get(
-        '${ApiEndpoints.customerCategory}/$categoryId',
-      );
+      final base = '${ApiEndpoints.customerCategory}/$categoryId';
+      final url = (branchId != null && branchId.isNotEmpty)
+          ? '$base?branch_id=${Uri.encodeComponent(branchId)}'
+          : base;
+      final response = await dioClient.dio.get(url);
       if (response.data != null && response.data['data'] != null) {
         return response.data['data'] as List<dynamic>;
       }

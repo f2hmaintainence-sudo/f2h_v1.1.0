@@ -10,13 +10,18 @@ class CatalogRepositoryImpl implements CatalogRepository {
   CatalogRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<List<Product>> getProducts() async {
+  Future<List<Product>> getProducts({String? branchId}) async {
     final prefs = await SharedPreferences.getInstance();
+
+    // Cache key is branch-specific so each branch's stock is stored separately
+    final cacheKey = branchId != null && branchId.isNotEmpty
+        ? 'cached_products_v14_$branchId'
+        : 'cached_products_v14';
 
     // 1. Try to load from cache
     try {
       // Bumped cache key to cached_products_v14 to force reload with special pricing
-      final cachedData = prefs.getString('cached_products_v14');
+      final cachedData = prefs.getString(cacheKey);
       if (cachedData != null) {
         final List<dynamic> decoded = jsonDecode(cachedData);
         final cachedProducts = decoded
@@ -25,7 +30,7 @@ class CatalogRepositoryImpl implements CatalogRepository {
 
         if (cachedProducts.isNotEmpty) {
           // Trigger background refresh silently
-          _refreshProductsSilently(prefs);
+          _refreshProductsSilently(prefs, branchId: branchId, cacheKey: cacheKey);
           return cachedProducts;
         }
       }
@@ -34,23 +39,24 @@ class CatalogRepositoryImpl implements CatalogRepository {
     }
 
     // 2. Fallback to remote if cache empty
-    return await _fetchAndCacheProducts(prefs);
+    return await _fetchAndCacheProducts(prefs, branchId: branchId, cacheKey: cacheKey);
   }
 
-  Future<void> _refreshProductsSilently(SharedPreferences prefs) async {
+  Future<void> _refreshProductsSilently(SharedPreferences prefs, {String? branchId, String? cacheKey}) async {
     try {
-      await _fetchAndCacheProducts(prefs);
+      await _fetchAndCacheProducts(prefs, branchId: branchId, cacheKey: cacheKey);
     } catch (_) {} // Ignore background fetch errors
   }
 
-  Future<List<Product>> _fetchAndCacheProducts(SharedPreferences prefs) async {
+  Future<List<Product>> _fetchAndCacheProducts(SharedPreferences prefs, {String? branchId, String? cacheKey}) async {
     try {
-      final rawList = await remoteDataSource.getProductVariants();
+      final rawList = await remoteDataSource.getProductVariants(branchId: branchId);
       final products = _mapRawProducts(rawList);
 
       if (products.isNotEmpty) {
+        final key = cacheKey ?? 'cached_products_v14';
         final encoded = jsonEncode(products.map((p) => p.toJson()).toList());
-        await prefs.setString('cached_products_v14', encoded);
+        await prefs.setString(key, encoded);
       }
 
       return products;
@@ -61,10 +67,11 @@ class CatalogRepositoryImpl implements CatalogRepository {
   }
 
   @override
-  Future<List<Product>> getProductsByCategoryId(String categoryId) async {
+  Future<List<Product>> getProductsByCategoryId(String categoryId, {String? branchId}) async {
     try {
       final rawList = await remoteDataSource.getProductsByCategoryId(
         categoryId,
+        branchId: branchId,
       );
       return _mapRawProducts(rawList);
     } catch (e) {

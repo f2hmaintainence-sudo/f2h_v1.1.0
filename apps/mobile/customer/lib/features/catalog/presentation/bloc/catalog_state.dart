@@ -18,6 +18,7 @@ class CatalogLoaded extends CatalogState {
   final List<Map<String, dynamic>> categories;
   final String searchQuery;
   final bool isFiltering;
+  final String? branchId;
 
   const CatalogLoaded({
     required this.products,
@@ -25,10 +26,11 @@ class CatalogLoaded extends CatalogState {
     this.categories = const [],
     this.searchQuery = '',
     this.isFiltering = false,
+    this.branchId,
   });
 
   @override
-  List<Object?> get props => [products, filteredProducts, categories, searchQuery, isFiltering];
+  List<Object?> get props => [products, filteredProducts, categories, searchQuery, isFiltering, branchId];
 }
 
 class CatalogError extends CatalogState {

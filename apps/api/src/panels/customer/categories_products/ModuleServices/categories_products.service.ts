@@ -95,6 +95,25 @@ export class CategoriesProductsService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // RESOLVE WAREHOUSE for a given branch
+  // warehouses.branch_id is a direct FK; one active warehouse per branch.
+  // Returns null when branch is unknown — callers fall back to all-warehouse
+  // stock aggregation (safe, backward-compatible).
+  // ─────────────────────────────────────────────────────────────────────────
+  async resolveWarehouseId(branchId: string | null | undefined): Promise<string | null> {
+    if (!branchId) return null;
+    try {
+      const rows = await this.db.query(
+        `SELECT warehouse_id FROM warehouses WHERE branch_id = $1 AND is_active = true AND deleted_at IS NULL LIMIT 1`,
+        [branchId],
+      );
+      return rows?.[0]?.warehouse_id ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // GET CATEGORIES
   // Categories images → categories.image_path (categories/ folder)
   // ─────────────────────────────────────────────────────────────────────────
@@ -146,13 +165,27 @@ export class CategoriesProductsService {
   // Variant images  → product_images.storage_key (variants/ folder, variant_id FK)
   // Product fallback → products.image_path (products/ folder)
   // ─────────────────────────────────────────────────────────────────────────
-  async getProducts(customerId?: string | null) {
+  async getProducts(customerId?: string | null, warehouseId?: string | null) {
     const baseUrl =
       process.env.MOBILE_BACKEND_URL ||
       process.env.BACKEND_URL ||
       'http://localhost:5001';
 
     const ratingsMap = await this.buildRatingsMap();
+
+    // stock_balances subquery — scoped to warehouse when known, otherwise global
+    const stockSubquery = warehouseId
+      ? `SELECT product_variant_id,
+             COALESCE(SUM(available_quantity), 0) AS available_quantity,
+             COALESCE(MIN(low_stock_threshold), 0) AS low_stock_threshold,
+             BOOL_AND(COALESCE(is_out_of_stock, false)) AS is_out_of_stock
+           FROM stock_balances
+           WHERE warehouse_id = '${warehouseId.replace(/'/g, "''")}'`
+      : `SELECT product_variant_id,
+             COALESCE(SUM(available_quantity), 0) AS available_quantity,
+             COALESCE(MIN(low_stock_threshold), 0) AS low_stock_threshold,
+             BOOL_AND(COALESCE(is_out_of_stock, false)) AS is_out_of_stock
+           FROM stock_balances`;
 
     try {
       // Variant images are loaded exclusively from product_images, joined on variant_id.
@@ -203,12 +236,7 @@ export class CategoriesProductsService {
         LEFT JOIN products p ON pv.product_id = p.product_id
         LEFT JOIN categories c ON p.category_id = c.category_id
         LEFT JOIN (
-          SELECT
-            product_variant_id,
-            COALESCE(SUM(available_quantity), 0) AS available_quantity,
-            COALESCE(MIN(low_stock_threshold), 0) AS low_stock_threshold,
-            BOOL_AND(COALESCE(is_out_of_stock, false)) AS is_out_of_stock
-          FROM stock_balances
+          ${stockSubquery}
           GROUP BY product_variant_id
         ) sb ON sb.product_variant_id = pv.variant_id
         WHERE (pv.status = 'active' OR pv.status IS NULL)
@@ -250,13 +278,27 @@ export class CategoriesProductsService {
   // GET PRODUCTS BY CATEGORY ID
   // Same image rules as getProducts()
   // ─────────────────────────────────────────────────────────────────────────
-  async getProductsByCategoryId(categoryId: string, customerId?: string | null) {
+  async getProductsByCategoryId(categoryId: string, customerId?: string | null, warehouseId?: string | null) {
     const baseUrl =
       process.env.MOBILE_BACKEND_URL ||
       process.env.BACKEND_URL ||
       'http://localhost:5001';
 
     const ratingsMap = await this.buildRatingsMap();
+
+    // stock_balances subquery — scoped to warehouse when known, otherwise global
+    const stockSubquery = warehouseId
+      ? `SELECT product_variant_id,
+             COALESCE(SUM(available_quantity), 0) AS available_quantity,
+             COALESCE(MIN(low_stock_threshold), 0) AS low_stock_threshold,
+             BOOL_AND(COALESCE(is_out_of_stock, false)) AS is_out_of_stock
+           FROM stock_balances
+           WHERE warehouse_id = '${warehouseId.replace(/'/g, "''")}'`
+      : `SELECT product_variant_id,
+             COALESCE(SUM(available_quantity), 0) AS available_quantity,
+             COALESCE(MIN(low_stock_threshold), 0) AS low_stock_threshold,
+             BOOL_AND(COALESCE(is_out_of_stock, false)) AS is_out_of_stock
+           FROM stock_balances`;
 
     try {
       const query = `
@@ -304,12 +346,7 @@ export class CategoriesProductsService {
         LEFT JOIN products p ON pv.product_id = p.product_id
         LEFT JOIN categories c ON p.category_id = c.category_id
         LEFT JOIN (
-          SELECT
-            product_variant_id,
-            COALESCE(SUM(available_quantity), 0) AS available_quantity,
-            COALESCE(MIN(low_stock_threshold), 0) AS low_stock_threshold,
-            BOOL_AND(COALESCE(is_out_of_stock, false)) AS is_out_of_stock
-          FROM stock_balances
+          ${stockSubquery}
           GROUP BY product_variant_id
         ) sb ON sb.product_variant_id = pv.variant_id
         WHERE (pv.status = 'active' OR pv.status IS NULL)

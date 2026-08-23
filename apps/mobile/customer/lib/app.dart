@@ -10,6 +10,7 @@ import 'package:f2h_customer/core/widgets/popup_banner_widget.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/home_screen.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_screen.dart'; // Contains BrowseScreen
 import 'package:f2h_customer/features/subscription/presentation/screens/my_subscriptions_screen.dart'; // Contains SubsScreen
+import 'package:f2h_customer/features/profile/presentation/screens/profile_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
@@ -135,6 +136,15 @@ class _CustomerSessionGateState extends State<CustomerSessionGate> {
             context.read<NotificationsBloc>().add(LoadNotifications());
             context.read<SubscriptionBloc>().add(LoadSubscriptions());
             context.read<OrderHistoryBloc>().add(LoadOrderHistory());
+
+            String? branchId;
+            try {
+              final defaultAddr = state.addresses.firstWhere((a) => a.isDefault);
+              if (defaultAddr.branchId.isNotEmpty) {
+                branchId = defaultAddr.branchId;
+              }
+            } catch (_) {}
+            context.read<CatalogBloc>().add(LoadCatalog(branchId: branchId));
           }
         }
       },
@@ -297,12 +307,14 @@ class AppShellState extends State<AppShell> {
         HomeScreen(isNavVisible: _showNav),
         BrowseScreen(isNavVisible: _showNav),
         const SubsScreen(),
+        const ProfileScreen(),
       ];
 
   static const _tabs = [
     (Icons.home_outlined, Icons.home_rounded, 'Home'),
     (Icons.grid_view_outlined, Icons.grid_view_rounded, 'Shop'),
     (Icons.calendar_today_outlined, Icons.calendar_today_rounded, 'Subscribe'),
+    (Icons.person_outline_rounded, Icons.person_rounded, 'Profile'),
   ];
 
   @override

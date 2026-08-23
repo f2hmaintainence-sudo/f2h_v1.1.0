@@ -71,6 +71,17 @@ class _HomeScreenState extends State<HomeScreen>
     'Search "thick curd"...',
   ];
 
+  String? _getBranchId(BuildContext context) {
+    try {
+      final session = context.read<CustomerSessionCubit>().state;
+      final defaultAddr = session.addresses.firstWhere((a) => a.isDefault);
+      if (defaultAddr.branchId.isNotEmpty) {
+        return defaultAddr.branchId;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -78,9 +89,10 @@ class _HomeScreenState extends State<HomeScreen>
     // Trigger catalog, notifications, and popup banner load on startup
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        final branchId = _getBranchId(context);
         final state = context.read<CatalogBloc>().state;
         if (state is! CatalogLoaded && state is! CatalogLoading) {
-          context.read<CatalogBloc>().add(LoadCatalog());
+          context.read<CatalogBloc>().add(LoadCatalog(branchId: branchId));
         }
         final session = context.read<CustomerSessionCubit>().state;
         final customerId = session.profile?.customerId;
@@ -113,59 +125,78 @@ class _HomeScreenState extends State<HomeScreen>
     super.build(context); // Required for AutomaticKeepAliveClientMixin
     return Scaffold(
       backgroundColor: kBg,
-      body: CartBarScrollScope(
-        child: Stack(
-          children: [
-            AppRefreshIndicator(
-              onRefresh: () async {
-                context.read<CatalogBloc>().add(LoadCatalog());
-                final session = context.read<CustomerSessionCubit>().state;
-                final customerId = session.profile?.customerId;
-                if (customerId != null) {
-                  context.read<CartBloc>().add(LoadCartEvent(customerId));
-                  context.read<NotificationsBloc>().add(LoadNotifications());
-                }
+      body: BlocListener<CustomerSessionCubit, CustomerSessionState>(
+        listenWhen: (prev, curr) {
+          final prevBranch = prev.addresses
+              .where((a) => a.isDefault)
+              .map((a) => a.branchId)
+              .firstOrNull;
+          final currBranch = curr.addresses
+              .where((a) => a.isDefault)
+              .map((a) => a.branchId)
+              .firstOrNull;
+          return prevBranch != currBranch;
+        },
+        listener: (context, sessionState) {
+          final branchId = _getBranchId(context);
+          context.read<CatalogBloc>().add(LoadCatalog(branchId: branchId));
+        },
+        child: CartBarScrollScope(
+          child: Stack(
+            children: [
+              AppRefreshIndicator(
+                onRefresh: () async {
+                  final branchId = _getBranchId(context);
+                  context.read<CatalogBloc>().add(LoadCatalog(branchId: branchId));
+                  final session = context.read<CustomerSessionCubit>().state;
+                  final customerId = session.profile?.customerId;
+                  if (customerId != null) {
+                    context.read<CartBloc>().add(LoadCartEvent(customerId));
+                    context.read<NotificationsBloc>().add(LoadNotifications());
+                  }
 
-                await Future.wait([
-                  context.read<CatalogBloc>().stream.firstWhere(
-                    (s) => s is CatalogLoaded || s is CatalogError,
-                  ),
-                  if (customerId != null) ...[
-                    context.read<CartBloc>().stream.firstWhere(
-                      (s) => s is CartLoadedState || s is CartErrorState,
+                  await Future.wait([
+                    context.read<CatalogBloc>().stream.firstWhere(
+                      (s) => s is CatalogLoaded || s is CatalogError,
                     ),
-                    context.read<NotificationsBloc>().stream.firstWhere(
-                      (s) =>
-                          s is NotificationsLoaded || s is NotificationsError,
+                    if (customerId != null) ...[
+                      context.read<CartBloc>().stream.firstWhere(
+                        (s) => s is CartLoadedState || s is CartErrorState,
+                      ),
+                      context.read<NotificationsBloc>().stream.firstWhere(
+                        (s) =>
+                            s is NotificationsLoaded || s is NotificationsError,
+                      ),
+                    ],
+                  ]);
+                },
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    // 1. Sticky App Header with Collapsing Search Bar & Branch Info
+                    SliverPersistentHeader(
+                      pinned: true,
+                      delegate: HomeHeaderDelegate(
+                        topPadding: MediaQuery.of(context).padding.top,
+                        searchHint: _searchHints[_searchIndex],
+                        branchWidget: _branchInfoChip(context),
+                        onSearchTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  const BrowseScreen(initialCategory: 'All'),
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  ],
-                ]);
-              },
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  // 1. Sticky App Header with Collapsing Search Bar
-                  SliverPersistentHeader(
-                    pinned: true,
-                    delegate: HomeHeaderDelegate(
-                      topPadding: MediaQuery.of(context).padding.top,
-                      searchHint: _searchHints[_searchIndex],
-                      notifBtn: _notifBtn(),
-                      profileBtn: _profileBtn(),
-                      onSearchTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                const BrowseScreen(initialCategory: 'All'),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
 
-                  // 2. Category Shortcuts Row
-                  SliverToBoxAdapter(child: _categoryShortcuts()),
+                    // 2. Delivery Address Prompt (if no default address/branch set)
+                    SliverToBoxAdapter(child: _noAddressPromptCard(context)),
+
+                    // 3. Category Shortcuts Row
+                    SliverToBoxAdapter(child: _categoryShortcuts()),
 
                   // 3. Top Banner (above Subscription Products)
                   const SliverToBoxAdapter(child: PromoBanner()),
@@ -254,7 +285,7 @@ class _HomeScreenState extends State<HomeScreen>
                               child: TextButton.icon(
                                 onPressed: () => context
                                     .read<CatalogBloc>()
-                                    .add(LoadCatalog()),
+                                    .add(LoadCatalog(branchId: _getBranchId(context))),
                                 icon: const Icon(Icons.refresh),
                                 label: const Text('Retry products'),
                               ),
@@ -275,7 +306,7 @@ class _HomeScreenState extends State<HomeScreen>
                               child: TextButton.icon(
                                 onPressed: () => context
                                     .read<CatalogBloc>()
-                                    .add(LoadCatalog()),
+                                    .add(LoadCatalog(branchId: _getBranchId(context))),
                                 icon: const Icon(Icons.refresh),
                                 label: const Text('Retry products'),
                               ),
@@ -466,224 +497,219 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _notifBtn() {
-    return BlocBuilder<NotificationsBloc, NotificationsState>(
-      builder: (context, state) {
-        int unreadCount = 0;
-        if (state is NotificationsLoaded) {
-          unreadCount = state.unreadCount;
-        }
-        return GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-            );
-          },
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.06),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.notifications_none_rounded,
-                  color: Color(0xFF16653A),
-                  size: 20,
-                ),
-              ),
-              if (unreadCount > 0)
-                Positioned(
-                  top: -2,
-                  right: -2,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 16,
-                      minHeight: 16,
-                    ),
-                    child: Center(
-                      child: Text(
-                        unreadCount > 99 ? '99+' : '$unreadCount',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 8,
-                          fontWeight: FontWeight.bold,
-                          height: 1.0,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _cartBtn() {
-    return BlocBuilder<CartBloc, CartState>(
-      builder: (context, state) {
-        final items = context.read<CartBloc>().currentItems;
-        int count = 0;
-        for (final item in items) {
-          if (item.purchaseType == 'subscription') {
-            count += 1;
-          } else {
-            count += item.quantity ?? 1;
+  Widget _branchInfoChip(BuildContext context) {
+    return BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
+      builder: (context, session) {
+        AddressModel? defaultAddr;
+        try {
+          defaultAddr = session.addresses.firstWhere((a) => a.isDefault);
+        } catch (_) {
+          if (session.addresses.isNotEmpty) {
+            defaultAddr = session.addresses.first;
           }
         }
+
+        String locationLabel = 'Set Location';
+        String? branchName;
+        final branchId = defaultAddr?.branchId;
+        if (branchId != null && branchId.isNotEmpty) {
+          final matchingBranch = session.branches.firstWhere(
+            (b) => (b is Map && (b['branch_id'] == branchId || b['id']?.toString() == branchId)),
+            orElse: () => null,
+          );
+          if (matchingBranch != null && matchingBranch is Map) {
+            branchName = matchingBranch['branch_name']?.toString() ?? matchingBranch['name']?.toString();
+          }
+        }
+
+        if (defaultAddr != null) {
+          if (defaultAddr.area.isNotEmpty) {
+            locationLabel = defaultAddr.area;
+          } else if (defaultAddr.city.isNotEmpty) {
+            locationLabel = defaultAddr.city;
+          } else if (branchName != null && branchName.isNotEmpty) {
+            locationLabel = branchName;
+          }
+        }
+
+        final bool hasBranch = branchId != null && branchId.isNotEmpty;
+
         return GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CartScreen()),
-            );
+          onTap: () async {
+            final chosen = await AddressSelectorDrawer.show(context);
+            if (chosen != null && context.mounted) {
+              context.read<CustomerSessionCubit>().refreshSilently();
+              if (chosen.branchId.isNotEmpty) {
+                context.read<CatalogBloc>().add(LoadCatalog(branchId: chosen.branchId));
+              }
+            }
           },
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              const Icon(
-                Icons.shopping_cart_outlined,
-                color: Color(0xFF16653A),
-                size: 24,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            constraints: const BoxConstraints(maxWidth: 160),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFF16653A).withValues(alpha: 0.15),
+                width: 1.0,
               ),
-              if (count > 0)
-                Positioned(
-                  top: -6,
-                  right: -6,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      count > 99 ? '99+' : '$count',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w900,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  hasBranch ? Icons.location_on_rounded : Icons.add_location_alt_rounded,
+                  color: const Color(0xFF16653A),
+                  size: 15,
+                ),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        locationLabel,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF16653A),
+                          height: 1.1,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
+                      if (branchName != null && branchName.isNotEmpty && branchName != locationLabel)
+                        Text(
+                          branchName,
+                          style: const TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w600,
+                            color: kTextSub,
+                            height: 1.1,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
                   ),
                 ),
-            ],
+                const SizedBox(width: 2),
+                const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: Color(0xFF16653A),
+                  size: 14,
+                ),
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  Widget _profileBtn() {
+  Widget _noAddressPromptCard(BuildContext context) {
     return BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
-      builder: (context, sessionState) {
-        final profile = sessionState.profile;
-        final isVip = profile?.isMember == true;
-        final isAuthenticated = profile != null;
+      builder: (context, session) {
+        final hasDefaultWithBranch = session.addresses.any(
+          (a) => a.isDefault && a.branchId.isNotEmpty,
+        );
+        if (hasDefaultWithBranch) return const SizedBox.shrink();
 
-        // First letter of name (or '?' as fallback)
-        final initial = (isAuthenticated && profile!.name.isNotEmpty)
-            ? profile.name[0].toUpperCase()
-            : '?';
-
-        return GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ProfileScreen()),
-            );
-          },
-          child: Stack(
-            clipBehavior: Clip.none,
+        return Container(
+          margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
             children: [
-              // ── Outer ring (VIP: gold gradient, normal: white) ──────────
               Container(
-                width: 38,
-                height: 38,
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  gradient: isVip
-                      ? const LinearGradient(
-                          colors: [Color(0xFFFFD700), Color(0xFFB8860B)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                      : null,
-                  color: isVip ? null : Colors.white,
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
                   shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: isVip
-                          ? const Color(0xFFFFD700).withValues(alpha: 0.45)
-                          : Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
+                ),
+                child: const Icon(
+                  Icons.location_on_rounded,
+                  color: Color(0xFFD97706),
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Select Delivery Address',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF92400E),
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Set your delivery location to view accurate stock & delivery times.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFFB45309),
+                        height: 1.2,
+                      ),
                     ),
                   ],
                 ),
-                // ── Inner circle ─────────────────────────────────────────
-                padding: isVip ? const EdgeInsets.all(2.5) : EdgeInsets.zero,
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () async {
+                  final chosen = await AddressSelectorDrawer.show(context);
+                  if (chosen != null && context.mounted) {
+                    context.read<CustomerSessionCubit>().refreshSilently();
+                    if (chosen.branchId.isNotEmpty) {
+                      context.read<CatalogBloc>().add(LoadCatalog(branchId: chosen.branchId));
+                    }
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD97706),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Center(
-                    child: isAuthenticated
-                        ? Text(
-                            initial,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              color: isVip
-                                  ? const Color(0xFF133220)
-                                  : const Color(0xFF16653A),
-                              height: 1.0,
-                            ),
-                          )
-                        : const Icon(
-                            Icons.person_outline_rounded,
-                            color: Color(0xFF16653A),
-                            size: 20,
-                          ),
+                  elevation: 0,
+                ),
+                child: const Text(
+                  'Set',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
-
-              // ── Gold star badge (VIP only) ──────────────────────────
-              if (isVip)
-                Positioned(
-                  top: -2,
-                  right: -2,
-                  child: Container(
-                    padding: const EdgeInsets.all(2.5),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFFD700),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.star_rounded,
-                      size: 9,
-                      color: Color(0xFF0F2015),
-                    ),
-                  ),
-                ),
             ],
           ),
         );
@@ -1909,15 +1935,13 @@ class _InfiniteAutoScrollListState extends State<InfiniteAutoScrollList> {
 class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
   final double topPadding;
   final String searchHint;
-  final Widget notifBtn;
-  final Widget profileBtn;
+  final Widget branchWidget;
   final VoidCallback onSearchTap;
 
   HomeHeaderDelegate({
     required this.topPadding,
     required this.searchHint,
-    required this.notifBtn,
-    required this.profileBtn,
+    required this.branchWidget,
     required this.onSearchTap,
   });
 
@@ -1985,7 +2009,7 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
             ),
           ),
 
-          // 4. Top Row (App Logo, Title, Actions) - fades out
+          // 4. Top Row (App Logo, Title, Branch Info) - fades out
           Positioned(
             top: topPadding + 10,
             left: 16,
@@ -2025,9 +2049,7 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
                     ),
                   ),
                   const Spacer(),
-                  notifBtn,
-                  const SizedBox(width: 12),
-                  profileBtn,
+                  branchWidget,
                 ],
               ),
             ),
@@ -2104,8 +2126,7 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(covariant HomeHeaderDelegate oldDelegate) {
     return oldDelegate.searchHint != searchHint ||
-        oldDelegate.notifBtn != notifBtn ||
-        oldDelegate.profileBtn != profileBtn ||
+        oldDelegate.branchWidget != branchWidget ||
         oldDelegate.topPadding != topPadding;
   }
 }
