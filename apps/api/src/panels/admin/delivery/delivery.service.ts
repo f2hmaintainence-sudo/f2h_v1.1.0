@@ -575,21 +575,17 @@ export class DeliveryManagementService {
    * Returns the last-known GPS position for all delivery partners that have
    * ever sent a location update. Used by the admin tracking page on initial
    * load so every partner marker appears on the map before WebSocket takes over.
-   */
-  /**
-   * Active delivery partners with their current availability state.
-   * to act on them in one payload.
+   * Comprehensive Delivery Partner Availability, Capacity & Branch Requirement Calculation.
    *
-   * Kept separate from `getPartners` deliberately: that list is a roster and is
-   * paginated, whereas this is an operational view — who is on shift right now,
-   * where they are, what they are carrying, and whether they are actually
-   * supposed to be working today.
-   *
-   * The leave lookups are lateral joins rather than a second round trip so a
-   * partner who is online *while on approved leave* is visible immediately;
-   * that combination is the one worth flagging.
+   * Calculates:
+   * - Partner status: ONLINE, OFFLINE, or ON_LEAVE
+   * - Partner max_daily_orders, today_assigned_addresses, remaining_capacity (0 for OFFLINE and ON_LEAVE)
+   * - Current delivery run and status per partner
+   * - Branch-wise total available partners, total capacity, used capacity, remaining capacity
+   * - Branch-wise today's total delivery addresses vs available capacity
+   * - Requirement status: "Sufficient", "Near Capacity", or "Extra Delivery Partner Required" (+ extra capacity & partners needed)
    */
-  async getOnlinePartners(branchId?: string) {
+  async getPartnerAvailabilityOverview(branchId?: string) {
     try {
       const params: any[] = [];
       let branchFilter = '';
@@ -598,7 +594,8 @@ export class DeliveryManagementService {
         branchFilter = `AND dp.branch_id = $${params.length}`;
       }
 
-      const sql = `
+      // 1. Fetch partner records joined with users, branches, today's leave, today's runs & stats
+      const partnersSql = `
         SELECT
           dp.delivery_partner_id AS id,
           COALESCE(NULLIF(TRIM(dp.full_name), ''),
@@ -612,11 +609,14 @@ export class DeliveryManagementService {
           dp.current_lat, dp.current_lng, dp.last_location_at,
           EXTRACT(EPOCH FROM (NOW() - dp.last_location_at))::int AS location_age_seconds,
           dp.vehicle_type, dp.vehicle_number,
-          dp.average_rating, dp.total_deliveries, dp.total_runs, dp.max_daily_orders,
+          dp.average_rating, dp.total_deliveries, dp.total_runs,
+          COALESCE(dp.max_daily_orders, 50)::int             AS max_daily_orders,
           dp.daily_salary,
           dp.joined_date AS joining_date,
-          dp.branch_id, b.branch_name,
+          dp.branch_id,
+          COALESCE(b.branch_name, 'Main Branch')             AS branch_name,
           dp.breakdown_reason, dp.breakdown_reported_at,
+          -- Approved leave covering today
           lv.id            AS leave_id,
           lv.leave_type    AS leave_type,
           lv.leave_date    AS leave_from,
@@ -624,14 +624,21 @@ export class DeliveryManagementService {
           lv.status        AS leave_status,
           lv.half_day_shift,
           lv.reason        AS leave_reason,
-          COALESCE(pend.pending_count, 0)::int  AS pending_leave_requests,
-          COALESCE(pend_list.pending_leaves, '[]'::json) AS pending_leaves,
-          COALESCE(upc_list.upcoming_leaves, '[]'::json) AS upcoming_leaves,
+          COALESCE(pend.pending_count, 0)::int               AS pending_leave_requests,
+          COALESCE(pend_list.pending_leaves, '[]'::json)     AS pending_leaves,
+          COALESCE(upc_list.upcoming_leaves, '[]'::json)     AS upcoming_leaves,
           upc.next_leave_date,
+          -- Latest active run today
           run.run_id, run.run_status, run.slot,
-          COALESCE(run.assigned_stops, 0)::int  AS assigned_stops,
-          COALESCE(run.completed_stops, 0)::int AS completed_stops,
-          COALESCE(run.failed_stops, 0)::int    AS failed_stops
+          COALESCE(run.assigned_stops, 0)::int               AS latest_run_assigned_stops,
+          COALESCE(run.completed_stops, 0)::int              AS latest_run_completed_stops,
+          COALESCE(run.failed_stops, 0)::int                 AS latest_run_failed_stops,
+          -- Aggregated run stops today
+          COALESCE(today_runs.total_run_addresses, 0)::int   AS today_run_addresses,
+          COALESCE(today_runs.completed_run_addresses, 0)::int AS today_completed_addresses,
+          COALESCE(today_runs.failed_run_addresses, 0)::int  AS today_failed_addresses,
+          -- Direct assigned orders today not part of runs
+          COALESCE(direct_orders.direct_order_count, 0)::int AS direct_assigned_orders
         FROM delivery_partners dp
         LEFT JOIN users u    ON u.user_id   = dp.delivery_partner_id
         LEFT JOIN branches b ON b.branch_id = dp.branch_id
@@ -699,6 +706,7 @@ export class DeliveryManagementService {
              AND LOWER(l.status) IN ('approved', 'pending')
              AND l.leave_date > CURRENT_DATE
         ) upc ON TRUE
+        -- Latest Run for partner today
         LEFT JOIN LATERAL (
           SELECT r.run_id, r.status AS run_status, r.delivery_slot AS slot,
                  r.total_addresses AS assigned_stops,
@@ -710,60 +718,278 @@ export class DeliveryManagementService {
              AND r.deleted_at IS NULL
            ORDER BY r.created_at DESC LIMIT 1
         ) run ON TRUE
+        -- Sum of all run addresses for partner today
+        LEFT JOIN LATERAL (
+          SELECT
+            COALESCE(SUM(r.total_addresses), 0)::int AS total_run_addresses,
+            COALESCE(SUM(r.completed_addresses), 0)::int AS completed_run_addresses,
+            COALESCE(SUM(r.failed_addresses), 0)::int AS failed_run_addresses
+          FROM delivery_runs r
+          WHERE r.delivery_partner_id = dp.delivery_partner_id
+            AND r.run_date = CURRENT_DATE
+            AND r.deleted_at IS NULL
+            AND r.status != 'cancelled'
+        ) today_runs ON TRUE
+        -- Direct assigned orders today not inside a delivery_run
+        LEFT JOIN LATERAL (
+          SELECT COUNT(DISTINCT o.order_id)::int AS direct_order_count
+          FROM orders o
+          WHERE o.delivery_partner_id = dp.delivery_partner_id
+            AND DATE(o.scheduled_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
+            AND o.status NOT IN ('cancelled', 'failed')
+            AND o.delivery_run_id IS NULL
+        ) direct_orders ON TRUE
         WHERE dp.deleted_at IS NULL
           AND dp.is_active = true
           ${branchFilter}
-        ORDER BY dp.last_location_at DESC NULLS LAST
+        ORDER BY dp.branch_id ASC, dp.is_online DESC, dp.last_location_at DESC NULLS LAST
       `;
 
-      const rows = (await this.db.query(sql, params)) || [];
+      const partnerRows = (await this.db.query(partnersSql, params)) || [];
+
+      // 2. Fetch today's branch delivery demands (scheduled delivery orders/addresses)
+      const branchDemandSql = `
+        SELECT
+          b.branch_id,
+          b.branch_name,
+          COUNT(DISTINCT o.order_id)::int AS today_total_orders,
+          COUNT(DISTINCT COALESCE(o.address_id::text, o.order_id))::int AS today_total_addresses,
+          COUNT(DISTINCT CASE WHEN (o.delivery_partner_id IS NOT NULL OR o.delivery_run_id IS NOT NULL) THEN o.order_id END)::int AS today_assigned_orders,
+          COUNT(DISTINCT CASE WHEN (o.delivery_partner_id IS NULL AND o.delivery_run_id IS NULL) THEN o.order_id END)::int AS today_unassigned_orders
+        FROM branches b
+        LEFT JOIN orders o ON o.branch_id = b.branch_id
+          AND DATE(o.scheduled_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
+          AND o.status NOT IN ('cancelled', 'refunded')
+        WHERE b.deleted_at IS NULL
+        ${branchId ? 'AND b.branch_id = $1' : ''}
+        GROUP BY b.branch_id, b.branch_name
+        ORDER BY b.branch_name ASC
+      `;
+
+      const demandRows = (await this.db.query(branchDemandSql, branchId ? [branchId] : [])) || [];
+      const demandMap = new Map<string, any>();
+      for (const d of demandRows) {
+        demandMap.set(d.branch_id, d);
+      }
 
       const STALE_AFTER_SECONDS = 300;
 
-      const partners = rows.map((r: any) => ({
-        ...r,
-        average_rating: r.average_rating != null ? Number(r.average_rating) : null,
-        daily_salary: r.daily_salary != null ? Number(r.daily_salary) : null,
-        current_lat: r.current_lat != null ? Number(r.current_lat) : null,
-        current_lng: r.current_lng != null ? Number(r.current_lng) : null,
-        is_location_stale:
-          r.location_age_seconds == null ||
-          r.location_age_seconds > STALE_AFTER_SECONDS,
-        on_leave_today: Boolean(r.leave_id),
-        today_leave_details: r.leave_id
-          ? {
-              id: r.leave_id,
-              leave_type: r.leave_type,
-              leave_from: r.leave_from,
-              leave_to: r.leave_to,
-              half_day_shift: r.half_day_shift,
-              reason: r.leave_reason,
-              status: r.leave_status,
-            }
-          : null,
-        has_pending_leave: Number(r.pending_leave_requests) > 0,
-        pending_leaves: Array.isArray(r.pending_leaves) ? r.pending_leaves : [],
-        upcoming_leaves: Array.isArray(r.upcoming_leaves) ? r.upcoming_leaves : [],
-      }));
+      // 3. Transform and calculate partner-wise availability and capacity metrics
+      const partners = partnerRows.map((r: any) => {
+        const onLeaveToday = Boolean(r.leave_id);
+        const isOnline = Boolean(r.is_online && r.duty_status !== 'off_duty');
+        
+        let status: 'ONLINE' | 'OFFLINE' | 'ON_LEAVE' = 'OFFLINE';
+        if (onLeaveToday) {
+          status = 'ON_LEAVE';
+        } else if (isOnline) {
+          status = 'ONLINE';
+        } else {
+          status = 'OFFLINE';
+        }
+
+        const maxDailyOrders = Number(r.max_daily_orders || 50);
+        // Total today assigned addresses combines delivery run addresses + direct orders
+        const todayAssignedAddresses = Math.max(
+          Number(r.today_run_addresses || 0) + Number(r.direct_assigned_orders || 0),
+          Number(r.latest_run_assigned_stops || 0),
+        );
+        const todayCompletedAddresses = Number(r.today_completed_addresses || r.latest_run_completed_stops || 0);
+        const todayFailedAddresses = Number(r.today_failed_addresses || r.latest_run_failed_stops || 0);
+
+        // Remaining Capacity Calculation Rule:
+        // ONLINE: max_daily_orders - today_assigned_addresses
+        // OFFLINE and ON_LEAVE: strictly 0
+        let remainingCapacity = 0;
+        if (status === 'ONLINE') {
+          remainingCapacity = Math.max(0, maxDailyOrders - todayAssignedAddresses);
+        }
+
+        const isAvailableForAssignment = status === 'ONLINE' && remainingCapacity > 0;
+        const utilizationRate = maxDailyOrders > 0
+          ? Number(((todayAssignedAddresses / maxDailyOrders) * 100).toFixed(1))
+          : 0;
+
+        return {
+          id: r.id,
+          full_name: r.full_name,
+          phone: r.phone,
+          email: r.email,
+          profile_photo_url: r.profile_photo_url,
+          branch_id: r.branch_id,
+          branch_name: r.branch_name,
+          status, // 'ONLINE' | 'OFFLINE' | 'ON_LEAVE'
+          is_online: status === 'ONLINE',
+          is_active: Boolean(r.is_active),
+          is_available: Boolean(r.is_available),
+          is_available_for_assignment: isAvailableForAssignment,
+          max_daily_orders: maxDailyOrders,
+          today_assigned_addresses: todayAssignedAddresses,
+          today_completed_addresses: todayCompletedAddresses,
+          today_failed_addresses: todayFailedAddresses,
+          used_capacity: todayAssignedAddresses,
+          remaining_capacity: remainingCapacity,
+          utilization_rate: utilizationRate,
+          current_run: r.run_id
+            ? {
+                run_id: r.run_id,
+                run_status: r.run_status,
+                slot: r.slot,
+                assigned_stops: r.latest_run_assigned_stops,
+                completed_stops: r.latest_run_completed_stops,
+                failed_stops: r.latest_run_failed_stops,
+              }
+            : null,
+          vehicle_type: r.vehicle_type,
+          vehicle_number: r.vehicle_number,
+          average_rating: r.average_rating != null ? Number(r.average_rating) : null,
+          daily_salary: r.daily_salary != null ? Number(r.daily_salary) : null,
+          current_lat: r.current_lat != null ? Number(r.current_lat) : null,
+          current_lng: r.current_lng != null ? Number(r.current_lng) : null,
+          last_location_at: r.last_location_at,
+          is_location_stale:
+            r.location_age_seconds == null ||
+            r.location_age_seconds > STALE_AFTER_SECONDS,
+          on_leave_today: onLeaveToday,
+          today_leave_details: r.leave_id
+            ? {
+                id: r.leave_id,
+                leave_type: r.leave_type,
+                leave_from: r.leave_from,
+                leave_to: r.leave_to,
+                half_day_shift: r.half_day_shift,
+                reason: r.leave_reason,
+                status: r.leave_status,
+              }
+            : null,
+          has_pending_leave: Number(r.pending_leave_requests) > 0,
+          pending_leave_requests: Number(r.pending_leave_requests),
+          pending_leaves: Array.isArray(r.pending_leaves) ? r.pending_leaves : [],
+          upcoming_leaves: Array.isArray(r.upcoming_leaves) ? r.upcoming_leaves : [],
+        };
+      });
+
+      // 4. Calculate Branch-Wise Summaries
+      // Group partners by branch
+      const branchPartnerMap = new Map<string, typeof partners>();
+      for (const p of partners) {
+        const bId = p.branch_id || 'unassigned';
+        if (!branchPartnerMap.has(bId)) {
+          branchPartnerMap.set(bId, []);
+        }
+        branchPartnerMap.get(bId)!.push(p);
+      }
+
+      // Collect all branch IDs from demands and partners
+      const allBranchIds = new Set<string>([
+        ...Array.from(demandMap.keys()),
+        ...Array.from(branchPartnerMap.keys()),
+      ]);
+
+      const branchesSummary: any[] = [];
+
+      for (const bId of allBranchIds) {
+        const bDemand = demandMap.get(bId);
+        const bPartners = branchPartnerMap.get(bId) || [];
+        const branchName = bDemand?.branch_name || bPartners[0]?.branch_name || (bId === 'unassigned' ? 'Unassigned' : bId);
+
+        const totalPartners = bPartners.length;
+        const onlinePartners = bPartners.filter((p) => p.status === 'ONLINE').length;
+        const offlinePartners = bPartners.filter((p) => p.status === 'OFFLINE').length;
+        const onLeavePartners = bPartners.filter((p) => p.status === 'ON_LEAVE').length;
+        const availablePartners = bPartners.filter((p) => p.is_available_for_assignment).length;
+
+        const totalCapacity = bPartners.reduce((acc, p) => acc + p.max_daily_orders, 0);
+        const totalUsedCapacity = bPartners.reduce((acc, p) => acc + p.used_capacity, 0);
+        const totalAvailableCapacity = bPartners.reduce((acc, p) => acc + p.remaining_capacity, 0);
+
+        const todayTotalDeliveryAddresses = Number(bDemand?.today_total_addresses || bDemand?.today_total_orders || 0);
+        const todayAssignedOrders = Number(bDemand?.today_assigned_orders || totalUsedCapacity);
+        const todayUnassignedOrders = Number(bDemand?.today_unassigned_orders || Math.max(0, todayTotalDeliveryAddresses - todayAssignedOrders));
+
+        // Requirement status calculation:
+        // If available capacity < unassigned orders to deliver today -> Extra Delivery Partner Required
+        // If available capacity is tight (< 20% buffer or used > 80%) -> Near Capacity
+        // Else -> Sufficient
+        let requirementStatus: 'Sufficient' | 'Near Capacity' | 'Extra Delivery Partner Required' = 'Sufficient';
+        let extraCapacityNeeded = 0;
+        let extraPartnersNeeded = 0;
+
+        if (totalAvailableCapacity < todayUnassignedOrders) {
+          requirementStatus = 'Extra Delivery Partner Required';
+          extraCapacityNeeded = todayUnassignedOrders - totalAvailableCapacity;
+          extraPartnersNeeded = Math.max(1, Math.ceil(extraCapacityNeeded / 50));
+        } else if (
+          todayUnassignedOrders > 0 &&
+          (totalAvailableCapacity <= todayUnassignedOrders * 1.25 ||
+           (totalUsedCapacity + todayUnassignedOrders) >= totalCapacity * 0.85)
+        ) {
+          requirementStatus = 'Near Capacity';
+        } else if (onlinePartners === 0 && todayTotalDeliveryAddresses > 0) {
+          requirementStatus = 'Extra Delivery Partner Required';
+          extraCapacityNeeded = todayTotalDeliveryAddresses;
+          extraPartnersNeeded = Math.max(1, Math.ceil(extraCapacityNeeded / 50));
+        }
+
+        branchesSummary.push({
+          branch_id: bId,
+          branch_name: branchName,
+          total_partners: totalPartners,
+          online_partners: onlinePartners,
+          offline_partners: offlinePartners,
+          on_leave_partners: onLeavePartners,
+          available_partners_count: availablePartners,
+          total_capacity: totalCapacity,
+          used_capacity: totalUsedCapacity,
+          remaining_capacity: totalAvailableCapacity,
+          available_delivery_capacity: totalAvailableCapacity,
+          today_total_delivery_addresses: todayTotalDeliveryAddresses,
+          today_assigned_orders: todayAssignedOrders,
+          today_unassigned_orders: todayUnassignedOrders,
+          requirement_status: requirementStatus,
+          is_extra_required: requirementStatus === 'Extra Delivery Partner Required',
+          extra_capacity_needed: extraCapacityNeeded,
+          extra_partners_needed: extraPartnersNeeded,
+        });
+      }
+
+      // 5. Network-wide overall summary
+      const overallSummary = {
+        total_partners: partners.length,
+        total_online: partners.filter((p) => p.status === 'ONLINE').length,
+        total_offline: partners.filter((p) => p.status === 'OFFLINE').length,
+        total_on_leave: partners.filter((p) => p.status === 'ON_LEAVE').length,
+        total_available_partners: partners.filter((p) => p.is_available_for_assignment).length,
+        total_capacity: partners.reduce((acc, p) => acc + p.max_daily_orders, 0),
+        total_used_capacity: partners.reduce((acc, p) => acc + p.used_capacity, 0),
+        total_available_capacity: partners.reduce((acc, p) => acc + p.remaining_capacity, 0),
+        total_today_addresses: branchesSummary.reduce((acc, b) => acc + b.today_total_delivery_addresses, 0),
+        total_unassigned_orders: branchesSummary.reduce((acc, b) => acc + b.today_unassigned_orders, 0),
+        branches_requiring_extra_partners: branchesSummary.filter((b) => b.is_extra_required).length,
+        total_extra_partners_needed: branchesSummary.reduce((acc, b) => acc + b.extra_partners_needed, 0),
+      };
 
       return {
         status: true,
-        data: partners,
-        summary: {
-          total_online: partners.filter((p) => p.is_online).length,
-          on_duty: partners.filter((p) => p.duty_status === 'on_duty').length,
-          available: partners.filter((p) => p.is_available).length,
-          online_while_on_leave: partners.filter((p) => p.on_leave_today).length,
-          with_pending_leave: partners.filter((p) => p.has_pending_leave).length,
-          stale_location: partners.filter((p) => p.is_location_stale).length,
-        },
+        data: partners, // Kept array at data for backward compatibility with existing components
+        partners,
+        branches_summary: branchesSummary,
+        overall_summary: overallSummary,
+        summary: overallSummary,
       };
     } catch (error) {
-      this.developer.error('getOnlinePartners error', { error });
+      this.developer.error('getPartnerAvailabilityOverview error', { error });
       throw new InternalServerErrorException(
-        'Failed to retrieve partner availability',
+        'Failed to calculate delivery partner availability and capacity',
       );
     }
+  }
+
+  /**
+   * Active partners and their current availability (delegates to getPartnerAvailabilityOverview)
+   */
+  async getOnlinePartners(branchId?: string) {
+    return this.getPartnerAvailabilityOverview(branchId);
   }
 
   async getLivePartnerPositions(branchId?: string) {

@@ -107,6 +107,16 @@ export class DeliveryManagementController {
    * declaration order, so a literal segment registered after the parameterised
    * one would be swallowed by it and resolve as an id lookup for "online".
    */
+  @Get('partner-availability')
+  async getPartnerAvailability(@Query('branch_id') branchId?: string) {
+    return this.deliveryService.getPartnerAvailabilityOverview(branchId);
+  }
+
+  @Get('partners/availability')
+  async getPartnersAvailability(@Query('branch_id') branchId?: string) {
+    return this.deliveryService.getPartnerAvailabilityOverview(branchId);
+  }
+
   @Get('partners/online')
   async getOnlinePartners(@Query('branch_id') branchId?: string) {
     return this.deliveryService.getOnlinePartners(branchId);
