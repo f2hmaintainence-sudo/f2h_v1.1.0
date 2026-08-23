@@ -205,7 +205,7 @@ class ReferralInviteCard extends StatelessWidget {
               ),
               const SizedBox(height: 3),
               const Text(
-                'Invite friends, earn ₹50 each',
+                'Invite friends, earn ₹100 each',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -221,9 +221,8 @@ class ReferralInviteCard extends StatelessWidget {
                 spacing: 6,
                 runSpacing: 6,
                 children: const [
-                  _RewardPill(label: '₹50 for you'),
-                  _RewardPill(label: '₹50 for them'),
-                  _RewardPill(label: 'On first order'),
+                  _RewardPill(label: '₹100 for you'),
+                  _RewardPill(label: 'On first order delivered'),
                 ],
               ),
             ],
@@ -415,7 +414,6 @@ class ReferralInviteCard extends StatelessWidget {
   static Future<void> _shareCode(BuildContext context, String code) async {
     final message =
         'Your F2H Invite is Ready\n\n'
-        'Get ₹100 on your first order!\n'
         'Fresh farm products, delivered to your doorstep.\n\n'
         'Invite Code: $code\n'
         'https://f2h.app.link/$code\n\n'

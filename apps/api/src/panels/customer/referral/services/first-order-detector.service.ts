@@ -6,7 +6,7 @@ export class FirstOrderDetectorService {
   constructor(private readonly dataService: DataService) {}
 
   /**
-   * Detects if an order is the customer's first delivered order.
+   * Detects if an order is the customer's first delivered/completed order.
    * Enforces single-trigger execution and idempotency.
    */
   async detectAndMarkFirstOrder(customerId: string, orderId: string): Promise<boolean> {
@@ -30,12 +30,12 @@ export class FirstOrderDetectorService {
       return false;
     }
 
-    // Check if customer has older delivered orders (excluding current orderId)
+    // Check if customer has older delivered/completed orders (excluding current orderId)
     const prevOrdersRes = await this.dataService.query('orders', {
       select: ['order_id'],
       where: [
         { column: 'customer_id', operator: '=', value: customerId },
-        { column: 'status', operator: '=', value: 'delivered' },
+        { column: 'status', operator: 'IN', value: ['delivered', 'completed'] },
         { column: 'order_id', operator: '!=', value: orderId },
       ],
       limit: 1,
@@ -45,13 +45,18 @@ export class FirstOrderDetectorService {
       // Past delivered order exists - update flag and return false
       await this.dataService.update(
         'customers',
-        { first_order_completed: true, updated_at: new Date() },
+        { first_order_completed: true, referral_status: 'active', referral_code: customerId, updated_at: new Date() },
         [{ column: 'customer_id', operator: '=', value: customerId }],
+      );
+      await this.dataService.update(
+        'users',
+        { first_order_completed: true, referral_status: 'active', referral_code: customerId, updated_at: new Date() },
+        [{ column: 'user_id', operator: '=', value: customerId }],
       );
       return false;
     }
 
-    // Step 8: Unlock Referral Code & Mark First Order Completed
+    // Step 8: Unlock Referral Code (using customer's user_id) & Mark First Order Completed
     const now = new Date();
     await this.dataService.update(
       'customers',
@@ -59,6 +64,7 @@ export class FirstOrderDetectorService {
         first_order_completed: true,
         first_order_completed_at: now,
         referral_status: 'active',
+        referral_code: customerId,
         updated_at: now,
       },
       [{ column: 'customer_id', operator: '=', value: customerId }],
@@ -69,6 +75,7 @@ export class FirstOrderDetectorService {
       {
         first_order_completed: true,
         referral_status: 'active',
+        referral_code: customerId,
         updated_at: now,
       },
       [{ column: 'user_id', operator: '=', value: customerId }],
@@ -86,6 +93,7 @@ export class FirstOrderDetectorService {
       'customers',
       {
         referral_status: 'active',
+        referral_code: customerId,
         first_order_completed: true,
         updated_at: now,
       },
@@ -96,6 +104,7 @@ export class FirstOrderDetectorService {
       'users',
       {
         referral_status: 'active',
+        referral_code: customerId,
         first_order_completed: true,
         updated_at: now,
       },

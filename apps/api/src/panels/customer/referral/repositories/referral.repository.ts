@@ -25,8 +25,8 @@ export class ReferralRepository implements IReferralRepository {
         r.updated_at,
         r.rewarded_at,
         CASE 
-          WHEN r.referrer_customer_id = $1 THEN COALESCE(r.referrer_reward_amount, 50.00)
-          ELSE COALESCE(r.referred_reward_amount, 50.00)
+          WHEN r.referrer_customer_id = $1 THEN COALESCE(r.referrer_reward_amount, 100.00)
+          ELSE COALESCE(r.referred_reward_amount, 0.00)
         END as reward_amount,
         CASE 
           WHEN r.referrer_customer_id = $1 THEN COALESCE(u2.first_name, u2.user_name, 'Friend')
@@ -64,6 +64,7 @@ export class ReferralRepository implements IReferralRepository {
     if (generalInviteCodes.includes(raw)) {
       return {
         customer_id: 'APP_INVITE_GENERAL',
+        user_id: 'APP_INVITE_GENERAL',
         first_name: 'F2H App Invite',
         referral_code: 'APP INVITE',
         referral_status: 'active',
@@ -75,13 +76,17 @@ export class ReferralRepository implements IReferralRepository {
 
     const variations = Array.from(new Set([raw, noHyphen, withHyphen]));
 
-    // 1. Search users table by referral_code variations
+    // 1. Search users and customers table by user_id, customer_id, or referral_code variations
     for (const varCode of variations) {
       const userRes = await this.db.query(
         `SELECT c.*, u.user_id, u.first_name, u.last_name, u.user_name, u.email, u.phone, u.referral_code
          FROM users u
          LEFT JOIN customers c ON c.customer_id = u.user_id
-         WHERE u.referral_code = $1 LIMIT 1`,
+         WHERE UPPER(u.user_id) = $1
+            OR UPPER(COALESCE(c.customer_id, '')) = $1
+            OR UPPER(COALESCE(u.referral_code, '')) = $1
+            OR UPPER(COALESCE(c.referral_code, '')) = $1
+         LIMIT 1`,
         [varCode],
       );
       if (userRes?.[0]) {
@@ -89,7 +94,7 @@ export class ReferralRepository implements IReferralRepository {
       }
     }
 
-    // 3. Fallback for old phone-suffix referral codes e.g. F2H-0305, F2H0305, REF0305, 0305
+    // 2. Fallback for old phone-suffix referral codes e.g. F2H-0305, F2H0305, REF0305, 0305
     const digitsOnly = raw.replace(/\D/g, '');
     if (digitsOnly.length >= 3) {
       const lastDigits = digitsOnly.length >= 4 ? digitsOnly.slice(-4) : digitsOnly;
@@ -103,17 +108,11 @@ export class ReferralRepository implements IReferralRepository {
       let matchedCust = phoneMatch?.[0];
 
       if (matchedCust) {
-        await this.dataService.update(
-          'users',
-          { referral_code: raw, updated_at: new Date() },
-          [{ column: 'user_id', operator: '=', value: matchedCust.customer_id || matchedCust.user_id }]
-        );
-        matchedCust.referral_code = raw;
         return matchedCust;
       }
     }
 
-    // 4. Robust resolution for F2H formatted referral codes (e.g. F2HASH647)
+    // 3. Robust resolution for F2H formatted legacy referral codes (e.g. F2HASH647)
     if (raw.startsWith('F2H') && raw.length >= 6) {
       const namePart = raw.slice(3).replace(/\d/g, '');
       const firstName = raw === 'F2HASH647' || namePart.toUpperCase().includes('ASH') ? 'Ashok' : (namePart.length > 0 ? namePart.charAt(0).toUpperCase() + namePart.slice(1).toLowerCase() : 'F2H Referrer');
@@ -135,7 +134,7 @@ export class ReferralRepository implements IReferralRepository {
         email: placeholderEmail,
         mobile: placeholderPhone,
         phone: placeholderPhone,
-        referral_code: raw,
+        referral_code: newCustId,
         referral_status: 'active',
         created_at: new Date(),
         updated_at: new Date(),
@@ -162,8 +161,8 @@ export class ReferralRepository implements IReferralRepository {
       referrer_customer_id: data.referrer_customer_id || data.referrer_id,
       referred_customer_id: data.referred_customer_id || data.referee_id,
       referral_code: data.referral_code,
-      referrer_reward_amount: data.referrer_reward_amount || 50.00,
-      referred_reward_amount: data.referred_reward_amount || 50.00,
+      referrer_reward_amount: data.referrer_reward_amount || 100.00,
+      referred_reward_amount: data.referred_reward_amount || 0.00,
       status: data.status || 'pending',
       remarks: data.remarks || 'Referral signup pending first delivered order',
       created_at: new Date(),
@@ -181,7 +180,7 @@ export class ReferralRepository implements IReferralRepository {
       return st === 'rewarded' || st === 'completed' || st === 'active' || st === 'success' || st === 'credited';
     });
 
-    let total = rewarded.reduce((sum, r) => sum + Number(r.reward_amount || r.referrer_reward_amount || 50.00), 0);
+    let total = rewarded.reduce((sum, r) => sum + Number(r.reward_amount || r.referrer_reward_amount || 100.00), 0);
 
     try {
       const walletQuery = `
@@ -226,68 +225,70 @@ export class ReferralRepository implements IReferralRepository {
     }
   }
 
-  async ensureCustomerReferralCode(customerId: string): Promise<{ referral_code: string; referral_status: string; customer_id: string }> {
+  async ensureCustomerReferralCode(customerId: string): Promise<{ referral_code: string | null; referral_status: string; customer_id: string }> {
     const cust = await this.getCustomerByCustomerId(customerId);
+    const targetId = cust?.customer_id || customerId;
+
     if (!cust) {
       return {
-        referral_code: `F2H-${customerId.slice(-4).toUpperCase()}`,
+        referral_code: null,
         referral_status: 'locked',
-        customer_id: customerId,
+        customer_id: targetId,
       };
     }
 
-    // Check if customer has any order placed/delivered in database
-    const orderCheck = await this.dataService.query('orders', {
-      select: ['order_id'],
-      where: [{ column: 'customer_id', operator: '=', value: customerId }],
-      limit: 1,
-    });
+    // Check if customer has any order with status 'delivered' or 'completed'
+    let hasCompletedOrder = false;
+    try {
+      const deliveredCheck = await this.db.query(
+        `SELECT order_id FROM orders WHERE customer_id = $1 AND status IN ('delivered', 'completed') LIMIT 1`,
+        [targetId],
+      );
+      hasCompletedOrder = (deliveredCheck?.length || 0) > 0;
+    } catch (_) {
+      const orderCheck = await this.dataService.query('orders', {
+        select: ['order_id'],
+        where: [
+          { column: 'customer_id', operator: '=', value: targetId },
+          { column: 'status', operator: 'IN', value: ['delivered', 'completed'] },
+        ],
+        limit: 1,
+      });
+      hasCompletedOrder = (orderCheck?.data?.length || 0) > 0;
+    }
 
-    const hasOrder = (orderCheck?.data?.length || 0) > 0;
-    const isUnlocked = cust.first_order_completed || hasOrder || cust.referral_status === 'active';
+    const isUnlocked = Boolean(cust.first_order_completed || hasCompletedOrder || cust.referral_status === 'active');
     const computedStatus = isUnlocked ? 'active' : 'locked';
 
-    if (isUnlocked && (cust.referral_status !== 'active' || !cust.first_order_completed)) {
+    if (isUnlocked) {
+      const code = targetId; // As per Rule 2: use customer's user_id as the referral code after first order is completed
       try {
         await this.dataService.update(
+          'users',
+          { referral_code: code, referral_status: 'active', first_order_completed: true, updated_at: new Date() },
+          [{ column: 'user_id', operator: '=', value: targetId }]
+        );
+        await this.dataService.update(
           'customers',
-          { referral_status: 'active', first_order_completed: true, updated_at: new Date() },
-          [{ column: 'customer_id', operator: '=', value: cust.customer_id }]
+          { referral_code: code, referral_status: 'active', first_order_completed: true, updated_at: new Date() },
+          [{ column: 'customer_id', operator: '=', value: targetId }]
         );
       } catch {
-        // Deliberately tolerated: the caller has a valid fallback for this failure.
+        // Tolerated best-effort update
       }
-    }
 
-    if (cust.referral_code && cust.referral_code.trim().length > 0) {
       return {
-        referral_code: cust.referral_code,
-        referral_status: computedStatus,
-        customer_id: cust.customer_id,
+        referral_code: code,
+        referral_status: 'active',
+        customer_id: targetId,
       };
     }
 
-    const cleanName = (cust.first_name || 'USER').replace(/[^a-zA-Z]/g, '').toUpperCase();
-    const prefix = cleanName.length >= 3 ? cleanName.slice(0, 3) : 'USR';
-    const cleanPhone = (cust.phone || cust.mobile || '').replace(/\D/g, '');
-    const phoneSuffix = cleanPhone.length >= 3 ? cleanPhone.slice(-3) : Math.floor(100 + Math.random() * 900).toString();
-    const code = `F2H${prefix}${phoneSuffix}`;
-
-    await this.dataService.update(
-      'users',
-      { referral_code: code, updated_at: new Date() },
-      [{ column: 'user_id', operator: '=', value: cust.customer_id }]
-    );
-    await this.dataService.update(
-      'customers',
-      { referral_status: computedStatus, first_order_completed: isUnlocked, updated_at: new Date() },
-      [{ column: 'customer_id', operator: '=', value: cust.customer_id }]
-    );
-
+    // Customer has NOT completed first order -> referral code is NOT shown/issued
     return {
-      referral_code: code,
-      referral_status: computedStatus,
-      customer_id: cust.customer_id,
+      referral_code: null,
+      referral_status: 'locked',
+      customer_id: targetId,
     };
   }
 }

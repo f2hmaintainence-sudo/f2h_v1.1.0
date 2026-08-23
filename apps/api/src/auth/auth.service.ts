@@ -524,11 +524,12 @@ export class AuthService {
             { transaction },
           );
         } else {
-          // Insert only valid customers table columns (no first_name/last_name/phone/email/mobile)
+          // Insert only valid customers table columns (referral_code locked until first order completed)
           const custPayload: any = {
             customer_id: userId,
-            referral_code: generatedRefCode,
+            referral_code: null,
             referral_status: 'locked',
+            first_order_completed: false,
             branch_id: body.branch_id || null,
             created_at: now,
             updated_at: now,
@@ -539,19 +540,19 @@ export class AuthService {
           await this.Data.insert('customers', custPayload, { transaction });
         }
 
-        // Also store referral_code in users table for unified lookup
+        // Store initial locked referral state in users table
         await this.Data.update(
           'users',
-          { referral_code: generatedRefCode, updated_at: now },
+          { referral_code: null, referral_status: 'locked', first_order_completed: false, updated_at: now },
           [{ column: 'user_id', operator: '=', value: userId }],
           { transaction },
         );
 
-        // Insert row into referrals table if user registered with a referral code
+        // Insert row into referrals table if user registered with a referral code (status = 'pending')
         if (referrerId) {
           try {
             const referId = generateId('REF', 8);
-            const refCode = body.referral_code ? body.referral_code.trim().toUpperCase() : 'F2HREF';
+            const refCode = body.referral_code ? body.referral_code.trim().toUpperCase() : referrerId;
             const refereeName = [body.first_name, body.last_name].filter(Boolean).join(' ').trim() || body.name || 'Customer';
             const refereePhone = body.phone || (body as any).contact_number || '';
 
@@ -571,9 +572,9 @@ export class AuthService {
                 referrer_user_id: referrerId,
                 referred_user_id: userId,
                 referral_code: refCode,
-                referrer_reward_amount: isDpRef ? 75.00 : 50.00,
-                referred_reward_amount: isDpRef ? 0.00 : 50.00,
-                reward_amount: isDpRef ? '75.00' : '50.00',
+                referrer_reward_amount: isDpRef ? 75.00 : 100.00,
+                referred_reward_amount: 0.00,
+                reward_amount: isDpRef ? '75.00' : '100.00',
                 status: 'pending',
                 remarks: isDpRef ? 'DP referral registered - ₹75 for DP on 1st delivered order' : 'Referral registered - pending first delivered order',
                 created_at: now,
@@ -760,7 +761,21 @@ export class AuthService {
       };
     }
 
-    // 1. Search by referral_code in customers (only valid columns: referral_code, customer_id)
+    // 1. Direct Search by user_id in users or customer_id in customers (case-insensitive)
+    const directUserRes = await this.DataBase.query(
+      `SELECT c.*, u.user_id, u.first_name, u.last_name, u.user_name, u.email, u.phone, u.referral_code
+       FROM users u
+       LEFT JOIN customers c ON c.customer_id = u.user_id
+       WHERE UPPER(u.user_id) = $1
+          OR UPPER(COALESCE(c.customer_id, '')) = $1
+          OR UPPER(COALESCE(u.referral_code, '')) = $1
+          OR UPPER(COALESCE(c.referral_code, '')) = $1
+       LIMIT 1`,
+      [cleanCode],
+    );
+    if (directUserRes?.[0]) return directUserRes[0];
+
+    // 2. Search by referral_code variations in customers and users
     const noHyphen = cleanCode.replace(/-/g, '');
     const withHyphen = noHyphen.startsWith('F2H') && noHyphen.length > 3 ? 'F2H-' + noHyphen.substring(3) : cleanCode;
     const variations = Array.from(new Set([cleanCode, noHyphen, withHyphen]));
@@ -773,15 +788,8 @@ export class AuthService {
       if (res?.data?.length) return res.data[0];
     }
 
-    // 2. Search by customer_id in customers
-    const custByIdRes = await this.Data.query('customers', {
-      where: [{ column: 'customer_id', operator: '=', value: code.trim() }],
-      limit: 1,
-    });
-    if (custByIdRes?.data?.length) return custByIdRes.data[0];
-
-    // 3. Search by referral_code, user_id, phone, email in users
-    for (const field of ['referral_code', 'user_id', 'phone', 'email']) {
+    // 3. Search by phone or email in users
+    for (const field of ['phone', 'email']) {
       const res = await this.Data.query('users', {
         where: [{ column: field, operator: '=', value: code.trim() }],
         limit: 1,
@@ -820,8 +828,6 @@ export class AuthService {
       try {
         await this.Data.insert('customers', custData);
       } catch (error) {
-        // The caller only needs the referral code back; a duplicate customer row is
-        // the expected failure here. Anything else should still be visible.
         this.developer.warn('Customer row creation during referral setup failed', {
           customerId: newCustId,
           error,

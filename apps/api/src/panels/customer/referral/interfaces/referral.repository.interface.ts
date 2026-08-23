@@ -5,5 +5,5 @@ export interface IReferralRepository {
   createReferral(data: any): Promise<any>;
   getTotalEarnings(referrerId: string): Promise<number>;
   getCustomerByCustomerId(customerId: string): Promise<any | null>;
-  ensureCustomerReferralCode(customerId: string): Promise<{ referral_code: string; referral_status: string; customer_id?: string }>;
+  ensureCustomerReferralCode(customerId: string): Promise<{ referral_code: string | null; referral_status: string; customer_id?: string }>;
 }

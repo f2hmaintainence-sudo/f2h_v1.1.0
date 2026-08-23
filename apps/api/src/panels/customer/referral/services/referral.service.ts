@@ -28,7 +28,7 @@ export class ReferralService implements IReferralService {
       if (altEarnings > earnings) earnings = altEarnings;
     }
 
-    const totalReferrals = Math.max(list.length, earnings > 0 ? Math.ceil(earnings / 50) : 0);
+    const totalReferrals = Math.max(list.length, earnings > 0 ? Math.ceil(earnings / 100) : 0);
 
     return {
       status: true,
@@ -52,7 +52,7 @@ export class ReferralService implements IReferralService {
       data: {
         referral_code,
         referral_status,
-        reward_per_referral: 50.00,
+        reward_per_referral: 100.00,
         total_referrals: list.length,
         total_earnings: earnings,
       },
@@ -110,9 +110,11 @@ export class ReferralService implements IReferralService {
       referrer_id: userId,
       referee_name: dto.referee_name,
       referee_phone: dto.referee_phone,
-      referral_code: dto.referral_code || referral_code,
+      referral_code: dto.referral_code || referral_code || userId,
       status: 'completed',
-      reward_amount: 50.00,
+      reward_amount: 100.00,
+      referrer_reward_amount: 100.00,
+      referred_reward_amount: 0.00,
     });
 
     return {

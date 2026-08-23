@@ -233,25 +233,27 @@ export class CustomerBootstrapController {
       }
 
       try {
-        const orderCheck = await this.Data.query('orders', {
+        const deliveredCheck = await this.Data.query('orders', {
           select: ['order_id'],
-          where: [{ column: 'customer_id', operator: '=', value: customer.customer_id || userId }],
+          where: [
+            { column: 'customer_id', operator: '=', value: customer.customer_id || userId },
+            { column: 'status', operator: 'IN', value: ['delivered', 'completed'] },
+          ],
           limit: 1,
         });
-        const hasOrder = (orderCheck?.data?.length || 0) > 0;
-        const isUnlocked = customer.first_order_completed || hasOrder || customer.referral_status === 'active';
+        const hasDeliveredOrder = (deliveredCheck?.data?.length || 0) > 0;
+        const isUnlocked = Boolean(customer.first_order_completed || hasDeliveredOrder || customer.referral_status === 'active');
         const computedStatus = isUnlocked ? 'active' : 'locked';
 
-        if (!customer.referral_code || !customer.referral_code.trim()) {
-          const nameSeed = customer.first_name || customer.user_name || (customer.email ? customer.email.split('@')[0] : 'USR');
-          const cleanName = nameSeed.replace(/[^a-zA-Z]/g, '').toUpperCase();
-          const prefix = cleanName.length >= 3 ? cleanName.slice(0, 3) : (cleanName.length > 0 ? cleanName.padEnd(3, 'X') : 'USR');
-          const cleanPhone = (customer.mobile || customer.phone || '').replace(/\D/g, '');
-          const phoneSuffix = cleanPhone.length >= 3 ? cleanPhone.slice(-3) : Math.floor(100 + Math.random() * 900).toString();
-          customer.referral_code = `F2H${prefix}${phoneSuffix}`;
+        if (isUnlocked) {
+          customer.referral_code = customer.customer_id || userId;
+          customer.referral_status = 'active';
+          customer.first_order_completed = true;
 
           const userUpdatePayload = await this.filterValidFields('users', {
             referral_code: customer.referral_code,
+            referral_status: 'active',
+            first_order_completed: true,
             updated_at: new Date(),
           });
           await this.Data.update(
@@ -259,14 +261,16 @@ export class CustomerBootstrapController {
             userUpdatePayload,
             [{ column: 'user_id', operator: '=', value: customer.customer_id || userId }],
           );
+        } else {
+          customer.referral_code = null;
+          customer.referral_status = 'locked';
+          customer.first_order_completed = false;
         }
 
-        customer.referral_status = computedStatus;
-        customer.first_order_completed = isUnlocked;
-
         const updatePayload = await this.filterValidFields('customers', {
-          referral_status: computedStatus,
-          first_order_completed: isUnlocked,
+          referral_code: customer.referral_code,
+          referral_status: customer.referral_status,
+          first_order_completed: customer.first_order_completed,
           updated_at: new Date(),
         });
 
@@ -291,19 +295,17 @@ export class CustomerBootstrapController {
             `SELECT u.referral_code FROM users u WHERE u.user_id = $1 LIMIT 1`,
             [customer.referred_by],
           );
-          const refCode = referrerCustRows?.[0]?.referral_code || 'F2HREF';
+          const refCode = referrerCustRows?.[0]?.referral_code || customer.referred_by || 'F2HREF';
           const ts = Math.floor(Date.now() / 1000).toString(36).toUpperCase();
           const rnd = Math.floor(Math.random() * 9000 + 1000);
-          const refereeName = customer.first_name || customer.user_name || customer.email || 'Customer';
-          const refereePhone = customer.phone || '';
           const referralData = await this.filterValidFields('referrals', {
             refer_id: `REF${ts}${rnd}`,
             referrer_customer_id: customer.referred_by,
             referred_customer_id: customer.customer_id,
             referral_code: refCode,
-            referrer_reward_amount: 50.00,
-            referred_reward_amount: 50.00,
-            status: customer.first_order_completed ? 'completed' : 'pending',
+            referrer_reward_amount: 100.00,
+            referred_reward_amount: 0.00,
+            status: 'pending',
             remarks: 'Referral registered - pending first delivered order',
             created_at: new Date(),
             updated_at: new Date(),

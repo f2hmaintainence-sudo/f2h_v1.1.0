@@ -53,7 +53,7 @@ describe('ReferralRewardEngineService', () => {
   });
 
   // ─── Test Case: Reward credited once (Customer to Customer) ─
-  it('should credit ₹50 to both customer referrer and referee inside transaction', async () => {
+  it('should credit ₹100 to customer referrer inside transaction', async () => {
     mockClient.query
       .mockResolvedValueOnce({}) // BEGIN
       .mockResolvedValueOnce({
@@ -66,19 +66,19 @@ describe('ReferralRewardEngineService', () => {
             refer_id: 'REF001',
             referrer_customer_id: 'C1',
             referred_customer_id: 'C2',
-            referrer_reward_amount: 50,
-            referred_reward_amount: 50,
+            referrer_reward_amount: 100,
+            referred_reward_amount: 0,
             status: 'pending',
           },
         ],
       }) // SELECT FOR UPDATE referrals
       .mockResolvedValueOnce({ rows: [] }) // SELECT delivery_partners (not DP)
-      .mockResolvedValueOnce({ rows: [{ wallet_balance: 150 }] }) // UPDATE referrer wallet balance (+50)
+      .mockResolvedValueOnce({ rows: [{ wallet_balance: 200 }] }) // UPDATE referrer wallet balance (+100)
       .mockResolvedValueOnce({}) // INSERT referrer wallet transaction
       .mockResolvedValueOnce({}) // INSERT referrer notification
       .mockResolvedValueOnce({}) // INSERT referrer notification recipient
-      .mockResolvedValueOnce({ rows: [{ wallet_balance: 150 }] }) // UPDATE referee wallet balance (+50)
-      .mockResolvedValueOnce({}) // INSERT referee wallet transaction
+      .mockResolvedValueOnce({}) // UPDATE customers (first_order_completed = true, referral_code = 'C2')
+      .mockResolvedValueOnce({}) // UPDATE users (first_order_completed = true, referral_code = 'C2')
       .mockResolvedValueOnce({}) // UPDATE referrals status = 'rewarded'
       .mockResolvedValueOnce({}) // INSERT referee notification
       .mockResolvedValueOnce({}) // INSERT referee notification recipient
@@ -87,9 +87,9 @@ describe('ReferralRewardEngineService', () => {
     const result = await service.processReferralReward('C2', 'ORD-1');
 
     expect(result.status).toBe(true);
-    expect(result.referrer_reward).toBe(50);
-    expect(result.referee_reward).toBe(50);
-    expect(result.referee_new_balance).toBe(150);
+    expect(result.referrer_reward).toBe(100);
+    expect(result.referee_reward).toBe(0);
+    expect(result.referee_new_balance).toBe(100);
     expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
     expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
     expect(mockClient.release).toHaveBeenCalled();

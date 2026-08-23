@@ -15,9 +15,9 @@ export class AdminReferralService {
 
     const totalRewardsPaid =
       rewardedReferrals.reduce(
-        (sum: number, r: any) => sum + Number(r.reward_amount || 50.0),
+        (sum: number, r: any) => sum + Number(r.referrer_reward_amount || r.reward_amount || 100.0),
         0,
-      ) * 2; // Referrer + Referee payouts
+      );
 
     const conversionRate =
       totalReferrals > 0
@@ -55,7 +55,7 @@ export class AdminReferralService {
       };
       current.total_count += 1;
       if (ref.status === 'rewarded' || ref.status === 'completed') {
-        current.total_earnings += Number(ref.referrer_reward_amount || 50.0);
+        current.total_earnings += Number(ref.referrer_reward_amount || ref.reward_amount || 100.0);
       }
       referrerMap.set(id, current);
     }

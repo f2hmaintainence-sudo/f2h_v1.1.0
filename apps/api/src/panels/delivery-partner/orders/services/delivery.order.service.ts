@@ -7,6 +7,8 @@ import {
 import { DatabaseService } from '../../../../shared/database/Database.service';
 import { PushNotificationService } from '../../../../shared/pushNotifications/pushNotification.service';
 import { DeveloperService } from '../../../../shared/logger/Developer.service';
+import { FirstOrderDetectorService } from '../../../customer/referral/services/first-order-detector.service';
+import { ReferralRewardEngineService } from '../../../customer/referral/services/referral-reward-engine.service';
 
 @Injectable()
 export class DeliveryOrderService {
@@ -14,6 +16,8 @@ export class DeliveryOrderService {
     private readonly db: DatabaseService,
     private readonly pushNotificationService: PushNotificationService,
     private readonly developer: DeveloperService,
+    private readonly firstOrderDetector: FirstOrderDetectorService,
+    private readonly referralRewardEngine: ReferralRewardEngineService,
   ) { }
 
   cleanDeliveryImagePath(imageUrl: string | null | undefined): string | null {
@@ -743,6 +747,20 @@ export class DeliveryOrderService {
         } catch {
           // Deliberately tolerated: the caller has a valid fallback for this failure.
         }
+
+        if (order.customer_id && order.order_id) {
+          try {
+            await this.firstOrderDetector.detectAndMarkFirstOrder(order.customer_id, order.order_id);
+            await this.firstOrderDetector.unlockReferralCode(order.customer_id);
+            await this.referralRewardEngine.processReferralReward(order.customer_id, order.order_id);
+          } catch (refErr) {
+            this.developer.error('DeliveryOrderService: Failed to process referral reward for stop', {
+              orderId: order.order_id,
+              customerId: order.customer_id,
+              error: refErr,
+            });
+          }
+        }
       }
     }
 
@@ -771,37 +789,26 @@ export class DeliveryOrderService {
        WHERE dcr.run_id = ANY($1) AND dcr.deleted_at IS NULL`,
       [runIds],
     );
-    const totalBottles = Number(bottlesRes[0]?.total_bottles || 0);
+    const totalBottles = Number(bottlesRes?.[0]?.total_bottles || 0);
 
-    const returnedItemsRes = await this.db.query(
-      `SELECT 
-           oi.variant_id, 
-           pv.name AS product_name, 
-           SUM(oi.quantity) AS quantity,
-           pv.unit_value,
-           pv.unit_type
-         FROM orders o
-         JOIN order_items oi ON oi.order_id = o.order_id
-         JOIN product_variants pv ON pv.variant_id = oi.variant_id
-         WHERE o.delivery_run_id = ANY($1) 
-           AND o.status != 'delivered'
-         GROUP BY oi.variant_id, pv.name, pv.unit_value, pv.unit_type`,
+    const itemsRes = await this.db.query(
+      `SELECT dcr.container_id, dcr.collected_quantity AS quantity, c.name AS container_name
+       FROM delivery_container_reconciliation dcr
+       LEFT JOIN containers c ON c.container_id = dcr.container_id
+       WHERE dcr.run_id = ANY($1) AND dcr.deleted_at IS NULL`,
       [runIds],
     );
+    const returnedItems = itemsRes || [];
 
-    const returnedItems = (returnedItemsRes || []).map((item: any) => ({
-      product_variant_id: item.variant_id,
-      product_name: item.product_name || 'Unknown Product',
-      quantity: Number(item.quantity),
-      unit: `${item.unit_value || 1}${item.unit_type || 'PCS'}`,
-    }));
-
-    await this.db.transaction(async (client) => {
-      await client.query(
-        `UPDATE delivery_runs SET status = 'completed', actual_end_time = COALESCE(actual_end_time, NOW()), updated_at = NOW() WHERE id = $1`,
-        [run.id],
-      );
-    });
+    await this.db.query(
+      `UPDATE delivery_runs
+       SET status = 'handed_over',
+           empty_bottles_collected = $1,
+           actual_end_time = COALESCE(actual_end_time, NOW()),
+           updated_at = NOW()
+       WHERE id::text = ANY($2) OR run_id = ANY($2)`,
+      [totalBottles, runIds],
+    );
 
     return {
       success: true,
@@ -861,18 +868,33 @@ export class DeliveryOrderService {
   }
 
   async updateOrderStatus(userId: string, orderId: string, body: any) {
-    const boy = await this.resolveDeliveryPartner(userId);
+    return this.markDeliveryDelivered(userId, orderId, body);
+  }
 
+  async markDeliveryDelivered(
+    userId: string,
+    orderId: string,
+    body: any,
+  ) {
+    const boy = await this.resolveDeliveryPartner(userId);
     const orderRes = await this.db.query(
-      `SELECT order_id, status, customer_id, delivery_partner_id, delivery_run_id AS delivery_session_id, address_id, scheduled_date, delivery_slot, payment_mode, total_amount
-       FROM orders WHERE order_id = $1`,
+      `SELECT order_id, customer_id, status, total_amount, payment_mode, delivery_run_id FROM orders
+       WHERE order_id = $1 OR id::text = $1 LIMIT 1`,
       [orderId],
     );
-    if (!orderRes?.length) throw new NotFoundException('Order not found');
+    if (!orderRes?.length) {
+      throw new NotFoundException('Order not found');
+    }
     const order = orderRes[0];
 
-    if (String(order.delivery_partner_id) !== String(boy.user_id)) {
-      throw new ForbiddenException('You are not authorized to update this order status');
+    if (order.delivery_run_id) {
+      const runRes = await this.db.query(
+        `SELECT id, run_id, delivery_partner_id FROM delivery_runs WHERE id::text = $1 OR run_id = $1 LIMIT 1`,
+        [order.delivery_run_id],
+      );
+      if (runRes?.length && String(runRes[0].delivery_partner_id) !== String(boy.user_id)) {
+        throw new ForbiddenException('You are not assigned to this delivery run');
+      }
     }
 
     if (['delivered', 'failed'].includes(order.status)) {
@@ -956,6 +978,20 @@ export class DeliveryOrderService {
         }
       }
     });
+
+    if (status === 'delivered' && order.customer_id && order.order_id) {
+      try {
+        await this.firstOrderDetector.detectAndMarkFirstOrder(order.customer_id, order.order_id);
+        await this.firstOrderDetector.unlockReferralCode(order.customer_id);
+        await this.referralRewardEngine.processReferralReward(order.customer_id, order.order_id);
+      } catch (refErr) {
+        this.developer.error('DeliveryOrderService: Failed to process referral reward for order', {
+          orderId: order.order_id,
+          customerId: order.customer_id,
+          error: refErr,
+        });
+      }
+    }
 
     return { success: true, message: `Order status updated to ${status} successfully` };
   }

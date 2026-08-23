@@ -82,9 +82,7 @@ export class ReferralRewardEngineService {
           `SELECT referral_code FROM users WHERE user_id = $1 LIMIT 1`,
           [referrerId],
         );
-        const refCode = referrerRows.rows?.[0]?.referral_code || 'F2HREF';
-        const refName = referee.first_name || referee.name || referee.email || 'Customer';
-        const refPhone = referee.phone || '';
+        const refCode = referrerRows.rows?.[0]?.referral_code || referrerId || 'F2HREF';
 
         // Detect DP referrer
         const dpCheck = await client.query(
@@ -102,8 +100,8 @@ export class ReferralRewardEngineService {
                     'pending', 'Referral auto-synced on order delivery', NOW(), NOW())`,
           [
             referId, referrerId, realRefereeId, refCode,
-            isNewDpReferrer ? 75.00 : 50.00,
-            isNewDpReferrer ? 0.00 : 50.00,
+            isNewDpReferrer ? 75.00 : 100.00,
+            0.00,
           ],
         );
 
@@ -146,13 +144,13 @@ export class ReferralRewardEngineService {
 
       const referrerRewardAmount = referrerIsDP
         ? 75.00
-        : Number(referralRecord.referrer_reward_amount ?? referralRecord.reward_amount ?? 50.00) || 50.00;
+        : Number(referralRecord.referrer_reward_amount ?? referralRecord.reward_amount ?? 100.00) || 100.00;
       const referredRewardAmount = referrerIsDP
         ? 0.00
-        : Number(referralRecord.referred_reward_amount ?? 50.00) || 50.00;
+        : Number(referralRecord.referred_reward_amount ?? 0.00) || 0.00;
       const now = new Date();
 
-      // ── A. Credit Referrer ──────────────────────────────────────────────────────
+      // ── A. Credit Referrer (₹100 to wallet upon referee's 1st completed order) ──
       if (referrerIsDP) {
         const bonusId = `DPB${Math.floor(Date.now() / 1000).toString(36).toUpperCase()}${Math.floor(Math.random() * 9000 + 1000)}`;
         await client.query(
@@ -171,7 +169,7 @@ export class ReferralRewardEngineService {
           ],
         );
       } else {
-        // Customer referrer: credit ₹50
+        // Customer referrer: credit ₹100
         const referrerUpdateRes = await client.query(
           `UPDATE customers
            SET wallet_balance = COALESCE(wallet_balance, 0) + $1, updated_at = NOW()
@@ -194,13 +192,13 @@ export class ReferralRewardEngineService {
             referrerNewBalance,
             'referral_bonus',
             orderId || referralRecord.refer_id || String(referralRecord.id),
-            `Referral Reward: ${referee.first_name || referee.name || 'Customer'} completed 1st delivered order`,
+            `Referral Reward: ${referee.first_name || referee.name || 'Friend'} completed 1st order`,
             realRefereeId,
             now,
           ],
         );
 
-        // Send Notification
+        // Send Notification to Referrer
         try {
           const notifId1 = `NTF-${Date.now()}-R1`;
           await client.query(
@@ -224,8 +222,6 @@ export class ReferralRewardEngineService {
             [notifId1, targetReferrerId, 'unread', now, now],
           );
         } catch (error) {
-          // The reward itself is already recorded in this transaction; failing to
-          // notify must not undo it. Logged so silent notification loss is visible.
           this.developer.warn('Referrer reward notification insert failed', {
             targetReferrerId,
             error,
@@ -233,16 +229,16 @@ export class ReferralRewardEngineService {
         }
       }
 
-      // ── B. Credit Referee ──────────────────────────────────────────────────────
+      // ── B. Update Referee (Unlock referral code as user_id) ──────────────────
       let refereeNewBalance = Number(referee.wallet_balance || 0);
 
       if (referredRewardAmount > 0) {
-        // Customer referred customer: credit ₹50
         const refereeUpdateRes = await client.query(
           `UPDATE customers
            SET wallet_balance = COALESCE(wallet_balance, 0) + $1,
                first_order_completed = true,
                referral_status = 'active',
+               referral_code = $2,
                updated_at = NOW()
            WHERE customer_id = $2 OR customer_id = $3
            RETURNING wallet_balance`,
@@ -269,16 +265,27 @@ export class ReferralRewardEngineService {
           ],
         );
       } else {
-        // DP referred customer: ₹0 credit, unlock referral status
         await client.query(
           `UPDATE customers
            SET first_order_completed = true,
                referral_status = 'active',
+               referral_code = $1,
                updated_at = NOW()
            WHERE customer_id = $1 OR customer_id = $2`,
           [realRefereeId, refereeCustomerId],
         );
       }
+
+      // Also set user referral_code and referral_status in users table
+      await client.query(
+        `UPDATE users
+         SET first_order_completed = true,
+             referral_status = 'active',
+             referral_code = $1,
+             updated_at = NOW()
+         WHERE user_id = $1`,
+        [realRefereeId],
+      );
 
       // ── C. Mark Referral = 'rewarded' ──────────────────────────────────────────
       await client.query(
@@ -298,16 +305,14 @@ export class ReferralRewardEngineService {
       // ── D. Notify Referee ───────────────────────────────────────────────────────
       try {
         const notifId2 = `NTF-${Date.now()}-R2`;
-        const notifMsg = referredRewardAmount > 0
-          ? `₹${referredRewardAmount} credited to your wallet for completing your 1st order! Your referral code is now unlocked 🔓.`
-          : `Your 1st order has been delivered! Your referral code is now unlocked 🔓.`;
+        const notifMsg = `Your 1st order has been delivered! Your personal referral code (${realRefereeId}) is now unlocked 🔓. Share with friends to earn ₹100 on their first order!`;
 
         await client.query(
           `INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
           [
             notifId2,
-            '🎉 Welcome Reward Unlocked!',
+            '🎉 Referral Code Unlocked!',
             notifMsg,
             'push',
             'referral_bonus',
@@ -323,7 +328,6 @@ export class ReferralRewardEngineService {
           [notifId2, realRefereeId, 'unread', now, now],
         );
       } catch (error) {
-        // Best-effort, as above.
         this.developer.warn('Referee reward notification insert failed', {
           realRefereeId,
           error,
@@ -343,8 +347,8 @@ export class ReferralRewardEngineService {
         referee_reward: referredRewardAmount,
         referee_new_balance: refereeNewBalance,
         message: referrerIsDP
-          ? `Rewards processed: ₹${referrerRewardAmount} DP bonus recorded for salary (referee gets ₹0).`
-          : `Rewards processed: ₹${referrerRewardAmount} to referrer wallet; ₹${referredRewardAmount} to referee wallet.`,
+          ? `Rewards processed: ₹${referrerRewardAmount} DP bonus recorded for salary.`
+          : `Rewards processed: ₹${referrerRewardAmount} credited to referrer wallet.`,
       };
     } catch (error) {
       await client.query('ROLLBACK');

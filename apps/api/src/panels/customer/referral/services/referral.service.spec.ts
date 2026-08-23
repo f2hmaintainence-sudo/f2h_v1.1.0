@@ -18,7 +18,7 @@ const mockReferralRepository = () => ({
   createReferral: jest.fn(),
   getCustomerByCustomerId: jest.fn(),
   ensureCustomerReferralCode: jest.fn().mockResolvedValue({
-    referral_code: 'F2HUSER101',
+    referral_code: 'USER-1',
     referral_status: 'locked',
   }),
 });
@@ -40,7 +40,8 @@ describe('ReferralService', () => {
     const result = await service.getReferralDetails('USER-1');
 
     expect(result.status).toBe(true);
-    expect(result.data.referral_code).toBe('F2HUSER101');
+    expect(result.data.referral_code).toBe('USER-1');
+    expect(result.data.reward_per_referral).toBe(100.00);
     expect(result.data.total_referrals).toBe(0);
     expect(result.data.total_earnings).toBe(0);
   });

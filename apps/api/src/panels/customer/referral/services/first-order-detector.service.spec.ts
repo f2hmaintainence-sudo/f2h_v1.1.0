@@ -39,16 +39,16 @@ describe('FirstOrderDetectorService', () => {
     const result = await service.detectAndMarkFirstOrder('C1', 'ORD-1');
 
     expect(result).toBe(true);
-    // Should update customers table with first_order_completed = true and referral_status = 'active'
+    // Should update customers table with first_order_completed = true, referral_code = 'C1' and referral_status = 'active'
     expect(dataService.update).toHaveBeenCalledWith(
       'customers',
-      expect.objectContaining({ first_order_completed: true, referral_status: 'active' }),
+      expect.objectContaining({ first_order_completed: true, referral_status: 'active', referral_code: 'C1' }),
       expect.any(Array),
     );
     // Should also update users table
     expect(dataService.update).toHaveBeenCalledWith(
       'users',
-      expect.objectContaining({ first_order_completed: true, referral_status: 'active' }),
+      expect.objectContaining({ first_order_completed: true, referral_status: 'active', referral_code: 'C1' }),
       expect.any(Array),
     );
   });
@@ -76,10 +76,10 @@ describe('FirstOrderDetectorService', () => {
     const result = await service.detectAndMarkFirstOrder('C1', 'ORD-3');
 
     expect(result).toBe(false);
-    // Should still mark first_order_completed but NOT unlock referral via this path
+    // Should still mark first_order_completed
     expect(dataService.update).toHaveBeenCalledWith(
       'customers',
-      expect.objectContaining({ first_order_completed: true }),
+      expect.objectContaining({ first_order_completed: true, referral_code: 'C1' }),
       expect.any(Array),
     );
   });
@@ -98,12 +98,12 @@ describe('FirstOrderDetectorService', () => {
 
     expect(dataService.update).toHaveBeenCalledWith(
       'customers',
-      expect.objectContaining({ referral_status: 'active', first_order_completed: true }),
+      expect.objectContaining({ referral_status: 'active', referral_code: 'C1', first_order_completed: true }),
       expect.any(Array),
     );
     expect(dataService.update).toHaveBeenCalledWith(
       'users',
-      expect.objectContaining({ referral_status: 'active', first_order_completed: true }),
+      expect.objectContaining({ referral_status: 'active', referral_code: 'C1', first_order_completed: true }),
       expect.any(Array),
     );
   });

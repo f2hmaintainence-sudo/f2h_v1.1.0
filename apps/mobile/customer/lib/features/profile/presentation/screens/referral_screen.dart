@@ -44,7 +44,7 @@ class _ReferralScreenState extends State<ReferralScreen>
   double _totalEarnings = 0.0;
   int _totalCount = 0;
 
-  bool get _isLocked => _code.isEmpty || _status.toLowerCase() != 'unlocked';
+  bool get _isLocked => _code.isEmpty || (_status.toLowerCase() != 'unlocked' && _status.toLowerCase() != 'active');
   String get _activeCode => _code;
   String get _referralLink => 'https://f2h.app.link/$_activeCode';
 
@@ -91,7 +91,7 @@ class _ReferralScreenState extends State<ReferralScreen>
                 data['count'];
             int count = int.tryParse(countVal?.toString() ?? '0') ?? 0;
             if (count == 0 && _totalEarnings > 0) {
-              count = (_totalEarnings / 50).ceil();
+              count = (_totalEarnings / 100).ceil();
             }
             _totalCount = count;
 
@@ -135,16 +135,15 @@ class _ReferralScreenState extends State<ReferralScreen>
   // ── WHATSAPP SHARING ──────────────────────────────────────
   Future<void> _shareOnWhatsApp() async {
     final message = _isLocked
-        ? 'Join F2H — Farm To Home & Get ₹50 on your 1st order! 🥬🍓\n'
+        ? 'Join F2H — Farm To Home & Get fresh farm produce delivered! 🥬🍓\n'
           'Fresh farm products, delivered to your doorstep.\n'
           'https://f2h.app.link/invite'
         : 'Your F2H Invite is Ready\n\n'
-          'Get ₹50 on your first order!\n'
           'Fresh farm products, delivered to your doorstep.\n\n'
           'Invite Code: $_activeCode\n'
           '$_referralLink\n\n'
           'F2H — Farm To Home\n'
-          'Fresh. Smart. Rewarding. ';
+          'Fresh. Smart. Rewarding.';
 
     final encodedMsg = Uri.encodeComponent(message);
     final whatsappUri = Uri.parse('https://wa.me/?text=$encodedMsg');
@@ -293,7 +292,7 @@ class _ReferralScreenState extends State<ReferralScreen>
                   border: Border.all(color: const Color(0xFFDCFCE7)),
                 ),
                 child: const Text(
-                  '₹50 Reward Earned',
+                  '₹100 Reward Earned',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
@@ -494,10 +493,10 @@ class _ReferralScreenState extends State<ReferralScreen>
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.card_giftcard_rounded, color: _kGold, size: 16),
-                    SizedBox(width: 6),
-                    Text(
-                      'Refer & Earn ₹50',
+                    const Icon(Icons.card_giftcard_rounded, color: _kGold, size: 16),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Refer & Earn ₹100',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
@@ -511,7 +510,7 @@ class _ReferralScreenState extends State<ReferralScreen>
           ),
           const SizedBox(height: 10),
           const Text(
-            'Share your code or link and earn ₹50 for each successful referral!',
+            'Share your code or link and earn ₹100 for each successful referral!',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
@@ -834,7 +833,7 @@ class _ReferralScreenState extends State<ReferralScreen>
                   bg: const Color(0xFFECFDF5), fg: const Color(0xFF047857), scale: s),
               _stepArrow(s),
               _stepTile(
-                  '6', Icons.card_giftcard_rounded, 'You Both\nEarn',
+                  '6', Icons.card_giftcard_rounded, 'Referrer\nEarns ₹100',
                   bg: const Color(0xFFFEF3C7), fg: const Color(0xFFCA8A04), scale: s),
             ],
           ),
