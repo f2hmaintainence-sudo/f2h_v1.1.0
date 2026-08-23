@@ -78,6 +78,7 @@ export default function BranchesPage() {
   const [unassignedPartners, setUnassignedPartners] = useState<any[]>([]);
   const [selectedPartnerToAssign, setSelectedPartnerToAssign] = useState('');
   const [allocating, setAllocating] = useState(false);
+  const [overlapConflict, setOverlapConflict] = useState<any | null>(null);
 
   const normalizeHexShape = (value: unknown): BranchHexShape => {
     return value === 'circle' || value === 'square' || value === 'rectangle' || value === 'hexagon'
@@ -168,6 +169,10 @@ export default function BranchesPage() {
   const handleSave = async () => {
     if (!form.branch_name.trim()) { setError('Branch name is required'); return; }
     if (!form.branch_code.trim()) { setError('Branch code is required'); return; }
+    if (overlapConflict) {
+      setError(`Cannot save: Branch coverage overlaps with ${overlapConflict.branch_name}. Branches cannot overlap.`);
+      return;
+    }
 
     setSaving(true); setError('');
     try {
@@ -191,6 +196,10 @@ export default function BranchesPage() {
   const handleEdit = async () => {
     if (!selectedBranch) return;
     if (!form.branch_name.trim()) { setError('Branch name is required'); return; }
+    if (overlapConflict) {
+      setError(`Cannot save: Branch coverage overlaps with ${overlapConflict.branch_name}. Branches cannot overlap.`);
+      return;
+    }
 
     setSaving(true); setError('');
     try {
@@ -211,6 +220,7 @@ export default function BranchesPage() {
   const resetForm = () => {
     setForm(emptyForm);
     setError('');
+    setOverlapConflict(null);
   };
 
   const willRegenSectors = selectedBranch && mode === 'edit' && (
@@ -237,6 +247,7 @@ export default function BranchesPage() {
       hex_shape: normalizeHexShape(branch.hex_shape),
     });
     setError('');
+    setOverlapConflict(null);
     setMode('edit');
     setStep('form');
     setFormStep(1);
@@ -457,7 +468,7 @@ export default function BranchesPage() {
           />
 
           {/* Modal Box */}
-          <div className="relative z-10 bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-slate-100">
+          <div className="relative z-10 bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-slate-100">
             {/* Modal Header */}
             <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
               <div className="flex items-center gap-3">
@@ -481,7 +492,7 @@ export default function BranchesPage() {
                     setMode('list');
                   }
                 }}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -614,21 +625,23 @@ export default function BranchesPage() {
                 </div>
               ) : (
                 <div className="space-y-4 animate-in fade-in duration-200">
-                  {/* Map picker */}
-                  <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm relative h-[380px]">
+                  {/* Big Map picker */}
+                  <div className="rounded-2xl overflow-hidden border border-slate-200/80 shadow-md relative h-[520px] md:h-[580px]">
                     <MapPicker
                       lat={form.lat}
                       lng={form.lng}
                       radiusKm={form.delivery_radius_km}
                       bufferZoneKm={form.buffer_zone}
+                      allowBufferOrder={form.allow_buffer_order}
                       onLocationChange={(lat, lng) => setForm(f => ({ ...f, lat, lng }))}
                       existingBranches={existingBranchesToDisplay}
                       selectedShape={form.hex_shape}
                       onShapeChange={(hex_shape) => setForm(f => ({ ...f, hex_shape }))}
+                      onOverlapConflictChange={setOverlapConflict}
                     />
                   </div>
 
-                  {mode === 'edit' && willRegenSectors && (
+                  {mode === 'edit' && willRegenSectors && !overlapConflict && (
                     <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-3">
                       <AlertTriangle size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
                       <div>
@@ -646,10 +659,12 @@ export default function BranchesPage() {
             {/* Modal Footer */}
             <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
               <div>
-                {error && (
-                  <div className="flex items-center gap-1.5 text-rose-600 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100">
-                    <AlertTriangle size={13} className="flex-shrink-0" />
-                    <p className="text-xs font-semibold">{error}</p>
+                {(error || overlapConflict) && (
+                  <div className="flex items-center gap-1.5 text-rose-600 bg-rose-50 px-3.5 py-2 rounded-xl border border-rose-200 text-xs font-semibold max-w-lg">
+                    <AlertTriangle size={15} className="flex-shrink-0 text-rose-600" />
+                    <p>
+                      {error || `Coverage overlaps with ${overlapConflict?.branch_name}. Branches cannot overlap!`}
+                    </p>
                   </div>
                 )}
               </div>
@@ -664,7 +679,7 @@ export default function BranchesPage() {
                     }
                   }}
                   disabled={saving}
-                  className="px-5 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold transition-colors text-xs disabled:opacity-50"
+                  className="px-5 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold transition-colors text-xs disabled:opacity-50 cursor-pointer"
                 >
                   {formStep === 1 ? 'Cancel' : 'Back'}
                 </button>
@@ -677,15 +692,15 @@ export default function BranchesPage() {
                       setError('');
                       setFormStep(2);
                     }}
-                    className="px-6 py-2.5 rounded-xl bg-[#16a34a] hover:bg-[#15803d] text-white text-xs font-semibold transition-all shadow-md shadow-emerald-600/20 flex items-center gap-2"
+                    className="px-6 py-2.5 rounded-xl bg-[#16a34a] hover:bg-[#15803d] text-white text-xs font-semibold transition-all shadow-md shadow-emerald-600/20 flex items-center gap-2 cursor-pointer"
                   >
                     Next Step <ChevronRight size={14} />
                   </button>
                 ) : (
                   <button
                     onClick={mode === 'edit' ? handleEdit : handleSave}
-                    disabled={saving}
-                    className="px-6 py-2.5 rounded-xl bg-[#16a34a] hover:bg-[#15803d] text-white text-xs font-semibold transition-all shadow-md shadow-emerald-600/20 flex items-center gap-2 disabled:opacity-50"
+                    disabled={saving || Boolean(overlapConflict)}
+                    className="px-6 py-2.5 rounded-xl bg-[#16a34a] hover:bg-[#15803d] text-white text-xs font-semibold transition-all shadow-md shadow-emerald-600/20 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
                     {saving ? (
                       <><Loader2 size={14} className="animate-spin" /> Saving...</>

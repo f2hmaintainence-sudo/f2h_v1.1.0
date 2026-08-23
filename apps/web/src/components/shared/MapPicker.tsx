@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   APIProvider,
   Map,
@@ -20,20 +20,13 @@ import {
   Square,
   RectangleHorizontal,
   Hexagon,
+  AlertTriangle,
 } from 'lucide-react';
 import { useClientConfig } from '@/lib/client-config';
-export type ShapeType = 'hexagon' | 'circle' | 'square' | 'rectangle';
+import { findOverlappingBranch, ShapeType, BranchArea } from '@/lib/branch-overlap';
 
-interface ExistingBranch {
-  branch_id?: string;
-  branch_name: string;
-  branch_code?: string;
-  lat?: number | null;
-  lng?: number | null;
-  delivery_radius_km?: number | null;
-  buffer_zone?: number | null;
-  hex_shape?: ShapeType;
-}
+export type { ShapeType, BranchArea };
+export type ExistingBranch = BranchArea;
 
 interface MapPickerProps {
   lat: number | null;
@@ -44,6 +37,8 @@ interface MapPickerProps {
   existingBranches?: ExistingBranch[];
   selectedShape?: ShapeType;
   onShapeChange?: (shape: ShapeType) => void;
+  allowBufferOrder?: boolean;
+  onOverlapConflictChange?: (conflict: ExistingBranch | null) => void;
 }
 
 interface SearchSuggestion {
@@ -52,12 +47,12 @@ interface SearchSuggestion {
   lng: number;
 }
 
-const SHAPE_OPTIONS = [
+const SHAPE_OPTIONS: { value: ShapeType; label: string; Icon: React.ComponentType<{ size?: number; className?: string }> }[] = [
+  { value: 'hexagon', label: 'Hexagon', Icon: Hexagon },
   { value: 'circle', label: 'Circle', Icon: CircleIcon },
   { value: 'square', label: 'Square', Icon: Square },
   { value: 'rectangle', label: 'Rectangle', Icon: RectangleHorizontal },
-  { value: 'hexagon', label: 'Hexagon', Icon: Hexagon },
-] as const;
+];
 
 const EARTH_RADIUS_KM = 6371;
 const RECTANGLE_CORNER_BEARING_DEGREES = Math.atan2(2, 1) * (180 / Math.PI);
@@ -74,17 +69,20 @@ function destinationPoint(
   const longitude = lng * (Math.PI / 180);
 
   const destinationLatitude = Math.asin(
-    Math.sin(latitude) * Math.cos(angularDistance)
-    + Math.cos(latitude) * Math.sin(angularDistance) * Math.cos(bearing),
+    Math.sin(latitude) * Math.cos(angularDistance) +
+      Math.cos(latitude) * Math.sin(angularDistance) * Math.cos(bearing),
   );
-  const destinationLongitude = longitude + Math.atan2(
-    Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(latitude),
-    Math.cos(angularDistance) - Math.sin(latitude) * Math.sin(destinationLatitude),
-  );
+  const destinationLongitude =
+    longitude +
+    Math.atan2(
+      Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(latitude),
+      Math.cos(angularDistance) -
+        Math.sin(latitude) * Math.sin(destinationLatitude),
+    );
 
   return {
     lat: destinationLatitude * (180 / Math.PI),
-    lng: ((((destinationLongitude * (180 / Math.PI)) + 540) % 360) - 180),
+    lng: (((destinationLongitude * (180 / Math.PI) + 540) % 360) - 180),
   };
 }
 
@@ -94,16 +92,17 @@ function buildShapePath(
   radiusKm: number,
   shape: Exclude<ShapeType, 'circle'>,
 ): google.maps.LatLngLiteral[] {
-  const bearings = shape === 'hexagon'
-    ? [0, 60, 120, 180, 240, 300]
-    : shape === 'square'
-      ? [45, 135, 225, 315]
-      : [
-          RECTANGLE_CORNER_BEARING_DEGREES,
-          180 - RECTANGLE_CORNER_BEARING_DEGREES,
-          180 + RECTANGLE_CORNER_BEARING_DEGREES,
-          360 - RECTANGLE_CORNER_BEARING_DEGREES,
-        ];
+  const bearings =
+    shape === 'hexagon'
+      ? [0, 60, 120, 180, 240, 300]
+      : shape === 'square'
+        ? [45, 135, 225, 315]
+        : [
+            RECTANGLE_CORNER_BEARING_DEGREES,
+            180 - RECTANGLE_CORNER_BEARING_DEGREES,
+            180 + RECTANGLE_CORNER_BEARING_DEGREES,
+            360 - RECTANGLE_CORNER_BEARING_DEGREES,
+          ];
 
   return bearings.map((bearing) => destinationPoint(lat, lng, radiusKm, bearing));
 }
@@ -115,6 +114,7 @@ function CoverageOverlay({
   shape,
   isBuffer = false,
   isExisting = false,
+  isConflicting = false,
 }: {
   lat: number;
   lng: number;
@@ -122,11 +122,19 @@ function CoverageOverlay({
   shape: ShapeType;
   isBuffer?: boolean;
   isExisting?: boolean;
+  isConflicting?: boolean;
 }) {
-  const color = isBuffer ? '#a855f7' : isExisting ? '#059669' : '#16a34a';
-  const strokeWeight = isBuffer || isExisting ? 1.5 : 2;
-  const strokeOpacity = isBuffer ? 0.7 : isExisting ? 0.5 : 0.9;
-  const fillOpacity = isBuffer ? 0.04 : isExisting ? 0.05 : 0.08;
+  const color = isConflicting
+    ? '#ef4444'
+    : isBuffer
+      ? '#a855f7'
+      : isExisting
+        ? '#059669'
+        : '#16a34a';
+
+  const strokeWeight = isConflicting ? 2.5 : isBuffer || isExisting ? 1.5 : 2;
+  const strokeOpacity = isConflicting ? 0.95 : isBuffer ? 0.7 : isExisting ? 0.6 : 0.9;
+  const fillOpacity = isConflicting ? 0.18 : isBuffer ? 0.04 : isExisting ? 0.06 : 0.1;
 
   if (shape === 'circle') {
     return (
@@ -156,7 +164,11 @@ function CoverageOverlay({
 }
 
 // ── Smart Places search bar with theme styling and fallback ──────────────────
-function PlacesSearch({ onPlaceSelect }: { onPlaceSelect: (lat: number, lng: number, address: string) => void }) {
+function PlacesSearch({
+  onPlaceSelect,
+}: {
+  onPlaceSelect: (lat: number, lng: number, address: string) => void;
+}) {
   const placesLib = useMapsLibrary('places');
   const map = useMap();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -191,16 +203,16 @@ function PlacesSearch({ onPlaceSelect }: { onPlaceSelect: (lat: number, lng: num
               }
               setShowDropdown(false);
             }
-          } catch { }
+          } catch {}
         });
       }
-    } catch { }
+    } catch {}
 
     return () => {
       if (listener && typeof google !== 'undefined' && google?.maps?.event) {
         try {
           google.maps.event.removeListener(listener);
-        } catch { }
+        } catch {}
       }
     };
   }, [placesLib, map, onPlaceSelect]);
@@ -258,7 +270,7 @@ function PlacesSearch({ onPlaceSelect }: { onPlaceSelect: (lat: number, lng: num
   };
 
   return (
-    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 w-[320px] sm:w-[420px]">
+    <div className="absolute top-4 left-4 z-20 w-[280px] sm:w-[380px]">
       <div className="relative">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
         <input
@@ -266,18 +278,19 @@ function PlacesSearch({ onPlaceSelect }: { onPlaceSelect: (lat: number, lng: num
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          onFocus={() => { if (suggestions.length > 0) setShowDropdown(true); }}
-          placeholder="Search location, town, or address (e.g. Kuppam)..."
-          className="w-full pl-10 pr-9 py-2.5 bg-white/95 backdrop-blur border border-slate-200 rounded-xl shadow-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-medium"
+          onFocus={() => {
+            if (suggestions.length > 0) setShowDropdown(true);
+          }}
+          placeholder="Search location (e.g. Kuppam)..."
+          className="w-full pl-10 pr-9 py-2.5 bg-white/95 backdrop-blur border border-slate-200/80 rounded-2xl shadow-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-medium"
         />
         {loading && (
           <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600 animate-spin" size={16} />
         )}
       </div>
 
-      {/* Fallback Custom Suggestions Dropdown */}
       {showDropdown && suggestions.length > 0 && (
-        <div className="mt-1 bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden text-xs divide-y divide-slate-100 max-h-56 overflow-y-auto">
+        <div className="mt-1 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden text-xs divide-y divide-slate-100 max-h-56 overflow-y-auto">
           {suggestions.map((s, idx) => (
             <div
               key={idx}
@@ -306,12 +319,12 @@ function ClickHandler({ onClick }: { onClick: (lat: number, lng: number) => void
           if (e?.latLng) onClick(e.latLng.lat(), e.latLng.lng());
         });
       }
-    } catch { }
+    } catch {}
     return () => {
       if (listener && typeof google !== 'undefined' && google?.maps?.event) {
         try {
           google.maps.event.removeListener(listener);
-        } catch { }
+        } catch {}
       }
     };
   }, [map, onClick]);
@@ -320,22 +333,39 @@ function ClickHandler({ onClick }: { onClick: (lat: number, lng: number) => void
 
 // ── Inner map contents ──────────────────────────────────────────────────────
 function MapContents({
-  lat, lng, radiusKm, bufferZoneKm, existingBranches, selectedShape, onLocationChange,
+  lat,
+  lng,
+  radiusKm,
+  bufferZoneKm,
+  existingBranches,
+  selectedShape,
+  onLocationChange,
+  conflictBranchId,
 }: {
-  lat: number; lng: number; radiusKm: number; bufferZoneKm: number;
-  existingBranches: ExistingBranch[]; selectedShape: ShapeType;
+  lat: number;
+  lng: number;
+  radiusKm: number;
+  bufferZoneKm: number;
+  existingBranches: ExistingBranch[];
+  selectedShape: ShapeType;
   onLocationChange: (lat: number, lng: number) => void;
+  conflictBranchId?: string | null;
 }) {
-  const handlePlaceSelect = useCallback((plat: number, plng: number) => {
-    onLocationChange(plat, plng);
-  }, [onLocationChange]);
+  const handlePlaceSelect = useCallback(
+    (plat: number, plng: number) => {
+      onLocationChange(plat, plng);
+    },
+    [onLocationChange],
+  );
+
+  const hasConflict = Boolean(conflictBranchId);
 
   return (
     <>
       <PlacesSearch onPlaceSelect={handlePlaceSelect} />
       <ClickHandler onClick={onLocationChange} />
 
-      {/* Selected location marker (Green Theme) */}
+      {/* Selected location marker */}
       <AdvancedMarker
         position={{ lat: Number(lat), lng: Number(lng) }}
         draggable
@@ -344,7 +374,12 @@ function MapContents({
         }}
         title="Branch center — drag to reposition"
       >
-        <Pin background="#16a34a" borderColor="#15803d" glyphColor="#fff" scale={1.2} />
+        <Pin
+          background={hasConflict ? '#ef4444' : '#16a34a'}
+          borderColor={hasConflict ? '#b91c1c' : '#15803d'}
+          glyphColor="#fff"
+          scale={1.2}
+        />
       </AdvancedMarker>
 
       {Number(radiusKm) > 0 && (
@@ -353,6 +388,7 @@ function MapContents({
           lng={lng}
           radiusKm={radiusKm}
           shape={selectedShape}
+          isConflicting={hasConflict}
         />
       )}
 
@@ -363,6 +399,7 @@ function MapContents({
           radiusKm={Number(radiusKm) + Number(bufferZoneKm)}
           shape={selectedShape}
           isBuffer
+          isConflicting={hasConflict}
         />
       )}
 
@@ -372,21 +409,26 @@ function MapContents({
         const blng = b.lng !== null && b.lng !== undefined ? Number(b.lng) : NaN;
         if (isNaN(blat) || isNaN(blng)) return null;
 
+        const isConflictingWithThis = conflictBranchId && b.branch_id === conflictBranchId;
+
         return (
           <React.Fragment key={b.branch_id || b.branch_name}>
-            <AdvancedMarker
-              position={{ lat: blat, lng: blng }}
-              title={b.branch_name}
-            >
-              <Pin background="#059669" borderColor="#047857" glyphColor="#fff" scale={0.9} />
+            <AdvancedMarker position={{ lat: blat, lng: blng }} title={b.branch_name}>
+              <Pin
+                background={isConflictingWithThis ? '#ef4444' : '#059669'}
+                borderColor={isConflictingWithThis ? '#b91c1c' : '#047857'}
+                glyphColor="#fff"
+                scale={0.95}
+              />
             </AdvancedMarker>
             {b.delivery_radius_km && !isNaN(Number(b.delivery_radius_km)) && (
               <CoverageOverlay
                 lat={blat}
                 lng={blng}
                 radiusKm={Number(b.delivery_radius_km)}
-                shape={b.hex_shape ?? 'circle'}
+                shape={b.hex_shape ?? 'hexagon'}
                 isExisting
+                isConflicting={Boolean(isConflictingWithThis)}
               />
             )}
           </React.Fragment>
@@ -404,144 +446,126 @@ export default function MapPicker({
   radiusKm = 5,
   bufferZoneKm = 0,
   existingBranches = [],
-  selectedShape = 'circle',
+  selectedShape = 'hexagon',
   onShapeChange,
+  allowBufferOrder = false,
+  onOverlapConflictChange,
 }: MapPickerProps) {
   const { googleMapsApiKey } = useClientConfig();
-  const defaultCenter = { lat: 12.9716, lng: 77.5946 }; // Bangalore
-  const center = lat && lng ? { lat, lng } : defaultCenter;
+  const defaultCenter = useMemo(() => {
+    if (lat && lng) return { lat, lng };
+    return { lat: 12.9716, lng: 77.5946 }; // Default: Bangalore
+  }, []);
+
+  // Compute branch overlap in real-time
+  const conflictBranch = useMemo(() => {
+    if (!lat || !lng || !existingBranches.length) return null;
+    return findOverlappingBranch(
+      {
+        lat,
+        lng,
+        delivery_radius_km: radiusKm,
+        buffer_zone: bufferZoneKm,
+        allow_buffer_order: allowBufferOrder,
+        hex_shape: selectedShape,
+        branch_name: 'Current Branch',
+      },
+      existingBranches,
+    );
+  }, [lat, lng, radiusKm, bufferZoneKm, allowBufferOrder, selectedShape, existingBranches]);
+
+  useEffect(() => {
+    onOverlapConflictChange?.(conflictBranch as ExistingBranch | null);
+  }, [conflictBranch, onOverlapConflictChange]);
 
   return (
-    <div className="flex flex-col gap-3 w-full h-full min-h-[360px]">
-      {/* Hub Location Coordinates Bar */}
-      <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-2 font-bold text-xs text-slate-700">
-          <MapPin size={16} className="text-emerald-600 shrink-0" />
-          <span>Geocoded Hub Location:</span>
+    <div className="relative w-full h-full min-h-[480px] rounded-2xl overflow-hidden border border-slate-200/80 shadow-md">
+      <MapErrorBoundary fallbackMessage="Google Maps API Key Error. Click anywhere on the map area or use address search.">
+        <APIProvider apiKey={googleMapsApiKey} libraries={['places']}>
+          <Map
+            defaultCenter={defaultCenter}
+            defaultZoom={lat && lng ? 13 : 11}
+            mapId="f2h-branch-map"
+            gestureHandling="greedy"
+            disableDefaultUI={false}
+            mapTypeControl={false}
+            streetViewControl={false}
+            fullscreenControl={false}
+            zoomControl
+            style={{ width: '100%', height: '100%' }}
+            onClick={(e) => {
+              if (e.detail?.latLng) {
+                onLocationChange(e.detail.latLng.lat, e.detail.latLng.lng);
+              }
+            }}
+          >
+            {lat && lng ? (
+              <MapContents
+                lat={lat}
+                lng={lng}
+                radiusKm={radiusKm}
+                bufferZoneKm={bufferZoneKm}
+                existingBranches={existingBranches}
+                selectedShape={selectedShape}
+                onLocationChange={onLocationChange}
+                conflictBranchId={conflictBranch?.branch_id}
+              />
+            ) : (
+              <PlacesSearch onPlaceSelect={(plat, plng) => onLocationChange(plat, plng)} />
+            )}
+          </Map>
+        </APIProvider>
+      </MapErrorBoundary>
+
+      {/* Floating Side Shape Selector (Only shows shape icons without text, non-intrusive) */}
+      {onShapeChange && (
+        <div className="absolute top-4 right-4 z-20 flex flex-col gap-1.5 bg-white/95 backdrop-blur p-1.5 rounded-2xl shadow-xl border border-slate-200/80">
+          {SHAPE_OPTIONS.map(({ value, label, Icon }) => {
+            const isSelected = selectedShape === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                aria-label={label}
+                title={label}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onShapeChange(value);
+                }}
+                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 scale-105'
+                    : 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-700 hover:scale-105'
+                }`}
+              >
+                <Icon size={18} aria-hidden="true" />
+              </button>
+            );
+          })}
         </div>
+      )}
 
-        <div className="flex items-center gap-2 flex-1 max-w-md min-w-[260px]">
-          <div className="relative flex-1">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[9px] font-mono font-bold text-slate-400">LAT</span>
-            <input
-              type="number"
-              step="any"
-              placeholder="12.762813"
-              value={lat !== null && lat !== undefined ? lat : ''}
-              onChange={(e) => {
-                const val = parseFloat(e.target.value);
-                onLocationChange(isNaN(val) ? 0 : val, lng !== null && lng !== undefined ? lng : 77.5946);
-              }}
-              className="w-full pl-9 pr-2 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 focus:border-emerald-600 focus:outline-none shadow-2xs"
-            />
+      {/* Overlap Collision Alert Banner */}
+      {conflictBranch && (
+        <div className="absolute bottom-4 inset-x-4 z-20 flex justify-center pointer-events-none">
+          <div className="bg-rose-600/95 text-white backdrop-blur px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs font-bold border border-rose-400 animate-in fade-in slide-in-from-bottom-2 duration-200 max-w-lg pointer-events-auto">
+            <AlertTriangle size={16} className="shrink-0 text-amber-300" />
+            <span>
+              Overlap detected with <span className="underline font-extrabold">{conflictBranch.branch_name}</span>. Branches cannot overlap! Please adjust pin position or radius.
+            </span>
           </div>
-
-          <div className="relative flex-1">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[9px] font-mono font-bold text-slate-400">LNG</span>
-            <input
-              type="number"
-              step="any"
-              placeholder="78.351635"
-              value={lng !== null && lng !== undefined ? lng : ''}
-              onChange={(e) => {
-                const val = parseFloat(e.target.value);
-                onLocationChange(lat !== null && lat !== undefined ? lat : 12.9716, isNaN(val) ? 0 : val);
-              }}
-              className="w-full pl-9 pr-2 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 focus:border-emerald-600 focus:outline-none shadow-2xs"
-            />
-          </div>
-
-          {(!lat || !lng) && (
-            <button
-              type="button"
-              onClick={() => onLocationChange(12.762813, 78.351635)}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors shrink-0 cursor-pointer"
-            >
-              Set Location
-            </button>
-          )}
         </div>
-      </div>
+      )}
 
-      {/* Interactive Map View */}
-      <div className="relative w-full flex-1 min-h-[280px] rounded-2xl overflow-hidden border border-slate-200 shadow-xs">
-        <MapErrorBoundary fallbackMessage="Google Maps API Key Error (ApiProjectMapError). Use the Latitude/Longitude fields above to configure hub coordinates.">
-          <APIProvider apiKey={googleMapsApiKey} libraries={['places']}>
-            <Map
-              defaultCenter={center}
-              defaultZoom={lat && lng ? 13 : 11}
-              mapId="f2h-branch-map"
-              gestureHandling="greedy"
-              disableDefaultUI={false}
-              mapTypeControl={false}
-              streetViewControl={false}
-              fullscreenControl={false}
-              zoomControl
-              style={{ width: '100%', height: '100%' }}
-              onClick={(e) => {
-                if (e.detail?.latLng) {
-                  onLocationChange(e.detail.latLng.lat, e.detail.latLng.lng);
-                }
-              }}
-            >
-              {lat && lng && (
-                <MapContents
-                  lat={lat}
-                  lng={lng}
-                  radiusKm={radiusKm}
-                  bufferZoneKm={bufferZoneKm}
-                  existingBranches={existingBranches}
-                  selectedShape={selectedShape}
-                  onLocationChange={onLocationChange}
-                />
-              )}
-              {!lat && (
-                <PlacesSearch
-                  onPlaceSelect={(plat, plng) => onLocationChange(plat, plng)}
-                />
-              )}
-            </Map>
-          </APIProvider>
-        </MapErrorBoundary>
-
-        {onShapeChange && (
-          <div className="absolute inset-x-3 top-16 z-20 flex justify-center">
-            <div
-              role="group"
-              aria-label="Coverage shape"
-              className="grid w-full max-w-md grid-cols-4 gap-1 rounded-xl border border-slate-200 bg-white/95 p-1 shadow-lg backdrop-blur"
-            >
-              {SHAPE_OPTIONS.map(({ value, label, Icon }) => {
-                const isSelected = selectedShape === value;
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    aria-pressed={isSelected}
-                    onClick={() => onShapeChange(value)}
-                    className={`flex items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-bold transition-colors ${isSelected
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-700'
-                    }`}
-                    title={value === 'rectangle' ? 'Rectangle (2:1)' : label}
-                  >
-                    <Icon size={14} aria-hidden="true" />
-                    <span>{label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Coord display badge */}
-        {lat !== null && lng !== null && lat !== undefined && lng !== undefined && (
-          <div className="absolute bottom-3 left-3 bg-white/95 backdrop-blur text-xs text-emerald-800 font-semibold px-3 py-1.5 rounded-lg shadow border border-emerald-100 flex items-center gap-1.5 z-10">
-            <MapPin size={14} className="text-emerald-600" />
+      {/* Subtle Coordinate Badge in Bottom-Left */}
+      {lat !== null && lng !== null && lat !== undefined && lng !== undefined && (
+        <div className="absolute bottom-4 left-4 z-10 bg-white/90 backdrop-blur text-[11px] font-mono font-bold text-slate-700 px-3 py-1.5 rounded-xl shadow-md border border-slate-200/80 flex items-center gap-1.5 select-all">
+          <MapPin size={13} className={conflictBranch ? 'text-rose-600' : 'text-emerald-600'} />
+          <span>
             {Number(lat).toFixed(6)}, {Number(lng).toFixed(6)}
-          </div>
-        )}
-      </div>
+          </span>
+        </div>
+      )}
     </div>
   );
 }
