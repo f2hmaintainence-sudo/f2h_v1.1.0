@@ -250,14 +250,14 @@ class SubscriptionPaymentSheet extends StatelessWidget {
             ),
 
             const SizedBox(height: 18),
-            // Razorpay & UPI options
+            // Razorpay online payment option
             Row(
               children: [
                 const Expanded(child: Divider(color: Color(0xFFE5E7EB))),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   child: Text(
-                    'OR PAY VIA RAZORPAY / UPI',
+                    'OR PAY ONLINE VIA RAZORPAY',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
@@ -356,37 +356,6 @@ class SubscriptionPaymentSheet extends StatelessWidget {
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-
-            Row(
-              children: [
-                Expanded(
-                  child: _UpiOptionTile(
-                    label: 'Google Pay',
-                    icon: Icons.account_balance_rounded,
-                    accentColor: const Color(0xFF4285F4),
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      Navigator.pop(context);
-                      onConfirm(paymentType: 'prepaid', paymentMethod: 'upi');
-                    },
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _UpiOptionTile(
-                    label: 'PhonePe / UPI',
-                    icon: Icons.qr_code_scanner_rounded,
-                    accentColor: const Color(0xFF5F259F),
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      Navigator.pop(context);
-                      onConfirm(paymentType: 'prepaid', paymentMethod: 'upi');
-                    },
-                  ),
-                ),
-              ],
             ),
           ],
 
@@ -548,47 +517,6 @@ class SubscriptionPaymentSheet extends StatelessWidget {
             ],
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _UpiOptionTile extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final Color accentColor;
-  final VoidCallback onTap;
-
-  const _UpiOptionTile({
-    required this.label,
-    required this.icon,
-    required this.accentColor,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF9FAFB),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 18, color: accentColor),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kText),
-            ),
-          ],
-        ),
       ),
     );
   }
