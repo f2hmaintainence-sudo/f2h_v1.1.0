@@ -59,9 +59,6 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
   List<SubscriptionBillModel> _bills = [];
   bool _loadingBills = true;
 
-  /// Collapsed/expanded state of the Delivery Details panel.
-  bool _deliveryExpanded = false;
-
   /// Collapsed/expanded state of the Subscription Details panel.
   bool _subscriptionDetailsExpanded = false;
 
@@ -885,6 +882,9 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
         : (s.pricePerDay > 0 ? s.pricePerDay : 0.0);
     final isCancelled = s.status == 'cancelled';
     final isPostpaid = s.paymentType == 'postpaid';
+    final slot = s.slot.isNotEmpty ? s.slot : 'Morning';
+    final frequency = s.frequency.isNotEmpty ? s.frequency : 'Daily';
+    final hasEndDate = s.endDate != null && s.endDate!.isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -922,7 +922,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                 if (!_subscriptionDetailsExpanded)
                   Flexible(
                     child: Text(
-                      '#${s.id} · ${isPostpaid ? 'Postpaid' : 'Wallet'}',
+                      '#${s.id} · $frequency · $slot',
                       textAlign: TextAlign.end,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -959,6 +959,15 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                         'Product Price',
                         '₹${unitPrice.toStringAsFixed(2)} / unit',
                       ),
+                      _buildDetailRow('Frequency', frequency),
+                      _buildDetailRow('Delivery Slot', slot),
+                      _buildDetailRow('Start Date', _formatDate(s.startDate)),
+                      if (hasEndDate)
+                        _buildDetailRow('End Date', _formatDate(s.endDate)),
+                      _buildDetailRow(
+                        'Auto Renew',
+                        s.autoRenew ? 'Enabled' : 'Disabled',
+                      ),
                       _buildDetailRow(
                         'Payment Method',
                         isPostpaid ? 'Postpaid' : 'Wallet',
@@ -986,121 +995,26 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     );
   }
 
-  // ─── Delivery details (collapsible) ─────────────────────────
+  // ─── Sub Card Days & Frequency Widget ───────────────────────
 
-  Widget _buildDeliveryDetailsSection(Subscription s) {
-    final slot = s.slot.isNotEmpty ? s.slot : 'Morning';
-    final frequency = s.frequency.isNotEmpty ? s.frequency : 'Daily';
-    final hasEndDate = s.endDate != null && s.endDate!.isNotEmpty;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: kSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kBorderLt, width: 1.5),
-      ),
-      child: Column(
-        children: [
-          GestureDetector(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              setState(() => _deliveryExpanded = !_deliveryExpanded);
-            },
-            behavior: HitTestBehavior.opaque,
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.local_shipping_rounded,
-                  size: 16,
-                  color: kPrimary,
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Delivery Details',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    color: kText,
-                  ),
-                ),
-                const Spacer(),
-                // Summary while collapsed
-                if (!_deliveryExpanded)
-                  Flexible(
-                    child: Text(
-                      '$frequency · $slot',
-                      textAlign: TextAlign.end,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: kPrimary,
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 6),
-                AnimatedRotation(
-                  turns: _deliveryExpanded ? 0.5 : 0,
-                  duration: const Duration(milliseconds: 200),
-                  child: const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    size: 20,
-                    color: kTextSub,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.fastOutSlowIn,
-            alignment: Alignment.topCenter,
-            child: _deliveryExpanded
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildSelectedDaysWidget(s),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          _InfoPill(
-                            icon: Icons.wb_sunny_rounded,
-                            label: slot,
-                            color: const Color(0xFFD97706),
-                          ),
-                          if (s.autoRenew)
-                            _InfoPill(
-                              icon: Icons.autorenew_rounded,
-                              label: 'Auto Renew',
-                              color: const Color(0xFF0077B6),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      _buildDetailRow('Frequency', frequency),
-                      _buildDetailRow('Delivery Slot', slot),
-                      _buildDetailRow('Start Date', _formatDate(s.startDate)),
-                      if (hasEndDate)
-                        _buildDetailRow('End Date', _formatDate(s.endDate)),
-                    ],
-                  )
-                : const SizedBox(width: double.infinity),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSelectedDaysWidget(Subscription s) {
+  Widget _buildSubCardDaysWidget(Subscription s) {
     final dayQtys = s.getSelectedDayQuantities();
     if (dayQtys.isEmpty) return const SizedBox.shrink();
 
+    const morningColor = Color(0xFF14532D); // Dark green
+    const eveningColor = Color(0xFF16A34A); // Light green
+
+    final isSevenDays = dayQtys.length == 7;
+    final first = dayQtys.first;
+    final isAllSameSlots = isSevenDays &&
+        dayQtys.every((dq) =>
+            dq.morningQty == first.morningQty &&
+            dq.eveningQty == first.eveningQty &&
+            dq.quantity == first.quantity);
+
     return Container(
       margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(12),
@@ -1109,63 +1023,165 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.calendar_today_rounded, size: 12, color: kPrimary),
-              SizedBox(width: 6),
-              Text(
-                'Delivery Schedule:',
+              const Icon(
+                Icons.calendar_today_rounded,
+                size: 11.5,
+                color: kPrimary,
+              ),
+              const SizedBox(width: 5),
+              const Text(
+                'Schedule & Quantity:',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 10.5,
                   fontWeight: FontWeight.w800,
                   color: kTextSub,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                s.frequency.isNotEmpty ? s.frequency : 'Daily',
+                style: const TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                  color: kPrimary,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 6),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: dayQtys.map((dq) {
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.02),
-                      blurRadius: 3,
-                      offset: const Offset(0, 1),
+          if (isAllSameSlots)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Daily  ',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      color: kText,
+                    ),
+                  ),
+                  if (first.morningQty > 0) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'Morning: ${first.morningQty}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: morningColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                  ],
+                  if (first.eveningQty > 0) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: eveningColor.withValues(alpha: 0.3)),
+                      ),
+                      child: Text(
+                        'Evening: ${first.eveningQty}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: eveningColor,
+                        ),
+                      ),
                     ),
                   ],
-                ),
-                child: RichText(
-                  text: TextSpan(
-                    style: const TextStyle(fontSize: 11, color: kText),
-                    children: [
-                      TextSpan(
-                        text: '${dq.dayName} ',
+                  if (first.morningQty == 0 && first.eveningQty == 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'Qty: ${first.quantity}',
                         style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          color: morningColor,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            )
+          else
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: dayQtys.map((dq) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(7),
+                    border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${dq.dayName} ',
+                        style: const TextStyle(
+                          fontSize: 10.5,
                           fontWeight: FontWeight.w600,
                           color: kTextSub,
                         ),
                       ),
-                      TextSpan(
-                        text: '${dq.quantity}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          color: kPrimary,
+                      if (dq.morningQty > 0) ...[
+                        Text(
+                          'M:${dq.morningQty} ',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: morningColor,
+                          ),
                         ),
-                      ),
+                      ],
+                      if (dq.eveningQty > 0) ...[
+                        Text(
+                          'E:${dq.eveningQty}',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: eveningColor,
+                          ),
+                        ),
+                      ],
+                      if (dq.morningQty == 0 && dq.eveningQty == 0)
+                        Text(
+                          '${dq.quantity}',
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w900,
+                            color: kPrimary,
+                          ),
+                        ),
                     ],
                   ),
-                ),
-              );
-            }).toList(),
-          ),
+                );
+              }).toList(),
+            ),
         ],
       ),
     );
@@ -1601,6 +1617,8 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                             ),
                           ],
                         ),
+                        // Frequency & Day Quantities at bottom of Product Card
+                        _buildSubCardDaysWidget(s),
                       ],
                     ),
                   ),
@@ -1667,15 +1685,11 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   _buildDeliveryAddressCard(defaultAddress, addressString),
                   const SizedBox(height: 12),
 
-                  // ── 4. Delivery Details (collapsible) ──────────
-                  _buildDeliveryDetailsSection(s),
-                  const SizedBox(height: 12),
-
-                  // ── 5. Postpaid Summary Card (if Postpaid) ─────
+                  // ── 4. Postpaid Summary Card (if Postpaid) ─────
                   if (s.paymentType == 'postpaid')
                     _buildPostpaidSummaryCard(sessionState),
 
-                  // ── 6. Subscription Details (collapsible) ──────
+                  // ── 5. Subscription Details (collapsible, includes Delivery Details) ──
                   _buildSubscriptionDetailsSection(s),
                   const SizedBox(height: 20),
 
