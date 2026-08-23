@@ -10,7 +10,7 @@ final mockTx = [
   const Transaction(id:'t2', desc:'Order — Paneer × 1', date:'Today', amount:80, isCredit:false),
   const Transaction(id:'t3', desc:'Wallet Topup via UPI', date:'Yesterday', amount:500, isCredit:true),
   const Transaction(id:'t4', desc:'Order — Cow Milk × 2', date:'Yesterday', amount:64, isCredit:false),
-  const Transaction(id:'t5', desc:'Referral Bonus — Ravi K.', date:'07 Apr', amount:50, isCredit:true),
+  const Transaction(id:'t5', desc:'Referral Bonus — Ravi K.', date:'07 Apr', amount:100, isCredit:true),
   const Transaction(id:'t6', desc:'Order — Cow Milk × 2', date:'07 Apr', amount:64, isCredit:false),
   const Transaction(id:'t7', desc:'Wallet Topup via UPI', date:'05 Apr', amount:300, isCredit:true),
 ];
