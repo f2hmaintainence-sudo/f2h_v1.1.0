@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -311,14 +313,14 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                   ),
 
-                  // 6. One time Product
+                  // 6. Popular Product
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
                       child: Row(
                         children: [
                           const Text(
-                            'One-time Products',
+                            'Popular Products',
                             style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w900,
@@ -392,11 +394,17 @@ class _HomeScreenState extends State<HomeScreen>
                           return const SizedBox.shrink();
                         }
 
+                        // Popular Products: in-stock, non-subscribable, rated — highest first
                         List<Product> products = [];
                         if (state is CatalogLoaded) {
-                          products = state.products
-                              .where((p) => !p.isSubscribable)
-                              .toList();
+                          final all = state.products
+                              .where((p) =>
+                                  !p.isSubscribable &&
+                                  !p.isOutOfStock &&
+                                  p.rating > 0)
+                              .toList()
+                            ..sort((a, b) => b.rating.compareTo(a.rating));
+                          products = all.take(20).toList();
                         }
                         if (products.isEmpty) {
                           return const SizedBox.shrink();
@@ -424,10 +432,22 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                   ),
 
-                  // 6. Referral Banner (Invite Friends, Earn Rewards!)
+                  // 7. Per-category product groups with inline banners
+                  SliverToBoxAdapter(
+                    child: BlocBuilder<CatalogBloc, CatalogState>(
+                      builder: (context, state) {
+                        if (state is! CatalogLoaded) return const SizedBox.shrink();
+                        return _CategoryProductGroups(
+                          allProducts: state.products,
+                        );
+                      },
+                    ),
+                  ),
+
+                  // 8. Referral Banner (Invite Friends, Earn Rewards!)
                   const SliverToBoxAdapter(child: ReferralInviteCard()),
 
-                  // 7. The F2H Promise
+                  // 9. The F2H Promise
                   SliverToBoxAdapter(child: _promiseStrip()),
 
                   const SliverToBoxAdapter(child: SizedBox(height: 104)),
@@ -2358,4 +2378,317 @@ Widget oneTimeProductCard(BuildContext context, Product p) {
       ),
     ),
   );
+}
+
+// ══════════════════════════════════════════════════════════
+//  PER-CATEGORY PRODUCT GROUPS WITH INLINE BANNERS
+//  Fetches category_slide banners from the existing promo-banners
+//  endpoint, groups in-stock / non-subscribable products by category,
+//  and renders an inline banner above each group that has a matching
+//  product_banner row.
+// ══════════════════════════════════════════════════════════
+
+class _CategoryProductGroups extends StatefulWidget {
+  final List<Product> allProducts;
+  const _CategoryProductGroups({required this.allProducts});
+
+  @override
+  State<_CategoryProductGroups> createState() => _CategoryProductGroupsState();
+}
+
+class _CategoryProductGroupsState extends State<_CategoryProductGroups> {
+  /// Map from lowercase category name → banner data from promo-banners API.
+  final Map<String, Map<String, dynamic>> _categoryBanners = {};
+  bool _bannersLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCategoryBanners();
+  }
+
+  Future<void> _fetchCategoryBanners() async {
+    try {
+      final resp = await DioClient().dio.get(ApiEndpoints.promoBanners);
+      dynamic data = resp.data;
+      if (data is String) data = jsonDecode(data);
+      if (data is Map && data['status'] == true && data['data'] is List) {
+        for (final b in data['data'] as List) {
+          // Only category_slide banners that have an actionValue (the category id/name)
+          final actionType = (b['actionType'] ?? '').toString().toUpperCase();
+          final actionValue = b['actionValue']?.toString() ?? '';
+          if (actionType == 'CATEGORY' && actionValue.isNotEmpty) {
+            _categoryBanners[actionValue.toLowerCase()] =
+                Map<String, dynamic>.from(b as Map);
+          }
+        }
+      }
+    } catch (_) {
+      // Non-critical — fall through, groups render without banners
+    }
+    if (mounted) setState(() => _bannersLoaded = true);
+  }
+
+  String _formatImageUrl(String rawUrl) {
+    if (rawUrl.isEmpty) return '';
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      final uri = Uri.tryParse(rawUrl);
+      const localHosts = {'localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2'};
+      final apiHost = Uri.tryParse(ApiEndpoints.host)?.host;
+      if (uri != null &&
+          uri.path.isNotEmpty &&
+          (localHosts.contains(uri.host) || uri.host == apiHost)) {
+        return '${ApiEndpoints.host}${uri.path}';
+      }
+      return rawUrl;
+    }
+    final clean = rawUrl.startsWith('/') ? rawUrl : '/$rawUrl';
+    return '${ApiEndpoints.host}$clean';
+  }
+
+  /// Group in-stock, non-subscribable, rated products by category.
+  Map<String, List<Product>> _groupByCategory() {
+    final eligible = widget.allProducts
+        .where((p) => !p.isSubscribable && !p.isOutOfStock)
+        .toList()
+      ..sort((a, b) => b.rating.compareTo(a.rating));
+
+    final Map<String, List<Product>> groups = {};
+    for (final p in eligible) {
+      final cat = p.category.isNotEmpty ? p.category : 'Other';
+      groups.putIfAbsent(cat, () => []).add(p);
+    }
+    // Keep groups with at least 2 products; sort groups by name
+    final filtered = Map.fromEntries(
+      groups.entries
+          .where((e) => e.value.length >= 2)
+          .toList()
+        ..sort((a, b) => a.key.compareTo(b.key)),
+    );
+    return filtered;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final groups = _groupByCategory();
+    if (groups.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final entry in groups.entries) ...[
+          _CategorySection(
+            categoryName: entry.key,
+            products: entry.value,
+            banner: _bannersLoaded
+                ? (_categoryBanners[entry.key.toLowerCase()] ??
+                    _categoryBanners.entries
+                        .where((e) => entry.key
+                            .toLowerCase()
+                            .contains(e.key.toLowerCase()))
+                        .map((e) => e.value)
+                        .firstOrNull)
+                : null,
+            formatImageUrl: _formatImageUrl,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Single category group: header + optional inline banner + product scroll
+// ─────────────────────────────────────────────────────────────────────────────
+class _CategorySection extends StatelessWidget {
+  final String categoryName;
+  final List<Product> products;
+  final Map<String, dynamic>? banner;
+  final String Function(String) formatImageUrl;
+
+  const _CategorySection({
+    required this.categoryName,
+    required this.products,
+    required this.banner,
+    required this.formatImageUrl,
+  });
+
+  void _onBannerTap(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BrowseScreen(initialCategory: categoryName),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Category header ─────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+          child: Row(
+            children: [
+              Text(
+                categoryName,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: kText,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        BrowseScreen(initialCategory: categoryName),
+                  ),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'See All',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF16653A),
+                      ),
+                    ),
+                    SizedBox(width: 4),
+                    Icon(Icons.arrow_forward, size: 12, color: Color(0xFF16653A)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // ── Inline category banner (if admin set one for this category) ─────
+        if (banner != null) ...[
+          GestureDetector(
+            onTap: () => _onBannerTap(context),
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              height: 90,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                color: const Color(0xFF15803D),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Banner image
+                    Image.network(
+                      formatImageUrl(banner!['imageUrl']?.toString() ?? ''),
+                      fit: BoxFit.fill,
+                      width: double.infinity,
+                      errorBuilder: (_, __, ___) => Container(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF15803D), Color(0xFF22C55E)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    banner!['title']?.toString() ?? categoryName,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                  if ((banner!['subtitle'] ?? '').toString().isNotEmpty)
+                                    Text(
+                                      banner!['subtitle'].toString(),
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 11,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                banner!['cta']?.toString() ?? 'Shop Now',
+                                style: const TextStyle(
+                                  color: Color(0xFF15803D),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Tap ripple overlay
+                    Positioned.fill(
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () => _onBannerTap(context),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+
+        // ── Horizontal product scroll for this category ──────────────────────
+        SizedBox(
+          height: 245,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: products.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (ctx, i) => SizedBox(
+              width: 162,
+              child: oneTimeProductCard(ctx, products[i]),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 8),
+      ],
+    );
+  }
 }
