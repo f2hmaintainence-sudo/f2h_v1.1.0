@@ -470,7 +470,113 @@ class SubscriptionPaymentSheet extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    _CreditRow(label: 'Postpaid Credit Limit:', value: '₹${creditLimit.toStringAsFixed(0)}'),
+                    // 3 Metric columns
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFBBF7D0)),
+                            ),
+                            child: Column(
+                              children: [
+                                const Text(
+                                  'Credit Limit',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF166534),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  '₹${creditLimit.toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF1E293B),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFBBF7D0)),
+                            ),
+                            child: Column(
+                              children: [
+                                const Text(
+                                  'Usage',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF166534),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  '₹${combinedPostpaidTotal.toStringAsFixed(0)}/mo',
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFFD97706),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFBBF7D0)),
+                            ),
+                            child: Column(
+                              children: [
+                                const Text(
+                                  'Remaining',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF166534),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  '₹${(creditLimit - combinedPostpaidTotal).clamp(0, double.infinity).toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF15803D),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     _CreditRow(label: 'Existing Postpaid Subs:', value: '₹${existingPostpaidCommitted.toStringAsFixed(0)}/mo'),
                     _CreditRow(label: 'New Subscription Est:', value: '₹${monthlyEstimateForCreditCheck.toStringAsFixed(0)}/mo'),
                     const SizedBox(height: 8),
@@ -484,9 +590,18 @@ class SubscriptionPaymentSheet extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      'Remaining Credit Limit: ₹${(creditLimit - combinedPostpaidTotal).toStringAsFixed(0)}',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF15803D)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${((combinedPostpaidTotal / (creditLimit > 0 ? creditLimit : 1.0)) * 100).clamp(0, 100).toStringAsFixed(0)}% limit utilized',
+                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Color(0xFF166534)),
+                        ),
+                        Text(
+                          'Remaining: ₹${(creditLimit - combinedPostpaidTotal).clamp(0, double.infinity).toStringAsFixed(0)}',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF15803D)),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     SizedBox(

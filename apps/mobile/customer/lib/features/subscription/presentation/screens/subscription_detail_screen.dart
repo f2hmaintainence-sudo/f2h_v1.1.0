@@ -62,6 +62,9 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
   /// Collapsed/expanded state of the Delivery Details panel.
   bool _deliveryExpanded = false;
 
+  /// Collapsed/expanded state of the Subscription Details panel.
+  bool _subscriptionDetailsExpanded = false;
+
   String _getMonthName(int month) {
     const names = [
       '',
@@ -588,54 +591,395 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
 
   // ─── Delivery address (own card) ────────────────────────────
 
-  Widget _buildDeliveryAddressCard(String addressString) {
+  Widget _buildDeliveryAddressCard(AddressModel address, String addressString) {
+    final contactName = address.contactName.isNotEmpty
+        ? address.contactName
+        : (address.customerId.isNotEmpty ? address.customerId : 'Recipient');
+    final contactMobile = address.contactMobile;
+    final addressType = address.addressType.isNotEmpty
+        ? address.addressType.toUpperCase()
+        : 'HOME';
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: kSurface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: kBorderLt, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: kPrimaryPl,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(
-              Icons.location_on_rounded,
-              size: 16,
-              color: kPrimary,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Delivery Address',
-                  style: TextStyle(
-                    fontSize: 11,
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: kPrimaryPl,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.location_on_rounded,
+                  size: 16,
+                  color: kPrimary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'DELIVERY ADDRESS',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  color: kTextSub,
+                  letterSpacing: 0.6,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: kPrimary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  addressType,
+                  style: const TextStyle(
+                    fontSize: 9.5,
                     fontWeight: FontWeight.w800,
-                    color: kTextSub,
+                    color: kPrimary,
+                    letterSpacing: 0.3,
                   ),
                 ),
-                const SizedBox(height: 4),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (contactName.isNotEmpty || contactMobile.isNotEmpty) ...[
+            Row(
+              children: [
                 Text(
-                  addressString,
+                  contactName,
                   style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w900,
                     color: kText,
-                    height: 1.35,
+                  ),
+                ),
+                if (contactMobile.isNotEmpty) ...[
+                  const Text(' · ', style: TextStyle(color: kTextSub, fontWeight: FontWeight.bold)),
+                  Text(
+                    contactMobile,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: kTextSub,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 4),
+          ],
+          Text(
+            addressString,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: kTextSub,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Postpaid Summary Card ───────────────────────────────────
+
+  Widget _buildPostpaidSummaryCard(CustomerSessionState sessionState) {
+    final profile = sessionState.profile;
+    final creditLimit = profile?.postpaidCreditLimit ?? 0.0;
+    final usedCredit = _detailInfo?.outstandingAmount ?? 0.0;
+    final remainingLimit = (creditLimit - usedCredit).clamp(0.0, double.infinity);
+    final usagePercent = creditLimit > 0 ? (usedCredit / creditLimit).clamp(0.0, 1.0) : 0.0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFBBF7D0), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: kPrimary.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.verified_user_rounded,
+                  size: 16,
+                  color: Color(0xFF15803D),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Postpaid Credit Facility',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF14532D),
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'ACTIVE',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF15803D),
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // 3 Metric columns
+          Row(
+            children: [
+              Expanded(
+                child: _buildPostpaidStatPill(
+                  label: 'Credit Limit',
+                  value: '₹${creditLimit.toStringAsFixed(0)}',
+                  color: const Color(0xFF1E293B),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildPostpaidStatPill(
+                  label: 'Usage / Due',
+                  value: '₹${usedCredit.toStringAsFixed(0)}',
+                  color: usedCredit > 0 ? const Color(0xFFD97706) : const Color(0xFF64748B),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildPostpaidStatPill(
+                  label: 'Remaining',
+                  value: '₹${remainingLimit.toStringAsFixed(0)}',
+                  color: const Color(0xFF15803D),
+                  isBold: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Progress Bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: usagePercent,
+              backgroundColor: const Color(0xFFDCFCE7),
+              color: usagePercent > 0.85 ? Colors.red : const Color(0xFF15803D),
+              minHeight: 6,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${(usagePercent * 100).toStringAsFixed(0)}% utilized',
+                style: const TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF166534),
+                ),
+              ),
+              Text(
+                '₹${remainingLimit.toStringAsFixed(0)} available',
+                style: const TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF15803D),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPostpaidStatPill({
+    required String label,
+    required String value,
+    required Color color,
+    bool isBold = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFBBF7D0)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF166534),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: isBold ? FontWeight.w900 : FontWeight.w800,
+              color: color,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Subscription details (collapsible) ─────────────────────
+
+  Widget _buildSubscriptionDetailsSection(Subscription s) {
+    final unitPrice = (s.items.isNotEmpty && s.items.first.unitPrice > 0)
+        ? s.items.first.unitPrice
+        : (s.pricePerDay > 0 ? s.pricePerDay : 0.0);
+    final isCancelled = s.status == 'cancelled';
+    final isPostpaid = s.paymentType == 'postpaid';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kBorderLt, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              setState(() => _subscriptionDetailsExpanded = !_subscriptionDetailsExpanded);
+            },
+            behavior: HitTestBehavior.opaque,
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.receipt_outlined,
+                  size: 16,
+                  color: kPrimary,
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Subscription Details',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    color: kText,
+                  ),
+                ),
+                const Spacer(),
+                if (!_subscriptionDetailsExpanded)
+                  Flexible(
+                    child: Text(
+                      '#${s.id} · ${isPostpaid ? 'Postpaid' : 'Wallet'}',
+                      textAlign: TextAlign.end,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: kPrimary,
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 6),
+                AnimatedRotation(
+                  turns: _subscriptionDetailsExpanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 20,
+                    color: kTextSub,
                   ),
                 ),
               ],
             ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.fastOutSlowIn,
+            alignment: Alignment.topCenter,
+            child: _subscriptionDetailsExpanded
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 10),
+                      _buildDetailRow('Subscription ID', '#${s.id}'),
+                      _buildDetailRow(
+                        'Product Price',
+                        '₹${unitPrice.toStringAsFixed(2)} / unit',
+                      ),
+                      _buildDetailRow(
+                        'Payment Method',
+                        isPostpaid ? 'Postpaid' : 'Wallet',
+                      ),
+                      if (isCancelled)
+                        _buildDetailRow('Status', 'Cancelled', valueColor: kRed),
+                      if (!isPostpaid && _detailInfo != null && !_loadingDetail) ...[
+                        _buildDetailRow(
+                          'Wallet Balance',
+                          '₹${_detailInfo!.walletBalance.toStringAsFixed(2)}',
+                          valueColor: _detailInfo!.alertLowBalance ? kRed : kPrimary,
+                        ),
+                      ],
+                      if (_detailInfo != null && !_loadingDetail && _detailInfo!.nextRenewalEstimate > 0)
+                        _buildDetailRow(
+                          'Est. Renewal',
+                          '₹${_detailInfo!.nextRenewalEstimate.toStringAsFixed(0)} / month',
+                        ),
+                    ],
+                  )
+                : const SizedBox(width: double.infinity),
           ),
         ],
       ),
@@ -832,27 +1176,10 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
   Widget _buildAlertBanners() {
     final info = _detailInfo;
     if (_loadingDetail || info == null) return const SizedBox.shrink();
-    if (!info.alertLowBalance && !info.alertOutstandingBills)
-      return const SizedBox.shrink();
+    if (!info.alertOutstandingBills) return const SizedBox.shrink();
 
     return Column(
       children: [
-        if (info.alertLowBalance) ...[
-          _AlertBanner(
-            icon: Icons.account_balance_wallet_outlined,
-            message:
-                'Low Wallet Balance (₹${info.walletBalance.toStringAsFixed(0)}). Please recharge to continue your subscription.',
-            color: const Color(0xFFD97706),
-            bgColor: const Color(0xFFFFFBEB),
-            borderColor: const Color(0xFFFDE68A),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const WalletScreen()),
-            ),
-            actionLabel: 'Recharge',
-          ),
-          const SizedBox(height: 8),
-        ],
         if (info.alertOutstandingBills) ...[
           _AlertBanner(
             icon: Icons.receipt_long_outlined,
@@ -1102,6 +1429,10 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                     '${defaultAddress.city} - ${defaultAddress.pincode}',
                   ].join(', ');
 
+            final unitPrice = (s.items.isNotEmpty && s.items.first.unitPrice > 0)
+                ? s.items.first.unitPrice
+                : (s.pricePerDay > 0 ? s.pricePerDay : 0.0);
+
             return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
               child: Column(
@@ -1180,13 +1511,38 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 6),
-                                  Text(
-                                    '₹${monthlyPrice.toStringAsFixed(0)} / Month',
-                                    style: TextStyle(
-                                      fontSize: 14.5,
-                                      fontWeight: FontWeight.w900,
-                                      color: isCancelled ? kTextSub : kText,
-                                    ),
+                                  Wrap(
+                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                    spacing: 8,
+                                    children: [
+                                      if (unitPrice > 0)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 7,
+                                            vertical: 2.5,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: kPrimaryPl,
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            '₹${unitPrice.toStringAsFixed(2)} / unit',
+                                            style: const TextStyle(
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w900,
+                                              color: kPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                      Text(
+                                        '₹${monthlyPrice.toStringAsFixed(0)} / Month',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w900,
+                                          color: isCancelled ? kTextSub : kText,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                   if (s.pauseFromDate != null &&
                                       s.pauseToDate != null) ...[
@@ -1250,7 +1606,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // ── 2. Quick action buttons ────────────────────
+                  // ── 2. Quick action buttons (All Green Theme) ──
                   Row(
                     children: [
                       Expanded(
@@ -1272,7 +1628,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                         child: _QuickActionButton(
                           icon: Icons.receipt_long_rounded,
                           label: 'Bills',
-                          color: const Color(0xFF7C3AED),
+                          color: kPrimary,
                           onTap: _showBillsSheet,
                           badge: (_detailInfo?.outstandingBillCount ?? 0) > 0
                               ? '${_detailInfo!.outstandingBillCount}'
@@ -1284,7 +1640,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                         child: _QuickActionButton(
                           icon: Icons.history_rounded,
                           label: 'Pauses',
-                          color: kAccent,
+                          color: kPrimary,
                           onTap: _showPauseHistorySheet,
                           badge: _pauseHistory.isNotEmpty
                               ? '${_pauseHistory.length}'
@@ -1296,7 +1652,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                         child: _QuickActionButton(
                           icon: Icons.local_shipping_rounded,
                           label: 'Orders',
-                          color: const Color(0xFF0077B6),
+                          color: kPrimary,
                           onTap: _showOrdersHistorySheet,
                           badge: _subscriptionOrders.isNotEmpty
                               ? '${_subscriptionOrders.length}'
@@ -1308,47 +1664,22 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   const SizedBox(height: 16),
 
                   // ── 3. Delivery Address ────────────────────────
-                  _buildDeliveryAddressCard(addressString),
+                  _buildDeliveryAddressCard(defaultAddress, addressString),
                   const SizedBox(height: 12),
 
                   // ── 4. Delivery Details (collapsible) ──────────
                   _buildDeliveryDetailsSection(s),
+                  const SizedBox(height: 12),
+
+                  // ── 5. Postpaid Summary Card (if Postpaid) ─────
+                  if (s.paymentType == 'postpaid')
+                    _buildPostpaidSummaryCard(sessionState),
+
+                  // ── 6. Subscription Details (collapsible) ──────
+                  _buildSubscriptionDetailsSection(s),
                   const SizedBox(height: 20),
 
-                  // ── 5. Subscription Details ────────────────────
-                  const Text(
-                    'Subscription Details',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      color: kText,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildDetailRow('Sub Number', s.displayLabel),
-                  _buildDetailRow(
-                    'Payment Method',
-                    s.paymentType == 'postpaid' ? 'Postpaid' : 'Wallet',
-                  ),
-                  if (isCancelled)
-                    _buildDetailRow('Status', 'Cancelled', valueColor: kRed),
-                  if (_detailInfo != null && !_loadingDetail) ...[
-                    _buildDetailRow(
-                      'Wallet Balance',
-                      '₹${_detailInfo!.walletBalance.toStringAsFixed(2)}',
-                      valueColor: _detailInfo!.alertLowBalance
-                          ? kRed
-                          : kPrimary,
-                    ),
-                    if (_detailInfo!.nextRenewalEstimate > 0)
-                      _buildDetailRow(
-                        'Est. Renewal',
-                        '₹${_detailInfo!.nextRenewalEstimate.toStringAsFixed(0)} / month',
-                      ),
-                  ],
-                  const SizedBox(height: 20),
-
-                  // ── 6. Bills section ────────────────────────────
+                  // ── 7. Bills section ────────────────────────────
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
