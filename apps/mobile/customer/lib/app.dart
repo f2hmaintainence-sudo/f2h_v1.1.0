@@ -19,6 +19,7 @@ import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/core/network/network_bloc.dart';
 import 'package:f2h_customer/core/widgets/network_overlay.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/catalog_bloc.dart';
+import 'package:f2h_customer/features/catalog/presentation/bloc/catalog_event.dart';
 import 'package:f2h_customer/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:f2h_customer/features/subscription/presentation/bloc/subscription_bloc.dart';
 import 'package:f2h_customer/features/subscription/presentation/bloc/subscription_state.dart';

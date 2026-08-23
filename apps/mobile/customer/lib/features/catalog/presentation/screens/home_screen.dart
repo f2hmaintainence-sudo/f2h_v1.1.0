@@ -11,24 +11,15 @@ import '../bloc/catalog_event.dart';
 import '../../../../app.dart';
 import '../../../../core/session/customer_session_cubit.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
-import '../../../../core/widgets/custom_button.dart';
 import '../../../../core/widgets/app_refresh_indicator.dart';
-import '../../../../core/session/customer_session_state.dart';
 import '../../../../core/widgets/referral_invite_card.dart';
 import '../../../../core/network/network_bloc.dart';
 import '../../../../core/network/network_state.dart';
-import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
-import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
-import 'package:flutter/services.dart';
 import 'package:f2h_customer/core/services/app_asset_service.dart';
-import '../../../profile/presentation/screens/profile_screen.dart';
-import '../../../notifications/presentation/screens/notifications_screen.dart';
 import '../../../address/presentation/widgets/address_selector_drawer.dart';
 import '../../../address/data/models/profile_address.dart';
 import '../../data/models/product_model.dart';
 import '../widgets/product_tile.dart';
-import '../widgets/cart_widgets.dart';
-import '../widgets/offer_banner.dart';
 import '../widgets/image_banner.dart';
 import '../widgets/promo_banner.dart';
 import 'cart_screen.dart';
@@ -41,7 +32,6 @@ import '../bloc/cart/cart_event.dart';
 import '../../../notifications/presentation/bloc/notifications_bloc.dart';
 import '../../../notifications/presentation/bloc/notifications_state.dart';
 import '../../../notifications/presentation/bloc/notifications_event.dart';
-import '../../../../core/guards/auth_guard.dart';
 import '../../../../core/widgets/popup_banner_widget.dart';
 
 // ══════════════════════════════════════════════════════════
@@ -494,8 +484,9 @@ class _HomeScreenState extends State<HomeScreen>
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _branchInfoChip(BuildContext context) {
     return BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
