@@ -53,6 +53,13 @@ class ProductVariant {
     return label;
   }
 
+  int get discountPercent {
+    if (originalPrice > price && originalPrice > 0) {
+      return (((originalPrice - price) / originalPrice) * 100).round();
+    }
+    return 0;
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -176,6 +183,13 @@ class Product {
       return variants.first.formattedUnit;
     }
     return '';
+  }
+
+  int get discountPercent {
+    if (originalPrice > price && originalPrice > 0) {
+      return (((originalPrice - price) / originalPrice) * 100).round();
+    }
+    return 0;
   }
 
   List<ProductVariant> get allVariants {

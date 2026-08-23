@@ -754,36 +754,48 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                       style: const TextStyle(fontSize: 11, color: kTextSub),
                     ),
                     const SizedBox(height: 4),
-                    Row(
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 6,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE8F5E9),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(
-                                Icons.autorenew_rounded,
-                                size: 9,
-                                color: kPrimary,
-                              ),
-                              SizedBox(width: 3),
-                              Text(
-                                'Subscription',
-                                style: TextStyle(
-                                  fontSize: 8.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: kPrimary,
-                                ),
-                              ),
-                            ],
+                        Text(
+                          '₹${_subscriptionUnitPrice.toStringAsFixed(0)}/unit',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            color: kPrimary,
                           ),
                         ),
+                        if (_variant.originalPrice > _subscriptionUnitPrice) ...[
+                          Text(
+                            'MRP ₹${_variant.originalPrice.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: kMuted,
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                          ),
+                          if (_variant.discountPercent > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                                vertical: 1.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDCFCE7),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '${_variant.discountPercent}% OFF',
+                                style: const TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF166534),
+                                ),
+                              ),
+                            ),
+                        ],
                       ],
                     ),
                   ],
@@ -815,7 +827,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
+                      horizontal: 10,
                       vertical: 7,
                     ),
                     decoration: BoxDecoration(
@@ -836,13 +848,31 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                             color: isSel ? Colors.white : kText,
                           ),
                         ),
-                        Text(
-                          '₹${subPrice.toStringAsFixed(0)}/unit',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: isSel ? Colors.white70 : kPrimary,
-                          ),
+                        const SizedBox(height: 2),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '₹${subPrice.toStringAsFixed(0)}/unit',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                color: isSel ? Colors.white : kPrimary,
+                              ),
+                            ),
+                            if (v.originalPrice > subPrice) ...[
+                              const SizedBox(width: 4),
+                              Text(
+                                '₹${v.originalPrice.toStringAsFixed(0)}',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w500,
+                                  color: isSel ? Colors.white60 : kMuted,
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ],
                     ),

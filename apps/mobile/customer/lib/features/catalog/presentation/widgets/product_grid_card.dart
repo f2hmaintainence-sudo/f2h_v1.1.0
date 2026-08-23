@@ -430,7 +430,7 @@ class _PriceRow extends StatelessWidget {
           ),
         ),
         if (originalPrice > price) ...[
-          const SizedBox(width: 6),
+          const SizedBox(width: 5),
           Padding(
             padding: EdgeInsets.only(bottom: muted ? 0 : 2),
             child: Text(
@@ -444,6 +444,27 @@ class _PriceRow extends StatelessWidget {
               ),
             ),
           ),
+          if (!muted && (((originalPrice - price) / originalPrice) * 100).round() > 0) ...[
+            const SizedBox(width: 4),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: Text(
+                  '${(((originalPrice - price) / originalPrice) * 100).round()}% OFF',
+                  style: const TextStyle(
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF166534),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ],
     ),

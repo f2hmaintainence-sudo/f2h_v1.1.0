@@ -344,6 +344,8 @@ class SubscriptionItemModel {
   final int defaultEQty;
   final double unitPrice;
   final double finalPrice;
+  final double originalPrice;
+  final int discount;
   final String status;
   final String? startDate;
   final String? endDate;
@@ -362,6 +364,8 @@ class SubscriptionItemModel {
     this.defaultEQty = 0,
     this.unitPrice = 0,
     this.finalPrice = 0,
+    this.originalPrice = 0,
+    this.discount = 0,
     this.status = 'active',
     this.startDate,
     this.endDate,
@@ -371,6 +375,10 @@ class SubscriptionItemModel {
   });
 
   factory SubscriptionItemModel.fromJson(Map<String, dynamic> json) {
+    final unitP = _asDouble(json['unit_price'] ?? json['unitPrice'] ?? json['price']);
+    final origP = _asDouble(json['original_price'] ?? json['originalPrice']);
+    final disc = _asInt(json['discount'] ?? json['discount_percentage']);
+
     return SubscriptionItemModel(
       id:
           _asString(
@@ -393,8 +401,14 @@ class SubscriptionItemModel {
       sku: _asString(json['sku']) ?? '',
       defaultMQty: _asInt(json['default_m_quantity'] ?? json['defaultMQty']),
       defaultEQty: _asInt(json['default_e_quantity'] ?? json['defaultEQty']),
-      unitPrice: _asDouble(json['unit_price'] ?? json['unitPrice']),
+      unitPrice: unitP,
       finalPrice: _asDouble(json['final_price'] ?? json['finalPrice']),
+      originalPrice: origP > 0 ? origP : unitP,
+      discount: disc > 0
+          ? disc
+          : (origP > unitP && origP > 0
+              ? (((origP - unitP) / origP) * 100).round()
+              : 0),
       status: (_asString(json['item_status'] ?? json['status']) ?? 'active').toLowerCase() == 'paused'
           ? 'active'
           : (_asString(json['item_status'] ?? json['status']) ?? 'active'),

@@ -1445,9 +1445,18 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                     '${defaultAddress.city} - ${defaultAddress.pincode}',
                   ].join(', ');
 
-            final unitPrice = (s.items.isNotEmpty && s.items.first.unitPrice > 0)
-                ? s.items.first.unitPrice
+            final firstItem = s.items.isNotEmpty ? s.items.first : null;
+            final unitPrice = (firstItem != null && firstItem.unitPrice > 0)
+                ? firstItem.unitPrice
                 : (s.pricePerDay > 0 ? s.pricePerDay : 0.0);
+            final originalPrice = (firstItem != null && firstItem.originalPrice > 0)
+                ? firstItem.originalPrice
+                : 0.0;
+            final discount = (firstItem != null && firstItem.discount > 0)
+                ? firstItem.discount
+                : (originalPrice > unitPrice && originalPrice > 0
+                    ? (((originalPrice - unitPrice) / originalPrice) * 100).round()
+                    : 0);
 
             return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
@@ -1529,7 +1538,8 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                                   const SizedBox(height: 6),
                                   Wrap(
                                     crossAxisAlignment: WrapCrossAlignment.center,
-                                    spacing: 8,
+                                    spacing: 6,
+                                    runSpacing: 4,
                                     children: [
                                       if (unitPrice > 0)
                                         Container(
@@ -1550,10 +1560,40 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                                             ),
                                           ),
                                         ),
+                                      if (originalPrice > unitPrice) ...[
+                                        Text(
+                                          'MRP ₹${originalPrice.toStringAsFixed(0)}',
+                                          style: const TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: kMuted,
+                                            decoration: TextDecoration.lineThrough,
+                                          ),
+                                        ),
+                                        if (discount > 0)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 5.5,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFDCFCE7),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              '$discount% OFF',
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w800,
+                                                color: Color(0xFF166534),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
                                       Text(
                                         '₹${monthlyPrice.toStringAsFixed(0)} / Month',
                                         style: TextStyle(
-                                          fontSize: 14,
+                                          fontSize: 13.5,
                                           fontWeight: FontWeight.w900,
                                           color: isCancelled ? kTextSub : kText,
                                         ),

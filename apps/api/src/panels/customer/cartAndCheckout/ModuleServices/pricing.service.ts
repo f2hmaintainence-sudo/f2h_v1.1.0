@@ -7,6 +7,7 @@ export interface CalculatedPrice {
   price: number;
   subscription_price: number;
   discount_percentage: number;
+  discount?: number;
   discount_amount: number;
   final_price: number;
   final_subscription_price: number;
@@ -157,11 +158,16 @@ export class PricingService {
         );
       }
 
+      const autoDiscount = (storedDiscount > 0)
+        ? storedDiscount
+        : ((originalPrice > price && originalPrice > 0) ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0);
+
       return {
         original_price: originalPrice,
         price: price,
         subscription_price: subscriptionPrice,
-        discount_percentage: 0,
+        discount_percentage: autoDiscount,
+        discount: autoDiscount,
         discount_amount: 0,
         final_price: price,
         final_subscription_price: finalSubPrice,
@@ -195,22 +201,27 @@ export class PricingService {
 
     const result = products.map((prod) => {
       const copy = { ...prod };
+      const variantId = copy.variant_id || copy.id;
+      const specialPrice = specialPricesMap.get(variantId) || Number(copy.discount || 0);
+      const pricing = this.calculateVariantPrice(copy, specialPrice);
+      Object.assign(copy, pricing);
+
       if (copy.variants && Array.isArray(copy.variants)) {
         copy.variants = copy.variants.map((v: any) => {
-          const variantId = v.variant_id || v.id;
-          const specialPrice = specialPricesMap.get(variantId) || 0;
-          if (specialPrice > 0) specialPricesAppliedCount++;
+          const vId = v.variant_id || v.id;
+          const vSpecialPrice = specialPricesMap.get(vId) || 0;
+          if (vSpecialPrice > 0) specialPricesAppliedCount++;
           else standardPricingCount++;
-          const pricing = this.calculateVariantPrice(v, specialPrice);
-          return { ...v, ...pricing };
+          const vPricing = this.calculateVariantPrice(v, vSpecialPrice);
+          return { ...v, ...vPricing };
         });
       }
       if (copy.allVariants && Array.isArray(copy.allVariants)) {
         copy.allVariants = copy.allVariants.map((v: any) => {
-          const variantId = v.variant_id || v.id;
-          const specialPrice = specialPricesMap.get(variantId) || 0;
-          const pricing = this.calculateVariantPrice(v, specialPrice);
-          return { ...v, ...pricing };
+          const vId = v.variant_id || v.id;
+          const vSpecialPrice = specialPricesMap.get(vId) || 0;
+          const vPricing = this.calculateVariantPrice(v, vSpecialPrice);
+          return { ...v, ...vPricing };
         });
       }
       return copy;

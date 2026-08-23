@@ -765,6 +765,8 @@ export class SubscriptionsService {
         pv.sku,
         pv.price,
         pv.subscription_price,
+        pv.original_price,
+        pv.discount,
         pv.unit_value,
         pv.unit_type,
         pv.fulfillment_mode,
