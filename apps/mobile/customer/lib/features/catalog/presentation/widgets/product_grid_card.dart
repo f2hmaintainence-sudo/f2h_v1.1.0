@@ -175,66 +175,91 @@ class _TopStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    height: 20,
+    height: 22,
     child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Flexible(
-          flex: 5,
-          child: _ScaleDown(
-            alignment: Alignment.centerLeft,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (isOutOfStock)
-                  const _Chip(
-                    label: 'OUT OF STOCK',
-                    background: Colors.white,
-                    foreground: Color(0xFFE11D48),
-                    border: Color(0xFFE11D48),
-                  )
-                else if (discountPercent > 0)
-                  _Chip(
-                    label: '$discountPercent% OFF',
-                    background: kPrimary,
-                    foreground: Colors.white,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isOutOfStock)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFFEF4444), width: 0.9),
                   ),
-              ],
-            ),
-          ),
-        ),
-        if (reviews > 0)
-          Flexible(
-            flex: 4,
-            child: _ScaleDown(
-              alignment: Alignment.centerRight,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.star_rounded,
-                    size: 14,
-                    color: Color(0xFFF5A524),
-                  ),
-                  const SizedBox(width: 3),
-                  Text(
-                    '${rating.toStringAsFixed(1)} ($reviews)',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: kTextMid,
+                  child: const Text(
+                    'OUT OF STOCK',
+                    style: TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFEF4444),
+                      letterSpacing: 0.2,
                     ),
                   ),
-                ],
-              ),
-            ),
+                )
+              else if (discountPercent > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF047857),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '$discountPercent% OFF',
+                    style: const TextStyle(
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+            ],
           ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 0.8),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 2,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.star_rounded,
+                size: 11,
+                color: Color(0xFFF59E0B),
+              ),
+              const SizedBox(width: 2),
+              Text(
+                '${(rating > 0 ? rating : 5.0).toStringAsFixed(1)} (${reviews > 0 ? reviews : 1})',
+                style: const TextStyle(
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF374151),
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     ),
   );
 }
 
-/// Shrinks its child to fit rather than overflowing — cards get narrow on
-/// small phones and wide at large text scales.
 class _ScaleDown extends StatelessWidget {
   final Widget child;
   final Alignment alignment;
@@ -262,16 +287,16 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
     decoration: BoxDecoration(
       color: background,
-      borderRadius: BorderRadius.circular(6),
-      border: border != null ? Border.all(color: border!, width: 1.2) : null,
+      borderRadius: BorderRadius.circular(4),
+      border: border != null ? Border.all(color: border!, width: 1) : null,
     ),
     child: Text(
       label,
       style: TextStyle(
-        fontSize: 9.5,
+        fontSize: 8.5,
         fontWeight: FontWeight.w800,
         color: foreground,
         letterSpacing: 0.2,
@@ -569,16 +594,27 @@ class _CardAction extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.add_rounded, size: 18, color: Colors.white),
-                const SizedBox(width: 6),
-                Text(
-                  _subscriptionOnly ? 'Subscribe' : 'Add',
-                  style: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                if (_subscriptionOnly) ...[
+                  const Icon(Icons.autorenew_rounded, size: 15, color: Colors.white),
+                  const SizedBox(width: 4),
+                  const Text(
+                    'Subscribe',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
+                ] else ...[
+                  const Text(
+                    '+ Add',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -604,13 +640,13 @@ class _ActionShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    height: 34,
+    height: 32,
     width: double.infinity,
     alignment: Alignment.center,
-    padding: const EdgeInsets.symmetric(horizontal: 4),
+    padding: const EdgeInsets.symmetric(horizontal: 6),
     decoration: BoxDecoration(
       color: color,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(10),
     ),
     child: fill ? child : FittedBox(fit: BoxFit.scaleDown, child: child),
   );

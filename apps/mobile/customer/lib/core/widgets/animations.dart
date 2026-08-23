@@ -1161,22 +1161,22 @@ class InitialLoadingScreen extends StatelessWidget {
             children: [
               // Logo
               Container(
-                width: 72,
-                height: 72,
+                width: 76,
+                height: 76,
                 decoration: BoxDecoration(
                   color: kSurface,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(18),
                   border: Border.all(color: kBorderLt),
                   boxShadow: [
                     BoxShadow(
-                      color: kPrimary.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+                      color: kPrimary.withValues(alpha: 0.08),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
                     ),
                   ],
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(15),
+                  borderRadius: BorderRadius.circular(17),
                   child: Padding(
                     padding: const EdgeInsets.all(12.0),
                     child: AppAssetImage(
@@ -1197,33 +1197,22 @@ class InitialLoadingScreen extends StatelessWidget {
                   letterSpacing: 0.5,
                 ),
               ),
+              const SizedBox(height: 4),
               const Text(
                 'Fresh Daily Essentials',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 12.5,
                   fontWeight: FontWeight.w600,
                   color: kTextSub,
-                  letterSpacing: 1.0,
+                  letterSpacing: 0.8,
                 ),
               ),
-              const SizedBox(height: 54),
-              const Text(
-                'ROLLING FRESH ESSENTIALS',
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                  color: kTextSub,
-                  letterSpacing: 1.5,
-                ),
-              ),
-              const SizedBox(height: 12),
-              const RollingMarquee(),
-              const SizedBox(height: 40),
+              const SizedBox(height: 32),
               const SizedBox(
-                width: 20,
-                height: 20,
+                width: 22,
+                height: 22,
                 child: CircularProgressIndicator(
-                  strokeWidth: 2,
+                  strokeWidth: 2.2,
                   color: kPrimary,
                 ),
               ),

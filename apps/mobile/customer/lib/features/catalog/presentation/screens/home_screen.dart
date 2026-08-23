@@ -40,6 +40,7 @@ import '../../../notifications/presentation/bloc/notifications_bloc.dart';
 import '../../../notifications/presentation/bloc/notifications_state.dart';
 import '../../../notifications/presentation/bloc/notifications_event.dart';
 import '../../../../core/guards/auth_guard.dart';
+import '../../../../core/widgets/popup_banner_widget.dart';
 
 // ══════════════════════════════════════════════════════════
 //  HOME SCREEN
@@ -72,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen>
   void initState() {
     super.initState();
 
-    // Trigger catalog and notifications load on startup if not already loaded / loading
+    // Trigger catalog, notifications, and popup banner load on startup
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         final state = context.read<CatalogBloc>().state;
@@ -84,6 +85,8 @@ class _HomeScreenState extends State<HomeScreen>
         if (customerId != null) {
           context.read<NotificationsBloc>().add(LoadNotifications());
         }
+        // Show popup banner on HomeScreen
+        PopupBannerWidget.checkAndShowPopupBanner(context);
       }
     });
 
@@ -924,6 +927,11 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _subscriptionProductCard(BuildContext context, Product p) {
+    int discountPercent = 0;
+    if (p.originalPrice > p.price && p.originalPrice > 0) {
+      discountPercent = (((p.originalPrice - p.price) / p.originalPrice) * 100).round();
+    }
+
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
@@ -940,13 +948,13 @@ class _HomeScreenState extends State<HomeScreen>
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: kBorderLt, width: 1.0),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: kBorderLt, width: 1.1),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.02),
               blurRadius: 8,
-              offset: const Offset(0, 4),
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -958,14 +966,9 @@ class _HomeScreenState extends State<HomeScreen>
                 Container(
                   height: 120,
                   width: double.infinity,
-                  // decoration: const BoxDecoration(
-                  //   color: Color(0xFFE8F5E9),
-                  //   borderRadius: BorderRadius.vertical(
-                  //     top: Radius.circular(20),
-                  //   ),
-                  // ),
+                  color: const Color(0xFFF8FAFC),
                   child: Padding(
-                    padding: const EdgeInsets.all(8.0),
+                    padding: const EdgeInsets.all(6.0),
                     child: buildProductImage(
                       p.name,
                       imageAsset: p.imageAsset,
@@ -975,7 +978,7 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 const SizedBox(height: 6),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -999,43 +1002,26 @@ class _HomeScreenState extends State<HomeScreen>
                                       : p.unit)
                                   .toLowerCase() !=
                               p.name.toLowerCase()) ...[
-                        const SizedBox(height: 4),
-                        UnconstrainedBox(
-                          alignment: Alignment.centerLeft,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF3F4F6),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: const Color(0xFFE5E7EB),
-                                width: 1.0,
-                              ),
-                            ),
-                            child: Text(
-                              p.formattedUnit.isNotEmpty
-                                  ? p.formattedUnit
-                                  : p.unit,
-                              style: const TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF6B7280),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                        const SizedBox(height: 3),
+                        Text(
+                          p.formattedUnit.isNotEmpty
+                              ? p.formattedUnit
+                              : p.unit,
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w500,
+                            color: kTextSub,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ],
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -1082,135 +1068,125 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ],
             ),
-            if (p.isSubscribable &&
-                p.subscriptionPrice != null &&
-                p.subscriptionPrice! > 0)
+            // Top Left: Discount or Out of Stock Badge
+            if (p.isOutOfStock)
               Positioned(
-                top: 94,
-                left: 0,
-                right: 0,
+                top: 6,
+                left: 6,
                 child: Container(
-                  height: 26,
-                  decoration: const BoxDecoration(color: Color(0xFFDCFCE7)),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.sync_rounded,
-                        size: 12,
-                        color: Color(0xFF16653A),
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        'Subscribe @ ₹${p.subscriptionPrice!.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF16653A),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            if (p.reviews > 0)
-              Positioned(
-                top: 8,
-                left: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 5,
-                    vertical: 3,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: const Color(0xFFFFE0B2),
-                      width: 0.8,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFFEF4444), width: 0.9),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.star_rounded,
-                        size: 10,
-                        color: Colors.amber,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        '${p.rating.toStringAsFixed(1)} (${p.reviews})',
-                        style: const TextStyle(
-                          fontSize: 7.5,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFFE65100),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            if (p.isLowStock || p.isOutOfStock)
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFEBEE),
-                    borderRadius: BorderRadius.circular(100),
-                    border: Border.all(
-                      color: const Color(0xFFEF5350),
-                      width: 0.8,
-                    ),
-                  ),
-                  child: Text(
-                    p.isOutOfStock ? 'OUT OF STOCK' : 'LOW STOCK',
-                    style: const TextStyle(
-                      fontSize: 6.5,
+                  child: const Text(
+                    'OUT OF STOCK',
+                    style: TextStyle(
+                      fontSize: 7.5,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFFD32F2F),
-                      letterSpacing: 0.3,
+                      color: Color(0xFFEF4444),
+                      letterSpacing: 0.2,
                     ),
                   ),
                 ),
               )
-            else if (p.isOrganic)
+            else if (discountPercent > 0)
               Positioned(
-                top: 8,
-                right: 8,
+                top: 6,
+                left: 6,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 3,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFF7E6),
+                    color: const Color(0xFF047857),
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: const Color(0xFFFFD54F),
-                      width: 0.8,
-                    ),
                   ),
-                  child: const Text(
-                    'Best Seller',
-                    style: TextStyle(
-                      fontSize: 6.5,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFFB45309),
+                  child: Text(
+                    '$discountPercent% OFF',
+                    style: const TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
                       letterSpacing: 0.2,
                     ),
+                  ),
+                ),
+              ),
+            // Top Right: Rating Badge
+            Positioned(
+              top: 6,
+              right: 6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: const Color(0xFFE5E7EB), width: 0.8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.02),
+                      blurRadius: 2,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.star_rounded,
+                      size: 10,
+                      color: Color(0xFFF59E0B),
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      '${(p.rating > 0 ? p.rating : 5.0).toStringAsFixed(1)} (${p.reviews > 0 ? p.reviews : 1})',
+                      style: const TextStyle(
+                        fontSize: 8,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF374151),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Bottom of Image: Subscribe pill
+            if (p.isSubscribable && !p.isOutOfStock)
+              Positioned(
+                top: 94,
+                left: 6,
+                right: 6,
+                child: Container(
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: kPrimary,
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.autorenew_rounded,
+                        size: 10.5,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        'Subscribe @ ₹${(p.subscriptionPrice != null && p.subscriptionPrice! > 0 ? p.subscriptionPrice! : p.price).toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        size: 11,
+                        color: Colors.white,
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -2119,6 +2095,11 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
 // ══════════════════════════════════════════════════════════
 
 Widget oneTimeProductCard(BuildContext context, Product p) {
+  int discountPercent = 0;
+  if (p.originalPrice > p.price && p.originalPrice > 0) {
+    discountPercent = (((p.originalPrice - p.price) / p.originalPrice) * 100).round();
+  }
+
   return GestureDetector(
     onTap: () => Navigator.push(
       context,
@@ -2135,13 +2116,13 @@ Widget oneTimeProductCard(BuildContext context, Product p) {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: kBorderLt, width: 1.0),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kBorderLt, width: 1.1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 8,
-            offset: const Offset(0, 4),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -2153,22 +2134,19 @@ Widget oneTimeProductCard(BuildContext context, Product p) {
               Container(
                 height: 120,
                 width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                ),
+                color: const Color(0xFFF8FAFC),
                 child: Padding(
-                  padding: EdgeInsets.zero,
+                  padding: const EdgeInsets.all(6.0),
                   child: buildProductImage(
                     p.name,
                     imageAsset: p.imageAsset,
-                    fit: BoxFit.cover,
+                    fit: BoxFit.contain,
                   ),
                 ),
               ),
               const SizedBox(height: 6),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -2188,43 +2166,26 @@ Widget oneTimeProductCard(BuildContext context, Product p) {
                         (p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit)
                                 .toLowerCase() !=
                             p.name.toLowerCase()) ...[
-                      const SizedBox(height: 4),
-                      UnconstrainedBox(
-                        alignment: Alignment.centerLeft,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF3F4F6),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: const Color(0xFFE5E7EB),
-                              width: 1.0,
-                            ),
-                          ),
-                          child: Text(
-                            p.formattedUnit.isNotEmpty
-                                ? p.formattedUnit
-                                : p.unit,
-                            style: const TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF6B7280),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                      const SizedBox(height: 3),
+                      Text(
+                        p.formattedUnit.isNotEmpty
+                            ? p.formattedUnit
+                            : p.unit,
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w500,
+                          color: kTextSub,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ],
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Padding(
-                padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -2271,95 +2232,125 @@ Widget oneTimeProductCard(BuildContext context, Product p) {
               ),
             ],
           ),
-          if (p.reviews > 0)
+          // Top Left: Discount or Out of Stock Badge
+          if (p.isOutOfStock)
             Positioned(
-              top: 8,
-              left: 8,
+              top: 6,
+              left: 6,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: const Color(0xFFFFE0B2),
-                    width: 0.8,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: const Color(0xFFEF4444), width: 0.9),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.star_rounded,
-                      size: 10,
-                      color: Colors.amber,
-                    ),
-                    const SizedBox(width: 2),
-                    Text(
-                      '${p.rating.toStringAsFixed(1)} (${p.reviews})',
-                      style: const TextStyle(
-                        fontSize: 7.5,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFFE65100),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          if (p.isLowStock || p.isOutOfStock)
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFEBEE),
-                  borderRadius: BorderRadius.circular(100),
-                  border: Border.all(
-                    color: const Color(0xFFEF5350),
-                    width: 0.8,
-                  ),
-                ),
-                child: Text(
-                  p.isOutOfStock ? 'OUT OF STOCK' : 'LOW STOCK',
-                  style: const TextStyle(
-                    fontSize: 6.5,
+                child: const Text(
+                  'OUT OF STOCK',
+                  style: TextStyle(
+                    fontSize: 7.5,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFFD32F2F),
-                    letterSpacing: 0.3,
+                    color: Color(0xFFEF4444),
+                    letterSpacing: 0.2,
                   ),
                 ),
               ),
             )
-          else if (p.isOrganic)
+          else if (discountPercent > 0)
             Positioned(
-              top: 8,
-              right: 8,
+              top: 6,
+              left: 6,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF7E6),
+                  color: const Color(0xFF047857),
                   borderRadius: BorderRadius.circular(4),
-                  border: Border.all(
-                    color: const Color(0xFFFFD54F),
-                    width: 0.8,
-                  ),
                 ),
-                child: const Text(
-                  'Best Seller',
-                  style: TextStyle(
-                    fontSize: 6.5,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFFB45309),
+                child: Text(
+                  '$discountPercent% OFF',
+                  style: const TextStyle(
+                    fontSize: 8,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
                     letterSpacing: 0.2,
                   ),
+                ),
+              ),
+            ),
+          // Top Right: Rating Badge
+          Positioned(
+            top: 6,
+            right: 6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: const Color(0xFFE5E7EB), width: 0.8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 2,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.star_rounded,
+                    size: 10,
+                    color: Color(0xFFF59E0B),
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    '${(p.rating > 0 ? p.rating : 5.0).toStringAsFixed(1)} (${p.reviews > 0 ? p.reviews : 1})',
+                    style: const TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF374151),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Bottom of Image: Subscribe pill (if subscribable)
+          if (p.isSubscribable && !p.isOutOfStock)
+            Positioned(
+              top: 94,
+              left: 6,
+              right: 6,
+              child: Container(
+                height: 22,
+                decoration: BoxDecoration(
+                  color: kPrimary,
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.autorenew_rounded,
+                      size: 10.5,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      'Subscribe @ ₹${(p.subscriptionPrice != null && p.subscriptionPrice! > 0 ? p.subscriptionPrice! : p.price).toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 11,
+                      color: Colors.white,
+                    ),
+                  ],
                 ),
               ),
             ),

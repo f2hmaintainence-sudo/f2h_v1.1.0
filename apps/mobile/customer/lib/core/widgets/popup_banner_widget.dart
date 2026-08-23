@@ -43,6 +43,21 @@ class PopupBannerWidget {
       } catch (_) {
         // Ignore network errors on launch
       }
+
+      if (_bannerList.isEmpty) {
+        _bannerList = [
+          {
+            'id': 1,
+            'title': 'Fresh Farm Pure Milk',
+            'discount_text': 'Flat 10% OFF & Free Delivery',
+            'description': 'Enjoy fresh, farm-sourced pure milk delivered right to your doorstep every morning with hassle-free subscription.',
+            'action_type': 'CATEGORY',
+            'action_value': 'milk',
+            'cta_label': 'Subscribe Now',
+            'background_color': '#16A34A',
+          },
+        ];
+      }
     }
 
     if (_bannerList.isEmpty || _isBannerShowing) return;
