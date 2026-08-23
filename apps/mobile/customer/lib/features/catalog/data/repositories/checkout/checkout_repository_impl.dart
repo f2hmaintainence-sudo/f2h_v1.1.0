@@ -20,6 +20,9 @@ class CheckoutRepositoryImpl implements CheckoutRepository {
       subscriptionEndDate: request.subscriptionEndDate,
       subscriptionAutoRenew: request.subscriptionAutoRenew,
       couponCode: request.couponCode,
+      razorpayOrderId: request.razorpayOrderId,
+      razorpayPaymentId: request.razorpayPaymentId,
+      razorpaySignature: request.razorpaySignature,
     );
 
     return remoteDataSource.placeCheckout(requestModel);
