@@ -340,12 +340,9 @@ class _ContainersTrackerModalState extends State<ContainersTrackerModal> {
         ? widget.currentRun!.runId
         : 'Active Delivery Run';
     final bottomInset = MediaQuery.of(context).padding.bottom;
-    final bool canSubmit = _totalRemaining > 0 &&
-        (widget.groupedStops.isEmpty ||
-            widget.groupedStops.every((stop) {
-              final status = stop.status.toLowerCase();
-              return status == 'delivered' || status == 'completed' || status == 'failed' || status == 'cancelled';
-            }));
+    // Show return button whenever there are containers with a remaining balance —
+    // partners may need to return containers mid-run (e.g. partial drop-off).
+    final bool canSubmit = _totalRemaining > 0;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
