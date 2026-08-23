@@ -22,6 +22,8 @@ import 'package:f2h_delivery/features/orders/presentation/screens/pickup_selecti
 import 'package:f2h_delivery/features/profile/presentation/screens/notifications_screen.dart';
 import 'package:f2h_delivery/features/profile/presentation/screens/support_screen.dart';
 import 'package:f2h_delivery/core/widgets/f2h_hero_header.dart';
+import 'package:f2h_delivery/features/orders/presentation/widgets/delivery_basket_modal.dart';
+import 'package:f2h_delivery/features/orders/presentation/widgets/containers_tracker_modal.dart';
 import 'package:f2h_delivery/features/notifications/services/notification_api_service.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -708,14 +710,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Row(
                           children: [
                             _buildQuickActionCard(
-                              label: 'My Routes',
-                              icon: Icons.map_outlined,
+                              label: 'Basket',
+                              icon: Icons.shopping_basket_rounded,
                               cardBg: const Color(0xFFECFDF5),
                               borderColor: const Color(0xFFA7F3D0),
                               iconColor: const Color(0xFF16A34A),
-                              onTap: () {
-                                MockDataService().tabNavigationNotifier.value = 2;
-                              },
+                              onTap: () => DeliveryBasketModal.show(
+                                context,
+                                session.orders,
+                                groupedStops: session.groupedStops,
+                                currentRun: currentRun,
+                              ),
                             ),
                             const SizedBox(width: 10),
                             _buildQuickActionCard(
@@ -733,16 +738,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                             const SizedBox(width: 10),
                             _buildQuickActionCard(
-                              label: 'Support',
-                              icon: Icons.headset_mic_outlined,
-                              cardBg: const Color(0xFFFFFBEB),
-                              borderColor: const Color(0xFFFDE68A),
-                              iconColor: const Color(0xFFEA580C),
-                              onTap: () => Navigator.push(
+                              label: 'Containers',
+                              icon: Icons.all_inbox_rounded,
+                              cardBg: const Color(0xFFEFF6FF),
+                              borderColor: const Color(0xFFBFDBFE),
+                              iconColor: const Color(0xFF2563EB),
+                              onTap: () => ContainersTrackerModal.show(
                                 context,
-                                MaterialPageRoute(
-                                  builder: (_) => const SupportScreen(initialTabIndex: 0),
-                                ),
+                                session.groupedStops,
+                                currentRun: currentRun,
                               ),
                             ),
                           ],
