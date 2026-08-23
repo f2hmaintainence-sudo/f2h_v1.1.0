@@ -169,6 +169,23 @@ export function LoginContent() {
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({})
 
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("access_token")
+      if (token) {
+        api.get<any>("/users/me").then(({ data: me }) => {
+          if (me) {
+            const userHasAdmin = me?.roles?.some((r: any) => (r.role_name || r.role_id || '').toUpperCase() === 'ADMIN')
+            const role = (me?.active_role || (userHasAdmin ? "ADMIN" : "")).toUpperCase().trim()
+            if (!["CUSTOMER", "DELIVERY_PARTNER", "DELIVERY_BOY"].includes(role)) {
+              router.replace(getHomeForRole(role))
+            }
+          }
+        }).catch(() => {})
+      }
+    }
+  }, [router])
+
   const setError = (field: Field, msg: string | null) =>
     setErrors(prev => ({ ...prev, [field]: msg ?? undefined }))
 

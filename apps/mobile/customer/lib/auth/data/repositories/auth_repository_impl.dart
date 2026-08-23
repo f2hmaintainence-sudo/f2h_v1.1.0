@@ -163,18 +163,13 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<bool> checkAuthStatus() async {
-    // Call /customer/bootstrap — if it returns 200 the user is authenticated.
-    // 401 means the session/token is invalid → show Login screen.
+    final hasSession = await TokenStorage.hasSession();
+    if (!hasSession) return false;
     try {
       await dioClient.dio.get(ApiEndpoints.customerBootstrap);
       return true;
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 401) return false;
-      // Network error / server down — treat as authenticated (offline mode)
-      // so the user is not logged out just because of a connectivity issue.
-      return await TokenStorage.hasSession();
     } catch (_) {
-      return await TokenStorage.hasSession();
+      return true;
     }
   }
 

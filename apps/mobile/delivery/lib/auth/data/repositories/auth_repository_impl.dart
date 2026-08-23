@@ -180,10 +180,11 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<User?> checkAuthStatus() async {
-    final user = await localDataSource.getCachedUser();
-    if (user == null || user.token == null || user.token!.isEmpty) {
+    final token = await TokenStorage.getAccessToken();
+    if (token == null || token.isEmpty) {
       return null;
     }
-    return user;
+    final user = await localDataSource.getCachedUser();
+    return user ?? User(userId: 'dp_session', email: '', token: token);
   }
 }

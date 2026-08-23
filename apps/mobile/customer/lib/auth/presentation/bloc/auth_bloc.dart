@@ -125,12 +125,18 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(AuthCheckInProgress());
     try {
-      final isAuthenticated = await authRepository
-          .checkAuthStatus()
-          .timeout(
-            const Duration(seconds: 4),
-            onTimeout: () async => await authRepository.hasLocalSession(),
-          );
+      final hasLocal = await authRepository.hasLocalSession();
+      if (hasLocal) {
+        final user = await authRepository.getCachedUser();
+        emit(
+          Authenticated(
+            user: user ?? User(userId: 'session', email: ''),
+          ),
+        );
+        return;
+      }
+
+      final isAuthenticated = await authRepository.checkAuthStatus();
       if (isAuthenticated) {
         final user = await authRepository.getCachedUser();
         emit(
@@ -142,21 +148,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(const Unauthenticated());
       }
     } catch (_) {
-      try {
-        final hasSession = await authRepository.hasLocalSession().timeout(
-          const Duration(seconds: 1),
-          onTimeout: () => false,
+      final hasSession = await authRepository.hasLocalSession().catchError((_) => false);
+      if (hasSession) {
+        final user = await authRepository.getCachedUser();
+        emit(
+          Authenticated(
+            user: user ?? User(userId: 'session', email: ''),
+          ),
         );
-        if (hasSession) {
-          final user = await authRepository.getCachedUser();
-          emit(
-            Authenticated(
-              user: user ?? User(userId: 'session', email: ''),
-            ),
-          );
-          return;
-        }
-      } catch (_) {}
+        return;
+      }
       emit(const Unauthenticated());
     }
   }
