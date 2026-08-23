@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { DataService } from 'src/shared/database/Data.service';
 import { DatabaseService } from 'src/shared/database/Database.service';
 import { DeveloperService } from 'src/shared/logger/Developer.service';
@@ -872,5 +872,124 @@ export class ProfileService {
 
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000';
     return `uploads/documents/${filename}`;
+  }
+
+  /**
+   * Delivery Partner Referral Dashboard.
+   * Returns referral code, ₹75 reward rate, stats, referred partners list, and physical offline payment history.
+   */
+  async getDeliveryPartnerReferrals(deliveryPartnerId: string) {
+    try {
+      const [partnerUser] = await this.db.query(
+        `SELECT u.user_id, u.first_name, u.last_name, u.phone, u.referral_code, dp.delivery_partner_id
+         FROM delivery_partners dp
+         LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
+         WHERE dp.delivery_partner_id = $1 OR dp.user_id = $1
+         LIMIT 1`,
+        [deliveryPartnerId],
+      );
+
+      if (!partnerUser) {
+        throw new NotFoundException('Delivery partner not found');
+      }
+
+      let referralCode = partnerUser.referral_code;
+      if (!referralCode || !referralCode.trim()) {
+        const cleanName = (partnerUser.first_name || partnerUser.last_name || 'DP').replace(/[^a-zA-Z]/g, '').toUpperCase();
+        const prefix = cleanName.length >= 3 ? cleanName.slice(0, 3) : 'DP';
+        const cleanPhone = (partnerUser.phone || '').replace(/\D/g, '');
+        const phoneSuffix = cleanPhone.length >= 4 ? cleanPhone.slice(-4) : '7500';
+        referralCode = `F2HDR-${prefix}${phoneSuffix}`;
+      }
+
+      // Fetch all referral records
+      const referrals = await this.db.query(
+        `SELECT r.id, r.refer_id, r.referred_customer_id, r.status, r.created_at, r.rewarded_at,
+                COALESCE(u.first_name || ' ' || COALESCE(u.last_name, ''), u.user_name, 'Referee') AS referee_name,
+                u.phone AS referee_phone,
+                dpb.status AS bonus_status,
+                dpb.paid_at,
+                dpb.payment_reference,
+                dpb.remarks AS payment_remarks,
+                COALESCE(dpb.paid_amount, dpb.amount, 75.00)::numeric AS bonus_amount
+         FROM referrals r
+         LEFT JOIN users u ON u.user_id = r.referred_customer_id
+         LEFT JOIN delivery_partner_referral_bonuses dpb ON (dpb.refer_id = r.refer_id OR dpb.partner_id = $1)
+         WHERE r.referrer_customer_id = $1 OR r.referrer_customer_id = $2
+         ORDER BY r.created_at DESC`,
+        [deliveryPartnerId, partnerUser.user_id || deliveryPartnerId],
+      ).catch(() => []);
+
+      // Fetch all bonus records directly
+      const bonuses = await this.db.query(
+        `SELECT dpb.*,
+                COALESCE(dpb.paid_amount, dpb.amount, 75.00)::numeric AS paid_amount
+         FROM delivery_partner_referral_bonuses dpb
+         WHERE dpb.partner_id = $1 OR dpb.partner_id = $2
+         ORDER BY dpb.created_at DESC`,
+        [deliveryPartnerId, partnerUser.user_id || deliveryPartnerId],
+      ).catch(() => []);
+
+      const totalReferrals = Math.max(referrals.length, bonuses.length);
+      const eligibleBonuses = bonuses.filter((b: any) => b.status === 'paid' || b.status === 'pending');
+      const paidBonuses = bonuses.filter((b: any) => b.status === 'paid');
+      const pendingBonuses = bonuses.filter((b: any) => b.status === 'pending');
+
+      const eligibleCount = eligibleBonuses.length;
+      const paidCount = paidBonuses.length;
+      const pendingCount = Math.max(0, totalReferrals - eligibleCount);
+
+      const totalEarned = eligibleCount * 75.00;
+      const totalPaid = paidBonuses.reduce((acc: number, b: any) => acc + Number(b.paid_amount || b.amount || 75.00), 0);
+      const outstandingAmount = pendingBonuses.reduce((acc: number, b: any) => acc + Number(b.amount || 75.00), 0);
+
+      const paymentsHistory = paidBonuses.map((b: any) => ({
+        id: b.id,
+        bonus_id: b.bonus_id,
+        amount: Number(b.paid_amount || b.amount || 75.00),
+        paid_at: b.paid_at,
+        payment_reference: b.payment_reference || 'Physical / Cash',
+        remarks: b.remarks || 'Monthly offline referral payout',
+        referee_name: b.referee_name || 'Delivery Partner / Customer',
+      }));
+
+      return {
+        status: true,
+        data: {
+          referral_code: referralCode,
+          reward_per_referral: 75.00,
+          stats: {
+            total_referrals: totalReferrals,
+            eligible_referrals: eligibleCount,
+            pending_referrals: pendingCount,
+            total_earned: totalEarned,
+            total_paid: totalPaid,
+            outstanding_amount: outstandingAmount,
+            reward_per_referral: 75.00,
+          },
+          referrals: (bonuses.length > 0 ? bonuses : referrals).map((r: any) => {
+            const isEligible = r.status === 'rewarded' || r.status === 'completed' || r.status === 'paid' || r.status === 'pending' || r.bonus_id;
+            const isPaid = r.status === 'paid' || r.bonus_status === 'paid';
+            return {
+              id: r.id,
+              refer_id: r.refer_id || r.bonus_id,
+              referee_name: r.referee_name || 'Partner Referee',
+              referee_phone: r.referee_phone ? `${r.referee_phone.slice(0, 3)}****${r.referee_phone.slice(-3)}` : '******',
+              created_at: r.created_at,
+              status: isEligible ? 'eligible' : 'pending',
+              reward_amount: 75.00,
+              payment_status: isPaid ? 'paid' : (isEligible ? 'unpaid' : 'pending_activation'),
+              paid_at: r.paid_at || null,
+              payment_reference: r.payment_reference || null,
+            };
+          }),
+          payments_history: paymentsHistory,
+        },
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      this.developerService.error('[Profile] Error fetching referral dashboard', { error, deliveryPartnerId });
+      throw new InternalServerErrorException('Failed to fetch referral dashboard');
+    }
   }
 }

@@ -22,7 +22,8 @@ import {
   FileText,
   DollarSign,
   Activity,
-  Box
+  Box,
+  Gift
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -83,11 +84,12 @@ export default function DeliveryPartnerPortfolioPage({ params }: { params?: any 
     );
   }
 
-  const { partner, stats = {}, orders = [], documents = [], bank_accounts = [], vehicles = [] } = data;
+  const { partner, stats = {}, referral_stats = {}, referral_bonuses = [], orders = [], documents = [], bank_accounts = [], vehicles = [] } = data;
 
   const tabs = [
     { name: 'Overview & Performance', icon: <Activity size={16} /> },
     { name: `Assigned Deliveries (${orders.length})`, icon: <Package size={16} /> },
+    { name: 'Referrals & Bonuses', icon: <Gift size={16} /> },
     { name: 'KYC & Verification', icon: <ShieldCheck size={16} /> },
     { name: 'Vehicles & Assets', icon: <Truck size={16} /> },
     { name: 'Bank & Earnings', icon: <CreditCard size={16} /> },
@@ -281,6 +283,100 @@ export default function DeliveryPartnerPortfolioPage({ params }: { params?: any 
                   </table>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'Referrals & Bonuses' && (
+            <div className="space-y-6">
+              {/* Summary KPI Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Total Referrals</span>
+                  <p className="text-lg font-black text-slate-900 mt-1">{referral_stats.total_referrals || 0}</p>
+                </div>
+                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Eligible Referrals</span>
+                  <p className="text-lg font-black text-emerald-700 mt-1">{referral_stats.eligible_referrals || 0}</p>
+                </div>
+                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Pending Activation</span>
+                  <p className="text-lg font-black text-amber-700 mt-1">{referral_stats.pending_referrals || 0}</p>
+                </div>
+                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Total Earned</span>
+                  <p className="text-lg font-black text-slate-900 mt-1">₹{Number(referral_stats.total_amount_earned || 0).toFixed(2)}</p>
+                </div>
+                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Total Paid Out</span>
+                  <p className="text-lg font-black text-emerald-700 mt-1">₹{Number(referral_stats.total_amount_paid || 0).toFixed(2)}</p>
+                </div>
+                <div className="bg-amber-50 p-3.5 rounded-xl border border-amber-200">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800">Outstanding</span>
+                  <p className="text-lg font-black text-amber-900 mt-1">₹{Number(referral_stats.outstanding_referral_amount || 0).toFixed(2)}</p>
+                </div>
+              </div>
+
+              {/* Referrals & Payouts Table */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Referral Reward History (₹75 / Partner)</h3>
+                  <Link
+                    href="/admin/delivery/referral-payments"
+                    className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1"
+                  >
+                    Manage Referral Payments <ChevronRight size={13} />
+                  </Link>
+                </div>
+
+                {referral_bonuses.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400 text-xs bg-slate-50 rounded-xl border border-slate-200">
+                    No referral bonuses recorded for this partner yet.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-slate-200">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] tracking-wider">
+                          <th className="py-3 px-4">Bonus ID</th>
+                          <th className="py-3 px-4">Referee Name</th>
+                          <th className="py-3 px-4">Phone</th>
+                          <th className="py-3 px-4">Referral Date</th>
+                          <th className="py-3 px-4 text-center">Reward</th>
+                          <th className="py-3 px-4 text-center">Payment Status</th>
+                          <th className="py-3 px-4">Payment Reference</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {referral_bonuses.map((b: any) => (
+                          <tr key={b.id || b.bonus_id} className="hover:bg-slate-50">
+                            <td className="py-3 px-4 font-mono font-bold text-slate-800">{b.bonus_id}</td>
+                            <td className="py-3 px-4 font-bold text-slate-900">{b.referee_name}</td>
+                            <td className="py-3 px-4 text-slate-500">{b.referee_phone || 'N/A'}</td>
+                            <td className="py-3 px-4 text-slate-600">
+                              {new Date(b.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </td>
+                            <td className="py-3 px-4 text-center font-black text-slate-900">₹{Number(b.amount || 75).toFixed(2)}</td>
+                            <td className="py-3 px-4 text-center">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                b.status === 'paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                              }`}>
+                                {b.status === 'paid' ? 'PAID' : 'UNPAID'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-slate-600">
+                              {b.payment_reference ? (
+                                <span className="font-semibold text-slate-800">{b.payment_reference}</span>
+                              ) : (
+                                <span className="text-slate-400 italic">Pending offline payout</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

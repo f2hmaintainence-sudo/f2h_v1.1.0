@@ -56,9 +56,8 @@ const adminNav = [
     items: [
       { name: "Partner Availability", href: "/admin/delivery/partner-availability", icon: PieChart },
       { name: "Delivery Partners", href: "/admin/delivery/partners", icon: UserCog },
-
+      { name: "Referral Payments", href: "/admin/delivery/referral-payments", icon: Gift },
       { name: "Leave Requests", href: "/admin/delivery/leave-requests", icon: CalendarOff },
-
     ],
   },
   {

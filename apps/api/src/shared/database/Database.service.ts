@@ -106,6 +106,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       await this.pool.query(`
         CREATE UNIQUE INDEX IF NOT EXISTS stock_balances_warehouse_variant_unique 
         ON stock_balances (warehouse_id, product_variant_id);
+
+        ALTER TABLE public.delivery_partner_referral_bonuses 
+          ADD COLUMN IF NOT EXISTS paid_by VARCHAR(50),
+          ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS paid_amount NUMERIC(10,2);
       `);
     } catch (_) {}
   }

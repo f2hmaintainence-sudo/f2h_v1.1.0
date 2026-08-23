@@ -45,6 +45,12 @@ export class ProfileController {
     return this.profileService.getPersonalInfo(deliveryPartnerId);
   }
 
+  @Get('referrals')
+  async getReferrals(@Req() req: Request) {
+    const deliveryPartnerId = (req.user as any).user_id;
+    return this.profileService.getDeliveryPartnerReferrals(deliveryPartnerId);
+  }
+
   @Patch('personal')
   async updatePersonalInfo(@Req() req: Request, @Body() dto: UpdatePersonalDto) {
     const deliveryPartnerId = (req.user as any).user_id;

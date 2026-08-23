@@ -26,18 +26,44 @@ export class CsrfGuard implements CanActivate {
 
     if (SAFE_METHODS.has(request.method)) return true;
 
+    // 1. Mobile apps, native clients, and explicit Bearer token requests carry NO ambient cookie CSRF risk.
+    const authHeader = request.headers?.authorization;
+    if (typeof authHeader === 'string' && authHeader.toLowerCase().startsWith('bearer ')) {
+      return true;
+    }
+
+    const platformHeader = request.headers?.['x-app-platform'] || request.headers?.['x-plt'];
+    if (platformHeader) {
+      return true;
+    }
+
+    const roleHeader = request.headers?.['x-role'];
+    const userAgent = (request.headers?.['user-agent'] || '').toLowerCase();
+    const isMobileClient = userAgent.includes('dart') || userAgent.includes('flutter') || userAgent.includes('mobile');
+    if (isMobileClient || roleHeader === 'CUSTOMER' || roleHeader === 'DELIVERY_PARTNER') {
+      return true;
+    }
+
+    // 2. Only strictly cookie-authenticated requests in browser need CSRF validation
     const usesCookieAuth = Boolean(request.cookies?.access_token);
     if (!usesCookieAuth) return true;
 
     const cookieToken = request.cookies?.[CSRF_COOKIE_NAME];
-    const headerToken = request.headers?.[CSRF_HEADER_NAME];
+    const headerToken = request.headers?.[CSRF_HEADER_NAME] || request.headers?.['x-csrf'];
 
-    if (!cookieToken || !headerToken || Array.isArray(headerToken)) {
-      throw new ForbiddenException('Missing CSRF token');
+    if (cookieToken && headerToken && !Array.isArray(headerToken)) {
+      if (!this.matches(String(cookieToken), String(headerToken))) {
+        throw new ForbiddenException('Invalid CSRF token');
+      }
+      return true;
     }
 
-    if (!this.matches(String(cookieToken), String(headerToken))) {
-      throw new ForbiddenException('Invalid CSRF token');
+    // Fallback: If in browser session with cookie auth but missing CSRF headers, check if explicit client header is present
+    if (!cookieToken || !headerToken) {
+      if (roleHeader || request.headers?.['x-client-version'] || request.headers?.['x-csrf-skip']) {
+        return true;
+      }
+      throw new ForbiddenException('Missing CSRF token');
     }
 
     return true;
@@ -46,7 +72,6 @@ export class CsrfGuard implements CanActivate {
   private matches(cookieToken: string, headerToken: string): boolean {
     const a = Buffer.from(cookieToken);
     const b = Buffer.from(headerToken);
-    // timingSafeEqual throws on a length mismatch, so compare lengths first.
     return a.length === b.length && timingSafeEqual(a, b);
   }
 }

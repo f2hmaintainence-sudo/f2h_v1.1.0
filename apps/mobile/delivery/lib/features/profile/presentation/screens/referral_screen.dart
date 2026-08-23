@@ -17,15 +17,23 @@ class ReferralScreen extends StatefulWidget {
   State<ReferralScreen> createState() => _ReferralScreenState();
 }
 
-class _ReferralScreenState extends State<ReferralScreen> {
+class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProviderStateMixin {
   bool _loading = true;
   String? _error;
   Map<String, dynamic>? _data;
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadReferrals();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadReferrals() async {
@@ -38,7 +46,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
       setState(() { _data = data; _loading = false; });
     } on DioException catch (e) {
       setState(() { _error = e.response?.data?['message'] ?? 'Failed to load referrals. Please try again.'; _loading = false; });
-    } catch (e) {
+    } catch (_) {
       setState(() { _error = 'Failed to load referrals. Please try again.'; _loading = false; });
     }
   }
@@ -49,7 +57,9 @@ class _ReferralScreenState extends State<ReferralScreen> {
   }
 
   Future<void> _shareCode(String code) async {
-    final message = 'Join Farm to Home using my referral code: $code\nDownload the app and get exclusive farm fresh benefits!\nhttps://f2hfresh.com';
+    final message = 'Join Farm to Home Delivery Partner team using my referral code: $code\n'
+        'Sign up, start deliveries and earn great daily payouts!\n'
+        'https://f2hfresh.com/download/delivery';
     final encoded = Uri.encodeComponent(message);
     final url = Uri.parse('https://wa.me/?text=$encoded');
     if (await canLaunchUrl(url)) {
@@ -58,47 +68,6 @@ class _ReferralScreenState extends State<ReferralScreen> {
       _copyCode(code);
       if (mounted) AppSnackBar.info(context, 'Code copied! Share it with your friends.');
     }
-  }
-
-  Color _statusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'rewarded':
-      case 'completed':
-      case 'credited':
-      case 'success':
-      case 'active':
-        return const Color(0xFF15803D);
-      case 'pending':
-        return const Color(0xFFB45309);
-      case 'failed':
-      case 'expired':
-        return const Color(0xFFEF4444);
-      default:
-        return const Color(0xFF64748B);
-    }
-  }
-
-  Color _statusBg(String status) {
-    switch (status.toLowerCase()) {
-      case 'rewarded':
-      case 'completed':
-      case 'credited':
-      case 'success':
-      case 'active':
-        return const Color(0xFFDCFCE7);
-      case 'pending':
-        return const Color(0xFFFEF3C7);
-      case 'failed':
-      case 'expired':
-        return const Color(0xFFFEE2E2);
-      default:
-        return const Color(0xFFF1F5F9);
-    }
-  }
-
-  bool _isRewarded(String status) {
-    final s = status.toLowerCase();
-    return s == 'rewarded' || s == 'completed' || s == 'credited' || s == 'success' || s == 'active';
   }
 
   String _formatDate(dynamic rawDate) {
@@ -114,11 +83,18 @@ class _ReferralScreenState extends State<ReferralScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final stats = (_data?['stats'] as Map<String, dynamic>?) ?? {};
+    final total = stats['total_referrals'] ?? _data?['total_referrals'] ?? 0;
+    final eligible = stats['eligible_referrals'] ?? stats['successful_referrals'] ?? 0;
+    final totalEarned = (stats['total_earned'] ?? (eligible * 75)).toDouble();
+    final totalPaid = (stats['total_paid'] ?? 0).toDouble();
+    final outstanding = (stats['outstanding_amount'] ?? (totalEarned - totalPaid)).toDouble();
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: const F2hAppBar(
-        title: 'Referrals',
-        subtitle: 'Earn \u20b975 for every customer you refer',
+        title: 'Refer & Earn \u20b975',
+        subtitle: 'Earn \u20b975 for every delivery partner referred',
         icon: Icons.card_giftcard_rounded,
       ),
       body: _loading
@@ -133,11 +109,18 @@ class _ReferralScreenState extends State<ReferralScreen> {
                     children: [
                       _buildReferralCodeCard(),
                       const SizedBox(height: 16),
-                      _buildStatsRow(),
-                      const SizedBox(height: 20),
+                      _buildStatsRow(
+                        total: total,
+                        eligible: eligible,
+                        totalPaid: totalPaid,
+                        outstanding: outstanding,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildOfflinePaymentNotice(),
+                      const SizedBox(height: 16),
                       _buildHowItWorks(),
                       const SizedBox(height: 20),
-                      _buildReferralHistory(),
+                      _buildTabsSection(),
                     ],
                   ),
                 ),
@@ -209,11 +192,11 @@ class _ReferralScreenState extends State<ReferralScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Your Referral Code',
+                      'Your Delivery Partner Referral Code',
                       style: GoogleFonts.poppins(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w600),
                     ),
                     Text(
-                      'Share & Earn \u20b975 per customer',
+                      'Share & Earn \u20b975 per partner',
                       style: GoogleFonts.poppins(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w800),
                     ),
                   ],
@@ -317,19 +300,29 @@ class _ReferralScreenState extends State<ReferralScreen> {
     );
   }
 
-  Widget _buildStatsRow() {
-    final total = _data?['total_referrals'] ?? 0;
-    final rewarded = _data?['rewarded_count'] ?? 0;
-    final earningsRaw = _data?['total_earnings'];
-    final earnings = earningsRaw is num ? earningsRaw.toDouble() : double.tryParse(earningsRaw?.toString() ?? '0') ?? 0.0;
-
-    return Row(
+  Widget _buildStatsRow({
+    required dynamic total,
+    required dynamic eligible,
+    required double totalPaid,
+    required double outstanding,
+  }) {
+    return Column(
       children: [
-        _buildStatCard('Total Referred', '$total', Icons.people_outline_rounded, const Color(0xFF2563EB), const Color(0xFFDBEAFE)),
-        const SizedBox(width: 10),
-        _buildStatCard('Rewarded', '$rewarded', Icons.check_circle_outline_rounded, const Color(0xFF16A34A), const Color(0xFFDCFCE7)),
-        const SizedBox(width: 10),
-        _buildStatCard('Earnings', '\u20b9${earnings.toStringAsFixed(0)}', Icons.currency_rupee_rounded, const Color(0xFFD97706), const Color(0xFFFEF3C7)),
+        Row(
+          children: [
+            _buildStatCard('Total Referrals', '$total', Icons.people_outline_rounded, const Color(0xFF2563EB), const Color(0xFFDBEAFE)),
+            const SizedBox(width: 10),
+            _buildStatCard('Eligible (\u20b975)', '$eligible', Icons.check_circle_outline_rounded, const Color(0xFF16A34A), const Color(0xFFDCFCE7)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            _buildStatCard('Paid Out', '\u20b9${totalPaid.toStringAsFixed(0)}', Icons.payments_outlined, const Color(0xFF0D9488), const Color(0xFFCCFBF1)),
+            const SizedBox(width: 10),
+            _buildStatCard('Outstanding', '\u20b9${outstanding.toStringAsFixed(0)}', Icons.hourglass_bottom_rounded, const Color(0xFFD97706), const Color(0xFFFEF3C7)),
+          ],
+        ),
       ],
     );
   }
@@ -337,7 +330,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
   Widget _buildStatCard(String label, String value, IconData icon, Color color, Color bg) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
@@ -350,28 +343,66 @@ class _ReferralScreenState extends State<ReferralScreen> {
             ),
           ],
         ),
-        child: Column(
+        child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
               child: Icon(icon, color: color, size: 18),
             ),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
-            ),
-            const SizedBox(height: 1),
-            Text(
-              label,
-              style: GoogleFonts.poppins(fontSize: 10.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w600),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    value,
+                    style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
+                  ),
+                  Text(
+                    label,
+                    style: GoogleFonts.poppins(fontSize: 10.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildOfflinePaymentNotice() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFBBF7D0)),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline_rounded, color: Color(0xFF16A34A), size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Offline Monthly Settlement',
+                  style: GoogleFonts.poppins(fontSize: 12.5, fontWeight: FontWeight.w800, color: const Color(0xFF14532D)),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Referral bonuses (\u20b975 per eligible partner) are disbursed offline via cash or direct bank transfer at month-end.',
+                  style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF166534), fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -396,22 +427,22 @@ class _ReferralScreenState extends State<ReferralScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.info_outline_rounded, color: Color(0xFF2563EB), size: 18),
+              const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFF2563EB), size: 18),
               const SizedBox(width: 8),
               Text(
-                'How It Works',
+                'How Referral Works',
                 style: GoogleFonts.poppins(fontSize: 14.5, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          _buildStep('1', 'Share your referral code with new customers', const Color(0xFF2563EB), const Color(0xFFDBEAFE)),
+          const SizedBox(height: 14),
+          _buildStep('1', 'Share your referral code with prospective delivery partners', const Color(0xFF2563EB), const Color(0xFFDBEAFE)),
           const SizedBox(height: 10),
-          _buildStep('2', 'Customer signs up and places their first order', const Color(0xFFD97706), const Color(0xFFFEF3C7)),
+          _buildStep('2', 'Referred partner signs up and completes their KYC & onboarding', const Color(0xFFD97706), const Color(0xFFFEF3C7)),
           const SizedBox(height: 10),
-          _buildStep('3', 'You deliver their first order successfully', const Color(0xFF16A34A), const Color(0xFFDCFCE7)),
+          _buildStep('3', 'Partner activates and delivers their first assigned order run', const Color(0xFF16A34A), const Color(0xFFDCFCE7)),
           const SizedBox(height: 10),
-          _buildStep('4', 'You earn \u20b975 credited directly to your wallet!', const Color(0xFF9333EA), const Color(0xFFF3E8FF)),
+          _buildStep('4', 'You earn \u20b975, paid out offline at month-end settlement!', const Color(0xFF9333EA), const Color(0xFFF3E8FF)),
         ],
       ),
     );
@@ -421,166 +452,300 @@ class _ReferralScreenState extends State<ReferralScreen> {
     return Row(
       children: [
         Container(
-          width: 26,
-          height: 26,
+          width: 24,
+          height: 24,
           decoration: BoxDecoration(
             color: bg,
             shape: BoxShape.circle,
           ),
           alignment: Alignment.center,
-          child: Text(number, style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w800, color: fg)),
+          child: Text(number, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w800, color: fg)),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Expanded(
           child: Text(
             text,
-            style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF475569), fontWeight: FontWeight.w500),
+            style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFF475569), fontWeight: FontWeight.w500),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildReferralHistory() {
+  Widget _buildTabsSection() {
     final referrals = _data?['referrals'] as List<dynamic>? ?? [];
+    final payments = _data?['payments_history'] as List<dynamic>? ?? [];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Referral History',
-              style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFE2E8F0),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          padding: const EdgeInsets.all(3),
+          child: TabBar(
+            controller: _tabController,
+            indicator: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: const [
+                BoxShadow(color: Color(0x0A000000), blurRadius: 4, offset: Offset(0, 1)),
+              ],
             ),
+            labelColor: const Color(0xFF0F172A),
+            unselectedLabelColor: const Color(0xFF64748B),
+            labelStyle: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w800),
+            unselectedLabelStyle: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600),
+            tabs: [
+              Tab(text: 'Referred Partners (${referrals.length})'),
+              Tab(text: 'Payouts (${payments.length})'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 380,
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildReferralsList(referrals),
+              _buildPaymentsList(payments),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReferralsList(List<dynamic> referrals) {
+    if (referrals.isEmpty) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.people_outline_rounded, size: 42, color: Color(0xFF94A3B8)),
+            const SizedBox(height: 12),
             Text(
-              '${referrals.length} total',
-              style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w600),
+              'No referrals yet',
+              style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Share your code and earn \u20b975 for each new active delivery partner!',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        if (referrals.isEmpty)
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
-            child: Column(
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        itemCount: referrals.length,
+        separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+        itemBuilder: (_, i) {
+          final r = referrals[i] as Map<String, dynamic>;
+          final name = r['referee_name'] as String? ?? 'Delivery Partner';
+          final phone = r['referee_phone'] as String? ?? '';
+          final date = _formatDate(r['created_at']);
+          final status = (r['status'] as String? ?? 'pending').toLowerCase();
+          final paymentStatus = (r['payment_status'] as String? ?? 'unpaid').toLowerCase();
+          final isPaid = paymentStatus == 'paid';
+          final isEligible = status == 'eligible' || status == 'rewarded' || status == 'completed';
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
               children: [
-                const Icon(Icons.people_outline_rounded, size: 42, color: Color(0xFF94A3B8)),
-                const SizedBox(height: 12),
-                Text(
-                  'No referrals yet',
-                  style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: isPaid
+                        ? const Color(0xFFDCFCE7)
+                        : (isEligible ? const Color(0xFFFEF3C7) : const Color(0xFFF1F5F9)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    name.isNotEmpty ? name[0].toUpperCase() : 'P',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      color: isPaid
+                          ? const Color(0xFF15803D)
+                          : (isEligible ? const Color(0xFFB45309) : const Color(0xFF64748B)),
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Share your code and start earning \u20b975 per successful referral!',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
-                ),
-              ],
-            ),
-          )
-        else
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x04000000),
-                  blurRadius: 10,
-                  offset: Offset(0, 3),
-                ),
-              ],
-            ),
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: referrals.length,
-              separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
-              itemBuilder: (_, i) {
-                final r = referrals[i] as Map<String, dynamic>;
-                final status = r['status'] as String? ?? 'pending';
-                final rewarded = _isRewarded(status);
-                final name = r['referred_name'] as String? ?? 'Customer';
-                final phone = r['referred_phone'] as String? ?? '';
-                final rewardRaw = r['reward_amount'];
-                final reward = rewardRaw is num ? rewardRaw : double.tryParse(rewardRaw?.toString() ?? '75') ?? 75.0;
-                final date = _formatDate(r['created_at']);
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  child: Row(
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: rewarded ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          name.isNotEmpty ? name[0].toUpperCase() : 'C',
-                          style: GoogleFonts.poppins(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: rewarded ? const Color(0xFF15803D) : const Color(0xFF64748B),
-                          ),
-                        ),
+                      Text(
+                        name,
+                        style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              name,
-                              style: GoogleFonts.poppins(fontSize: 13.5, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
-                            ),
-                            if (phone.isNotEmpty)
-                              Text(
-                                phone,
-                                style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
-                              ),
-                            if (date.isNotEmpty)
-                              Text(
-                                date,
-                                style: GoogleFonts.poppins(fontSize: 10.5, color: const Color(0xFF94A3B8)),
-                              ),
-                          ],
+                      if (phone.isNotEmpty)
+                        Text(
+                          phone,
+                          style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF64748B)),
                         ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          if (rewarded)
-                            Text(
-                              '+\u20b9${reward.toStringAsFixed(0)}',
-                              style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w800, color: const Color(0xFF16A34A)),
-                            ),
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(color: _statusBg(status), borderRadius: BorderRadius.circular(8)),
-                            child: Text(
-                              status.toUpperCase(),
-                              style: GoogleFonts.poppins(fontSize: 9.5, fontWeight: FontWeight.w800, color: _statusColor(status)),
-                            ),
-                          ),
-                        ],
-                      ),
+                      if (date.isNotEmpty)
+                        Text(
+                          'Referred: $date',
+                          style: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFF94A3B8)),
+                        ),
                     ],
                   ),
-                );
-              },
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '+\u20b975.00',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: isEligible ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isPaid
+                            ? const Color(0xFFDCFCE7)
+                            : (isEligible ? const Color(0xFFFEF3C7) : const Color(0xFFF1F5F9)),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        isPaid ? 'PAID' : (isEligible ? 'ELIGIBLE' : 'PENDING'),
+                        style: GoogleFonts.poppins(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: isPaid
+                              ? const Color(0xFF15803D)
+                              : (isEligible ? const Color(0xFFB45309) : const Color(0xFF64748B)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ),
-      ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPaymentsList(List<dynamic> payments) {
+    if (payments.isEmpty) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.receipt_long_rounded, size: 42, color: Color(0xFF94A3B8)),
+            const SizedBox(height: 12),
+            Text(
+              'No payout history yet',
+              style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Referral earnings will appear here once settled offline by admin.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        itemCount: payments.length,
+        separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+        itemBuilder: (_, i) {
+          final p = payments[i] as Map<String, dynamic>;
+          final amount = (p['amount'] is num ? p['amount'] : double.tryParse(p['amount']?.toString() ?? '75') ?? 75.0).toDouble();
+          final date = _formatDate(p['paid_at']);
+          final ref = p['payment_reference'] as String? ?? 'Physical / Cash Payout';
+          final referee = p['referee_name'] as String? ?? 'Delivery Partner';
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Payout: $ref',
+                        style: GoogleFonts.poppins(fontSize: 12.5, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
+                      ),
+                      Text(
+                        'Referee: $referee',
+                        style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF64748B)),
+                      ),
+                      if (date.isNotEmpty)
+                        Text(
+                          'Paid on $date',
+                          style: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFF94A3B8)),
+                        ),
+                    ],
+                  ),
+                ),
+                Text(
+                  '\u20b9${amount.toStringAsFixed(2)}',
+                  style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w800, color: const Color(0xFF15803D)),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }

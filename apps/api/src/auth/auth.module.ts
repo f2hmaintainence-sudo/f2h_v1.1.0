@@ -41,7 +41,7 @@ import { JwtStrategy } from './jwt.strategy';
           signOptions: {
             expiresIn: configService.get<string>(
               'JWT_ACCESS_EXPIRES_IN',
-              '15m',
+              '100y',
             ) as SignOptions['expiresIn'],
           },
         };

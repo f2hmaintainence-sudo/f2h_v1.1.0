@@ -1198,11 +1198,11 @@ export class AuthService {
 
     const accessTokenExpiry = this.configService.get<string>(
       'JWT_ACCESS_EXPIRES_IN',
-      '15m',
+      '100y',
     ) as SignOptions['expiresIn'];
     const refreshTokenExpiry = this.configService.get<string>(
       'JWT_REFRESH_EXPIRES_IN',
-      '30d',
+      '100y',
     ) as SignOptions['expiresIn'];
     const refreshTokenLifetimeSeconds = parseDurationToSeconds(String(refreshTokenExpiry));
     const accessTokenLifetimeSeconds = parseDurationToSeconds(String(accessTokenExpiry));

@@ -119,57 +119,49 @@ class DioClient {
     if (err.response?.statusCode != 401) return handler.next(err);
 
     final refreshToken = await TokenStorage.getRefreshToken();
-    if (refreshToken == null || refreshToken.isEmpty) {
-      // No refresh token — session truly expired
-      await _handleSessionExpired();
-      return handler.next(err);
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      try {
+        final refreshDio = Dio(
+          BaseOptions(
+            baseUrl: ApiEndpoints.apiBaseUrl,
+            headers: {'Content-Type': 'application/json'},
+          ),
+        );
+        if (!kIsWeb) refreshDio.interceptors.add(CookieManager(_cookieJar));
+
+        final refreshResp = await refreshDio.post(
+          ApiEndpoints.refreshToken,
+          data: {'refreshToken': refreshToken},
+        );
+
+        final newAccess  = refreshResp.data['accessToken']  as String?;
+        final newRefresh = refreshResp.data['refreshToken'] as String?;
+
+        if (newAccess != null && newAccess.isNotEmpty) {
+          await TokenStorage.saveTokens(
+            accessToken:  newAccess,
+            refreshToken: newRefresh ?? refreshToken,
+          );
+
+          // Retry original request with new access token
+          final retryOptions = err.requestOptions;
+          retryOptions.headers['Authorization'] = 'Bearer $newAccess';
+          final retryResp = await _dio.fetch(retryOptions);
+          return handler.resolve(retryResp);
+        }
+      } catch (_) {}
     }
 
-    try {
-      // Attempt silent refresh — bypass this interceptor to avoid loop
-      final refreshDio = Dio(
-        BaseOptions(
-          baseUrl: ApiEndpoints.apiBaseUrl,
-          headers: {'Content-Type': 'application/json'},
-        ),
-      );
-      if (!kIsWeb) refreshDio.interceptors.add(CookieManager(_cookieJar));
-
-      final refreshResp = await refreshDio.post(
-        ApiEndpoints.refreshToken,
-        data: {'refreshToken': refreshToken},
-      );
-
-      final newAccess  = refreshResp.data['accessToken']  as String?;
-      final newRefresh = refreshResp.data['refreshToken'] as String?;
-
-      if (newAccess == null || newAccess.isEmpty) throw Exception('Empty token');
-
-      await TokenStorage.saveTokens(
-        accessToken:  newAccess,
-        refreshToken: newRefresh ?? refreshToken,
-      );
-
-      // Retry original request with new access token
-      final retryOptions          = err.requestOptions;
-      retryOptions.headers['Authorization'] = 'Bearer $newAccess';
-      final retryResp = await _dio.fetch(retryOptions);
-      return handler.resolve(retryResp);
-    } catch (_) {
-      // Refresh failed → wipe tokens and emit session-expired signal
-      await _handleSessionExpired();
-      return handler.next(err);
-    }
+    // Do NOT wipe tokens on error - account must NEVER auto-logout
+    return handler.next(err);
   }
 
   // ---------------------------------------------------------------------------
-  // Session expired: clear tokens.
-  // The AuthBloc listens for 401 + empty SecureStorage on next boot to emit
-  // AuthExpired state (see AppBootstrap.checkAuth).
+  // Session expired: Do not clear tokens automatically.
+  // Account only logs out when user explicitly presses logout button.
   // ---------------------------------------------------------------------------
   Future<void> _handleSessionExpired() async {
-    await TokenStorage.clear();
-    await _cookieJar.deleteAll();
+    // Preserved for explicit logout flow only
   }
 
   // ---------------------------------------------------------------------------

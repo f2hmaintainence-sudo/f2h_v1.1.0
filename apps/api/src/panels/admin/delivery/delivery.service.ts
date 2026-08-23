@@ -1443,6 +1443,42 @@ export class DeliveryManagementService {
           }]
         : [];
 
+      // Referral stats and bonuses for Delivery Partner
+      const refBonuses = await this.db.query(
+        `SELECT dpb.*,
+                COALESCE(dpb.paid_amount, dpb.amount, 75.00)::numeric AS paid_amount,
+                admin_u.first_name || ' ' || COALESCE(admin_u.last_name, '') AS paid_by_name
+         FROM delivery_partner_referral_bonuses dpb
+         LEFT JOIN users admin_u ON admin_u.user_id = dpb.paid_by
+         WHERE dpb.partner_id = $1 OR dpb.partner_id = $2
+         ORDER BY dpb.created_at DESC`,
+        [partnerId, partner.user_id || partnerId],
+      ).catch(() => []);
+
+      const rawReferrals = await this.db.query(
+        `SELECT r.*,
+                COALESCE(u.first_name || ' ' || u.last_name, u.user_name, 'Referee') AS referee_name,
+                u.phone AS referee_phone
+         FROM referrals r
+         LEFT JOIN users u ON u.user_id = r.referred_customer_id
+         WHERE r.referrer_customer_id = $1 OR r.referrer_customer_id = $2
+         ORDER BY r.created_at DESC`,
+        [partnerId, partner.user_id || partnerId],
+      ).catch(() => []);
+
+      const totalReferralsCount = Math.max((rawReferrals || []).length, (refBonuses || []).length);
+      const eligibleBonuses = (refBonuses || []).filter((b: any) => b.status === 'paid' || b.status === 'pending');
+      const paidBonuses = (refBonuses || []).filter((b: any) => b.status === 'paid');
+      const pendingBonuses = (refBonuses || []).filter((b: any) => b.status === 'pending');
+
+      const eligibleCount = eligibleBonuses.length;
+      const paidCount = paidBonuses.length;
+      const pendingCount = Math.max(0, totalReferralsCount - eligibleCount);
+
+      const totalEarnedAmount = eligibleCount * 75.00;
+      const totalPaidAmount = paidBonuses.reduce((acc: number, b: any) => acc + Number(b.paid_amount || b.amount || 75.00), 0);
+      const outstandingAmount = pendingBonuses.reduce((acc: number, b: any) => acc + Number(b.amount || 75.00), 0);
+
       const completedOrders = (orders || []).filter((o: any) => o.status === 'delivered');
       const totalDelivered = completedOrders.length;
       const totalAssigned = (orders || []).length;
@@ -1468,6 +1504,17 @@ export class DeliveryManagementService {
             is_active: partner.is_active || false,
             is_verified: partner.is_verified || false,
           },
+          referral_stats: {
+            total_referrals: totalReferralsCount,
+            successful_referrals: eligibleCount,
+            eligible_referrals: eligibleCount,
+            pending_referrals: pendingCount,
+            total_amount_earned: totalEarnedAmount,
+            total_amount_paid: totalPaidAmount,
+            outstanding_referral_amount: outstandingAmount,
+            reward_per_referral: 75.00,
+          },
+          referral_bonuses: refBonuses || [],
           orders: orders || [],
           documents: docs || [],
           bank_accounts: banks || [],
@@ -1478,6 +1525,185 @@ export class DeliveryManagementService {
       if (error instanceof BadRequestException) throw error;
       this.developer.error('getPartnerPortfolio error', { error, id });
       throw new InternalServerErrorException('Failed to fetch delivery partner portfolio');
+    }
+  }
+
+  /**
+   * Delivery Partner Referral Payments (Admin View).
+   * Displays all referral bonuses earned by delivery partners with month filter,
+   * eligibility status, payment status, and physical/offline payment tracking.
+   */
+  async getDeliveryPartnerReferralPayments(query: any) {
+    try {
+      const { month, branch_id, status, search } = query;
+      const params: any[] = [];
+      const whereClauses: string[] = ['1=1'];
+
+      if (month && month.trim().length > 0 && month !== 'all') {
+        params.push(`${month}%`);
+        whereClauses.push(`TO_CHAR(dpb.created_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM') LIKE $${params.length}`);
+      }
+
+      if (branch_id && branch_id.trim().length > 0 && branch_id !== 'all') {
+        params.push(branch_id);
+        whereClauses.push(`dp.branch_id = $${params.length}`);
+      }
+
+      if (status && status !== 'all') {
+        params.push(status.toLowerCase());
+        whereClauses.push(`LOWER(dpb.status) = $${params.length}`);
+      }
+
+      if (search && search.trim().length > 0) {
+        params.push(`%${search.trim().toLowerCase()}%`);
+        whereClauses.push(`(
+          LOWER(COALESCE(u.first_name || ' ' || COALESCE(u.last_name, ''), u.user_name, dp.full_name, '')) LIKE $${params.length}
+          OR LOWER(COALESCE(dpb.partner_id, '')) LIKE $${params.length}
+          OR LOWER(COALESCE(dpb.referee_name, '')) LIKE $${params.length}
+          OR LOWER(COALESCE(dpb.referee_phone, '')) LIKE $${params.length}
+          OR LOWER(COALESCE(dpb.bonus_id, '')) LIKE $${params.length}
+          OR LOWER(COALESCE(dpb.payment_reference, '')) LIKE $${params.length}
+        )`);
+      }
+
+      const sql = `
+        SELECT
+          dpb.id,
+          dpb.bonus_id,
+          dpb.partner_id,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''), u.user_name, dp.full_name, 'Delivery Partner') AS partner_name,
+          COALESCE(u.phone, dp.phone, '') AS partner_phone,
+          dp.branch_id,
+          COALESCE(b.branch_name, 'Main Branch') AS branch_name,
+          dpb.refer_id,
+          dpb.referee_name,
+          dpb.referee_phone,
+          dpb.order_id,
+          COALESCE(dpb.amount, 75.00)::numeric AS amount,
+          dpb.status,
+          dpb.remarks,
+          dpb.paid_at,
+          dpb.paid_by,
+          admin_u.first_name || ' ' || COALESCE(admin_u.last_name, '') AS paid_by_name,
+          COALESCE(dpb.paid_amount, dpb.amount, 75.00)::numeric AS paid_amount,
+          dpb.payment_reference,
+          dpb.created_at,
+          dpb.updated_at
+        FROM delivery_partner_referral_bonuses dpb
+        LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dpb.partner_id
+        LEFT JOIN users u ON u.user_id = dpb.partner_id
+        LEFT JOIN branches b ON b.branch_id = dp.branch_id
+        LEFT JOIN users admin_u ON admin_u.user_id = dpb.paid_by
+        WHERE ${whereClauses.join(' AND ')}
+        ORDER BY dpb.created_at DESC
+      `;
+
+      const bonuses = (await this.db.query(sql, params)) || [];
+
+      // Summary
+      const totalCount = bonuses.length;
+      const paidCount = bonuses.filter((b: any) => b.status === 'paid').length;
+      const pendingCount = bonuses.filter((b: any) => b.status === 'pending').length;
+      const totalAmountEarned = bonuses.reduce((acc: number, b: any) => acc + Number(b.amount || 75), 0);
+      const totalAmountPaid = bonuses.filter((b: any) => b.status === 'paid').reduce((acc: number, b: any) => acc + Number(b.paid_amount || b.amount || 75), 0);
+      const outstandingAmount = bonuses.filter((b: any) => b.status === 'pending').reduce((acc: number, b: any) => acc + Number(b.amount || 75), 0);
+
+      return {
+        status: true,
+        data: {
+          bonuses,
+          summary: {
+            total_referrals: totalCount,
+            eligible_paid_count: paidCount,
+            eligible_unpaid_count: pendingCount,
+            total_amount_earned: totalAmountEarned,
+            total_amount_paid: totalAmountPaid,
+            outstanding_amount: outstandingAmount,
+            reward_per_referral: 75.00,
+          },
+        },
+      };
+    } catch (error) {
+      this.developer.error('getDeliveryPartnerReferralPayments error', { error });
+      throw new InternalServerErrorException('Failed to fetch referral payments');
+    }
+  }
+
+  /**
+   * Mark selected delivery partner referral bonus(es) as Paid via Physical/Offline mode.
+   * Prevents double payment using strict transactional locking.
+   */
+  async markReferralBonusesPaid(dto: { bonus_ids: string[]; payment_reference: string; remarks?: string; paid_amount?: number }, adminId: string) {
+    const { bonus_ids, payment_reference, remarks, paid_amount } = dto;
+    if (!bonus_ids || !Array.isArray(bonus_ids) || bonus_ids.length === 0) {
+      throw new BadRequestException('At least one referral bonus ID must be selected');
+    }
+    if (!payment_reference || !payment_reference.trim()) {
+      throw new BadRequestException('Payment reference/mode is required for offline physical payment');
+    }
+
+    const client = await this.db.getClient();
+    try {
+      await client.query('BEGIN');
+
+      // Verify all selected bonuses are in 'pending' status with lock
+      const checkRes = await client.query(
+        `SELECT id, bonus_id, partner_id, amount, status 
+         FROM delivery_partner_referral_bonuses 
+         WHERE (bonus_id = ANY($1) OR id::text = ANY($1))
+         FOR UPDATE`,
+        [bonus_ids],
+      );
+
+      const rows = checkRes.rows || [];
+      if (rows.length === 0) {
+        await client.query('ROLLBACK');
+        throw new BadRequestException('No matching referral bonuses found');
+      }
+
+      const alreadyPaid = rows.filter((r: any) => r.status === 'paid');
+      if (alreadyPaid.length > 0) {
+        await client.query('ROLLBACK');
+        throw new BadRequestException(
+          `Referral bonus ${alreadyPaid.map((r: any) => r.bonus_id).join(', ')} has already been paid. Duplicate payment is strictly prohibited.`,
+        );
+      }
+
+      const targetBonusIds = rows.map((r: any) => r.bonus_id);
+
+      await client.query(
+        `UPDATE delivery_partner_referral_bonuses
+         SET status = 'paid',
+             paid_at = NOW(),
+             paid_by = $1,
+             payment_reference = $2,
+             paid_amount = COALESCE($3, amount, 75.00),
+             remarks = COALESCE($4, remarks),
+             updated_at = NOW()
+         WHERE bonus_id = ANY($5)`,
+        [
+          adminId || 'admin',
+          payment_reference.trim(),
+          paid_amount || null,
+          remarks ? remarks.trim() : null,
+          targetBonusIds,
+        ],
+      );
+
+      await client.query('COMMIT');
+
+      return {
+        status: true,
+        message: `Successfully marked ${targetBonusIds.length} referral payment(s) as paid offline.`,
+        paid_bonuses: targetBonusIds,
+      };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      if (error instanceof BadRequestException) throw error;
+      this.developer.error('markReferralBonusesPaid error', { error, dto });
+      throw new InternalServerErrorException('Failed to process offline referral payment');
+    } finally {
+      client.release();
     }
   }
 }

@@ -37,6 +37,19 @@ export class DeliveryManagementController {
     return this.deliveryService.getDeliveryPartners(query);
   }
 
+  // ── Delivery Partner Referral Payments ──
+
+  @Get('referral-payments')
+  async getReferralPayments(@Query() query: any) {
+    return this.deliveryService.getDeliveryPartnerReferralPayments(query);
+  }
+
+  @Post('referral-payments/mark-paid')
+  async markReferralPaymentsPaid(@Body() body: any, @Req() req: any) {
+    const adminId = req.user?.user_id ?? 'system';
+    return this.deliveryService.markReferralBonusesPaid(body, adminId);
+  }
+
   @Get('partners/:id/portfolio')
   async getPartnerPortfolio(@Param('id') id: string) {
     return this.deliveryService.getPartnerPortfolio(id);

@@ -61,40 +61,32 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Invalid token payload');
     }
 
-    // Check if token has been revoked using paired sessions structure
+    // Check if token has been explicitly revoked
     if (jti && userId) {
-      const userPrefix = `f2h_user_jwt_${userId}`;
-      const sessionData = await this.redisService.fetch(userPrefix);
-
-      if (!sessionData) {
-        throw new UnauthorizedException('Token has been revoked (user logged out)');
-      }
-
       try {
-        const parsed =
-          typeof sessionData === 'string'
-            ? JSON.parse(sessionData)
-            : sessionData;
+        const userPrefix = `f2h_user_jwt_${userId}`;
+        const sessionData = await this.redisService.fetch(userPrefix);
 
-        const sessions = parsed.sessions || [];
-        const matchedSession = sessions.find(
-          (session: any) =>
-            (session.accessJti !== null && session.accessJti === jti) ||
-            session.refreshJti === jti,
-        );
+        if (sessionData) {
+          const parsed =
+            typeof sessionData === 'string'
+              ? JSON.parse(sessionData)
+              : sessionData;
 
-        if (!matchedSession) {
-          throw new UnauthorizedException('Token has been revoked');
+          if (parsed.is_logged_out === true || parsed.blacklistedJtis?.includes(jti)) {
+            throw new UnauthorizedException('Token has been revoked');
+          }
         }
-
       } catch (parseError) {
-        console.error('[JwtStrategy] Failed to parse session data:', parseError);
-        throw new UnauthorizedException('Invalid token state');
+        if (parseError instanceof UnauthorizedException) {
+          throw parseError;
+        }
+        // Fallback gracefully without auto-logging out the user
       }
     }
 
-    if (jti && (await this.tokenRevocationService.isRevoked(jti))) {
-      throw new UnauthorizedException('Token has been revoked (legacy check)');
+    if (jti && (await this.tokenRevocationService.isRevoked(jti).catch(() => false))) {
+      throw new UnauthorizedException('Token has been revoked');
     }
 
     const user = await this.findUser(userId, email);

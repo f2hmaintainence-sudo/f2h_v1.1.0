@@ -108,53 +108,44 @@ class DioClient {
     if (err.response?.statusCode != 401) return handler.next(err);
 
     final refreshToken = await TokenStorage.getRefreshToken();
-    if (refreshToken == null || refreshToken.isEmpty) {
-      await _handleSessionExpired();
-      return handler.next(err);
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      try {
+        final refreshDio = Dio(
+          BaseOptions(
+            baseUrl: ApiEndpoints.apiBaseUrl,
+            headers: {'Content-Type': 'application/json'},
+          ),
+        );
+        if (!kIsWeb) refreshDio.interceptors.add(CookieManager(_cookieJar));
+
+        final refreshResp = await refreshDio.post(
+          ApiEndpoints.refreshToken,
+          data: {'refreshToken': refreshToken},
+        );
+
+        final newAccess  = refreshResp.data['accessToken']  as String?;
+        final newRefresh = refreshResp.data['refreshToken'] as String?;
+
+        if (newAccess != null && newAccess.isNotEmpty) {
+          await TokenStorage.saveTokens(
+            accessToken:  newAccess,
+            refreshToken: newRefresh ?? refreshToken,
+          );
+
+          final retryOptions = err.requestOptions;
+          retryOptions.headers['Authorization'] = 'Bearer $newAccess';
+          final retryResp = await _dio.fetch(retryOptions);
+          return handler.resolve(retryResp);
+        }
+      } catch (_) {}
     }
 
-    try {
-      final refreshDio = Dio(
-        BaseOptions(
-          baseUrl: ApiEndpoints.apiBaseUrl,
-          headers: {'Content-Type': 'application/json'},
-        ),
-      );
-      if (!kIsWeb) refreshDio.interceptors.add(CookieManager(_cookieJar));
-
-      final refreshResp = await refreshDio.post(
-        ApiEndpoints.refreshToken,
-        data: {'refreshToken': refreshToken},
-      );
-
-      final newAccess  = refreshResp.data['accessToken']  as String?;
-      final newRefresh = refreshResp.data['refreshToken'] as String?;
-
-      if (newAccess == null || newAccess.isEmpty) throw Exception('Empty token');
-
-      await TokenStorage.saveTokens(
-        accessToken:  newAccess,
-        refreshToken: newRefresh ?? refreshToken,
-      );
-
-      final retryOptions = err.requestOptions;
-      retryOptions.headers['Authorization'] = 'Bearer $newAccess';
-      final retryResp = await _dio.fetch(retryOptions);
-      return handler.resolve(retryResp);
-    } catch (_) {
-      await _handleSessionExpired();
-      return handler.next(err);
-    }
+    // Do NOT wipe tokens on error - account must NEVER auto-logout
+    return handler.next(err);
   }
 
   Future<void> _handleSessionExpired() async {
-    await TokenStorage.clear();
-    await _cookieJar.deleteAll();
-    try {
-      if (sl.isRegistered<AuthBloc>()) {
-        sl<AuthBloc>().add(LogoutRequested());
-      }
-    } catch (_) {}
+    // Preserved for explicit logout flow only
   }
 
   Future<void> fetchCsrfToken() async {
