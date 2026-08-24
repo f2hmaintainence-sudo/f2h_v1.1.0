@@ -24,21 +24,31 @@
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="demo">
+  <meta name="apple-mobile-web-app-title" content="F2H Fresh">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>demo</title>
+  <title>F2H Fresh</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
+<body>
   <script>
+    // 1. Force unregister any existing service workers
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
         for (let registration of registrations) {
           registration.unregister();
+        }
+      });
+    }
+    // 2. Wipe browser CacheStorage so new JS/WASM builds are loaded fresh
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        for (let name of names) {
+          caches.delete(name);
         }
       });
     }

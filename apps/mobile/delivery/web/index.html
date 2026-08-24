@@ -36,10 +36,19 @@
 </head>
 <body>
   <script>
+    // 1. Force unregister any existing service workers
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
         for (let registration of registrations) {
           registration.unregister();
+        }
+      });
+    }
+    // 2. Wipe browser CacheStorage so new JS/WASM builds are loaded fresh
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        for (let name of names) {
+          caches.delete(name);
         }
       });
     }

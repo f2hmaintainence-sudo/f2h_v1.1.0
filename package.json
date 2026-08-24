@@ -5,11 +5,11 @@
   "scripts": {
     "build:api": "npm --workspace=apps/api run build",
     "build:web": "npm --workspace=apps/web run build",
-    "build:customer-web": "cd apps/mobile/customer && flutter build web --release --pwa-strategy=none",
-    "build:partner-web": "cd apps/mobile/delivery && flutter build web --release --pwa-strategy=none",
-    "deploy:customer-web": "cd apps/mobile/customer && flutter build web --release --pwa-strategy=none && cp -r build/web/* /home/f2hfresh-customer/htdocs/customer.f2hfresh.com/ && chmod -R 755 /home/f2hfresh-customer/htdocs/customer.f2hfresh.com/",
-    "deploy:partner-web": "cd apps/mobile/delivery && flutter build web --release --pwa-strategy=none && cp -r build/web/* /home/f2hfresh-partner/htdocs/partner.f2hfresh.com/ && chmod -R 755 /home/f2hfresh-partner/htdocs/partner.f2hfresh.com/",
-    "deploy:all": "npm run deploy:customer-web && npm run deploy:partner-web"
+    "build:customer-web": "./build-flutter.sh customer",
+    "build:partner-web": "./build-flutter.sh partner",
+    "deploy:customer-web": "./build-flutter.sh customer clean",
+    "deploy:partner-web": "./build-flutter.sh partner clean",
+    "deploy:all": "./build-flutter.sh both clean"
   },
   "workspaces": [
     "apps/api",
