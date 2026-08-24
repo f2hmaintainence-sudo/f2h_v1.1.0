@@ -436,25 +436,79 @@ export class CustomersService {
       const totalWalletCredits = Math.max(totalWalletCreditsFromTxns, currentWalletBalance + totalWalletDebits);
 
       const subRes = await this.databaseService.query(
-        `SELECT * FROM subscriptions WHERE customer_id = ? ORDER BY created_at DESC`,
+        `SELECT s.*, 
+                COALESCE(ca.flat_no, '') || ' ' || COALESCE(ca.building_name, '') || ' ' || COALESCE(ca.street, '') || ' ' || COALESCE(ca.area, '') as delivery_address,
+                ca.landmark as delivery_landmark,
+                ca.city as delivery_city,
+                ca.pincode as delivery_pincode,
+                b.branch_name
+         FROM subscriptions s
+         LEFT JOIN customer_addresses ca ON (ca.address_id = s.address_id OR ca.id::text = s.address_id)
+         LEFT JOIN branches b ON b.branch_id = s.branch_id
+         WHERE s.customer_id = ?
+         ORDER BY s.created_at DESC`,
         [customerId]
-      );
+      ).catch(() => []);
 
-      let activeSub: any = null;
-      let subItems: any[] = [];
-      if (subRes.length > 0) {
-        activeSub = subRes.find((s: any) => s.status === 'active') || subRes[0];
-        if (activeSub) {
-          subItems = await this.databaseService.query(
-            `SELECT si.*, pv.name as variant_name, p.name as product_name
+      const subscriptionItemsRes = subRes.length > 0
+        ? await this.databaseService.query(
+            `SELECT si.*, 
+                    pv.name AS variant_name, 
+                    p.name AS product_name,
+                    pi.image_url AS product_image,
+                    COALESCE(si.unit_price, 0) as unit_price,
+                    COALESCE(si.final_price, si.unit_price, 0) as final_price,
+                    COALESCE(si.quantity, 1) as quantity
              FROM subscription_items si
+             JOIN subscriptions s ON (s.subscription_id = si.subscription_id OR s.subscription_number = si.subscription_id OR s.id::text = si.subscription_id)
              LEFT JOIN product_variants pv ON pv.variant_id = si.product_variant_id
              LEFT JOIN products p ON p.product_id = pv.product_id
-             WHERE si.subscription_id = ? OR si.subscription_id = ?`,
-            [activeSub.subscription_id || '', activeSub.subscription_number || '']
-          );
-        }
+             LEFT JOIN (
+               SELECT DISTINCT ON (product_id) product_id, image_url
+               FROM product_images
+               ORDER BY product_id, is_primary DESC, id ASC
+             ) pi ON pi.product_id = p.product_id
+             WHERE s.customer_id = ?
+             ORDER BY si.id ASC`,
+            [customerId],
+          ).catch(() => [])
+        : [];
+
+      const subscriptionItemsById: Record<string, any[]> = {};
+      for (const item of subscriptionItemsRes) {
+        const key = String(item.subscription_id || '');
+        if (!subscriptionItemsById[key]) subscriptionItemsById[key] = [];
+        subscriptionItemsById[key].push({
+          ...item,
+          quantity: Number(item.quantity || 1),
+          unit_price: Number(item.unit_price || 0),
+          final_price: Number(item.final_price || item.unit_price || 0),
+          discount_amount: Number(item.discount_amount || 0),
+          coupon_amount: Number(item.coupon_amount || 0),
+        });
       }
+
+      const formattedSubscriptions = subRes.map((subscription: any) => {
+        const subIdKey = String(subscription.subscription_id || '');
+        const subNumKey = String(subscription.subscription_number || '');
+        const idKey = String(subscription.id || '');
+        const matchedItems = [
+          ...(subscriptionItemsById[subIdKey] || []),
+          ...(subNumKey && subNumKey !== subIdKey ? (subscriptionItemsById[subNumKey] || []) : []),
+          ...(idKey && idKey !== subIdKey && idKey !== subNumKey ? (subscriptionItemsById[idKey] || []) : []),
+        ];
+        const uniqueItems = Array.from(new Map(matchedItems.map(it => [it.id || it.subscription_item_id, it])).values());
+        const totalPerDelivery = uniqueItems.reduce((sum: number, it: any) => sum + (Number(it.final_price || it.unit_price || 0) * Number(it.quantity || 1)), 0);
+
+        return {
+          ...subscription,
+          subscription_items: uniqueItems,
+          total_per_delivery: totalPerDelivery,
+        };
+      });
+
+      let activeSub: any = formattedSubscriptions.find((s: any) => s.status === 'active') || formattedSubscriptions[0] || null;
+      let subItems: any[] = activeSub?.subscription_items || [];
 
       const monthlyRevenueRes = await this.databaseService.query(
         `SELECT 
@@ -725,7 +779,7 @@ export class CustomersService {
           subscriptions: {
             active_plan: activeSub,
             items: subItems,
-            history: subRes,
+            history: formattedSubscriptions,
           },
           container_tracking: {
             balances: containerBalancesRes.map(b => ({

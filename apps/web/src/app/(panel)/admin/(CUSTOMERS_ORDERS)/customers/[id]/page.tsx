@@ -41,15 +41,6 @@ import CustomerSpecialPriceModal from '@/components/f2h/CustomerSpecialPriceModa
 import SubscriptionResumeModal from '@/components/f2h/SubscriptionResumeModal';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/services/api.client';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer
-} from 'recharts';
 
 export default function CustomerDetailsPage() {
   const params = useParams();
@@ -398,7 +389,7 @@ export default function CustomerDetailsPage() {
             />
           )}
           {activeTab === 'Wallet Analytics' && <WalletTab ledger={data.wallet_ledger} />}
-          {activeTab === 'Subscription' && <SubscriptionTab subscriptions={data.subscriptions} />}
+          {activeTab === 'Subscription' && <SubscriptionTab subscriptions={data.subscriptions} onRefresh={fetchPortfolio} />}
           {activeTab === 'Revenue Trends' && <RevenueTrendsTab revenueAnalytics={data.revenue_analytics} />}
           {activeTab === 'Activity Log' && <ActivityLogTab timeline={data.activity_timeline} />}
           {!activeTab.startsWith('Orders') && !['Overview & Insights', 'Containers & Returns', 'Postpaid Ledger', 'Wallet Analytics', 'Subscription', 'Revenue Trends', 'Activity Log'].includes(activeTab) && (
@@ -1405,229 +1396,368 @@ function WalletTab({ ledger }: { ledger: any }) {
 }
 
 function SubscriptionTab({ subscriptions, onRefresh }: { subscriptions: any; onRefresh?: () => void }) {
-  const [isResumeModalOpen, setIsResumeModalOpen] = useState(false);
-  const [togglingAutoRenew, setTogglingAutoRenew] = useState(false);
-  const [activePlanState, setActivePlanState] = useState<any>(subscriptions?.active_plan || null);
-
-  useEffect(() => {
-    setActivePlanState(subscriptions?.active_plan || null);
-  }, [subscriptions]);
+  const [selectedResumeSub, setSelectedResumeSub] = useState<any>(null);
+  const [togglingSubId, setTogglingSubId] = useState<string | null>(null);
 
   if (!subscriptions || (!subscriptions.active_plan && (!subscriptions.history || subscriptions.history.length === 0))) {
     return (
-      <div className="text-center py-12 text-gray-500 font-medium flex flex-col items-center justify-center">
-        <Calendar size={44} className="mb-3 text-gray-300" />
-        <p className="text-base font-bold text-gray-700">No Active Subscriptions</p>
-        <p className="text-xs text-gray-400 mt-1">This customer does not have any active or past subscription plans.</p>
+      <div className="text-center py-16 text-gray-500 font-medium flex flex-col items-center justify-center bg-white rounded-2xl border border-gray-100 p-8 shadow-xs">
+        <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-400 mb-3">
+          <Calendar size={28} />
+        </div>
+        <p className="text-base font-bold text-gray-800">No Subscriptions Found</p>
+        <p className="text-xs text-gray-400 mt-1 max-w-sm">This customer does not have any active or past subscription plans registered in the system.</p>
       </div>
     );
   }
 
-  const { items = [], history = [] } = subscriptions;
-  const active_plan = activePlanState;
+  const history: any[] = Array.isArray(subscriptions.history) && subscriptions.history.length > 0
+    ? subscriptions.history
+    : (subscriptions.active_plan ? [subscriptions.active_plan] : []);
 
   const now = new Date();
   const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-  const cleanPFrom = active_plan?.pause_from_date ? String(active_plan.pause_from_date).slice(0, 10) : null;
-  const cleanPTo = active_plan?.pause_to_date ? String(active_plan.pause_to_date).slice(0, 10) : null;
-  const isCurrentlyPaused = Boolean(cleanPTo && cleanPTo >= todayStr);
-
-  const handleToggleAutoRenew = async () => {
-    if (!active_plan) return;
-    const subId = active_plan.subscription_id || active_plan.id;
-    const nextVal = !active_plan.auto_renew;
-    setTogglingAutoRenew(true);
-    try {
-      await api.patch(`/subscriptions/subscriptions/${subId}/auto-renew`, {
-        auto_renew: nextVal,
-      });
-      setActivePlanState((prev: any) => ({ ...prev, auto_renew: nextVal }));
-      if (onRefresh) onRefresh();
-    } catch (err) {
-      console.error('Failed to toggle auto renew:', err);
-    } finally {
-      setTogglingAutoRenew(false);
-    }
-  };
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return 'N/A';
     try {
-      return new Date(dateStr + 'T00:00:00Z').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      return new Date(dateStr + (dateStr.includes('T') ? '' : 'T00:00:00Z')).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
     } catch {
       return dateStr;
     }
   };
 
+  const handleToggleAutoRenew = async (sub: any) => {
+    const subId = sub.subscription_id || sub.subscription_number || sub.id;
+    if (!subId) return;
+    const nextVal = !sub.auto_renew;
+    setTogglingSubId(String(subId));
+    try {
+      await api.patch(`/subscriptions/subscriptions/${subId}/auto-renew`, {
+        auto_renew: nextVal,
+      });
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error('Failed to toggle auto renew:', err);
+    } finally {
+      setTogglingSubId(null);
+    }
+  };
+
+  const activeCount = history.filter((s: any) => s.status === 'active').length;
+  const totalItemsCount = history.reduce((sum: number, s: any) => sum + (Array.isArray(s.subscription_items) ? s.subscription_items.length : 0), 0);
+
   return (
     <div className="space-y-6">
-      {/* Active Subscription Summary Card */}
-      {active_plan ? (
-        <div className="bg-gradient-to-r from-emerald-50 via-teal-50/50 to-emerald-50 p-6 rounded-2xl border border-emerald-200 shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-emerald-200/60">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-xs">
-                <Calendar size={22} />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-black text-gray-900">
-                    Subscription #{active_plan.subscription_number || active_plan.subscription_id || active_plan.id}
-                  </h3>
-                  <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
-                    isCurrentlyPaused
-                      ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                      : active_plan.status === 'active'
-                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                      : 'bg-gray-100 text-gray-700 border border-gray-200'
-                  }`}>
-                    {isCurrentlyPaused ? 'PAUSED' : (active_plan.status || 'ACTIVE')}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Created on {formatDate(active_plan.created_at)}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {/* Auto Renew Toggle */}
-              <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-emerald-200 shadow-2xs">
-                <span className="text-xs font-bold text-slate-700">Auto Renew:</span>
-                <button
-                  type="button"
-                  onClick={handleToggleAutoRenew}
-                  disabled={togglingAutoRenew}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
-                    active_plan.auto_renew ? 'bg-emerald-600' : 'bg-slate-300'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                      active_plan.auto_renew ? 'translate-x-4.5' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-                <span className={`text-[11px] font-black uppercase ${active_plan.auto_renew ? 'text-emerald-700' : 'text-slate-400'}`}>
-                  {active_plan.auto_renew ? 'ON' : 'OFF'}
-                </span>
-              </div>
-
-              {isCurrentlyPaused && (
-                <button
-                  onClick={() => setIsResumeModalOpen(true)}
-                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
-                >
-                  <PlayCircle className="w-3.5 h-3.5" /> Resume Deliveries
-                </button>
-              )}
-            </div>
+      {/* Subscriptions Overview Header Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+            <Calendar size={20} />
           </div>
-
-          {/* Pause Status Alert */}
-          {isCurrentlyPaused && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs text-amber-900">
-              <span className="font-bold flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-amber-600" /> Currently Paused until {formatDate(cleanPTo)} ({formatDate(cleanPFrom)} &rarr; {formatDate(cleanPTo)})
-              </span>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-1">
-            <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Start Date</p>
-              <p className="text-sm font-bold text-gray-900">{formatDate(active_plan.start_date)}</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">End Date</p>
-              <p className="text-sm font-bold text-gray-900">{formatDate(active_plan.end_date) || 'Ongoing'}</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Schedule Type</p>
-              <p className="text-sm font-bold text-gray-900 capitalize">{active_plan.schedule_type || 'Everyday'}</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Payment Mode</p>
-              <p className="text-sm font-bold text-gray-900 capitalize">{active_plan.payment_mode || active_plan.payment_type || 'Prepaid Wallet'}</p>
-            </div>
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Subscriptions</p>
+            <p className="text-lg font-black text-gray-900">{history.length}</p>
           </div>
         </div>
-      ) : null}
 
-      {/* Subscribed Items */}
-      <div>
-        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-          <Box size={16} className="text-emerald-600" /> Subscribed Items ({items.length})
-        </h3>
-        {items.length === 0 ? (
-          <p className="text-xs text-gray-500 italic bg-gray-50 p-4 rounded-xl border border-gray-100">
-            No specific items detailed for this active plan.
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {items.map((item: any, i: number) => (
-              <div key={i} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl hover:shadow-xs transition-shadow">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-sm">
-                    {i + 1}
-                  </div>
-                  <div>
-                    <p className="font-bold text-gray-900 text-sm">{item.product_name || 'Milk / Dairy Product'}</p>
-                    {item.variant_name && <p className="text-xs text-gray-500">{item.variant_name}</p>}
-                    {item.quantity && <p className="text-[11px] font-semibold text-emerald-700 mt-0.5">Quantity: {item.quantity} unit(s)</p>}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-extrabold text-gray-900 text-sm">₹{Number(item.final_price || item.unit_price || 0).toLocaleString()}</p>
-                  <p className="text-[10px] text-gray-400 uppercase">per delivery</p>
-                </div>
-              </div>
-            ))}
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold">
+            <Activity size={20} />
           </div>
-        )}
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Active Plans</p>
+            <p className="text-lg font-black text-emerald-600">{activeCount}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+            <Box size={20} />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Subscribed Products</p>
+            <p className="text-lg font-black text-gray-900">{totalItemsCount} Item(s)</p>
+          </div>
+        </div>
       </div>
 
-      {/* Subscription History */}
-      {history.length > 0 && (
-        <div>
-          <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">
-            Subscription History ({history.length})
-          </h3>
-          <div className="space-y-2">
-            {history.map((sub: any, i: number) => (
-              <div key={i} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl bg-white text-xs">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-bold text-gray-900">#{sub.subscription_number || sub.subscription_id || sub.id}</span>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                      sub.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
+      {/* Subscription-wise Full Details List */}
+      <div className="space-y-6">
+        {history.map((sub: any, idx: number) => {
+          const subId = sub.subscription_id || sub.id;
+          const subNum = sub.subscription_number || subId;
+          const items: any[] = Array.isArray(sub.subscription_items) ? sub.subscription_items : [];
+          
+          const cleanPFrom = sub.pause_from_date ? String(sub.pause_from_date).slice(0, 10) : null;
+          const cleanPTo = sub.pause_to_date ? String(sub.pause_to_date).slice(0, 10) : null;
+          const isCurrentlyPaused = Boolean(cleanPTo && cleanPTo >= todayStr);
+
+          const statusLower = String(sub.status || 'active').toLowerCase();
+          const isActive = statusLower === 'active' && !isCurrentlyPaused;
+
+          const totalPerDelivery = items.reduce(
+            (sum: number, it: any) => sum + (Number(it.final_price || it.unit_price || 0) * Number(it.quantity || 1)),
+            0
+          );
+
+          return (
+            <div
+              key={subId || idx}
+              className={`rounded-2xl border transition-all duration-200 overflow-hidden shadow-xs ${
+                isActive
+                  ? 'bg-white border-emerald-200 ring-1 ring-emerald-500/10'
+                  : isCurrentlyPaused
+                  ? 'bg-white border-amber-200 ring-1 ring-amber-500/10'
+                  : 'bg-white border-gray-200'
+              }`}
+            >
+              {/* Subscription Card Header */}
+              <div className={`p-5 sm:p-6 border-b ${
+                isActive
+                  ? 'bg-gradient-to-r from-emerald-50/70 via-teal-50/40 to-transparent border-emerald-100'
+                  : isCurrentlyPaused
+                  ? 'bg-gradient-to-r from-amber-50/70 via-orange-50/40 to-transparent border-amber-100'
+                  : 'bg-gray-50/60 border-gray-100'
+              }`}>
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  {/* Left: ID, Badge, and Schedule Info */}
+                  <div className="flex items-start sm:items-center gap-3.5">
+                    <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold shadow-xs shrink-0 ${
+                      isActive
+                        ? 'bg-emerald-600 text-white'
+                        : isCurrentlyPaused
+                        ? 'bg-amber-500 text-white'
+                        : 'bg-gray-200 text-gray-700'
                     }`}>
-                      {sub.status}
-                    </span>
+                      <Calendar size={20} />
+                    </div>
+
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-base font-black text-gray-900 tracking-tight">
+                          Subscription #{subNum}
+                        </h3>
+                        {subId !== subNum && (
+                          <span className="text-[11px] font-mono text-gray-400">
+                            (ID: {subId})
+                          </span>
+                        )}
+                        <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                          isCurrentlyPaused
+                            ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                            : isActive
+                            ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                            : 'bg-gray-100 text-gray-600 border border-gray-200'
+                        }`}>
+                          {isCurrentlyPaused ? 'PAUSED' : (sub.status || 'ACTIVE')}
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 uppercase">
+                          {sub.schedule_type || 'Everyday'}
+                        </span>
+                        {sub.delivery_slot && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 uppercase">
+                            {sub.delivery_slot}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Created on <span className="font-semibold text-gray-700">{formatDate(sub.created_at)}</span>
+                        {sub.billing_cycle && (
+                          <> • Billing Cycle: <span className="capitalize font-semibold text-gray-700">{sub.billing_cycle}</span></>
+                        )}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-gray-500">
-                    Cycle: <span className="capitalize font-semibold">{sub.billing_cycle || sub.schedule_type || 'N/A'}</span> • Created {new Date(sub.created_at).toLocaleDateString('en-GB')}
-                  </p>
+
+                  {/* Right: Actions (Auto-Renew & Resume) */}
+                  <div className="flex flex-wrap items-center gap-3 shrink-0">
+                    {/* Auto-renew Switch */}
+                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-2xs">
+                      <span className="text-xs font-bold text-slate-600">Auto Renew:</span>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAutoRenew(sub)}
+                        disabled={togglingSubId === String(subId)}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
+                          sub.auto_renew ? 'bg-emerald-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                            sub.auto_renew ? 'translate-x-4.5' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                      <span className={`text-[11px] font-black uppercase ${sub.auto_renew ? 'text-emerald-700' : 'text-slate-400'}`}>
+                        {sub.auto_renew ? 'ON' : 'OFF'}
+                      </span>
+                    </div>
+
+                    {/* Resume Deliveries Button (if paused) */}
+                    {isCurrentlyPaused && (
+                      <button
+                        onClick={() => setSelectedResumeSub(sub)}
+                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <PlayCircle className="w-3.5 h-3.5" /> Resume
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="font-semibold text-gray-700 capitalize">{sub.schedule_type || 'Custom Schedule'}</span>
+
+                {/* Pause Info Banner if Paused */}
+                {isCurrentlyPaused && (
+                  <div className="mt-4 p-3 bg-amber-50/80 border border-amber-200 rounded-xl flex items-center justify-between text-xs text-amber-900">
+                    <span className="font-bold flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                      Paused until {formatDate(cleanPTo)} ({formatDate(cleanPFrom)} &rarr; {formatDate(cleanPTo)})
+                    </span>
+                    {sub.pause_reason && (
+                      <span className="text-[11px] text-amber-700 italic">
+                        Reason: {sub.pause_reason}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Subscription Meta Details Grid */}
+              <div className="p-5 sm:p-6 space-y-6">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-xl bg-gray-50/70 border border-gray-100 text-xs">
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Start Date</p>
+                    <p className="font-bold text-gray-800">{formatDate(sub.start_date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">End Date</p>
+                    <p className="font-bold text-gray-800">{formatDate(sub.end_date) || 'Ongoing'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Payment Mode</p>
+                    <p className="font-bold text-gray-800 capitalize">{sub.payment_mode || sub.payment_type || 'Prepaid Wallet'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Estimated / Delivery</p>
+                    <p className="font-black text-emerald-700 text-sm">₹{Number(totalPerDelivery || sub.monthly_estimate || 0).toLocaleString('en-IN')}</p>
+                  </div>
+                  {sub.delivery_address && (
+                    <div className="col-span-2 sm:col-span-4 pt-2 border-t border-gray-200/60 flex items-start gap-2 text-gray-600">
+                      <MapPin size={14} className="text-gray-400 shrink-0 mt-0.5" />
+                      <span className="text-[11px]">
+                        <strong className="text-gray-700">Delivery Address:</strong> {sub.delivery_address}
+                        {sub.delivery_landmark && ` (Landmark: ${sub.delivery_landmark})`}
+                        {sub.branch_name && ` • Branch: ${sub.branch_name}`}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Subscribed Items for THIS Specific Subscription */}
+                <div>
+                  <h4 className="text-xs font-black text-gray-900 uppercase tracking-wider mb-3 flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <Box size={15} className="text-emerald-600" />
+                      Subscribed Items ({items.length})
+                    </span>
+                    {totalPerDelivery > 0 && (
+                      <span className="text-[11px] font-extrabold text-emerald-700">
+                        Total per delivery: ₹{Number(totalPerDelivery).toLocaleString('en-IN')}
+                      </span>
+                    )}
+                  </h4>
+
+                  {items.length === 0 ? (
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 text-center">
+                      <p className="text-xs text-gray-400 italic">No item records attached to this subscription.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {items.map((item: any, itemIdx: number) => {
+                        const unitPrice = Number(item.unit_price || 0);
+                        const finalPrice = Number(item.final_price || unitPrice);
+                        const qty = Number(item.quantity || item.daily_quantity || 1);
+                        const itemTotal = finalPrice * qty;
+
+                        return (
+                          <div
+                            key={item.id || itemIdx}
+                            className="flex items-center justify-between p-3.5 bg-white border border-gray-100 rounded-xl hover:border-emerald-200 transition-colors shadow-2xs"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              {/* Product Thumbnail or Counter */}
+                              {item.product_image ? (
+                                <img
+                                  src={item.product_image.startsWith('http') ? item.product_image : `/uploads/${item.product_image.replace(/^\//, '')}`}
+                                  alt={item.product_name || 'Product'}
+                                  className="w-11 h-11 rounded-xl object-cover border border-gray-100 shrink-0"
+                                  onError={(e: any) => {
+                                    e.currentTarget.style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-black text-xs shrink-0">
+                                  {itemIdx + 1}
+                                </div>
+                              )}
+
+                              <div className="min-w-0">
+                                <p className="font-bold text-gray-900 text-xs truncate">
+                                  {item.product_name || 'Subscribed Product'}
+                                </p>
+                                {item.variant_name && (
+                                  <p className="text-[11px] text-gray-500 font-medium truncate">
+                                    {item.variant_name}
+                                  </p>
+                                )}
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded-md">
+                                    Qty: {qty} unit{qty > 1 ? 's' : ''}
+                                  </span>
+                                  {item.is_free && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded-md">
+                                      FREE
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="text-right shrink-0 pl-3">
+                              <p className="font-black text-gray-900 text-xs">
+                                ₹{itemTotal.toLocaleString('en-IN')}
+                              </p>
+                              <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-tight">
+                                ₹{finalPrice.toLocaleString('en-IN')}/unit
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            </div>
+          );
+        })}
+      </div>
 
-      {/* Resume Modal */}
-      {active_plan && (
+      {/* Resume Deliveries Modal */}
+      {selectedResumeSub && (
         <SubscriptionResumeModal
-          isOpen={isResumeModalOpen}
-          onClose={() => setIsResumeModalOpen(false)}
-          subscriptionId={String(active_plan.subscription_id || active_plan.id)}
-          subscriptionNumber={active_plan.subscription_number}
-          pauseFromDate={active_plan.pause_from_date}
-          pauseToDate={active_plan.pause_to_date}
+          isOpen={Boolean(selectedResumeSub)}
+          onClose={() => setSelectedResumeSub(null)}
+          subscriptionId={String(selectedResumeSub.subscription_id || selectedResumeSub.id)}
+          subscriptionNumber={selectedResumeSub.subscription_number}
+          pauseFromDate={selectedResumeSub.pause_from_date}
+          pauseToDate={selectedResumeSub.pause_to_date}
           onSuccess={() => {
+            setSelectedResumeSub(null);
             if (onRefresh) onRefresh();
           }}
         />
@@ -1639,13 +1769,14 @@ function SubscriptionTab({ subscriptions, onRefresh }: { subscriptions: any; onR
 function RevenueTrendsTab({ revenueAnalytics }: { revenueAnalytics: any }) {
   const monthlyTrend = revenueAnalytics?.monthly_trend || [];
   const topProducts = revenueAnalytics?.top_products || [];
+  const maxRevenue = Math.max(...monthlyTrend.map((m: any) => Number(m.revenue || 0)), 1000);
 
   return (
     <div className="space-y-6 font-sans">
       {/* 6-Month Revenue Trend */}
       <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xs">
         <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-          <TrendingUp size={16} className="text-emerald-600" /> Revenue & Spending Trends
+          <TrendingUp size={16} className="text-emerald-600" /> Revenue &amp; Spending Trends
         </h3>
         
         {monthlyTrend.length === 0 ? (
@@ -1653,20 +1784,31 @@ function RevenueTrendsTab({ revenueAnalytics }: { revenueAnalytics: any }) {
             No completed order revenue recorded yet.
           </p>
         ) : (
-          <div className="h-64 w-full pt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={8} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} tickFormatter={(v) => `₹${v}`} />
-                <RechartsTooltip 
-                  cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', fontSize: '12px', fontWeight: 'bold' }}
-                  formatter={(val) => [`₹${Number(val ?? 0).toLocaleString()}`, 'Revenue']}
-                />
-                <Bar dataKey="revenue" fill="#10b981" radius={[6, 6, 0, 0]} barSize={36} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="pt-4">
+            <div className="flex items-end gap-3 h-48 border-b border-gray-200 pb-2 px-2">
+              {monthlyTrend.map((item: any, i: number) => {
+                const rev = Number(item.revenue || 0);
+                const heightPct = Math.max(Math.round((rev / maxRevenue) * 100), 4);
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-2 group relative">
+                    <div className="absolute -top-8 bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md z-20">
+                      ₹{rev.toLocaleString()}
+                    </div>
+                    <div className="w-full bg-emerald-50 rounded-t-lg relative flex items-end justify-center h-40 overflow-hidden">
+                      <div 
+                        className="w-full bg-emerald-500 hover:bg-emerald-600 rounded-t-lg transition-all"
+                        style={{ height: `${heightPct}%` }}
+                      />
+                    </div>
+                    <span className="text-[11px] font-semibold text-gray-600 truncate">{item.month}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-between items-center text-[10px] text-gray-400 font-bold uppercase mt-2 px-1">
+              <span>Past Months</span>
+              <span>Max: ₹{maxRevenue.toLocaleString()}</span>
+            </div>
           </div>
         )}
       </div>
