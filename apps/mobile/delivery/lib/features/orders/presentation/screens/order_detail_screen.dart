@@ -246,9 +246,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               const SizedBox(height: 16),
             ],
 
-            // Bottle Returns Ledger Card
-            _buildBottleLedgerCard(),
-            const SizedBox(height: 16),
+            // Bottle Returns Ledger Card (Only show if customer has outstanding bottles at home)
+            if (_currentStop.bottlesWithCustomer > 0 || (isDone && _currentStop.emptyBottlesCollected > 0)) ...[
+              _buildBottleLedgerCard(),
+              const SizedBox(height: 16),
+            ],
 
             // Order-wise Details Cards
             ..._buildOrderWiseCards(),
@@ -726,21 +728,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ],
       ),
     );
-  }
 
   Widget _buildBottleLedgerCard() {
-    // outstanding = bottles already at customer's home (min 0, negatives mean over-collected earlier)
     final outstanding = (_currentStop.bottlesWithCustomer).clamp(0, 9999);
-    // deliveredToday = containers being delivered in this order (from backend)
-    final deliveredToday = _currentStop.emptyBottlesExpected;
     final statusLower = _currentStop.status.toLowerCase();
     final isDone = statusLower == 'delivered' ||
                    statusLower == 'failed' ||
                    statusLower == 'completed' ||
                    statusLower == 'cancelled';
     final collected = isDone ? _currentStop.emptyBottlesCollected : 0;
-    // Projected = outstanding + delivered today - collected today
-    final projectedBalance = outstanding + deliveredToday - collected;
+
+    if (outstanding <= 0 && collected <= 0) {
+      return const SizedBox.shrink();
+    }
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -752,13 +752,29 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.opacity_rounded, color: Colors.teal, size: 20),
-              SizedBox(width: 8),
-              Text(
-                'BOTTLE RETURNS LEDGER',
+              const Icon(Icons.opacity_rounded, color: Colors.teal, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'BOTTLE RETURNS',
                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: kTextSub, letterSpacing: 0.8),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.teal.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$outstanding to collect',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.teal.shade800,
+                  ),
+                ),
               ),
             ],
           ),
@@ -772,47 +788,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   Colors.teal,
                 ),
               ),
-              Container(width: 1, height: 40, color: kBorderLt),
-              Expanded(
-                child: _buildBottleIndicator(
-                  'Delivered Today',
-                  '+$deliveredToday',
-                  kPrimary,
-                ),
-              ),
-              Container(width: 1, height: 40, color: kBorderLt),
-              Expanded(
-                child: _buildBottleIndicator(
-                  isDone ? 'Collected Today' : 'Expected Today',
-                  isDone ? '$collected' : '$deliveredToday',
-                  isDone ? kSuccess : kAccent,
-                ),
-              ),
-            ],
-          ),
-          const Divider(height: 24, color: kBorder),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Projected Outstanding Balance',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: kText),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: projectedBalance > 0 ? Colors.teal.shade50 : Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '$projectedBalance bottle${projectedBalance == 1 ? '' : 's'}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    color: projectedBalance > 0 ? Colors.teal.shade800 : Colors.orange.shade800,
+              if (isDone) ...[
+                Container(width: 1, height: 40, color: kBorderLt),
+                Expanded(
+                  child: _buildBottleIndicator(
+                    'Collected Today',
+                    '$collected',
+                    kSuccess,
                   ),
                 ),
-              ),
+                Container(width: 1, height: 40, color: kBorderLt),
+                Expanded(
+                  child: _buildBottleIndicator(
+                    'Remaining',
+                    '${(outstanding - collected).clamp(0, 9999)}',
+                    (outstanding - collected) > 0 ? Colors.orange.shade700 : kSuccess,
+                  ),
+                ),
+              ],
             ],
           ),
         ],

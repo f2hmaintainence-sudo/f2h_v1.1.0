@@ -101,16 +101,17 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
     
     // Also support fallback default Glass Bottle if containerBalances is empty
     if (_containerInputs.isEmpty) {
-      final expected = widget.stop.emptyBottlesExpected;
       final outstanding = widget.stop.bottlesWithCustomer;
-      _containerInputs['PKG_GLASS_BOTTLE'] = ContainerReturnInput(
-        containerId: 'PKG_GLASS_BOTTLE',
-        name: 'Glass Bottle',
-        balance: outstanding,
-        expected: expected,
-        isChecked: expected > 0,
-        returned: expected > 0 ? expected : 0,
-      );
+      if (outstanding > 0) {
+        _containerInputs['PKG_GLASS_BOTTLE'] = ContainerReturnInput(
+          containerId: 'PKG_GLASS_BOTTLE',
+          name: 'Glass Bottle',
+          balance: outstanding,
+          expected: outstanding,
+          isChecked: true,
+          returned: outstanding,
+        );
+      }
     }
 
     _syncLegacyCounts();
@@ -1377,9 +1378,8 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
   }
 
   Widget _buildItemsSection({bool showReturnsInfo = true}) {
-    final expectedToday = widget.stop.emptyBottlesExpected;
     final outstanding = widget.stop.bottlesWithCustomer;
-    final hasReturnable = outstanding > 0 || expectedToday > 0;
+    final hasReturnable = outstanding > 0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -1454,7 +1454,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                   const Icon(Icons.swap_horizontal_circle_rounded, color: Colors.teal, size: 18),
                   const SizedBox(width: 8),
                   Text(
-                    'EXPECTED RETURNS',
+                    'CONTAINER RETURNS',
                     style: TextStyle(
                       fontWeight: FontWeight.w900,
                       fontSize: 11,
@@ -1479,7 +1479,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                     ),
                   ),
                   Text(
-                    '$expectedToday bottles',
+                    '$outstanding bottle${outstanding == 1 ? '' : 's'}',
                     style: const TextStyle(
                       fontWeight: FontWeight.w900,
                       fontSize: 13,

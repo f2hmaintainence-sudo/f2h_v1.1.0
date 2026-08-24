@@ -414,22 +414,23 @@ class _MapDeliverySheetState extends State<MapDeliverySheet> {
                   ],
                 ),
 
-                const Divider(height: 24, color: kBorder),
-
-                // Bottles Outstanding
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'OUTSTANDING BOTTLES AT HOME',
-                      style: TextStyle(fontSize: 10, color: kTextSub, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                    ),
-                    Text(
-                      '${nextStop.bottlesWithCustomer > 0 ? -nextStop.bottlesWithCustomer : 0} empty bottles',
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Colors.teal),
-                    ),
-                  ],
-                ),
+                // Bottles Outstanding (Only show if customer has containers to return)
+                if (nextStop.bottlesWithCustomer > 0) ...[
+                  const Divider(height: 24, color: kBorder),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'OUTSTANDING BOTTLES AT HOME',
+                        style: TextStyle(fontSize: 10, color: kTextSub, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                      ),
+                      Text(
+                        '${nextStop.bottlesWithCustomer} empty bottle${nextStop.bottlesWithCustomer == 1 ? '' : 's'}',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Colors.teal),
+                      ),
+                    ],
+                  ),
+                ],
                 
                 // Special Instructions (if any)
                 if (nextStop.specialInstructions != null && nextStop.specialInstructions!.isNotEmpty) ...[

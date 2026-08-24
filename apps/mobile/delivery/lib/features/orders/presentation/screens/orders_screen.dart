@@ -619,36 +619,39 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                 ],
               ),
 
-              const Divider(height: 24, color: kBorder),
-                         // Bottle Outstanding & Collection Status (Aligned with Map screen style)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'OUTSTANDING BOTTLES',
-                    style: TextStyle(fontSize: 10, color: kTextSub, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+              // Bottle Outstanding & Collection Status (Only show if customer has containers to return)
+              if (stop.bottlesWithCustomer > 0 || (isDone && stop.emptyBottlesCollected > 0)) ...[
+                const Divider(height: 24, color: kBorder),
+                if (stop.bottlesWithCustomer > 0)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'OUTSTANDING BOTTLES',
+                        style: TextStyle(fontSize: 10, color: kTextSub, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                      ),
+                      Text(
+                        '${stop.bottlesWithCustomer} empty bottle${stop.bottlesWithCustomer == 1 ? '' : 's'}',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Colors.teal),
+                      ),
+                    ],
                   ),
-                  Text(
-                    '${stop.bottlesWithCustomer > 0 ? -stop.bottlesWithCustomer : 0} empty bottles',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Colors.teal),
+                if (isDone && stop.emptyBottlesCollected > 0) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'COLLECTED BOTTLES',
+                        style: TextStyle(fontSize: 10, color: kTextSub, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                      ),
+                      Text(
+                        '${stop.emptyBottlesCollected} bottles',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: kSuccess),
+                      ),
+                    ],
                   ),
                 ],
-              ),
-              if (isDone) ...[
-                const SizedBox(height: 6),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'COLLECTED BOTTLES',
-                      style: TextStyle(fontSize: 10, color: kTextSub, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                    ),
-                    Text(
-                      '${stop.emptyBottlesCollected} bottles',
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: kSuccess),
-                    ),
-                  ],
-                ),
               ],
 
               // Actions
