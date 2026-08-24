@@ -752,109 +752,75 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ],
                         ),
 
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 20),
 
-                        // ── SECTION 4: STEP 1 OF SHIFT / PICKUP CARD ────────
-                        if (currentRun != null) ...[
-                          PickupStatusCard(currentRun: currentRun),
-                          const SizedBox(height: 12),
-                        ],
-
-                        // ── SECTION 5: QUEUE TABS & ORDER ITEMS ─────────────
-                        Container(
-                          height: 48,
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(16)),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () => setState(() => _selectedTab = 0),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: _selectedTab == 0 ? Colors.white : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(12),
-                                      boxShadow: _selectedTab == 0
-                                          ? const [BoxShadow(color: Color(0x08000000), blurRadius: 4, offset: Offset(0, 2))]
-                                          : null,
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        'To Collect (${collectQueue.length})',
-                                        style: GoogleFonts.poppins(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 12.5,
-                                          color: _selectedTab == 0 ? const Color(0xFF16A34A) : const Color(0xFF64748B),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
+                        // ── SECTION 4: ORDERS LIST ──────────────────────────
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Orders (${listQueue.length})',
+                              style: GoogleFonts.poppins(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF0F172A),
+                                letterSpacing: -0.2,
                               ),
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () => setState(() => _selectedTab = 1),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: _selectedTab == 1 ? Colors.white : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(12),
-                                      boxShadow: _selectedTab == 1
-                                          ? const [BoxShadow(color: Color(0x08000000), blurRadius: 4, offset: Offset(0, 2))]
-                                          : null,
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        'Active Queue (${activeQueue.length})',
-                                        style: GoogleFonts.poppins(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 12.5,
-                                          color: _selectedTab == 1 ? const Color(0xFF16A34A) : const Color(0xFF64748B),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        if (_selectedTab == 0) ...[
-                          if (collectQueue.isEmpty)
+                            ),
                             Container(
-                              padding: const EdgeInsets.all(24),
-                              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFE2E8F0))),
-                              child: Center(child: Text('No items to collect for today.', style: GoogleFonts.poppins(color: const Color(0xFF64748B), fontWeight: FontWeight.w600))),
-                            )
-                          else ...[
-                            ...collectQueue.map((stop) => CollectQueueItem(stop: stop)),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDCFCE7),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '${listQueue.where((s) => s.status == 'delivered').length}/${listQueue.length} Delivered',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF15803D),
+                                ),
+                              ),
+                            ),
                           ],
-                        ] else ...[
-                          if (activeQueue.isEmpty)
-                            Container(
-                              padding: const EdgeInsets.all(24),
-                              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFE2E8F0))),
-                              child: Center(child: Text('No active deliveries. Complete collection first.', style: GoogleFonts.poppins(color: const Color(0xFF64748B), fontWeight: FontWeight.w600))),
-                            )
-                          else
-                            ...List.generate(activeQueue.length, (index) {
-                              final stop = activeQueue[index];
-                              final isNext = nextStop?.customerId == stop.customerId;
-                              return Column(
-                                children: [
-                                  QueueItemTile(
-                                    stop: stop,
-                                    isNext: isNext,
-                                    distanceStr: _calculateDistanceStr(stop),
-                                    onDeliverTap: () => _showConfirmation(context, stop),
-                                  ),
-                                  if (index < activeQueue.length - 1)
-                                    const SizedBox(height: 10),
-                                ],
-                              );
-                            }),
-                        ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        if (listQueue.isEmpty)
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Center(
+                              child: Text(
+                                'No orders assigned for today.',
+                                style: GoogleFonts.poppins(
+                                  color: const Color(0xFF64748B),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          ...List.generate(listQueue.length, (index) {
+                            final stop = listQueue[index];
+                            final isNext = nextStop?.customerId == stop.customerId;
+                            return Column(
+                              children: [
+                                QueueItemTile(
+                                  stop: stop,
+                                  isNext: isNext,
+                                  distanceStr: _calculateDistanceStr(stop),
+                                  onDeliverTap: () => _showConfirmation(context, stop),
+                                ),
+                                if (index < listQueue.length - 1)
+                                  const SizedBox(height: 10),
+                              ],
+                            );
+                          }),
                       ],
                     ],
                   ),

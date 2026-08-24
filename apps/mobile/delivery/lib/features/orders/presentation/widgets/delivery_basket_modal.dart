@@ -1,5 +1,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:f2h_delivery/core/utils/app_snackbar.dart';
+import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/core/api/api_endpoints.dart';
 import 'package:f2h_delivery/core/api/dio_client.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
@@ -110,6 +114,8 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
 
   List<ProductInventorySummary>? _apiProductBreakdown;
   bool _isReturningProducts = false;
+  bool? _apiPickupConfirmed;
+  bool _isConfirmingPickup = false;
 
   @override
   void initState() {
@@ -136,6 +142,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
       if (response.statusCode == 200 && response.data != null) {
         final data = Map<String, dynamic>.from(response.data as Map);
         final breakdownRaw = (data['product_breakdown'] as List<dynamic>? ?? []);
+        final isConfirmed = data['pickup_confirmed'] == true;
 
         final List<ProductInventorySummary> parsedBreakdown = [];
         for (final item in breakdownRaw) {
@@ -162,7 +169,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
               damagedCount: damaged,
               remainingToDeliver: currentBasket > 0 ? currentBasket : math.max(0, loaded - delivered - returned - damaged),
               extraBuffer: emergency,
-              isPickupConfirmed: true,
+              isPickupConfirmed: isConfirmed,
               stops: [],
             ),
           );
@@ -170,11 +177,46 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
 
         if (mounted) {
           setState(() {
+            _apiPickupConfirmed = isConfirmed;
             _apiProductBreakdown = parsedBreakdown;
           });
         }
       }
     } catch (_) {}
+  }
+
+  Future<void> _confirmPickupFromBasket() async {
+    setState(() => _isConfirmingPickup = true);
+    try {
+      final dioClient = sl<DioClient>();
+      final runIdParam = widget.currentRun?.runId;
+      final response = await dioClient.dio.post(
+        '${ApiEndpoints.deliveryBaseUrl}/orders/pickup/confirm',
+        data: runIdParam != null && runIdParam.isNotEmpty ? {'run_id': runIdParam} : {},
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (mounted) {
+          AppSnackBar.success(context, '✅ Dispatch confirmed! Orders are now Out for Delivery.');
+          setState(() {
+            _apiPickupConfirmed = true;
+          });
+          await _fetchLiveBasketSummary();
+          try {
+            context.read<DeliverySessionBloc>().add(ReloadSessionEvent());
+          } catch (_) {}
+        }
+      } else {
+        if (mounted) {
+          AppSnackBar.error(context, response.data?['message'] ?? 'Failed to confirm pickup');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackBar.error(context, 'Error confirming pickup: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isConfirmingPickup = false);
+    }
   }
 
   Future<void> _returnProductsToHub() async {
@@ -340,6 +382,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
   }
 
   bool get isPickupConfirmed {
+    if (_apiPickupConfirmed != null) return _apiPickupConfirmed!;
     final status = (widget.currentRun?.status ?? '').toLowerCase();
     return status == 'in_progress' ||
         status == 'in_transit' ||
@@ -486,6 +529,85 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                if (!isPickupConfirmed) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFF86EFAC), width: 1.2),
+                      boxShadow: const [
+                        BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2)),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFDCFCE7),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.inventory_2_rounded, color: Color(0xFF16A34A), size: 20),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Dispatch Handover Pending',
+                                    style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 14,
+                                      color: const Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  Text(
+                                    'Verify physical bag stock against dispatch items below',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 11.5,
+                                      color: const Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 44,
+                          child: ElevatedButton.icon(
+                            onPressed: _isConfirmingPickup ? null : _confirmPickupFromBasket,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF16A34A),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            icon: _isConfirmingPickup
+                                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                : const Icon(Icons.check_circle_outline_rounded, size: 18),
+                            label: Text(
+                              _isConfirmingPickup ? 'CONFIRMING DISPATCH...' : 'CONFIRM DISPATCH & START DELIVERY',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [

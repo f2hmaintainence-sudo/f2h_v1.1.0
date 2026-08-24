@@ -15,10 +15,12 @@ metadata:
 **MUST** run, and read the output:
 
 ```
+git pull origin main      # ensure workspace is 100% up to date with remote
 git status                # uncommitted work already present
 git branch --show-current # which branch you are on
 ```
 
+- **Always pull latest changes**: Never start coding on stale code. Always run `git pull origin main` first.
 - **Uncommitted changes you did not make are the user's work.** Never revert, stash, discard, or overwrite them. Work alongside them, and keep your edits distinguishable.
 - If you are on the default branch (`main`, `master`, `develop`) and the task is more than trivial, **SHOULD** create a branch first — but only if the project's workflow uses branches. Check whether the repo has other branches and how they are named.
 - Inspect history when the change depends on prior intent: `git log --oneline -20`, `git log -p -- <path>`, `git blame <file>`. Read history when a line looks deliberate and you do not know why.

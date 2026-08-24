@@ -1101,89 +1101,78 @@ export class DeliveryOrderService {
       }
     }
 
-    let items: any[] = [];
-    const itemsByOrder: Record<string, any[]> = {};
+    // 1. Fetch items ONLY from delivery_dispatch_items table (joining delivery_dispatch & delivery_runs)
+    const dispatchItemsRes = await this.db.query(
+      `SELECT
+         ddi.id,
+         dd.dispatch_id,
+         ddi.product_variant_id,
+         pv.name AS product_name,
+         pv.unit_value,
+         pv.unit_type,
+         p.is_returnable,
+         COALESCE(ddi.planned_qty, 0)::numeric AS planned_qty,
+         COALESCE(ddi.loaded_qty, 0)::numeric AS loaded_qty,
+         COALESCE(ddi.delivered_qty, 0)::numeric AS delivered_qty,
+         COALESCE(ddi.unit, pv.unit_type, 'PCS') AS unit
+       FROM delivery_runs dr
+       JOIN delivery_dispatch dd ON dd.delivery_run_id = dr.run_id
+       JOIN delivery_dispatch_items ddi ON ddi.dispatch_id = dd.dispatch_id
+       LEFT JOIN product_variants pv ON pv.variant_id = ddi.product_variant_id
+       LEFT JOIN products p ON p.product_id = pv.product_id
+       WHERE (dr.delivery_partner_id = $1 OR dr.run_id = ANY($2))
+         AND DATE(dr.run_date AT TIME ZONE 'Asia/Kolkata') = $3
+         AND ddi.deleted_at IS NULL
+       ORDER BY pv.name`,
+      [boy.user_id, runIds.length ? runIds : ['NONE'], targetDate],
+    );
 
-    if (allOrderIds.length > 0) {
-      const orderItems = await this.db.query(
-        `SELECT
-             oi.order_id,
-             oi.variant_id AS product_variant_id,
-             oi.quantity,
-             pv.name AS product_name,
-             pv.unit_value,
-             pv.unit_type,
-             p.is_returnable
-           FROM order_items oi
-           JOIN product_variants pv ON pv.variant_id = oi.variant_id
-           LEFT JOIN products p ON p.product_id = pv.product_id
-           WHERE oi.order_id = ANY($1)`,
-        [allOrderIds],
-      );
+    // 2. Fetch required quantities from assigned orders to check sufficiency against dispatch
+    const ordersReqRes = await this.db.query(
+      `SELECT
+         oi.variant_id AS product_variant_id,
+         SUM(oi.quantity)::numeric AS required_qty
+       FROM orders o
+       JOIN order_items oi ON oi.order_id = o.order_id
+       WHERE (o.delivery_run_id = ANY($1) OR o.delivery_partner_id = $2)
+         AND (o.scheduled_date::date = $3 OR (o.scheduled_date IS NULL AND DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') = $3))
+         AND o.status NOT IN ('cancelled', 'failed')
+       GROUP BY oi.variant_id`,
+      [runIds.length ? runIds : ['NONE'], boy.user_id, targetDate],
+    );
 
-      for (const item of orderItems || []) {
-        const key = String(item.order_id);
-        if (!itemsByOrder[key]) itemsByOrder[key] = [];
-        itemsByOrder[key].push({
-          product_variant_id: item.product_variant_id,
-          product_name: item.product_name,
-          quantity: Number(item.quantity),
-          unit: `${item.unit_value}${item.unit_type}`,
-          unit_value: item.unit_value || 1,
-          is_returnable: item.is_returnable || false,
-        });
-      }
-
-      const consolidatedPickupItems: Record<string, any> = {};
-      for (const orderId of allOrderIds) {
-        const oItems = itemsByOrder[String(orderId)] || [];
-        for (const item of oItems) {
-          const key = `${item.product_variant_id}_${item.unit}`;
-          if (!consolidatedPickupItems[key]) {
-            consolidatedPickupItems[key] = {
-              id: key,
-              dispatch_id: '',
-              product_variant_id: item.product_variant_id,
-              product_name: item.product_name || 'Unknown Product',
-              quantity: item.quantity,
-              unit: item.unit || 'PCS',
-              unit_value: item.unit_value || 1,
-              is_returnable: item.is_returnable || false,
-              loaded_qty: 0,
-            };
-          } else {
-            consolidatedPickupItems[key].quantity += item.quantity;
-          }
-        }
-      }
-      items = Object.values(consolidatedPickupItems);
+    const requiredMap: Record<string, number> = {};
+    for (const r of ordersReqRes || []) {
+      requiredMap[String(r.product_variant_id)] = Number(r.required_qty || 0);
     }
 
-    const baggingInstructions = (stops || []).map((stop: any) => {
-      const ids = stop.order_id ? [String(stop.order_id)] : [];
-      const stopItems: any[] = [];
-      for (const orderId of ids) {
-        const oItems = itemsByOrder[orderId] || [];
-        stopItems.push(...oItems);
-      }
-
-      const consolidatedItems: Record<string, any> = {};
-      for (const item of stopItems) {
-        const key = `${item.product_name}_${item.unit}`;
-        if (!consolidatedItems[key]) {
-          consolidatedItems[key] = { ...item };
-        } else {
-          consolidatedItems[key].quantity += item.quantity;
-        }
-      }
+    let isSufficientForOrders = true;
+    const items = (dispatchItemsRes || []).map((di: any) => {
+      const vId = String(di.product_variant_id);
+      const reqQty = requiredMap[vId] || 0;
+      const planned = Number(di.planned_qty || 0);
+      const loaded = Number(di.loaded_qty || 0);
+      const effectiveStock = loaded > 0 ? loaded : planned;
+      const isSufficient = effectiveStock >= reqQty;
+      if (!isSufficient) isSufficientForOrders = false;
 
       return {
-        sequence_no: stop.sequence_no,
-        customer_name: stop.customer_name,
-        address: stop.customer_address,
-        items: Object.values(consolidatedItems),
+        id: di.id ? String(di.id) : vId,
+        dispatch_id: di.dispatch_id,
+        product_variant_id: vId,
+        product_name: di.product_name || 'Product Item',
+        unit: `${di.unit_value || ''}${di.unit || 'PCS'}`,
+        unit_value: di.unit_value || 1,
+        is_returnable: di.is_returnable || false,
+        planned_qty: planned,
+        loaded_qty: loaded,
+        required_qty: reqQty,
+        is_sufficient: isSufficient,
+        quantity: effectiveStock,
       };
     });
+
+    const isConfirmed = ['in_progress', 'completed', 'partial', 'out_for_delivery'].includes(String(runStatus));
 
     return {
       status: true,
@@ -1192,74 +1181,113 @@ export class DeliveryOrderService {
       run_id: runIdentifier,
       run_status: runStatus,
       slot: runSlot,
-      pickup_confirmed: ['in_progress', 'completed', 'partial'].includes(String(runStatus)),
+      pickup_confirmed: isConfirmed,
+      is_sufficient_for_orders: isSufficientForOrders,
       items,
-      bagging_instructions: baggingInstructions,
     };
   }
 
   async confirmPickup(
     userId: string,
     body: {
-      run_id: string;
-      items: Array<{ product_variant_id: string; confirmed_qty: number }>;
+      run_id?: string;
+      items?: Array<{ product_variant_id: string; confirmed_qty: number }>;
       latitude?: number;
       longitude?: number;
     },
   ) {
     const boy = await this.resolveDeliveryPartner(userId);
-    const run = await this.findDeliveryRunByIdAndBoy(body.run_id, boy);
+    let run: any;
+    if (body?.run_id && body.run_id.trim().length > 0) {
+      run = await this.findDeliveryRunByIdAndBoy(body.run_id, boy);
+    } else {
+      const activeRuns = await this.db.query(
+        `SELECT id, run_id, status, delivery_slot AS slot, run_date, branch_id
+         FROM delivery_runs
+         WHERE delivery_partner_id = $1
+           AND DATE(run_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
+           AND status != 'cancelled'
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [String(boy.user_id)],
+      );
+      if (!activeRuns?.length) {
+        throw new NotFoundException('No active delivery run found for today');
+      }
+      run = activeRuns[0];
+    }
     const runIds = this.getRunIdentifiers(run);
     const runIdentifier = run.run_id || String(run.id);
 
-    if (!['planned', 'assigned', 'dispatched'].includes(String(run.status))) {
+    if (!['planned', 'assigned', 'dispatched', 'draft'].includes(String(run.status))) {
       return { success: true, message: 'Pickup already confirmed', status: run.status };
     }
 
     await this.db.transaction(async (client) => {
-      for (const item of body.items) {
-        await client.query(
-          `UPDATE delivery_dispatch_items
+      // 1. If items were passed with confirmed quantities, update loaded_qty in delivery_dispatch_items
+      if (body.items && body.items.length > 0) {
+        for (const item of body.items) {
+          await client.query(
+            `UPDATE delivery_dispatch_items ddi
              SET loaded_qty = $1, updated_at = NOW()
-             WHERE delivery_run_id = ANY($2) AND product_variant_id = $3`,
-          [item.confirmed_qty, runIds, item.product_variant_id],
-        );
+             FROM delivery_dispatch dd
+             WHERE dd.dispatch_id = ddi.dispatch_id
+               AND dd.delivery_run_id = ANY($2)
+               AND ddi.product_variant_id = $3`,
+            [item.confirmed_qty, runIds, item.product_variant_id],
+          );
+        }
       }
 
+      // 2. Update delivery_runs status to 'in_progress'
       await client.query(
         `UPDATE delivery_runs
-           SET status = 'in_progress',
-               actual_start_time = COALESCE(actual_start_time, NOW()),
-               updated_at = NOW()
-           WHERE id = $1`,
-        [run.id],
+         SET status = 'in_progress',
+             actual_start_time = COALESCE(actual_start_time, NOW()),
+             updated_at = NOW()
+         WHERE id = $1 OR run_id = $2`,
+        [run.id, runIdentifier],
       );
 
-      const runAddressesRes = await client.query(
-        `SELECT order_id FROM orders WHERE delivery_run_id = ANY($1)`,
+      // 3. Update delivery_dispatch status to 'collected'
+      await client.query(
+        `UPDATE delivery_dispatch
+         SET status = 'collected',
+             collected_at = COALESCE(collected_at, NOW()),
+             loaded_by = COALESCE(loaded_by, $1),
+             updated_at = NOW()
+         WHERE delivery_run_id = ANY($2)`,
+        [boy.user_id, runIds],
+      );
+
+      // 4. Update delivery_run_addresses status to 'in_transit'
+      await client.query(
+        `UPDATE delivery_run_addresses
+         SET delivery_status = 'in_transit',
+             status = 'in_transit',
+             updated_at = NOW()
+         WHERE run_id = ANY($1)
+           AND delivery_status IN ('pending', 'assigned')`,
         [runIds],
       );
-      const orderIds = (runAddressesRes.rows || []).map((row) => String(row.order_id));
 
-      if (orderIds.length > 0) {
-        await client.query(
-          `UPDATE orders
-             SET status = 'out_for_delivery',
-                 delivery_partner_id = $1,
-                 delivery_run_id = $2,
-                 updated_at = NOW()
-             WHERE order_id = ANY($3)
-               AND status IN ('pending', 'placed', 'confirmed', 'packed', 'assigned')`,
-          [boy.user_id, runIdentifier, orderIds],
-        );
-      }
-
-
+      // 5. Update orders status to 'out_for_delivery'
+      await client.query(
+        `UPDATE orders
+         SET status = 'out_for_delivery',
+             delivery_partner_id = $1,
+             delivery_run_id = $2,
+             updated_at = NOW()
+         WHERE (delivery_run_id = ANY($3) OR delivery_partner_id = $1)
+           AND (scheduled_date::date = CURRENT_DATE OR (scheduled_date IS NULL AND DATE(created_at AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE))
+           AND status IN ('pending', 'placed', 'confirmed', 'packed', 'assigned')`,
+        [boy.user_id, runIdentifier, runIds],
+      );
     });
 
     return {
       success: true,
-      message: 'Pickup confirmed successfully',
+      message: 'Pickup confirmed successfully. Orders are now Out for Delivery.',
       run_id: runIdentifier,
       status: 'in_progress',
     };

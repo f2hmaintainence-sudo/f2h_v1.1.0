@@ -26,6 +26,9 @@ class F2hHeroHeader extends StatelessWidget {
 
     return Container(
       width: double.infinity,
+      constraints: BoxConstraints(
+        minHeight: topInset + 185,
+      ),
       decoration: const BoxDecoration(
         color: Color(0xFF0F172A),
       ),
@@ -37,7 +40,7 @@ class F2hHeroHeader extends StatelessWidget {
             child: Image.asset(
               'assets/home_bg.png',
               fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
+              alignment: Alignment.center,
               errorBuilder: (_, __, ___) => Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
@@ -62,8 +65,8 @@ class F2hHeroHeader extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black.withValues(alpha: 0.40),
-                    Colors.black.withValues(alpha: 0.72),
+                    Colors.black.withValues(alpha: 0.35),
+                    Colors.black.withValues(alpha: 0.75),
                   ],
                 ),
               ),
@@ -72,9 +75,10 @@ class F2hHeroHeader extends StatelessWidget {
 
           // 3. Top Header Content (Greeting, Bell, Online Pill)
           Padding(
-            padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 16),
+            padding: EdgeInsets.fromLTRB(16, topInset + 16, 16, 28),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // Top Bar with Greeting and Notification Icon
                 Row(
