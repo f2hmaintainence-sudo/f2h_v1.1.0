@@ -620,21 +620,26 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   CircleAvatar(
-                    backgroundColor: primaryColor.withValues(alpha: 0.08),
-                    radius: 20,
+                    backgroundColor: primaryColor.withValues(alpha: 0.12),
+                    radius: 24,
                     child: Text(
                       stop.customerName.isNotEmpty ? stop.customerName[0].toUpperCase() : '?',
-                      style: TextStyle(fontWeight: FontWeight.w900, color: primaryColor),
+                      style: TextStyle(fontWeight: FontWeight.w900, color: primaryColor, fontSize: 18),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           stop.customerName,
-                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: kText),
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: kText),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          stop.customerPhone,
+                          style: const TextStyle(fontSize: 12, color: kTextSub, fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 4),
                         Text(

@@ -41,6 +41,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _unreadNotificationsCount = 0;
   Position? _currentPosition;
   Timer? _locationUpdateTimer;
+  bool _isFabMenuOpen = false;
 
   Future<void> _reloadDashboardOrders() async {
     if (_isReloading) return;
@@ -418,6 +419,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         return Scaffold(
           backgroundColor: const Color(0xFFF8FAFC),
+          floatingActionButton: _buildExpandableFab(session, currentRun),
           body: Column(
             children: [
               // ── HERO GREETING HEADER ───────────────────────────────
@@ -425,6 +427,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 driverName: session.driverName,
                 isOnline: session.isOnline,
                 unreadCount: _unreadNotificationsCount,
+                address: nextStop != null
+                    ? nextStop.address
+                    : (session.currentRun?.runId != null
+                        ? 'Run #${session.currentRun!.runId} (${session.currentRun!.slot})'
+                        : 'Active and online for assigned runs'),
+                addressLabel: nextStop != null ? 'NEXT DELIVERY ADDRESS' : 'CURRENT LOCATION',
                 onToggleOnline: _handleOnlineToggle,
                 onNotifications: () async {
                   await Navigator.push(
@@ -634,127 +642,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         ),
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 24),
 
-                        // ── SECTION 2: NEXT DELIVERY ─────────────────────────
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Next Delivery',
-                              style: GoogleFonts.poppins(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF0F172A),
-                                letterSpacing: -0.2,
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () {
-                                MockDataService().tabNavigationNotifier.value = 1;
-                              },
-                              child: Text(
-                                'View All',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF16A34A),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-
-                        if (nextStop != null) ...[
-                          NextDeliveryCard(
-                            stop: nextStop,
-                            distanceStr: _calculateDistanceStr(nextStop),
-                            onDeliverTap: () => _showConfirmation(context, nextStop),
-                          ),
-                        ] else ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
-                            ),
-                            child: Center(
-                              child: Text(
-                                'No active next delivery. Check orders queue below.',
-                                style: GoogleFonts.poppins(
-                                  color: const Color(0xFF64748B),
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-
-                        const SizedBox(height: 20),
-
-                        // ── SECTION 3: QUICK ACTIONS ────────────────────────
-                        Text(
-                          'Quick Actions',
-                          style: GoogleFonts.poppins(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF0F172A),
-                            letterSpacing: -0.2,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-
-                        Row(
-                          children: [
-                            _buildQuickActionCard(
-                              label: 'Basket',
-                              icon: Icons.shopping_basket_rounded,
-                              cardBg: const Color(0xFFECFDF5),
-                              borderColor: const Color(0xFFA7F3D0),
-                              iconColor: const Color(0xFF16A34A),
-                              onTap: () => DeliveryBasketModal.show(
-                                context,
-                                session.orders,
-                                groupedStops: session.groupedStops,
-                                currentRun: currentRun,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            _buildQuickActionCard(
-                              label: 'Help Center',
-                              icon: Icons.help_outline_rounded,
-                              cardBg: const Color(0xFFFAF5FF),
-                              borderColor: const Color(0xFFE9D5FF),
-                              iconColor: const Color(0xFF9333EA),
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const SupportScreen(initialTabIndex: 1),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            _buildQuickActionCard(
-                              label: 'Containers',
-                              icon: Icons.all_inbox_rounded,
-                              cardBg: const Color(0xFFEFF6FF),
-                              borderColor: const Color(0xFFBFDBFE),
-                              iconColor: const Color(0xFF2563EB),
-                              onTap: () => ContainersTrackerModal.show(
-                                context,
-                                session.groupedStops,
-                                currentRun: currentRun,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 20),
-
-                        // ── SECTION 4: ORDERS LIST ──────────────────────────
+                        // ── SECTION: ORDERS LIST ────────────────────────────
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -879,51 +769,146 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildQuickActionCard({
-    required String label,
-    required IconData icon,
-    required Color cardBg,
-    required Color borderColor,
-    required Color iconColor,
-    required VoidCallback onTap,
-  }) {
-    return Expanded(
-      child: Container(
-        height: 72,
-        decoration: BoxDecoration(
-          color: cardBg,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: borderColor),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, color: iconColor, size: 22),
-                  const SizedBox(height: 5),
-                  Text(
-                    label,
-                    style: GoogleFonts.poppins(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF0F172A),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
+  Widget _buildExpandableFab(DeliverySessionLoaded session, dynamic currentRun) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (_isFabMenuOpen) ...[
+          _buildFabOption(
+            label: 'Basket',
+            icon: Icons.shopping_basket_outlined,
+            iconColor: const Color(0xFF16A34A),
+            bgColor: const Color(0xFFDCFCE7),
+            onTap: () {
+              setState(() => _isFabMenuOpen = false);
+              DeliveryBasketModal.show(
+                context,
+                session.orders,
+                groupedStops: session.groupedStops,
+                currentRun: currentRun,
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          _buildFabOption(
+            label: 'Help Center',
+            icon: Icons.help_outline_rounded,
+            iconColor: const Color(0xFF9333EA),
+            bgColor: const Color(0xFFFAF5FF),
+            onTap: () {
+              setState(() => _isFabMenuOpen = false);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const SupportScreen(initialTabIndex: 1),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          _buildFabOption(
+            label: 'Containers',
+            icon: Icons.all_inbox_outlined,
+            iconColor: const Color(0xFF2563EB),
+            bgColor: const Color(0xFFEFF6FF),
+            onTap: () {
+              setState(() => _isFabMenuOpen = false);
+              ContainersTrackerModal.show(
+                context,
+                session.groupedStops,
+                currentRun: currentRun,
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+        ],
+        FloatingActionButton(
+          heroTag: 'dashboard_fab_actions',
+          onPressed: () {
+            setState(() {
+              _isFabMenuOpen = !_isFabMenuOpen;
+            });
+          },
+          backgroundColor: const Color(0xFF16A34A),
+          elevation: 4,
+          shape: const CircleBorder(),
+          child: AnimatedRotation(
+            turns: _isFabMenuOpen ? 0.125 : 0.0,
+            duration: const Duration(milliseconds: 200),
+            child: const Icon(
+              Icons.add_rounded,
+              color: Colors.white,
+              size: 28,
             ),
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildFabOption({
+    required String label,
+    required IconData icon,
+    required Color iconColor,
+    required Color bgColor,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: iconColor, size: 18),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

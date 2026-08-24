@@ -1178,9 +1178,11 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Top Header: Name + Extra / Short Badges + Equal Width Unit Badge + In Bag Badge
+                    // Top Header: Image + Name + Extra / Short Badges + Equal Width Unit Badge + In Bag Badge
                     Row(
                       children: [
+                        _buildProductImage(inv.productImage, size: 36),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Wrap(
                             crossAxisAlignment: WrapCrossAlignment.center,
@@ -1394,8 +1396,69 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
     );
   }
 
+  String _resolveImageUrl(String? rawUrl) {
+    if (rawUrl == null || rawUrl.trim().isEmpty) return '';
+    final trimmed = rawUrl.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    final cleanPath = trimmed.startsWith('/') ? trimmed : '/$trimmed';
+    return '${ApiEndpoints.host}$cleanPath';
+  }
 
+  Widget _buildProductImage(String? imageUrl, {double size = 36}) {
+    final fullUrl = _resolveImageUrl(imageUrl);
+    if (fullUrl.isEmpty) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: const Center(
+          child: Icon(Icons.inventory_2_outlined, size: 18, color: Color(0xFF94A3B8)),
+        ),
+      );
+    }
 
-
-
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(7),
+        child: Image.network(
+          fullUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              color: const Color(0xFFF8FAFC),
+              child: const Center(
+                child: Icon(Icons.inventory_2_outlined, size: 18, color: Color(0xFF94A3B8)),
+              ),
+            );
+          },
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              color: const Color(0xFFF8FAFC),
+              child: const Center(
+                child: SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 1.8, color: Color(0xFF16A34A)),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
 }

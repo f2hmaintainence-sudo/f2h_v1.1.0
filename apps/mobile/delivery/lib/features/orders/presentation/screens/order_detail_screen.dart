@@ -30,6 +30,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   late GroupedStop _currentStop;
   String _calculatedDistanceText = 'Calculating distance...';
   String _calculatedEtaText = 'Calculating ETA...';
+  bool _showAddressDetails = true;
 
   @override
   void initState() {
@@ -226,10 +227,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Status bar indicator
-            _buildStatusBanner(),
-            const SizedBox(height: 16),
-
             if (isDone) ...[
               _buildDeliveryReceiptCard(),
               const SizedBox(height: 16),
@@ -242,15 +239,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             // Bottle Returns Ledger Card
             _buildBottleLedgerCard(),
             const SizedBox(height: 16),
+
             // Map Route Preview
             if (!isDone) ...[
               _buildMapRoutePreviewCard(),
               const SizedBox(height: 16),
             ],
 
-            // Order Details (Items + Slot + Payment Status)
-            _buildOrderDetailsCard(),
-            const SizedBox(height: 16),
+            // Order-wise Details Cards
+            ..._buildOrderWiseCards(),
 
             // Delivery Notes Card
             if (_currentStop.specialInstructions != null && _currentStop.specialInstructions!.isNotEmpty)
@@ -320,77 +317,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ],
               ),
             ),
-    );
-  }
-
-  Widget _buildStatusBanner() {
-    Color color;
-    IconData icon;
-    String title;
-    String sub;
-
-    switch (_currentStop.status.toLowerCase()) {
-      case 'delivered':
-        color = kSuccess;
-        icon = Icons.task_alt_rounded;
-        title = 'Delivery Completed';
-        sub = 'Order handed over successfully.';
-        break;
-      case 'failed':
-        color = kDanger;
-        icon = Icons.cancel_outlined;
-        title = 'Delivery Failed';
-        sub = 'Issue reported. Returned to hub.';
-        break;
-      case 'out_for_delivery':
-        color = kAccent;
-        icon = Icons.directions_bike_rounded;
-        title = 'Out For Delivery';
-        sub = 'You are currently routing to this stop.';
-        break;
-      default:
-        color = kPrimary;
-        icon = Icons.assignment_turned_in_rounded;
-        title = 'Stop Assigned';
-        sub = 'Morning delivery slot scheduled.';
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.25), width: 1.5),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: color),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  sub,
-                  style: const TextStyle(fontSize: 12, color: kTextSub, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -591,25 +517,67 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: kSurface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: kBorder),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'CUSTOMER PROFILE',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: kTextSub, letterSpacing: 0.8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'CUSTOMER PROFILE',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: kTextSub, letterSpacing: 0.8),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: kPrimary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Stop #${_currentStop.stop}',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: kPrimary),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
+
+          // Big Customer Profile Row
           Row(
             children: [
-              CircleAvatar(
-                backgroundColor: kPrimary.withValues(alpha: 0.1),
-                radius: 26,
-                child: Text(
-                  _currentStop.customerName.isNotEmpty ? _currentStop.customerName[0].toUpperCase() : '?',
-                  style: const TextStyle(fontWeight: FontWeight.w900, color: kPrimary, fontSize: 20),
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF16A34A), Color(0xFF15803D)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF16A34A).withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Text(
+                    _currentStop.customerName.isNotEmpty ? _currentStop.customerName[0].toUpperCase() : '?',
+                    style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 24),
+                  ),
                 ),
               ),
               const SizedBox(width: 16),
@@ -619,81 +587,142 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   children: [
                     Text(
                       _currentStop.customerName,
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: kText),
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 19, color: kText),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       _currentStop.customerPhone,
-                      style: const TextStyle(fontSize: 13, color: kTextSub, fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontSize: 14, color: kTextSub, fontWeight: FontWeight.w700),
                     ),
                   ],
                 ),
               ),
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.blue.withValues(alpha: 0.08),
+                  color: Colors.blue.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+                  border: Border.all(color: Colors.blue.withValues(alpha: 0.25)),
                 ),
                 child: IconButton(
                   icon: const Icon(Icons.phone_in_talk_rounded, color: Colors.blue, size: 22),
                   onPressed: () => _callPhone(_currentStop.customerPhone),
+                  tooltip: 'Call Customer',
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 18),
-          const Divider(color: kBorderLt, height: 1),
-          const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.location_on_rounded, color: kPrimary, size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Delivery Address',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: kText),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _currentStop.address,
-                      style: const TextStyle(fontSize: 12.5, color: kTextSub, height: 1.4),
-                    ),
-                  ],
-                ),
+          const SizedBox(height: 16),
+
+          // View Address Action Button
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _showAddressDetails = !_showAddressDetails;
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: _showAddressDetails ? const Color(0xFFF1F5F9) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.apartment_rounded, color: kAccent, size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Landmark',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: kText),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                     _currentStop.landmark != null && _currentStop.landmark!.isNotEmpty
-                          ? _currentStop.landmark!
-                          : _currentStop.address,
-                      style: const TextStyle(fontSize: 12.5, color: kTextSub),
-                    ),
-                  ],
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on_rounded, color: kPrimary, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        _showAddressDetails ? 'Hide Address' : 'View Address',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          color: kText,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Icon(
+                    _showAddressDetails ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                    color: kTextSub,
+                    size: 20,
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
+
+          if (_showAddressDetails) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.pin_drop_rounded, color: kPrimary, size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Delivery Address',
+                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: kText),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              _currentStop.address,
+                              style: const TextStyle(fontSize: 12, color: kTextSub, height: 1.4),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  const Divider(color: Color(0xFFE2E8F0), height: 1),
+                  const SizedBox(height: 10),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.apartment_rounded, color: kAccent, size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Landmark',
+                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: kText),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              _currentStop.landmark != null && _currentStop.landmark!.isNotEmpty
+                                  ? _currentStop.landmark!
+                                  : _currentStop.address,
+                              style: const TextStyle(fontSize: 12, color: kTextSub, height: 1.4),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -931,109 +960,186 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  Widget _buildOrderDetailsCard() {
-    final subOrders = _currentStop.orders.where((o) => o.orderType.toLowerCase() == 'subscription').toList();
-    final oneTimeOrders = _currentStop.orders.where((o) => o.orderType.toLowerCase() == 'one-time' || o.orderType.toLowerCase() == 'single').toList();
-    final subscriptionItems = _consolidateOrderItems(subOrders);
-    final oneTimeItems = _consolidateOrderItems(oneTimeOrders);
+  List<Widget> _buildOrderWiseCards() {
+    if (_currentStop.orders.isEmpty) {
+      return [const SizedBox.shrink()];
+    }
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: kSurface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: kBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'ORDER DETAILS',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: kTextSub, letterSpacing: 0.8),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            _currentStop.itemCountLabel,
-            style: const TextStyle(fontSize: 12, color: kText, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 14),
-          
-          // Items Ordered List separated by type
-          if (subscriptionItems.isNotEmpty) ...[
-            const Row(
+    return _currentStop.orders.asMap().entries.map((entry) {
+      final orderIndex = entry.key + 1;
+      final order = entry.value;
+      final isSub = order.orderType.toLowerCase() == 'subscription';
+      final totalUnits = order.products.fold<int>(0, (sum, p) => sum + p.quantity);
+      final isCod = order.isCod || (order.paymentMode.toLowerCase() == 'cod') || (order.paymentStatus.toLowerCase() == 'pending');
+
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: kSurface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: kBorder),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x06000000),
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(Icons.cached_rounded, color: Colors.blue, size: 15),
-                SizedBox(width: 6),
                 Text(
-                  'SUBSCRIPTION ITEMS',
-                  style: TextStyle(fontSize: 10, color: Colors.blue, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                  _currentStop.orders.length > 1
+                      ? 'ORDER #$orderIndex DETAILS'
+                      : 'ORDER DETAILS',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    color: kTextSub,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${order.products.length} Types · $totalUnits ${totalUnits == 1 ? 'Unit' : 'Units'}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF475569),
+                    ),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            ...subscriptionItems.map((p) => _buildProductRow(p, true)),
-          ],
-          if (subscriptionItems.isNotEmpty && oneTimeItems.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            const Divider(color: kBorderLt, height: 1),
             const SizedBox(height: 12),
-          ],
-          if (oneTimeItems.isNotEmpty) ...[
-            const Row(
+            Row(
               children: [
-                Icon(Icons.shopping_bag_rounded, color: Colors.purple, size: 15),
-                SizedBox(width: 6),
+                Icon(
+                  isSub ? Icons.cached_rounded : Icons.shopping_bag_rounded,
+                  color: isSub ? Colors.blue : Colors.purple,
+                  size: 14,
+                ),
+                const SizedBox(width: 6),
                 Text(
-                  'ONE-TIME ITEMS',
-                  style: TextStyle(fontSize: 10, color: Colors.purple, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                  isSub ? 'SUBSCRIPTION ITEMS' : 'ONE-TIME ITEMS',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: isSub ? Colors.blue : Colors.purple,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            ...oneTimeItems.map((p) => _buildProductRow(p, false)),
-          ],
-          const Divider(height: 24, color: kBorder),
-          
-          // Slot info
-          _buildInfoRow('Delivery Time Slot', _currentStop.deliverySlot.toLowerCase() == 'morning' ? 'Morning' : 'Evening'),
-          const SizedBox(height: 12),
-          
-          // Payment mode
-          _buildInfoRow(
-            'Payment Status', 
-            _currentStop.isCod 
-                ? 'Cash on Delivery (Collect ₹${_currentStop.codAmount.round()})' 
-                : 'Prepaid Order',
-            isAlert: _currentStop.isCod,
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 14),
+            ...order.products.map((p) => _buildProductRow(p, isSub)),
+            const Divider(height: 24, color: kBorder),
 
-          // Total Value
-          _buildInfoRow('Total Value', '₹${_currentStop.totalAmount.round()}', isHighlight: true),
-        ],
-      ),
-    );
+            // Slot info
+            _buildInfoRow(
+              'Delivery Time Slot',
+              order.deliverySlot.isNotEmpty
+                  ? (order.deliverySlot.toLowerCase() == 'morning' ? 'Morning' : 'Evening')
+                  : (_currentStop.deliverySlot.toLowerCase() == 'morning' ? 'Morning' : 'Evening'),
+            ),
+            const SizedBox(height: 12),
+
+            // Payment mode
+            _buildInfoRow(
+              'Payment Status',
+              isCod
+                  ? 'Cash on Delivery (Collect ₹${(order.codAmount ?? order.totalAmount).round()})'
+                  : (order.paymentStatus.toLowerCase() == 'paid' || !isCod ? 'Prepaid Order' : 'Pending'),
+              isAlert: isCod,
+            ),
+            const SizedBox(height: 12),
+
+            // Total Value
+            _buildInfoRow(
+              'Total Value',
+              '₹${order.totalAmount.round()}',
+              isHighlight: true,
+            ),
+          ],
+        ),
+      );
+    }).toList();
   }
 
-  List<DeliveryOrderItem> _consolidateOrderItems(List<DeliveryOrderModel> orders) {
-    final Map<String, DeliveryOrderItem> items = {};
-    for (final order in orders) {
-      for (final item in order.products) {
-        final key = '${item.productName}_${item.unit}';
-        final existing = items[key];
-        if (existing == null) {
-          items[key] = item;
-        } else {
-          items[key] = DeliveryOrderItem(
-            productName: existing.productName,
-            quantity: existing.quantity + item.quantity,
-            unit: existing.unit,
-            price: existing.price + item.price,
-          );
-        }
-      }
+  String _resolveImageUrl(String? rawUrl) {
+    if (rawUrl == null || rawUrl.trim().isEmpty) return '';
+    final trimmed = rawUrl.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
     }
-    return items.values.toList();
+    final cleanPath = trimmed.startsWith('/') ? trimmed : '/$trimmed';
+    return '${ApiEndpoints.host}$cleanPath';
+  }
+
+  Widget _buildProductImage(String? imageUrl, {double size = 46}) {
+    final fullUrl = _resolveImageUrl(imageUrl);
+    if (fullUrl.isEmpty) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: const Center(
+          child: Icon(Icons.inventory_2_outlined, size: 22, color: Color(0xFF94A3B8)),
+        ),
+      );
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(9),
+        child: Image.network(
+          fullUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              color: const Color(0xFFF8FAFC),
+              child: const Center(
+                child: Icon(Icons.inventory_2_outlined, size: 22, color: Color(0xFF94A3B8)),
+              ),
+            );
+          },
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              color: const Color(0xFFF8FAFC),
+              child: const Center(
+                child: SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF16A34A)),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
   }
 
   Widget _buildInfoRow(String label, String val, {bool isAlert = false, bool isHighlight = false}) {
@@ -1096,24 +1202,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Widget _buildProductRow(DeliveryOrderItem p, bool isSub) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: const BoxDecoration(
-                    color: kBgDeep,
-                    borderRadius: BorderRadius.all(Radius.circular(8)),
-                  ),
-                  child: Text(
-                    isSub ? '🥛' : '📦',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ),
+                _buildProductImage(p.productImage, size: 46),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -1125,9 +1221,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      const SizedBox(height: 2),
                       Text(
                         isSub ? 'Unit: ${p.unit}' : 'Unit: ${p.unit} · ₹${p.price.round()}',
-                        style: const TextStyle(fontSize: 11, color: kTextSub, fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontSize: 11.5, color: kTextSub, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),

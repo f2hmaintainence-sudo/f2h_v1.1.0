@@ -9,6 +9,8 @@ class F2hHeroHeader extends StatelessWidget {
   final ValueChanged<bool> onToggleOnline;
   final VoidCallback? onNotifications;
   final int unreadCount;
+  final String? address;
+  final String? addressLabel;
 
   const F2hHeroHeader({
     super.key,
@@ -17,6 +19,8 @@ class F2hHeroHeader extends StatelessWidget {
     required this.onToggleOnline,
     this.onNotifications,
     this.unreadCount = 0,
+    this.address,
+    this.addressLabel,
   });
 
   @override
@@ -123,6 +127,58 @@ class F2hHeroHeader extends StatelessWidget {
                     _buildBellButton(onTap: onNotifications, unreadCount: unreadCount),
                   ],
                 ),
+
+                if (address != null && address!.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF16A34A),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.location_on_rounded, color: Colors.white, size: 18),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                addressLabel ?? 'CURRENT LOCATION',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF86EFAC),
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                address!,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
 
                 const SizedBox(height: 14),
 
