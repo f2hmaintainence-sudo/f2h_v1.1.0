@@ -83,10 +83,10 @@ export class DeliveryDispatchService {
         );
         const activeDispatchId = dispatchRows.rows[0].dispatch_id;
 
-        // Cleanup any existing dispatch items for this run to start fresh
+        // Cleanup any existing dispatch items for this dispatch to start fresh
         await client.query(
-          `DELETE FROM delivery_dispatch_items WHERE delivery_run_id = $1`,
-          [run.run_id],
+          `DELETE FROM delivery_dispatch_items WHERE dispatch_id = $1`,
+          [activeDispatchId],
         );
 
         for (const item of items) {
@@ -106,25 +106,14 @@ export class DeliveryDispatchService {
             );
           }
 
-          // 2. Create or refresh the delivery_dispatch_items record.
-          // The unique index on (delivery_run_id, product_variant_id) is
-          // partial, so the conflict target must repeat its WHERE clause.
+          // 2. Create the delivery_dispatch_items record
           const insertResult = await client.query(
             `INSERT INTO delivery_dispatch_items
-              (dispatch_id, warehouse_id, delivery_run_id, product_variant_id,
-               planned_qty, loaded_qty, unit, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-            ON CONFLICT (delivery_run_id, product_variant_id) WHERE deleted_at IS NULL
-            DO UPDATE SET
-              dispatch_id  = EXCLUDED.dispatch_id,
-              warehouse_id = EXCLUDED.warehouse_id,
-              loaded_qty   = EXCLUDED.loaded_qty,
-              planned_qty  = EXCLUDED.planned_qty,
-              unit         = EXCLUDED.unit,
-              updated_at   = NOW()
+              (dispatch_id, product_variant_id, planned_qty, loaded_qty, unit, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
             RETURNING *`,
             [
-              activeDispatchId, item.warehouse_id, run.run_id, item.product_variant_id,
+              activeDispatchId, item.product_variant_id,
               plannedQty, loadedQty, item.unit || 'pcs',
             ],
           );
@@ -198,10 +187,14 @@ export class DeliveryDispatchService {
         for (const item of items) {
           // 1. Get the dispatch item record
           const dispatchItemResult = await client.query(
-            `SELECT * FROM delivery_dispatch_items
-             WHERE (delivery_run_id = $1 OR delivery_run_id = $2) AND product_variant_id = $3
+            `SELECT ddi.*, dd.warehouse_id
+             FROM delivery_dispatch_items ddi
+             JOIN delivery_dispatch dd ON dd.dispatch_id = ddi.dispatch_id
+             JOIN delivery_runs dr ON dr.run_id = dd.delivery_run_id
+             WHERE (dr.run_id = $1 OR dr.id::varchar = $1)
+               AND ddi.product_variant_id = $2
              FOR UPDATE`,
-            [run.run_id, String(run.id), item.product_variant_id],
+            [run.run_id, item.product_variant_id],
           );
 
           if (!dispatchItemResult.rows[0]) {
@@ -217,18 +210,17 @@ export class DeliveryDispatchService {
           // 2. Update delivery_dispatch_items
           await client.query(
             `UPDATE delivery_dispatch_items
-             SET delivered_qty = $3,
-                 returned_qty = $4,
-                 damaged_qty = $5,
-                 extra_sold_qty = $6,
-                 remarks = $7,
+             SET delivered_qty = $2,
+                 returned_qty = $3,
+                 damaged_qty = $4,
+                 extra_sold_qty = $5,
+                 remarks = $6,
                  updated_at = NOW()
-             WHERE (delivery_run_id = $1 OR delivery_run_id = $2) AND product_variant_id = $8`,
+             WHERE id = $1`,
             [
-              run.run_id, String(run.id),
+              dispatchItem.id,
               item.delivered_qty, item.returned_qty, item.damaged_qty,
               item.extra_sold_qty || 0, item.remarks || null,
-              item.product_variant_id,
             ],
           );
 
@@ -291,23 +283,25 @@ export class DeliveryDispatchService {
 
       if (warehouse_id) {
         params.push(warehouse_id);
-        where.push(`ddi.warehouse_id = $${params.length}`);
+        where.push(`dd.warehouse_id = $${params.length}`);
       }
 
       const sql = `
         SELECT
           ddi.*,
+          dd.warehouse_id,
           dr.run_id, dr.delivery_slot, dr.status AS run_status,
           db.full_name AS delivery_partner_name,
           pv.name AS variant_name, pv.sku,
           p.name AS product_name,
           w.name AS warehouse_name
         FROM delivery_dispatch_items ddi
-        JOIN delivery_runs dr ON (dr.run_id::varchar = ddi.delivery_run_id OR dr.id::varchar = ddi.delivery_run_id)
+        JOIN delivery_dispatch dd ON dd.dispatch_id = ddi.dispatch_id
+        JOIN delivery_runs dr ON (dr.run_id = dd.delivery_run_id OR dr.id::varchar = dd.delivery_run_id)
         LEFT JOIN delivery_partners db ON db.delivery_partner_id = dr.delivery_partner_id
         LEFT JOIN product_variants pv ON pv.variant_id = ddi.product_variant_id
         LEFT JOIN products p ON p.product_id = pv.product_id
-        LEFT JOIN warehouses w ON w.warehouse_id = ddi.warehouse_id
+        LEFT JOIN warehouses w ON w.warehouse_id = dd.warehouse_id
         WHERE ${where.join(' AND ')}
         ORDER BY dr.delivery_slot, db.full_name, p.name
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
@@ -319,7 +313,7 @@ export class DeliveryDispatchService {
       // Totals
       const totalsSql = `
 SELECT
-    COUNT(DISTINCT ddi.delivery_run_id)::int AS total_runs,
+    COUNT(DISTINCT dd.delivery_run_id)::int AS total_runs,
     COUNT(DISTINCT ddi.product_variant_id)::int AS unique_products,
     COALESCE(SUM(ddi.planned_qty),0) AS total_planned,
     COALESCE(SUM(ddi.loaded_qty),0) AS total_loaded,
@@ -327,8 +321,9 @@ SELECT
     COALESCE(SUM(ddi.returned_qty),0) AS total_returned,
     COALESCE(SUM(ddi.damaged_qty),0) AS total_damaged
 FROM delivery_dispatch_items ddi
+JOIN delivery_dispatch dd ON dd.dispatch_id = ddi.dispatch_id
 JOIN delivery_runs dr
-    ON (dr.run_id::varchar = ddi.delivery_run_id OR dr.id::varchar = ddi.delivery_run_id)
+    ON (dr.run_id = dd.delivery_run_id OR dr.id::varchar = dd.delivery_run_id)
 WHERE ${where.join(' AND ')}
 `;
 
@@ -358,6 +353,7 @@ WHERE ${where.join(' AND ')}
       const sql = `
         SELECT
           ddi.*,
+          dd.warehouse_id,
           pv.name AS variant_name, pv.sku,
           pv.unit_value,
           pv.unit_type,
@@ -365,12 +361,13 @@ WHERE ${where.join(' AND ')}
           w.name AS warehouse_name,
           COALESCE(sb.available_quantity, 0)::numeric AS warehouse_stock
         FROM delivery_dispatch_items ddi
+        JOIN delivery_dispatch dd ON dd.dispatch_id = ddi.dispatch_id
+        JOIN delivery_runs dr ON (dr.run_id = dd.delivery_run_id OR dr.id::varchar = dd.delivery_run_id)
         LEFT JOIN product_variants pv ON pv.variant_id = ddi.product_variant_id
         LEFT JOIN products p ON p.product_id = pv.product_id
-        LEFT JOIN warehouses w ON w.warehouse_id = ddi.warehouse_id
+        LEFT JOIN warehouses w ON w.warehouse_id = dd.warehouse_id
         LEFT JOIN stock_balances sb ON sb.product_variant_id = ddi.product_variant_id
-          AND sb.warehouse_id = ddi.warehouse_id
-        JOIN delivery_runs dr ON (dr.run_id::varchar = ddi.delivery_run_id OR dr.id::varchar = ddi.delivery_run_id)
+          AND sb.warehouse_id = dd.warehouse_id
         WHERE dr.id::varchar = $1 OR dr.run_id = $1
         ORDER BY p.name, pv.name
       `;
@@ -653,15 +650,13 @@ WHERE ${where.join(' AND ')}
           OR (dr.warehouse_id IS NULL AND w.branch_id = dr.branch_id AND w.is_active = true)
         ) AND w.deleted_at IS NULL
         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
-        LEFT JOIN delivery_dispatch_items ddi ON (
-          ddi.delivery_run_id = dr.run_id::varchar
-          OR ddi.delivery_run_id = dr.id::varchar
-        ) AND ddi.deleted_at IS NULL
+        LEFT JOIN delivery_dispatch dd ON dd.delivery_run_id = dr.run_id
+        LEFT JOIN delivery_dispatch_items ddi ON ddi.dispatch_id = dd.dispatch_id AND ddi.deleted_at IS NULL
         WHERE ${where.join(' AND ')}
           AND dr.deleted_at IS NULL
         GROUP BY
           dr.id, dr.run_id, dr.run_number, dr.delivery_slot, dr.run_date, dr.status,
-          dr.warehouse_id, w.warehouse_id, w.name, b.branch_name,
+          dr.warehouse_id, w.warehouse_id, dd.warehouse_id, w.name, b.branch_name,
           dp.full_name, dp.delivery_partner_id
         HAVING COUNT(ddi.id) > 0
         ORDER BY dr.delivery_slot, dr.run_date DESC
@@ -690,7 +685,7 @@ WHERE ${where.join(' AND ')}
           ddi.id,
           ddi.dispatch_id,
           ddi.product_variant_id,
-          ddi.warehouse_id,
+          dd.warehouse_id,
           w.name AS warehouse_name,
           pv.name AS variant_name,
           p.name AS product_name,
@@ -706,13 +701,14 @@ WHERE ${where.join(' AND ')}
             0
           ) AS returnable_qty
         FROM delivery_dispatch_items ddi
-        LEFT JOIN warehouses w ON w.warehouse_id = ddi.warehouse_id
+        JOIN delivery_dispatch dd ON dd.dispatch_id = ddi.dispatch_id
+        JOIN delivery_runs dr ON (
+          dr.run_id = dd.delivery_run_id
+          OR dr.id::varchar = dd.delivery_run_id
+        )
+        LEFT JOIN warehouses w ON w.warehouse_id = dd.warehouse_id
         LEFT JOIN product_variants pv ON pv.variant_id = ddi.product_variant_id
         LEFT JOIN products p ON p.product_id = pv.product_id
-        JOIN delivery_runs dr ON (
-          dr.run_id::varchar = ddi.delivery_run_id
-          OR dr.id::varchar = ddi.delivery_run_id
-        )
         WHERE dr.id::varchar = $1 OR dr.run_id = $1
         ORDER BY p.name, pv.name
       `;
@@ -773,20 +769,20 @@ WHERE ${where.join(' AND ')}
 
       if (date_from) { params.push(date_from); where.push(`dr.run_date >= $${params.length}`); }
       if (date_to) { params.push(date_to); where.push(`dr.run_date <= $${params.length}`); }
-      if (warehouse_id) { params.push(warehouse_id); where.push(`ddi.warehouse_id = $${params.length}`); }
+      if (warehouse_id) { params.push(warehouse_id); where.push(`dd.warehouse_id = $${params.length}`); }
       if (delivery_slot) { params.push(delivery_slot); where.push(`dr.delivery_slot = $${params.length}`); }
 
       const sql = `
         SELECT
           ddi.id,
           ddi.dispatch_id,
-          ddi.delivery_run_id,
+          dd.delivery_run_id,
           dr.run_id,
           dr.run_number,
           dr.run_date,
           dr.delivery_slot,
           dr.status AS run_status,
-          ddi.warehouse_id,
+          dd.warehouse_id,
           w.name AS warehouse_name,
           ddi.product_variant_id,
           p.name AS product_name,
@@ -799,11 +795,12 @@ WHERE ${where.join(' AND ')}
           dp.full_name AS delivery_partner_name,
           ddi.created_at
         FROM delivery_dispatch_items ddi
+        JOIN delivery_dispatch dd ON dd.dispatch_id = ddi.dispatch_id
         JOIN delivery_runs dr ON (
-          dr.run_id::varchar = ddi.delivery_run_id
-          OR dr.id::varchar = ddi.delivery_run_id
+          dr.run_id = dd.delivery_run_id
+          OR dr.id::varchar = dd.delivery_run_id
         )
-        LEFT JOIN warehouses w ON w.warehouse_id = ddi.warehouse_id
+        LEFT JOIN warehouses w ON w.warehouse_id = dd.warehouse_id
         LEFT JOIN product_variants pv ON pv.variant_id = ddi.product_variant_id
         LEFT JOIN products p ON p.product_id = pv.product_id
         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
@@ -816,9 +813,10 @@ WHERE ${where.join(' AND ')}
       const countSql = `
         SELECT COUNT(*)::int AS total
         FROM delivery_dispatch_items ddi
+        JOIN delivery_dispatch dd ON dd.dispatch_id = ddi.dispatch_id
         JOIN delivery_runs dr ON (
-          dr.run_id::varchar = ddi.delivery_run_id
-          OR dr.id::varchar = ddi.delivery_run_id
+          dr.run_id = dd.delivery_run_id
+          OR dr.id::varchar = dd.delivery_run_id
         )
         WHERE ${where.join(' AND ')}
       `;
@@ -854,7 +852,7 @@ WHERE ${where.join(' AND ')}
 
       if (date_from) { params.push(date_from); where.push(`dr.run_date >= $${params.length}`); }
       if (date_to) { params.push(date_to); where.push(`dr.run_date <= $${params.length}`); }
-      if (warehouse_id) { params.push(warehouse_id); where.push(`ddi.warehouse_id = $${params.length}`); }
+      if (warehouse_id) { params.push(warehouse_id); where.push(`dd.warehouse_id = $${params.length}`); }
       if (delivery_slot) { params.push(delivery_slot); where.push(`dr.delivery_slot = $${params.length}`); }
       if (partner_id) { params.push(partner_id); where.push(`dr.delivery_partner_id = $${params.length}`); }
 
@@ -869,7 +867,7 @@ WHERE ${where.join(' AND ')}
           dr.run_date,
           dr.delivery_slot,
           dr.status AS run_status,
-          ddi.warehouse_id,
+          dd.warehouse_id,
           w.name AS warehouse_name,
           COUNT(ddi.id)::int AS items_count,
           COALESCE(SUM(ddi.loaded_qty), 0) AS total_qty,
@@ -877,18 +875,19 @@ WHERE ${where.join(' AND ')}
           COALESCE(SUM(ddi.returned_qty), 0) AS returned_qty,
           ddi.dispatch_id AS dispatch_status_ref
         FROM delivery_dispatch_items ddi
+        JOIN delivery_dispatch dd ON dd.dispatch_id = ddi.dispatch_id
         JOIN delivery_runs dr ON (
-          dr.run_id::varchar = ddi.delivery_run_id
-          OR dr.id::varchar = ddi.delivery_run_id
+          dr.run_id = dd.delivery_run_id
+          OR dr.id::varchar = dd.delivery_run_id
         )
-        LEFT JOIN warehouses w ON w.warehouse_id = ddi.warehouse_id
+        LEFT JOIN warehouses w ON w.warehouse_id = dd.warehouse_id
         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
         WHERE ${where.join(' AND ')}
         GROUP BY
           dr.delivery_partner_id, dp.full_name, dp.phone,
           ddi.dispatch_id, dr.run_id, dr.run_number,
           dr.run_date, dr.delivery_slot, dr.status,
-          ddi.warehouse_id, w.name
+          dd.warehouse_id, w.name
         ORDER BY dr.run_date DESC, dp.full_name, dr.delivery_slot
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
       `;
@@ -897,9 +896,10 @@ WHERE ${where.join(' AND ')}
       const countSql = `
         SELECT COUNT(DISTINCT ddi.dispatch_id)::int AS total
         FROM delivery_dispatch_items ddi
+        JOIN delivery_dispatch dd ON dd.dispatch_id = ddi.dispatch_id
         JOIN delivery_runs dr ON (
-          dr.run_id::varchar = ddi.delivery_run_id
-          OR dr.id::varchar = ddi.delivery_run_id
+          dr.run_id = dd.delivery_run_id
+          OR dr.id::varchar = dd.delivery_run_id
         )
         WHERE ${where.join(' AND ')}
       `;

@@ -130,20 +130,34 @@ export class DeliveryRunsAdminController {
       const items = itemsRes.rows || [];
 
       const dispatchId = `DIS_${Date.now().toString(36).toUpperCase()}`;
-      for (const item of items) {
-        await client.query(
-          `INSERT INTO delivery_dispatch_items (
-             dispatch_id, delivery_run_id, product_variant_id, planned_qty, loaded_qty, unit, created_at, updated_at
-           ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
-          [
-            dispatchId,
-            runId,
-            item.product_variant_id,
-            Number(item.planned_qty),
-            Number(item.planned_qty), // Default loaded_qty to planned_qty
-            item.unit || 'PCS',
-          ],
+      if (items.length > 0) {
+        const whRes = await client.query(
+          `SELECT warehouse_id FROM warehouses WHERE branch_id = $1 AND is_active = true AND deleted_at IS NULL LIMIT 1`,
+          [body.branch_id],
         );
+        const whId = whRes.rows[0]?.warehouse_id || 'WH_MAIN';
+
+        await client.query(
+          `INSERT INTO delivery_dispatch (dispatch_id, warehouse_id, delivery_run_id, status, created_at, updated_at)
+           VALUES ($1, $2, $3, 'draft', NOW(), NOW())
+           ON CONFLICT (delivery_run_id) DO UPDATE SET updated_at = NOW()`,
+          [dispatchId, whId, runId],
+        );
+
+        for (const item of items) {
+          await client.query(
+            `INSERT INTO delivery_dispatch_items (
+               dispatch_id, product_variant_id, planned_qty, loaded_qty, unit, created_at, updated_at
+             ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+            [
+              dispatchId,
+              item.product_variant_id,
+              Number(item.planned_qty),
+              Number(item.planned_qty),
+              item.unit || 'PCS',
+            ],
+          );
+        }
       }
 
       return {
