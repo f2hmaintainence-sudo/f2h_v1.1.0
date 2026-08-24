@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { Sprout, Truck, Recycle } from "lucide-react";
 import { F2H_CUSTOMER_PLAYSTORE_URL } from "@/constants/f2hPublicAssets";
@@ -22,6 +23,7 @@ const products = [
   {
     name: "Milk",
     tagline: "Fresh dairy, delivered daily",
+    price: "From ₹35 / 500ml",
     badge: "Daily Staple",
     badgeColor: "bg-sky-100 text-sky-700 border-sky-200",
     image: ASSETS.milk,
@@ -31,6 +33,7 @@ const products = [
   {
     name: "Ghee",
     tagline: "Traditional clarified butter",
+    price: "From ₹570 / 500g",
     badge: "Best Seller",
     badgeColor: "bg-amber-100 text-amber-700 border-amber-200",
     image: ASSETS.ghee,
@@ -40,6 +43,7 @@ const products = [
   {
     name: "Curd",
     tagline: "Creamy, probiotic-rich curd",
+    price: "From ₹50 / 500ml",
     badge: "Fresh Daily",
     badgeColor: "bg-emerald-100 text-emerald-700 border-emerald-200",
     image: ASSETS.curd,
@@ -49,6 +53,7 @@ const products = [
   {
     name: "Paneer",
     tagline: "Farm fresh cottage cheese",
+    price: "From ₹115 / 200g",
     badge: "Farm Fresh",
     badgeColor: "bg-lime-100 text-lime-700 border-lime-200",
     image: ASSETS.paneer,
@@ -58,6 +63,7 @@ const products = [
   {
     name: "Kova",
     tagline: "Rich, slow-cooked milk solids",
+    price: "Traditional Sweet",
     badge: "Traditional",
     badgeColor: "bg-yellow-100 text-yellow-700 border-yellow-200",
     image: ASSETS.kova,
@@ -67,6 +73,7 @@ const products = [
   {
     name: "Carrot Halwa",
     tagline: "Seasonal handcrafted sweet",
+    price: "Pure Ghee Recipe",
     badge: "Handcrafted",
     badgeColor: "bg-orange-100 text-orange-700 border-orange-200",
     image: ASSETS.carrotHalwa,
@@ -76,6 +83,7 @@ const products = [
   {
     name: "Cold Pressed Oil",
     tagline: "Pure oils, slow-pressed",
+    price: "From ₹360 / 1L",
     badge: "Natural",
     badgeColor: "bg-green-100 text-green-700 border-green-200",
     image: ASSETS.coldPressedOil,
@@ -85,6 +93,7 @@ const products = [
   {
     name: "Dry Fruits",
     tagline: "Premium nuts & dried fruits",
+    price: "From ₹950 / 1kg",
     badge: "Premium",
     badgeColor: "bg-rose-100 text-rose-700 border-rose-200",
     image: ASSETS.dryFruits,
@@ -255,19 +264,24 @@ export function Products() {
               </div>
 
               {/* Card body */}
-              <div className="relative z-10 px-4 pb-5 pt-3 text-center">
+              <div className="relative z-10 px-4 pb-4 pt-3 text-center">
                 <h3 className="text-sm sm:text-base font-bold text-[#0d3d1a] leading-tight mb-1">
                   {product.name}
                 </h3>
                 <p
-                  className="text-[#4a6c52] text-[11px] sm:text-xs leading-snug"
+                  className="text-[#4a6c52] text-[11px] sm:text-xs leading-snug mb-2"
                   style={{ fontFamily: "system-ui, sans-serif", fontWeight: 400 }}
                 >
                   {product.tagline}
                 </p>
 
-                {/* Order CTA — appears on hover, scrolls to #contact */}
-                <div className="mt-3 overflow-hidden">
+                {/* Visible price badge */}
+                <div className="inline-block rounded-full bg-emerald-100/80 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 border border-emerald-200/60 mb-2">
+                  {product.price}
+                </div>
+
+                {/* Order CTA — appears on hover */}
+                <div className="mt-1 overflow-hidden">
                   <div
                     className="h-7 translate-y-8 group-hover:translate-y-0 opacity-0 group-hover:opacity-100
                       transition-all duration-400 ease-out"
@@ -298,13 +312,25 @@ export function Products() {
           ))}
         </motion.div>
 
+        {/* Pricing link button */}
+        <div className="mt-8 text-center">
+          <Link
+            href="/pricing"
+            className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-700 px-6 py-2.5 text-xs sm:text-sm font-bold text-white shadow-sm hover:bg-emerald-800 hover:border-emerald-800 transition-all hover:scale-105"
+            style={{ fontFamily: "system-ui, sans-serif" }}
+          >
+            <span>View Full Product Pricing &amp; Plans</span>
+            <span>→</span>
+          </Link>
+        </div>
+
         {/* Bottom CTA strip */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.3 }}
-          className="mt-14 flex flex-col sm:flex-row items-center justify-center gap-4"
+          className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
         >
           <div
             className="backdrop-blur-md bg-white/50 border border-white/60 rounded-2xl px-8 py-5

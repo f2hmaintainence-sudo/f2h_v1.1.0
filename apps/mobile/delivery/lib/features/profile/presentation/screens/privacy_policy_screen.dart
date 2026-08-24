@@ -38,14 +38,20 @@ class PrivacyPolicyScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             _buildPolicyCard(
-              title: "4. Your Rights & Choices",
+              title: "4. Your Rights & Support",
               content:
-                  "You have the right to request access to your personal data, update your account details, or request account deletion by contacting our partner support team.",
+                  "You have the right to request access to your personal data, update your account details, or request account deletion by contacting our partner support team at support@f2hfresh.com or +91 91487 73591.",
+            ),
+            const SizedBox(height: 12),
+            _buildPolicyCard(
+              title: "5. Official Entity & Support",
+              content:
+                  "F2H - Farm to Home\nRegistered Office: 1st Cross, SJP Layout, Nagondanahalli, Whitefield, Bangalore – 560066, Karnataka, India\nEmail: support@f2hfresh.com | Phone: +91 91487 73591",
             ),
             const SizedBox(height: 24),
             const Center(
               child: Text(
-                "Last updated: January 2026 • F2H Fresh Partner Platform",
+                "Last updated: August 2026 • F2H Fresh Partner Platform",
                 style: TextStyle(fontSize: 11, color: kTextSub),
               ),
             ),

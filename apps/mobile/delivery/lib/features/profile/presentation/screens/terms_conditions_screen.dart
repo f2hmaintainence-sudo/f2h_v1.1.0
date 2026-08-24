@@ -42,10 +42,16 @@ class TermsConditionsScreen extends StatelessWidget {
               content:
                   "You must maintain a valid driver's license, vehicle registration, and active insurance for the vehicle used during delivery operations.",
             ),
+            const SizedBox(height: 12),
+            _buildTermsCard(
+              title: "5. Registered Operating Entity",
+              content:
+                  "F2H - Farm to Home\n1st Cross, SJP Layout, Nagondanahalli, Whitefield, Bangalore – 560066, Karnataka, India\nSupport: support@f2hfresh.com | Helpline: +91 91487 73591",
+            ),
             const SizedBox(height: 24),
             const Center(
               child: Text(
-                "Effective: January 2026 • F2H Fresh Partner Terms",
+                "Effective: August 2026 • F2H Fresh Partner Terms",
                 style: TextStyle(fontSize: 11, color: kTextSub),
               ),
             ),

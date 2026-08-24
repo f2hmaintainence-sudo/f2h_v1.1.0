@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { ChevronRight, Home } from "lucide-react";
@@ -82,11 +82,11 @@ const sections: PolicySection[] = [
       "The Platform may contain links to third-party websites, applications, payment gateways, maps, communication tools, or service providers. You are requested to review the privacy practices of such third parties before proceeding. We are not responsible for the privacy practices, content, or security standards of websites or services that We do not own, manage, or control.",
     ],
     bullets: [
-      "Information capable of identifying You, such as name, mobile number, email address, billing address, delivery address, location details, account credentials, and communication preferences.",
-      "Financial and transaction-related information such as payment instrument details, transaction records, order history, refund records, preferred payment mode, spending patterns, subscription history, wallet or credit balance, and similar service data.",
-      "Information about the pages You visit, products You view, links You click, features You use, number of visits, device identifiers, IP address, browser type, operating system, app version, referral source, and similar browsing or usage information.",
-      "Information You provide directly through registration forms, online surveys, support requests, feedback forms, complaints, WhatsApp or phone support, promotional campaigns, contests, referrals, or any other voluntary interaction with Us.",
-      "Information collected with Your consent while You navigate the Platform, including usage details, approximate location, IP address, Cookies, analytics identifiers, and data collected through similar tracking technologies.",
+      "Customer Identification: Name, verified mobile phone number, email address, profile photo (optional), and account credentials.",
+      "Delivery & Location Data: Doorstep delivery address, apartment/villa details, landmark, and GPS coordinates to facilitate route-optimized morning and evening deliveries.",
+      "Financial & Payment Records: Razorpay transaction reference IDs, UPI transaction identifiers, wallet balances, recharge history, and tax invoices. All card numbers and bank security credentials are processed securely via PCI-DSS Level-1 compliant payment gateway (Razorpay) and are never stored on F2H servers.",
+      "Usage & Device Telemetry: Device identifier, operating system, app version, IP address, browsing/cart actions, and push notification delivery logs to diagnose app performance and prevent fraud.",
+      "Support & Feedback Communications: In-app support tickets, WhatsApp message history, call recordings for quality assurance, and survey responses.",
     ],
   },
   {
@@ -158,13 +158,11 @@ const sections: PolicySection[] = [
     id: "rights",
     title: "10. Rights of Users, Customers, and Buyers",
     bullets: [
-      "You may opt out of certain collection or uses of Your Personal Information, including certain Cookies, similar technologies, and marketing communications, where such choice is available.",
-      "You may request access to Personal Information provided by You and request correction, amendment, or updating of inaccurate or incomplete information.",
-      "You may request information about the identities or categories of third parties with whom Your Personal Information has been shared for providing products or services requested by You, subject to applicable law and business confidentiality requirements.",
-      "You may withdraw consent or alter Your preferences for the use of Your Personal Information. Withdrawal of consent may limit or prevent access to products, services, subscriptions, orders, delivery, payment, support, or parts of the Platform that depend on such information.",
-      "You may request erasure or deletion of Your Personal Information, subject to retention required under applicable law, legal claims, accounting, compliance, fraud prevention, dispute resolution, or legitimate business purposes.",
-      "You may nominate a person who may exercise Your rights in the event of Your death or inability, where such right is available under applicable law.",
-      "You have the right to grievance redressal using the contact details provided in this Privacy Policy.",
+      "Opt-out & Preferences: You may opt out of non-essential promotional communications, WhatsApp updates, or marketing emails at any time via in-app preferences or by contacting support.",
+      "Access & Correction: You may view, edit, and update your personal details, profile name, and saved delivery addresses directly from the Profile screen in the F2H Mobile App.",
+      "Account & Data Deletion: You can request complete erasure and deletion of your account and personal data either via 'Profile' > 'Delete Account' in the mobile app or online at https://f2hfresh.com/delete-account.",
+      "Transaction Data Retention: Certain records (such as completed delivery manifests and GST tax invoices) are retained for mandatory statutory periods as mandated by applicable accounting and tax laws.",
+      "Grievance Redressal: You have the right to register concerns or request data portability with our dedicated Grievance Officer.",
     ],
     note: "To exercise any of these rights, please contact Us using the email address or details provided in the Contact Us section below.",
   },

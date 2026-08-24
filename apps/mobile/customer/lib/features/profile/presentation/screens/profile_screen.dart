@@ -17,6 +17,10 @@ import 'package:f2h_customer/features/profile/data/models/profile_model.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
 import 'package:f2h_customer/core/widgets/referral_invite_card.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/privacy_screen.dart';
+import 'package:f2h_customer/features/profile/presentation/screens/terms_conditions_screen.dart';
+import 'package:f2h_customer/features/profile/presentation/screens/refund_policy_screen.dart';
+import 'package:f2h_customer/features/profile/presentation/screens/delivery_policy_screen.dart';
+import 'package:f2h_customer/features/profile/presentation/screens/contact_us_screen.dart';
 import 'package:f2h_customer/features/notifications/presentation/screens/notifications_screen.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/customer_bills_screen.dart';
@@ -1655,19 +1659,76 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Column(
                           children: [
                             _menuItem(
+                              Icons.support_agent_rounded,
+                              'Contact & Grievance Support',
+                              const Color(0xFFE0F2FE),
+                              const Color(0xFF0284C7),
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const ContactUsScreen(),
+                                ),
+                              ),
+                            ),
+                            _divider(),
+                            _menuItem(
+                              Icons.description_outlined,
+                              'Terms & Conditions',
+                              const Color(0xFFF3E8FF),
+                              const Color(0xFF7E22CE),
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const TermsConditionsScreen(),
+                                ),
+                              ),
+                            ),
+                            _divider(),
+                            _menuItem(
+                              Icons.replay_circle_filled_outlined,
+                              'Cancellation & Refund Policy',
+                              const Color(0xFFFEF3C7),
+                              const Color(0xFFB45309),
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const RefundPolicyScreen(),
+                                ),
+                              ),
+                            ),
+                            _divider(),
+                            _menuItem(
+                              Icons.local_shipping_outlined,
+                              'Delivery & Shipping Policy',
+                              const Color(0xFFDCFCE7),
+                              const Color(0xFF15803D),
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const DeliveryPolicyScreen(),
+                                ),
+                              ),
+                            ),
+                            _divider(),
+                            _menuItem(
+                              Icons.security_outlined,
+                              'Privacy Policy',
+                              const Color(0xFFE8F5E9),
+                              const Color(0xFF2E7D32),
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const PrivacyScreen(),
+                                ),
+                              ),
+                            ),
+                            _divider(),
+                            _menuItem(
                               Icons.phone_outlined,
-                              'Call Us - +91 91487 73591',
+                              'Call Helpline - +91 91487 73591',
                               const Color(0xFFE8F5E9),
                               const Color(0xFF2E7D32),
                               onTap: () async {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Calling support line +91 91487 73591...',
-                                    ),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
                                 final url = Uri.parse('tel:+919148773591');
                                 try {
                                   await launchUrl(url);
@@ -1677,7 +1738,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             _divider(),
                             _menuItem(
                               Icons.chat_bubble_outline_rounded,
-                              'WhatsApp Us',
+                              'WhatsApp Support',
                               const Color(0xFFE8F8F5),
                               const Color(0xFF075E54),
                               onTap: () => _showWhatsAppPopup(context),

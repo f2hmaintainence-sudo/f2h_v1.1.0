@@ -6,11 +6,12 @@ import { F2H_PUBLIC } from "@/constants/f2hPublicAssets";
 import { usePublicCompany } from "./PublicCompanyProvider";
 
 const navLinks = [
-  { name: "Home", href: "#home" },
-  { name: "Products", href: "#products" },
-  { name: "Why Us", href: "#why" },
-  { name: "How it Works", href: "#how-it-works" },
-  { name: "Contact", href: "#contact" },
+  { name: "Home", href: "/#home" },
+  { name: "Products", href: "/#products" },
+  { name: "Pricing", href: "/pricing" },
+  { name: "Why Us", href: "/#why" },
+  { name: "Delivery", href: "/delivery-policy" },
+  { name: "Contact", href: "/contact-us" },
 ];
 
 export function Navbar() {

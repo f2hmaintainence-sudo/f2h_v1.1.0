@@ -861,6 +861,73 @@ CREATE TABLE public.delivery_calendar (
     deleted_by integer
 );
 
+-- =========================================================
+-- DELIVERY DISPATCH STATUS
+-- =========================================================
+
+CREATE TYPE delivery_dispatch_status_enum AS ENUM (
+    'draft',
+    'loaded',
+    'collected',
+    'in_progress',
+    'return_pending',
+    'completed'
+);
+
+
+-- =========================================================
+-- DELIVERY DISPATCH
+-- =========================================================
+
+CREATE TABLE public.delivery_dispatch (
+    id BIGSERIAL PRIMARY KEY,
+
+    dispatch_id VARCHAR(30) UNIQUE NOT NULL,
+
+    warehouse_id VARCHAR(30) NOT NULL,
+
+    delivery_run_id VARCHAR(30) NOT NULL
+        REFERENCES delivery_runs(id)
+        ON DELETE CASCADE,
+
+    status delivery_dispatch_status_enum
+        NOT NULL DEFAULT 'draft',
+
+    loaded_at TIMESTAMPTZ,
+
+    collected_at TIMESTAMPTZ,
+
+    returned_at TIMESTAMPTZ,
+
+    loaded_by VARCHAR(30),
+
+    return_collected_by VARCHAR(30),
+
+    created_by VARCHAR(30),
+
+    updated_by VARCHAR(30),
+
+    notes TEXT,
+
+    created_at TIMESTAMPTZ DEFAULT now(),
+
+    updated_at TIMESTAMPTZ DEFAULT now(),
+
+    deleted_at TIMESTAMPTZ,
+
+    UNIQUE (delivery_run_id)
+);
+
+CREATE INDEX idx_delivery_dispatch_warehouse
+ON public.delivery_dispatch(warehouse_id);
+
+CREATE INDEX idx_delivery_dispatch_run
+ON public.delivery_dispatch(delivery_run_id);
+
+CREATE INDEX idx_delivery_dispatch_status
+ON public.delivery_dispatch(status);
+
+
 --
 -- Name: delivery_dispatch_items; Type: TABLE; Schema: public; Owner: -
 --

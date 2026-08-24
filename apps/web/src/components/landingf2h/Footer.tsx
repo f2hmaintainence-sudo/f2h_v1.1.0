@@ -7,12 +7,12 @@ import { FaInstagram, FaWhatsapp, FaFacebookF, FaYoutube } from "react-icons/fa"
 import { FiPhone, FiMail, FiMapPin } from "react-icons/fi";
 
 const quickLinks = [
-  { name: "Home", href: "#home" },
-  { name: "Milk Plans", href: "#products" },
-  { name: "Delivery", href: "#delivery" },
-  { name: "Why Us", href: "#why" },
-  { name: "Benefits", href: "#benefits" },
-  { name: "Contact", href: "#contact" },
+  { name: "Home", href: "/#home" },
+  { name: "Pricing & Plans", href: "/pricing" },
+  { name: "Delivery Policy", href: "/delivery-policy" },
+  { name: "Refund Policy", href: "/refund-policy" },
+  { name: "Terms & Conditions", href: "/terms-and-conditions" },
+  { name: "Contact Us", href: "/contact-us" },
 ];
 
 const badges = ["Pure & Natural", "No Preservatives", "Daily Fresh Delivery", "Directly from Farms", "Cold-Chain Maintained"];
@@ -377,21 +377,29 @@ export function Footer() {
           <p className="text-white/60 text-xs tracking-wide text-center sm:text-left">
             © {new Date().getFullYear()} F2H — Farm to Home. All rights reserved.
           </p>
-          <div className="flex items-center gap-5 text-xs">
+          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-x-4 gap-y-2 text-xs">
             <Link href="/privacy-policy" className="text-white/60 hover:text-green-400 transition-colors duration-200">
               Privacy Policy
             </Link>
-            <span className="w-1 h-1 rounded-full bg-white/20" />
+            <span className="w-1 h-1 rounded-full bg-white/20 hidden sm:inline-block" />
             <Link href="/terms-and-conditions" className="text-white/60 hover:text-green-400 transition-colors duration-200">
               Terms & Conditions
             </Link>
-            <span className="w-1 h-1 rounded-full bg-white/20" />
+            <span className="w-1 h-1 rounded-full bg-white/20 hidden sm:inline-block" />
             <Link href="/refund-policy" className="text-white/60 hover:text-green-400 transition-colors duration-200">
               Refund Policy
             </Link>
-            <span className="w-1 h-1 rounded-full bg-white/20" />
+            <span className="w-1 h-1 rounded-full bg-white/20 hidden sm:inline-block" />
             <Link href="/delivery-policy" className="text-white/60 hover:text-green-400 transition-colors duration-200">
               Delivery Policy
+            </Link>
+            <span className="w-1 h-1 rounded-full bg-white/20 hidden sm:inline-block" />
+            <Link href="/pricing" className="text-white/60 hover:text-green-400 transition-colors duration-200">
+              Pricing
+            </Link>
+            <span className="w-1 h-1 rounded-full bg-white/20 hidden sm:inline-block" />
+            <Link href="/contact-us" className="text-white/60 hover:text-green-400 transition-colors duration-200">
+              Contact Us
             </Link>
           </div>
         </div>

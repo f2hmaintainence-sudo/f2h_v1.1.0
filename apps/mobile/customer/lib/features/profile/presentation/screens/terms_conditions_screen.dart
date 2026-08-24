@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 
 // ══════════════════════════════════════════════════════════
-//  PRIVACY POLICY - Hardcoded Premium Design
+//  TERMS & CONDITIONS - Customer Mobile Screen
 // ══════════════════════════════════════════════════════════
 
-class PrivacyScreen extends StatelessWidget {
-  const PrivacyScreen({super.key});
+class TermsConditionsScreen extends StatelessWidget {
+  const TermsConditionsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +17,7 @@ class PrivacyScreen extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         title: const Text(
-          'Privacy Policy',
+          'Terms & Conditions',
           style: TextStyle(
             color: kText,
             fontSize: 18,
@@ -58,7 +58,7 @@ class PrivacyScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(100),
                     ),
                     child: const Text(
-                      'Effective Date: June 30, 2026',
+                      'F2H - Farm to Home',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
@@ -66,18 +66,18 @@ class PrivacyScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
                   const Text(
-                    'Your Trust is Our Commitment',
+                    'Terms of Service & Usage',
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 19,
                       fontWeight: FontWeight.w900,
                       color: kText,
                     ),
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'At Farm to Home (F2H), we value your trust above all else. This Privacy Policy describes how we collect, use, share, and safeguard your personal information when you use our mobile application.',
+                    'Please read these terms and conditions carefully before subscribing to our daily farm dairy delivery service or purchasing products through the F2H platform.',
                     style: TextStyle(
                       fontSize: 13,
                       height: 1.5,
@@ -90,46 +90,47 @@ class PrivacyScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            // Policy Sections
+            // Terms Sections
             _buildSection(
-              title: '1. Information We Collect',
-              icon: Icons.info_outline_rounded,
-              content: '• Account Details: When you register, we collect your name, mobile phone number, email address, and F2H zone preferences.\n'
-                  '• Delivery Addresses: We save your designated delivery addresses to facilitate accurate and timely milk/dairy drops.\n'
-                  '• Location Data: We may ask for background location access to validate zone-based delivery coverage and provide precise real-time order tracking.',
+              title: '1. About F2H & Subscriptions',
+              icon: Icons.local_shipping_outlined,
+              content: '• Daily Doorstep Delivery: F2H delivers farm-fresh milk and dairy products in two daily shifts: Morning (5:30 AM - 7:30 AM) and Evening (5:00 PM - 7:30 PM).\n'
+                  '• Active Subscriptions: You can create recurring schedules (Daily, Alternate Days, or Custom) with ₹0 delivery charges.',
             ),
             _buildSection(
-              title: '2. How We Use Your Information',
-              icon: Icons.settings_outlined,
-              content: '• Fulfilling and managing your one-time and subscription orders.\n'
-                  '• Processing wallet top-ups, transactions, and secure checkouts.\n'
-                  '• Sending push notifications regarding active deliveries, pauses, or account status.\n'
-                  '• Continuously optimizing our farm-to-table supply chain logistics and customer support experience.',
+              title: '2. Daily Cut-Off Times & Changes',
+              icon: Icons.access_time_rounded,
+              content: '• Morning Shift Cut-Off: Orders, pause requests, and quantity changes must be submitted by 9:00 PM the previous night.\n'
+                  '• Evening Shift Cut-Off: Orders, pause requests, and modifications must be submitted by 10:00 AM the same day.\n'
+                  '• Free Modifications: Any change made before the respective cut-off is 100% free of charge.',
             ),
             _buildSection(
-              title: '3. Data Security & Protection',
-              icon: Icons.shield_outlined,
-              content: 'We employ state-of-the-art security measures including SSL encryption, secure tokens, and hashed database storage to protect your personal details and order history. F2H is FSSAI compliant, assuring safety both in product delivery and digital infrastructure.',
+              title: '3. Wallet, Billing & Payments',
+              icon: Icons.account_balance_wallet_outlined,
+              content: '• Prepaid Wallet: Money is deducted from your F2H Wallet only when the delivery manifest is dispatched for that shift.\n'
+                  '• Secure Gateways: Online top-ups are powered by Razorpay supporting UPI, Cards, NetBanking, and AutoPay e-mandates.\n'
+                  '• Postpaid Credit: Approved postpaid customers receive itemized monthly statements payable within 7 days.',
             ),
             _buildSection(
-              title: '4. Information Sharing',
-              icon: Icons.share_outlined,
-              content: 'F2H does not sell, trade, or rent your personal identification information to third parties. We only share essential details with delivery agents/vendors and payment processors to complete transactions and execute home deliveries.',
+              title: '4. Cancellations & 2-Hour Refunds',
+              icon: Icons.replay_circle_filled_outlined,
+              content: '• 2-Hour Wallet Refund: Verified cancellations, missing packets, or damaged milk issues are credited to your F2H Wallet within 2 hours.\n'
+                  '• Bank Settlement: Direct refunds to original payment methods (Cards/UPI) take 5-7 business days via standard banking gateways.\n'
+                  '• Perishable Reporting: Dairy quality concerns must be reported within 24 hours of delivery with photo proof.',
             ),
             _buildSection(
-              title: '5. Your Rights & Management',
-              icon: Icons.manage_accounts_outlined,
-              content: 'You retain full control over your F2H profile data. You can view, modify, or update your personal details and saved addresses directly via the Profile Screen inside the app. To request permanent account deletion, contact our support team.',
+              title: '5. Doorstep Milk Bag Protocol',
+              icon: Icons.shopping_bag_outlined,
+              content: '• Insulated Bag: Customers are requested to hang an insulated F2H delivery bag outside the door for early morning silent drops.\n'
+                  '• Photo Confirmation: Delivery riders upload a drop photo upon successful delivery at your doorstep.',
             ),
             _buildSection(
-              title: '6. Contact & Grievance Redressal',
-              icon: Icons.help_outline_rounded,
-              content: 'If you have any questions or feedback regarding this Privacy Policy, please reach out to us at:\n\n'
+              title: '6. Official Registered Entity',
+              icon: Icons.business_outlined,
+              content: '• Entity Name: F2H - Farm to Home\n'
+                  '• Registered Office: 1st Cross, SJP Layout, Nagondanahalli, Whitefield, Bangalore - 560066, Karnataka, India\n'
                   '• Official Email: support@f2hfresh.com\n'
-                  '• Grievance Officer: grievanceofficer@f2hfresh.com\n'
-                  '• Helpline: +91 91487 73591 / +91 79893 68142\n'
-                  '• WhatsApp: +91 91487 73591\n'
-                  '• Registered Office: 1st Cross, SJP Layout, Nagondanahalli, Whitefield, Bangalore - 560066, Karnataka, India.',
+                  '• Phone: +91 91487 73591 / +91 79893 68142',
             ),
             const SizedBox(height: 16),
           ],
@@ -144,10 +145,10 @@ class PrivacyScreen extends StatelessWidget {
     required String content,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: kSurface,
           borderRadius: BorderRadius.circular(20),
@@ -160,21 +161,23 @@ class PrivacyScreen extends StatelessWidget {
               children: [
                 Icon(icon, size: 20, color: kPrimary),
                 const SizedBox(width: 10),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    color: kText,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      color: kText,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(
               content,
               style: const TextStyle(
-                fontSize: 13,
+                fontSize: 12.5,
                 height: 1.5,
                 color: kTextSub,
                 fontWeight: FontWeight.w500,

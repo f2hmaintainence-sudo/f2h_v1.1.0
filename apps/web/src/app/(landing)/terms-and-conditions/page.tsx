@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { ChevronRight, Home } from "lucide-react";
@@ -114,21 +114,20 @@ const sections: TermsSection[] = [
     title: "8. Terms of Shipping and Delivery",
     paragraphs: [
       "You agree and undertake that You are accessing the Services and transacting at Your sole risk, and are using Your best and prudent judgment before entering into any transaction on the Platform.",
-      "The Company operates two delivery shifts every day — morning and evening. After recharge of Your wallet (in the manner specified on the Platform), the Company shall arrange for delivery of the Product(s) to the address provided by You in the applicable shift. Money for a placed order is deducted from Your wallet only after successful delivery of the Products. You are responsible for checking the Products and their descriptions in the cart before placing an order. Any order placed by You is a firm commitment to purchase, and You are obligated to complete the transaction and not contest it in any way.",
-      "While the Company strives to deliver Products to the address mentioned by You in select serviceable cities, various circumstances may restrict or hamper delivery to a particular location, and the Company may, in its sole discretion, identify certain localities as unserviceable. The Company and its logistics partners make every effort to deliver to the address provided during registration; however, serviceability of a location can sometimes only be confirmed once the logistics partner visits the address. If the Company concludes that an address is unserviceable, a full refund of the remaining wallet balance (after deduction of cashback, etc.) will be processed to the original payment source, and You agree not to raise any claims or disputes against the Company, its directors, employees, or logistics partners regarding such a decision.",
-      "To ensure timely and accurate delivery, the Company may collect information such as Your name, shipping address, billing address, landmarks, and contact details. You shall ensure all information You submit is true, complete, accurate, and sufficient to identify the place of delivery. You shall bear absolute liability for any delivery failure caused by incorrect, incomplete, or improperly specified delivery details provided by You.",
-      "You are required to leave a re-usable bag outside the door at a secure place for delivery. If no bag is available, or the order is too large to fit, items will be left at Your doorstep.",
-      "The Company takes reasonable precautions to ensure safe and timely delivery. However, due to the nature of the business, the involvement of human resources, the perishable nature of the Products, and external factors beyond the Company's control — including logistical issues, unsuitable weather, political disruptions or strikes, acts of God (floods, earthquakes, pandemic-like situations), non-reachability of the delivery point, or other unforeseeable circumstances — the Company shall not be held liable for inadvertent errors, delays, or omissions. In such events, the Company will make reasonable attempts to inform You by push notification, SMS, call, or email, but disclaims liability for failure to notify, and shall be under no obligation to compensate You for delay or non-delivery.",
-      "The Company engages logistics partners on a principal-to-principal basis and shall not be liable for acts or omissions of such partners or their personnel, including deficiency in service, wrong delivery, delivery delays, or package tampering, that are beyond the Company's control. The Company also disclaims responsibility for any misconduct or discourtesy by delivery personnel, who operate independently; any dispute with a delivery executive must be resolved by You directly, though the Company may, at its discretion, provide reasonable assistance.",
+      "The Company operates two dedicated delivery shifts every day — Morning Shift (5:30 AM to 7:30 AM) and Evening Shift (5:00 PM to 7:30 PM). After recharge of Your prepaid wallet or activation of an approved postpaid credit limit, the Company arranges for doorstep delivery of the ordered Products to Your designated address in the applicable shift.",
+      "Money for a scheduled delivery is deducted from Your F2H wallet only upon generation and dispatch of the delivery manifest. You are responsible for reviewing quantities and product selections before cut-off times. Any order placed or scheduled on active subscription is a firm commitment to purchase.",
+      "While the Company strives to deliver Products to every residential community within active zones, serviceability is confirmed by route logistics. If an address is determined to be unserviceable, 100% of any remaining real-currency wallet balance will be refunded immediately to Your original payment source.",
+      "Customers are required to hang a clean, reusable F2H insulated bag outside their door for silent morning drops. The Company's delivery partners will place the items securely in the bag and log photo confirmation.",
+      "The Company maintains a strict cold-chain process (2°C to 6°C) from collection at the dairy farm to doorstep arrival.",
     ],
   },
   {
     id: "pricing",
-    title: "9. Pricing",
+    title: "9. Pricing and Tax Inclusivity",
     paragraphs: [
-      "The M.R.P. or offer price mentioned against a Product can be changed at any time without notice. You are requested to check the final price in the cart before placing an order.",
-      "Due to the perishable nature of the Products, the Platform procures and supplies fresh Products depending on shelf life. In case of any price revision on a subscribed Product, whether upward or downward, the revised amount shall be charged from Your wallet. If Your wallet does not have sufficient balance, We shall intimate You to top it up, pending which We may not be able to process Your order.",
-      "While reasonable steps are taken to label Products accurately, errors in data entry may occur due to technical issues, typographical errors, human error, or incorrect Product information. The Company reserves the right to cancel an order (in full or in part) due to shortage or unavailability of Products, or at Your request via customer support. If the Company cancels an order, You will not be charged, and any payment already made will be refunded to Your source account or wallet, as chosen by You, within 5-7 working days from verification of the refund request, subject to Your bank's or payment gateway's timelines.",
+      "All product prices listed on the Platform and in product catalog tables are 100% inclusive of all applicable Goods & Services Tax (GST). There are zero separate delivery, handling, or surge fees for active scheduled subscriptions.",
+      "Due to the perishable nature of fresh farm milk and seasonal dairy commodities, prices may be adjusted from time to time. Any price revision will be updated transparently on the Platform and applied to future recurring subscription cycles with advance notice.",
+      "If the Company cancels a delivery shift due to extreme weather or unserviceability, You will not be charged, and the corresponding amount will be credited back to Your F2H wallet within 2 hours or refunded to Your bank source in 5-7 working days.",
     ],
   },
   {
@@ -211,25 +210,30 @@ const sections: TermsSection[] = [
   },
   {
     id: "billing-payment",
-    title: "18. Billing Policy & Payment",
+    title: "18. Billing Policy, Wallets & Payment Gateways",
+    paragraphs: [
+      "The Platform supports secure online payments via Razorpay payment gateway, supporting UPI (Google Pay, PhonePe, Paytm), Credit Cards, Debit Cards, NetBanking, and recurring AutoPay / e-Mandates.",
+      "Prepaid Wallet: Customers maintain an in-app F2H Wallet balance for daily auto-debits. Money is deducted only upon generation of the active delivery manifest for that shift.",
+      "Postpaid Accounts: Approved postpaid enterprise and residential customers receive an itemized monthly billing statement with detailed tax breakdown. Invoices are payable within 7 calendar days of statement generation.",
+    ],
     bullets: [
-      "A summary of purchases for the current month and the last 2 months will be available on the Platform.",
-      "In case of bill payment by cheque, the cheque should be drawn in favour of F2H - Farm to Home.",
-      "In case of bill payment in cash, please share the one-time password (OTP) sent to Your registered mobile number with the delivery partner before handing over cash.",
-      "Customers are entitled to view transaction details for the last 6 months only; the Company will not provide details beyond this period. You are responsible for reviewing Your transactions and raising grievances, if any, and the Company shall bear no responsibility or liability in this regard.",
-      "Customers should download their statement from time to time.",
+      "A complete summary of daily deliveries and wallet transactions is accessible on the Platform for instant review and PDF statement download.",
+      "All card transactions are processed through PCI-DSS certified encryption gateways. The Company does not store raw credit card numbers or CVV codes.",
+      "Customers can initiate wallet top-ups starting at INR 200 via any supported online payment mode.",
     ],
   },
   {
     id: "return-policy",
-    title: "19. Return Policy",
+    title: "19. Return, Quality & 2-Hour Wallet Refund Policy",
     paragraphs: [
-      "Products ordered for the morning delivery shift must be placed by 9:00 PM the previous night; Customers may cancel such an order by 9:00 PM. Products ordered for the evening delivery shift must be placed by 10:00 AM the same day; Customers may cancel such an order by 10:00 AM. (Note: these cut-off times are placeholders — please confirm and update with F2H's actual shift cut-offs.) Delivered Products are non-returnable except where they are damaged, defective, expired, or incorrectly delivered. No exchange or return will be accepted if the Product packaging has been opened, or the Product has been used or consumed, in part or otherwise.",
-      "Returns will not be accepted on grounds of the Product not being required or not being to the Customer's taste; the Company reserves the right to deny such a return.",
+      "Orders for the Morning Shift must be placed, modified, or cancelled by 9:00 PM the previous night. Orders for the Evening Shift must be placed, modified, or cancelled by 10:00 AM the same day. Cancellations made prior to the respective cut-off are 100% free of charge.",
+      "Given the perishable nature of fresh farm milk, physical returns are not accepted once delivered. However, for any verified quality defect (such as curdling upon boil or packaging damage):",
     ],
     bullets: [
-      "Quality issues for Milk, Curd, Paneer, and other fresh dairy Products must be reported within 24 hours of delivery.",
-      "Quality issues for Ghee, Kova, Carrot Halwa, Cold Pressed Oils, Dry Fruits, and other non-perishable categories must be reported within 3 days of delivery.",
+      "Quality issues with fresh milk, curd, or paneer must be reported via the app or WhatsApp within 24 hours of delivery with photo proof.",
+      "Quality issues with ghee, oils, or dry fruits must be reported within 3 days (72 hours) of delivery.",
+      "2-Hour Wallet Refund: Verified claims are credited back to Your F2H Wallet within 2 hours.",
+      "Original Source Bank Refund: Refunds requested back to the original bank account or payment card upon account closure are processed via Razorpay within 5-7 working days.",
     ],
   },
   {
@@ -264,9 +268,9 @@ const sections: TermsSection[] = [
   },
   {
     id: "prepaid-products",
-    title: "22. Pre-paid Products",
+    title: "22. Pre-paid Products & AutoPay Wallet Maintenance",
     paragraphs: [
-      "To place an order for a prepaid Product, You are required to recharge Your F2H wallet with a minimum amount of INR 200; for subsequent orders, You are required to recharge Your wallet with the MRP of the selected Product via the available payment modes.",
+      "To activate a daily recurring subscription, You are required to top-up Your F2H wallet with a minimum initial recharge of INR 200. You may also activate Razorpay AutoPay for automatic wallet replenishment when Your balance dips below INR 100.",
     ],
   },
   {

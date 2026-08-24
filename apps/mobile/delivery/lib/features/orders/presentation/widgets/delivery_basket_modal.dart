@@ -145,7 +145,8 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        final data = Map<String, dynamic>.from(response.data as Map);
+        final rawMap = response.data is Map ? Map<String, dynamic>.from(response.data as Map) : <String, dynamic>{};
+        final data = rawMap['data'] is Map ? Map<String, dynamic>.from(rawMap['data'] as Map) : rawMap;
         final breakdownRaw = (data['product_breakdown'] as List<dynamic>? ?? []);
         final isConfirmed = data['pickup_confirmed'] == true;
         final isSufficientOverall = data['is_sufficient_for_orders'] != false;
@@ -393,13 +394,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
 
   bool get isPickupConfirmed {
     if (_apiPickupConfirmed != null) return _apiPickupConfirmed!;
-    final status = (widget.currentRun?.status ?? '').toLowerCase();
-    return status == 'in_progress' ||
-        status == 'in_transit' ||
-        status == 'out_for_delivery' ||
-        status == 'completed' ||
-        status == 'handed_over' ||
-        (allOrders.isNotEmpty && allOrders.every((o) => o.status == 'out_for_delivery' || o.status == 'delivered' || o.status == 'completed'));
+    return false;
   }
 
   List<ProductInventorySummary> get _inventorySummaries {

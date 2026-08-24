@@ -265,7 +265,7 @@ export class BasketService {
       `SELECT dr.id, dr.run_id, dr.delivery_partner_id, dr.warehouse_id, dr.delivery_slot, dr.status
        FROM delivery_runs dr
        WHERE (dr.delivery_partner_id = ANY($1) OR dr.run_id = $2 OR dr.id::text = $2)
-         AND DATE(dr.run_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
+         AND (dr.run_date::date = CURRENT_DATE OR DATE(dr.run_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE OR dr.run_date IS NULL)
          AND dr.status != 'cancelled'
        ORDER BY dr.created_at DESC
        LIMIT 1`,
@@ -277,17 +277,22 @@ export class BasketService {
     const runIds = activeRun ? [String(activeRun.id), activeRun.run_id].filter(Boolean) : (activeRunId ? [activeRunId] : []);
 
     // 3. Fetch active delivery_dispatch record for this run
-    const dispatchRes = runIds.length > 0 ? await this.db.query(
+    const dispatchRes = await this.db.query(
       `SELECT dd.id, dd.dispatch_id, dd.delivery_run_id, dd.status AS dispatch_status, dd.loaded_at, dd.collected_at
        FROM delivery_dispatch dd
        WHERE dd.delivery_run_id = ANY($1)
+          OR dd.delivery_run_id IN (
+            SELECT dr.run_id FROM delivery_runs dr
+            WHERE (dr.delivery_partner_id = ANY($2) OR dr.run_id = $3 OR dr.id::text = $3)
+              AND dr.status != 'cancelled'
+          )
        ORDER BY dd.created_at DESC
        LIMIT 1`,
-      [runIds],
-    ) : [];
+      [runIds.length ? runIds : ['NONE'], partnerIds, runId || ''],
+    );
     const activeDispatch = dispatchRes?.length ? dispatchRes[0] : null;
     const activeDispatchId = activeDispatch?.dispatch_id;
-    const dispatchStatus = activeDispatch?.dispatch_status || (activeRun ? (['in_progress', 'completed', 'handed_over'].includes(activeRun.status) ? 'collected' : 'loaded') : 'draft');
+    const dispatchStatus = activeDispatch?.dispatch_status || 'draft';
 
     // 4. Fetch live planned & delivered quantities from orders & order_items
     const livePlannedRes = await this.db.query(
@@ -378,7 +383,6 @@ export class BasketService {
          LEFT JOIN product_variants pv ON pv.variant_id = ddi.product_variant_id
          LEFT JOIN products p ON p.product_id = pv.product_id
          WHERE dr.run_id = ANY($1)
-           AND DATE(dr.run_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
            AND ddi.deleted_at IS NULL
          ORDER BY pv.name`,
         [runIds],
@@ -457,7 +461,9 @@ export class BasketService {
     const productBreakdown = Object.values(productMap);
     const isSufficientForOrders = productBreakdown.length > 0 && productBreakdown.every((p: any) => p.is_sufficient);
     const runStatus = activeRun?.status || 'planned';
-    const isPickupConfirmed = dispatchStatus === 'collected' || ['in_progress', 'out_for_delivery', 'completed', 'handed_over'].includes(String(runStatus));
+    // Single source of truth: if dispatchStatus === 'loaded', pickup is pending (isPickupConfirmed = false).
+    // Only when dispatchStatus === 'collected' or 'completed' is pickup confirmed.
+    const isPickupConfirmed = dispatchStatus === 'collected' || dispatchStatus === 'completed';
 
     let totalLoaded = 0;
     let customerItemsCount = 0;

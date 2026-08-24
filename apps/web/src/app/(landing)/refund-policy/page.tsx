@@ -21,113 +21,109 @@ type PolicySection = {
 const sections: PolicySection[] = [
   {
     id: "overview",
-    title: "1. Overview",
+    title: "1. Overview & Commitment",
     paragraphs: [
-      "This Cancellation & Refund Policy (\"Policy\") explains when and how You can cancel an order placed on the F2H - Farm to Home website, mobile application, or sub-domains (collectively, the \"Platform\"), and how refunds are calculated, processed, and paid out.",
+      "This Cancellation & Refund Policy (\"Policy\") explains when and how You can cancel an order or modify a subscription placed on the F2H - Farm to Home website, mobile application, or sub-domains (collectively, the \"Platform\"), and how refunds are calculated, processed, and paid out.",
       "This Policy forms part of, and must be read together with, the F2H Terms and Conditions and Privacy Policy. In the event of any conflict between this Policy and the Terms and Conditions on matters relating specifically to cancellations and refunds, this Policy shall prevail.",
+      "At F2H, we are committed to 100% customer satisfaction. If you ever receive a damaged, leaked, or compromised product, we guarantee a swift, hassle-free resolution with our 2-hour wallet refund turnaround.",
     ],
   },
   {
     id: "cancellation-by-customer",
-    title: "2. Cancellation by You",
+    title: "2. Order & Subscription Cancellation Rules",
     paragraphs: [
-      "F2H delivers in two daily shifts — morning and evening. Orders for the morning shift must be placed, and may be cancelled free of charge, by 9:00 PM the previous night. Orders for the evening shift must be placed, and may be cancelled free of charge, by 10:00 AM the same day. (Note: these cut-off times are placeholders — please confirm and update with F2H's actual shift cut-offs.)",
-      "Once the applicable cancellation window has passed, the order is handed over for processing and delivery, and can no longer be cancelled by You through the Platform. If You are unable to accept delivery after this point, please refer to Section 4 (Refusal at Delivery) below.",
+      "F2H operates two daily delivery shifts — Morning and Evening. Due to the perishable nature of fresh farm milk and daily dairy staples, logistics and procurement schedules operate on strict daily cut-off windows:",
     ],
     bullets: [
-      "Subscriptions can be paused, modified, or cancelled at any time using the Platform, or by reaching out to customer support, subject to the applicable cut-off time shown on the Platform for that delivery cycle.",
-      "You will not create multiple accounts at the same address to work around order or offer limits. If this is found, F2H reserves the right to cancel or merge the accounts and/or cancel the associated orders or subscriptions.",
+      "Morning Shift Delivery (5:30 AM – 7:30 AM): Orders, pause requests, and quantity modifications must be placed or cancelled by 9:00 PM the previous night. Cancellations made before 9:00 PM are 100% free of charge.",
+      "Evening Shift Delivery (5:00 PM – 7:30 PM): Orders, pause requests, and quantity modifications must be placed or cancelled by 10:00 AM the same day. Cancellations made before 10:00 AM are 100% free of charge.",
+      "Post-Cut-Off Window: Once the respective cut-off time passes, farm collection, quality checks, and route packing commence immediately. At this stage, orders cannot be cancelled in the system. If you are unable to receive the order at delivery, please refer to Section 4 (Refusal at Delivery).",
+      "Subscriptions: You may pause, resume, modify quantities, or cancel your recurring daily or alternate-day subscriptions at any time via the F2H mobile app before the applicable cut-off time.",
     ],
   },
   {
     id: "cancellation-by-f2h",
     title: "3. Cancellation by F2H",
     paragraphs: [
-      "F2H reserves the right to cancel an order, in full or in part, for reasons including but not limited to shortage or unavailability of a Product, a pricing or listing error, delivery-address serviceability issues, suspected fraud or misuse, or at Your request through customer support.",
-      "If F2H cancels an order, You will not be charged for the cancelled portion, and any payment already made for it will be refunded in full, in accordance with Section 6 (Refund Timelines & Mode) below.",
+      "F2H reserves the right to cancel an order, in full or in part, in rare situations such as acute farm shortage, unserviceable adverse weather conditions, listed pricing/catalog typographical error, unserviceable delivery address, or suspected fraud.",
+      "If F2H cancels an order or delivery shift, You will not be charged. Any prepaid deduction for the unfulfilled portion will be refunded in full automatically, in accordance with Section 7 (Refund Timelines & Mode) below.",
     ],
   },
   {
     id: "refusal-at-delivery",
-    title: "4. Refusal at Delivery",
+    title: "4. Refusal of Delivery & Unattended Deliveries",
     paragraphs: [
-      "For fresh dairy orders — Milk, Curd, Paneer, and similar Products — specifically, if You decline to accept the order at the time of delivery, a Product Loss Charge of INR 100 (or such other amount as may be indicated on the Platform from time to time) will be applied. This charge reflects F2H's genuine pre-estimate of the loss incurred in preparing and attempting delivery of perishable goods, and is not a penalty.",
-      "For other Product categories (Ghee, Kova, Carrot Halwa, Cold Pressed Oils, Dry Fruits), repeated or unreasonable refusal at delivery may result in restrictions on Your account or future Cash on Delivery eligibility, at F2H's discretion.",
+      "For fresh dairy items (Milk, Curd, Paneer) that are customized and packed exclusively for your delivery slot, if a Customer refuses delivery at the doorstep without a verified quality defect, a Product Loss Charge of up to INR 100 may be levied to cover actual farm processing and logistics costs.",
+      "To ensure uninterrupted morning delivery even if you are asleep, customers are encouraged to hang an insulated F2H milk bag outside the doorstep. The delivery rider will drop the order securely and upload photo confirmation.",
     ],
   },
   {
     id: "unserviceable-address",
     title: "5. Refunds for Unserviceable Addresses",
     paragraphs: [
-      "F2H and its logistics partners make every effort to deliver to the address You provide. In some cases, however, the serviceability of a location can only be confirmed once the logistics partner visits the address. If F2H determines that Your address is unserviceable, a full refund of the remaining wallet balance for that order (after deduction of any cashback already availed) will be processed to the original payment source.",
-      "By using the Platform, You agree not to raise claims or disputes against F2H, its directors, employees, or logistics partners in relation to a genuine unserviceability determination made in good faith.",
+      "F2H strives to expand coverage across Bangalore and serviceable hubs. If a customer recharges their wallet or places an order for an address that is subsequently verified as unserviceable by our logistics route planning, the entire remaining wallet balance will be refunded 100% back to the customer's original payment source without deductions.",
     ],
   },
   {
     id: "returns-replacements",
-    title: "6. Returns, Replacements & Quality Issues",
+    title: "6. Quality Issues, Damaged Items & Returns",
     paragraphs: [
-      "Given the perishable and fast-moving nature of most Products sold on the Platform, delivered Products are generally non-returnable once accepted, except where they are damaged, defective, expired, or incorrectly delivered. No exchange or return will be accepted where the Product packaging has been opened, or the Product has been used or consumed, in part or otherwise.",
-      "Returns will not be accepted solely on the ground that a Product was not required, or was not to Your taste; F2H reserves the right to decline such requests.",
+      "Due to the perishable nature and strict cold-chain requirements of milk and dairy products, physical returns of perishable items are not accepted once delivered and opened. However, we offer full replacements or refunds for verified quality concerns:",
     ],
     bullets: [
-      "Quality issues with Milk, Curd, Paneer, and other fresh dairy Products must be reported to customer support within 24 hours of delivery.",
-      "Quality issues with Ghee, Kova, Carrot Halwa, Cold Pressed Oils, Dry Fruits, and other non-perishable categories must be reported within 3 days of delivery.",
-      "You may be asked to share order details, photographs, or other supporting information to help F2H verify a quality complaint before a replacement or refund is approved.",
+      "Fresh Milk & Perishable Dairy: Any issue relating to milk curdling upon initial boil, packaging leakage, or temperature compromise must be reported via the app or WhatsApp within 24 hours of delivery with photo proof.",
+      "Ghee, Cold-Pressed Oils & Dry Fruits: Quality or packaging issues with non-perishable categories must be reported within 3 days (72 hours) of delivery.",
+      "Verification Process: Our customer care team reviews the uploaded photo or batch number and immediately issues a replacement on the next shift or a full refund.",
     ],
   },
   {
     id: "refund-timelines",
-    title: "7. Refund Timelines & Mode",
+    title: "7. Refund Timelines & Settlement Modes",
     paragraphs: [
-      "Where a refund is approved — whether due to order cancellation, an unserviceable address, or a verified quality or delivery issue — the amount will be credited to Your F2H wallet or to Your original payment source, as chosen by You (where applicable), within 5-7 working days from the date F2H verifies and confirms the refund request.",
-      "You acknowledge that once a refund is initiated by F2H, the time it takes to actually reflect in Your bank account or payment instrument is subject to the timelines of Your bank or payment gateway service provider, and is outside F2H's control.",
+      "Refunds are processed promptly based on the refund mode selected or applicable:",
+    ],
+    bullets: [
+      "F2H In-App Wallet Refund (Turnaround: Within 2 Hours): Approved refunds for order cancellations, missing packets, or verified quality complaints are credited to your F2H Wallet within 2 hours. Wallet funds never expire and can be used immediately for future deliveries.",
+      "Original Payment Source (Turnaround: 5 to 7 Business Days): In case of wallet balance encashment upon permanent account closure, or direct payment gateway reversals, refunds are initiated via Razorpay to your original payment method (Credit/Debit Card, NetBanking, UPI). The funds will reflect in your bank account within 5 to 7 working days, subject to your bank's clearance cycles.",
+      "Zero Deduction on Legitimate Claims: No cancellation or processing fees are deducted for quality-related refunds or cancellations made prior to shift cut-off.",
     ],
   },
   {
     id: "wallet-membership-refunds",
-    title: "8. Wallet, Membership & Cashback Refunds",
+    title: "8. Wallet, AutoPay & Referral Credits",
     bullets: [
-      "F2H Membership plans, once purchased, cannot be cancelled, transferred, or encashed. Where a Membership is on auto-renewal for an Unlimited Benefit plan and Your savings at the time of expiry are less than the amount paid, F2H will refund the difference directly to Your wallet; this benefit applies only to auto-renewed Unlimited Benefit plans.",
-      "Cashback credited in relation to AutoPay activation or transactions is conditional on the AutoPay mandate remaining active. If the mandate is cancelled, disabled, or otherwise becomes inactive, F2H reserves the right to reverse, recover, or adjust the cashback previously credited.",
-      "Referral bonuses and promotional wallet credits are non-transferable and cannot be exchanged for cash under any circumstances; they can only be used towards future purchases on the Platform.",
-      "F2H reserves the right to withhold a discount, bonus, or cashback, or to debit an amount already credited, where it determines that these Terms or the applicable offer terms have been violated.",
-    ],
-  },
-  {
-    id: "nach-failed-transactions",
-    title: "9. Refunds Relating to NACH Mandate Transactions",
-    paragraphs: [
-      "Transactions against a NACH Mandate are processed only on a Business Day. If a mandated transaction fails, it will not be retried within that calendar month, and any amount already deducted for a corresponding order that could not be fulfilled will be refunded in accordance with Section 7 above.",
-      "F2H shall not be liable for, and will not refund, transactions that are processed because You failed to revoke a NACH Mandate at least two days prior to the next Due Date; such processed transactions are treated as valid and binding.",
+      "Promotional Credits & Bonuses: Promotional credits, cashback bonuses, and referral rewards credited to your wallet are promotional in nature, cannot be transferred to another user, and cannot be encashed for physical cash.",
+      "AutoPay / e-Mandate Cancellations: If you cancel an AutoPay mandate on Razorpay, upcoming scheduled orders will be processed only if your prepaid wallet balance has sufficient funds.",
+      "Unused Prepaid Wallet Balance: Any deposited real-currency wallet balance (excluding promotional bonuses) can be refunded back to the source bank account upon written request to customer support.",
     ],
   },
   {
     id: "how-to-request",
-    title: "10. How to Request a Cancellation or Refund",
+    title: "9. How to Request a Cancellation or Refund",
     paragraphs: [
-      "Most cancellations can be completed directly on the Platform, within the applicable cut-off window. For refund requests relating to quality, delivery, or billing issues, please reach out to customer support with Your order ID and relevant details.",
+      "You can manage cancellations and request refunds through multiple easy channels:",
     ],
     subsections: [
       {
-        title: "Customer support",
+        title: "Official Support & Grievance Channels",
         bullets: [
-          "Email: support@f2hfresh.com",
-          "Primary phone: +91 91487 73591",
-          "Secondary phone: +91 79893 68142",
-          "WhatsApp: Message us on WhatsApp via the number listed on the Platform",
-          "In-app: Help & Support section on the F2H app",
+          "In-App Support: Navigate to 'Profile' > 'Help & Support' in the F2H Mobile App",
+          "WhatsApp Support: +91 91487 73591 (Instant Chat & Photo Upload)",
+          "Customer Care Phone: +91 91487 73591 / +91 79893 68142",
+          "Official Email: support@f2hfresh.com",
+          "Grievance Officer: grievanceofficer@f2hfresh.com",
+          "Operational Address: 1st Cross, SJP Layout, Nagondanahalli, Whitefield, Bangalore - 560066, Karnataka, India",
         ],
       },
     ],
   },
   {
     id: "changes",
-    title: "11. Changes to This Policy",
+    title: "10. Changes to This Policy",
     paragraphs: [
-      "F2H reserves the right to modify or amend this Policy at any time, for legal, operational, or business reasons. Updated versions will be posted on the Platform and will take effect from the date of posting. Your continued use of the Platform after such changes constitutes acceptance of the updated Policy.",
+      "F2H reserves the right to modify or update this Cancellation & Refund Policy from time to time in accordance with operational requirements and applicable e-commerce regulations. Any changes will be published directly on this page with an updated timestamp.",
     ],
-    note: "This Policy does not affect any statutory rights You may have under applicable consumer protection law, which shall continue to apply regardless of anything stated above.",
+    note: "This Policy complies with the Consumer Protection (E-Commerce) Rules, 2020 and does not limit your statutory rights under Indian law.",
   },
 ];
 
@@ -175,7 +171,7 @@ export default function CancellationRefundPolicyPage() {
             Home
           </Link>
           <ChevronRight size={14} className="text-slate-300" />
-          <span className="font-semibold text-slate-800">Cancellation & Refund Policy</span>
+          <span className="font-semibold text-slate-800">Cancellation &amp; Refund Policy</span>
         </nav>
 
         <article className="rounded-[8px] border border-slate-200 bg-white px-4 py-7 shadow-sm sm:px-6 lg:px-7">
@@ -184,8 +180,11 @@ export default function CancellationRefundPolicyPage() {
               F2H - Farm to Home
             </p>
             <h1 className="text-2xl font-bold tracking-normal text-slate-950 sm:text-[28px]">
-              Cancellation & Refund Policy
+              Cancellation &amp; Refund Policy
             </h1>
+            <p className="mt-2 text-xs text-slate-500">
+              Last updated: August 2026 • Verified 2-Hour Wallet Refund &amp; 5–7 Day Bank Refund Timelines
+            </p>
           </div>
 
           <div className="space-y-7">

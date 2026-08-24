@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 
 // ══════════════════════════════════════════════════════════
-//  PRIVACY POLICY - Hardcoded Premium Design
+//  REFUND & CANCELLATION POLICY - Customer Mobile Screen
 // ══════════════════════════════════════════════════════════
 
-class PrivacyScreen extends StatelessWidget {
-  const PrivacyScreen({super.key});
+class RefundPolicyScreen extends StatelessWidget {
+  const RefundPolicyScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -17,10 +17,10 @@ class PrivacyScreen extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         title: const Text(
-          'Privacy Policy',
+          'Cancellation & Refund Policy',
           style: TextStyle(
             color: kText,
-            fontSize: 18,
+            fontSize: 17,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -32,7 +32,7 @@ class PrivacyScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Header Card
+            // Header card
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -54,30 +54,30 @@ class PrivacyScreen extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: kPrimaryPl,
+                      color: const Color(0xFFE8F5E9),
                       borderRadius: BorderRadius.circular(100),
                     ),
                     child: const Text(
-                      'Effective Date: June 30, 2026',
+                      '2-Hour Wallet Refund Guarantee',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
-                        color: kPrimary,
+                        color: Color(0xFF2E7D32),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
                   const Text(
-                    'Your Trust is Our Commitment',
+                    'Clear, Hassle-Free Refunds',
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 19,
                       fontWeight: FontWeight.w900,
                       color: kText,
                     ),
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'At Farm to Home (F2H), we value your trust above all else. This Privacy Policy describes how we collect, use, share, and safeguard your personal information when you use our mobile application.',
+                    'We are committed to delivering 100% pure, uncompromised dairy. Here are our exact cancellation cut-offs and refund timelines.',
                     style: TextStyle(
                       fontSize: 13,
                       height: 1.5,
@@ -90,46 +90,38 @@ class PrivacyScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            // Policy Sections
             _buildSection(
-              title: '1. Information We Collect',
-              icon: Icons.info_outline_rounded,
-              content: '• Account Details: When you register, we collect your name, mobile phone number, email address, and F2H zone preferences.\n'
-                  '• Delivery Addresses: We save your designated delivery addresses to facilitate accurate and timely milk/dairy drops.\n'
-                  '• Location Data: We may ask for background location access to validate zone-based delivery coverage and provide precise real-time order tracking.',
+              title: '1. Order Cancellation Timelines',
+              icon: Icons.timer_outlined,
+              content: '• Morning Delivery (5:30 AM - 7:30 AM): Cancel before 9:00 PM the previous night for 100% free cancellation.\n'
+                  '• Evening Delivery (5:00 PM - 7:30 PM): Cancel before 10:00 AM the same day for 100% free cancellation.\n'
+                  '• After Cut-Off: Farm collection and pouch packing begin; orders cannot be cancelled in the app once cut-off passes.',
             ),
             _buildSection(
-              title: '2. How We Use Your Information',
-              icon: Icons.settings_outlined,
-              content: '• Fulfilling and managing your one-time and subscription orders.\n'
-                  '• Processing wallet top-ups, transactions, and secure checkouts.\n'
-                  '• Sending push notifications regarding active deliveries, pauses, or account status.\n'
-                  '• Continuously optimizing our farm-to-table supply chain logistics and customer support experience.',
+              title: '2. 2-Hour Wallet Refund Policy',
+              icon: Icons.flash_on_rounded,
+              content: '• Instant Wallet Credits: Approved claims for missing packets, unfulfilled shifts, or damaged milk are credited to your F2H Wallet within 2 hours.\n'
+                  '• Always Available: Wallet funds never expire and apply automatically toward upcoming daily drops.',
             ),
             _buildSection(
-              title: '3. Data Security & Protection',
-              icon: Icons.shield_outlined,
-              content: 'We employ state-of-the-art security measures including SSL encryption, secure tokens, and hashed database storage to protect your personal details and order history. F2H is FSSAI compliant, assuring safety both in product delivery and digital infrastructure.',
+              title: '3. Bank Source Refunds (5-7 Days)',
+              icon: Icons.account_balance_outlined,
+              content: '• Source Reversal: For wallet balance payouts or payment gateway transaction reversals, funds are credited via Razorpay back to your original payment method (Credit/Debit Card, NetBanking, UPI) within 5 to 7 working days.',
             ),
             _buildSection(
-              title: '4. Information Sharing',
-              icon: Icons.share_outlined,
-              content: 'F2H does not sell, trade, or rent your personal identification information to third parties. We only share essential details with delivery agents/vendors and payment processors to complete transactions and execute home deliveries.',
+              title: '4. Quality Claims & Replacements',
+              icon: Icons.verified_outlined,
+              content: '• Fresh Milk & Curd: Report any curdling upon first boil or packaging leakage within 24 hours of delivery with a photo.\n'
+                  '• Non-Perishables (Ghee, Oils, Dry Fruits): Report quality concerns within 3 days (72 hours).\n'
+                  '• Resolution: We provide an immediate replacement on the next shift or a full refund.',
             ),
             _buildSection(
-              title: '5. Your Rights & Management',
-              icon: Icons.manage_accounts_outlined,
-              content: 'You retain full control over your F2H profile data. You can view, modify, or update your personal details and saved addresses directly via the Profile Screen inside the app. To request permanent account deletion, contact our support team.',
-            ),
-            _buildSection(
-              title: '6. Contact & Grievance Redressal',
-              icon: Icons.help_outline_rounded,
-              content: 'If you have any questions or feedback regarding this Privacy Policy, please reach out to us at:\n\n'
-                  '• Official Email: support@f2hfresh.com\n'
-                  '• Grievance Officer: grievanceofficer@f2hfresh.com\n'
-                  '• Helpline: +91 91487 73591 / +91 79893 68142\n'
+              title: '5. Customer Care & Disputes',
+              icon: Icons.support_agent_rounded,
+              content: '• In-App Help: Tap "Help & Support" in the profile drawer.\n'
                   '• WhatsApp: +91 91487 73591\n'
-                  '• Registered Office: 1st Cross, SJP Layout, Nagondanahalli, Whitefield, Bangalore - 560066, Karnataka, India.',
+                  '• Email: support@f2hfresh.com\n'
+                  '• Helpline: +91 91487 73591 / +91 79893 68142',
             ),
             const SizedBox(height: 16),
           ],
@@ -144,10 +136,10 @@ class PrivacyScreen extends StatelessWidget {
     required String content,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: kSurface,
           borderRadius: BorderRadius.circular(20),
@@ -160,21 +152,23 @@ class PrivacyScreen extends StatelessWidget {
               children: [
                 Icon(icon, size: 20, color: kPrimary),
                 const SizedBox(width: 10),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    color: kText,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      color: kText,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(
               content,
               style: const TextStyle(
-                fontSize: 13,
+                fontSize: 12.5,
                 height: 1.5,
                 color: kTextSub,
                 fontWeight: FontWeight.w500,

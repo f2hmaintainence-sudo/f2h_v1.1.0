@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, Home } from "lucide-react";
+import { ChevronRight, Home, Sun, Moon, ShieldCheck, MapPin, Truck, Clock } from "lucide-react";
 
 type PolicySection = {
   id: string;
@@ -14,98 +14,78 @@ type PolicySection = {
 const sections: PolicySection[] = [
   {
     id: "overview",
-    title: "1. Overview",
+    title: "1. Overview & Cold-Chain Promise",
     paragraphs: [
-      "This Delivery & Shipping Policy (\"Policy\") explains how F2H — Farm to Home (\"F2H\", \"We\", \"Us\") delivers Products ordered through the Platform (website, mobile app, and sub-domains), including delivery shifts, coverage areas, timelines, and what happens if a delivery cannot be completed.",
-      "This Policy forms part of, and must be read together with, the F2H Terms and Conditions and the Cancellation & Refund Policy. In the event of a conflict between this Policy and the Terms and Conditions on matters relating specifically to delivery, this Policy shall prevail.",
-      "F2H does not use third-party couriers or postal shipping. All Products are delivered directly by F2H's own delivery riders or authorized delivery partners, within the coverage zones listed on the Platform.",
+      "This Delivery & Shipping Policy (\"Policy\") explains how F2H — Farm to Home (\"F2H\", \"We\", \"Us\") manages doorstep delivery of fresh milk, dairy items, and farm groceries ordered through our website, mobile applications, and digital platforms.",
+      "This Policy forms part of, and must be read together with, the F2H Terms and Conditions and Cancellation & Refund Policy.",
+      "F2H does not rely on generic third-party parcel couriers. Every single liter of milk and dairy product is delivered directly by F2H's trained delivery riders using insulated delivery boxes to ensure pure farm-to-table freshness within hours of collection.",
     ],
   },
   {
     id: "delivery-shifts",
-    title: "2. Delivery Shifts & Timelines",
+    title: "2. Delivery Shifts & Guaranteed Timelines",
     paragraphs: [
-      "F2H operates two daily delivery shifts:",
-      "Delivery timings are estimates based on normal operating conditions. Actual delivery time may vary due to weather, traffic, local disruptions, or other circumstances beyond F2H's reasonable control, though F2H targets on-time delivery for every order.",
-      "Orders are auto-generated for the next applicable shift based on Your active subscription. You can pause, skip, or modify an upcoming delivery through the Platform before the cut-off time shown for that shift.",
+      "F2H operates two dedicated daily delivery shifts across serviceable zones in Bangalore:",
+      "Morning milk is collected directly from partner dairy farms at approximately 4:00 AM, chilled instantly to 2–6°C, packed in tamper-proof food-grade pouches, and delivered before 7:30 AM.",
+      "Orders and subscriptions are automatically scheduled for your preferred daily or alternate-day slot upon wallet activation.",
     ],
     shifts: [
       {
         icon: "sun",
-        label: "Morning Shift",
-        time: "Before 7:00 AM",
-        desc: "Milk is collected from partner farms at approximately 4:00 AM and delivered to Your doorstep before 7:00 AM.",
+        label: "Morning Shift Delivery",
+        time: "5:30 AM – 7:30 AM",
+        desc: "Fresh morning milk & dairy essentials dropped at your doorstep every single day before 7:30 AM.",
       },
       {
         icon: "moon",
-        label: "Evening Shift",
-        time: "Select Zones",
-        desc: "Available in select zones; delivery timing is shown on the Platform at the time of subscription.",
+        label: "Evening Shift Delivery",
+        time: "5:00 PM – 7:30 PM",
+        desc: "Evening fresh milk and cooking staples delivered directly to your doorstep in active zones.",
       },
     ],
   },
   {
     id: "coverage-zones",
-    title: "3. Coverage Zones",
+    title: "3. Serviceable Coverage Zones",
     paragraphs: [
-      "F2H currently delivers only within the localities listed as active coverage zones on the Platform. Coverage is added periodically as F2H expands.",
-      "If Your address falls outside an active coverage zone, You may register interest on the Platform, and F2H will notify You once delivery becomes available in Your area. F2H is not obligated to deliver to unserviceable addresses.",
-      "Serviceability of a specific address within a listed zone (e.g., gated communities, restricted-access buildings) may be confirmed only at the time of the first delivery attempt. See Section 6 for the process if an address is found unserviceable.",
+      "F2H currently delivers to residential apartments, gated communities, independent houses, and villas across Bangalore, including but not limited to: Whitefield, Nagondanahalli, Kadugodi, Hoodi, ITPL, Hope Farm, Marathahalli, Varthur, Belathur, and adjoining localities.",
+      "We are rapidly expanding to new pin codes across Greater Bengaluru. You can enter your pin code or drop your GPS pin in the F2H Mobile App to instantly check serviceability.",
+      "If your area is currently outside our delivery grid, you can register your interest in the app, and you will be notified immediately when your cluster becomes operational.",
     ],
   },
   {
     id: "cut-off-times",
-    title: "4. Order Cut-Off Times",
+    title: "4. Daily Cut-Off Times for Orders & Pauses",
     paragraphs: [
-      "To be included in the next Morning Shift delivery, orders, pauses, or modifications must be made by the cut-off time shown on the Platform (indicatively 9:00 PM the previous night).",
-      "To be included in the next Evening Shift delivery, orders, pauses, or modifications must be made by the cut-off time shown on the Platform (indicatively 10:00 AM the same day).",
-      "Requests made after the applicable cut-off will be processed for the following delivery shift.",
-    ],
-  },
-  {
-    id: "process-tracking",
-    title: "5. Delivery Process & Tracking",
-    paragraphs: [
-      "Every delivery follows the same cold-chain process: milk collection at the farm, quality testing and tamper-proof packaging, sorting at the local hub, and dispatch by a GPS-tracked delivery rider.",
-      "Cold chain is maintained throughout, with Products kept between 2–6°C from collection until doorstep delivery.",
-      "You will receive WhatsApp notifications at key stages — collection, dispatch, and doorstep arrival — for both morning and evening shifts.",
-      "Deliveries are made with photo proof of delivery wherever applicable.",
+      "Morning Shift Cut-Off (9:00 PM previous night): Any new subscription, quantity change, one-time add-on, or vacation pause for the next morning must be submitted by 9:00 PM. Modifications made before 9:00 PM are 100% free of charge.",
+      "Evening Shift Cut-Off (10:00 AM same day): Any order, quantity modification, or pause for the evening shift must be submitted by 10:00 AM.",
+      "Requests received after the cut-off times are automatically scheduled for the subsequent delivery cycle.",
     ],
   },
   {
     id: "unattended-deliveries",
-    title: "6. Unattended or Failed Deliveries",
+    title: "5. Doorstep Delivery Protocol & Missed Deliveries",
     paragraphs: [
-      "If nobody is available to receive the delivery, the rider will attempt to leave the Product at the doorstep or designated safe location, where it is safe and hygienic to do so (subject to Your delivery preferences set on the Platform).",
-      "For fresh dairy Products (Milk, Curd, Paneer, and similar), if delivery cannot be completed because the address is inaccessible, incorrect, or the recipient is unreachable, the order may be treated as refused at delivery. Please refer to the Cancellation & Refund Policy for the applicable charges and refund treatment in such cases.",
-      "If F2H's logistics partner determines, at the point of delivery, that Your address is genuinely unserviceable, F2H will notify You and process the applicable refund in accordance with the Cancellation & Refund Policy.",
-      "Repeated failed deliveries due to reasons within Your control (e.g., wrong address, unavailability) may result in F2H pausing or restricting Your subscription until the issue is resolved.",
+      "Silent Morning Drops: To ensure you are not disturbed during early morning hours, our riders place milk in your designated F2H insulated bag hung outside the door or at your secure doorstep.",
+      "Delivery Confirmation: Upon successful drop, riders upload photo proof of delivery and you receive a WhatsApp notification and in-app update.",
+      "Gated Communities & Security Entry: If security guards or apartment gates restrict rider access, our logistics team coordinates with the resident. Please ensure necessary security pre-approvals (e.g. MyGate, NoBrokerHood) are granted for F2H delivery staff.",
+      "Missed Deliveries: If a delivery is missed due to a rider delay or logistical glitch, our customer support team provides an instant replacement or initiates an immediate 2-hour wallet refund.",
     ],
   },
   {
     id: "delivery-charges",
-    title: "7. Delivery Charges",
+    title: "6. Delivery Charges & Transparent Pricing",
     paragraphs: [
-      "F2H does not currently charge a separate delivery fee for orders within active coverage zones; delivery is included as part of Your subscription. Any change to this will be communicated on the Platform before it takes effect.",
-      "F2H reserves the right to introduce delivery charges for specific zones, order values, or delivery slots in the future, with such charges clearly shown at checkout before You confirm an order.",
+      "₹0 Free Delivery on Subscriptions: There are no delivery charges for active daily or alternate-day milk subscriptions within our coverage zones.",
+      "Zero Surge or Rain Pricing: F2H does not charge peak hours, rain fees, or holiday delivery surcharges. The price you see on our catalog is the exact price debited from your wallet.",
     ],
   },
   {
-    id: "delays-exceptions",
-    title: "8. Delays & Exceptions",
+    id: "contact-support",
+    title: "7. Delivery Grievances & Support",
     paragraphs: [
-      "While F2H targets on-time delivery for every order, delivery may occasionally be delayed due to reasons beyond F2H's reasonable control, including but not limited to severe weather, public holidays, local restrictions, farm-side supply issues, or force majeure events.",
-      "In case of an anticipated delay, F2H will make reasonable efforts to notify You via WhatsApp or the Platform.",
-      "Where a delay results in non-delivery for a shift, the applicable refund or wallet credit will be processed in accordance with the Cancellation & Refund Policy.",
+      "For any delivery delays, route assistance, or address updates, our delivery operations team is available from 5:00 AM to 9:00 PM IST every day:",
     ],
-  },
-  {
-    id: "policy-changes",
-    title: "9. Changes to This Policy",
-    paragraphs: [
-      "F2H reserves the right to modify or amend this Policy at any time, for legal, operational, or business reasons, including changes to coverage zones, shift timings, or cut-off windows. Updated versions will be posted on the Platform and will take effect from the date of posting. Your continued use of the Platform after such changes constitutes acceptance of the updated Policy.",
-    ],
-    note: "This Policy does not affect any statutory rights You may have under applicable consumer protection law, which shall continue to apply regardless of anything stated above.",
   },
 ];
 
@@ -117,9 +97,16 @@ function ShiftCards({ shifts }: { shifts: NonNullable<PolicySection["shifts"]> }
           key={shift.label}
           className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3"
         >
-          <p className="text-sm font-semibold text-slate-800 mb-0.5">{shift.label}</p>
-          <p className="text-[11px] font-medium text-emerald-700 mb-1.5">{shift.time}</p>
-          <p className="text-[12.5px] leading-5 text-slate-500">{shift.desc}</p>
+          <div className="flex items-center gap-2 mb-1">
+            {shift.icon === "sun" ? (
+              <Sun className="text-amber-600" size={16} />
+            ) : (
+              <Moon className="text-indigo-600" size={16} />
+            )}
+            <p className="text-sm font-semibold text-slate-800">{shift.label}</p>
+          </div>
+          <p className="text-[12px] font-bold text-emerald-700 mb-1.5">{shift.time}</p>
+          <p className="text-[12.5px] leading-5 text-slate-600">{shift.desc}</p>
         </div>
       ))}
     </div>
@@ -162,6 +149,9 @@ export default function DeliveryShippingPolicyPage() {
             <h1 className="text-2xl font-bold tracking-normal text-slate-950 sm:text-[28px]">
               Delivery &amp; Shipping Policy
             </h1>
+            <p className="mt-2 text-xs text-slate-500">
+              Last updated: August 2026 • Verified Delivery Windows, Coverage Zones &amp; Cold-Chain Protocols
+            </p>
           </div>
 
           <div className="space-y-7">
@@ -188,16 +178,13 @@ export default function DeliveryShippingPolicyPage() {
                   <div className="ml-10 border-l border-emerald-100 pl-4">
                     {hasShifts ? (
                       <>
-                        {/* 2.1 intro paragraph */}
                         {section.paragraphs && section.paragraphs[0] && (
                           <p className="flex gap-2.5 text-[13px] leading-6 text-slate-600 sm:text-sm mb-3">
                             <span className="shrink-0 font-semibold text-slate-500">{sectionNumber}.1</span>
                             <span>{section.paragraphs[0]}</span>
                           </p>
                         )}
-                        {/* Shift cards */}
                         <ShiftCards shifts={section.shifts!} />
-                        {/* 2.2 and 2.3 paragraphs */}
                         {section.paragraphs && section.paragraphs.slice(1).length > 0 && (
                           renderParagraphs(section.paragraphs.slice(1), sectionNumber, 1)
                         )}
@@ -216,15 +203,19 @@ export default function DeliveryShippingPolicyPage() {
               );
             })}
 
-            {/* Customer Support Card */}
+            {/* Official Support Details Card */}
             <div className="mt-8 rounded-[12px] border border-emerald-200 bg-emerald-50/60 p-6">
-              <h3 className="text-base font-bold text-slate-900 mb-3">Customer Support</h3>
+              <h3 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <Truck className="text-emerald-700" size={18} />
+                Delivery Support &amp; Official Contact Details
+              </h3>
               <ul className="space-y-2 text-xs sm:text-sm text-slate-700">
                 <li><span className="font-semibold text-slate-900">Email:</span> &nbsp;support@f2hfresh.com</li>
                 <li><span className="font-semibold text-slate-900">Primary Phone:</span> &nbsp;+91 91487 73591</li>
                 <li><span className="font-semibold text-slate-900">Secondary Phone:</span> &nbsp;+91 79893 68142</li>
-                <li><span className="font-semibold text-slate-900">WhatsApp:</span> &nbsp;Message us on WhatsApp via the number listed on the Platform</li>
-                <li><span className="font-semibold text-slate-900">In-app:</span> &nbsp;Help &amp; Support section on the F2H app</li>
+                <li><span className="font-semibold text-slate-900">WhatsApp:</span> &nbsp;+91 91487 73591</li>
+                <li><span className="font-semibold text-slate-900">Operating Support Hours:</span> &nbsp;5:00 AM – 9:00 PM IST (All 7 Days)</li>
+                <li><span className="font-semibold text-slate-900">Registered Office:</span> &nbsp;1st Cross, SJP Layout, Nagondanahalli, Whitefield, Bangalore – 560066, Karnataka, India</li>
               </ul>
             </div>
           </div>

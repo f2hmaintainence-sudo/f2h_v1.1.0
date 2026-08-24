@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 
 // ══════════════════════════════════════════════════════════
-//  PRIVACY POLICY - Hardcoded Premium Design
+//  DELIVERY & SHIPPING POLICY - Customer Mobile Screen
 // ══════════════════════════════════════════════════════════
 
-class PrivacyScreen extends StatelessWidget {
-  const PrivacyScreen({super.key});
+class DeliveryPolicyScreen extends StatelessWidget {
+  const DeliveryPolicyScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -17,10 +17,10 @@ class PrivacyScreen extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         title: const Text(
-          'Privacy Policy',
+          'Delivery & Shipping Policy',
           style: TextStyle(
             color: kText,
-            fontSize: 18,
+            fontSize: 17,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -32,7 +32,7 @@ class PrivacyScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Header Card
+            // Header card
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -58,7 +58,7 @@ class PrivacyScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(100),
                     ),
                     child: const Text(
-                      'Effective Date: June 30, 2026',
+                      'Pure Cold-Chain Logistics',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
@@ -66,18 +66,18 @@ class PrivacyScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
                   const Text(
-                    'Your Trust is Our Commitment',
+                    'Doorstep Delivery Before 7:30 AM',
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 19,
                       fontWeight: FontWeight.w900,
                       color: kText,
                     ),
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'At Farm to Home (F2H), we value your trust above all else. This Privacy Policy describes how we collect, use, share, and safeguard your personal information when you use our mobile application.',
+                    'Our dedicated delivery fleet collects milk directly from dairy farms and drops it at your door within 3 hours, strictly maintaining 2–6°C cold-chain.',
                     style: TextStyle(
                       fontSize: 13,
                       height: 1.5,
@@ -90,46 +90,37 @@ class PrivacyScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            // Policy Sections
             _buildSection(
-              title: '1. Information We Collect',
-              icon: Icons.info_outline_rounded,
-              content: '• Account Details: When you register, we collect your name, mobile phone number, email address, and F2H zone preferences.\n'
-                  '• Delivery Addresses: We save your designated delivery addresses to facilitate accurate and timely milk/dairy drops.\n'
-                  '• Location Data: We may ask for background location access to validate zone-based delivery coverage and provide precise real-time order tracking.',
+              title: '1. Daily Delivery Shifts',
+              icon: Icons.access_time_filled_rounded,
+              content: '• Morning Shift: 5:30 AM – 7:30 AM (Collected fresh from partner farms at 4:00 AM).\n'
+                  '• Evening Shift: 5:00 PM – 7:30 PM (Fresh evening milk and pantry staples).\n'
+                  '• ₹0 Delivery Fee: Free doorstep delivery on all active daily/scheduled subscriptions.',
             ),
             _buildSection(
-              title: '2. How We Use Your Information',
-              icon: Icons.settings_outlined,
-              content: '• Fulfilling and managing your one-time and subscription orders.\n'
-                  '• Processing wallet top-ups, transactions, and secure checkouts.\n'
-                  '• Sending push notifications regarding active deliveries, pauses, or account status.\n'
-                  '• Continuously optimizing our farm-to-table supply chain logistics and customer support experience.',
+              title: '2. Coverage & Service Zones',
+              icon: Icons.map_outlined,
+              content: '• Active Hubs: Whitefield, Nagondanahalli, Kadugodi, Hoodi, ITPL, Marathahalli, Varthur, Belathur, and adjoining Bengaluru clusters.\n'
+                  '• Expansion: New pin codes added weekly across Greater Bengaluru.',
             ),
             _buildSection(
-              title: '3. Data Security & Protection',
+              title: '3. Doorstep Bag & Silent Drops',
+              icon: Icons.door_front_door_outlined,
+              content: '• Milk Bag Setup: Please hang an insulated bag outside your door for silent morning drops.\n'
+                  '• Photo Proof: Riders take a photo upon delivery, and an instant WhatsApp confirmation is sent to your registered number.',
+            ),
+            _buildSection(
+              title: '4. Missed or Delayed Deliveries',
               icon: Icons.shield_outlined,
-              content: 'We employ state-of-the-art security measures including SSL encryption, secure tokens, and hashed database storage to protect your personal details and order history. F2H is FSSAI compliant, assuring safety both in product delivery and digital infrastructure.',
+              content: '• Immediate Resolution: If your delivery is delayed due to weather or logistics, our team coordinates an instant replacement or a 2-hour wallet refund.',
             ),
             _buildSection(
-              title: '4. Information Sharing',
-              icon: Icons.share_outlined,
-              content: 'F2H does not sell, trade, or rent your personal identification information to third parties. We only share essential details with delivery agents/vendors and payment processors to complete transactions and execute home deliveries.',
-            ),
-            _buildSection(
-              title: '5. Your Rights & Management',
-              icon: Icons.manage_accounts_outlined,
-              content: 'You retain full control over your F2H profile data. You can view, modify, or update your personal details and saved addresses directly via the Profile Screen inside the app. To request permanent account deletion, contact our support team.',
-            ),
-            _buildSection(
-              title: '6. Contact & Grievance Redressal',
-              icon: Icons.help_outline_rounded,
-              content: 'If you have any questions or feedback regarding this Privacy Policy, please reach out to us at:\n\n'
-                  '• Official Email: support@f2hfresh.com\n'
-                  '• Grievance Officer: grievanceofficer@f2hfresh.com\n'
-                  '• Helpline: +91 91487 73591 / +91 79893 68142\n'
+              title: '5. Delivery Team Contact',
+              icon: Icons.phone_in_talk_outlined,
+              content: '• Delivery Operations: 5:00 AM – 9:00 PM IST\n'
+                  '• Phone: +91 91487 73591 / +91 79893 68142\n'
                   '• WhatsApp: +91 91487 73591\n'
-                  '• Registered Office: 1st Cross, SJP Layout, Nagondanahalli, Whitefield, Bangalore - 560066, Karnataka, India.',
+                  '• Email: support@f2hfresh.com',
             ),
             const SizedBox(height: 16),
           ],
@@ -144,10 +135,10 @@ class PrivacyScreen extends StatelessWidget {
     required String content,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: kSurface,
           borderRadius: BorderRadius.circular(20),
@@ -160,21 +151,23 @@ class PrivacyScreen extends StatelessWidget {
               children: [
                 Icon(icon, size: 20, color: kPrimary),
                 const SizedBox(width: 10),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    color: kText,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      color: kText,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(
               content,
               style: const TextStyle(
-                fontSize: 13,
+                fontSize: 12.5,
                 height: 1.5,
                 color: kTextSub,
                 fontWeight: FontWeight.w500,
