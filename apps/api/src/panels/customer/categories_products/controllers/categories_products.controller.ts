@@ -8,7 +8,7 @@ import { CategoriesProductsService } from '../ModuleServices/categories_products
 
 @Controller({ path: 'customer', version: '1' })
 export class CategoriesController {
-  constructor(private readonly service: CategoriesProductsService) { }
+  constructor(private readonly service: CategoriesProductsService) {}
 
   /**
    * Turns an admin `product_banner` row into the shape the app's carousels
@@ -42,6 +42,7 @@ export class CategoriesController {
       route,
       actionType,
       actionValue,
+      bannerType: row.banner_type || 'home_carousel',
       isActive: true,
     };
   }
@@ -52,7 +53,10 @@ export class CategoriesController {
     const host = `${req.protocol}://${req.get('host')}`;
 
     // Admin-managed carousel banners win; the bundled files are the fallback.
-    const managed = await this.service.getManagedBanners(['home_carousel'], false);
+    const managed = await this.service.getManagedBanners(
+      ['home_carousel'],
+      false,
+    );
     if (managed.length > 0) {
       return {
         status: true,
@@ -65,17 +69,30 @@ export class CategoriesController {
     try {
       if (existsSync(bannersDir)) {
         const files = readdirSync(bannersDir).filter(
-          (f) => f.endsWith('.png') || f.endsWith('.jpg') || f.endsWith('.jpeg') || f.endsWith('.webp'),
+          (f) =>
+            f.endsWith('.png') ||
+            f.endsWith('.jpg') ||
+            f.endsWith('.jpeg') ||
+            f.endsWith('.webp'),
         );
-        const subBanners = files.filter((f) => f.startsWith('sub_banner_')).sort();
-        bannerFiles = subBanners.length > 0 ? subBanners : ['sub_banner_1.png', 'sub_banner_2.png', 'sub_banner_3.png'];
+        const subBanners = files
+          .filter((f) => f.startsWith('sub_banner_'))
+          .sort();
+        bannerFiles =
+          subBanners.length > 0
+            ? subBanners
+            : ['sub_banner_1.png', 'sub_banner_2.png', 'sub_banner_3.png'];
       }
     } catch {
       // Deliberately tolerated: the caller has a valid fallback for this failure.
     }
 
     if (bannerFiles.length === 0) {
-      bannerFiles = ['sub_banner_1.png', 'sub_banner_2.png', 'sub_banner_3.png'];
+      bannerFiles = [
+        'sub_banner_1.png',
+        'sub_banner_2.png',
+        'sub_banner_3.png',
+      ];
     }
 
     const data = bannerFiles.map((file, idx) => {
@@ -88,8 +105,14 @@ export class CategoriesController {
         id: `banner-${idx + 1}`,
         imageUrl: `${host}/uploads/banners/${encodeURIComponent(file)}`,
         title: 'Farm Fresh Essentials',
-        subtitle: 'Subscribe to pure organic milk, paneer, ghee & daily essentials.',
-        cta: route === 'subscribe' ? 'Subscribe Now' : route === 'refer' ? 'Refer Now' : 'Shop Now',
+        subtitle:
+          'Subscribe to pure organic milk, paneer, ghee & daily essentials.',
+        cta:
+          route === 'subscribe'
+            ? 'Subscribe Now'
+            : route === 'refer'
+              ? 'Refer Now'
+              : 'Shop Now',
         route,
         actionType: 'NONE',
         actionValue: null,
@@ -124,7 +147,9 @@ export class CategoriesController {
     try {
       if (existsSync(bannersDir)) {
         const files = readdirSync(bannersDir);
-        promoFiles = ['subscription_banner.png', 'wallet_banner.png'].filter((f) => files.includes(f));
+        promoFiles = ['subscription_banner.png', 'wallet_banner.png'].filter(
+          (f) => files.includes(f),
+        );
       }
     } catch {
       // Deliberately tolerated: the caller has a valid fallback for this failure.
@@ -140,7 +165,9 @@ export class CategoriesController {
         id: `promo-banner-${idx + 1}`,
         imageUrl: `${host}/uploads/banners/${encodeURIComponent(file)}`,
         title: isSub ? 'Subscription Savings' : 'F2H Wallet',
-        subtitle: isSub ? 'Subscribe & Save on Daily Fresh Essentials' : 'Add Cash & Get Extra Cashback',
+        subtitle: isSub
+          ? 'Subscribe & Save on Daily Fresh Essentials'
+          : 'Add Cash & Get Extra Cashback',
         cta: isSub ? 'Subscribe Now' : 'Add Money',
         route: isSub ? 'subscribe' : 'wallet',
         actionType: 'NONE',
@@ -164,7 +191,10 @@ export class CategoriesController {
   @Get('popup-banner')
   async getPopupBanner(@Req() req: Request) {
     const host = `${req.protocol}://${req.get('host')}`;
-    const rows = await this.service.getManagedBanners(['popup', 'home_carousel'], true);
+    const rows = await this.service.getManagedBanners(
+      ['popup', 'home_carousel'],
+      true,
+    );
 
     const banners = rows.map((row) => {
       const rawImage = row.image_url || row.image_path || '';
@@ -200,13 +230,22 @@ export class CategoriesController {
         const token = authHeader.substring(7);
         const parts = token.split('.');
         if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'));
-          return payload?.user_id || payload?.id || payload?.sub || payload?.customer_id || null;
+          const payload = JSON.parse(
+            Buffer.from(parts[1], 'base64').toString('utf-8'),
+          );
+          return (
+            payload?.user_id ||
+            payload?.id ||
+            payload?.sub ||
+            payload?.customer_id ||
+            null
+          );
         }
       } catch {}
     }
 
-    const customHeader = req.headers['x-user-id'] || req.headers['x-customer-id'];
+    const customHeader =
+      req.headers['x-user-id'] || req.headers['x-customer-id'];
     if (customHeader) return String(customHeader);
 
     return null;
@@ -220,18 +259,32 @@ export class CategoriesController {
 
   @Public()
   @Get('products')
-  async getProducts(@Req() req: Request, @Query('branch_id') branchId?: string) {
+  async getProducts(
+    @Req() req: Request,
+    @Query('branch_id') branchId?: string,
+  ) {
     const customerId = this.extractCustomerId(req);
-    const warehouseId = branchId ? await this.service.resolveWarehouseId(branchId) : null;
+    const warehouseId = branchId
+      ? await this.service.resolveWarehouseId(branchId)
+      : null;
     return this.service.getProducts(customerId, warehouseId);
   }
 
   @Public()
   @Get('category/:category_id')
-  async getProductsByCategoryId(@Req() req: Request, @Query('branch_id') branchId?: string) {
+  async getProductsByCategoryId(
+    @Req() req: Request,
+    @Query('branch_id') branchId?: string,
+  ) {
     const customerId = this.extractCustomerId(req);
-    const warehouseId = branchId ? await this.service.resolveWarehouseId(branchId) : null;
-    return this.service.getProductsByCategoryId(req.params.category_id as string, customerId, warehouseId);
+    const warehouseId = branchId
+      ? await this.service.resolveWarehouseId(branchId)
+      : null;
+    return this.service.getProductsByCategoryId(
+      req.params.category_id as string,
+      customerId,
+      warehouseId,
+    );
   }
 
   // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
@@ -242,5 +295,3 @@ export class CategoriesController {
     return this.service.getProductReviews(req.params.productId as string);
   }
 }
-
-

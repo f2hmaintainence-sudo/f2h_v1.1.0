@@ -127,26 +127,17 @@ export default function BecomeAPartnerPage() {
                 Already have a smartphone? Install the official partner app for instant digital KYC, live route navigation, and shift dispatches.
               </p>
 
-              <div className="space-y-2.5">
+              <div>
                 <a
                   href="https://play.google.com/store/apps/details?id=com.f2h.delivery"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2.5 w-full rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-slate-800 transition shadow-sm"
+                  className="flex items-center justify-center gap-2.5 w-full rounded-xl bg-slate-900 px-4 py-3 text-xs font-semibold text-white hover:bg-slate-800 transition shadow-sm"
                 >
                   <svg className="h-4 w-4 fill-current text-white" viewBox="0 0 24 24">
                     <path d="M3.609 1.814L13.792 12 3.61 22.186a2.036 2.036 0 0 1-.22-.964V2.778c0-.361.08-.696.22-.964zM15.207 13.414l2.42 2.42-12.87 7.377 10.45-9.797zm2.42-5.242l-2.42 2.42L4.757.789l12.87 7.383zM16.621 12l2.97-1.704a1.867 1.867 0 0 1 0 3.408L16.62 12z" />
                   </svg>
                   <span>GET IT ON Google Play</span>
-                </a>
-
-                <a
-                  href="https://api.f2hfresh.com/uploads/appRelease/delivery/app-release.apk"
-                  download
-                  className="flex items-center justify-center gap-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 transition"
-                >
-                  <Download size={14} className="text-emerald-700" />
-                  <span>Download Direct APK (.apk)</span>
                 </a>
               </div>
 
@@ -290,7 +281,7 @@ export default function BecomeAPartnerPage() {
                         required
                         value={formData.fullName}
                         onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                        placeholder="Ramesh Gowda"
+                        placeholder="Ashok Gowda"
                         className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                       />
                     </div>
@@ -319,7 +310,7 @@ export default function BecomeAPartnerPage() {
                       type="email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="ramesh@example.com"
+                      placeholder="Ashok@example.com"
                       className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   </div>

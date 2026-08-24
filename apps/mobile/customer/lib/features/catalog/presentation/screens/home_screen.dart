@@ -21,6 +21,7 @@ import '../../../address/data/models/profile_address.dart';
 import '../../data/models/product_model.dart';
 import '../widgets/product_tile.dart';
 import '../widgets/image_banner.dart';
+import '../widgets/home_coupon_banner.dart';
 import '../widgets/promo_banner.dart';
 import 'cart_screen.dart';
 import 'product_detail_view_screen.dart';
@@ -333,6 +334,8 @@ class _HomeScreenState extends State<HomeScreen>
                       child: ImageBanner(),
                     ),
                   ),
+
+                  const SliverToBoxAdapter(child: HomeCouponBanner()),
 
                   // 6. Popular Product
                   SliverToBoxAdapter(
@@ -2426,7 +2429,8 @@ class _CategoryProductGroupsState extends State<_CategoryProductGroups> {
       if (data is String) data = jsonDecode(data);
       if (data is Map && data['status'] == true && data['data'] is List) {
         for (final b in data['data'] as List) {
-          // Only category_slide banners that have an actionValue (the category id/name)
+          final bannerType = (b['bannerType'] ?? b['banner_type'] ?? '').toString().toLowerCase();
+          if (bannerType.isNotEmpty && bannerType != 'category_slide') continue;
           final actionType = (b['actionType'] ?? '').toString().toUpperCase();
           final actionValue = b['actionValue']?.toString() ?? '';
           if (actionType == 'CATEGORY' && actionValue.isNotEmpty) {
