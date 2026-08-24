@@ -20,7 +20,14 @@ enum MapLayerType {
 }
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  final GroupedStop? focusedStop;
+  final bool isStandalonePage;
+
+  const MapScreen({
+    super.key,
+    this.focusedStop,
+    this.isStandalonePage = false,
+  });
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -281,6 +288,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
 
+    if (widget.focusedStop != null) {
+      _selectedStop = widget.focusedStop;
+    }
+
     _pulsateController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -296,6 +307,17 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     );
 
     _goToCurrentLocation();
+
+    if (widget.focusedStop != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (widget.focusedStop!.addressLat.isFinite && widget.focusedStop!.addressLng.isFinite) {
+          _mapController.move(
+            LatLng(widget.focusedStop!.addressLat, widget.focusedStop!.addressLng),
+            16.5,
+          );
+        }
+      });
+    }
   }
 
   @override
@@ -646,12 +668,47 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   ),
                 ),
 
-                // 3. Floating Search Bar
+                // 3. Floating Search Bar & Back Button
                 Positioned(
                   top: MediaQuery.of(context).padding.top + 12,
-                  left: 16,
+                  left: (widget.isStandalonePage || Navigator.canPop(context)) ? 16 : 16,
                   right: 72,
-                  child: _buildSearchBar(effectiveStops),
+                  child: Row(
+                    children: [
+                      if (widget.isStandalonePage || Navigator.canPop(context)) ...[
+                        GestureDetector(
+                          onTap: () => Navigator.maybePop(context),
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            margin: const EdgeInsets.only(right: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x14000000),
+                                  blurRadius: 8,
+                                  offset: Offset(0, 3),
+                                )
+                              ],
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.arrow_back_rounded,
+                                color: Color(0xFF0F172A),
+                                size: 22,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                      Expanded(
+                        child: _buildSearchBar(effectiveStops),
+                      ),
+                    ],
+                  ),
                 ),
 
                 // 4. Floating Shortest Route Summary Card

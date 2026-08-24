@@ -7,6 +7,7 @@ import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/order_detail_screen.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/delivery_confirmation_sheet.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/warehouse_handover_screen.dart';
+import 'package:f2h_delivery/features/tracking/presentation/screens/map_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_bloc.dart';
@@ -215,14 +216,16 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
     );
   }
 
-  void _openNav(double lat, double lng) async {
-    final url = Uri.parse('google.navigation:q=$lat,$lng');
-    if (await launchUrl(url)) {
-      // success
-    } else {
-      final webUrl = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
-      await launchUrl(webUrl, mode: LaunchMode.externalApplication);
-    }
+  void _openNav(GroupedStop stop) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapScreen(
+          focusedStop: stop,
+          isStandalonePage: true,
+        ),
+      ),
+    );
   }
 
   @override
@@ -745,7 +748,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: _buildActionBtn(Icons.map_rounded, 'Navigate', kPrimary, () => _openNav(stop.addressLat, stop.addressLng)),
+                      child: _buildActionBtn(Icons.navigation_rounded, 'Navigate', kPrimary, () => _openNav(stop)),
                     ),
                     const SizedBox(width: 10),
                     Expanded(

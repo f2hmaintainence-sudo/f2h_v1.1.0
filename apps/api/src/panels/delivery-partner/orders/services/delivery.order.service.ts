@@ -628,6 +628,14 @@ export class DeliveryOrderService {
       }
     }
 
+    // The handover state the app gates its Pickup/Confirm action on lives on
+    // delivery_dispatch, not on the run — surface it alongside the run status.
+    const activeDispatch = activeRunId
+      ? await this.findActiveDispatchForRun([...new Set([...runIds, activeRunId])])
+      : null;
+    const dispatchStatus = activeDispatch?.status || null;
+    const pickupConfirmed = isDispatchHandedOver(dispatchStatus);
+
     if (!orders?.length) {
       return {
         status: true,
@@ -635,6 +643,9 @@ export class DeliveryOrderService {
         date: targetDate,
         run_id: activeRunId,
         run_status: activeRunStatus,
+        dispatch_id: activeDispatch?.dispatch_id || null,
+        dispatch_status: dispatchStatus,
+        pickup_confirmed: pickupConfirmed,
         total: 0,
         deliveries: [],
       };
@@ -648,6 +659,9 @@ export class DeliveryOrderService {
       date: targetDate,
       run_id: activeRunId,
       run_status: activeRunStatus,
+      dispatch_id: activeDispatch?.dispatch_id || null,
+      dispatch_status: dispatchStatus,
+      pickup_confirmed: pickupConfirmed,
       total: deliveries.length,
       deliveries,
     };
@@ -1268,6 +1282,12 @@ export class DeliveryOrderService {
     };
   }
 
+  /**
+   * Takes custody of a loaded dispatch: validates that what the warehouse loaded
+   * covers what the assigned orders need, then moves delivery_dispatch,
+   * delivery_runs, delivery_run_addresses and orders forward together in a single
+   * transaction so a partial handover can never be persisted.
+   */
   async confirmPickup(
     userId: string,
     body: {
@@ -1299,121 +1319,146 @@ export class DeliveryOrderService {
     }
     const runIds = this.getRunIdentifiers(run);
     const runIdentifier = run.run_id || String(run.id);
+    const runSlot = run.slot || run.delivery_slot || 'morning';
+    const { targetDate } = this.getKolkataDateAndSlot();
 
-    // 1. Fetch dispatch for this run
-    const dispatchRes = await this.db.query(
-      `SELECT dd.id, dd.dispatch_id, dd.status
-       FROM delivery_dispatch dd
-       WHERE dd.delivery_run_id = ANY($1)
-       ORDER BY dd.created_at DESC
-       LIMIT 1`,
-      [runIds],
-    );
-    const dispatch = dispatchRes?.length ? dispatchRes[0] : null;
+    const dispatch = await this.findActiveDispatchForRun(runIds);
 
-    if (dispatch?.status === 'collected' || ['in_progress', 'completed', 'handed_over'].includes(String(run.status))) {
-      return { success: true, message: 'Pickup already confirmed', status: 'in_progress', run_id: runIdentifier };
+    if (!dispatch) {
+      throw new BadRequestException(
+        'No dispatch has been loaded for this run yet. Please wait for the warehouse to load your items.',
+      );
     }
 
-    // 2. Validate that dispatched items are sufficient for assigned orders
-    const ordersReqRes = await this.db.query(
-      `SELECT
-         oi.variant_id AS product_variant_id,
-         SUM(oi.quantity)::numeric AS required_qty
-       FROM orders o
-       JOIN order_items oi ON oi.order_id = o.order_id
-       WHERE (o.delivery_run_id = ANY($1) OR o.delivery_partner_id = $2)
-         AND (o.scheduled_date::date = CURRENT_DATE OR (o.scheduled_date IS NULL AND DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE))
-         AND o.status NOT IN ('cancelled', 'failed')
-       GROUP BY oi.variant_id`,
-      [runIds, boy.user_id],
-    );
+    // The dispatch status is the single source of truth for the handover. A run
+    // sitting at 'in_progress' with a dispatch still at 'loaded' is NOT confirmed —
+    // treating it as confirmed is what left the dispatch stuck and hid the action.
+    if (isDispatchHandedOver(dispatch.status)) {
+      return {
+        success: true,
+        message: 'Pickup already confirmed',
+        status: run.status,
+        run_id: runIdentifier,
+        dispatch_id: dispatch.dispatch_id,
+        dispatch_status: dispatch.status,
+        pickup_confirmed: true,
+      };
+    }
 
-    if (dispatch && ordersReqRes && ordersReqRes.length > 0) {
-      const dispatchItemsRes = await this.db.query(
-        `SELECT product_variant_id, COALESCE(loaded_qty, 0)::numeric AS loaded_qty, COALESCE(planned_qty, 0)::numeric AS planned_qty
+    const orderedMap = await this.getOrderedQtyByVariant(runIds, String(boy.user_id), targetDate, runSlot);
+
+    const confirmedQtyByVariant = new Map<string, number>();
+    for (const item of body.items || []) {
+      if (!item?.product_variant_id) continue;
+      confirmedQtyByVariant.set(String(item.product_variant_id), Number(item.confirmed_qty || 0));
+    }
+
+    const result = await this.db.transaction(async (client) => {
+      // 1. Apply the quantities the partner actually accepted at the warehouse.
+      //    Only rows the client named are touched, so EXTRA items the app did not
+      //    send keep their loaded_qty instead of being silently zeroed.
+      for (const [variantId, confirmedQty] of confirmedQtyByVariant) {
+        await client.query(
+          `UPDATE delivery_dispatch_items
+           SET loaded_qty = $1, updated_at = NOW()
+           WHERE dispatch_id = $2
+             AND product_variant_id = $3
+             AND deleted_at IS NULL`,
+          [confirmedQty, dispatch.dispatch_id, variantId],
+        );
+      }
+
+      // 2. Re-read the dispatch inside the transaction and validate sufficiency
+      //    against the post-update quantities — validating before the update would
+      //    let a client confirm short by sending lower quantities.
+      const dispatchItems = await client.query(
+        `SELECT product_variant_id,
+                COALESCE(loaded_qty, 0)::numeric AS loaded_qty,
+                COALESCE(planned_qty, 0)::numeric AS planned_qty
          FROM delivery_dispatch_items
          WHERE dispatch_id = $1 AND deleted_at IS NULL`,
         [dispatch.dispatch_id],
       );
 
       const loadedMap: Record<string, number> = {};
-      for (const di of dispatchItemsRes || []) {
-        loadedMap[String(di.product_variant_id)] = Number(di.loaded_qty || di.planned_qty || 0);
+      for (const di of dispatchItems.rows || []) {
+        loadedMap[String(di.product_variant_id)] = this.effectiveLoadedQty(di);
       }
 
-      for (const req of ordersReqRes) {
-        const vId = String(req.product_variant_id);
-        const reqQty = Number(req.required_qty || 0);
-        const loadedQty = loadedMap[vId] || 0;
-        if (loadedQty < reqQty) {
-          throw new BadRequestException(
-            `Cannot confirm pickup: dispatched quantity (${loadedQty}) is insufficient for assigned orders (${reqQty}). Please request warehouse to load required items.`,
-          );
-        }
-      }
-    }
-
-    await this.db.transaction(async (client) => {
-      // 1. If items were passed with confirmed quantities, update loaded_qty in delivery_dispatch_items
-      if (body.items && body.items.length > 0) {
-        for (const item of body.items) {
-          await client.query(
-            `UPDATE delivery_dispatch_items ddi
-             SET loaded_qty = $1, updated_at = NOW()
-             FROM delivery_dispatch dd
-             WHERE dd.dispatch_id = ddi.dispatch_id
-               AND dd.delivery_run_id = ANY($2)
-               AND ddi.product_variant_id = $3`,
-            [item.confirmed_qty, runIds, item.product_variant_id],
-          );
+      const shortages: string[] = [];
+      for (const [variantId, orderedQty] of Object.entries(orderedMap)) {
+        if (orderedQty <= 0) continue;
+        const loadedQty = loadedMap[variantId] || 0;
+        if (loadedQty < orderedQty) {
+          shortages.push(`${variantId} (loaded ${loadedQty}, required ${orderedQty})`);
         }
       }
 
-      // 2. Update delivery_runs status to 'in_progress'
-      await client.query(
-        `UPDATE delivery_runs
-         SET status = 'in_progress',
-             actual_start_time = COALESCE(actual_start_time, NOW()),
-             updated_at = NOW()
-         WHERE id = $1 OR run_id = $2`,
-        [run.id, runIdentifier],
-      );
+      if (shortages.length) {
+        throw new BadRequestException(
+          `Cannot confirm pickup: dispatched quantities are insufficient for the assigned orders — ${shortages.join(
+            ', ',
+          )}. Please ask the warehouse to load the missing quantities.`,
+        );
+      }
 
-      // 3. Update delivery_dispatch status to 'collected'
-      await client.query(
+      // 3. delivery_dispatch: loaded -> collected (the partner now holds the stock)
+      const updatedDispatch = await client.query(
         `UPDATE delivery_dispatch
          SET status = 'collected',
              collected_at = COALESCE(collected_at, NOW()),
              loaded_by = COALESCE(loaded_by, $1),
              updated_at = NOW()
-         WHERE delivery_run_id = ANY($2)`,
-        [boy.user_id, runIds],
+         WHERE dispatch_id = $2
+         RETURNING dispatch_id, status`,
+        [boy.user_id, dispatch.dispatch_id],
       );
 
-      // 4. Update delivery_run_addresses status to 'in_transit'
+      // 4. delivery_runs: the route is now under way
+      await client.query(
+        `UPDATE delivery_runs
+         SET status = 'in_progress',
+             actual_start_time = COALESCE(actual_start_time, NOW()),
+             updated_at = NOW()
+         WHERE (id::text = $1 OR run_id = $2)
+           AND status NOT IN ('completed', 'handed_over', 'cancelled')`,
+        [String(run.id), runIdentifier],
+      );
+
+      // 5. delivery_run_addresses: every stop still waiting is now in transit
       await client.query(
         `UPDATE delivery_run_addresses
          SET delivery_status = 'in_transit',
              status = 'in_transit',
              updated_at = NOW()
          WHERE run_id = ANY($1)
-           AND delivery_status IN ('pending', 'assigned')`,
+           AND deleted_at IS NULL
+           AND COALESCE(delivery_status, 'pending') IN ('pending', 'assigned')`,
         [runIds],
       );
 
-      // 5. Update orders status to 'out_for_delivery'
-      await client.query(
+      // 6. orders: scoped to this run (or this partner's unassigned orders in the
+      //    same slot) so a second run's orders are never dragged out for delivery
+      const updatedOrders = await client.query(
         `UPDATE orders
          SET status = 'out_for_delivery',
              delivery_partner_id = $1,
              delivery_run_id = $2,
              updated_at = NOW()
-         WHERE (delivery_run_id = ANY($3) OR delivery_partner_id = $1)
-           AND (scheduled_date::date = CURRENT_DATE OR (scheduled_date IS NULL AND DATE(created_at AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE))
-           AND status IN ('pending', 'placed', 'confirmed', 'packed', 'assigned')`,
-        [boy.user_id, runIdentifier, runIds],
+         WHERE (delivery_run_id = ANY($3)
+                OR (delivery_partner_id = $1 AND delivery_run_id IS NULL))
+           AND (scheduled_date::date = $4::date
+                OR (scheduled_date IS NULL AND DATE(created_at AT TIME ZONE 'Asia/Kolkata') = $4::date))
+           AND (delivery_slot = $5 OR delivery_slot IS NULL)
+           AND status IN ('pending', 'placed', 'confirmed', 'packed', 'assigned')
+         RETURNING order_id`,
+        [boy.user_id, runIdentifier, runIds, targetDate, runSlot],
       );
+
+      return {
+        dispatchStatus: updatedDispatch.rows?.[0]?.status || 'collected',
+        ordersUpdated: updatedOrders.rows?.length || 0,
+      };
     });
 
     return {
@@ -1421,6 +1466,10 @@ export class DeliveryOrderService {
       message: 'Pickup confirmed successfully. Orders are now Out for Delivery.',
       run_id: runIdentifier,
       status: 'in_progress',
+      dispatch_id: dispatch.dispatch_id,
+      dispatch_status: result.dispatchStatus,
+      pickup_confirmed: true,
+      orders_updated: result.ordersUpdated,
     };
   }
 

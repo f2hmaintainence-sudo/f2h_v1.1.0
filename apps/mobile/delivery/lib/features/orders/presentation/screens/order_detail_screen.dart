@@ -9,6 +9,7 @@ import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/delivery_confirmation_sheet.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/report_issue_screen.dart';
+import 'package:f2h_delivery/features/tracking/presentation/screens/map_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -86,14 +87,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
-  void _openNav(double lat, double lng) async {
-    final url = Uri.parse('google.navigation:q=$lat,$lng');
-    if (await launchUrl(url)) {
-      // success
-    } else {
-      final webUrl = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
-      await launchUrl(webUrl, mode: LaunchMode.externalApplication);
-    }
+  void _openNav(double lat, double lng) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapScreen(
+          focusedStop: _currentStop,
+          isStandalonePage: true,
+        ),
+      ),
+    );
   }
 
   void _showConfirmation(BuildContext context) async {

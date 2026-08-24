@@ -5,22 +5,44 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:f2h_delivery/core/utils/app_snackbar.dart';
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/core/api/api_endpoints.dart';
+import 'package:dio/dio.dart';
 import 'package:f2h_delivery/core/api/dio_client.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 
+/// One product line of the dispatch ledger: what `order_items` demand, what
+/// `delivery_dispatch_items` physically hold, and the gap between the two.
 class ProductInventorySummary {
   final String productName;
   final String unit;
   final String? productImage;
-  final int totalOrdered; // planned_qty
-  final int loaded; // loaded_qty
+
+  /// Demand from the partner's assigned `order_items`.
+  final int totalOrdered;
+
+  /// `delivery_dispatch_items.planned_qty` — what the warehouse was told to load.
+  final int plannedQty;
+
+  /// `delivery_dispatch_items.loaded_qty` — what it actually loaded, EXTRA included.
+  final int loaded;
+
   final int deliveredCount; // delivered_qty
   final int returnedCount; // returned_qty
   final int damagedCount; // damaged_qty
-  final int remainingToDeliver; // current_basket
-  final int extraBuffer; // extra_sold_qty / extra load
+
+  /// Physically still in the bag: loaded - delivered - returned - damaged.
+  final int remainingToDeliver;
+
+  /// Still owed to customers: ordered - delivered.
+  final int remainingQty;
+
+  /// Loaded beyond order demand.
+  final int extraBuffer;
+
+  /// Order demand the dispatch does not cover.
+  final int shortageQty;
+
   final bool isPickupConfirmed;
   final bool isSufficient;
   final bool isExtraOnly;
@@ -31,12 +53,15 @@ class ProductInventorySummary {
     required this.unit,
     this.productImage,
     required this.totalOrdered,
+    this.plannedQty = 0,
     this.loaded = 0,
     required this.deliveredCount,
     this.returnedCount = 0,
     this.damagedCount = 0,
     required this.remainingToDeliver,
+    this.remainingQty = 0,
     required this.extraBuffer,
+    this.shortageQty = 0,
     required this.isPickupConfirmed,
     this.isSufficient = true,
     this.isExtraOnly = false,
@@ -121,6 +146,15 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
   bool? _apiPickupConfirmed;
   bool _isSufficientForOrders = true;
   bool _isConfirmingPickup = false;
+  bool _isLoadingSummary = true;
+
+  /// Live `delivery_dispatch.status` — the single source of truth for which
+  /// pickup action to offer. Never inferred from the run status.
+  String _dispatchStatus = 'draft';
+
+  /// Server-decided action: confirm | blocked | confirmed | unavailable.
+  String _pickupAction = 'unavailable';
+  List<Map<String, dynamic>> _insufficientItems = const [];
 
   @override
   void initState() {
@@ -150,33 +184,54 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
         final breakdownRaw = (data['product_breakdown'] as List<dynamic>? ?? []);
         final isConfirmed = data['pickup_confirmed'] == true;
         final isSufficientOverall = data['is_sufficient_for_orders'] != false;
+        final dispatchStatus = data['dispatch_status']?.toString() ?? 'draft';
+        final hasDispatch = data['has_dispatch'] == true || data['dispatch_id'] != null;
+        final pickupAction = data['pickup_action']?.toString() ??
+            (isConfirmed
+                ? 'confirmed'
+                : hasDispatch
+                    ? (isSufficientOverall ? 'confirm' : 'blocked')
+                    : 'unavailable');
+        final insufficient = (data['insufficient_items'] as List<dynamic>? ?? [])
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
 
         final List<ProductInventorySummary> parsedBreakdown = [];
         for (final item in breakdownRaw) {
           final m = Map<String, dynamic>.from(item as Map);
-          final loaded = _parseNum(m['loaded']);
-          final planned = _parseNum(m['planned']);
-          final emergency = _parseNum(m['emergency'] ?? m['extra_load']);
-          final delivered = _parseNum(m['delivered']);
-          final returned = _parseNum(m['returned']);
-          final damaged = _parseNum(m['damaged']);
-          final currentBasket = _parseNum(m['current_basket']);
+          // Prefer the explicit ledger keys; fall back to the legacy ones so an
+          // older API build still renders.
+          final ordered = _parseNum(m['ordered_qty'] ?? m['planned']);
+          final plannedQty = _parseNum(m['planned_qty']);
+          final loaded = _parseNum(m['loaded_qty'] ?? m['loaded']);
+          final extra = _parseNum(m['extra_qty'] ?? m['emergency'] ?? m['extra_load']);
+          final delivered = _parseNum(m['delivered_qty'] ?? m['delivered']);
+          final returned = _parseNum(m['returned_qty'] ?? m['returned']);
+          final damaged = _parseNum(m['damaged_qty'] ?? m['damaged']);
+          final inBasket = _parseNum(m['in_basket_qty'] ?? m['current_basket']);
+          final remaining = _parseNum(m['remaining_qty'] ?? m['pending']);
+          final shortage = _parseNum(m['shortage_qty']);
           final unit = m['unit']?.toString() ?? '';
           final name = m['name']?.toString() ?? 'Product Item';
-          final isSufficient = m['is_sufficient'] != false && (loaded >= planned);
-          final isExtraOnly = m['is_extra_only'] == true || (planned == 0 && loaded > 0);
+          final isSufficient = m['is_sufficient'] != false && loaded >= ordered;
+          final isExtraOnly = m['is_extra_only'] == true || (ordered == 0 && loaded > 0);
 
           parsedBreakdown.add(
             ProductInventorySummary(
               productName: name,
               unit: unit,
-              totalOrdered: planned,
+              totalOrdered: ordered,
+              plannedQty: plannedQty,
               loaded: loaded,
               deliveredCount: delivered,
               returnedCount: returned,
               damagedCount: damaged,
-              remainingToDeliver: currentBasket > 0 ? currentBasket : math.max(0, loaded - delivered - returned - damaged),
-              extraBuffer: emergency > 0 ? emergency : math.max(0, loaded - planned),
+              remainingToDeliver:
+                  inBasket > 0 ? inBasket : math.max(0, loaded - delivered - returned - damaged),
+              remainingQty: remaining > 0 ? remaining : math.max(0, ordered - delivered),
+              extraBuffer: extra > 0 ? extra : math.max(0, loaded - ordered),
+              shortageQty: shortage > 0 ? shortage : math.max(0, ordered - loaded),
               isPickupConfirmed: isConfirmed,
               isSufficient: isSufficient,
               isExtraOnly: isExtraOnly,
@@ -188,12 +243,22 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
         if (mounted) {
           setState(() {
             _apiPickupConfirmed = isConfirmed;
-            _isSufficientForOrders = isSufficientOverall && (parsedBreakdown.isEmpty || parsedBreakdown.every((p) => p.isSufficient));
+            _dispatchStatus = dispatchStatus;
+            _pickupAction = pickupAction;
+            _insufficientItems = insufficient;
+            // EXTRA-only lines carry no order demand, so they must never count
+            // against sufficiency — that is what used to disable the button
+            // once the warehouse loaded extra stock.
+            _isSufficientForOrders = isSufficientOverall;
             _apiProductBreakdown = parsedBreakdown;
           });
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Keep whatever the last successful refresh produced.
+    } finally {
+      if (mounted) setState(() => _isLoadingSummary = false);
+    }
   }
 
   Future<void> _confirmPickupFromBasket() async {
@@ -206,12 +271,16 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
         data: runIdParam != null && runIdParam.isNotEmpty ? {'run_id': runIdParam} : {},
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
+        // Re-read the dispatch instead of assuming success flipped it. The refresh
+        // also brings the EXTRA loaded quantities back, so the ledger keeps showing
+        // what is physically in the bag rather than only what was planned.
+        await _fetchLiveBasketSummary();
         if (mounted) {
-          AppSnackBar.success(context, '✅ Dispatch confirmed! Orders are now Out for Delivery.');
-          setState(() {
-            _apiPickupConfirmed = true;
-          });
-          await _fetchLiveBasketSummary();
+          if (_apiPickupConfirmed == true) {
+            AppSnackBar.success(context, '✅ Dispatch confirmed! Orders are now Out for Delivery.');
+          } else {
+            AppSnackBar.error(context, 'Dispatch was not confirmed. Please try again.');
+          }
           try {
             context.read<DeliverySessionBloc>().add(ReloadSessionEvent());
           } catch (_) {}
@@ -222,12 +291,23 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
         }
       }
     } catch (e) {
+      // A rejected confirmation (insufficient stock) must leave the button live,
+      // so resync from the server rather than freezing the last local guess.
+      await _fetchLiveBasketSummary();
       if (mounted) {
-        AppSnackBar.error(context, 'Error confirming pickup: $e');
+        AppSnackBar.error(context, _confirmErrorMessage(e));
       }
     } finally {
       if (mounted) setState(() => _isConfirmingPickup = false);
     }
+  }
+
+  String _confirmErrorMessage(Object error) {
+    if (error is DioException) {
+      final data = error.response?.data;
+      if (data is Map && data['message'] != null) return data['message'].toString();
+    }
+    return 'Error confirming pickup: $error';
   }
 
   Future<void> _returnProductsToHub() async {
@@ -482,6 +562,16 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
   int get _totalInitialStock =>
       effectiveSummaries.fold(0, (sum, i) => sum + i.initialStock);
 
+  /// Units the assigned orders demand, from `order_items`.
+  int get _totalOrderedUnits =>
+      effectiveSummaries.fold(0, (sum, i) => sum + i.totalOrdered);
+
+  /// A line stays on the ledger while it still holds stock or still owes a customer.
+  /// EXTRA-only lines qualify on the first clause, so they survive confirmation.
+  List<ProductInventorySummary> get _activeSummaries => effectiveSummaries
+      .where((inv) => inv.currentlyInBag > 0 || inv.remainingQty > 0 || inv.shortageQty > 0)
+      .toList();
+
   @override
   Widget build(BuildContext context) {
     final summaries = effectiveSummaries;
@@ -517,13 +607,15 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
               ),
               child: Row(
                 children: [
+                  _buildHeaderStatCol('ORDERED', '$_totalOrderedUnits', 'Planned', const Color(0xFF475569)),
+                  _buildHeaderDivider(),
                   _buildHeaderStatCol('TAKEN', '$_totalInitialStock', 'Loaded', const Color(0xFF334155)),
                   _buildHeaderDivider(),
                   _buildHeaderStatCol('DELIVERED', '$_totalDeliveredUnits', 'Fulfilled', const Color(0xFF1D4ED8)),
                   _buildHeaderDivider(),
                   _buildHeaderStatCol('IN BAG', '$_totalInBagNow', 'Currently have', const Color(0xFF047857), isHighlight: true),
                   _buildHeaderDivider(),
-                  _buildHeaderStatCol('EXTRA', '+$_totalExtraBuffer', 'Emergency', const Color(0xFF6D28D9)),
+                  _buildHeaderStatCol('EXTRA', '+$_totalExtraBuffer', 'Loaded extra', const Color(0xFF6D28D9)),
                 ],
               ),
             ),
@@ -534,133 +626,8 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                if (!isPickupConfirmed) ...[
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: _isSufficientForOrders ? const Color(0xFF86EFAC) : const Color(0xFFFCA5A5),
-                        width: 1.2,
-                      ),
-                      boxShadow: const [
-                        BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2)),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: _isSufficientForOrders ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                _isSufficientForOrders ? Icons.inventory_2_rounded : Icons.warning_amber_rounded,
-                                color: _isSufficientForOrders ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _isSufficientForOrders
-                                        ? 'Dispatch Handover Ready'
-                                        : 'Dispatched Quantities Insufficient',
-                                    style: GoogleFonts.poppins(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 14,
-                                      color: const Color(0xFF0F172A),
-                                    ),
-                                  ),
-                                  Text(
-                                    _isSufficientForOrders
-                                        ? 'Physical inventory matches order demand (+${_totalExtraBuffer} extra). Confirm pickup to set orders Out for Delivery.'
-                                        : 'Dispatched items are less than assigned customer orders. Please ask warehouse to load missing quantities before confirming.',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 11.5,
-                                      color: const Color(0xFF64748B),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 44,
-                          child: ElevatedButton.icon(
-                            onPressed: (!_isSufficientForOrders || _isConfirmingPickup)
-                                ? null
-                                : _confirmPickupFromBasket,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF16A34A),
-                              foregroundColor: Colors.white,
-                              disabledBackgroundColor: const Color(0xFFE2E8F0),
-                              disabledForegroundColor: const Color(0xFF94A3B8),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            icon: _isConfirmingPickup
-                                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                : Icon(
-                                    _isSufficientForOrders ? Icons.check_circle_outline_rounded : Icons.lock_outline_rounded,
-                                    size: 18,
-                                  ),
-                            label: Text(
-                              _isConfirmingPickup
-                                  ? 'CONFIRMING DISPATCH...'
-                                  : (_isSufficientForOrders
-                                      ? 'CONFIRM DISPATCH & START DELIVERY'
-                                      : 'INSUFFICIENT DISPATCH STOCK'),
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 12,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ] else ...[
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFF86EFAC)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.verified_rounded, color: Color(0xFF16A34A), size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Dispatch Confirmed — Orders Out for Delivery',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF15803D),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                _buildDispatchActionCard(),
+
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -698,7 +665,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                 ),
                 const SizedBox(height: 14),
 
-                if (summaries.isEmpty || _totalInBagNow == 0 || summaries.every((s) => (s.totalOrdered + s.extraBuffer - s.deliveredCount) <= 0))
+                if (_activeSummaries.isEmpty)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
@@ -778,9 +745,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                     ),
                   )
                 else
-                  _buildUnifiedProductCard(
-                    summaries.where((inv) => (inv.totalOrdered + inv.extraBuffer - inv.deliveredCount) > 0).toList(),
-                  ),
+                  _buildUnifiedProductCard(_activeSummaries),
 
                 const SizedBox(height: 24),
               ],
@@ -839,6 +804,276 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  /// Always rendered. Which action it offers comes from the live
+  /// `delivery_dispatch.status`, never from whether extra items were loaded —
+  /// hiding the button once the warehouse added extras left the dispatch stuck.
+  Widget _buildDispatchActionCard() {
+    if (_isLoadingSummary && _apiProductBreakdown == null) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.symmetric(vertical: 22),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+        ),
+        child: const Center(
+          child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4)),
+        ),
+      );
+    }
+
+    switch (_pickupAction) {
+      case 'confirmed':
+        return _buildDispatchStateCard(
+          accent: const Color(0xFF16A34A),
+          background: const Color(0xFFDCFCE7),
+          border: const Color(0xFF86EFAC),
+          icon: Icons.verified_rounded,
+          title: 'Dispatch Confirmed — Orders Out for Delivery',
+          subtitle: _totalExtraBuffer > 0
+              ? 'You are carrying $_totalInitialStock unit(s), including $_totalExtraBuffer extra loaded at the warehouse.'
+              : 'You are carrying $_totalInitialStock unit(s) for your assigned orders.',
+        );
+
+      case 'unavailable':
+        return _buildDispatchStateCard(
+          accent: const Color(0xFFB45309),
+          background: const Color(0xFFFEF3C7),
+          border: const Color(0xFFFCD34D),
+          icon: Icons.hourglass_top_rounded,
+          title: 'Waiting for Warehouse Dispatch',
+          subtitle: 'No dispatch has been loaded for your run yet. The pickup action opens as soon as the warehouse loads your items.',
+        );
+
+      case 'blocked':
+      case 'confirm':
+      default:
+        final canConfirm = _pickupAction == 'confirm' && _isSufficientForOrders;
+        return _buildConfirmDispatchCard(canConfirm: canConfirm);
+    }
+  }
+
+  Widget _buildDispatchStateCard({
+    required Color accent,
+    required Color background,
+    required Color border,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: accent, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: GoogleFonts.poppins(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          color: accent,
+                        ),
+                      ),
+                    ),
+                    _buildDispatchStatusChip(accent),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFF475569)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The raw `delivery_dispatch.status` behind the action currently offered.
+  Widget _buildDispatchStatusChip(Color accent) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: accent.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        _dispatchStatus.replaceAll('_', ' ').toUpperCase(),
+        style: GoogleFonts.poppins(
+          fontSize: 9.5,
+          fontWeight: FontWeight.w900,
+          color: accent,
+          letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConfirmDispatchCard({required bool canConfirm}) {
+    final shortageLines = _insufficientItems
+        .map((e) =>
+            '${e['name'] ?? e['variant_id']}: loaded ${_parseNum(e['loaded_qty'])} of ${_parseNum(e['ordered_qty'])}')
+        .toList();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: canConfirm ? const Color(0xFF86EFAC) : const Color(0xFFFCA5A5),
+          width: 1.2,
+        ),
+        boxShadow: const [
+          BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: canConfirm ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  canConfirm ? Icons.inventory_2_rounded : Icons.warning_amber_rounded,
+                  color: canConfirm ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            canConfirm ? 'Dispatch Handover Ready' : 'Dispatched Quantities Insufficient',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              color: const Color(0xFF0F172A),
+                            ),
+                          ),
+                        ),
+                        _buildDispatchStatusChip(
+                          canConfirm ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      canConfirm
+                          ? 'Loaded $_totalInitialStock unit(s) for $_totalOrderedUnits ordered'
+                              '${_totalExtraBuffer > 0 ? ' (+$_totalExtraBuffer extra)' : ''}.'
+                              ' Confirm pickup to set orders Out for Delivery.'
+                          : 'The warehouse has loaded less than your assigned orders need. Ask for the missing quantities before confirming.',
+                      style: GoogleFonts.poppins(
+                        fontSize: 11.5,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (!canConfirm && shortageLines.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: shortageLines
+                    .map(
+                      (line) => Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: Text(
+                          '• $line',
+                          style: GoogleFonts.poppins(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFFB91C1C),
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton.icon(
+              onPressed: (!canConfirm || _isConfirmingPickup) ? null : _confirmPickupFromBasket,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF16A34A),
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: const Color(0xFFE2E8F0),
+                disabledForegroundColor: const Color(0xFF94A3B8),
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: _isConfirmingPickup
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Icon(
+                      canConfirm ? Icons.check_circle_outline_rounded : Icons.lock_outline_rounded,
+                      size: 18,
+                    ),
+              label: Text(
+                _isConfirmingPickup
+                    ? 'CONFIRMING DISPATCH...'
+                    : (canConfirm ? 'CONFIRM DISPATCH & START DELIVERY' : 'INSUFFICIENT DISPATCH STOCK'),
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -988,7 +1223,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                                     border: Border.all(color: const Color(0xFFEF4444), width: 1),
                                   ),
                                   child: Text(
-                                    'SHORT (-${inv.totalOrdered - inv.loaded})',
+                                    'SHORT (-${inv.shortageQty})',
                                     style: const TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w800,
@@ -1093,16 +1328,20 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                         children: [
                           _buildStatCol('PLANNED', '${inv.totalOrdered}', const Color(0xFF475569)),
                           _buildVerticalDivider(),
-                          _buildStatCol('LOADED', '${inv.initialStock}', const Color(0xFF047857)),
+                          _buildStatCol('LOADED', '${inv.loaded}', const Color(0xFF047857)),
+                          _buildVerticalDivider(),
+                          _buildStatCol('EXTRA', '+${inv.extraBuffer}', const Color(0xFF6D28D9)),
                           _buildVerticalDivider(),
                           _buildStatCol('DELIVERED', '${inv.deliveredCount}', const Color(0xFF1D4ED8)),
                           _buildVerticalDivider(),
-                          _buildStatCol('RETURNED', '${inv.returnedCount}', const Color(0xFFB45309)),
-                          _buildVerticalDivider(),
-                          _buildStatCol('DAMAGED', '${inv.damagedCount}', const Color(0xFFBE123C)),
-                          if (inv.extraBuffer > 0) ...[
+                          _buildStatCol('REMAINING', '${inv.remainingQty}', const Color(0xFF0F766E)),
+                          if (inv.returnedCount > 0) ...[
                             _buildVerticalDivider(),
-                            _buildStatCol('EXTRA', '+${inv.extraBuffer}', const Color(0xFF6D28D9)),
+                            _buildStatCol('RETURNED', '${inv.returnedCount}', const Color(0xFFB45309)),
+                          ],
+                          if (inv.damagedCount > 0) ...[
+                            _buildVerticalDivider(),
+                            _buildStatCol('DAMAGED', '${inv.damagedCount}', const Color(0xFFBE123C)),
                           ],
                         ],
                       ),

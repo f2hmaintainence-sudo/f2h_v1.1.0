@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
+import 'package:f2h_delivery/features/tracking/presentation/screens/map_screen.dart';
 
 class NextDeliveryCard extends StatelessWidget {
   final GroupedStop stop;
@@ -22,11 +23,16 @@ class NextDeliveryCard extends StatelessWidget {
     }
   }
 
-  void _openNav(double lat, double lng) async {
-    final url = Uri.parse("google.navigation:q=$lat,$lng");
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url);
-    }
+  void _openNav(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapScreen(
+          focusedStop: stop,
+          isStandalonePage: true,
+        ),
+      ),
+    );
   }
 
   Widget _buildNextCardBtn(IconData icon, String label, VoidCallback onTap) {
@@ -153,7 +159,7 @@ class NextDeliveryCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _buildNextCardBtn(Icons.map_rounded, 'Navigate', () => _openNav(stop.addressLat, stop.addressLng)),
+                child: _buildNextCardBtn(Icons.navigation_rounded, 'Navigate', () => _openNav(context)),
               ),
               const SizedBox(width: 8),
               Expanded(
