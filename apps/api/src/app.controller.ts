@@ -435,4 +435,74 @@ export class AppController {
     return 0;
   }
 
+  @Public()
+  @Post(['delivery-partner/onboarding-request', 'partner/become-partner', 'delivery-partner/become-partner'])
+  async createDeliveryPartnerRequest(@Body() body: any) {
+    const {
+      fullName,
+      phone,
+      email,
+      city,
+      area,
+      vehicleType,
+      vehicleNumber,
+      drivingLicenseNumber,
+      preferredShift,
+      experienceYears,
+      source,
+    } = body;
+
+    if (!fullName || !fullName.trim()) {
+      throw new BadRequestException('Full name is required');
+    }
+    if (!phone || !phone.trim()) {
+      throw new BadRequestException('Phone number is required');
+    }
+    if (!area || !area.trim()) {
+      throw new BadRequestException('Area/Locality is required');
+    }
+    if (!vehicleType || !vehicleType.trim()) {
+      throw new BadRequestException('Vehicle type is required');
+    }
+
+    const rows = await this.db.query(
+      `INSERT INTO delivery_partner_requests (
+        full_name,
+        phone,
+        email,
+        city,
+        area,
+        vehicle_type,
+        vehicle_number,
+        driving_license_number,
+        preferred_shift,
+        experience_years,
+        status,
+        source
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      RETURNING *`,
+      [
+        fullName.trim(),
+        phone.trim(),
+        email?.trim() || null,
+        city?.trim() || 'Bengaluru',
+        area.trim(),
+        vehicleType.trim(),
+        vehicleNumber?.trim() || null,
+        drivingLicenseNumber?.trim() || null,
+        preferredShift?.trim() || 'Both',
+        experienceYears?.trim() || 'Fresher',
+        'PENDING',
+        source || 'website_landing',
+      ],
+    );
+
+    return {
+      success: true,
+      message: 'Your partner application has been received successfully! Our onboarding team will contact you within 24 hours.',
+      data: rows[0],
+    };
+  }
+
 }
+

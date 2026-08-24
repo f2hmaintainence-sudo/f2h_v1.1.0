@@ -342,6 +342,14 @@ export class BasketService {
            p.product_id,
            p.name AS product_name,
            p.is_returnable,
+           (
+             SELECT COALESCE(NULLIF(pi.url, ''), '/uploads/' || pi.storage_key)
+             FROM product_images pi
+             WHERE (pi.variant_id = pv.variant_id OR pi.product_id = pv.product_id)
+               AND pi.deleted_at IS NULL
+             ORDER BY (pi.variant_id = pv.variant_id) DESC, pi.is_primary DESC, pi.sort_order ASC
+             LIMIT 1
+           ) AS product_image,
            COALESCE(ddi.planned_qty, 0)::numeric AS planned_qty,
            COALESCE(ddi.loaded_qty, 0)::numeric AS loaded_qty,
            COALESCE(ddi.delivered_qty, 0)::numeric AS delivered_qty,
@@ -422,6 +430,8 @@ export class BasketService {
         product_id: dItem.product_id,
         name: vName,
         unit: `${dItem.unit_value || ''}${dItem.unit_type || dItem.unit || ''}`,
+        product_image: dItem.product_image || null,
+        image_url: dItem.product_image || null,
 
         // Explicit dispatch-vs-orders ledger
         ordered_qty: orderedQty,

@@ -9,6 +9,7 @@ import { DeliveryShowEditService } from './services/showEdit.service';
 import { DeliverySaveEditService } from './services/saveEdit.service';
 import { DeliveryLeaveTableService } from './services/table.service';
 import { DeliveryLeaveShowEditService, DeliveryLeaveSaveEditService } from './services/leave-edit.service';
+import { DeliveryPartnerRequestService } from './services/partner-request.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
@@ -28,7 +29,28 @@ export class DeliveryManagementController {
     private readonly leaveTableService: DeliveryLeaveTableService,
     private readonly leaveShowEditService: DeliveryLeaveShowEditService,
     private readonly leaveSaveEditService: DeliveryLeaveSaveEditService,
+    private readonly partnerRequestService: DeliveryPartnerRequestService,
   ) { }
+
+  // ── Delivery Partner Onboarding Requests ──
+
+  @Get('partner-requests')
+  async getDeliveryPartnerRequests(@Query() query: any) {
+    return this.partnerRequestService.getRequests(query);
+  }
+
+  @Patch('partner-requests/:id/status')
+  async updatePartnerRequestStatus(
+    @Param('id') id: string,
+    @Body() body: { status: string; notes?: string },
+  ) {
+    return this.partnerRequestService.updateRequestStatus(id, body.status, body.notes);
+  }
+
+  @Delete('partner-requests/:id')
+  async deletePartnerRequest(@Param('id') id: string) {
+    return this.partnerRequestService.deleteRequest(id);
+  }
 
   // ── Delivery Partners ──
 

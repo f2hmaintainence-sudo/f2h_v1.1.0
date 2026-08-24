@@ -24,6 +24,8 @@ const PUBLIC_ROUTES = [
   '/delete-account',
   '/contact-us',
   '/pricing',
+  '/become-a-partner',
+  '/partner',
 ];
 
 const PUBLIC_PREFIXES = [

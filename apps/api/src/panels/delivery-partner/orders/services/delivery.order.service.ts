@@ -64,6 +64,14 @@ export class DeliveryOrderService {
          pv.name AS product_name,
          pv.unit_value,
          pv.unit_type,
+         (
+           SELECT COALESCE(NULLIF(pi.url, ''), '/uploads/' || pi.storage_key)
+           FROM product_images pi
+           WHERE (pi.variant_id = pv.variant_id OR pi.product_id = pv.product_id)
+             AND pi.deleted_at IS NULL
+           ORDER BY (pi.variant_id = pv.variant_id) DESC, pi.is_primary DESC, pi.sort_order ASC
+           LIMIT 1
+         ) AS product_image,
          COALESCE(c.is_returnable, p.is_returnable, false) AS is_returnable
        FROM order_items oi
        JOIN product_variants pv ON pv.variant_id = oi.variant_id
@@ -83,6 +91,8 @@ export class DeliveryOrderService {
         quantity: Number(item.quantity),
         unit: `${item.unit_value}${item.unit_type}`,
         price: Number(item.final_price),
+        product_image: item.product_image || null,
+        image_url: item.product_image || null,
       });
 
       if (item.is_returnable) {
