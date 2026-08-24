@@ -612,29 +612,37 @@ export class DeliveryOrderService {
     }
 
     if (activeRunId) {
-      const uncompletedOrdersRes = await this.db.query(
-        `SELECT COUNT(*)::int AS count FROM orders
-         WHERE (delivery_run_id = $1 OR delivery_run_id::text = $1)
-           AND status NOT IN ('delivered', 'failed', 'completed', 'cancelled')`,
-        [activeRunId],
-      );
-      const uncompletedCount = Number(uncompletedOrdersRes[0]?.count || 0);
       const dbRun = await this.db.query(
         `SELECT status FROM delivery_runs WHERE run_id = $1 OR id::text = $1 LIMIT 1`,
         [activeRunId],
       );
-      const currentDbStatus = dbRun?.length ? dbRun[0].status : 'in_progress';
+      const currentDbStatus = dbRun?.length ? dbRun[0].status : 'assigned';
 
-      if (uncompletedCount === 0 && orders?.length > 0 && currentDbStatus !== 'handed_over') {
-        await this.db.query(
-          `UPDATE delivery_runs SET status = 'completed', actual_end_time = COALESCE(actual_end_time, NOW()), updated_at = NOW() WHERE run_id = $1 OR id::text = $1`,
+      // Only evaluate run completion if the run was actually active/in progress
+      if (['in_progress', 'out_for_delivery', 'dispatched'].includes(currentDbStatus)) {
+        const uncompletedOrdersRes = await this.db.query(
+          `SELECT COUNT(*)::int AS count FROM orders
+           WHERE (delivery_run_id = $1 OR delivery_run_id::text = $1)
+             AND status NOT IN ('delivered', 'failed', 'completed', 'cancelled')`,
           [activeRunId],
         );
-        activeRunStatus = (await this.isRunHandedOver(activeRunId!)) ? 'handed_over' : 'completed';
+        const uncompletedCount = Number(uncompletedOrdersRes[0]?.count || 0);
+
+        if (uncompletedCount === 0 && orders?.length > 0) {
+          await this.db.query(
+            `UPDATE delivery_runs SET status = 'completed', actual_end_time = COALESCE(actual_end_time, NOW()), updated_at = NOW() WHERE run_id = $1 OR id::text = $1`,
+            [activeRunId],
+          );
+          activeRunStatus = (await this.isRunHandedOver(activeRunId!)) ? 'handed_over' : 'completed';
+        } else {
+          activeRunStatus = currentDbStatus;
+        }
       } else if (currentDbStatus === 'completed') {
         activeRunStatus = (await this.isRunHandedOver(activeRunId!)) ? 'handed_over' : 'completed';
       } else if (currentDbStatus === 'handed_over') {
         activeRunStatus = 'handed_over';
+      } else {
+        activeRunStatus = currentDbStatus;
       }
     }
 

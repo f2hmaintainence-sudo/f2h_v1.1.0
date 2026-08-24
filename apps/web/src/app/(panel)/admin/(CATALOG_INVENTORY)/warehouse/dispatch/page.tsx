@@ -1184,7 +1184,7 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
       if (p.delivery_partner_id) totalRiders++;
       totalQty += p.totalQuantity;
     });
-    const dispatched = plans.filter((p) => ["dispatched", "in_progress", "completed", "partial"].includes(p.status)).length;
+    const dispatched = plans.filter((p) => Boolean(p.isDispatched ?? p.hasActualDispatch)).length;
     const pending = plans.length - dispatched;
     return { totalOrders, totalCustomers: uniqueCustomers.size, totalRiders, totalProducts: Object.keys(warehouseTotals).length, totalQty, dispatched, pending };
   }, [plans, warehouseTotals]);
@@ -1469,13 +1469,13 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
                       <p className="text-sm font-bold text-slate-400">No delivery runs match your filters</p>
                     </div>
                   ) : (() => {
-                    const pendingPlans = filteredPlans.filter((p) => !["dispatched", "in_progress", "completed", "partial"].includes(p.status));
-                    const dispatchedPlans = filteredPlans.filter((p) => ["dispatched", "in_progress", "completed", "partial"].includes(p.status));
+                    const pendingPlans = filteredPlans.filter((p) => !Boolean(p.isDispatched ?? p.hasActualDispatch));
+                    const dispatchedPlans = filteredPlans.filter((p) => Boolean(p.isDispatched ?? p.hasActualDispatch));
 
                     const renderCard = (plan: DeliveryPartnerPlan) => {
                       const isExpanded = !!expandedCards[plan.run_id];
                       const showBreakdown = !!showOrderBreakdowns[plan.run_id];
-                      const isDispatched = ["dispatched", "in_progress", "completed", "partial"].includes(plan.status);
+                      const isDispatched = Boolean(plan.isDispatched ?? plan.hasActualDispatch);
                       const isApproving = !!approvingRuns[plan.run_id];
 
                       return (

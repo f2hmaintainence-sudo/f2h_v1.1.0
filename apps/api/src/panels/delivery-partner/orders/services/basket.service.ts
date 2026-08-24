@@ -262,15 +262,25 @@ export class BasketService {
       : [partnerId];
 
     // 2. Fetch active delivery_run for this partner on today's date
+    const kolkataHour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getHours();
+    const currentSlot = kolkataHour < 12 ? 'morning' : 'evening';
+
     const runRes = await this.db.query(
-      `SELECT dr.id, dr.run_id, dr.delivery_partner_id, dr.warehouse_id, dr.delivery_slot, dr.status
+      `SELECT dr.id, dr.run_id, dr.delivery_partner_id, dr.warehouse_id, dr.delivery_slot, dr.status,
+              dd.dispatch_id, dd.status AS dispatch_status
        FROM delivery_runs dr
+       LEFT JOIN delivery_dispatch dd ON (dd.delivery_run_id = dr.run_id OR dd.delivery_run_id = dr.id::text)
        WHERE (dr.delivery_partner_id = ANY($1) OR dr.run_id = $2 OR dr.id::text = $2)
          AND (dr.run_date::date = CURRENT_DATE OR DATE(dr.run_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE OR dr.run_date IS NULL)
          AND dr.status != 'cancelled'
-       ORDER BY dr.created_at DESC
+       ORDER BY
+         (dr.run_id = $2 OR dr.id::text = $2) DESC,
+         (dr.status IN ('in_progress', 'handed_over', 'dispatched') AND dd.dispatch_id IS NOT NULL) DESC,
+         (dd.dispatch_id IS NOT NULL) DESC,
+         (dr.delivery_slot = $3) DESC,
+         dr.created_at DESC
        LIMIT 1`,
-      [partnerIds, runId || ''],
+      [partnerIds, runId || '', currentSlot],
     );
 
     const activeRun = runRes?.length ? runRes[0] : null;
