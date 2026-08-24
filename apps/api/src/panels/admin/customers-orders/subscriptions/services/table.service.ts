@@ -181,10 +181,12 @@ export class SubscriptionsTableService {
         customer_id: ['subscriptions.customer_id', true],
         first_name: ['users.first_name', false],
         last_name: ['users.last_name', false],
-        full_name: ["CONCAT_WS(' ', users.first_name, users.last_name)", false],
+        user_name: ['users.user_name', false],
         customer_name: ['users.first_name', true],
         mobile: ['users.phone', false],
         phone: ['users.phone', true],
+        branch_id: ['subscriptions.branch_id', true],
+        branch_name: ['branches.branch_name', false],
         schedule_type: ['subscriptions.schedule_type', true],
         payment_type: ['subscriptions.payment_type', true],
         billing_cycle: ['subscriptions.billing_cycle', true],
@@ -207,6 +209,11 @@ export class SubscriptionsTableService {
           table: 'customers',
           on: [['customers.customer_id', 'subscriptions.customer_id']],
         },
+        {
+          type: 'LEFT',
+          table: 'branches',
+          on: [['branches.branch_id', 'subscriptions.branch_id']],
+        },
       ],
       conditions,
       custom: [
@@ -214,10 +221,9 @@ export class SubscriptionsTableService {
           type: 'compute',
           column: 'customer_name',
           callback: (row) => {
-            if (row.full_name) return row.full_name;
             const parts = [row.first_name, row.last_name].filter(Boolean);
             if (parts.length > 0) return parts.join(' ');
-            return row.customer_id || 'N/A';
+            return row.user_name || row.customer_id || 'N/A';
           },
           renderHtml: false,
         },

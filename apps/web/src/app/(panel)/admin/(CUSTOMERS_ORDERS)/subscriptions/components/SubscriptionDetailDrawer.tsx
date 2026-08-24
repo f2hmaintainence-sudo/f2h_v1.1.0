@@ -319,7 +319,7 @@ export default function SubscriptionDetailDrawer({
                 </div>
               </div>
 
-              {/* Customer Details Card */}
+              {/* Customer & Branch Details Card */}
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
                 <div className="flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider">
                   <span className="flex items-center gap-1.5 text-slate-900 font-bold">
@@ -337,23 +337,40 @@ export default function SubscriptionDetailDrawer({
                     <span className="font-bold text-slate-900 mt-0.5 block font-mono">📞 {subData?.phone || 'N/A'}</span>
                   </div>
                   <div>
+                    <span className="text-slate-400 block text-[11px]">Branch / Zone</span>
+                    <span className="font-bold text-slate-800 mt-0.5 block">{subData?.branch_name || subData?.branch_id || 'N/A'}</span>
+                  </div>
+                  <div>
                     <span className="text-slate-400 block text-[11px]">Wallet Balance</span>
                     <span className="font-bold text-emerald-700 mt-0.5 block">
                       ₹{Number(subData?.wallet_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div>
-                    <span className="text-slate-400 block text-[11px]">Billing Cycle</span>
-                    <span className="font-bold text-slate-800 capitalize mt-0.5 block">{subData?.billing_cycle || 'Monthly'}</span>
-                  </div>
                 </div>
+
+                {/* Delivery Address if available */}
+                {subData?.address_line && (
+                  <div className="pt-2 border-t border-slate-200/60 text-xs">
+                    <span className="text-slate-400 block text-[11px]">Delivery Address</span>
+                    <p className="font-semibold text-slate-700 mt-0.5 text-[11px] leading-relaxed">
+                      {[subData.flat_no, subData.building_name, subData.address_line, subData.landmark, subData.address_city, subData.address_pincode].filter(Boolean).join(', ')}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Subscribed Product Items List */}
               <div className="space-y-3">
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                  <Tag className="w-4 h-4 text-emerald-600" /> Subscribed Product Items ({subItems.length})
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <Tag className="w-4 h-4 text-emerald-600" /> Subscribed Product Items ({subItems.length})
+                  </h3>
+                  {subData?.frequency_label && (
+                    <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                      {subData.frequency_label}
+                    </span>
+                  )}
+                </div>
 
                 {subItems.length === 0 ? (
                   <div className="p-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-center text-xs text-slate-400 font-semibold">
@@ -370,14 +387,32 @@ export default function SubscriptionDetailDrawer({
 
                       return (
                         <div key={idx} className="p-4 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-3 hover:border-emerald-200 transition-colors">
-                          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                            <div>
-                              <span className="text-xs font-black text-slate-900 block">{itemTitle}</span>
-                              {unitValueStr && (
-                                <span className="text-[11px] font-semibold text-slate-500">Unit Size: {unitValueStr}</span>
+                          <div className="flex items-start justify-between border-b border-slate-100 pb-2.5 gap-3">
+                            <div className="flex items-center gap-3">
+                              {item.image_url ? (
+                                <img
+                                  src={item.image_url}
+                                  alt={itemTitle}
+                                  className="w-11 h-11 object-cover rounded-xl border border-slate-100 shrink-0 shadow-2xs"
+                                />
+                              ) : (
+                                <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center font-bold text-xs shrink-0">
+                                  <Package className="w-5 h-5" />
+                                </div>
                               )}
+                              <div>
+                                <span className="text-xs font-black text-slate-900 block">{itemTitle}</span>
+                                {unitValueStr && (
+                                  <span className="text-[11px] font-semibold text-slate-500">Unit Size: {unitValueStr}</span>
+                                )}
+                                {item.frequency_label && (
+                                  <span className="inline-block mt-0.5 text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
+                                    {item.frequency_label}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <span className="text-xs font-black text-emerald-700">₹{Number(item.final_price || item.unit_price || 0).toFixed(2)} / unit</span>
+                            <span className="text-xs font-black text-emerald-700 shrink-0">₹{Number(item.final_price || item.unit_price || 0).toFixed(2)} / unit</span>
                           </div>
 
                           <div className="grid grid-cols-2 gap-2.5 text-xs">
@@ -408,17 +443,63 @@ export default function SubscriptionDetailDrawer({
 
               {/* Weekly Delivery Schedule Matrix */}
               <div className="space-y-3">
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-emerald-600" /> Weekly Delivery Schedule Matrix
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-emerald-600" /> Weekly Delivery Schedule Matrix
+                  </h3>
+                  <span className="text-[11px] font-bold text-slate-500">
+                    {subData?.frequency_label || (subData?.schedule_type ? `${subData.schedule_type.toUpperCase()} Schedule` : 'Active Schedule')}
+                  </span>
+                </div>
 
                 <div className="grid grid-cols-7 gap-1.5">
-                  {daysOfWeek.map((day, idx) => (
-                    <div key={idx} className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-center">
-                      <span className="block text-[10px] font-bold text-slate-400 uppercase">{day}</span>
-                      <span className="block text-xs font-black text-emerald-700 mt-1">Active</span>
-                    </div>
-                  ))}
+                  {(
+                    subData?.weekly_schedule && subData.weekly_schedule.length === 7
+                      ? subData.weekly_schedule
+                      : subItems.length > 0 && subItems[0].weekly_schedule && subItems[0].weekly_schedule.length === 7
+                      ? subItems[0].weekly_schedule
+                      : daysOfWeek.map((day, idx) => ({
+                          day_of_week: idx,
+                          day_name: day,
+                          short_day: day,
+                          m_quantity: 1,
+                          e_quantity: 0,
+                          total_quantity: 1,
+                          is_active: true,
+                        }))
+                  ).map((daySchedule: any, idx: number) => {
+                    const isActive = Boolean(daySchedule.is_active || daySchedule.total_quantity > 0);
+                    const mQty = Number(daySchedule.m_quantity || 0);
+                    const eQty = Number(daySchedule.e_quantity || 0);
+
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-2.5 rounded-xl text-center border transition-all ${
+                          isActive
+                            ? 'bg-emerald-50/90 border-emerald-200 text-emerald-900 shadow-2xs'
+                            : 'bg-slate-50 border-slate-200 text-slate-400 opacity-60'
+                        }`}
+                      >
+                        <span className={`block text-[10px] font-black uppercase ${isActive ? 'text-emerald-800' : 'text-slate-400'}`}>
+                          {daySchedule.short_day || daysOfWeek[idx]}
+                        </span>
+                        <span
+                          className={`block text-[11px] font-black mt-1 ${
+                            isActive ? 'text-emerald-700' : 'text-slate-400'
+                          }`}
+                        >
+                          {isActive ? 'Active' : 'Off'}
+                        </span>
+                        {isActive && (mQty > 0 || eQty > 0) && (
+                          <div className="mt-1 flex flex-col gap-0.5 text-[9px] font-bold">
+                            {mQty > 0 && <span className="text-amber-700">☀️ {mQty}M</span>}
+                            {eQty > 0 && <span className="text-indigo-700">🌙 {eQty}E</span>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

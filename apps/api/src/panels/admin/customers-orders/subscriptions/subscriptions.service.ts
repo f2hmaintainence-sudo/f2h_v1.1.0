@@ -13,26 +13,126 @@ export class SubscriptionsService {
     private readonly refundEligibility: RefundEligibilityService,
   ) {}
 
+  private static readonly DAYS_OF_WEEK = [
+    { day_of_week: 0, day_name: 'Sunday', short_day: 'Sun' },
+    { day_of_week: 1, day_name: 'Monday', short_day: 'Mon' },
+    { day_of_week: 2, day_name: 'Tuesday', short_day: 'Tue' },
+    { day_of_week: 3, day_name: 'Wednesday', short_day: 'Wed' },
+    { day_of_week: 4, day_name: 'Thursday', short_day: 'Thu' },
+    { day_of_week: 5, day_name: 'Friday', short_day: 'Fri' },
+    { day_of_week: 6, day_name: 'Saturday', short_day: 'Sat' },
+  ];
+
+  private formatFrequencyLabel(schedule: any[], scheduleType?: string): string {
+    const activeDays = schedule.filter((s) => s.is_active);
+    if (activeDays.length === 7) return 'Daily (7 Days/Week)';
+    if (activeDays.length === 0) return 'No active schedule days';
+    const shortNames = activeDays.map((d) => d.short_day);
+    const activeIndices = activeDays.map((d) => d.day_of_week);
+    if (
+      activeIndices.length === 3 &&
+      activeIndices.includes(1) &&
+      activeIndices.includes(3) &&
+      activeIndices.includes(5)
+    ) {
+      return 'Alternate Days (Mon, Wed, Fri)';
+    }
+    if (
+      activeIndices.length === 5 &&
+      [1, 2, 3, 4, 5].every((i) => activeIndices.includes(i))
+    ) {
+      return 'Weekdays (Mon - Fri)';
+    }
+    if (
+      activeIndices.length === 2 &&
+      activeIndices.includes(0) &&
+      activeIndices.includes(6)
+    ) {
+      return 'Weekends (Sat - Sun)';
+    }
+    return `${scheduleType ? scheduleType.charAt(0).toUpperCase() + scheduleType.slice(1) : 'Weekly'} (${shortNames.join(', ')})`;
+  }
+
   async getSubscriptionView(subscriptionId: string) {
     try {
       const rows = await this.databaseService.query(
         `SELECT s.*,
-                u.first_name || ' ' || u.last_name AS customer_name,
+                COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), u.user_name, s.customer_id) AS customer_name,
                 u.phone AS phone,
                 u.email AS customer_email,
-                c.wallet_balance
+                c.wallet_balance,
+                b.branch_name AS branch_name,
+                ca.address_line,
+                ca.flat_no,
+                ca.building_name,
+                ca.street,
+                ca.area,
+                ca.city AS address_city,
+                ca.state AS address_state,
+                ca.pincode AS address_pincode,
+                ca.landmark AS address_landmark
          FROM subscriptions s
          LEFT JOIN users u ON u.user_id = s.customer_id
          LEFT JOIN customers c ON c.customer_id = s.customer_id
+         LEFT JOIN branches b ON b.branch_id = s.branch_id
+         LEFT JOIN customer_addresses ca ON ca.address_id = s.address_id
          WHERE s.id::text = $1 OR s.subscription_id = $1 OR s.subscription_number = $1
          LIMIT 1`,
         [subscriptionId],
       );
 
+      const sub = rows[0] ?? null;
+      if (!sub) {
+        return {
+          status: true,
+          data: null,
+          message: 'Subscription not found',
+        };
+      }
+
+      // Fetch weekly schedule for subscription
+      const scheduleRows = await this.databaseService.query(
+        `SELECT ws.id, ws.subscription_id, ws.subscription_item_id, ws.day_of_week, ws.m_quantity, ws.e_quantity
+         FROM subscription_weekly_schedule ws
+         WHERE ws.subscription_id = $1
+            OR ws.subscription_id IN (
+              SELECT subscription_id FROM subscriptions WHERE id::text = $1 OR subscription_number = $1 OR subscription_id = $1
+            )
+            OR ws.subscription_item_id IN (
+              SELECT subscription_item_id FROM subscription_items 
+              WHERE subscription_id = $1 
+                 OR subscription_id IN (SELECT subscription_id FROM subscriptions WHERE id::text = $1 OR subscription_number = $1 OR subscription_id = $1)
+            )
+         ORDER BY ws.day_of_week ASC`,
+        [subscriptionId],
+      );
+
+      const weeklySchedule = SubscriptionsService.DAYS_OF_WEEK.map((d) => {
+        const dayMatches = scheduleRows.filter(
+          (ws: any) => Number(ws.day_of_week) === d.day_of_week,
+        );
+        const mQty = dayMatches.reduce((sum: number, ws: any) => sum + Number(ws.m_quantity || 0), 0);
+        const eQty = dayMatches.reduce((sum: number, ws: any) => sum + Number(ws.e_quantity || 0), 0);
+        return {
+          ...d,
+          m_quantity: mQty,
+          e_quantity: eQty,
+          total_quantity: mQty + eQty,
+          is_active: mQty > 0 || eQty > 0,
+        };
+      });
+
+      const frequencyLabel = this.formatFrequencyLabel(weeklySchedule, sub.schedule_type);
+
       return {
         status: true,
-        data: rows[0] ?? null,
-        message: rows[0] ? 'Subscription fetched' : 'Subscription not found',
+        data: {
+          ...sub,
+          weekly_schedule: weeklySchedule,
+          frequency_label: frequencyLabel,
+          active_days_count: weeklySchedule.filter((s) => s.is_active).length,
+        },
+        message: 'Subscription fetched',
       };
     } catch (error) {
       this.developer.error('getSubscriptionView error', {
@@ -45,7 +145,7 @@ export class SubscriptionsService {
 
   async getSubscriptionItems(subscriptionId: string) {
     try {
-      const rows = await this.databaseService.query(
+      const itemRows = await this.databaseService.query(
         `SELECT
           si.id,
           si.subscription_item_id,
@@ -55,10 +155,7 @@ export class SubscriptionsService {
           pv.name AS variant_name,
           pv.unit_value,
           pv.unit_type,
-          COALESCE(MAX(ws.m_quantity), 0)::numeric AS daily_m_quantity,
-          COALESCE(MAX(ws.e_quantity), 0)::numeric AS daily_e_quantity,
-          COALESCE(SUM(ws.m_quantity), 0)::numeric AS total_m_quantity,
-          COALESCE(SUM(ws.e_quantity), 0)::numeric AS total_e_quantity,
+          COALESCE(pi_v.url, pi_p.url) AS image_url,
           si.unit_price,
           si.discount_id,
           si.coupon_id,
@@ -71,22 +168,79 @@ export class SubscriptionsService {
          FROM subscription_items si
          LEFT JOIN product_variants pv ON pv.variant_id = si.product_variant_id
          LEFT JOIN products p ON p.product_id = pv.product_id
-         LEFT JOIN subscription_weekly_schedule ws ON (ws.subscription_item_id = si.subscription_item_id OR ws.subscription_item_id = si.id::text)
+         LEFT JOIN (
+           SELECT DISTINCT ON (variant_id) variant_id, url 
+           FROM product_images 
+           WHERE variant_id IS NOT NULL 
+           ORDER BY variant_id, is_primary DESC, id ASC
+         ) pi_v ON pi_v.variant_id = pv.variant_id
+         LEFT JOIN (
+           SELECT DISTINCT ON (product_id) product_id, url 
+           FROM product_images 
+           ORDER BY product_id, is_primary DESC, id ASC
+         ) pi_p ON pi_p.product_id = p.product_id
          WHERE si.subscription_id = $1
             OR si.subscription_id IN (
               SELECT subscription_id FROM subscriptions WHERE id::text = $1 OR subscription_number = $1 OR subscription_id = $1
             )
-         GROUP BY
-          si.id, si.subscription_item_id, si.subscription_id, si.product_variant_id,
-          p.name, pv.name, pv.unit_value, pv.unit_type, si.unit_price, si.discount_id, si.coupon_id,
-          si.discount_amount, si.coupon_amount, si.final_price, si.is_free, si.status, si.created_at
          ORDER BY si.id ASC`,
         [subscriptionId],
       );
 
+      const scheduleRows = await this.databaseService.query(
+        `SELECT ws.id, ws.subscription_id, ws.subscription_item_id, ws.day_of_week, ws.m_quantity, ws.e_quantity
+         FROM subscription_weekly_schedule ws
+         WHERE ws.subscription_id = $1
+            OR ws.subscription_id IN (
+              SELECT subscription_id FROM subscriptions WHERE id::text = $1 OR subscription_number = $1 OR subscription_id = $1
+            )
+            OR ws.subscription_item_id IN (
+              SELECT subscription_item_id FROM subscription_items 
+              WHERE subscription_id = $1 
+                 OR subscription_id IN (SELECT subscription_id FROM subscriptions WHERE id::text = $1 OR subscription_number = $1 OR subscription_id = $1)
+            )
+         ORDER BY ws.day_of_week ASC`,
+        [subscriptionId],
+      );
+
+      const items = itemRows.map((item: any) => {
+        const itemWeeklySchedule = SubscriptionsService.DAYS_OF_WEEK.map((d) => {
+          const match = scheduleRows.find(
+            (ws: any) =>
+              Number(ws.day_of_week) === d.day_of_week &&
+              (ws.subscription_item_id === item.subscription_item_id || !ws.subscription_item_id),
+          );
+          const mQty = match ? Number(match.m_quantity || 0) : 0;
+          const eQty = match ? Number(match.e_quantity || 0) : 0;
+          return {
+            ...d,
+            m_quantity: mQty,
+            e_quantity: eQty,
+            total_quantity: mQty + eQty,
+            is_active: mQty > 0 || eQty > 0,
+          };
+        });
+
+        const dailyMQty = Math.max(...itemWeeklySchedule.map((s) => s.m_quantity), 0);
+        const dailyEQty = Math.max(...itemWeeklySchedule.map((s) => s.e_quantity), 0);
+        const totalMQty = itemWeeklySchedule.reduce((sum: number, s) => sum + s.m_quantity, 0);
+        const totalEQty = itemWeeklySchedule.reduce((sum: number, s) => sum + s.e_quantity, 0);
+        const itemFreqLabel = this.formatFrequencyLabel(itemWeeklySchedule);
+
+        return {
+          ...item,
+          daily_m_quantity: dailyMQty,
+          daily_e_quantity: dailyEQty,
+          total_m_quantity: totalMQty,
+          total_e_quantity: totalEQty,
+          weekly_schedule: itemWeeklySchedule,
+          frequency_label: itemFreqLabel,
+        };
+      });
+
       return {
         status: true,
-        data: rows,
+        data: items,
         message: 'Subscription items fetched',
       };
     } catch (error) {
