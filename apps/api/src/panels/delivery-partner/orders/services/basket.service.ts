@@ -247,283 +247,258 @@ export class BasketService {
   async getBasketSummary(partnerId: string, runId?: string): Promise<any> {
     const basket = await this.getOrCreateActiveBasket(partnerId, runId);
 
-    // 1. Fetch active delivery_run for this partner on today's date
+    // 1. Resolve Delivery Partner profile to support user_id, delivery_partner_id, or integer id
+    const partnerRes = await this.db.query(
+      `SELECT dp.id, dp.user_id, dp.delivery_partner_id, dp.branch_id
+       FROM delivery_partners dp
+       WHERE dp.user_id = $1 OR dp.delivery_partner_id = $1 OR dp.id::text = $1
+       LIMIT 1`,
+      [partnerId],
+    );
+    const partner = partnerRes?.length ? partnerRes[0] : null;
+    const partnerIds = partner
+      ? [partner.user_id, partner.delivery_partner_id, String(partner.id), partnerId].filter(Boolean)
+      : [partnerId];
+
+    // 2. Fetch active delivery_run for this partner on today's date
     const runRes = await this.db.query(
       `SELECT dr.id, dr.run_id, dr.delivery_partner_id, dr.warehouse_id, dr.delivery_slot, dr.status
        FROM delivery_runs dr
-       WHERE (dr.delivery_partner_id = $1 OR dr.run_id = $2)
+       WHERE (dr.delivery_partner_id = ANY($1) OR dr.run_id = $2 OR dr.id::text = $2)
          AND DATE(dr.run_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
          AND dr.status != 'cancelled'
        ORDER BY dr.created_at DESC
        LIMIT 1`,
-      [partnerId, runId || ''],
+      [partnerIds, runId || ''],
     );
 
     const activeRun = runRes?.length ? runRes[0] : null;
     const activeRunId = activeRun ? (activeRun.run_id || String(activeRun.id)) : (runId || basket.delivery_run_id);
+    const runIds = activeRun ? [String(activeRun.id), activeRun.run_id].filter(Boolean) : (activeRunId ? [activeRunId] : []);
 
-    // 2. Fetch live planned & delivered quantities from orders table
+    // 3. Fetch active delivery_dispatch record for this run
+    const dispatchRes = runIds.length > 0 ? await this.db.query(
+      `SELECT dd.id, dd.dispatch_id, dd.delivery_run_id, dd.status AS dispatch_status, dd.loaded_at, dd.collected_at
+       FROM delivery_dispatch dd
+       WHERE dd.delivery_run_id = ANY($1)
+       ORDER BY dd.created_at DESC
+       LIMIT 1`,
+      [runIds],
+    ) : [];
+    const activeDispatch = dispatchRes?.length ? dispatchRes[0] : null;
+    const activeDispatchId = activeDispatch?.dispatch_id;
+    const dispatchStatus = activeDispatch?.dispatch_status || (activeRun ? (['in_progress', 'completed', 'handed_over'].includes(activeRun.status) ? 'collected' : 'loaded') : 'draft');
+
+    // 4. Fetch live planned & delivered quantities from orders & order_items
     const livePlannedRes = await this.db.query(
       `SELECT
          oi.variant_id AS product_variant_id,
+         pv.name AS variant_name,
+         pv.unit_value,
+         pv.unit_type,
+         p.product_id,
+         p.name AS product_name,
          SUM(oi.quantity)::numeric AS planned_qty,
          SUM(CASE WHEN o.status IN ('delivered', 'completed') THEN oi.quantity ELSE 0 END)::numeric AS delivered_qty
        FROM orders o
        JOIN order_items oi ON oi.order_id = o.order_id
-       WHERE (o.delivery_run_id = $1 OR o.delivery_partner_id = $2)
+       LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
+       LEFT JOIN products p ON p.product_id = pv.product_id
+       WHERE (o.delivery_run_id = ANY($1) OR o.delivery_partner_id = ANY($2))
          AND (o.scheduled_date::date = CURRENT_DATE OR (o.scheduled_date IS NULL AND DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE))
          AND o.status NOT IN ('cancelled', 'failed')
-       GROUP BY oi.variant_id`,
-      [activeRunId, partnerId],
+       GROUP BY oi.variant_id, pv.name, pv.unit_value, pv.unit_type, p.product_id, p.name`,
+      [runIds.length ? runIds : ['NONE'], partnerIds],
     );
-    const livePlannedMap: Record<string, { planned: number; delivered: number }> = {};
+
+    const livePlannedMap: Record<string, { planned: number; delivered: number; name: string; unit: string; product_id?: string }> = {};
     for (const lp of livePlannedRes || []) {
       livePlannedMap[String(lp.product_variant_id)] = {
         planned: Number(lp.planned_qty || 0),
         delivered: Number(lp.delivered_qty || 0),
+        name: lp.variant_name || lp.product_name || 'Product Item',
+        unit: `${lp.unit_value || ''}${lp.unit_type || ''}`,
+        product_id: lp.product_id,
       };
     }
 
-    // 3. Fetch delivery_dispatch_items by joining delivery_runs -> delivery_dispatch -> delivery_dispatch_items
-    const dispatchItemsRes = await this.db.query(
-      `SELECT
-         ddi.id,
-         dd.dispatch_id,
-         dd.delivery_run_id,
-         dd.status AS dispatch_status,
-         ddi.product_variant_id,
-         pv.name AS variant_name,
-         pv.unit_value,
-         pv.unit_type,
-         COALESCE(ddi.planned_qty, 0) AS planned_qty,
-         COALESCE(ddi.loaded_qty, 0) AS loaded_qty,
-         COALESCE(ddi.delivered_qty, 0) AS delivered_qty,
-         COALESCE(ddi.returned_qty, 0) AS returned_qty,
-         COALESCE(ddi.damaged_qty, 0) AS damaged_qty,
-         COALESCE(ddi.extra_sold_qty, 0) AS extra_sold_qty
-       FROM delivery_runs dr
-       JOIN delivery_dispatch dd ON dd.delivery_run_id = dr.run_id
-       JOIN delivery_dispatch_items ddi ON ddi.dispatch_id = dd.dispatch_id
-       LEFT JOIN product_variants pv ON pv.variant_id = ddi.product_variant_id
-       WHERE (dr.delivery_partner_id = $1 OR dr.run_id = $2)
-         AND DATE(dr.run_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
-         AND ddi.deleted_at IS NULL`,
-      [partnerId, activeRunId || ''],
-    );
+    // 5. Fetch delivery_dispatch_items using the active dispatch_id (or joined by run_id)
+    let dispatchItemsRes: any[] = [];
+    if (activeDispatchId) {
+      dispatchItemsRes = await this.db.query(
+        `SELECT
+           ddi.id,
+           ddi.dispatch_id,
+           ddi.product_variant_id,
+           pv.name AS variant_name,
+           pv.unit_value,
+           pv.unit_type,
+           p.product_id,
+           p.name AS product_name,
+           p.is_returnable,
+           COALESCE(ddi.planned_qty, 0)::numeric AS planned_qty,
+           COALESCE(ddi.loaded_qty, 0)::numeric AS loaded_qty,
+           COALESCE(ddi.delivered_qty, 0)::numeric AS delivered_qty,
+           COALESCE(ddi.returned_qty, 0)::numeric AS returned_qty,
+           COALESCE(ddi.damaged_qty, 0)::numeric AS damaged_qty,
+           COALESCE(ddi.extra_sold_qty, 0)::numeric AS extra_sold_qty,
+           COALESCE(ddi.unit, pv.unit_type, 'PCS') AS unit
+         FROM delivery_dispatch_items ddi
+         LEFT JOIN product_variants pv ON pv.variant_id = ddi.product_variant_id
+         LEFT JOIN products p ON p.product_id = pv.product_id
+         WHERE ddi.dispatch_id = $1
+           AND ddi.deleted_at IS NULL
+         ORDER BY pv.name`,
+        [activeDispatchId],
+      );
+    } else if (runIds.length > 0) {
+      dispatchItemsRes = await this.db.query(
+        `SELECT
+           ddi.id,
+           dd.dispatch_id,
+           dd.delivery_run_id,
+           dd.status AS dispatch_status,
+           ddi.product_variant_id,
+           pv.name AS variant_name,
+           pv.unit_value,
+           pv.unit_type,
+           p.product_id,
+           p.name AS product_name,
+           p.is_returnable,
+           COALESCE(ddi.planned_qty, 0)::numeric AS planned_qty,
+           COALESCE(ddi.loaded_qty, 0)::numeric AS loaded_qty,
+           COALESCE(ddi.delivered_qty, 0)::numeric AS delivered_qty,
+           COALESCE(ddi.returned_qty, 0)::numeric AS returned_qty,
+           COALESCE(ddi.damaged_qty, 0)::numeric AS damaged_qty,
+           COALESCE(ddi.extra_sold_qty, 0)::numeric AS extra_sold_qty,
+           COALESCE(ddi.unit, pv.unit_type, 'PCS') AS unit
+         FROM delivery_runs dr
+         JOIN delivery_dispatch dd ON dd.delivery_run_id = dr.run_id
+         JOIN delivery_dispatch_items ddi ON ddi.dispatch_id = dd.dispatch_id
+         LEFT JOIN product_variants pv ON pv.variant_id = ddi.product_variant_id
+         LEFT JOIN products p ON p.product_id = pv.product_id
+         WHERE dr.run_id = ANY($1)
+           AND DATE(dr.run_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
+           AND ddi.deleted_at IS NULL
+         ORDER BY pv.name`,
+        [runIds],
+      );
+    }
 
-    if (dispatchItemsRes && dispatchItemsRes.length > 0) {
-      let totalLoaded = 0;
-      let customerItemsCount = 0;
-      let emergencyItemsCount = 0;
-      let deliveredCount = 0;
-      let returnedCount = 0;
-      let damagedCount = 0;
+    const isContainerName = (name: string) => {
+      const lower = (name || '').toLowerCase();
+      return lower.includes('empty bottle') || lower.includes('glass bottle') || lower.includes('container return') || lower.includes('milk bottel');
+    };
 
-      const productMap: Record<string, any> = {};
+    const productMap: Record<string, any> = {};
 
-      const isContainerName = (name: string) => {
-        const lower = (name || '').toLowerCase();
-        return lower.includes('empty bottle') || lower.includes('glass bottle') || lower.includes('container return') || lower.includes('milk bottel');
-      };
+    // Process all dispatched items (including extra items loaded at warehouse)
+    for (const dItem of dispatchItemsRes || []) {
+      const vName = dItem.variant_name || dItem.product_name || 'Product Item';
+      if (isContainerName(vName)) continue;
 
-      for (const dItem of dispatchItemsRes) {
-        if (isContainerName(dItem.variant_name)) continue;
+      const vId = String(dItem.product_variant_id);
+      const liveInfo = livePlannedMap[vId];
+      const orderPlanned = liveInfo ? liveInfo.planned : 0;
+      const ddiPlanned = Number(dItem.planned_qty || 0);
+      const planned = orderPlanned > 0 ? orderPlanned : ddiPlanned;
+      const loaded = Number(dItem.loaded_qty || 0);
+      const extra = Math.max(0, loaded - planned);
+      const delivered = Math.max(Number(dItem.delivered_qty || 0), liveInfo ? liveInfo.delivered : 0);
+      const returned = Number(dItem.returned_qty || 0);
+      const damaged = Number(dItem.damaged_qty || 0);
+      const currentBasket = Math.max(0, loaded - delivered - returned - damaged);
+      const isSufficient = loaded >= planned;
+      const isExtraOnly = planned === 0 && loaded > 0;
 
-        const liveInfo = livePlannedMap[dItem.product_variant_id];
-        const planned = liveInfo ? Math.max(liveInfo.planned, Number(dItem.planned_qty || 0)) : Number(dItem.planned_qty || 0);
-        const rawLoaded = Number(dItem.loaded_qty || 0);
-        const loaded = Math.max(planned, rawLoaded);
-        const delivered = Math.max(Number(dItem.delivered_qty || 0), liveInfo ? liveInfo.delivered : 0);
-        const returned = Number(dItem.returned_qty || 0);
-        const damaged = Number(dItem.damaged_qty || 0);
-        const extra = Math.max(0, loaded - planned);
-
-        totalLoaded += loaded;
-        customerItemsCount += planned;
-        emergencyItemsCount += extra;
-        deliveredCount += delivered;
-        returnedCount += returned;
-        damagedCount += damaged;
-
-        const pKey = dItem.product_variant_id || 'UNKNOWN';
-        if (!productMap[pKey]) {
-          productMap[pKey] = {
-            variant_id: dItem.product_variant_id,
-            name: dItem.variant_name || 'Product Item',
-            unit: `${dItem.unit_value || ''}${dItem.unit_type || ''}`,
-            planned: 0,
-            loaded: 0,
-            delivered: 0,
-            pending: 0,
-            emergency: 0,
-            returned: 0,
-            damaged: 0,
-            current_basket: 0,
-          };
-        }
-
-        const pEntry = productMap[pKey];
-        pEntry.planned += planned;
-        pEntry.loaded += loaded;
-        pEntry.delivered += delivered;
-        pEntry.emergency += extra;
-        pEntry.returned += returned;
-        pEntry.damaged += damaged;
-        pEntry.current_basket += Math.max(0, loaded - delivered - returned - damaged);
-      }
-
-      const dispatchStatus = dispatchItemsRes[0]?.dispatch_status || 'loaded';
-      const dispatchId = dispatchItemsRes[0]?.dispatch_id || `DSP-${basket.id.replace('BSK-', '')}`;
-
-      const currentBasket = Math.max(0, totalLoaded - deliveredCount - returnedCount - damagedCount);
-
-      return {
-        basket_id: basket.id,
-        dispatch_id: dispatchId,
-        delivery_partner_id: partnerId,
-        delivery_run_id: activeRunId || basket.delivery_run_id,
-        date: basket.delivery_date,
-        status: basket.status,
-        pickup_confirmed: true,
-        total_loaded: totalLoaded,
-        customer_items_count: customerItemsCount,
-        emergency_items_count: emergencyItemsCount,
-        delivered_count: deliveredCount,
-        pending_count: Math.max(0, customerItemsCount - deliveredCount),
-        returned_count: returnedCount,
-        damaged_count: damagedCount,
-        cancelled_count: 0,
+      productMap[vId] = {
+        variant_id: vId,
+        product_id: dItem.product_id,
+        name: vName,
+        unit: `${dItem.unit_value || ''}${dItem.unit_type || dItem.unit || ''}`,
+        planned,
+        loaded,
+        delivered,
+        pending: Math.max(0, planned - delivered),
+        emergency: extra,
+        extra_load: extra,
+        returned,
+        damaged,
         current_basket: currentBasket,
-        product_breakdown: Object.values(productMap),
-        items: dispatchItemsRes,
+        is_sufficient: isSufficient,
+        is_extra_only: isExtraOnly,
       };
     }
 
-    // 2. Fallback to basket_items query if dispatch items are not found
-    const rawItems = await this.db.query(
-      `SELECT
-         bi.id,
-         bi.basket_id,
-         bi.product_id,
-         bi.variant_id,
-         bi.order_id,
-         bi.order_item_id,
-         bi.quantity,
-         bi.item_type,
-         bi.status,
-         bi.loaded_at,
-         bi.delivered_at,
-         bi.returned_at,
-         pv.name AS variant_name,
-         pv.unit_value,
-         pv.unit_type
-       FROM basket_items bi
-       LEFT JOIN product_variants pv ON pv.variant_id = bi.variant_id
-       WHERE bi.basket_id = $1`,
-      [basket.id],
-    );
+    // Include any orders not found in dispatch items
+    for (const [vId, oInfo] of Object.entries(livePlannedMap)) {
+      if (isContainerName(oInfo.name)) continue;
+      if (!productMap[vId]) {
+        productMap[vId] = {
+          variant_id: vId,
+          product_id: oInfo.product_id,
+          name: oInfo.name,
+          unit: oInfo.unit,
+          planned: oInfo.planned,
+          loaded: 0,
+          delivered: oInfo.delivered,
+          pending: Math.max(0, oInfo.planned - oInfo.delivered),
+          emergency: 0,
+          extra_load: 0,
+          returned: 0,
+          damaged: 0,
+          current_basket: 0,
+          is_sufficient: false,
+          is_extra_only: false,
+        };
+      }
+    }
+
+    const productBreakdown = Object.values(productMap);
+    const isSufficientForOrders = productBreakdown.length > 0 && productBreakdown.every((p: any) => p.is_sufficient);
+    const runStatus = activeRun?.status || 'planned';
+    const isPickupConfirmed = dispatchStatus === 'collected' || ['in_progress', 'out_for_delivery', 'completed', 'handed_over'].includes(String(runStatus));
 
     let totalLoaded = 0;
     let customerItemsCount = 0;
     let emergencyItemsCount = 0;
     let deliveredCount = 0;
-    let pendingCount = 0;
     let returnedCount = 0;
     let damagedCount = 0;
-    let cancelledCount = 0;
 
-    const productMap: Record<string, any> = {};
-
-    for (const item of rawItems || []) {
-      const qty = Number(item.quantity || 1);
-      totalLoaded += qty;
-
-      if (item.item_type === 'EMERGENCY') {
-        emergencyItemsCount += qty;
-      } else {
-        customerItemsCount += qty;
-      }
-
-      if (item.status === 'DELIVERED') deliveredCount += qty;
-      else if (item.status === 'IN_BASKET' || item.status === 'ALLOCATED') pendingCount += qty;
-      else if (item.status === 'RETURNED') returnedCount += qty;
-      else if (item.status === 'DAMAGED') damagedCount += qty;
-      else if (item.status === 'CANCELLED') cancelledCount += qty;
-
-      // Group product level breakdown
-      const pKey = item.variant_id || item.product_id || 'UNKNOWN';
-      if (!productMap[pKey]) {
-        productMap[pKey] = {
-          variant_id: item.variant_id,
-          name: item.variant_name || 'Product Item',
-          unit: `${item.unit_value || ''}${item.unit_type || ''}`,
-          loaded: 0,
-          delivered: 0,
-          pending: 0,
-          emergency: 0,
-          returned: 0,
-          damaged: 0,
-          current_basket: 0,
-        };
-      }
-
-      const pEntry = productMap[pKey];
-      pEntry.loaded += qty;
-      if (item.item_type === 'EMERGENCY') pEntry.emergency += qty;
-      if (item.status === 'DELIVERED') pEntry.delivered += qty;
-      else if (item.status === 'IN_BASKET' || item.status === 'ALLOCATED') {
-        pEntry.pending += qty;
-        pEntry.current_basket += qty;
-      } else if (item.status === 'RETURNED') pEntry.returned += qty;
-      else if (item.status === 'DAMAGED') pEntry.damaged += qty;
+    for (const p of productBreakdown) {
+      totalLoaded += p.loaded;
+      customerItemsCount += p.planned;
+      emergencyItemsCount += p.emergency;
+      deliveredCount += p.delivered;
+      returnedCount += p.returned;
+      damagedCount += p.damaged;
     }
 
-    const dispatchRes = await this.db.query(
-      `SELECT dispatch_id, status FROM delivery_dispatch WHERE delivery_run_id = $1 LIMIT 1`,
-      [basket.delivery_run_id],
-    );
-    const checkRunRes = await this.db.query(
-      `SELECT status FROM delivery_runs WHERE id::text = $1 OR run_id = $1 LIMIT 1`,
-      [basket.delivery_run_id],
-    );
-    const dispatchStatus = dispatchRes?.length ? dispatchRes[0].status : null;
-    const runStatus = checkRunRes?.length ? checkRunRes[0].status : null;
-
-    const isPickupConfirmed = dispatchStatus === 'collected' ||
-      ['in_progress', 'in_transit', 'out_for_delivery', 'completed'].includes(String(runStatus));
-
-    const dispatchId = dispatchRes?.length
-      ? dispatchRes[0].dispatch_id
-      : `DSP-${basket.id.replace('BSK-', '')}`;
-
-    const effectiveCurrentBasket = isPickupConfirmed
-      ? (totalLoaded - deliveredCount - returnedCount - damagedCount - cancelledCount)
-      : emergencyItemsCount;
-
-    const finalProductBreakdown = Object.values(productMap).map((entry: any) => ({
-      ...entry,
-      current_basket: isPickupConfirmed ? entry.current_basket : entry.emergency,
-    }));
+    const currentBasket = Math.max(0, totalLoaded - deliveredCount - returnedCount - damagedCount);
+    const finalDispatchId = activeDispatchId || (dispatchItemsRes[0]?.dispatch_id) || `DSP-${basket.id.replace('BSK-', '')}`;
 
     return {
       basket_id: basket.id,
-      dispatch_id: dispatchId,
+      dispatch_id: finalDispatchId,
       delivery_partner_id: partnerId,
-      delivery_run_id: basket.delivery_run_id,
+      delivery_run_id: activeRunId || basket.delivery_run_id,
       date: basket.delivery_date,
       status: basket.status,
+      dispatch_status: dispatchStatus,
+      run_status: runStatus,
       pickup_confirmed: isPickupConfirmed,
+      is_sufficient_for_orders: isSufficientForOrders,
       total_loaded: totalLoaded,
       customer_items_count: customerItemsCount,
       emergency_items_count: emergencyItemsCount,
       delivered_count: deliveredCount,
-      pending_count: pendingCount,
+      pending_count: Math.max(0, customerItemsCount - deliveredCount),
       returned_count: returnedCount,
       damaged_count: damagedCount,
-      cancelled_count: cancelledCount,
-      current_basket: Math.max(0, effectiveCurrentBasket),
-      product_breakdown: finalProductBreakdown,
-      items: rawItems,
+      cancelled_count: 0,
+      current_basket: currentBasket,
+      product_breakdown: productBreakdown,
     };
   }
 

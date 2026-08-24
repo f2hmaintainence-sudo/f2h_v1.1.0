@@ -20,8 +20,10 @@ class ProductInventorySummary {
   final int returnedCount; // returned_qty
   final int damagedCount; // damaged_qty
   final int remainingToDeliver; // current_basket
-  final int extraBuffer; // extra_sold_qty
+  final int extraBuffer; // extra_sold_qty / extra load
   final bool isPickupConfirmed;
+  final bool isSufficient;
+  final bool isExtraOnly;
   final List<StopDeliveryItem> stops;
 
   ProductInventorySummary({
@@ -36,6 +38,8 @@ class ProductInventorySummary {
     required this.remainingToDeliver,
     required this.extraBuffer,
     required this.isPickupConfirmed,
+    this.isSufficient = true,
+    this.isExtraOnly = false,
     required this.stops,
   });
 
@@ -115,6 +119,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
   List<ProductInventorySummary>? _apiProductBreakdown;
   bool _isReturningProducts = false;
   bool? _apiPickupConfirmed;
+  bool _isSufficientForOrders = true;
   bool _isConfirmingPickup = false;
 
   @override
@@ -143,20 +148,22 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
         final data = Map<String, dynamic>.from(response.data as Map);
         final breakdownRaw = (data['product_breakdown'] as List<dynamic>? ?? []);
         final isConfirmed = data['pickup_confirmed'] == true;
+        final isSufficientOverall = data['is_sufficient_for_orders'] != false;
 
         final List<ProductInventorySummary> parsedBreakdown = [];
         for (final item in breakdownRaw) {
           final m = Map<String, dynamic>.from(item as Map);
           final loaded = _parseNum(m['loaded']);
-          final plannedVal = _parseNum(m['planned']);
-          final emergency = _parseNum(m['emergency']);
-          final planned = plannedVal > 0 ? plannedVal : math.max(0, loaded - emergency);
+          final planned = _parseNum(m['planned']);
+          final emergency = _parseNum(m['emergency'] ?? m['extra_load']);
           final delivered = _parseNum(m['delivered']);
           final returned = _parseNum(m['returned']);
           final damaged = _parseNum(m['damaged']);
           final currentBasket = _parseNum(m['current_basket']);
           final unit = m['unit']?.toString() ?? '';
           final name = m['name']?.toString() ?? 'Product Item';
+          final isSufficient = m['is_sufficient'] != false && (loaded >= planned);
+          final isExtraOnly = m['is_extra_only'] == true || (planned == 0 && loaded > 0);
 
           parsedBreakdown.add(
             ProductInventorySummary(
@@ -168,8 +175,10 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
               returnedCount: returned,
               damagedCount: damaged,
               remainingToDeliver: currentBasket > 0 ? currentBasket : math.max(0, loaded - delivered - returned - damaged),
-              extraBuffer: emergency,
+              extraBuffer: emergency > 0 ? emergency : math.max(0, loaded - planned),
               isPickupConfirmed: isConfirmed,
+              isSufficient: isSufficient,
+              isExtraOnly: isExtraOnly,
               stops: [],
             ),
           );
@@ -178,6 +187,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
         if (mounted) {
           setState(() {
             _apiPickupConfirmed = isConfirmed;
+            _isSufficientForOrders = isSufficientOverall && (parsedBreakdown.isEmpty || parsedBreakdown.every((p) => p.isSufficient));
             _apiProductBreakdown = parsedBreakdown;
           });
         }
@@ -536,7 +546,10 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFF86EFAC), width: 1.2),
+                      border: Border.all(
+                        color: _isSufficientForOrders ? const Color(0xFF86EFAC) : const Color(0xFFFCA5A5),
+                        width: 1.2,
+                      ),
                       boxShadow: const [
                         BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2)),
                       ],
@@ -548,11 +561,15 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                           children: [
                             Container(
                               padding: const EdgeInsets.all(8),
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFDCFCE7),
+                              decoration: BoxDecoration(
+                                color: _isSufficientForOrders ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.inventory_2_rounded, color: Color(0xFF16A34A), size: 20),
+                              child: Icon(
+                                _isSufficientForOrders ? Icons.inventory_2_rounded : Icons.warning_amber_rounded,
+                                color: _isSufficientForOrders ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                                size: 20,
+                              ),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
@@ -560,7 +577,9 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Dispatch Handover Pending',
+                                    _isSufficientForOrders
+                                        ? 'Dispatch Handover Ready'
+                                        : 'Dispatched Quantities Insufficient',
                                     style: GoogleFonts.poppins(
                                       fontWeight: FontWeight.w800,
                                       fontSize: 14,
@@ -568,7 +587,9 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                                     ),
                                   ),
                                   Text(
-                                    'Verify physical bag stock against dispatch items below',
+                                    _isSufficientForOrders
+                                        ? 'Physical inventory matches order demand (+${_totalExtraBuffer} extra). Confirm pickup to set orders Out for Delivery.'
+                                        : 'Dispatched items are less than assigned customer orders. Please ask warehouse to load missing quantities before confirming.',
                                     style: GoogleFonts.poppins(
                                       fontSize: 11.5,
                                       color: const Color(0xFF64748B),
@@ -584,23 +605,60 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                           width: double.infinity,
                           height: 44,
                           child: ElevatedButton.icon(
-                            onPressed: _isConfirmingPickup ? null : _confirmPickupFromBasket,
+                            onPressed: (!_isSufficientForOrders || _isConfirmingPickup)
+                                ? null
+                                : _confirmPickupFromBasket,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF16A34A),
                               foregroundColor: Colors.white,
+                              disabledBackgroundColor: const Color(0xFFE2E8F0),
+                              disabledForegroundColor: const Color(0xFF94A3B8),
                               elevation: 0,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                             icon: _isConfirmingPickup
                                 ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                : const Icon(Icons.check_circle_outline_rounded, size: 18),
+                                : Icon(
+                                    _isSufficientForOrders ? Icons.check_circle_outline_rounded : Icons.lock_outline_rounded,
+                                    size: 18,
+                                  ),
                             label: Text(
-                              _isConfirmingPickup ? 'CONFIRMING DISPATCH...' : 'CONFIRM DISPATCH & START DELIVERY',
+                              _isConfirmingPickup
+                                  ? 'CONFIRMING DISPATCH...'
+                                  : (_isSufficientForOrders
+                                      ? 'CONFIRM DISPATCH & START DELIVERY'
+                                      : 'INSUFFICIENT DISPATCH STOCK'),
                               style: GoogleFonts.poppins(
                                 fontWeight: FontWeight.w800,
                                 fontSize: 12,
                                 letterSpacing: 0.3,
                               ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFF86EFAC)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.verified_rounded, color: Color(0xFF16A34A), size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Dispatch Confirmed — Orders Out for Delivery',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF15803D),
                             ),
                           ),
                         ),
@@ -890,20 +948,61 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Top Header: Name + Equal Width Unit Badge + Equal Width In Bag Capsule Badge
+                    // Top Header: Name + Extra / Short Badges + Equal Width Unit Badge + In Bag Badge
                     Row(
                       children: [
                         Expanded(
-                          child: Text(
-                            inv.productName,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF0F172A),
-                              letterSpacing: -0.2,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          child: Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              Text(
+                                inv.productName,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF0F172A),
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                              if (inv.extraBuffer > 0 || inv.isExtraOnly)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF3C7),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFFF59E0B), width: 1),
+                                  ),
+                                  child: Text(
+                                    inv.isExtraOnly ? 'EXTRA ONLY' : 'EXTRA (+${inv.extraBuffer})',
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFFB45309),
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                ),
+                              if (!inv.isSufficient)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEE2E2),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFFEF4444), width: 1),
+                                  ),
+                                  child: Text(
+                                    'SHORT (-${inv.totalOrdered - inv.loaded})',
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFFB91C1C),
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                         const SizedBox(width: 8),

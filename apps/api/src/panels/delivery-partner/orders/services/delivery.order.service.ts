@@ -1219,8 +1219,58 @@ export class DeliveryOrderService {
     const runIds = this.getRunIdentifiers(run);
     const runIdentifier = run.run_id || String(run.id);
 
-    if (!['planned', 'assigned', 'dispatched', 'draft'].includes(String(run.status))) {
-      return { success: true, message: 'Pickup already confirmed', status: run.status };
+    // 1. Fetch dispatch for this run
+    const dispatchRes = await this.db.query(
+      `SELECT dd.id, dd.dispatch_id, dd.status
+       FROM delivery_dispatch dd
+       WHERE dd.delivery_run_id = ANY($1)
+       ORDER BY dd.created_at DESC
+       LIMIT 1`,
+      [runIds],
+    );
+    const dispatch = dispatchRes?.length ? dispatchRes[0] : null;
+
+    if (dispatch?.status === 'collected' || ['in_progress', 'completed', 'handed_over'].includes(String(run.status))) {
+      return { success: true, message: 'Pickup already confirmed', status: 'in_progress', run_id: runIdentifier };
+    }
+
+    // 2. Validate that dispatched items are sufficient for assigned orders
+    const ordersReqRes = await this.db.query(
+      `SELECT
+         oi.variant_id AS product_variant_id,
+         SUM(oi.quantity)::numeric AS required_qty
+       FROM orders o
+       JOIN order_items oi ON oi.order_id = o.order_id
+       WHERE (o.delivery_run_id = ANY($1) OR o.delivery_partner_id = $2)
+         AND (o.scheduled_date::date = CURRENT_DATE OR (o.scheduled_date IS NULL AND DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE))
+         AND o.status NOT IN ('cancelled', 'failed')
+       GROUP BY oi.variant_id`,
+      [runIds, boy.user_id],
+    );
+
+    if (dispatch && ordersReqRes && ordersReqRes.length > 0) {
+      const dispatchItemsRes = await this.db.query(
+        `SELECT product_variant_id, COALESCE(loaded_qty, 0)::numeric AS loaded_qty, COALESCE(planned_qty, 0)::numeric AS planned_qty
+         FROM delivery_dispatch_items
+         WHERE dispatch_id = $1 AND deleted_at IS NULL`,
+        [dispatch.dispatch_id],
+      );
+
+      const loadedMap: Record<string, number> = {};
+      for (const di of dispatchItemsRes || []) {
+        loadedMap[String(di.product_variant_id)] = Number(di.loaded_qty || di.planned_qty || 0);
+      }
+
+      for (const req of ordersReqRes) {
+        const vId = String(req.product_variant_id);
+        const reqQty = Number(req.required_qty || 0);
+        const loadedQty = loadedMap[vId] || 0;
+        if (loadedQty < reqQty) {
+          throw new BadRequestException(
+            `Cannot confirm pickup: dispatched quantity (${loadedQty}) is insufficient for assigned orders (${reqQty}). Please request warehouse to load required items.`,
+          );
+        }
+      }
     }
 
     await this.db.transaction(async (client) => {
