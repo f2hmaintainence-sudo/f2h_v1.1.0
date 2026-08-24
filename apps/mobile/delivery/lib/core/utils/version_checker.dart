@@ -7,16 +7,17 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_delivery/core/api/api_endpoints.dart';
 
 class VersionChecker {
+  static const String _defaultPlayStoreUrl = 'https://play.google.com/store/apps/details?id=com.f2h.delivery';
+
   /// Checks for updates. Returns [true] if a forced update is required and active, blocking navigation.
   static Future<bool> checkUpdates(BuildContext context) async {
+    if (kIsWeb) return false;
     try {
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
-      final platform = kIsWeb
-          ? 'web_delivery'
-          : defaultTargetPlatform == TargetPlatform.iOS
-              ? 'ios_delivery'
-              : 'android_delivery';
+      final platform = defaultTargetPlatform == TargetPlatform.iOS
+          ? 'ios_delivery'
+          : 'android_delivery';
 
       final checkUrl = '${ApiEndpoints.baseUrl}/app/check-version';
       final response = await http.get(
@@ -209,11 +210,15 @@ class VersionChecker {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           ),
                           onPressed: () async {
-                            final uri = Uri.parse(url);
+                            final targetUrl = url.trim().isNotEmpty ? url.trim() : _defaultPlayStoreUrl;
+                            final uri = Uri.parse(targetUrl);
                             try {
                               await launchUrl(uri, mode: LaunchMode.externalApplication);
                             } catch (e) {
                               debugPrint('Could not launch update URL: $e');
+                              try {
+                                await launchUrl(Uri.parse(_defaultPlayStoreUrl), mode: LaunchMode.externalApplication);
+                              } catch (_) {}
                             }
                             if (!forceUpdate && context.mounted) {
                               Navigator.pop(context);

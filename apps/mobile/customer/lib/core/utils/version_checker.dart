@@ -1,5 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
@@ -12,9 +13,12 @@ import 'package:f2h_customer/core/api/api_endpoints.dart';
 
 class VersionChecker {
   static final _updater = ShorebirdUpdater();
+  static const String _defaultPlayStoreUrl = 'https://play.google.com/store/apps/details?id=com.f2h.customer';
   static String get _versionApiUrl => '${ApiEndpoints.baseUrl}${ApiEndpoints.appVersion}';
 
   static Future<void> checkUpdates(BuildContext context) async {
+    if (kIsWeb) return;
+
     // 0. Non-blocking device info reporting in background (never blocks UI)
     _sendDeviceInformation();
 
@@ -47,7 +51,7 @@ class VersionChecker {
       debugPrint('Shorebird check error: $e');
     }
 
-    // 2. Check for Major Updates (APK Replacement)
+    // 2. Check for Major Updates (Play Store / App Update)
     try {
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
@@ -305,11 +309,16 @@ class VersionChecker {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           ),
                           onPressed: () async {
-                            final uri = Uri.parse(url);
+                            final targetUrl = url.trim().isNotEmpty ? url.trim() : _defaultPlayStoreUrl;
+                            final uri = Uri.parse(targetUrl);
                             try {
                               await launchUrl(uri, mode: LaunchMode.externalApplication);
                             } catch (e) {
                               debugPrint('Could not launch update URL: $e');
+                              // Fallback to direct Play Store intent
+                              try {
+                                await launchUrl(Uri.parse(_defaultPlayStoreUrl), mode: LaunchMode.externalApplication);
+                              } catch (_) {}
                             }
                             if (!forceUpdate && context.mounted) {
                               Navigator.pop(context);
