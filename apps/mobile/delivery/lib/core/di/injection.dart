@@ -16,6 +16,7 @@ import 'package:f2h_delivery/features/orders/presentation/bloc/handover_bloc.dar
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/core/isar/isar_service.dart';
 import 'package:f2h_delivery/services/location_service.dart';
+import 'package:f2h_delivery/services/route_optimization_service.dart';
 import 'package:f2h_delivery/services/location_tracking_service.dart';
 
 import 'package:f2h_delivery/core/config/config_repository.dart';
@@ -81,6 +82,7 @@ Future<void> init() async {
 
   // Services
   sl.registerLazySingleton(() => LocationService());
+  sl.registerLazySingleton(() => RouteOptimizationService(locationService: sl()));
   sl.registerLazySingleton(() => LocationTrackingService(
     locationService: sl(),
     dioClient: sl(),

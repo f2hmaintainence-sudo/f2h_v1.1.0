@@ -9,6 +9,7 @@ import { PushNotificationService } from '../../../../shared/pushNotifications/pu
 import { DeveloperService } from '../../../../shared/logger/Developer.service';
 import { FirstOrderDetectorService } from '../../../customer/referral/services/first-order-detector.service';
 import { ReferralRewardEngineService } from '../../../customer/referral/services/referral-reward-engine.service';
+import { isDispatchHandedOver } from '../dispatch-status';
 
 @Injectable()
 export class DeliveryOrderService {
@@ -222,6 +223,70 @@ export class DeliveryOrderService {
     return ids;
   }
 
+
+  /**
+   * The active delivery_dispatch row for a run. `delivery_dispatch.delivery_run_id`
+   * stores the textual run_id, but callers may hold either the numeric id or the
+   * run_id, so both identifiers are passed through.
+   */
+  async findActiveDispatchForRun(runIds: string[]): Promise<any | null> {
+    if (!runIds?.length) return null;
+
+    const res = await this.db.query(
+      `SELECT dd.id, dd.dispatch_id, dd.delivery_run_id, dd.status, dd.loaded_at, dd.collected_at
+       FROM delivery_dispatch dd
+       WHERE dd.delivery_run_id = ANY($1)
+         AND dd.deleted_at IS NULL
+         AND dd.status <> 'draft'
+       ORDER BY dd.created_at DESC
+       LIMIT 1`,
+      [runIds],
+    );
+    return res?.length ? res[0] : null;
+  }
+
+  /**
+   * Quantities the partner's assigned orders actually require, per variant, taken
+   * from order_items. Scoped to the run's slot so an evening run never counts
+   * against a morning dispatch.
+   */
+  async getOrderedQtyByVariant(
+    runIds: string[],
+    partnerUserId: string,
+    targetDate: string,
+    slot: string,
+  ): Promise<Record<string, number>> {
+    const rows = await this.db.query(
+      `SELECT
+         oi.variant_id AS product_variant_id,
+         SUM(oi.quantity)::numeric AS ordered_qty
+       FROM orders o
+       JOIN order_items oi ON oi.order_id = o.order_id
+       WHERE (o.delivery_run_id = ANY($1) OR o.delivery_partner_id = $2)
+         AND (o.scheduled_date::date = $3::date
+              OR (o.scheduled_date IS NULL AND DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') = $3::date))
+         AND (o.delivery_slot = $4 OR o.delivery_slot IS NULL)
+         AND o.status NOT IN ('cancelled', 'failed')
+       GROUP BY oi.variant_id`,
+      [runIds.length ? runIds : ['NONE'], partnerUserId, targetDate, slot],
+    );
+
+    const map: Record<string, number> = {};
+    for (const r of rows || []) {
+      map[String(r.product_variant_id)] = Number(r.ordered_qty || 0);
+    }
+    return map;
+  }
+
+  /**
+   * Physical quantity a dispatch row represents. loaded_qty is authoritative once
+   * the warehouse has loaded anything; planned_qty stands in only while nothing
+   * has been loaded yet.
+   */
+  effectiveLoadedQty(item: { loaded_qty?: any; planned_qty?: any }): number {
+    const loaded = Number(item.loaded_qty || 0);
+    return loaded > 0 ? loaded : Number(item.planned_qty || 0);
+  }
 
   async findDeliveryRunByIdAndBoy(runId: string, boy: any) {
     const runRes = await this.db.query(
@@ -1101,60 +1166,51 @@ export class DeliveryOrderService {
       }
     }
 
-    // 1. Fetch items ONLY from delivery_dispatch_items table (joining delivery_dispatch & delivery_runs)
-    const dispatchItemsRes = await this.db.query(
-      `SELECT
-         ddi.id,
-         dd.dispatch_id,
-         ddi.product_variant_id,
-         pv.name AS product_name,
-         pv.unit_value,
-         pv.unit_type,
-         p.is_returnable,
-         COALESCE(ddi.planned_qty, 0)::numeric AS planned_qty,
-         COALESCE(ddi.loaded_qty, 0)::numeric AS loaded_qty,
-         COALESCE(ddi.delivered_qty, 0)::numeric AS delivered_qty,
-         COALESCE(ddi.unit::text, pv.unit_type::text, 'PCS') AS unit
-       FROM delivery_runs dr
-       JOIN delivery_dispatch dd ON dd.delivery_run_id = dr.run_id
-       JOIN delivery_dispatch_items ddi ON ddi.dispatch_id = dd.dispatch_id
-       LEFT JOIN product_variants pv ON pv.variant_id = ddi.product_variant_id
-       LEFT JOIN products p ON p.product_id = pv.product_id
-       WHERE (dr.delivery_partner_id = $1 OR dr.run_id = ANY($2))
-         AND DATE(dr.run_date AT TIME ZONE 'Asia/Kolkata') = $3
-         AND ddi.deleted_at IS NULL
-       ORDER BY pv.name`,
-      [boy.user_id, runIds.length ? runIds : ['NONE'], targetDate],
-    );
+    // 1. Resolve the active dispatch for this run. Its status — not the run status —
+    //    decides whether the handover has already happened.
+    const dispatch = await this.findActiveDispatchForRun(runIds);
+    const dispatchStatus = dispatch?.status || 'draft';
 
-    // 2. Fetch required quantities from assigned orders to check sufficiency against dispatch
-    const ordersReqRes = await this.db.query(
-      `SELECT
-         oi.variant_id AS product_variant_id,
-         SUM(oi.quantity)::numeric AS required_qty
-       FROM orders o
-       JOIN order_items oi ON oi.order_id = o.order_id
-       WHERE (o.delivery_run_id = ANY($1) OR o.delivery_partner_id = $2)
-         AND (o.scheduled_date::date = $3 OR (o.scheduled_date IS NULL AND DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') = $3))
-         AND o.status NOT IN ('cancelled', 'failed')
-       GROUP BY oi.variant_id`,
-      [runIds.length ? runIds : ['NONE'], boy.user_id, targetDate],
-    );
+    // 2. Fetch items ONLY from delivery_dispatch_items, keyed on the active dispatch_id
+    //    so EXTRA quantities loaded at the warehouse come through untouched.
+    const dispatchItemsRes = dispatch
+      ? await this.db.query(
+          `SELECT
+             ddi.id,
+             ddi.dispatch_id,
+             ddi.product_variant_id,
+             pv.name AS product_name,
+             pv.unit_value,
+             pv.unit_type,
+             p.is_returnable,
+             COALESCE(ddi.planned_qty, 0)::numeric AS planned_qty,
+             COALESCE(ddi.loaded_qty, 0)::numeric AS loaded_qty,
+             COALESCE(ddi.delivered_qty, 0)::numeric AS delivered_qty,
+             COALESCE(ddi.returned_qty, 0)::numeric AS returned_qty,
+             COALESCE(ddi.damaged_qty, 0)::numeric AS damaged_qty,
+             COALESCE(ddi.unit::text, pv.unit_type::text, 'PCS') AS unit
+           FROM delivery_dispatch_items ddi
+           LEFT JOIN product_variants pv ON pv.variant_id = ddi.product_variant_id
+           LEFT JOIN products p ON p.product_id = pv.product_id
+           WHERE ddi.dispatch_id = $1
+             AND ddi.deleted_at IS NULL
+           ORDER BY pv.name`,
+          [dispatch.dispatch_id],
+        )
+      : [];
 
-    const requiredMap: Record<string, number> = {};
-    for (const r of ordersReqRes || []) {
-      requiredMap[String(r.product_variant_id)] = Number(r.required_qty || 0);
-    }
+    // 3. Quantities the assigned orders require, from order_items.
+    const orderedMap = await this.getOrderedQtyByVariant(runIds, String(boy.user_id), targetDate, targetSlot);
 
-    let isSufficientForOrders = true;
     const items = (dispatchItemsRes || []).map((di: any) => {
       const vId = String(di.product_variant_id);
-      const reqQty = requiredMap[vId] || 0;
-      const planned = Number(di.planned_qty || 0);
-      const loaded = Number(di.loaded_qty || 0);
-      const effectiveStock = loaded > 0 ? loaded : planned;
-      const isSufficient = effectiveStock >= reqQty;
-      if (!isSufficient) isSufficientForOrders = false;
+      const orderedQty = orderedMap[vId] || 0;
+      const plannedQty = Number(di.planned_qty || 0);
+      const loadedQty = Number(di.loaded_qty || 0);
+      const deliveredQty = Number(di.delivered_qty || 0);
+      const returnedQty = Number(di.returned_qty || 0);
+      const damagedQty = Number(di.damaged_qty || 0);
+      const effectiveStock = this.effectiveLoadedQty(di);
 
       return {
         id: di.id ? String(di.id) : vId,
@@ -1164,15 +1220,35 @@ export class DeliveryOrderService {
         unit: `${di.unit_value || ''}${di.unit || 'PCS'}`,
         unit_value: di.unit_value || 1,
         is_returnable: di.is_returnable || false,
-        planned_qty: planned,
-        loaded_qty: loaded,
-        required_qty: reqQty,
-        is_sufficient: isSufficient,
+        planned_qty: plannedQty,
+        loaded_qty: loadedQty,
+        delivered_qty: deliveredQty,
+        returned_qty: returnedQty,
+        damaged_qty: damagedQty,
+        ordered_qty: orderedQty,
+        required_qty: orderedQty,
+        extra_qty: Math.max(0, effectiveStock - orderedQty),
+        shortage_qty: Math.max(0, orderedQty - effectiveStock),
+        remaining_qty: Math.max(0, orderedQty - deliveredQty),
+        in_basket_qty: Math.max(0, loadedQty - deliveredQty - returnedQty - damagedQty),
+        is_sufficient: effectiveStock >= orderedQty,
+        is_extra_only: orderedQty === 0 && effectiveStock > 0,
         quantity: effectiveStock,
       };
     });
 
-    const isConfirmed = ['in_progress', 'completed', 'partial', 'out_for_delivery'].includes(String(runStatus));
+    // A variant the orders need but the dispatch never loaded is a shortage that must
+    // block confirmation, so it has to be counted even though it has no dispatch row.
+    const dispatchedVariantIds = new Set(items.map((i) => i.product_variant_id));
+    const missingVariantIds = Object.keys(orderedMap).filter(
+      (vId) => orderedMap[vId] > 0 && !dispatchedVariantIds.has(vId),
+    );
+
+    const isSufficientForOrders =
+      missingVariantIds.length === 0 &&
+      items.filter((i) => i.ordered_qty > 0).every((i) => i.is_sufficient);
+
+    const isConfirmed = isDispatchHandedOver(dispatchStatus);
 
     return {
       status: true,
@@ -1181,8 +1257,13 @@ export class DeliveryOrderService {
       run_id: runIdentifier,
       run_status: runStatus,
       slot: runSlot,
+      dispatch_id: dispatch?.dispatch_id || null,
+      dispatch_status: dispatchStatus,
+      has_dispatch: !!dispatch,
       pickup_confirmed: isConfirmed,
+      can_confirm_pickup: !!dispatch && !isConfirmed && isSufficientForOrders && items.length > 0,
       is_sufficient_for_orders: isSufficientForOrders,
+      missing_variant_ids: missingVariantIds,
       items,
     };
   }

@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../../../shared/database/Database.service';
+import { isDispatchHandedOver } from '../dispatch-status';
 
 @Injectable()
 export class BasketService {
@@ -396,97 +397,150 @@ export class BasketService {
 
     const productMap: Record<string, any> = {};
 
-    // Process all dispatched items (including extra items loaded at warehouse)
+    // 6. Build the per-variant ledger. delivery_dispatch_items is the physical truth
+    //    of what the warehouse handed over (EXTRA loads included); order_items is the
+    //    demand it has to cover. Every quantity below is one or the other, never a mix.
     for (const dItem of dispatchItemsRes || []) {
       const vName = dItem.variant_name || dItem.product_name || 'Product Item';
       if (isContainerName(vName)) continue;
 
       const vId = String(dItem.product_variant_id);
       const liveInfo = livePlannedMap[vId];
-      const orderPlanned = liveInfo ? liveInfo.planned : 0;
-      const ddiPlanned = Number(dItem.planned_qty || 0);
-      const planned = orderPlanned > 0 ? orderPlanned : ddiPlanned;
-      const loaded = Number(dItem.loaded_qty || 0);
-      const extra = Math.max(0, loaded - planned);
-      const delivered = Math.max(Number(dItem.delivered_qty || 0), liveInfo ? liveInfo.delivered : 0);
-      const returned = Number(dItem.returned_qty || 0);
-      const damaged = Number(dItem.damaged_qty || 0);
-      const currentBasket = Math.max(0, loaded - delivered - returned - damaged);
-      const isSufficient = loaded >= planned;
-      const isExtraOnly = planned === 0 && loaded > 0;
+      const orderedQty = liveInfo ? liveInfo.planned : 0;
+      const plannedQty = Number(dItem.planned_qty || 0);
+      const loadedQty = Number(dItem.loaded_qty || 0);
+      const deliveredQty = Math.max(Number(dItem.delivered_qty || 0), liveInfo ? liveInfo.delivered : 0);
+      const returnedQty = Number(dItem.returned_qty || 0);
+      const damagedQty = Number(dItem.damaged_qty || 0);
+      const extraQty = Math.max(0, loadedQty - orderedQty);
+      const shortageQty = Math.max(0, orderedQty - loadedQty);
+      const remainingQty = Math.max(0, orderedQty - deliveredQty);
+      const inBasketQty = Math.max(0, loadedQty - deliveredQty - returnedQty - damagedQty);
 
       productMap[vId] = {
         variant_id: vId,
         product_id: dItem.product_id,
         name: vName,
         unit: `${dItem.unit_value || ''}${dItem.unit_type || dItem.unit || ''}`,
-        planned,
-        loaded,
-        delivered,
-        pending: Math.max(0, planned - delivered),
-        emergency: extra,
-        extra_load: extra,
-        returned,
-        damaged,
-        current_basket: currentBasket,
-        is_sufficient: isSufficient,
-        is_extra_only: isExtraOnly,
+
+        // Explicit dispatch-vs-orders ledger
+        ordered_qty: orderedQty,
+        planned_qty: plannedQty,
+        loaded_qty: loadedQty,
+        extra_qty: extraQty,
+        delivered_qty: deliveredQty,
+        returned_qty: returnedQty,
+        damaged_qty: damagedQty,
+        remaining_qty: remainingQty,
+        in_basket_qty: inBasketQty,
+        shortage_qty: shortageQty,
+        is_sufficient: loadedQty >= orderedQty,
+        is_extra_only: orderedQty === 0 && loadedQty > 0,
+
+        // Legacy keys the delivery app already renders
+        planned: orderedQty > 0 ? orderedQty : plannedQty,
+        loaded: loadedQty,
+        delivered: deliveredQty,
+        pending: remainingQty,
+        emergency: extraQty,
+        extra_load: extraQty,
+        returned: returnedQty,
+        damaged: damagedQty,
+        current_basket: inBasketQty,
       };
     }
 
-    // Include any orders not found in dispatch items
+    // 7. A variant the orders require but the dispatch never loaded is a shortage,
+    //    not an omission — surface it so the partner can see why pickup is blocked.
     for (const [vId, oInfo] of Object.entries(livePlannedMap)) {
       if (isContainerName(oInfo.name)) continue;
-      if (!productMap[vId]) {
-        productMap[vId] = {
-          variant_id: vId,
-          product_id: oInfo.product_id,
-          name: oInfo.name,
-          unit: oInfo.unit,
-          planned: oInfo.planned,
-          loaded: 0,
-          delivered: oInfo.delivered,
-          pending: Math.max(0, oInfo.planned - oInfo.delivered),
-          emergency: 0,
-          extra_load: 0,
-          returned: 0,
-          damaged: 0,
-          current_basket: 0,
-          is_sufficient: false,
-          is_extra_only: false,
-        };
-      }
+      if (productMap[vId]) continue;
+
+      const orderedQty = oInfo.planned;
+      const deliveredQty = oInfo.delivered;
+
+      productMap[vId] = {
+        variant_id: vId,
+        product_id: oInfo.product_id,
+        name: oInfo.name,
+        unit: oInfo.unit,
+
+        ordered_qty: orderedQty,
+        planned_qty: 0,
+        loaded_qty: 0,
+        extra_qty: 0,
+        delivered_qty: deliveredQty,
+        returned_qty: 0,
+        damaged_qty: 0,
+        remaining_qty: Math.max(0, orderedQty - deliveredQty),
+        in_basket_qty: 0,
+        shortage_qty: orderedQty,
+        is_sufficient: orderedQty === 0,
+        is_extra_only: false,
+
+        planned: orderedQty,
+        loaded: 0,
+        delivered: deliveredQty,
+        pending: Math.max(0, orderedQty - deliveredQty),
+        emergency: 0,
+        extra_load: 0,
+        returned: 0,
+        damaged: 0,
+        current_basket: 0,
+      };
     }
 
-    const productBreakdown = Object.values(productMap);
-    const isSufficientForOrders = productBreakdown.length > 0 && productBreakdown.every((p: any) => p.is_sufficient);
-    const runStatus = activeRun?.status || 'planned';
-    // Single source of truth: if dispatchStatus === 'loaded', pickup is pending (isPickupConfirmed = false).
-    // Only when dispatchStatus === 'collected' or 'completed' is pickup confirmed.
-    const isPickupConfirmed = dispatchStatus === 'collected' || dispatchStatus === 'completed';
+    const productBreakdown = Object.values(productMap) as any[];
 
+    // Sufficiency is only meaningful for variants the assigned orders actually
+    // require. An EXTRA-only load carries no demand, so it can never make the
+    // dispatch insufficient — that is what used to block the confirm button
+    // after the warehouse added extra stock.
+    const requiredItems = productBreakdown.filter((p) => p.ordered_qty > 0);
+    const shortageItems = requiredItems.filter((p) => !p.is_sufficient);
+    const isSufficientForOrders = shortageItems.length === 0;
+
+    const runStatus = activeRun?.status || 'planned';
+    const isPickupConfirmed = isDispatchHandedOver(dispatchStatus);
+
+    let totalOrdered = 0;
+    let totalPlanned = 0;
     let totalLoaded = 0;
-    let customerItemsCount = 0;
-    let emergencyItemsCount = 0;
+    let totalExtra = 0;
+    let totalShortage = 0;
     let deliveredCount = 0;
     let returnedCount = 0;
     let damagedCount = 0;
 
     for (const p of productBreakdown) {
-      totalLoaded += p.loaded;
-      customerItemsCount += p.planned;
-      emergencyItemsCount += p.emergency;
-      deliveredCount += p.delivered;
-      returnedCount += p.returned;
-      damagedCount += p.damaged;
+      totalOrdered += p.ordered_qty;
+      totalPlanned += p.planned_qty;
+      totalLoaded += p.loaded_qty;
+      totalExtra += p.extra_qty;
+      totalShortage += p.shortage_qty;
+      deliveredCount += p.delivered_qty;
+      returnedCount += p.returned_qty;
+      damagedCount += p.damaged_qty;
     }
 
     const currentBasket = Math.max(0, totalLoaded - deliveredCount - returnedCount - damagedCount);
-    const finalDispatchId = activeDispatchId || (dispatchItemsRes[0]?.dispatch_id) || `DSP-${basket.id.replace('BSK-', '')}`;
+    const finalDispatchId = activeDispatchId || dispatchItemsRes[0]?.dispatch_id || null;
+
+    const canConfirmPickup =
+      !!finalDispatchId && !isPickupConfirmed && isSufficientForOrders && totalLoaded > 0;
+
+    const pickupAction = !finalDispatchId
+      ? 'unavailable'
+      : isPickupConfirmed
+        ? 'confirmed'
+        : canConfirmPickup
+          ? 'confirm'
+          : 'blocked';
 
     return {
       basket_id: basket.id,
       dispatch_id: finalDispatchId,
+      has_dispatch: !!finalDispatchId,
       delivery_partner_id: partnerId,
       delivery_run_id: activeRunId || basket.delivery_run_id,
       date: basket.delivery_date,
@@ -494,12 +548,27 @@ export class BasketService {
       dispatch_status: dispatchStatus,
       run_status: runStatus,
       pickup_confirmed: isPickupConfirmed,
+      can_confirm_pickup: canConfirmPickup,
+      pickup_action: pickupAction,
       is_sufficient_for_orders: isSufficientForOrders,
+      insufficient_items: shortageItems.map((p) => ({
+        variant_id: p.variant_id,
+        name: p.name,
+        ordered_qty: p.ordered_qty,
+        loaded_qty: p.loaded_qty,
+        shortage_qty: p.shortage_qty,
+      })),
+      total_ordered: totalOrdered,
+      total_planned: totalPlanned,
       total_loaded: totalLoaded,
-      customer_items_count: customerItemsCount,
-      emergency_items_count: emergencyItemsCount,
+      total_extra: totalExtra,
+      total_shortage: totalShortage,
+      total_returned: returnedCount,
+      total_in_bag_now: currentBasket,
+      customer_items_count: totalOrdered,
+      emergency_items_count: totalExtra,
       delivered_count: deliveredCount,
-      pending_count: Math.max(0, customerItemsCount - deliveredCount),
+      pending_count: Math.max(0, totalOrdered - deliveredCount),
       returned_count: returnedCount,
       damaged_count: damagedCount,
       cancelled_count: 0,
@@ -689,27 +758,20 @@ export class BasketService {
     );
     const dispatchIds = (dispatchRes || []).map((d: any) => d.dispatch_id);
 
-    // 2. Update delivery_dispatch_items: set returned_qty = (loaded_qty - delivered_qty - damaged_qty)
-    if (dispatchIds.length > 0) {
-      await this.db.query(
-        `UPDATE delivery_dispatch_items
-         SET
-           returned_qty = GREATEST(0, loaded_qty - delivered_qty - damaged_qty),
-           updated_at = NOW()
-         WHERE (delivery_run_id = $1 OR dispatch_id = ANY($2::varchar[]))
-           AND deleted_at IS NULL`,
-        [activeRunId, dispatchIds],
-      );
-    } else {
-      await this.db.query(
-        `UPDATE delivery_dispatch_items
-         SET
-           returned_qty = GREATEST(0, loaded_qty - delivered_qty - damaged_qty),
-           updated_at = NOW()
-         WHERE delivery_run_id = $1 AND deleted_at IS NULL`,
-        [activeRunId],
-      );
-    }
+    // 2. Update delivery_dispatch_items: set returned_qty = (loaded_qty - delivered_qty - damaged_qty).
+    //    delivery_dispatch_items has no run column of its own — it is reached through
+    //    delivery_dispatch.delivery_run_id.
+    await this.db.query(
+      `UPDATE delivery_dispatch_items ddi
+       SET
+         returned_qty = GREATEST(0, ddi.loaded_qty - ddi.delivered_qty - ddi.damaged_qty),
+         updated_at = NOW()
+       FROM delivery_dispatch dd
+       WHERE dd.dispatch_id = ddi.dispatch_id
+         AND (dd.delivery_run_id = $1 OR dd.dispatch_id = ANY($2::varchar[]))
+         AND ddi.deleted_at IS NULL`,
+      [activeRunId, dispatchIds],
+    );
 
     // 3. Update delivery_baskets status to 'RETURNING' or 'CLOSED'
     await this.db.query(

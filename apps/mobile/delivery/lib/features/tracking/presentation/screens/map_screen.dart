@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/services/location_service.dart';
+import 'package:f2h_delivery/services/route_optimization_service.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/delivery_confirmation_sheet.dart';
@@ -41,6 +42,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   GroupedStop? _selectedStop;
   bool _hideAllClearedCard = false;
 
+  // Shortest Path Route Optimization State
+  OptimizedRouteResult? _optimizedRoute;
+  bool _isCalculatingRoute = false;
+  bool _hasInitialCameraFitted = false;
+
   // Search
   bool _showSearch = false;
   final TextEditingController _searchController = TextEditingController();
@@ -60,6 +66,56 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
   }
 
+  Future<void> _calculateShortestPath(List<GroupedStop> stops) async {
+    if (stops.isEmpty || _isCalculatingRoute) return;
+    _isCalculatingRoute = true;
+    try {
+      final routeService = sl<RouteOptimizationService>();
+      final result = await routeService.fetchShortestPathRoute(
+        currentPosition: _currentPosition,
+        stops: stops,
+      );
+
+      if (mounted) {
+        setState(() {
+          _optimizedRoute = result;
+        });
+
+        if (!_hasInitialCameraFitted) {
+          _hasInitialCameraFitted = true;
+          _fitRouteBounds();
+        }
+      }
+    } catch (e) {
+      print('Error calculating shortest path: $e');
+    } finally {
+      _isCalculatingRoute = false;
+    }
+  }
+
+  void _fitRouteBounds() {
+    final List<LatLng> points = [];
+    if (_currentPosition != null) points.add(_currentPosition!);
+    if (_optimizedRoute != null && _optimizedRoute!.fullRoutePoints.isNotEmpty) {
+      points.addAll(_optimizedRoute!.fullRoutePoints);
+    }
+
+    if (points.length >= 2) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        try {
+          _mapController.fitCamera(
+            CameraFit.bounds(
+              bounds: LatLngBounds.fromPoints(points),
+              padding: const EdgeInsets.fromLTRB(40, 100, 40, 240),
+            ),
+          );
+        } catch (_) {}
+      });
+    } else if (points.length == 1) {
+      _mapController.move(points.first, 15.5);
+    }
+  }
+
   Future<void> _goToCurrentLocation() async {
     try {
       final locationService = sl<LocationService>();
@@ -70,6 +126,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           _currentPosition = newPos;
         });
         _mapController.move(newPos, 16.0);
+
+        final sessionState = context.read<DeliverySessionBloc>().state;
+        if (sessionState is DeliverySessionLoaded) {
+          _calculateShortestPath(sessionState.groupedStops);
+        }
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -449,27 +510,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       },
       listener: (context, state) {
         if (state is DeliverySessionLoaded) {
-          final groupedStops = state.groupedStops;
-          if (groupedStops.isNotEmpty) {
-            final points = groupedStops
-                .where((s) => s.addressLat.isFinite && !s.addressLat.isNaN && s.addressLng.isFinite && !s.addressLng.isNaN)
-                .map((s) => LatLng(s.addressLat, s.addressLng))
-                .toList();
-            if (points.isNotEmpty) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                try {
-                  _mapController.fitCamera(
-                    CameraFit.bounds(
-                      bounds: LatLngBounds.fromPoints(points),
-                      padding: const EdgeInsets.all(60.0),
-                    ),
-                  );
-                } catch (e) {
-                  print('Error fitting camera bounds: $e');
-                }
-              });
-            }
-          }
+          _calculateShortestPath(state.groupedStops);
         }
       },
       child: BlocBuilder<DeliverySessionBloc, DeliverySessionState>(
@@ -482,21 +523,61 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             );
           }
 
-          final groupedStops = state.groupedStops;
-          final pendingCount = state.pendingGroupedStopsCount;
+          final effectiveStops = _optimizedRoute?.orderedStops ?? state.groupedStops;
+          if (_optimizedRoute == null && effectiveStops.isNotEmpty && !_isCalculatingRoute) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _calculateShortestPath(effectiveStops);
+            });
+          }
 
-          final List<LatLng> routePoints = [];
-          if (groupedStops.isNotEmpty) {
-            for (var stop in groupedStops) {
+          final List<Polyline> polylines = [];
+          if (_optimizedRoute != null && _optimizedRoute!.fullRoutePoints.length >= 2) {
+            if (_optimizedRoute!.remainingRoutePoints.length >= 2) {
+              polylines.add(
+                Polyline(
+                  points: _optimizedRoute!.remainingRoutePoints,
+                  strokeWidth: 4.0,
+                  color: const Color(0xFF2563EB),
+                  borderStrokeWidth: 1.5,
+                  borderColor: Colors.white.withOpacity(0.8),
+                ),
+              );
+            }
+            if (_optimizedRoute!.activeLegPoints.length >= 2) {
+              polylines.add(
+                Polyline(
+                  points: _optimizedRoute!.activeLegPoints,
+                  strokeWidth: 5.5,
+                  color: const Color(0xFF10B981),
+                  borderStrokeWidth: 2.5,
+                  borderColor: Colors.white,
+                ),
+              );
+            }
+          } else if (effectiveStops.length > 1) {
+            final List<LatLng> fallbackPoints = [];
+            if (_currentPosition != null) fallbackPoints.add(_currentPosition!);
+            for (var stop in effectiveStops) {
               if (stop.addressLat.isFinite && !stop.addressLat.isNaN && stop.addressLng.isFinite && !stop.addressLng.isNaN) {
-                routePoints.add(LatLng(stop.addressLat, stop.addressLng));
+                fallbackPoints.add(LatLng(stop.addressLat, stop.addressLng));
               }
+            }
+            if (fallbackPoints.length >= 2) {
+              polylines.add(
+                Polyline(
+                  points: fallbackPoints,
+                  strokeWidth: 4.5,
+                  color: const Color(0xFF16A34A),
+                  borderStrokeWidth: 2.0,
+                  borderColor: Colors.white,
+                ),
+              );
             }
           }
 
-          LatLng mapCenter = const LatLng(12.9125, 77.6430);
-          final validStops = groupedStops.where((s) => s.addressLat.isFinite && !s.addressLat.isNaN && s.addressLng.isFinite && !s.addressLng.isNaN).toList();
-          if (validStops.isNotEmpty) {
+          LatLng mapCenter = _currentPosition ?? const LatLng(12.9125, 77.6430);
+          final validStops = effectiveStops.where((s) => s.addressLat.isFinite && !s.addressLat.isNaN && s.addressLng.isFinite && !s.addressLng.isNaN).toList();
+          if (_currentPosition == null && validStops.isNotEmpty) {
             double totalLat = 0;
             double totalLng = 0;
             for (var stop in validStops) {
@@ -525,20 +606,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                         userAgentPackageName: 'com.f2h.delivery',
                         subdomains: const ['mt0', 'mt1', 'mt2', 'mt3'],
                       ),
-                      if (routePoints.length > 1)
+                      if (polylines.isNotEmpty)
                         PolylineLayer(
-                          polylines: [
-                            Polyline(
-                              points: routePoints,
-                              strokeWidth: 4.0,
-                              color: const Color(0xFF16A34A),
-                              borderStrokeWidth: 2.0,
-                              borderColor: Colors.white,
-                            ),
-                          ],
+                          polylines: polylines,
                         ),
                       MarkerLayer(
-                        markers: _buildMarkers(groupedStops),
+                        markers: _buildMarkers(effectiveStops),
                       ),
                     ],
                   ),
@@ -578,10 +651,19 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   top: MediaQuery.of(context).padding.top + 12,
                   left: 16,
                   right: 72,
-                  child: _buildSearchBar(groupedStops),
+                  child: _buildSearchBar(effectiveStops),
                 ),
 
-                // 4. Floating Side Map Options
+                // 4. Floating Shortest Route Summary Card
+                if (!_showSearch)
+                  Positioned(
+                    top: MediaQuery.of(context).padding.top + 70,
+                    left: 16,
+                    right: 72,
+                    child: _buildShortestRouteCard(),
+                  ),
+
+                // 5. Floating Side Map Options
                 Positioned(
                   right: 16,
                   top: MediaQuery.of(context).padding.top + 12,
@@ -634,8 +716,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   ),
                 ),
 
-                // 5. Bottom Active Delivery Details HUD
-                _buildBottomHUD(state),
+                // 6. Bottom Active Delivery Details HUD
+                _buildBottomHUD(state, effectiveStops),
               ],
             ),
           );
@@ -879,9 +961,183 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildBottomHUD(DeliverySessionLoaded state) {
-    final groupedStops = state.groupedStops;
-    final nextStop = _selectedStop ?? state.nextGroupedDelivery;
+  Widget _buildShortestRouteCard() {
+    if (_optimizedRoute == null || _optimizedRoute!.fullRoutePoints.length < 2) {
+      return const SizedBox.shrink();
+    }
+
+    final route = _optimizedRoute!;
+    final pendingStops = route.orderedStops.where(
+      (s) => s.status != 'delivered' && s.status != 'completed' && s.status != 'failed',
+    ).toList();
+    final nextPending = pendingStops.isNotEmpty ? pendingStops.first : route.orderedStops.first;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.96),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFDCFCE7), width: 1.5),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1F000000),
+            blurRadius: 14,
+            offset: Offset(0, 4),
+          )
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF16A34A),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.bolt_rounded, color: Colors.white, size: 13),
+                    const SizedBox(width: 4),
+                    Text(
+                      'SHORTEST ROUTE',
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 10,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: _fitRouteBounds,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.fit_screen_rounded, size: 12, color: Color(0xFF475569)),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Fit Route',
+                        style: GoogleFonts.poppins(
+                          color: const Color(0xFF475569),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    const Icon(Icons.near_me_rounded, color: Color(0xFF2563EB), size: 16),
+                    const SizedBox(width: 6),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${route.totalDistanceKm.toStringAsFixed(1)} km',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                            color: const Color(0xFF0F172A),
+                          ),
+                        ),
+                        Text(
+                          'Total Distance',
+                          style: GoogleFonts.poppins(fontSize: 9.5, color: const Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Container(width: 1, height: 26, color: const Color(0xFFE2E8F0)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Row(
+                  children: [
+                    const Icon(Icons.schedule_rounded, color: Color(0xFF16A34A), size: 16),
+                    const SizedBox(width: 6),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '~${route.totalDurationMinutes.round()} mins',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                            color: const Color(0xFF0F172A),
+                          ),
+                        ),
+                        Text(
+                          'Est. Travel Time',
+                          style: GoogleFonts.poppins(fontSize: 9.5, color: const Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.flag_circle_rounded, color: Color(0xFF16A34A), size: 14),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Next Stop: Stop #${nextPending.stop} (${nextPending.customerName}) · ${route.activeLegDistanceKm.toStringAsFixed(1)} km',
+                    style: GoogleFonts.poppins(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF334155),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomHUD(DeliverySessionLoaded state, List<GroupedStop> effectiveStops) {
+    final pendingStops = effectiveStops.where((s) => s.status != 'delivered' && s.status != 'completed' && s.status != 'failed').toList();
+    final defaultNext = pendingStops.isNotEmpty ? pendingStops.first : (effectiveStops.isNotEmpty ? effectiveStops.first : null);
+    final nextStop = _selectedStop ?? defaultNext;
+
     if (nextStop == null) {
       if (_hideAllClearedCard) {
         return const Positioned(
@@ -930,7 +1186,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
 
     return MapDeliverySheet(
-      groupedStops: groupedStops,
+      groupedStops: effectiveStops,
       nextStop: nextStop,
       onStopSelected: (stop) {
         setState(() {
