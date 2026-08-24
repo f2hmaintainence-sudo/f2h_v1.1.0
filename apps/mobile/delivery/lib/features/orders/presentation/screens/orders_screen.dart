@@ -349,106 +349,14 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                 ),
               ),
             )
-          : (() {
-              // Group stops by route name
-              final Map<String, List<GroupedStop>> routeStops = {};
-              for (var stop in filtered) {
-                var name = stop.orders.first.routeName ?? stop.orders.first.routeId ?? stop.orders.first.runId ?? 'Unassigned Route';
-                if (name == stop.orders.first.runId) {
-                  name = 'Run: $name';
-                }
-                routeStops.putIfAbsent(name, () => []).add(stop);
-              }
-              
-              final routeNames = routeStops.keys.toList();
-
-              return ListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 80),
-                itemCount: routeNames.length,
-                itemBuilder: (ctx, idx) {
-                  final routeName = routeNames[idx];
-                  final stops = routeStops[routeName]!;
-                  final totalStops = stops.length;
-                  final deliveredCount = stops.where((s) => s.status == 'delivered').length;
-                  final pendingCount = totalStops - deliveredCount;
-
-                  return Theme(
-                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 14),
-                      decoration: BoxDecoration(
-                        color: kSurface,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: kBorder),
-                        boxShadow: [
-                          BoxShadow(
-                            color: kText.withValues(alpha: 0.02),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          )
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: ExpansionTile(
-                          backgroundColor: Colors.transparent,
-                          collapsedBackgroundColor: Colors.transparent,
-                          iconColor: kPrimary,
-                          collapsedIconColor: kTextSub,
-                          title: Text(
-                            routeName,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 15,
-                              color: kText,
-                            ),
-                          ),
-                          subtitle: Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Row(
-                              children: [
-                                Text(
-                                  '$totalStops Stops',
-                                  style: const TextStyle(fontSize: 11, color: kTextSub, fontWeight: FontWeight.w600),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  width: 4,
-                                  height: 4,
-                                  decoration: const BoxDecoration(color: kBorder, shape: BoxShape.circle),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '$deliveredCount Done',
-                                  style: const TextStyle(fontSize: 11, color: kSuccess, fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  width: 4,
-                                  height: 4,
-                                  decoration: const BoxDecoration(color: kBorder, shape: BoxShape.circle),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '$pendingCount Wait',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: pendingCount > 0 ? kAccent : kTextSub,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          childrenPadding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-                          children: stops.map((stop) => _buildOrderCard(context, stop)).toList(),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              );
-            })(),
+          : ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 80),
+              itemCount: filtered.length,
+              itemBuilder: (ctx, idx) {
+                final stop = filtered[idx];
+                return _buildOrderCard(context, stop);
+              },
+            ),
     );
   }
 

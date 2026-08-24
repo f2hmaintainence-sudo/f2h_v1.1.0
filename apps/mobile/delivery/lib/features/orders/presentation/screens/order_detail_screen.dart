@@ -30,7 +30,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   late GroupedStop _currentStop;
   String _calculatedDistanceText = 'Calculating distance...';
   String _calculatedEtaText = 'Calculating ETA...';
-  bool _showAddressDetails = true;
+  bool _showAddressDetails = false;
 
   @override
   void initState() {
@@ -88,7 +88,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
-  void _openNav(double lat, double lng) {
+  void _openNav(double lat, double lng) async {
+    try {
+      await _locationService.getCurrentPosition();
+    } catch (_) {}
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -236,15 +240,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             _buildCustomerProfileCard(),
             const SizedBox(height: 16),
 
-            // Bottle Returns Ledger Card
-            _buildBottleLedgerCard(),
-            const SizedBox(height: 16),
-
-            // Map Route Preview
+            // Map Route Preview (moved to top of bottle returns)
             if (!isDone) ...[
               _buildMapRoutePreviewCard(),
               const SizedBox(height: 16),
             ],
+
+            // Bottle Returns Ledger Card
+            _buildBottleLedgerCard(),
+            const SizedBox(height: 16),
 
             // Order-wise Details Cards
             ..._buildOrderWiseCards(),
@@ -531,12 +535,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              const Text(
-                'CUSTOMER PROFILE',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: kTextSub, letterSpacing: 0.8),
-              ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -550,7 +550,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
           // Big Customer Profile Row
           Row(

@@ -71,8 +71,20 @@ export default function BecomeAPartnerPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f7faf8]" style={{ fontFamily: "Poppins, sans-serif" }}>
-      <div className="mx-auto max-w-[1240px] px-3 pb-16 pt-28 sm:px-4 lg:px-6">
+    <div className="relative min-h-screen overflow-hidden bg-[#f7faf8]" style={{ fontFamily: "Poppins, sans-serif" }}>
+      {/* ── Rich Styled Backdrop Image & Organic Overlay ── */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <img
+          src="/assets/productbg.webp"
+          alt=""
+          aria-hidden
+          className="absolute inset-0 h-full w-full object-cover opacity-90"
+          loading="eager"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#f9f6ef]/85 via-[#edf7ed]/75 to-[#f2f9f3]/90" />
+      </div>
+
+      <div className="relative z-10 mx-auto max-w-[1240px] px-3 pb-16 pt-28 sm:px-4 lg:px-6">
         {/* Breadcrumb Navigation */}
         <nav className="mb-6 flex items-center gap-1.5 text-sm text-slate-500">
           <Link href="/" className="flex items-center gap-1 transition-colors hover:text-emerald-700">
