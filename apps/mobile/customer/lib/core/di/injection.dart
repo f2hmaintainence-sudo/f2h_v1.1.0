@@ -20,6 +20,7 @@ import 'package:f2h_customer/auth/data/datasources/auth_local_datasource.dart';
 import 'package:f2h_customer/auth/data/repositories/auth_repository_impl.dart';
 import 'package:f2h_customer/auth/domain/repositories/auth_repository.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
+import 'package:f2h_customer/core/services/app_asset_service.dart';
 import 'package:f2h_customer/core/network/network_bloc.dart';
 
 import 'package:f2h_customer/features/catalog/data/datasources/catalog_remote_datasource.dart';
@@ -75,6 +76,10 @@ Future<void> init() async {
   sl.registerLazySingleton(() => NotificationService());
   sl.registerLazySingleton(() => CustomerSessionCache());
   sl.registerLazySingleton(() => CustomerBootstrapApi(dioClient: sl()));
+  sl.registerLazySingleton(() => AppAssetService());
+
+  // Warm app asset cache asynchronously
+  AppAssetService().init();
 
   // Data sources
   sl.registerLazySingleton<AuthRemoteDataSource>(

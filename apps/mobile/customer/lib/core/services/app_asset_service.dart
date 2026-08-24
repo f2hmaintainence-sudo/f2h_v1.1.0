@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
@@ -19,6 +20,8 @@ class AppAssetService {
     if (_isInitialized) return;
     _isInitialized = true;
     await _loadFromLocalCache();
+    // Warm image cache from existing local cache immediately
+    _precacheStoredImages();
     // Silently refresh in background
     fetchAndCacheAppAssets();
   }
@@ -38,6 +41,26 @@ class AppAssetService {
     } catch (e) {
       debugPrint('Error loading cached app assets: $e');
     }
+  }
+
+  void _precacheStoredImages() {
+    for (final entry in _assetMap.entries) {
+      final url = entry.value;
+      if (_isImageUrl(url)) {
+        try {
+          DefaultCacheManager().downloadFile(url);
+        } catch (_) {}
+      }
+    }
+  }
+
+  static bool _isImageUrl(String url) {
+    final lower = url.toLowerCase();
+    return lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.gif');
   }
 
   /// Fetches app assets list from GET /customer/assets and updates local cache
@@ -68,6 +91,8 @@ class AppAssetService {
           _assetMap.addAll(newMap);
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString(_prefKey, jsonEncode(_assetMap));
+          // Pre-cache all image assets to disk & memory cache
+          _precacheStoredImages();
         }
       }
     } catch (e) {
@@ -80,6 +105,13 @@ class AppAssetService {
   static String getAssetUrl(String key) {
     if (key.startsWith('http://') || key.startsWith('https://')) {
       return key;
+    }
+
+    if (key.startsWith('api/uploads/')) {
+      return '${ApiEndpoints.host}/${key.substring(4)}';
+    }
+    if (key.startsWith('/api/uploads/')) {
+      return '${ApiEndpoints.host}/${key.substring(5)}';
     }
 
     if (key.startsWith('/uploads/') || key.startsWith('uploads/')) {

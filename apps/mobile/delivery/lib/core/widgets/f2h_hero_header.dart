@@ -26,92 +26,106 @@ class F2hHeroHeader extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 16),
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFE8F7EE),
-            Color(0xFFF3FBF5),
-            Color(0xFFF8FAFC),
-          ],
-          stops: [0.0, 0.55, 1.0],
-        ),
+        color: Color(0xFF0F172A),
       ),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // Background rider illustration placeholder / background image
-          Positioned(
-            right: 0,
-            bottom: -8,
-            child: Opacity(
-              opacity: 0.95,
-              child: SizedBox(
-                width: 145,
-                height: 110,
-                child: Image.asset(
-                  'assets/bg/home_intro.jpg',
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          // 1. Top Background Image (assets/home_bg.png)
+          Positioned.fill(
+            child: Image.asset(
+              'assets/home_bg.png',
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
+              errorBuilder: (_, __, ___) => Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF064E3B),
+                      Color(0xFF065F46),
+                      Color(0xFF0F172A),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
 
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top Bar with Greeting and Notification Icon
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${AppGreeting.get()}, $firstName!',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.poppins(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFF0F172A),
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Row(
-                          children: [
-                            Text(
-                              'Ready to deliver amazing today',
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: const Color(0xFF64748B),
-                              ),
-                            ),
-                            const SizedBox(width: 3),
-                            const Text('📍', style: TextStyle(fontSize: 12)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Notification Bell Pill Button
-                  _buildBellButton(onTap: onNotifications, unreadCount: unreadCount),
-                ],
+          // 2. Elegant dark/emerald gradient overlay for text readability & contrast
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.40),
+                    Colors.black.withValues(alpha: 0.72),
+                  ],
+                ),
               ),
+            ),
+          ),
 
-              const SizedBox(height: 14),
+          // 3. Top Header Content (Greeting, Bell, Online Pill)
+          Padding(
+            padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Bar with Greeting and Notification Icon
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${AppGreeting.get()}, $firstName!',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              Text(
+                                'Ready to deliver amazing today',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: const Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              const SizedBox(width: 3),
+                              const Text('📍', style: TextStyle(fontSize: 12)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
 
-              // Online / Offline Status Dropdown Pill
-              _buildOnlineStatusPill(context),
-            ],
+                    // Notification Bell Pill Button
+                    _buildBellButton(onTap: onNotifications, unreadCount: unreadCount),
+                  ],
+                ),
+
+                const SizedBox(height: 14),
+
+                // Online / Offline Status Dropdown Pill
+                _buildOnlineStatusPill(context),
+              ],
+            ),
           ),
         ],
       ),

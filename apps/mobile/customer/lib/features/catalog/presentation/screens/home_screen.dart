@@ -1969,7 +1969,7 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
           Opacity(
             opacity: (1.0 - shrinkFactor).clamp(0.0, 1.0),
             child: AppAssetImage(
-              assetKey: 'assets/bg/home_bg.jpg',
+              assetKey: 'api/uploads/app_assets/bg/home_bg.jpg',
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
               errorBuilder: (context, error, stackTrace) {
