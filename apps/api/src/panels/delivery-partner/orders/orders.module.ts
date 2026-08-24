@@ -1,17 +1,26 @@
 import { Module } from '@nestjs/common';
 import { DeliveryOrderController } from './controllers/delivery.order.controller';
+import { BasketController } from './controllers/basket.controller';
 import { DatabaseService } from 'src/shared/database/Database.service';
 import { DataService } from 'src/shared/database/Data.service';
 import { DeveloperService } from 'src/shared/logger/Developer.service';
 import { HelpersModule } from 'src/helpers/Helpers.module';
 import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
 import { DeliveryOrderService } from './services/delivery.order.service';
+import { BasketService } from './services/basket.service';
 
 import { ReferralModule } from '../../customer/referral/referral.module';
 
 @Module({
   imports: [HelpersModule, ReferralModule],
-  controllers: [DeliveryOrderController],
-  providers: [DeveloperService, PushNotificationService, DataService, DeliveryOrderService],
+  controllers: [DeliveryOrderController, BasketController],
+  providers: [
+    DeveloperService,
+    PushNotificationService,
+    DataService,
+    DeliveryOrderService,
+    BasketService,
+  ],
+  exports: [BasketService],
 })
 export class DeliveryOrdersModule {}

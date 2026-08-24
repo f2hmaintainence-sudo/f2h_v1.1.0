@@ -55,6 +55,9 @@ export class BasketService {
    * Synchronizes assigned run order items into physical basket_items.
    */
   async syncRunOrdersToBasket(basketId: string, partnerId: string, runId?: string): Promise<void> {
+    const kolkataHour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getHours();
+    const currentSlot = kolkataHour < 12 ? 'morning' : 'evening';
+
     // 0. Purge any stale basket items not belonging to today's active orders
     await this.db.query(
       `DELETE FROM basket_items
@@ -62,11 +65,12 @@ export class BasketService {
          AND item_type = 'ORDER'
          AND order_id NOT IN (
            SELECT o.order_id FROM orders o
-           WHERE (o.delivery_partner_id = $2 OR ($3::text IS NOT NULL AND o.delivery_run_id = $3::text))
+           WHERE (($3::text IS NOT NULL AND (o.delivery_run_id = $3::text OR o.delivery_run_id::text = $3::text))
+                  OR (o.delivery_partner_id = $2 AND (o.delivery_slot = $4 OR $4 IS NULL)))
              AND (o.scheduled_date::date = CURRENT_DATE OR (o.scheduled_date IS NULL AND DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE))
              AND o.status NOT IN ('cancelled', 'failed')
          )`,
-      [basketId, partnerId, runId || null],
+      [basketId, partnerId, runId || null, currentSlot],
     );
 
     // Query all active orders assigned to partner / run for today
@@ -75,10 +79,11 @@ export class BasketService {
        FROM orders o
        JOIN order_items oi ON oi.order_id = o.order_id
        LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
-       WHERE (o.delivery_partner_id = $1 OR ($2::text IS NOT NULL AND o.delivery_run_id = $2::text))
+       WHERE (($2::text IS NOT NULL AND (o.delivery_run_id = $2::text OR o.delivery_run_id::text = $2::text))
+              OR (o.delivery_partner_id = $1 AND (o.delivery_slot = $3 OR $3 IS NULL)))
          AND (o.scheduled_date::date = CURRENT_DATE OR (o.scheduled_date IS NULL AND DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE))
          AND o.status NOT IN ('cancelled', 'failed')`,
-      [partnerId, runId || null],
+      [partnerId, runId || null, currentSlot],
     );
 
     for (const item of ordersRes || []) {
@@ -305,7 +310,9 @@ export class BasketService {
     const activeDispatchId = activeDispatch?.dispatch_id;
     const dispatchStatus = activeDispatch?.dispatch_status || 'draft';
 
-    // 4. Fetch live planned & delivered quantities from orders & order_items
+    const runSlot = activeRun?.delivery_slot || currentSlot;
+
+    // 4. Fetch live planned & delivered quantities from orders & order_items for this run/slot
     const livePlannedRes = await this.db.query(
       `SELECT
          oi.variant_id AS product_variant_id,
@@ -320,11 +327,14 @@ export class BasketService {
        JOIN order_items oi ON oi.order_id = o.order_id
        LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
        LEFT JOIN products p ON p.product_id = pv.product_id
-       WHERE (o.delivery_run_id = ANY($1) OR o.delivery_partner_id = ANY($2))
+       WHERE (
+         (o.delivery_run_id = ANY($1))
+         OR (o.delivery_partner_id = ANY($2) AND (o.delivery_slot = $3 OR $3 IS NULL))
+       )
          AND (o.scheduled_date::date = CURRENT_DATE OR (o.scheduled_date IS NULL AND DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE))
          AND o.status NOT IN ('cancelled', 'failed')
        GROUP BY oi.variant_id, pv.name, pv.unit_value, pv.unit_type, p.product_id, p.name`,
-      [runIds.length ? runIds : ['NONE'], partnerIds],
+      [runIds.length ? runIds : ['NONE'], partnerIds, runSlot],
     );
 
     const livePlannedMap: Record<string, { planned: number; delivered: number; name: string; unit: string; product_id?: string }> = {};
