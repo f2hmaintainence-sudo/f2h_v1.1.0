@@ -300,7 +300,7 @@ export class BasketService {
          oi.variant_id AS product_variant_id,
          pv.name AS variant_name,
          pv.unit_value,
-         pv.unit_type,
+         pv.unit_type::text AS unit_type,
          p.product_id,
          p.name AS product_name,
          SUM(oi.quantity)::numeric AS planned_qty,
@@ -337,7 +337,7 @@ export class BasketService {
            ddi.product_variant_id,
            pv.name AS variant_name,
            pv.unit_value,
-           pv.unit_type,
+           pv.unit_type::text AS unit_type,
            p.product_id,
            p.name AS product_name,
            p.is_returnable,
@@ -347,7 +347,7 @@ export class BasketService {
            COALESCE(ddi.returned_qty, 0)::numeric AS returned_qty,
            COALESCE(ddi.damaged_qty, 0)::numeric AS damaged_qty,
            COALESCE(ddi.extra_sold_qty, 0)::numeric AS extra_sold_qty,
-           COALESCE(ddi.unit, pv.unit_type, 'PCS') AS unit
+           COALESCE(ddi.unit::text, pv.unit_type::text, 'PCS') AS unit
          FROM delivery_dispatch_items ddi
          LEFT JOIN product_variants pv ON pv.variant_id = ddi.product_variant_id
          LEFT JOIN products p ON p.product_id = pv.product_id
@@ -366,7 +366,7 @@ export class BasketService {
            ddi.product_variant_id,
            pv.name AS variant_name,
            pv.unit_value,
-           pv.unit_type,
+           pv.unit_type::text AS unit_type,
            p.product_id,
            p.name AS product_name,
            p.is_returnable,
@@ -376,7 +376,7 @@ export class BasketService {
            COALESCE(ddi.returned_qty, 0)::numeric AS returned_qty,
            COALESCE(ddi.damaged_qty, 0)::numeric AS damaged_qty,
            COALESCE(ddi.extra_sold_qty, 0)::numeric AS extra_sold_qty,
-           COALESCE(ddi.unit, pv.unit_type, 'PCS') AS unit
+           COALESCE(ddi.unit::text, pv.unit_type::text, 'PCS') AS unit
          FROM delivery_runs dr
          JOIN delivery_dispatch dd ON dd.delivery_run_id = dr.run_id
          JOIN delivery_dispatch_items ddi ON ddi.dispatch_id = dd.dispatch_id

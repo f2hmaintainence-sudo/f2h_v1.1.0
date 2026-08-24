@@ -1114,7 +1114,7 @@ export class DeliveryOrderService {
          COALESCE(ddi.planned_qty, 0)::numeric AS planned_qty,
          COALESCE(ddi.loaded_qty, 0)::numeric AS loaded_qty,
          COALESCE(ddi.delivered_qty, 0)::numeric AS delivered_qty,
-         COALESCE(ddi.unit, pv.unit_type, 'PCS') AS unit
+         COALESCE(ddi.unit::text, pv.unit_type::text, 'PCS') AS unit
        FROM delivery_runs dr
        JOIN delivery_dispatch dd ON dd.delivery_run_id = dr.run_id
        JOIN delivery_dispatch_items ddi ON ddi.dispatch_id = dd.dispatch_id

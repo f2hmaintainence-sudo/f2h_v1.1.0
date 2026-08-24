@@ -18,6 +18,7 @@ import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/privacy_screen.dart';
+import 'package:f2h_customer/features/profile/presentation/screens/terms_conditions_screen.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -306,7 +307,11 @@ class _SignupScreenState extends State<SignupScreen> {
               _TermsCheckbox(
                 value: _agreeToTerms,
                 onChanged: (v) => setState(() => _agreeToTerms = v),
-                onOpenPolicy: () => Navigator.push(
+                onOpenTerms: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TermsConditionsScreen()),
+                ),
+                onOpenPrivacy: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const PrivacyScreen()),
                 ),
@@ -380,12 +385,14 @@ class _FieldHint extends StatelessWidget {
 class _TermsCheckbox extends StatelessWidget {
   final bool value;
   final ValueChanged<bool> onChanged;
-  final VoidCallback onOpenPolicy;
+  final VoidCallback onOpenTerms;
+  final VoidCallback onOpenPrivacy;
 
   const _TermsCheckbox({
     required this.value,
     required this.onChanged,
-    required this.onOpenPolicy,
+    required this.onOpenTerms,
+    required this.onOpenPrivacy,
   });
 
   @override
@@ -423,7 +430,7 @@ class _TermsCheckbox extends StatelessWidget {
                   color: kPrimaryMid,
                   fontWeight: FontWeight.w800,
                 ),
-                recognizer: TapGestureRecognizer()..onTap = onOpenPolicy,
+                recognizer: TapGestureRecognizer()..onTap = onOpenTerms,
               ),
               const TextSpan(text: ' and '),
               TextSpan(
@@ -432,7 +439,7 @@ class _TermsCheckbox extends StatelessWidget {
                   color: kPrimaryMid,
                   fontWeight: FontWeight.w800,
                 ),
-                recognizer: TapGestureRecognizer()..onTap = onOpenPolicy,
+                recognizer: TapGestureRecognizer()..onTap = onOpenPrivacy,
               ),
             ],
           ),

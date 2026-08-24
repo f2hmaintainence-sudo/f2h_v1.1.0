@@ -22,6 +22,8 @@ const PUBLIC_ROUTES = [
   '/refund-policy',
   '/delivery-policy',
   '/delete-account',
+  '/contact-us',
+  '/pricing',
 ];
 
 const PUBLIC_PREFIXES = [
