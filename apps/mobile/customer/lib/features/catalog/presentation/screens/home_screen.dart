@@ -2055,9 +2055,9 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
             right: 16,
             top:
                 topPadding +
-                170 -
+                208 -
                 (shrinkFactor *
-                    162), // Interpolates from topPadding+170 to topPadding+8
+                    200), // Interpolates from topPadding+208 to topPadding+8
             child: GestureDetector(
               onTap: onSearchTap,
               child: Container(
