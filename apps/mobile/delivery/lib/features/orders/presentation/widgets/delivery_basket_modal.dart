@@ -191,7 +191,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
       final dioClient = sl<DioClient>();
       final runIdParam = widget.currentRun?.runId;
       final response = await dioClient.dio.post(
-        '${ApiEndpoints.deliveryBaseUrl}/orders/pickup/confirm',
+        ApiEndpoints.confirmPickup,
         data: runIdParam != null && runIdParam.isNotEmpty ? {'run_id': runIdParam} : {},
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
