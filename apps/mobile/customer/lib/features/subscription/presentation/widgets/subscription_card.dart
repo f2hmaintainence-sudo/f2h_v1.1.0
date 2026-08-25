@@ -74,6 +74,14 @@ class SubCard extends StatelessWidget {
                     ? 'COMPLETED'
                     : 'CANCELLED';
 
+    // Payment Type visuals
+    final isPostpaid = s.paymentType.toLowerCase() == 'postpaid';
+    final Color paymentTypeColor = isPostpaid ? const Color(0xFF7E22CE) : const Color(0xFF047857);
+    final Color paymentTypeBg = isPostpaid ? const Color(0xFFF3E8FF) : const Color(0xFFECFDF5);
+    final Color paymentTypeBorder = isPostpaid ? const Color(0xFFD8B4FE) : const Color(0xFFA7F3D0);
+    final IconData paymentTypeIcon = isPostpaid ? Icons.credit_card_rounded : Icons.account_balance_wallet_outlined;
+    final String paymentTypeLabel = isPostpaid ? 'POSTPAID' : 'PREPAID';
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -167,7 +175,36 @@ class SubCard extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
+                            // Payment Type Badge (Prepaid / Postpaid)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                              decoration: BoxDecoration(
+                                color: paymentTypeBg,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: paymentTypeBorder,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(paymentTypeIcon, size: 10, color: paymentTypeColor),
+                                  const SizedBox(width: 3.5),
+                                  Text(
+                                    paymentTypeLabel,
+                                    style: TextStyle(
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.w900,
+                                      color: paymentTypeColor,
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 5),
                             // Dynamic status badge
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

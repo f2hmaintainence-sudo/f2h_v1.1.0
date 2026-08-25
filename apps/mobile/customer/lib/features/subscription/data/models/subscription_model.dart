@@ -769,7 +769,7 @@ class Subscription {
               ? 'active'
               : (_asString(json['status']) ?? 'active'),
       scheduleType: _asString(json['schedule_type']) ?? 'weekly',
-      paymentType: _asString(json['payment_type']) ?? 'prepaid',
+      paymentType: (_asString(json['payment_type'] ?? json['payment_mode'] ?? json['paymentMode']) ?? 'prepaid').toLowerCase(),
       deliverySlot: slotLabel,
       autoRenew: _isTruthy(json['auto_renew'] ?? json['autoRenew']),
       startDate: _asString(json['start_date'] ?? json['startDate']),
