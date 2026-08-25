@@ -82,6 +82,93 @@ export class DeliveryRunService {
     private readonly refundEligibility: RefundEligibilityService,
   ) { }
 
+  /**
+   * Helper to resolve partner user_id and human-friendly name for notifications
+   */
+  private async resolvePartnerUserInfo(partnerIdOrUserId?: string | null): Promise<{ userId: string; partnerName: string } | null> {
+    if (!partnerIdOrUserId) return null;
+    try {
+      const rows = await this.db.query<any>(
+        `SELECT dp.delivery_partner_id, dp.user_id,
+                COALESCE(NULLIF(TRIM(CONCAT(u.first_name, ' ', u.last_name)), ''), u.user_name, 'Delivery Partner') AS partner_name
+         FROM delivery_partners dp
+         LEFT JOIN users u ON (u.user_id = dp.user_id OR u.user_id = dp.delivery_partner_id)
+         WHERE dp.delivery_partner_id = $1 
+            OR dp.user_id = $1 
+            OR dp.id::varchar = $1 
+            OR u.user_id = $1
+         LIMIT 1`,
+        [partnerIdOrUserId],
+      );
+      if (!rows || rows.length === 0) {
+        return { userId: partnerIdOrUserId, partnerName: 'Delivery Partner' };
+      }
+      return {
+        userId: rows[0].user_id || rows[0].delivery_partner_id || partnerIdOrUserId,
+        partnerName: rows[0].partner_name || 'Delivery Partner',
+      };
+    } catch {
+      return { userId: partnerIdOrUserId, partnerName: 'Delivery Partner' };
+    }
+  }
+
+  /**
+   * Helper to dispatch both in-app notification and FCM mobile push notification to a partner
+   */
+  private async notifyDeliveryPartner(
+    partnerIdOrUserId: string | null | undefined,
+    notification: {
+      title: string;
+      body: string;
+      type?: string;
+      data?: Record<string, any>;
+    },
+  ) {
+    if (!partnerIdOrUserId) return;
+    try {
+      const resolved = await this.resolvePartnerUserInfo(partnerIdOrUserId);
+      if (!resolved?.userId) return;
+      const targetUserId = resolved.userId;
+
+      // 1. In-App & Database Notification (shows in notification bell & history)
+      if (this.notificationService) {
+        try {
+          await this.notificationService.sendNotification({
+            title: notification.title,
+            message: notification.body,
+            type: (['success', 'info', 'warning', 'error'].includes(notification.type || '') ? (notification.type as any) : 'info'),
+            priority: 'high',
+            recipientIds: [targetUserId],
+            senderId: 'admin',
+          });
+        } catch (err) {
+          this.developer.error(`[notifyDeliveryPartner] In-app notification error for ${targetUserId}:`, { err });
+        }
+      }
+
+      // 2. FCM Mobile Push Notification (shows on partner's phone lock screen / banner)
+      if (this.pushNotificationService) {
+        try {
+          await this.pushNotificationService.sendNotificationToUsers(
+            [targetUserId],
+            {
+              title: notification.title,
+              body: notification.body,
+              data: {
+                ...(notification.data || {}),
+                type: notification.type || 'delivery_run_updated',
+              },
+            },
+          );
+        } catch (err) {
+          this.developer.error(`[notifyDeliveryPartner] Push notification error for ${targetUserId}:`, { err });
+        }
+      }
+    } catch (err) {
+      this.developer.error(`[notifyDeliveryPartner] Failed to notify partner ${partnerIdOrUserId}:`, { err });
+    }
+  }
+
   // ────────────────────────────────────────────────
   // Create Optimized Delivery Runs
   // ────────────────────────────────────────────────
@@ -497,21 +584,20 @@ export class DeliveryRunService {
       );
 
       // Notify assigned delivery partners
-      if (this.pushNotificationService) {
-        const assignedPartnerIds = [...new Set(createdRuns.map((r) => r.partner_id).filter(Boolean))];
-        for (const pid of assignedPartnerIds) {
-          try {
-            const partnerRuns = createdRuns.filter((r) => r.partner_id === pid);
-            const totalStops = partnerRuns.reduce((sum, r) => sum + (r.unique_addresses || 0), 0);
-            await this.pushNotificationService.sendNotificationToUsers(
-              [pid!],
-              {
-                title: 'New Delivery Run Assigned 🚚',
-                body: `You have been assigned ${totalStops} delivery stop(s) for ${targetDate}.`,
-              },
-            );
-          } catch (_) { }
-        }
+      const assignedPartnerIds = [...new Set(createdRuns.map((r) => r.partner_id).filter(Boolean))];
+      for (const pid of assignedPartnerIds) {
+        const partnerRuns = createdRuns.filter((r) => r.partner_id === pid);
+        const totalStops = partnerRuns.reduce((sum, r) => sum + (r.unique_addresses || 0), 0);
+        await this.notifyDeliveryPartner(pid, {
+          title: 'New Delivery Run Assigned 🚚',
+          body: `You have been assigned ${totalStops} delivery stop(s) for ${targetDate}.`,
+          type: 'delivery_run_assigned',
+          data: {
+            type: 'delivery_run_assigned',
+            date: targetDate,
+            stops_count: totalStops,
+          },
+        });
       }
 
       // Record in admin_audit_logs
@@ -982,37 +1068,29 @@ export class DeliveryRunService {
       );
 
       // Notify new assigned partner
-      if (toPartnerId && this.pushNotificationService) {
-        try {
-          await this.pushNotificationService.sendNotificationToUsers(
-            [toPartnerId],
-            {
-              title: 'Delivery Run Assigned 🚚',
-              body: `Delivery run ${actualRunId} has been assigned to you.`,
-              data: {
-                type: 'delivery_run_assigned',
-                run_id: actualRunId,
-              },
-            },
-          );
-        } catch (_) {}
+      if (toPartnerId) {
+        await this.notifyDeliveryPartner(toPartnerId, {
+          title: 'Delivery Run Assigned 🚚',
+          body: `Delivery run ${actualRunId} has been assigned to you.`,
+          type: 'delivery_run_assigned',
+          data: {
+            type: 'delivery_run_assigned',
+            run_id: actualRunId,
+          },
+        });
       }
 
       // Notify previous partner if different
-      if (fromPartnerId && fromPartnerId !== toPartnerId && this.pushNotificationService) {
-        try {
-          await this.pushNotificationService.sendNotificationToUsers(
-            [fromPartnerId],
-            {
-              title: 'Delivery Run Reassigned ℹ️',
-              body: `Delivery run ${actualRunId} has been reassigned to another delivery partner.`,
-              data: {
-                type: 'delivery_run_reassigned',
-                run_id: actualRunId,
-              },
-            },
-          );
-        } catch (_) {}
+      if (fromPartnerId && fromPartnerId !== toPartnerId) {
+        await this.notifyDeliveryPartner(fromPartnerId, {
+          title: 'Delivery Run Reassigned ℹ️',
+          body: `Delivery run ${actualRunId} has been reassigned to another delivery partner.`,
+          type: 'delivery_run_reassigned',
+          data: {
+            type: 'delivery_run_reassigned',
+            run_id: actualRunId,
+          },
+        });
       }
 
       return {
@@ -1660,15 +1738,11 @@ export class DeliveryRunService {
 
       const partnerIds = [...new Set([body.partner_a_id, body.partner_b_id])].filter(Boolean);
       for (const pid of partnerIds) {
-        try {
-          await this.pushNotificationService.sendNotificationToUsers(
-            [pid],
-            {
-              title: 'Delivery Run Updated 🔄',
-              body: 'Your delivery run addresses have been updated by the admin.',
-            },
-          );
-        } catch (_) { }
+        await this.notifyDeliveryPartner(pid, {
+          title: 'Delivery Run Updated 🔄',
+          body: 'Your delivery run addresses have been updated by the admin.',
+          type: 'delivery_run_updated',
+        });
       }
 
       return {
@@ -2153,30 +2227,69 @@ export class DeliveryRunService {
         // 11. Operation ID for tracking response
         const operationId = `OP-MOVE-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
-        // 12. Push Notifications
-        if (this.pushNotificationService) {
-          if (sourceRun.delivery_partner_id) {
-            try {
-              await this.pushNotificationService.sendNotificationToUsers(
-                [sourceRun.delivery_partner_id],
-                {
-                  title: 'Delivery Run Updated 🚚',
-                  body: `An address stop has been reassigned to another driver.`,
-                },
-              );
-            } catch (_) { }
+        // 12. Send In-App & Mobile Push Notifications to both affected partners
+        let customerName = 'Customer';
+        let addressLine = 'Customer Address';
+        try {
+          const stopDetailRes = await client.query<any>(
+            `SELECT dra.address_id, dra.customer_id,
+                    COALESCE(NULLIF(TRIM(CONCAT(cu.first_name, ' ', cu.last_name)), ''), cu.user_name, 'Customer') AS customer_name,
+                    COALESCE(NULLIF(TRIM(ca.address_line), ''), ca.landmark, 'Customer Address') AS address_line
+             FROM delivery_run_addresses dra
+             LEFT JOIN customer_addresses ca ON ca.address_id = dra.address_id
+             LEFT JOIN users cu ON cu.user_id = dra.customer_id
+             WHERE dra.id = $1 LIMIT 1`,
+            [sourceStop.id],
+          );
+          if (stopDetailRes.rows.length > 0) {
+            customerName = stopDetailRes.rows[0].customer_name || 'Customer';
+            addressLine = stopDetailRes.rows[0].address_line || 'Customer Address';
           }
-          if (targetRun.delivery_partner_id) {
-            try {
-              await this.pushNotificationService.sendNotificationToUsers(
-                [targetRun.delivery_partner_id],
-                {
-                  title: 'New Address Stop Added 🚚',
-                  body: `A new address stop has been added to your delivery run.`,
-                },
-              );
-            } catch (_) { }
-          }
+        } catch (_) {}
+
+        let sourcePartnerName = 'Delivery Partner';
+        try {
+          const srcPartnerRes = await client.query<any>(
+            `SELECT dp.delivery_partner_id, dp.user_id,
+                    COALESCE(NULLIF(TRIM(CONCAT(u.first_name, ' ', u.last_name)), ''), u.user_name, 'Delivery Partner') AS partner_name
+             FROM delivery_partners dp
+             LEFT JOIN users u ON (u.user_id = dp.user_id OR u.user_id = dp.delivery_partner_id)
+             WHERE dp.delivery_partner_id = $1 OR dp.user_id = $1 OR dp.id::varchar = $1 LIMIT 1`,
+            [sourceRun.delivery_partner_id],
+          );
+          sourcePartnerName = srcPartnerRes.rows[0]?.partner_name || 'Delivery Partner';
+        } catch (_) {}
+
+        const targetPartnerName = targetPartner?.partner_name || 'Delivery Partner';
+
+        if (sourceRun.delivery_partner_id) {
+          await this.notifyDeliveryPartner(sourceRun.delivery_partner_id, {
+            title: 'Address Stop Reassigned 🚚',
+            body: `Stop for ${customerName} (${addressLine}) on run ${sourceRun.run_id} has been moved to ${targetPartnerName}.`,
+            type: 'address_moved_out',
+            data: {
+              type: 'address_moved_out',
+              run_id: sourceRun.run_id,
+              address_id: resolvedAddressId,
+              target_partner_name: targetPartnerName,
+              target_run_id: targetRun.run_id,
+            },
+          });
+        }
+
+        if (targetRun.delivery_partner_id) {
+          await this.notifyDeliveryPartner(targetRun.delivery_partner_id, {
+            title: 'New Address Stop Assigned 🚚',
+            body: `A new stop for ${customerName} (${addressLine}) has been assigned to your run ${targetRun.run_id}.`,
+            type: 'address_moved_in',
+            data: {
+              type: 'address_moved_in',
+              run_id: targetRun.run_id,
+              address_id: resolvedAddressId,
+              source_partner_name: sourcePartnerName,
+              source_run_id: sourceRun.run_id,
+            },
+          });
         }
 
         // 13. Audit Log in admin_audit_logs
@@ -2459,18 +2572,75 @@ export class DeliveryRunService {
         // 9. Operation ID for tracking response
         const operationId = `OP-SWAP-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
-        // 10. Push Notifications
-        if (this.pushNotificationService) {
-          try {
-            await this.pushNotificationService.sendNotificationToUsers(
-              [runA.delivery_partner_id],
-              { title: 'Delivery Run Updated 🔄', body: `Address stops have been swapped on your delivery run.` },
-            );
-            await this.pushNotificationService.sendNotificationToUsers(
-              [runB.delivery_partner_id],
-              { title: 'Delivery Run Updated 🔄', body: `Address stops have been swapped on your delivery run.` },
-            );
-          } catch (_) { }
+        // 10. Send In-App & Mobile Push Notifications to both affected partners
+        let custNameA = 'Customer';
+        let addrLineA = 'Customer Address';
+        let custNameB = 'Customer';
+        let addrLineB = 'Customer Address';
+        try {
+          const stopDetailARes = await client.query<any>(
+            `SELECT dra.address_id, dra.customer_id,
+                    COALESCE(NULLIF(TRIM(CONCAT(cu.first_name, ' ', cu.last_name)), ''), cu.user_name, 'Customer') AS customer_name,
+                    COALESCE(NULLIF(TRIM(ca.address_line), ''), ca.landmark, 'Customer Address') AS address_line
+             FROM delivery_run_addresses dra
+             LEFT JOIN customer_addresses ca ON ca.address_id = dra.address_id
+             LEFT JOIN users cu ON cu.user_id = dra.customer_id
+             WHERE dra.id = $1 LIMIT 1`,
+            [stopA.id],
+          );
+          if (stopDetailARes.rows.length > 0) {
+            custNameA = stopDetailARes.rows[0].customer_name || 'Customer';
+            addrLineA = stopDetailARes.rows[0].address_line || 'Customer Address';
+          }
+          const stopDetailBRes = await client.query<any>(
+            `SELECT dra.address_id, dra.customer_id,
+                    COALESCE(NULLIF(TRIM(CONCAT(cu.first_name, ' ', cu.last_name)), ''), cu.user_name, 'Customer') AS customer_name,
+                    COALESCE(NULLIF(TRIM(ca.address_line), ''), ca.landmark, 'Customer Address') AS address_line
+             FROM delivery_run_addresses dra
+             LEFT JOIN customer_addresses ca ON ca.address_id = dra.address_id
+             LEFT JOIN users cu ON cu.user_id = dra.customer_id
+             WHERE dra.id = $1 LIMIT 1`,
+            [stopB.id],
+          );
+          if (stopDetailBRes.rows.length > 0) {
+            custNameB = stopDetailBRes.rows[0].customer_name || 'Customer';
+            addrLineB = stopDetailBRes.rows[0].address_line || 'Customer Address';
+          }
+        } catch (_) {}
+
+        const partnerAInfo = partnersRes.rows.find((p: any) => p.delivery_partner_id === runA.delivery_partner_id);
+        const partnerBInfo = partnersRes.rows.find((p: any) => p.delivery_partner_id === runB.delivery_partner_id);
+        const partnerAName = partnerAInfo?.partner_name || 'Delivery Partner A';
+        const partnerBName = partnerBInfo?.partner_name || 'Delivery Partner B';
+
+        if (runA.delivery_partner_id) {
+          await this.notifyDeliveryPartner(runA.delivery_partner_id, {
+            title: 'Address Stops Swapped 🔄',
+            body: `Your stop for ${custNameA} (${addrLineA}) on run ${runA.run_id} was swapped with ${custNameB} (${addrLineB}) from ${partnerBName}.`,
+            type: 'address_swapped',
+            data: {
+              type: 'address_swapped',
+              run_id: runA.run_id,
+              old_address_id: stopA.address_id,
+              new_address_id: stopB.address_id,
+              other_partner_name: partnerBName,
+            },
+          });
+        }
+
+        if (runB.delivery_partner_id) {
+          await this.notifyDeliveryPartner(runB.delivery_partner_id, {
+            title: 'Address Stops Swapped 🔄',
+            body: `Your stop for ${custNameB} (${addrLineB}) on run ${runB.run_id} was swapped with ${custNameA} (${addrLineA}) from ${partnerAName}.`,
+            type: 'address_swapped',
+            data: {
+              type: 'address_swapped',
+              run_id: runB.run_id,
+              old_address_id: stopB.address_id,
+              new_address_id: stopA.address_id,
+              other_partner_name: partnerAName,
+            },
+          });
         }
 
         // 11. Audit Log in admin_audit_logs
