@@ -280,8 +280,8 @@ export class BasketService {
          AND dr.status != 'cancelled'
        ORDER BY
          (dr.run_id = $2 OR dr.id::text = $2) DESC,
-         (dr.status IN ('in_progress', 'handed_over', 'dispatched') AND dd.dispatch_id IS NOT NULL AND dd.status != 'completed') DESC,
-         (dd.dispatch_id IS NOT NULL AND dd.status != 'completed') DESC,
+         (dr.status IN ('in_progress', 'handed_over', 'dispatched') AND dd.dispatch_id IS NOT NULL AND dd.status NOT IN ('completed', 'return_pending')) DESC,
+         (dd.dispatch_id IS NOT NULL AND dd.status NOT IN ('completed', 'return_pending')) DESC,
          (dr.delivery_slot = $3) DESC,
          dr.created_at DESC
        LIMIT 1`,
@@ -302,8 +302,8 @@ export class BasketService {
             WHERE (dr.delivery_partner_id = ANY($2) OR dr.run_id = $3 OR dr.id::text = $3)
               AND dr.status != 'cancelled'
           ))
-          AND (dd.status != 'completed' OR $3 != '')
-       ORDER BY (dd.status != 'completed') DESC, dd.created_at DESC
+          AND (dd.status NOT IN ('completed', 'return_pending') OR $3 != '')
+       ORDER BY (dd.status NOT IN ('completed', 'return_pending')) DESC, dd.created_at DESC
        LIMIT 1`,
       [runIds.length ? runIds : ['NONE'], partnerIds, runId || ''],
     );
@@ -311,14 +311,14 @@ export class BasketService {
     const activeDispatchId = activeDispatch?.dispatch_id;
     const dispatchStatus = activeDispatch?.dispatch_status || 'draft';
 
-    if (activeDispatch?.dispatch_status === 'completed' && !runId) {
+    if ((activeDispatch?.dispatch_status === 'completed' || activeDispatch?.dispatch_status === 'return_pending') && !runId) {
       return {
-        status: 'CLOSED',
+        status: activeDispatch?.dispatch_status === 'return_pending' ? 'RETURNING' : 'CLOSED',
         is_sufficient_for_orders: true,
         pickup_confirmed: true,
         has_dispatch: false,
-        dispatch_status: 'completed',
-        pickup_action: 'completed',
+        dispatch_status: activeDispatch?.dispatch_status,
+        pickup_action: activeDispatch?.dispatch_status === 'return_pending' ? 'return_pending' : 'completed',
         insufficient_items: [],
         total_ordered: 0,
         total_planned: 0,

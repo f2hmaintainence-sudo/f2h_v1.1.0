@@ -546,25 +546,38 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
   }
 
   List<ProductInventorySummary> get effectiveSummaries {
+    if (_dispatchStatus == 'return_pending' || _dispatchStatus == 'completed') {
+      return const [];
+    }
     final list = _apiProductBreakdown ?? _inventorySummaries;
     return list.where((inv) => !_isReturnContainer(inv.productName)).toList();
   }
 
   int get _totalInBagNow =>
-      effectiveSummaries.fold(0, (sum, i) => sum + i.currentlyInBag);
+      (_dispatchStatus == 'return_pending' || _dispatchStatus == 'completed')
+          ? 0
+          : effectiveSummaries.fold(0, (sum, i) => sum + i.currentlyInBag);
 
   int get _totalDeliveredUnits =>
-      effectiveSummaries.fold(0, (sum, i) => sum + i.deliveredCount);
+      (_dispatchStatus == 'return_pending' || _dispatchStatus == 'completed')
+          ? 0
+          : effectiveSummaries.fold(0, (sum, i) => sum + i.deliveredCount);
 
   int get _totalExtraBuffer =>
-      effectiveSummaries.fold(0, (sum, i) => sum + i.extraBuffer);
+      (_dispatchStatus == 'return_pending' || _dispatchStatus == 'completed')
+          ? 0
+          : effectiveSummaries.fold(0, (sum, i) => sum + i.extraBuffer);
 
   int get _totalInitialStock =>
-      effectiveSummaries.fold(0, (sum, i) => sum + i.initialStock);
+      (_dispatchStatus == 'return_pending' || _dispatchStatus == 'completed')
+          ? 0
+          : effectiveSummaries.fold(0, (sum, i) => sum + i.initialStock);
 
   /// Units the assigned orders demand, from `order_items`.
   int get _totalOrderedUnits =>
-      effectiveSummaries.fold(0, (sum, i) => sum + i.totalOrdered);
+      (_dispatchStatus == 'return_pending' || _dispatchStatus == 'completed')
+          ? 0
+          : effectiveSummaries.fold(0, (sum, i) => sum + i.totalOrdered);
 
   /// All products on the run remain visible on the ledger even when fully delivered.
   List<ProductInventorySummary> get _activeSummaries => effectiveSummaries;
@@ -756,19 +769,27 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                           ),
                         ),
                         const SizedBox(height: 14),
-                        const Text(
-                          'Your Delivery Bag is Empty',
-                          style: TextStyle(
+                        Text(
+                          _dispatchStatus == 'return_pending'
+                              ? 'Shift Return Submitted'
+                              : (_dispatchStatus == 'completed'
+                                  ? 'Dispatch & Returns Completed'
+                                  : 'Your Delivery Bag is Empty'),
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
                             color: Color(0xFF0F172A),
                           ),
                         ),
                         const SizedBox(height: 6),
-                        const Text(
-                          'All assigned items delivered!\nWaiting for upcoming orders.',
+                        Text(
+                          _dispatchStatus == 'return_pending'
+                              ? 'All items & empty containers submitted for return.\nWaiting for warehouse verification.'
+                              : (_dispatchStatus == 'completed'
+                                  ? 'All returns verified cleanly by warehouse.\nReady for next dispatch!'
+                                  : 'All assigned items delivered!\nWaiting for upcoming orders.'),
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w500,
                             color: Color(0xFF64748B),
@@ -779,21 +800,27 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
+                            color: _dispatchStatus == 'return_pending' ? const Color(0xFFCCFBF1) : const Color(0xFFF1F5F9),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                            border: Border.all(
+                              color: _dispatchStatus == 'return_pending' ? const Color(0xFF5EEAD4) : const Color(0xFFE2E8F0),
+                            ),
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.hourglass_top_rounded, size: 14, color: Color(0xFF059669)),
-                              SizedBox(width: 6),
+                              Icon(
+                                _dispatchStatus == 'return_pending' ? Icons.assignment_return_rounded : Icons.hourglass_top_rounded,
+                                size: 14,
+                                color: _dispatchStatus == 'return_pending' ? const Color(0xFF0D9488) : const Color(0xFF059669),
+                              ),
+                              const SizedBox(width: 6),
                               Text(
-                                'Ready for next dispatch',
+                                _dispatchStatus == 'return_pending' ? 'Awaiting Warehouse Verification' : 'Ready for next dispatch',
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF334155),
+                                  color: _dispatchStatus == 'return_pending' ? const Color(0xFF0F766E) : const Color(0xFF334155),
                                 ),
                               ),
                             ],
