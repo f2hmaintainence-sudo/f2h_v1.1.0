@@ -1,4 +1,4 @@
-import 'package:isar/isar.dart';
+import 'package:isar_db/isar_db.dart';
 import 'package:f2h_customer/auth/domain/entities/user_entity.dart';
 
 part 'user_model.g.dart';

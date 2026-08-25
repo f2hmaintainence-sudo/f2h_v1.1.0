@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_db/isar_db.dart';
 import 'package:f2h_delivery/auth/data/models/user_model.dart';
 import 'package:f2h_delivery/auth/data/models/auth_local_model.dart';
 import 'auth_local_datasource.dart';

@@ -911,8 +911,8 @@ export class ProfileService {
                   u.phone AS referee_phone,
                   COALESCE(r.referrer_reward_amount, 75.00)::numeric AS bonus_amount
            FROM referrals r
-           LEFT JOIN users u ON u.user_id = r.referred_customer_id OR u.user_id = r.referred_user_id
-           WHERE r.referrer_customer_id = $1 OR r.referrer_user_id = $1
+           LEFT JOIN users u ON u.user_id = r.referred_customer_id
+           WHERE r.referrer_customer_id = $1
            ORDER BY r.created_at DESC`,
           [deliveryPartnerId],
         );

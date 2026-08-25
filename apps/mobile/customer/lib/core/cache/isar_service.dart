@@ -11,7 +11,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
-import 'package:isar/isar.dart';
+import 'package:isar_db/isar_db.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:f2h_customer/auth/data/models/user_model.dart';
 

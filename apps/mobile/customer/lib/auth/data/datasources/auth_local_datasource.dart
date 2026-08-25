@@ -9,7 +9,7 @@
 // ============================================================================
 
 import 'package:flutter/foundation.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_db/isar_db.dart';
 import 'package:f2h_customer/auth/data/models/user_model.dart';
 import 'package:f2h_customer/core/cache/isar_service.dart';
 

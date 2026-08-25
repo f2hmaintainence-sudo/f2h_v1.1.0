@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_db/isar_db.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:f2h_delivery/auth/data/models/auth_local_model.dart';
 

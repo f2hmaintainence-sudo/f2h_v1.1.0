@@ -1,4 +1,4 @@
-import 'package:isar/isar.dart';
+import 'package:isar_db/isar_db.dart';
 
 part 'auth_local_model.g.dart';
 
