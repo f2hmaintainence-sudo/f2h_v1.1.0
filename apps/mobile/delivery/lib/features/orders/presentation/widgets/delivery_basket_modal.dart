@@ -566,11 +566,8 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
   int get _totalOrderedUnits =>
       effectiveSummaries.fold(0, (sum, i) => sum + i.totalOrdered);
 
-  /// A line stays on the ledger while it still holds stock or still owes a customer.
-  /// EXTRA-only lines qualify on the first clause, so they survive confirmation.
-  List<ProductInventorySummary> get _activeSummaries => effectiveSummaries
-      .where((inv) => inv.currentlyInBag > 0 || inv.remainingQty > 0 || inv.shortageQty > 0)
-      .toList();
+  /// All products on the run remain visible on the ledger even when fully delivered.
+  List<ProductInventorySummary> get _activeSummaries => effectiveSummaries;
 
   @override
   Widget build(BuildContext context) {

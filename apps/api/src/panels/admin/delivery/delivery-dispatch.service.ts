@@ -84,49 +84,96 @@ export class DeliveryDispatchService {
         );
         const activeDispatchId = dispatchRows.rows[0].dispatch_id;
 
-        // Cleanup any existing dispatch items for this dispatch to start fresh
+        // Fetch existing loaded quantities for this dispatch to support re-dispatching & incremental adjustments
+        const existingItemsRes = await client.query(
+          `SELECT product_variant_id, COALESCE(loaded_qty, 0)::numeric AS loaded_qty
+           FROM delivery_dispatch_items
+           WHERE dispatch_id = $1`,
+          [activeDispatchId],
+        );
+        const existingLoadedMap: Record<string, number> = {};
+        for (const row of existingItemsRes.rows) {
+          existingLoadedMap[String(row.product_variant_id)] = Number(row.loaded_qty || 0);
+        }
+
+        // Cleanup existing dispatch items for this dispatch to re-insert with latest values
         await client.query(
           `DELETE FROM delivery_dispatch_items WHERE dispatch_id = $1`,
           [activeDispatchId],
         );
 
+        const processedVariantIds = new Set<string>();
+
         for (const item of items) {
           const plannedQty = Number(item.planned_qty ?? 0);
           const loadedQty = item.loaded_qty !== undefined ? Number(item.loaded_qty) : plannedQty;
-
           const targetWarehouseId = item.warehouse_id || warehouseId;
+          const variantIdStr = String(item.product_variant_id);
+          processedVariantIds.add(variantIdStr);
 
-          // 1. Validate warehouse stock
-          const stock = await this.stockCore.getLockedStockBalance(
-            client,
-            targetWarehouseId,
-            item.product_variant_id,
-          );
+          const previousLoadedQty = existingLoadedMap[variantIdStr] || 0;
+          const delta = loadedQty - previousLoadedQty;
 
-          if (stock.available_quantity < loadedQty) {
-            const [varRes, whRes] = await Promise.all([
-              client.query(
-                `SELECT p.product_name, pv.variant_name, pv.unit_value, pv.unit_type
-                 FROM product_variants pv
-                 JOIN products p ON p.product_id = pv.product_id
-                 WHERE pv.product_variant_id = $1`,
-                [item.product_variant_id],
-              ),
-              client.query(
-                `SELECT warehouse_name FROM warehouses WHERE warehouse_id = $1`,
-                [targetWarehouseId],
-              ),
-            ]);
-            const pName = varRes.rows[0]
-              ? `${varRes.rows[0].product_name} (${varRes.rows[0].variant_name || `${varRes.rows[0].unit_value || ''} ${varRes.rows[0].unit_type || ''}`.trim()})`
-              : ((item as any).product_name || item.product_variant_id);
-            const wName = whRes.rows[0]?.warehouse_name || 'Warehouse';
-            throw new BadRequestException(
-              `Insufficient stock for "${pName}" at "${wName}". Available: ${stock.available_quantity}, Requested: ${loadedQty}`,
+          // If delta > 0, we need additional stock from the warehouse
+          if (delta > 0) {
+            const stock = await this.stockCore.getLockedStockBalance(
+              client,
+              targetWarehouseId,
+              item.product_variant_id,
             );
+
+            if (stock.available_quantity < delta) {
+              const [varRes, whRes] = await Promise.all([
+                client.query(
+                  `SELECT p.product_name, pv.variant_name, pv.unit_value, pv.unit_type
+                   FROM product_variants pv
+                   JOIN products p ON p.product_id = pv.product_id
+                   WHERE pv.product_variant_id = $1`,
+                  [item.product_variant_id],
+                ),
+                client.query(
+                  `SELECT warehouse_name FROM warehouses WHERE warehouse_id = $1`,
+                  [targetWarehouseId],
+                ),
+              ]);
+              const pName = varRes.rows[0]
+                ? `${varRes.rows[0].product_name} (${varRes.rows[0].variant_name || `${varRes.rows[0].unit_value || ''} ${varRes.rows[0].unit_type || ''}`.trim()})`
+                : ((item as any).product_name || item.product_variant_id);
+              const wName = whRes.rows[0]?.warehouse_name || 'Warehouse';
+              throw new BadRequestException(
+                `Insufficient stock for "${pName}" at "${wName}". Available: ${stock.available_quantity}, Additional Requested: ${delta}`,
+              );
+            }
+
+            // Record incremental stock OUT movement
+            await this.stockCore.recordStockMovement(client, {
+              warehouse_id: targetWarehouseId,
+              product_variant_id: item.product_variant_id,
+              movement_type: 'dispatch',
+              direction: -1,
+              quantity: delta,
+              reference_type: 'delivery_run',
+              reference_id: runId,
+              notes: `Dispatch to delivery boy for run ${run.run_id || runId} (added: ${delta}, total loaded: ${loadedQty})`,
+              created_by: adminId,
+            });
+          } else if (delta < 0) {
+            // Reduced loaded quantity: return excess back to warehouse stock
+            const returnQty = Math.abs(delta);
+            await this.stockCore.recordStockMovement(client, {
+              warehouse_id: targetWarehouseId,
+              product_variant_id: item.product_variant_id,
+              movement_type: 'stock_adjustment',
+              direction: 1,
+              quantity: returnQty,
+              reference_type: 'delivery_run',
+              reference_id: runId,
+              notes: `Reduced dispatch quantity for run ${run.run_id || runId} (returned to stock: ${returnQty}, total loaded: ${loadedQty})`,
+              created_by: adminId,
+            });
           }
 
-          // 2. Create the delivery_dispatch_items record
+          // Create the updated delivery_dispatch_items record
           const insertResult = await client.query(
             `INSERT INTO delivery_dispatch_items
               (dispatch_id, product_variant_id, planned_qty, loaded_qty, unit, created_at, updated_at)
@@ -138,23 +185,27 @@ export class DeliveryDispatchService {
             ],
           );
 
-          // 3. Create stock OUT movement
-          await this.stockCore.recordStockMovement(client, {
-            warehouse_id: item.warehouse_id,
-            product_variant_id: item.product_variant_id,
-            movement_type: 'dispatch',
-            direction: -1,
-            quantity: loadedQty,
-            reference_type: 'delivery_run',
-            reference_id: runId,
-            notes: `Dispatch to delivery boy for run ${run.run_id || runId} (planned: ${plannedQty}, loaded: ${loadedQty})`,
-            created_by: adminId,
-          });
-
           results.push(insertResult.rows[0]);
         }
 
-        // 4. Update run status to 'in_progress' (dispatched corresponds to 'in_progress' in constraint)
+        // Return stock for any items that were previously loaded but removed entirely from the handover
+        for (const [prevVarId, prevQty] of Object.entries(existingLoadedMap)) {
+          if (!processedVariantIds.has(prevVarId) && prevQty > 0) {
+            await this.stockCore.recordStockMovement(client, {
+              warehouse_id: warehouseId,
+              product_variant_id: prevVarId,
+              movement_type: 'stock_adjustment',
+              direction: 1,
+              quantity: prevQty,
+              reference_type: 'delivery_run',
+              reference_id: runId,
+              notes: `Removed item from dispatch for run ${run.run_id || runId} (returned to stock: ${prevQty})`,
+              created_by: adminId,
+            });
+          }
+        }
+
+        // Update run status to 'in_progress'
         await client.query(
           `UPDATE delivery_runs
            SET status = 'in_progress', updated_at = NOW()

@@ -380,7 +380,8 @@ class _SubscriptionPillButton extends StatelessWidget {
       onTap: () => _openSubscriptionSetup(context, product),
       behavior: HitTestBehavior.opaque,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         decoration: BoxDecoration(
           color: kPrimary,
           borderRadius: BorderRadius.circular(20),
@@ -394,23 +395,27 @@ class _SubscriptionPillButton extends StatelessWidget {
         ),
         child: FittedBox(
           fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.autorenew_rounded, color: Colors.white, size: 11),
-              const SizedBox(width: 3),
-              Text(
-                'Subscribe @ ₹${subscriptionPrice.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
+          alignment: Alignment.center,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.autorenew_rounded, color: Colors.white, size: 10),
+                const SizedBox(width: 2),
+                Text(
+                  'Subscribe @ ₹${subscriptionPrice.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 2),
-              const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 12),
-            ],
+                const SizedBox(width: 1),
+                const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 11),
+              ],
+            ),
           ),
         ),
       ),

@@ -1584,7 +1584,12 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
                                 ))}
                               </div>
                               <StatusBadge dispatched={isDispatched} dispatchStatus={plan.dispatchStatus} />
-                              {!isDispatched && (
+                              {isDispatched ? (
+                                <button onClick={(e) => { e.stopPropagation(); if (!isApproving) handleApproveDispatch(plan); }} disabled={isApproving}
+                                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all no-print bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border border-slate-200 hover:border-emerald-300 shadow-2xs hover:scale-[1.02] active:scale-[0.98]">
+                                  <RotateCcw size={12} className="text-emerald-700" /> Re-dispatch / Add Items
+                                </button>
+                              ) : (
                                 <button onClick={(e) => { e.stopPropagation(); if (!isApproving) handleApproveDispatch(plan); }} disabled={isApproving}
                                   className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all no-print shadow-sm ${
                                     isApproving ? "bg-emerald-50 text-emerald-600 cursor-wait border border-emerald-200" : "bg-[#2E7D32] hover:bg-[#1B5E20] text-white shadow-[#2E7D32]/20 hover:scale-[1.02] active:scale-[0.98]"
@@ -1603,14 +1608,20 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
                           {isExpanded && (
                             <div className="border-t border-slate-100 bg-slate-50/30 p-4 md:p-5 animate-in fade-in slide-in-from-top-1 duration-200 space-y-4">
                               <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">Handover Items</h4>
-                                  {(plan.totalExtraQty || 0) > 0 && (
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300/80 shadow-2xs">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                                      +{plan.totalExtraQty} Extra Units Loaded
-                                    </span>
-                                  )}
+                                <div className="flex items-center justify-between flex-wrap gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">Handover Items</h4>
+                                    {(plan.totalExtraQty || 0) > 0 && (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300/80 shadow-2xs">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                        +{plan.totalExtraQty} Extra Units Loaded
+                                      </span>
+                                    )}
+                                  </div>
+                                  <button onClick={(e) => { e.stopPropagation(); handleApproveDispatch(plan); }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-all">
+                                    <Plus size={11} /> {isDispatched ? "Re-dispatch / Add Items" : "Edit Handover Items"}
+                                  </button>
                                 </div>
                                 <div className="bg-white border border-slate-200/80 rounded-xl overflow-hidden shadow-xs">
                                   <table className="w-full text-xs text-left">
@@ -1879,7 +1890,11 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl"><CheckCircle2 size={18} /></div>
                 <div>
-                  <h3 className="font-black text-slate-900 text-base">Verify Dispatch Handover</h3>
+                  <h3 className="font-black text-slate-900 text-base">
+                    {Boolean(activePlanForModal.isDispatched ?? activePlanForModal.hasActualDispatch)
+                      ? "Re-dispatch / Edit Handover"
+                      : "Verify Dispatch Handover"}
+                  </h3>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full">
                       <Truck size={9} /> {activePlanForModal.delivery_partner_name}
@@ -2128,7 +2143,7 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
                 </button>
                 <button onClick={handleConfirmModalApproval}
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#2E7D32] hover:bg-[#1B5E20] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-[#2E7D32]/20 hover:scale-[1.02] active:scale-[0.98]">
-                  <CheckCircle2 size={13} /> Approve &amp; Issue Stock
+                  <CheckCircle2 size={13} /> {Boolean(activePlanForModal?.isDispatched ?? activePlanForModal?.hasActualDispatch) ? "Save & Re-dispatch Stock" : "Approve & Issue Stock"}
                 </button>
               </div>
             </div>

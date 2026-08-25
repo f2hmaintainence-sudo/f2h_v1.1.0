@@ -79,7 +79,8 @@ class _CompactBadge extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
         decoration: BoxDecoration(
           color: const Color(0xFF1B4332),
           borderRadius: BorderRadius.circular(20),
@@ -93,11 +94,12 @@ class _CompactBadge extends StatelessWidget {
         ),
         child: FittedBox(
           fit: BoxFit.scaleDown,
+          alignment: Alignment.center,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.autorenew_rounded, size: 9, color: Colors.white),
-              const SizedBox(width: 3),
+              const SizedBox(width: 2),
               Text(
                 label,
                 style: const TextStyle(

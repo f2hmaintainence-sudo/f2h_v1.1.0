@@ -235,6 +235,30 @@ export class DispatchPlanningService {
           totals[groupKey].loaded_qty = (totals[groupKey].loaded_qty || 0) + loadedQty;
           totals[groupKey].extra_qty = (totals[groupKey].extra_qty || 0) + extraQty;
         });
+
+        // Ensure any ordered item from customer orders that was omitted in delivery_dispatch_items
+        // is still surfaced in totals with loaded_qty = 0 so the admin can re-dispatch it!
+        orders.forEach(order => {
+          order.items.forEach(item => {
+            const groupKey = `${item.product_name.trim()}::${item.variant_name.trim()}`;
+            if (!totals[groupKey]) {
+              const reqQty = orderQuantities[groupKey] || item.quantity;
+              totals[groupKey] = {
+                product_variant_id: item.product_variant_id,
+                product_name: item.product_name,
+                variant_name: item.variant_name,
+                unit_value: item.unit_value,
+                unit_type: item.unit_type,
+                quantity: 0,
+                planned_qty: reqQty,
+                loaded_qty: 0,
+                extra_qty: 0,
+                displayLabel: '',
+                orderCount: orderCounts[groupKey] || 1,
+              };
+            }
+          });
+        });
       } else {
         // Not dispatched yet: compile planned demand from customer orders
         orders.forEach(order => {

@@ -1362,6 +1362,7 @@ class _HomeScreenState extends State<HomeScreen>
                 right: 6,
                 child: Container(
                   height: 22,
+                  width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                   decoration: BoxDecoration(
                     color: kPrimary,
@@ -1369,6 +1370,7 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
+                    alignment: Alignment.center,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -2525,6 +2527,7 @@ Widget oneTimeProductCard(BuildContext context, Product p) {
               right: 6,
               child: Container(
                 height: 22,
+                width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 decoration: BoxDecoration(
                   color: kPrimary,
@@ -2532,6 +2535,7 @@ Widget oneTimeProductCard(BuildContext context, Product p) {
                 ),
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
+                  alignment: Alignment.center,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
