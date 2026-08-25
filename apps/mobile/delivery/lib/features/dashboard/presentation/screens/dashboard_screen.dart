@@ -43,6 +43,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Position? _currentPosition;
   Timer? _locationUpdateTimer;
   bool _isFabMenuOpen = false;
+  String _selectedStatusFilter = 'all'; // 'all', 'pending', 'delivered', 'failed'
 
   Future<void> _reloadDashboardOrders() async {
     if (_isReloading) return;
@@ -418,6 +419,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
           return null;
         })();
 
+        final displayedStops = listQueue.where((stop) {
+          if (_selectedStatusFilter == 'all') return true;
+          if (_selectedStatusFilter == 'delivered') {
+            return stop.status == 'delivered' || stop.status == 'completed';
+          }
+          if (_selectedStatusFilter == 'failed') {
+            return stop.status == 'failed' || stop.status == 'cancelled';
+          }
+          if (_selectedStatusFilter == 'pending') {
+            return stop.status != 'delivered' &&
+                stop.status != 'completed' &&
+                stop.status != 'failed' &&
+                stop.status != 'cancelled';
+          }
+          return true;
+        }).toList();
+
+        final pendingCount = listQueue.where((s) =>
+            s.status != 'delivered' &&
+            s.status != 'completed' &&
+            s.status != 'failed' &&
+            s.status != 'cancelled').length;
+        final deliveredCount = listQueue.where((s) => s.status == 'delivered' || s.status == 'completed').length;
+        final failedCount = listQueue.where((s) => s.status == 'failed' || s.status == 'cancelled').length;
+
         return Scaffold(
           backgroundColor: const Color(0xFFF8FAFC),
           floatingActionButton: _buildExpandableFab(session, currentRun),
@@ -651,12 +677,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                         const SizedBox(height: 24),
 
-                        // ── SECTION: ORDERS LIST ────────────────────────────
+                        // ── SECTION: STOPS LIST ────────────────────────────
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'Orders (${listQueue.length})',
+                              'Stops (${displayedStops.length})',
                               style: GoogleFonts.poppins(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
@@ -664,26 +690,128 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 letterSpacing: -0.2,
                               ),
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFDCFCE7),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                '${listQueue.where((s) => s.status == 'delivered').length}/${listQueue.length} Delivered',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF15803D),
+
+                            // Filter Dropdown Button
+                            PopupMenuButton<String>(
+                              initialValue: _selectedStatusFilter,
+                              tooltip: 'Filter stops by status',
+                              onSelected: (String val) {
+                                setState(() => _selectedStatusFilter = val);
+                              },
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: _selectedStatusFilter == 'all' ? const Color(0xFFF1F5F9) : const Color(0xFFDCFCE7),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: _selectedStatusFilter == 'all' ? const Color(0xFFCBD5E1) : const Color(0xFF86EFAC),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.filter_list_rounded,
+                                      size: 15,
+                                      color: _selectedStatusFilter == 'all' ? const Color(0xFF64748B) : const Color(0xFF15803D),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      _selectedStatusFilter == 'all'
+                                          ? 'All'
+                                          : (_selectedStatusFilter == 'pending'
+                                              ? 'Pending ($pendingCount)'
+                                              : (_selectedStatusFilter == 'delivered'
+                                                  ? 'Delivered ($deliveredCount)'
+                                                  : 'Failed ($failedCount)')),
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: _selectedStatusFilter == 'all' ? const Color(0xFF64748B) : const Color(0xFF15803D),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Icon(
+                                      Icons.arrow_drop_down_rounded,
+                                      size: 18,
+                                      color: _selectedStatusFilter == 'all' ? const Color(0xFF64748B) : const Color(0xFF15803D),
+                                    ),
+                                  ],
                                 ),
                               ),
+                              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                                PopupMenuItem<String>(
+                                  value: 'all',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.list_alt_rounded, size: 18, color: _selectedStatusFilter == 'all' ? kPrimary : kTextSub),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'All Stops (${listQueue.length})',
+                                        style: TextStyle(
+                                          fontWeight: _selectedStatusFilter == 'all' ? FontWeight.bold : FontWeight.normal,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem<String>(
+                                  value: 'pending',
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.access_time_rounded, size: 18, color: Color(0xFFD97706)),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Pending ($pendingCount)',
+                                        style: TextStyle(
+                                          fontWeight: _selectedStatusFilter == 'pending' ? FontWeight.bold : FontWeight.normal,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem<String>(
+                                  value: 'delivered',
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.check_circle_rounded, size: 18, color: Color(0xFF16A34A)),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Delivered ($deliveredCount)',
+                                        style: TextStyle(
+                                          fontWeight: _selectedStatusFilter == 'delivered' ? FontWeight.bold : FontWeight.normal,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem<String>(
+                                  value: 'failed',
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.cancel_rounded, size: 18, color: Color(0xFFDC2626)),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Failed ($failedCount)',
+                                        style: TextStyle(
+                                          fontWeight: _selectedStatusFilter == 'failed' ? FontWeight.bold : FontWeight.normal,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
                         const SizedBox(height: 12),
 
-                        if (listQueue.isEmpty)
+                        if (displayedStops.isEmpty)
                           Container(
                             padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
@@ -693,7 +821,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                             child: Center(
                               child: Text(
-                                'No orders assigned for today.',
+                                _selectedStatusFilter == 'all'
+                                    ? 'No stops assigned for today.'
+                                    : 'No $_selectedStatusFilter stops found.',
                                 style: GoogleFonts.poppins(
                                   color: const Color(0xFF64748B),
                                   fontWeight: FontWeight.w600,
@@ -702,9 +832,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           )
                         else
-                          ...List.generate(listQueue.length, (index) {
-                            final stop = listQueue[index];
-                            final isNext = nextStop?.customerId == stop.customerId;
+                          ...List.generate(displayedStops.length, (index) {
+                            final stop = displayedStops[index];
+                            final isNext = nextStop != null &&
+                                ((nextStop.addressId.isNotEmpty && nextStop.addressId == stop.addressId) ||
+                                    (nextStop.addressId.isEmpty && nextStop.customerId == stop.customerId));
                             return Column(
                               children: [
                                 QueueItemTile(
@@ -713,7 +845,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   distanceStr: _calculateDistanceStr(stop),
                                   onDeliverTap: () => _showConfirmation(context, stop),
                                 ),
-                                if (index < listQueue.length - 1)
+                                if (index < displayedStops.length - 1)
                                   const SizedBox(height: 10),
                               ],
                             );
