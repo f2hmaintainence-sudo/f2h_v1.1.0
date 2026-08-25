@@ -437,7 +437,7 @@ export class CustomersService {
 
       const subRes = await this.databaseService.query(
         `SELECT s.*, 
-                COALESCE(ca.flat_no, '') || ' ' || COALESCE(ca.building_name, '') || ' ' || COALESCE(ca.street, '') || ' ' || COALESCE(ca.area, '') as delivery_address,
+                CONCAT_WS(' ', ca.flat_no, ca.building_name, ca.street, ca.area) as delivery_address,
                 ca.landmark as delivery_landmark,
                 ca.city as delivery_city,
                 ca.pincode as delivery_pincode,
@@ -445,7 +445,7 @@ export class CustomersService {
          FROM subscriptions s
          LEFT JOIN customer_addresses ca ON (ca.address_id = s.address_id OR ca.id::text = s.address_id)
          LEFT JOIN branches b ON b.branch_id = s.branch_id
-         WHERE s.customer_id = ?
+         WHERE s.customer_id = $1
          ORDER BY s.created_at DESC`,
         [customerId]
       ).catch(() => []);
@@ -455,23 +455,47 @@ export class CustomersService {
             `SELECT si.*, 
                     pv.name AS variant_name, 
                     p.name AS product_name,
-                    pi.image_url AS product_image,
-                    COALESCE(si.unit_price, 0) as unit_price,
-                    COALESCE(si.final_price, si.unit_price, 0) as final_price,
-                    COALESCE(si.quantity, 1) as quantity
+                    pi.url AS product_image,
+                    COALESCE(si.unit_price::numeric, 0) as unit_price,
+                    COALESCE(NULLIF(si.final_price, 0)::numeric, si.unit_price::numeric, 0) as final_price,
+                    COALESCE(
+                      (
+                        SELECT COALESCE(NULLIF(MAX(GREATEST(ws.m_quantity::numeric, ws.e_quantity::numeric)), 0), 1)
+                        FROM subscription_weekly_schedule ws
+                        WHERE ws.subscription_item_id = si.subscription_item_id
+                          AND ws.deleted_at IS NULL
+                      ),
+                      1
+                    )::numeric as quantity,
+                    COALESCE(
+                      (
+                        SELECT json_agg(json_build_object(
+                          'day_of_week', ws.day_of_week,
+                          'm_quantity', ws.m_quantity,
+                          'e_quantity', ws.e_quantity
+                        ) ORDER BY ws.day_of_week ASC)
+                        FROM subscription_weekly_schedule ws
+                        WHERE ws.subscription_item_id = si.subscription_item_id
+                          AND ws.deleted_at IS NULL
+                      ), '[]'::json
+                    ) AS weekly_schedule
              FROM subscription_items si
-             JOIN subscriptions s ON (s.subscription_id = si.subscription_id OR s.subscription_number = si.subscription_id OR s.id::text = si.subscription_id)
+             JOIN subscriptions s ON s.subscription_id = si.subscription_id
              LEFT JOIN product_variants pv ON pv.variant_id = si.product_variant_id
              LEFT JOIN products p ON p.product_id = pv.product_id
              LEFT JOIN (
-               SELECT DISTINCT ON (product_id) product_id, image_url
+               SELECT DISTINCT ON (product_id) product_id, url
                FROM product_images
                ORDER BY product_id, is_primary DESC, id ASC
              ) pi ON pi.product_id = p.product_id
-             WHERE s.customer_id = ?
+             WHERE s.customer_id = $1
+               AND si.deleted_at IS NULL
              ORDER BY si.id ASC`,
             [customerId],
-          ).catch(() => [])
+          ).catch((err) => {
+            this.developer.error('subscriptionItemsRes error', { err });
+            return [];
+          })
         : [];
 
       const subscriptionItemsById: Record<string, any[]> = {};
@@ -490,18 +514,17 @@ export class CustomersService {
 
       const formattedSubscriptions = subRes.map((subscription: any) => {
         const subIdKey = String(subscription.subscription_id || '');
-        const subNumKey = String(subscription.subscription_number || '');
-        const idKey = String(subscription.id || '');
-        const matchedItems = [
-          ...(subscriptionItemsById[subIdKey] || []),
-          ...(subNumKey && subNumKey !== subIdKey ? (subscriptionItemsById[subNumKey] || []) : []),
-          ...(idKey && idKey !== subIdKey && idKey !== subNumKey ? (subscriptionItemsById[idKey] || []) : []),
-        ];
-        const uniqueItems = Array.from(new Map(matchedItems.map(it => [it.id || it.subscription_item_id, it])).values());
-        const totalPerDelivery = uniqueItems.reduce((sum: number, it: any) => sum + (Number(it.final_price || it.unit_price || 0) * Number(it.quantity || 1)), 0);
+        // Strictly match items belonging to this subscription_id
+        const uniqueItems = subscriptionItemsById[subIdKey] || [];
+        const totalPerDelivery = uniqueItems.reduce(
+          (sum: number, it: any) => sum + (Number(it.final_price || it.unit_price || 0) * Number(it.quantity || 1)),
+          0
+        );
 
         return {
           ...subscription,
+          frequency: subscription.schedule_type || 'weekly',
+          schedule_type: subscription.schedule_type || 'weekly',
           subscription_items: uniqueItems,
           total_per_delivery: totalPerDelivery,
         };

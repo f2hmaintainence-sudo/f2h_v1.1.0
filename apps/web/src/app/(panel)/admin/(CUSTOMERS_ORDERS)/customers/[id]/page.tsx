@@ -1486,8 +1486,8 @@ function SubscriptionTab({ subscriptions, onRefresh }: { subscriptions: any; onR
         </div>
       </div>
 
-      {/* Subscription-wise Full Details List */}
-      <div className="space-y-6">
+      {/* Subscription-wise Full Details List (2 Cards in a Row) */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
         {history.map((sub: any, idx: number) => {
           const subId = sub.subscription_id || sub.id;
           const subNum = sub.subscription_number || subId;
@@ -1505,10 +1505,12 @@ function SubscriptionTab({ subscriptions, onRefresh }: { subscriptions: any; onR
             0
           );
 
+          const displayEstimated = Number(totalPerDelivery || sub.total_per_delivery || 0);
+
           return (
             <div
               key={subId || idx}
-              className={`rounded-2xl border transition-all duration-200 overflow-hidden shadow-xs ${
+              className={`rounded-2xl border transition-all duration-200 overflow-hidden shadow-xs flex flex-col ${
                 isActive
                   ? 'bg-white border-emerald-200 ring-1 ring-emerald-500/10'
                   : isCurrentlyPaused
@@ -1517,37 +1519,37 @@ function SubscriptionTab({ subscriptions, onRefresh }: { subscriptions: any; onR
               }`}
             >
               {/* Subscription Card Header */}
-              <div className={`p-5 sm:p-6 border-b ${
+              <div className={`p-4 sm:p-5 border-b ${
                 isActive
                   ? 'bg-gradient-to-r from-emerald-50/70 via-teal-50/40 to-transparent border-emerald-100'
                   : isCurrentlyPaused
                   ? 'bg-gradient-to-r from-amber-50/70 via-orange-50/40 to-transparent border-amber-100'
                   : 'bg-gray-50/60 border-gray-100'
               }`}>
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   {/* Left: ID, Badge, and Schedule Info */}
-                  <div className="flex items-start sm:items-center gap-3.5">
-                    <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold shadow-xs shrink-0 ${
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold shadow-xs shrink-0 ${
                       isActive
                         ? 'bg-emerald-600 text-white'
                         : isCurrentlyPaused
                         ? 'bg-amber-500 text-white'
                         : 'bg-gray-200 text-gray-700'
                     }`}>
-                      <Calendar size={20} />
+                      <Calendar size={18} />
                     </div>
 
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-base font-black text-gray-900 tracking-tight">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <h3 className="text-sm font-black text-gray-900 tracking-tight truncate">
                           Subscription #{subNum}
                         </h3>
-                        {subId !== subNum && (
-                          <span className="text-[11px] font-mono text-gray-400">
+                        {subId && subId !== subNum && (
+                          <span className="text-[10px] font-mono text-gray-400">
                             (ID: {subId})
                           </span>
                         )}
-                        <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
                           isCurrentlyPaused
                             ? 'bg-amber-100 text-amber-800 border border-amber-300'
                             : isActive
@@ -1556,16 +1558,16 @@ function SubscriptionTab({ subscriptions, onRefresh }: { subscriptions: any; onR
                         }`}>
                           {isCurrentlyPaused ? 'PAUSED' : (sub.status || 'ACTIVE')}
                         </span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 uppercase">
-                          {sub.schedule_type || 'Everyday'}
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 uppercase">
+                          {sub.frequency || sub.schedule_type || 'Weekly'}
                         </span>
                         {sub.delivery_slot && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 uppercase">
+                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 uppercase">
                             {sub.delivery_slot}
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-[11px] text-gray-500 mt-0.5">
                         Created on <span className="font-semibold text-gray-700">{formatDate(sub.created_at)}</span>
                         {sub.billing_cycle && (
                           <> • Billing Cycle: <span className="capitalize font-semibold text-gray-700">{sub.billing_cycle}</span></>
@@ -1575,25 +1577,25 @@ function SubscriptionTab({ subscriptions, onRefresh }: { subscriptions: any; onR
                   </div>
 
                   {/* Right: Actions (Auto-Renew & Resume) */}
-                  <div className="flex flex-wrap items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center">
                     {/* Auto-renew Switch */}
-                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-2xs">
-                      <span className="text-xs font-bold text-slate-600">Auto Renew:</span>
+                    <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-xl border border-gray-200 shadow-2xs">
+                      <span className="text-[11px] font-bold text-slate-600">Auto Renew:</span>
                       <button
                         type="button"
                         onClick={() => handleToggleAutoRenew(sub)}
                         disabled={togglingSubId === String(subId)}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
+                        className={`relative inline-flex h-4.5 w-8 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
                           sub.auto_renew ? 'bg-emerald-600' : 'bg-slate-300'
                         }`}
                       >
                         <span
-                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                            sub.auto_renew ? 'translate-x-4.5' : 'translate-x-1'
+                          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                            sub.auto_renew ? 'translate-x-4' : 'translate-x-0.5'
                           }`}
                         />
                       </button>
-                      <span className={`text-[11px] font-black uppercase ${sub.auto_renew ? 'text-emerald-700' : 'text-slate-400'}`}>
+                      <span className={`text-[10px] font-black uppercase ${sub.auto_renew ? 'text-emerald-700' : 'text-slate-400'}`}>
                         {sub.auto_renew ? 'ON' : 'OFF'}
                       </span>
                     </div>
@@ -1602,9 +1604,9 @@ function SubscriptionTab({ subscriptions, onRefresh }: { subscriptions: any; onR
                     {isCurrentlyPaused && (
                       <button
                         onClick={() => setSelectedResumeSub(sub)}
-                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl transition shadow-xs flex items-center gap-1 cursor-pointer"
                       >
-                        <PlayCircle className="w-3.5 h-3.5" /> Resume
+                        <PlayCircle className="w-3 h-3" /> Resume
                       </button>
                     )}
                   </div>
@@ -1612,13 +1614,13 @@ function SubscriptionTab({ subscriptions, onRefresh }: { subscriptions: any; onR
 
                 {/* Pause Info Banner if Paused */}
                 {isCurrentlyPaused && (
-                  <div className="mt-4 p-3 bg-amber-50/80 border border-amber-200 rounded-xl flex items-center justify-between text-xs text-amber-900">
-                    <span className="font-bold flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                  <div className="mt-3 p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl flex items-center justify-between text-xs text-amber-900">
+                    <span className="font-bold flex items-center gap-1.5 text-[11px]">
+                      <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                       Paused until {formatDate(cleanPTo)} ({formatDate(cleanPFrom)} &rarr; {formatDate(cleanPTo)})
                     </span>
                     {sub.pause_reason && (
-                      <span className="text-[11px] text-amber-700 italic">
+                      <span className="text-[10px] text-amber-700 italic">
                         Reason: {sub.pause_reason}
                       </span>
                     )}
@@ -1627,28 +1629,30 @@ function SubscriptionTab({ subscriptions, onRefresh }: { subscriptions: any; onR
               </div>
 
               {/* Subscription Meta Details Grid */}
-              <div className="p-5 sm:p-6 space-y-6">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-xl bg-gray-50/70 border border-gray-100 text-xs">
+              <div className="p-4 sm:p-5 space-y-4 flex-1">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 rounded-xl bg-gray-50/70 border border-gray-100 text-xs">
                   <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Start Date</p>
-                    <p className="font-bold text-gray-800">{formatDate(sub.start_date)}</p>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Start Date</p>
+                    <p className="font-bold text-gray-800 text-[11px]">{formatDate(sub.start_date)}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">End Date</p>
-                    <p className="font-bold text-gray-800">{formatDate(sub.end_date) || 'Ongoing'}</p>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">End Date</p>
+                    <p className="font-bold text-gray-800 text-[11px]">{formatDate(sub.end_date) || 'Ongoing'}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Payment Mode</p>
-                    <p className="font-bold text-gray-800 capitalize">{sub.payment_mode || sub.payment_type || 'Prepaid Wallet'}</p>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Payment Mode</p>
+                    <p className="font-bold text-gray-800 capitalize text-[11px]">{sub.payment_mode || sub.payment_type || 'Prepaid'}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Estimated / Delivery</p>
-                    <p className="font-black text-emerald-700 text-sm">₹{Number(totalPerDelivery || sub.monthly_estimate || 0).toLocaleString('en-IN')}</p>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Estimated / Delivery</p>
+                    <p className="font-black text-emerald-700 text-xs">
+                      {isNaN(displayEstimated) || displayEstimated === 0 ? '—' : `₹${displayEstimated.toLocaleString('en-IN')}`}
+                    </p>
                   </div>
                   {sub.delivery_address && (
-                    <div className="col-span-2 sm:col-span-4 pt-2 border-t border-gray-200/60 flex items-start gap-2 text-gray-600">
-                      <MapPin size={14} className="text-gray-400 shrink-0 mt-0.5" />
-                      <span className="text-[11px]">
+                    <div className="col-span-2 sm:col-span-4 pt-1.5 border-t border-gray-200/60 flex items-start gap-1.5 text-gray-600">
+                      <MapPin size={12} className="text-gray-400 shrink-0 mt-0.5" />
+                      <span className="text-[10px] leading-relaxed">
                         <strong className="text-gray-700">Delivery Address:</strong> {sub.delivery_address}
                         {sub.delivery_landmark && ` (Landmark: ${sub.delivery_landmark})`}
                         {sub.branch_name && ` • Branch: ${sub.branch_name}`}
@@ -1659,24 +1663,24 @@ function SubscriptionTab({ subscriptions, onRefresh }: { subscriptions: any; onR
 
                 {/* Subscribed Items for THIS Specific Subscription */}
                 <div>
-                  <h4 className="text-xs font-black text-gray-900 uppercase tracking-wider mb-3 flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <Box size={15} className="text-emerald-600" />
+                  <h4 className="text-[11px] font-black text-gray-900 uppercase tracking-wider mb-2.5 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Box size={14} className="text-emerald-600" />
                       Subscribed Items ({items.length})
                     </span>
                     {totalPerDelivery > 0 && (
-                      <span className="text-[11px] font-extrabold text-emerald-700">
-                        Total per delivery: ₹{Number(totalPerDelivery).toLocaleString('en-IN')}
+                      <span className="text-[10px] font-extrabold text-emerald-700">
+                        Total / delivery: ₹{Number(totalPerDelivery).toLocaleString('en-IN')}
                       </span>
                     )}
                   </h4>
 
                   {items.length === 0 ? (
-                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 text-center">
-                      <p className="text-xs text-gray-400 italic">No item records attached to this subscription.</p>
+                    <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-center">
+                      <p className="text-[11px] text-gray-400 italic">No item records attached to this subscription.</p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-2">
                       {items.map((item: any, itemIdx: number) => {
                         const unitPrice = Number(item.unit_price || 0);
                         const finalPrice = Number(item.final_price || unitPrice);
@@ -1685,22 +1689,22 @@ function SubscriptionTab({ subscriptions, onRefresh }: { subscriptions: any; onR
 
                         return (
                           <div
-                            key={item.id || itemIdx}
-                            className="flex items-center justify-between p-3.5 bg-white border border-gray-100 rounded-xl hover:border-emerald-200 transition-colors shadow-2xs"
+                            key={item.id || item.subscription_item_id || itemIdx}
+                            className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl hover:border-emerald-200 transition-colors shadow-2xs"
                           >
-                            <div className="flex items-center gap-3 min-w-0">
+                            <div className="flex items-center gap-2.5 min-w-0">
                               {/* Product Thumbnail or Counter */}
                               {item.product_image ? (
                                 <img
                                   src={item.product_image.startsWith('http') ? item.product_image : `/uploads/${item.product_image.replace(/^\//, '')}`}
                                   alt={item.product_name || 'Product'}
-                                  className="w-11 h-11 rounded-xl object-cover border border-gray-100 shrink-0"
+                                  className="w-10 h-10 rounded-xl object-cover border border-gray-100 shrink-0"
                                   onError={(e: any) => {
                                     e.currentTarget.style.display = 'none';
                                   }}
                                 />
                               ) : (
-                                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-black text-xs shrink-0">
+                                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-black text-xs shrink-0">
                                   {itemIdx + 1}
                                 </div>
                               )}
@@ -1710,16 +1714,16 @@ function SubscriptionTab({ subscriptions, onRefresh }: { subscriptions: any; onR
                                   {item.product_name || 'Subscribed Product'}
                                 </p>
                                 {item.variant_name && (
-                                  <p className="text-[11px] text-gray-500 font-medium truncate">
+                                  <p className="text-[10px] text-gray-500 font-medium truncate">
                                     {item.variant_name}
                                   </p>
                                 )}
-                                <div className="flex items-center gap-2 mt-0.5">
-                                  <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded-md">
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 bg-emerald-50 text-emerald-700 rounded">
                                     Qty: {qty} unit{qty > 1 ? 's' : ''}
                                   </span>
                                   {item.is_free && (
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded-md">
+                                    <span className="text-[9px] font-bold px-1.5 py-0.2 bg-amber-50 text-amber-700 rounded">
                                       FREE
                                     </span>
                                   )}
@@ -1727,7 +1731,7 @@ function SubscriptionTab({ subscriptions, onRefresh }: { subscriptions: any; onR
                               </div>
                             </div>
 
-                            <div className="text-right shrink-0 pl-3">
+                            <div className="text-right shrink-0 pl-2">
                               <p className="font-black text-gray-900 text-xs">
                                 ₹{itemTotal.toLocaleString('en-IN')}
                               </p>
