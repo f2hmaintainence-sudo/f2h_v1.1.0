@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:dio/dio.dart';
 
 import 'package:f2h_delivery/theme/app_colors.dart';
@@ -22,6 +23,9 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
   String? _error;
   Map<String, dynamic>? _data;
   late TabController _tabController;
+
+  static const String _customerAppUrl =
+      'https://play.google.com/store/apps/details?id=com.f2h.customer&pcampaignid=web_share';
 
   @override
   void initState() {
@@ -51,23 +55,176 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
     }
   }
 
+  String _getShareMessage(String code) {
+    return '🥛 Order 100% Pure, Farm-Fresh Milk, Organic Vegetables & Daily Groceries delivered to your doorstep with Farm to Home (F2H)!\n\n'
+        '🎁 Use my Customer Referral Code: $code to get special discounts on your first order!\n\n'
+        '📲 Download the F2H Customer App now:\n'
+        '$_customerAppUrl';
+  }
+
   void _copyCode(String code) {
-    Clipboard.setData(ClipboardData(text: code));
-    AppSnackBar.success(context, 'Referral code copied!');
+    final fullMessage = _getShareMessage(code);
+    Clipboard.setData(ClipboardData(text: fullMessage));
+    AppSnackBar.success(context, 'Customer referral link & code copied!');
   }
 
   Future<void> _shareCode(String code) async {
-    final message = 'Join Farm to Home Delivery Partner team using my referral code: $code\n'
-        'Sign up, start deliveries and earn great daily payouts!\n'
-        'https://f2hfresh.com/download/delivery';
-    final encoded = Uri.encodeComponent(message);
-    final url = Uri.parse('https://wa.me/?text=$encoded');
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
-      _copyCode(code);
-      if (mounted) AppSnackBar.info(context, 'Code copied! Share it with your friends.');
+    final message = _getShareMessage(code);
+    try {
+      await Share.share(
+        message,
+        subject: 'Farm to Home (F2H) - Fresh Milk & Groceries Referral',
+      );
+    } catch (_) {
+      _showShareBottomSheet(code);
     }
+  }
+
+  void _showShareBottomSheet(String code) {
+    final message = _getShareMessage(code);
+    final encoded = Uri.encodeComponent(message);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Share Customer Referral Link',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Invite customers to order fresh farm products & earn \u20b975 per customer',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  color: const Color(0xFF64748B),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildShareOption(
+                    icon: Icons.chat_rounded,
+                    label: 'WhatsApp',
+                    color: const Color(0xFF25D366),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final url = Uri.parse('https://wa.me/?text=$encoded');
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url, mode: LaunchMode.externalApplication);
+                      } else {
+                        _copyCode(code);
+                      }
+                    },
+                  ),
+                  _buildShareOption(
+                    icon: Icons.send_rounded,
+                    label: 'Telegram',
+                    color: const Color(0xFF0088CC),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final url = Uri.parse('https://t.me/share/url?url=${Uri.encodeComponent(_customerAppUrl)}&text=${Uri.encodeComponent(message)}');
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url, mode: LaunchMode.externalApplication);
+                      } else {
+                        _copyCode(code);
+                      }
+                    },
+                  ),
+                  _buildShareOption(
+                    icon: Icons.sms_rounded,
+                    label: 'SMS',
+                    color: const Color(0xFFEA580C),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final url = Uri.parse('sms:?body=$encoded');
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url, mode: LaunchMode.externalApplication);
+                      } else {
+                        _copyCode(code);
+                      }
+                    },
+                  ),
+                  _buildShareOption(
+                    icon: Icons.share_rounded,
+                    label: 'All Apps',
+                    color: const Color(0xFF16A34A),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      Share.share(
+                        message,
+                        subject: 'Farm to Home (F2H) - Fresh Milk & Groceries Referral',
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShareOption({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 26),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF334155),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   String _formatDate(dynamic rawDate) {
@@ -94,7 +251,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: const F2hAppBar(
         title: 'Refer & Earn \u20b975',
-        subtitle: 'Earn \u20b975 for every delivery partner referred',
+        subtitle: 'Earn \u20b975 for every customer referred',
         icon: Icons.card_giftcard_rounded,
       ),
       body: _loading
@@ -181,7 +338,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.20),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.card_giftcard_rounded, color: Colors.white, size: 20),
@@ -192,11 +349,11 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Your Delivery Partner Referral Code',
+                      'Your Customer Referral Code',
                       style: GoogleFonts.poppins(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w600),
                     ),
                     Text(
-                      'Share & Earn \u20b975 per partner',
+                      'Share & Earn \u20b975 per customer',
                       style: GoogleFonts.poppins(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w800),
                     ),
                   ],
@@ -208,9 +365,9 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
+              color: Colors.white.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white.withOpacity(0.35), width: 1.2),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1.2),
             ),
             child: Row(
               children: [
@@ -230,7 +387,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.25),
+                      color: Colors.white.withValues(alpha: 0.25),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(Icons.copy_rounded, color: Colors.white, size: 18),
@@ -248,9 +405,9 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.18),
+                      color: Colors.white.withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.white.withOpacity(0.35), width: 1.2),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1.2),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -396,7 +553,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Referral bonuses (\u20b975 per eligible partner) are disbursed offline via cash or direct bank transfer at month-end.',
+                  'Referral bonuses (\u20b975 per eligible customer) are disbursed offline via cash or direct bank transfer at month-end.',
                   style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF166534), fontWeight: FontWeight.w500),
                 ),
               ],
@@ -430,19 +587,19 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
               const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFF2563EB), size: 18),
               const SizedBox(width: 8),
               Text(
-                'How Referral Works',
+                'How Customer Referral Works',
                 style: GoogleFonts.poppins(fontSize: 14.5, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
               ),
             ],
           ),
           const SizedBox(height: 14),
-          _buildStep('1', 'Share your referral code with prospective delivery partners', const Color(0xFF2563EB), const Color(0xFFDBEAFE)),
+          _buildStep('1', 'Share your customer referral link with friends, family & neighbors', const Color(0xFF2563EB), const Color(0xFFDBEAFE)),
           const SizedBox(height: 10),
-          _buildStep('2', 'Referred partner signs up and completes their KYC & onboarding', const Color(0xFFD97706), const Color(0xFFFEF3C7)),
+          _buildStep('2', 'Customer downloads the F2H Customer App using your link', const Color(0xFFD97706), const Color(0xFFFEF3C7)),
           const SizedBox(height: 10),
-          _buildStep('3', 'Partner activates and delivers their first assigned order run', const Color(0xFF16A34A), const Color(0xFFDCFCE7)),
+          _buildStep('3', 'Customer signs up, adds your code, and places their first order', const Color(0xFF16A34A), const Color(0xFFDCFCE7)),
           const SizedBox(height: 10),
-          _buildStep('4', 'You earn \u20b975, paid out offline at month-end settlement!', const Color(0xFF9333EA), const Color(0xFFF3E8FF)),
+          _buildStep('4', 'You earn \u20b975 per customer, paid out offline at month-end settlement!', const Color(0xFF9333EA), const Color(0xFFF3E8FF)),
         ],
       ),
     );
@@ -499,7 +656,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
             labelStyle: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w800),
             unselectedLabelStyle: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600),
             tabs: [
-              Tab(text: 'Referred Partners (${referrals.length})'),
+              Tab(text: 'Referred Customers (${referrals.length})'),
               Tab(text: 'Payouts (${payments.length})'),
             ],
           ),
@@ -539,7 +696,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
             ),
             const SizedBox(height: 4),
             Text(
-              'Share your code and earn \u20b975 for each new active delivery partner!',
+              'Share your code and earn \u20b975 for each new customer who orders!',
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
             ),
@@ -557,10 +714,10 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(vertical: 6),
         itemCount: referrals.length,
-        separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+        separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
         itemBuilder: (_, i) {
           final r = referrals[i] as Map<String, dynamic>;
-          final name = r['referee_name'] as String? ?? 'Delivery Partner';
+          final name = r['referee_name'] as String? ?? 'Customer';
           final phone = r['referee_phone'] as String? ?? '';
           final date = _formatDate(r['created_at']);
           final status = (r['status'] as String? ?? 'pending').toLowerCase();
@@ -583,7 +740,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                   ),
                   alignment: Alignment.center,
                   child: Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : 'P',
+                    name.isNotEmpty ? name[0].toUpperCase() : 'C',
                     style: GoogleFonts.poppins(
                       fontSize: 14,
                       fontWeight: FontWeight.w900,
@@ -694,13 +851,13 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(vertical: 6),
         itemCount: payments.length,
-        separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+        separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
         itemBuilder: (_, i) {
           final p = payments[i] as Map<String, dynamic>;
           final amount = (p['amount'] is num ? p['amount'] : double.tryParse(p['amount']?.toString() ?? '75') ?? 75.0).toDouble();
           final date = _formatDate(p['paid_at']);
           final ref = p['payment_reference'] as String? ?? 'Physical / Cash Payout';
-          final referee = p['referee_name'] as String? ?? 'Delivery Partner';
+          final referee = p['referee_name'] as String? ?? 'Customer';
 
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
