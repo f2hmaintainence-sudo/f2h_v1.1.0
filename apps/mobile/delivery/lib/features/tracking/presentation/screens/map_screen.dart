@@ -11,6 +11,7 @@ import 'package:f2h_delivery/features/orders/presentation/screens/delivery_confi
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/features/tracking/presentation/widgets/map_delivery_sheet.dart';
+import 'package:f2h_delivery/features/orders/presentation/widgets/pickup_required_dialog.dart';
 import 'package:f2h_delivery/core/config/app_config.dart';
 
 enum MapLayerType {
@@ -442,6 +443,19 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   }
 
   void _showConfirmation(BuildContext context, GroupedStop stop) async {
+    final sessionState = context.read<DeliverySessionBloc>().state is DeliverySessionLoaded
+        ? context.read<DeliverySessionBloc>().state as DeliverySessionLoaded
+        : null;
+    if (sessionState != null && !sessionState.isPickupConfirmed) {
+      showPickupRequiredDialog(
+        context,
+        orders: sessionState.orders,
+        groupedStops: sessionState.groupedStops,
+        currentRun: sessionState.currentRun,
+      );
+      return;
+    }
+
     final locationService = sl<LocationService>();
     final position = await locationService.getCurrentPosition();
 

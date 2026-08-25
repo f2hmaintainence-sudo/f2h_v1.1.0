@@ -38,6 +38,20 @@ class DeliverySessionLoaded extends DeliverySessionState {
 
   bool get isAccountActive => accountStatus.toLowerCase() == 'active';
 
+  bool get isPickupConfirmed {
+    if (currentRun != null) {
+      return currentRun!.pickupConfirmed ||
+          currentRun!.status == 'in_progress' ||
+          currentRun!.status == 'completed' ||
+          currentRun!.status == 'handed_over';
+    }
+    return orders.isNotEmpty &&
+        orders.every((o) =>
+            o.status.toLowerCase() == 'out_for_delivery' ||
+            o.status.toLowerCase() == 'delivered' ||
+            o.status.toLowerCase() == 'failed');
+  }
+
   List<GroupedStop> get groupedStops {
     // Group orders by address_id — the delivery stop is defined by WHERE we deliver,
     // not WHO the customer is. The same customer at two different addresses must be

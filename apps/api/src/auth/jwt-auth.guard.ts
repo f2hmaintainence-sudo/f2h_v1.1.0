@@ -31,7 +31,13 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
   handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
     if (err || !user) {
-      console.error('[JwtAuthGuard] ❌ Authentication failed, throwing UnauthorizedException');
+      // `info` carries the reason (TokenExpiredError, JsonWebTokenError, No auth
+      // token). Dropping it made every 401 look identical in the logs.
+      const req = context.switchToHttp().getRequest();
+      const reason = info?.message || err?.message || 'no user resolved';
+      console.error(
+        `[JwtAuthGuard] ❌ Authentication failed on ${req?.method} ${req?.originalUrl || req?.url}: ${reason}`,
+      );
       throw new UnauthorizedException('Invalid or expired token');
     }
 

@@ -13,6 +13,7 @@ import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_event.dart';
 import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
+import 'package:f2h_delivery/features/orders/presentation/widgets/pickup_required_dialog.dart';
 import 'package:f2h_delivery/features/profile/presentation/screens/profile_screen.dart';
 
 class OrdersScreen extends StatefulWidget {
@@ -92,6 +93,19 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
   }
 
   void _showConfirmation(BuildContext context, GroupedStop stop) async {
+    final sessionState = context.read<DeliverySessionBloc>().state is DeliverySessionLoaded
+        ? context.read<DeliverySessionBloc>().state as DeliverySessionLoaded
+        : null;
+    if (sessionState != null && !sessionState.isPickupConfirmed) {
+      showPickupRequiredDialog(
+        context,
+        orders: sessionState.orders,
+        groupedStops: sessionState.groupedStops,
+        currentRun: sessionState.currentRun,
+      );
+      return;
+    }
+
     final position = await _locationService.getCurrentPosition();
     if (position != null) {
       final dist = _locationService.haversineDistanceKm(
@@ -437,34 +451,59 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
               // Deliver Button or Delivered Status
               if (!isDone) ...[
                 const SizedBox(height: 14),
-                GestureDetector(
-                  onTap: () => _showConfirmation(context, stop),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: primaryColor,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: primaryColor.withValues(alpha: 0.2),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        )
-                      ],
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.check_circle_rounded, color: Colors.white, size: 17),
-                        SizedBox(width: 6),
-                        Text(
-                          'Deliver',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13),
+                Builder(
+                  builder: (ctx) {
+                    final session = ctx.watch<DeliverySessionBloc>().state is DeliverySessionLoaded
+                        ? ctx.watch<DeliverySessionBloc>().state as DeliverySessionLoaded
+                        : null;
+                    final isPickupConfirmed = session?.isPickupConfirmed ?? true;
+                    final btnColor = isPickupConfirmed ? primaryColor : const Color(0xFFD97706);
+
+                    return GestureDetector(
+                      onTap: () {
+                        if (!isPickupConfirmed && session != null) {
+                          showPickupRequiredDialog(
+                            context,
+                            orders: session.orders,
+                            groupedStops: session.groupedStops,
+                            currentRun: session.currentRun,
+                          );
+                        } else {
+                          _showConfirmation(context, stop);
+                        }
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: btnColor,
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: btnColor.withValues(alpha: 0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            )
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              isPickupConfirmed ? Icons.check_circle_rounded : Icons.warehouse_rounded,
+                              color: Colors.white,
+                              size: 17,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              isPickupConfirmed ? 'Deliver' : 'Pickup Required from Warehouse',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ] else ...[
                 const SizedBox(height: 12),

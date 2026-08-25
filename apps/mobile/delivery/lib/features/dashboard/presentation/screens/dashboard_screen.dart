@@ -27,6 +27,7 @@ import 'package:f2h_delivery/features/profile/presentation/screens/support_scree
 import 'package:f2h_delivery/core/widgets/f2h_hero_header.dart';
 import 'package:f2h_delivery/features/orders/presentation/widgets/delivery_basket_modal.dart';
 import 'package:f2h_delivery/features/orders/presentation/widgets/containers_tracker_modal.dart';
+import 'package:f2h_delivery/features/orders/presentation/widgets/pickup_required_dialog.dart';
 import 'package:f2h_delivery/features/notifications/services/notification_api_service.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -250,7 +251,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _showConfirmation(BuildContext context, GroupedStop stop) {
+  void _showConfirmation(BuildContext context, GroupedStop stop, {DeliverySessionLoaded? session}) {
+    final sessionState = session ?? (context.read<DeliverySessionBloc>().state is DeliverySessionLoaded ? context.read<DeliverySessionBloc>().state as DeliverySessionLoaded : null);
+    if (sessionState != null && !sessionState.isPickupConfirmed) {
+      showPickupRequiredDialog(
+        context,
+        orders: sessionState.orders,
+        groupedStops: sessionState.groupedStops,
+        currentRun: sessionState.currentRun,
+      );
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -596,6 +608,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         ),
                       ] else ...[
+                        // ── WAREHOUSE PICKUP REQUIRED CARD (When handover pending) ──
+                        if (!pickupConfirmed && currentRun != null && listQueue.isNotEmpty) ...[
+                          PickupStatusCard(currentRun: currentRun),
+                          const SizedBox(height: 12),
+                        ],
+
                         // ── SECTION 1: TODAY'S PROGRESS ─────────────────────
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -850,7 +868,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   stop: stop,
                                   isNext: isNext,
                                   distanceStr: _calculateDistanceStr(stop),
-                                  onDeliverTap: () => _showConfirmation(context, stop),
+                                  isPickupConfirmed: pickupConfirmed,
+                                  onDeliverTap: () => _showConfirmation(context, stop, session: session),
+                                  onPickupRequiredTap: () => showPickupRequiredDialog(
+                                    context,
+                                    orders: session.orders,
+                                    groupedStops: session.groupedStops,
+                                    currentRun: currentRun,
+                                  ),
                                 ),
                                 if (index < displayedStops.length - 1)
                                   const SizedBox(height: 10),

@@ -417,14 +417,26 @@ export class AuthController {
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
+    @Body() body?: { refreshToken?: string; refresh_token?: string },
   ) {
-    const refreshToken = req.cookies?.refresh_token;
+    // The web panels send the refresh token as an httpOnly cookie, but the
+    // Flutter apps have no cookie jar on web and send it in the body instead.
+    // Reading the cookie only made every app-side refresh fail with a 401, so
+    // an expired access token became a hard logout mid-session.
+    const refreshToken =
+      req.cookies?.refresh_token || body?.refreshToken || body?.refresh_token;
     if (!refreshToken) {
       throw new UnauthorizedException('Refresh token is required');
     }
     const tokens = await this.authService.refreshTokens(refreshToken);
     this.setCookies(res, tokens.accessToken, tokens.refreshToken);
-    return { message: 'Tokens refreshed successfully' };
+    // The cookies are httpOnly, so a client that authenticates by header can
+    // only pick the rotated tokens up from the body.
+    return {
+      message: 'Tokens refreshed successfully',
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
   }
 
   @Get('session-info')

@@ -363,6 +363,8 @@ class DeliveryRun {
   final String status;
   final String slot;
   final String runDate;
+  final bool pickupConfirmed;
+  final String? dispatchStatus;
   final List<DeliveryOrderModel> orders;
 
   const DeliveryRun({
@@ -370,6 +372,8 @@ class DeliveryRun {
     required this.status,
     required this.slot,
     required this.runDate,
+    this.pickupConfirmed = false,
+    this.dispatchStatus,
     required this.orders,
   });
 
@@ -377,11 +381,18 @@ class DeliveryRun {
     final ordersList = (json['deliveries'] as List<dynamic>? ?? [])
         .map((e) => DeliveryOrderModel.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
+    final bool isConfirmed = json['pickup_confirmed'] == true ||
+        json['pickup_confirmed'] == 1 ||
+        json['run_status'] == 'in_progress' ||
+        json['run_status'] == 'completed' ||
+        json['run_status'] == 'handed_over';
     return DeliveryRun(
       runId: json['run_id']?.toString() ?? '',
       status: json['run_status']?.toString() ?? 'pending',
       slot: json['slot']?.toString() ?? '',
       runDate: json['date']?.toString() ?? '',
+      pickupConfirmed: isConfirmed,
+      dispatchStatus: json['dispatch_status']?.toString(),
       orders: ordersList,
     );
   }

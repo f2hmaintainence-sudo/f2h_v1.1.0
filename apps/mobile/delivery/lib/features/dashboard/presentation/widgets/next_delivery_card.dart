@@ -8,12 +8,16 @@ class NextDeliveryCard extends StatelessWidget {
   final GroupedStop stop;
   final String distanceStr;
   final VoidCallback onDeliverTap;
+  final bool isPickupConfirmed;
+  final VoidCallback? onPickupRequiredTap;
 
   const NextDeliveryCard({
     super.key,
     required this.stop,
     required this.distanceStr,
     required this.onDeliverTap,
+    this.isPickupConfirmed = true,
+    this.onPickupRequiredTap,
   });
 
   void _callPhone(String phone) async {
@@ -164,11 +168,11 @@ class NextDeliveryCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: GestureDetector(
-                  onTap: onDeliverTap,
+                  onTap: isPickupConfirmed ? onDeliverTap : (onPickupRequiredTap ?? onDeliverTap),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: isPickupConfirmed ? Colors.white : const Color(0xFFFEF3C7),
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: const [
                         BoxShadow(
@@ -178,14 +182,22 @@ class NextDeliveryCard extends StatelessWidget {
                         )
                       ],
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.check_circle_rounded, color: kPrimary, size: 16),
-                        SizedBox(width: 4),
+                        Icon(
+                          isPickupConfirmed ? Icons.check_circle_rounded : Icons.warehouse_rounded,
+                          color: isPickupConfirmed ? kPrimary : const Color(0xFFD97706),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 4),
                         Text(
-                          'Deliver',
-                          style: TextStyle(color: kPrimary, fontWeight: FontWeight.w900, fontSize: 12),
+                          isPickupConfirmed ? 'Deliver' : 'Pickup',
+                          style: TextStyle(
+                            color: isPickupConfirmed ? kPrimary : const Color(0xFFD97706),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),

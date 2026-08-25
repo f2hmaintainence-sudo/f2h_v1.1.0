@@ -2,8 +2,11 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
+import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
+import 'package:f2h_delivery/features/orders/presentation/widgets/pickup_required_dialog.dart';
 
 
 class ContainerReturnInput {
@@ -209,6 +212,22 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
   }
 
   void _triggerSuccess() {
+    final sessionState = context.read<DeliverySessionBloc>().state is DeliverySessionLoaded
+        ? context.read<DeliverySessionBloc>().state as DeliverySessionLoaded
+        : null;
+    if (sessionState != null && !sessionState.isPickupConfirmed) {
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      showPickupRequiredDialog(
+        context,
+        orders: sessionState.orders,
+        groupedStops: sessionState.groupedStops,
+        currentRun: sessionState.currentRun,
+      );
+      return;
+    }
+
     String paymentDetails = widget.stop.isCod
         ? 'Collected via ${_isUpi ? "UPI" : "Cash"}'
         : 'Prepaid Online';

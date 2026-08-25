@@ -15,6 +15,7 @@ import 'package:f2h_delivery/features/delivery_session/presentation/bloc/deliver
 import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_delivery/core/config/app_config.dart';
 import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
+import 'package:f2h_delivery/features/orders/presentation/widgets/pickup_required_dialog.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final GroupedStop stop;
@@ -130,6 +131,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         return;
       }
       */
+    }
+
+    final sessionState = context.read<DeliverySessionBloc>().state is DeliverySessionLoaded
+        ? context.read<DeliverySessionBloc>().state as DeliverySessionLoaded
+        : null;
+    if (sessionState != null && !sessionState.isPickupConfirmed) {
+      showPickupRequiredDialog(
+        context,
+        orders: sessionState.orders,
+        groupedStops: sessionState.groupedStops,
+        currentRun: sessionState.currentRun,
+      );
+      return;
     }
 
     if (!mounted) return;

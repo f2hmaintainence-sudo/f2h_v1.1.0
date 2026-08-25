@@ -1054,11 +1054,38 @@ export class DeliveryOrderService {
 
     if (order.delivery_run_id) {
       const runRes = await this.db.query(
-        `SELECT id, run_id, delivery_partner_id FROM delivery_runs WHERE id::text = $1 OR run_id = $1 LIMIT 1`,
+        `SELECT id, run_id, status, delivery_partner_id FROM delivery_runs WHERE id::text = $1 OR run_id = $1 LIMIT 1`,
         [order.delivery_run_id],
       );
-      if (runRes?.length && String(runRes[0].delivery_partner_id) !== String(boy.user_id)) {
-        throw new ForbiddenException('You are not assigned to this delivery run');
+      if (runRes?.length) {
+        const run = runRes[0];
+        if (String(run.delivery_partner_id) !== String(boy.user_id)) {
+          throw new ForbiddenException('You are not assigned to this delivery run');
+        }
+        const runIds = [String(run.id), run.run_id].filter(Boolean);
+        const dispatch = await this.findActiveDispatchForRun(runIds);
+        if (dispatch && !isDispatchHandedOver(dispatch.status)) {
+          throw new BadRequestException(
+            'Cannot deliver order: Items have not been picked up from the warehouse yet. Please verify and confirm pickup first.',
+          );
+        }
+      }
+    } else if (!['out_for_delivery', 'delivered'].includes(order.status)) {
+      const activeRuns = await this.db.query(
+        `SELECT id, run_id, status FROM delivery_runs 
+         WHERE delivery_partner_id = $1 
+           AND DATE(run_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE 
+           AND status != 'cancelled' LIMIT 1`,
+        [String(boy.user_id)],
+      );
+      if (activeRuns?.length) {
+        const runIds = [String(activeRuns[0].id), activeRuns[0].run_id].filter(Boolean);
+        const dispatch = await this.findActiveDispatchForRun(runIds);
+        if (dispatch && !isDispatchHandedOver(dispatch.status)) {
+          throw new BadRequestException(
+            'Cannot deliver order: Items have not been picked up from the warehouse yet. Please verify and confirm pickup first.',
+          );
+        }
       }
     }
 
