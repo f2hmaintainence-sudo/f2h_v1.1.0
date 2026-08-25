@@ -575,7 +575,50 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
-      appBar: F2hAppBar(title: 'Delivery Basket Ledger'),
+      appBar: F2hAppBar(
+        title: 'Delivery Basket Ledger',
+        actions: [
+          if (_dispatchStatus != 'completed')
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Center(
+                child: InkWell(
+                  onTap: _isReturningProducts ? null : _returnProductsToHub,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: _dispatchStatus == 'return_pending' ? const Color(0xFFCCFBF1) : const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _dispatchStatus == 'return_pending' ? const Color(0xFF5EEAD4) : const Color(0xFFA7F3D0),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.assignment_return_rounded,
+                          size: 15,
+                          color: _dispatchStatus == 'return_pending' ? const Color(0xFF0D9488) : const Color(0xFF059669),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _dispatchStatus == 'return_pending' ? 'Return Pending' : 'Return',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: _dispatchStatus == 'return_pending' ? const Color(0xFF0F766E) : const Color(0xFF059669),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
       body: _isLoadingSummary && _apiProductBreakdown == null
           ? const Center(
               child: Column(
@@ -767,8 +810,8 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
             ),
           ),
 
-          // Bottom Action Button: Return Items to Warehouse (Available whenever partner holds custody of the dispatch)
-          if (_dispatchStatus != 'completed' && _dispatchStatus != 'draft' && (_apiPickupConfirmed == true || _dispatchStatus == 'collected' || _dispatchStatus == 'in_progress' || _dispatchStatus == 'return_pending'))
+          // Bottom Action Button: Return Items to Warehouse (Available whenever dispatch is active / not completed)
+          if (_dispatchStatus != 'completed')
             Container(
               padding: EdgeInsets.fromLTRB(14, 10, 14, MediaQuery.of(context).padding.bottom + 10),
               decoration: const BoxDecoration(
