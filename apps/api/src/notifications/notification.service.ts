@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataService } from '../shared/database/Data.service';
+import { DatabaseService } from '../shared/database/Database.service';
 import { DeveloperService } from '../shared/logger/Developer.service';
 import { RedisService } from '../redis/redis.service';
 import { generateId } from '../helpers/RandomHelper';
@@ -81,6 +82,7 @@ export class NotificationService {
 
   constructor(
     private readonly dataService: DataService,
+    private readonly db: DatabaseService,
     private readonly developer: DeveloperService,
     private readonly redisService: RedisService,
   ) { }
@@ -288,21 +290,38 @@ export class NotificationService {
   }
 
   /**
-   * Mark notifications as read
+   * Mark notifications as read (supports numeric IDs and string notification_ids)
    */
-  async markAsRead(userId: string, notificationIds: number[]): Promise<void> {
+  async markAsRead(userId: string, notificationIds: (number | string)[]): Promise<void> {
     try {
-      await this.dataService.update(
-        'notification_recipients',
-        {
-          status: 'read',
-          read_at: new Date(),
-          updated_at: new Date(),
-        },
-        [
-          { column: 'user_id', operator: '=', value: userId },
-          { column: 'id', operator: 'IN', value: notificationIds },
-        ],
+      if (!notificationIds || notificationIds.length === 0) return;
+      const numericIds: number[] = [];
+      const stringIds: string[] = [];
+
+      for (const raw of notificationIds) {
+        const num = Number(raw);
+        if (!isNaN(num) && Number.isInteger(num)) {
+          numericIds.push(num);
+        }
+        stringIds.push(String(raw));
+      }
+
+      await this.db.query(
+        `UPDATE notification_recipients
+         SET status = 'read', read_at = NOW(), updated_at = NOW()
+         WHERE (
+           user_id = $1
+           OR user_id IN (
+             SELECT dp.delivery_partner_id FROM delivery_partners dp WHERE dp.user_id = $1
+             UNION
+             SELECT dp.user_id FROM delivery_partners dp WHERE dp.delivery_partner_id = $1
+           )
+         )
+         AND (
+           id = ANY($2::bigint[])
+           OR notification_id = ANY($3::text[])
+         )`,
+        [userId, numericIds.length > 0 ? numericIds : [-1], stringIds],
       );
 
       this.logger.log(
@@ -319,14 +338,19 @@ export class NotificationService {
    */
   async markAllAsRead(userId: string): Promise<void> {
     try {
-      await this.dataService.update(
-        'notification_recipients',
-        {
-          status: 'read',
-          read_at: new Date(),
-          updated_at: new Date(),
-        },
-        [{ column: 'user_id', operator: '=', value: userId }],
+      await this.db.query(
+        `UPDATE notification_recipients
+         SET status = 'read', read_at = NOW(), updated_at = NOW()
+         WHERE (
+           user_id = $1
+           OR user_id IN (
+             SELECT dp.delivery_partner_id FROM delivery_partners dp WHERE dp.user_id = $1
+             UNION
+             SELECT dp.user_id FROM delivery_partners dp WHERE dp.delivery_partner_id = $1
+           )
+         )
+         AND status != 'read'`,
+        [userId],
       );
 
       this.logger.log(`Marked all notifications as read for user ${userId}`);

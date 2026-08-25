@@ -11,7 +11,10 @@ export class AuthService {
     }
 
     const boyRes = await this.db.query(
-      `SELECT id, is_active, delivery_partner_id, user_id FROM delivery_partners WHERE user_id = $1 OR delivery_partner_id = $1 LIMIT 1`,
+      `SELECT is_active, is_online, is_available, duty_status, delivery_partner_id
+       FROM delivery_partners
+       WHERE delivery_partner_id = $1
+       LIMIT 1`,
       [userId],
     );
 
@@ -19,7 +22,7 @@ export class AuthService {
       throw new NotFoundException('Delivery partner profile not found');
     }
 
-    const currentStatus = Boolean(boyRes[0].is_active);
+    const currentStatus = Boolean(boyRes[0].is_online ?? boyRes[0].is_active);
     const newStatus = typeof requestedActiveState === 'boolean' ? requestedActiveState : !currentStatus;
 
     if (newStatus === false) {
@@ -27,11 +30,11 @@ export class AuthService {
       const pendingRes = await this.db.query(
         `SELECT COUNT(*)::int AS pending_count
          FROM orders
-         WHERE (delivery_partner_id = $1 OR delivery_partner_id = $2)
-           AND scheduled_date = $3::date
-           AND delivery_slot = $4
+         WHERE delivery_partner_id = $1
+           AND scheduled_date = $2::date
+           AND delivery_slot = $3
            AND status NOT IN ('delivered', 'failed', 'cancelled')`,
-        [boyRes[0].delivery_partner_id, boyRes[0].user_id, targetDate, targetSlot],
+        [boyRes[0].delivery_partner_id, targetDate, targetSlot],
       );
       const pendingCount = Number(pendingRes?.[0]?.pending_count ?? 0);
       if (pendingCount > 0) {
@@ -39,15 +42,24 @@ export class AuthService {
       }
     }
 
-    await this.db.execute(
-      `UPDATE delivery_partners SET is_active = $1, is_online = $1, updated_at = NOW() WHERE id = $2`,
-      [newStatus, boyRes[0].id],
+    const dutyStatus = newStatus ? 'on_duty' : 'off_duty';
+
+    await this.db.query(
+      `UPDATE delivery_partners
+       SET is_active = $1,
+           is_online = $1,
+           is_available = $1,
+           duty_status = $2,
+           updated_at = NOW()
+       WHERE delivery_partner_id = $3`,
+      [newStatus, dutyStatus, boyRes[0].delivery_partner_id],
     );
 
     return {
       success: true,
       is_active: newStatus,
       is_online: newStatus,
+      duty_status: dutyStatus,
       message: `Shift status updated to ${newStatus ? 'active' : 'inactive'}`,
     };
   }

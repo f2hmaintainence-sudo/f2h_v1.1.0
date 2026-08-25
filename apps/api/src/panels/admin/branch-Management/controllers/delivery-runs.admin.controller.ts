@@ -6,6 +6,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { DatabaseService } from 'src/shared/database/Database.service';
+import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
@@ -13,7 +14,10 @@ import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 @Controller({ path: 'admin/delivery-runs', version: '1' })
 @UseGuards(JwtAuthGuard)
 export class DeliveryRunsAdminController {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly pushNotificationService: PushNotificationService,
+  ) {}
 
   @Post()
   async createDeliveryRun(
@@ -47,7 +51,7 @@ export class DeliveryRunsAdminController {
     const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
     const runId = `RUN_${dateStr}_${randomSuffix}`.substring(0, 30);
 
-    return this.db.transaction(async (client) => {
+    const result = await this.db.transaction(async (client) => {
       // 1. Retrieve orders with customer and address details
       const ordersRes = await client.query(
         `SELECT
@@ -168,5 +172,24 @@ export class DeliveryRunsAdminController {
         orders_assigned: orders.length,
       };
     });
+
+    // Notify delivery partner
+    try {
+      await this.pushNotificationService.sendNotificationToUsers(
+        [body.delivery_partner_id],
+        {
+          title: 'New Delivery Run Assigned 🚚',
+          body: `You have been assigned a new delivery run (${result.run_id}) with ${result.stops} stops for slot ${body.slot} on ${body.run_date}.`,
+          data: {
+            type: 'delivery_run_assigned',
+            run_id: result.run_id,
+            slot: body.slot,
+            run_date: body.run_date,
+          },
+        },
+      );
+    } catch (_) {}
+
+    return result;
   }
 }

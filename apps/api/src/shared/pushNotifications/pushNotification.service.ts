@@ -127,7 +127,8 @@ export class PushNotificationService implements OnModuleInit {
     }
 
     /**
-     * Sends a notification to specific users
+     * Sends a notification to specific users, delivery partners, or customers.
+     * Automatically resolves FCM tokens and records in-app notification in DB.
      */
     async sendNotificationToUsers(
         user_id: any[],
@@ -137,26 +138,62 @@ export class PushNotificationService implements OnModuleInit {
             return { success: false, error: 'No user IDs provided' };
         }
 
-        const queryResult = await this.dataService.query('users', {
-            select: ['fcm_token'],
-            where: [
-                {
-                    column: 'user_id',
-                    operator: 'IN',
-                    value: user_id,
-                },
-            ],
-        });
-
-        const tokenList = (queryResult?.data || [])
-            .map((u: any) => u.fcm_token)
-            .filter((t: string) => !!t && t.length > 0 && t !== 'fcmToken' && t !== 'fcmtoken');
-
-        if (tokenList.length === 0) {
-            console.warn(`[PushNotificationService] ALERT: Attempted to send notification to user(s) ${user_id.join(', ')} but no valid FCM tokens were found in the database!`);
-            return { success: false, error: 'No user IDs provided or no valid tokens found' };
+        const ids = (Array.isArray(user_id) ? user_id : [user_id]).map(String).filter(Boolean);
+        if (ids.length === 0) {
+            return { success: false, error: 'No valid IDs provided' };
         }
 
-        return await this.sendToMultipleDevices(tokenList, message.title, message.body, message.data);
+        try {
+            // 1. Resolve FCM tokens and primary user_ids across users, delivery_partners, and customers
+            const rows = await this.db.query(
+                `SELECT DISTINCT u.fcm_token, u.user_id
+                 FROM users u
+                 LEFT JOIN delivery_partners dp ON dp.user_id = u.user_id
+                 LEFT JOIN customers c ON c.user_id = u.user_id
+                 WHERE u.user_id = ANY($1::text[])
+                    OR dp.delivery_partner_id = ANY($1::text[])
+                    OR dp.id::text = ANY($1::text[])
+                    OR c.customer_id = ANY($1::text[])
+                    OR c.id::text = ANY($1::text[])`,
+                [ids]
+            );
+
+            const tokenList = (rows || [])
+                .map((u: any) => u.fcm_token)
+                .filter((t: string) => !!t && t.length > 0 && t !== 'fcmToken' && t !== 'fcmtoken');
+
+            // 2. Insert into notifications and notification_recipients tables for in-app history
+            const resolvedUserIds = [...new Set((rows || []).map((r: any) => r.user_id).concat(ids))].filter(Boolean);
+            try {
+                const notifId = `NTF-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+                const now = new Date();
+                await this.db.query(
+                    `INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)
+                     VALUES ($1, $2, $3, 'push', 'info', 'high', true, $4, $4)`,
+                    [notifId, message.title, message.body, now]
+                );
+
+                for (const uid of resolvedUserIds) {
+                    await this.db.query(
+                        `INSERT INTO notification_recipients (notification_id, user_id, status, notified_at, created_at, updated_at)
+                         VALUES ($1, $2, 'unread', $3, $3, $3)
+                         ON CONFLICT DO NOTHING`,
+                        [notifId, uid, now]
+                    );
+                }
+            } catch (e) {
+                this.developerService.warn('Failed to insert in-app notification record in sendNotificationToUsers:', e);
+            }
+
+            if (tokenList.length === 0) {
+                this.developerService.warn(`[PushNotificationService] ALERT: No valid FCM tokens found for: ${ids.join(', ')}`);
+                return { success: false, error: 'No valid tokens found' };
+            }
+
+            return await this.sendToMultipleDevices(tokenList, message.title, message.body, message.data);
+        } catch (error) {
+            this.developerService.error('sendNotificationToUsers error:', error);
+            return { success: false, error: String(error) };
+        }
     }
 }

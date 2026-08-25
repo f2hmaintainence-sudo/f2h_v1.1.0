@@ -8,6 +8,7 @@ import {
   Query,
   Patch,
   Put,
+  Delete,
   Param,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
@@ -88,17 +89,25 @@ export class NotificationController {
   }
 
   /**
-   * Mark specific notifications as read
+   * Mark specific notifications as read (supports POST/PATCH and kebab/camel case)
    */
+  @Post('mark-read')
+  @Patch('mark-read')
+  @Post('mark-as-read')
   @Patch('mark-as-read')
   @UseGuards(JwtAuthGuard)
-  @Throttle({ short: { limit: 20, ttl: 60000 } })
-  async markAsRead(@Req() req: Request, @Body() body: MarkAsReadDto) {
+  @Throttle({ short: { limit: 60, ttl: 60000 } })
+  async markAsRead(@Req() req: Request, @Body() body: any) {
     const user = req.user as any;
-    await this.notificationService.markAsRead(
-      user.user_id,
-      body.notificationIds,
-    );
+    const rawIds =
+      body?.notificationIds ||
+      body?.notification_ids ||
+      body?.ids ||
+      (body?.notificationId ? [body.notificationId] : []) ||
+      (body?.id ? [body.id] : []);
+
+    const ids = Array.isArray(rawIds) ? rawIds : [rawIds];
+    await this.notificationService.markAsRead(user.user_id, ids.filter(Boolean));
 
     return {
       success: true,
@@ -109,9 +118,14 @@ export class NotificationController {
   /**
    * Mark all notifications as read for the authenticated user
    */
+  @Post('mark-all-read')
+  @Patch('mark-all-read')
+  @Post('mark-all-as-read')
   @Patch('mark-all-as-read')
+  @Put('mark-all/read')
+  @Put('mark-all-read')
   @UseGuards(JwtAuthGuard)
-  @Throttle({ short: { limit: 10, ttl: 60000 } })
+  @Throttle({ short: { limit: 30, ttl: 60000 } })
   async markAllAsRead(@Req() req: Request) {
     const user = req.user as any;
     await this.notificationService.markAllAsRead(user.user_id);
@@ -198,9 +212,10 @@ export class NotificationController {
   /**
    * Dismiss/soft delete a notification
    */
+  @Delete(':recipientId')
   @Put(':recipientId/dismiss')
   @UseGuards(JwtAuthGuard)
-  @Throttle({ short: { limit: 20, ttl: 60000 } })
+  @Throttle({ short: { limit: 60, ttl: 60000 } })
   async dismissNotification(
     @Req() req: Request,
     @Param('recipientId') recipientId: string,
@@ -209,9 +224,10 @@ export class NotificationController {
     const id = parseInt(recipientId, 10);
 
     if (isNaN(id)) {
+      await this.notificationService.markAsRead(user.user_id, [recipientId]);
       return {
-        success: false,
-        message: 'Invalid notification ID',
+        success: true,
+        message: 'Notification dismissed',
       };
     }
 
@@ -242,9 +258,11 @@ export class NotificationController {
   /**
    * Dismiss all notifications for the authenticated user
    */
+  @Delete('dismiss-all')
   @Put('dismiss-all')
+  @Post('dismiss-all')
   @UseGuards(JwtAuthGuard)
-  @Throttle({ short: { limit: 10, ttl: 60000 } })
+  @Throttle({ short: { limit: 20, ttl: 60000 } })
   async dismissAllNotifications(@Req() req: Request) {
     const user = req.user as any;
     await this.notificationService.dismissAllNotifications(user.user_id);

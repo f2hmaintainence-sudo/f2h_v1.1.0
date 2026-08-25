@@ -94,7 +94,14 @@ export class LocationController {
         try {
           // Update recent coordinates on delivery_partners table
           await this.db.query(
-            `UPDATE delivery_partners SET current_lat = $1, current_lng = $2, updated_at = NOW() WHERE user_id = $3 OR delivery_partner_id = $3`,
+            `UPDATE delivery_partners
+             SET current_lat = $1,
+                 current_lng = $2,
+                 last_location_at = NOW(),
+                 is_online = true,
+                 duty_status = 'on_duty',
+                 updated_at = NOW()
+             WHERE delivery_partner_id = $3`,
             [Number(body.latitude), Number(body.longitude), userId]
           );
 
@@ -226,20 +233,18 @@ export class LocationController {
     };
 
     // Update Redis cache with SOS status (TTL 1 hour)
-    await this.redisService.put(redisKey, locationData, 3600);
-
-    // Write SOS entry to database logs immediately for emergency audit trail
-    this.db.query(`SELECT id FROM delivery_partners WHERE user_id = $1 OR delivery_partner_id = $1`, [userId])
+    await this.redisService.put(redisKey, locationData, 3600);    // Write SOS entry to database logs immediately for emergency audit trail
+    this.db.query(`SELECT delivery_partner_id FROM delivery_partners WHERE delivery_partner_id = $1`, [userId])
       .then(async (boyRows) => {
         if (boyRows && boyRows.length > 0) {
-          const deliveryPartnerId = boyRows[0].id;
+          const deliveryPartnerId = boyRows[0].delivery_partner_id;
           try {
             await this.db.query(
-              `UPDATE delivery_partners SET current_lat = $1, current_lng = $2, updated_at = NOW() WHERE id = $3`,
+              `UPDATE delivery_partners SET current_lat = $1, current_lng = $2, last_location_at = NOW(), updated_at = NOW() WHERE delivery_partner_id = $3`,
               [latitude, longitude, deliveryPartnerId]
             );
             await this.db.query(
-              `INSERT INTO delivery_location_logs (delivery_partner_id, latitude, longitude, recorded_at)
+              `INSERT INTO delivery_location_logs (user_id, latitude, longitude, recorded_at)
                VALUES ($1, $2, $3, NOW())`,
               [deliveryPartnerId, latitude, longitude]
             );
@@ -258,8 +263,8 @@ export class LocationController {
         userId,
         latitude,
         longitude,
-        battery: prevLocation?.battery || 100,
         speed: 0,
+        battery: prevLocation?.battery || 100,
         status: 'SOS',
         timestamp: new Date().toISOString(),
       });
@@ -267,7 +272,8 @@ export class LocationController {
 
     return {
       status: true,
-      message: 'SOS alert broadcasted to admin panel successfully',
+      message: 'SOS alert broadcasted to dispatch team successfully',
+      data: locationData,
     };
   }
 
@@ -309,18 +315,23 @@ export class LocationController {
   @UseGuards(AuthGuard('jwt'))
   async getActiveLocations() {
     const query = `
-      SELECT id, user_id, full_name, phone, vehicle_type, is_active 
-      FROM delivery_partners 
-      WHERE is_active = true
+      SELECT dp.delivery_partner_id,
+             dp.delivery_partner_id AS id,
+             dp.delivery_partner_id AS user_id,
+             COALESCE(NULLIF(TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Delivery Partner') AS full_name,
+             u.phone,
+             dp.vehicle_type,
+             dp.is_active,
+             dp.is_online
+      FROM delivery_partners dp
+      LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
+      WHERE dp.is_active = true
     `;
     const rows = await this.db.query(query);
 
-    // Decrypt fields
-    const decryptedRows = this.fieldEncryption.decryptRows('delivery_partners', rows);
-
     // Map each driver with their Redis location
     const activeDrivers: any[] = [];
-    for (const driver of decryptedRows) {
+    for (const driver of rows || []) {
       const redisKey = `delivery_partner_location:${driver.user_id}`;
       const location: any = await this.redisService.fetch(redisKey);
 
@@ -338,7 +349,7 @@ export class LocationController {
            FROM orders o
            JOIN customers c ON c.customer_id = o.customer_id
            WHERE o.delivery_partner_id = $1 AND o.scheduled_date = CURRENT_DATE`,
-          [driver.id]
+          [driver.delivery_partner_id]
         );
       } catch (e) {
         console.error('Error fetching driver orders:', e);

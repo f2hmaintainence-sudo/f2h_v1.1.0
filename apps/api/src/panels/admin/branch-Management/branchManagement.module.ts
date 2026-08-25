@@ -26,6 +26,8 @@ import { BranchCoverageOverlapService } from './services/branch-coverage-overlap
 import { RedisModule } from 'src/shared/redis/redis.module';
 import { DeliveryManagementModule } from '../delivery/delivery.module';
 
+import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
+
 @Module({
   imports: [HelpersModule, FieldEncryptionModule, RedisModule, DeliveryManagementModule],
   controllers: [
@@ -57,7 +59,9 @@ import { DeliveryManagementModule } from '../delivery/delivery.module';
     BranchConfigService,
     BranchCoverageOverlapService,
     DeveloperService,
-    IdGeneratorService],
+    IdGeneratorService,
+    PushNotificationService,
+  ],
   exports: [BranchManagementService, BranchConfigService],
 })
 export class BranchManagementModule { }

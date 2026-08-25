@@ -598,11 +598,10 @@ export class DeliveryManagementService {
       const partnersSql = `
         SELECT
           dp.delivery_partner_id AS id,
-          COALESCE(NULLIF(TRIM(dp.full_name), ''),
-                   NULLIF(TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')), ''),
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''),
                    u.user_name, 'Delivery Partner')          AS full_name,
-          COALESCE(dp.phone, u.phone)                        AS phone,
-          COALESCE(dp.email, u.email)                        AS email,
+          u.phone                                            AS phone,
+          u.email                                            AS email,
           dp.profile_photo_url,
           dp.is_online, dp.is_available, dp.is_active, dp.is_verified,
           dp.duty_status,
@@ -777,7 +776,11 @@ export class DeliveryManagementService {
       // 3. Transform and calculate partner-wise availability and capacity metrics
       const partners = partnerRows.map((r: any) => {
         const onLeaveToday = Boolean(r.leave_id);
-        const isOnline = Boolean(r.is_online && r.duty_status !== 'off_duty');
+        const isOnline = Boolean(
+          r.is_online === true ||
+          r.duty_status === 'on_duty' ||
+          r.duty_status === 'in_transit'
+        );
         
         let status: 'ONLINE' | 'OFFLINE' | 'ON_LEAVE' = 'OFFLINE';
         if (onLeaveToday) {

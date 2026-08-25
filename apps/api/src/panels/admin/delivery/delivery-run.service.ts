@@ -978,6 +978,40 @@ export class DeliveryRunService {
         [actualRunId, toPartnerId, runId],
       );
 
+      // Notify new assigned partner
+      if (toPartnerId && this.pushNotificationService) {
+        try {
+          await this.pushNotificationService.sendNotificationToUsers(
+            [toPartnerId],
+            {
+              title: 'Delivery Run Assigned 🚚',
+              body: `Delivery run ${actualRunId} has been assigned to you.`,
+              data: {
+                type: 'delivery_run_assigned',
+                run_id: actualRunId,
+              },
+            },
+          );
+        } catch (_) {}
+      }
+
+      // Notify previous partner if different
+      if (fromPartnerId && fromPartnerId !== toPartnerId && this.pushNotificationService) {
+        try {
+          await this.pushNotificationService.sendNotificationToUsers(
+            [fromPartnerId],
+            {
+              title: 'Delivery Run Reassigned ℹ️',
+              body: `Delivery run ${actualRunId} has been reassigned to another delivery partner.`,
+              data: {
+                type: 'delivery_run_reassigned',
+                run_id: actualRunId,
+              },
+            },
+          );
+        } catch (_) {}
+      }
+
       return {
         status: true,
         message: `Run reassigned from partner ${fromPartnerId} to ${toPartnerId}`,

@@ -18,6 +18,8 @@ import { RoleResolverService } from '../auth/role-resolver.service';
     NotificationService,
     RoleResolverService,
     DeveloperService,
+    DatabaseService,
+    DataService,
   ],
   exports: [NotificationGateway, NotificationService],
 })
