@@ -209,7 +209,7 @@ class _PromoBannerState extends State<PromoBanner> {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: AspectRatio(
-        aspectRatio: 3.24,
+        aspectRatio: 2.65,
         child: PageView.builder(
           controller: _pageController,
           itemCount: 100000,
@@ -218,57 +218,24 @@ class _PromoBannerState extends State<PromoBanner> {
             final rawUrl = banner['imageUrl']?.toString() ?? '';
             final imageUrl = _formatImageUrl(rawUrl);
 
-            final hasRichContent = (banner['title'] != null && banner['title'].toString().isNotEmpty) ||
-                (banner['discountText'] != null && banner['discountText'].toString().isNotEmpty) ||
-                (banner['discount_text'] != null && banner['discount_text'].toString().isNotEmpty) ||
-                (banner['categoryName'] != null && banner['categoryName'].toString().isNotEmpty) ||
-                (banner['category_name'] != null && banner['category_name'].toString().isNotEmpty) ||
-                (banner['backgroundColor'] != null && banner['backgroundColor'].toString().isNotEmpty) ||
-                (banner['background_color'] != null && banner['background_color'].toString().isNotEmpty);
-
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Container(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
+                      color: Colors.black.withValues(alpha: 0.12),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
                   ],
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(16),
                   child: GestureDetector(
                     onTap: () => _onBannerTap(banner),
-                    child: imageUrl.isNotEmpty
-                        ? Image.network(
-                            imageUrl,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            loadingBuilder: (_, child, progress) {
-                              if (progress == null) return child;
-                              return Container(
-                                color: const Color(0xFF16A34A),
-                                child: const Center(
-                                  child: SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                            errorBuilder: (context, error, stackTrace) {
-                              return _buildOfferCard(banner, imageUrl);
-                            },
-                          )
-                        : _buildOfferCard(banner, ''),
+                    child: _buildOfferCard(banner, imageUrl),
                   ),
                 ),
               ),
@@ -289,7 +256,7 @@ class _PromoBannerState extends State<PromoBanner> {
     final bannerType = banner['bannerType']?.toString() ?? banner['banner_type']?.toString() ?? 'home_carousel';
     final bgHex = banner['backgroundColor']?.toString() ?? banner['background_color']?.toString();
 
-    Color bgColor = const Color(0xFF8B1214); // Dynamic crimson red matching admin preview
+    Color bgColor = const Color(0xFFa21616); // Dynamic crimson red matching admin preview
     if (bgHex != null && bgHex.isNotEmpty) {
       final cleanHex = bgHex.replaceAll('#', '').trim();
       if (cleanHex.length == 6) {
@@ -299,31 +266,21 @@ class _PromoBannerState extends State<PromoBanner> {
       }
     }
 
-    String placementLabel = 'SPECIAL OFFER';
-    IconData placementIcon = Icons.local_offer_rounded;
-    if (bannerType == 'category_slide') {
-      placementLabel = 'CATEGORY SLIDE';
-      placementIcon = Icons.folder_copy_rounded;
+    String placementLabel = 'CATEGORY SLIDE';
+    IconData placementIcon = Icons.folder_copy_rounded;
+    if (bannerType == 'home_carousel') {
+      placementLabel = 'HOME CAROUSEL';
+      placementIcon = Icons.tag_rounded;
     } else if (bannerType == 'checkout_promo' || bannerType == 'checkout_banner') {
       placementLabel = 'CHECKOUT PROMO';
       placementIcon = Icons.shopping_bag_rounded;
-    } else if (bannerType == 'home_carousel') {
-      placementLabel = 'HOME CAROUSEL';
-      placementIcon = Icons.tag_rounded;
     }
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Row(
         children: [
@@ -340,9 +297,9 @@ class _PromoBannerState extends State<PromoBanner> {
                     children: [
                       // Badge 1: Banner Placement
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.25),
+                          color: Colors.black.withValues(alpha: 0.30),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Row(
@@ -353,27 +310,27 @@ class _PromoBannerState extends State<PromoBanner> {
                             Text(
                               placementLabel,
                               style: const TextStyle(
-                                fontSize: 8,
+                                fontSize: 8.5,
                                 fontWeight: FontWeight.w900,
                                 color: Colors.white,
-                                letterSpacing: 0.4,
+                                letterSpacing: 0.3,
                               ),
                             ),
                           ],
                         ),
                       ),
                       if (categoryName != null && categoryName.isNotEmpty) ...[
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 5),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.20),
+                            color: Colors.white.withValues(alpha: 0.22),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             categoryName,
                             style: const TextStyle(
-                              fontSize: 8,
+                              fontSize: 8.5,
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
                             ),
@@ -383,9 +340,9 @@ class _PromoBannerState extends State<PromoBanner> {
                         ),
                       ],
                       if (discountText != null && discountText.isNotEmpty) ...[
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 5),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(6),
@@ -393,7 +350,7 @@ class _PromoBannerState extends State<PromoBanner> {
                           child: Text(
                             discountText.toUpperCase(),
                             style: TextStyle(
-                              fontSize: 8,
+                              fontSize: 8.5,
                               fontWeight: FontWeight.w900,
                               color: bgColor,
                             ),
@@ -403,7 +360,7 @@ class _PromoBannerState extends State<PromoBanner> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 5),
+                const SizedBox(height: 6),
 
                 // Title
                 Text(
@@ -411,7 +368,7 @@ class _PromoBannerState extends State<PromoBanner> {
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
-                    fontSize: 14,
+                    fontSize: 15,
                     height: 1.15,
                   ),
                   maxLines: 1,
@@ -420,12 +377,12 @@ class _PromoBannerState extends State<PromoBanner> {
 
                 // Subtitle / Description
                 if (subtitle.isNotEmpty) ...[
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
                     subtitle,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      fontSize: 10,
+                      color: Colors.white.withValues(alpha: 0.88),
+                      fontSize: 10.5,
                       height: 1.1,
                     ),
                     maxLines: 1,
@@ -433,17 +390,17 @@ class _PromoBannerState extends State<PromoBanner> {
                   ),
                 ],
 
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
 
                 // CTA / Coupon Code Button Pill
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.08),
+                        color: Colors.black.withValues(alpha: 0.10),
                         blurRadius: 4,
                         offset: const Offset(0, 2),
                       ),
@@ -457,7 +414,7 @@ class _PromoBannerState extends State<PromoBanner> {
                             ? 'USE CODE: $couponCode'
                             : ctaText,
                         style: TextStyle(
-                          fontSize: 9.5,
+                          fontSize: 10,
                           fontWeight: FontWeight.w900,
                           color: bgColor,
                           letterSpacing: 0.3,
@@ -466,7 +423,7 @@ class _PromoBannerState extends State<PromoBanner> {
                       const SizedBox(width: 4),
                       Icon(
                         Icons.arrow_forward_rounded,
-                        size: 11,
+                        size: 12,
                         color: bgColor,
                       ),
                     ],
@@ -476,22 +433,41 @@ class _PromoBannerState extends State<PromoBanner> {
             ),
           ),
 
-          // Right side product/banner image (if available)
-          if (imageUrl.isNotEmpty) ...[
-            const SizedBox(width: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SizedBox(
-                width: 95,
-                height: 70,
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                ),
-              ),
+          // Right side product/banner image
+          const SizedBox(width: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: 110,
+              height: 86,
+              color: Colors.white.withValues(alpha: 0.15),
+              child: imageUrl.isNotEmpty
+                  ? Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        child: const Center(
+                          child: Icon(
+                            Icons.shopping_bag_rounded,
+                            color: Colors.white70,
+                            size: 32,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Container(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      child: const Center(
+                        child: Icon(
+                          Icons.shopping_bag_rounded,
+                          color: Colors.white70,
+                          size: 32,
+                        ),
+                      ),
+                    ),
             ),
-          ],
+          ),
         ],
       ),
     );
