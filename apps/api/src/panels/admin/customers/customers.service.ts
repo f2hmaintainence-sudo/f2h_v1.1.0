@@ -407,20 +407,61 @@ export class CustomersService {
 
       const postpaidLimit = Number(customer.postpaid_credit_limit || 0);
 
-      const billsRes: any[] = await this.databaseService.query(
-        `SELECT * FROM customer_bills WHERE customer_id = ? ORDER BY created_at DESC`,
+      const rawBillsRes: any[] = await this.databaseService.query(
+        `SELECT b.*,
+                o.status as order_status,
+                o.delivery_slot as order_slot,
+                s.subscription_number,
+                s.status as subscription_status,
+                s.schedule_type,
+                s.billing_cycle
+         FROM customer_bills b
+         LEFT JOIN orders o ON (b.bill_type = 'order' AND (o.order_id = b.reference_id OR o.id::text = b.reference_id))
+         LEFT JOIN subscriptions s ON (b.bill_type = 'subscription' AND (s.subscription_id = b.reference_id OR s.subscription_number = b.reference_id))
+         WHERE b.customer_id = $1
+         ORDER BY b.created_at DESC`,
         [customerId]
       ).catch(() => []);
 
-      const outstandingDue = subOrdersDue > 0
-        ? subOrdersDue
-        : billsRes.filter((b: any) => b.status !== 'paid' && b.status !== 'cancelled').reduce((sum: number, b: any) => sum + Number(b.due_amount || 0), 0);
+      const formattedBills = rawBillsRes.map(b => {
+        const totalAmt = Number(b.total_amount || 0);
+        const paidAmt = Number(b.paid_amount || 0);
+        const dueAmt = Number(b.due_amount ?? (b.status === 'paid' ? 0 : Math.max(0, totalAmt - paidAmt)));
+        return {
+          ...b,
+          subtotal: Number(b.subtotal || totalAmt),
+          discount_amount: Number(b.discount_amount || 0),
+          tax_amount: Number(b.tax_amount || 0),
+          total_amount: totalAmt,
+          paid_amount: paidAmt,
+          due_amount: dueAmt,
+          is_paid: b.status === 'paid' || (dueAmt === 0 && paidAmt >= totalAmt),
+        };
+      });
 
-      const totalCreditGiven = subOrdersTotalBilled || billsRes.reduce((sum: number, b: any) => sum + Number(b.total_amount || 0), 0);
-      const totalPostpaidPaid = subOrdersPaid || billsRes.reduce((sum: number, b: any) => sum + Number(b.paid_amount || 0), 0);
+      const subscriptionBills = formattedBills.filter(b => b.bill_type === 'subscription');
+      const orderBills = formattedBills.filter(b => b.bill_type === 'order' || b.bill_type === 'one_time');
+      const outstandingBills = formattedBills.filter(b => !b.is_paid && b.status !== 'cancelled' && b.due_amount > 0);
+      const outstandingSubscriptionBills = subscriptionBills.filter(b => !b.is_paid && b.status !== 'cancelled' && b.due_amount > 0);
+
+      const totalBilled = formattedBills.reduce((sum, b) => sum + b.total_amount, 0);
+      const totalPaid = formattedBills.reduce((sum, b) => sum + b.paid_amount, 0);
+      const totalDue = outstandingBills.reduce((sum, b) => sum + b.due_amount, 0);
+
+      const subBilled = subscriptionBills.reduce((sum, b) => sum + b.total_amount, 0);
+      const subPaid = subscriptionBills.reduce((sum, b) => sum + b.paid_amount, 0);
+      const subDue = outstandingSubscriptionBills.reduce((sum, b) => sum + b.due_amount, 0);
+
+      const orderBilled = orderBills.reduce((sum, b) => sum + b.total_amount, 0);
+      const orderPaid = orderBills.reduce((sum, b) => sum + b.paid_amount, 0);
+      const orderDue = orderBills.filter(b => !b.is_paid && b.status !== 'cancelled').reduce((sum, b) => sum + b.due_amount, 0);
+
+      const outstandingDue = totalDue > 0 ? totalDue : (subOrdersDue > 0 ? subOrdersDue : 0);
+      const totalCreditGiven = totalBilled > 0 ? totalBilled : subOrdersTotalBilled;
+      const totalPostpaidPaid = totalPaid > 0 ? totalPaid : subOrdersPaid;
 
       const walletTxns = await this.databaseService.query(
-        `SELECT * FROM customer_wallet_transactions WHERE customer_id = ? ORDER BY created_at DESC`,
+        `SELECT * FROM customer_wallet_transactions WHERE customer_id = $1 ORDER BY created_at DESC`,
         [customerId]
       );
 
@@ -771,20 +812,47 @@ export class CustomersService {
             preferred_delivery_slot: formattedOrders[0]?.delivery_slot || 'Morning',
             preferred_payment_method: formattedOrders[0]?.payment_mode || 'UPI',
           },
+          payments_ledger: {
+            summary: {
+              credit_limit: postpaidLimit,
+              total_billed: totalBilled,
+              total_paid: totalPaid,
+              total_due: totalDue,
+              subscription_billed: subBilled,
+              subscription_paid: subPaid,
+              subscription_due: subDue,
+              order_billed: orderBilled,
+              order_paid: orderPaid,
+              order_due: orderDue,
+              credit_utilization_pct: postpaidLimit > 0 ? Math.min(100, (totalDue / postpaidLimit) * 100) : 0,
+            },
+            bills: formattedBills,
+            subscription_bills: subscriptionBills,
+            order_bills: orderBills,
+            outstanding_bills: outstandingBills,
+            outstanding_subscription_bills: outstandingSubscriptionBills,
+          },
           postpaid_ledger: {
             summary: {
               credit_limit: postpaidLimit,
-              total_credit_given: totalCreditGiven,
-              total_paid: totalPostpaidPaid,
+              total_credit_given: totalBilled,
+              total_paid: totalPaid,
               current_due: outstandingDue,
               credit_utilization_pct: postpaidLimit > 0 ? Math.min(100, (outstandingDue / postpaidLimit) * 100) : 0,
+              total_billed: totalBilled,
+              total_due: totalDue,
+              subscription_billed: subBilled,
+              subscription_paid: subPaid,
+              subscription_due: subDue,
+              order_billed: orderBilled,
+              order_paid: orderPaid,
+              order_due: orderDue,
             },
-            bills: billsRes.map(b => ({
-              ...b,
-              total_amount: Number(b.total_amount || 0),
-              paid_amount: Number(b.paid_amount || 0),
-              due_amount: Number(b.due_amount || 0),
-            })),
+            bills: formattedBills,
+            subscription_bills: subscriptionBills,
+            order_bills: orderBills,
+            outstanding_bills: outstandingBills,
+            outstanding_subscription_bills: outstandingSubscriptionBills,
             subscription_orders: formattedSubOrders,
           },
           wallet_ledger: {
@@ -803,6 +871,8 @@ export class CustomersService {
             active_plan: activeSub,
             items: subItems,
             history: formattedSubscriptions,
+            bills: subscriptionBills,
+            outstanding_bills: outstandingSubscriptionBills,
           },
           container_tracking: {
             balances: containerBalancesRes.map(b => ({
@@ -1783,8 +1853,11 @@ export class CustomersService {
   async settlePostpaidBill(id: string, body: any, adminId: string = 'system') {
     try {
       const custRes = await this.databaseService.query(
-        `SELECT customer_id, first_name, last_name, phone FROM customers WHERE customer_id = ? OR id::text = ?`,
-        [id, id]
+        `SELECT c.customer_id, u.first_name, u.last_name, u.phone 
+         FROM customers c
+         JOIN users u ON u.user_id = c.customer_id
+         WHERE c.customer_id = $1 OR c.id::text = $1`,
+        [id]
       );
       if (!custRes || custRes.length === 0) {
         throw new BadRequestException('Customer not found');
@@ -1802,7 +1875,7 @@ export class CustomersService {
       await this.databaseService.query(
         `UPDATE orders
          SET payment_status = 'paid', updated_at = NOW()
-         WHERE customer_id = ?
+         WHERE customer_id = $1
            AND payment_mode = 'POSTPAID'
            AND payment_status != 'paid'`,
         [customerId]
@@ -1812,7 +1885,7 @@ export class CustomersService {
       await this.databaseService.query(
         `UPDATE customer_bills
          SET status = 'paid', paid_amount = total_amount, due_amount = 0, updated_at = NOW()
-         WHERE customer_id = ? AND status != 'paid'`,
+         WHERE customer_id = $1 AND status != 'paid'`,
         [customerId]
       ).catch(() => []);
 
