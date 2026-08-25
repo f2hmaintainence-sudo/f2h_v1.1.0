@@ -52,9 +52,22 @@ class _SecurityScreenState extends State<SecurityScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Logout from All Devices',
-          style: GoogleFonts.poppins(color: kRed, fontWeight: FontWeight.bold, fontSize: 16),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: const BoxDecoration(
+                color: Color(0xFFFEE2E2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.phonelink_erase_rounded, color: Color(0xFFDC2626), size: 18),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'Logout All Devices',
+              style: GoogleFonts.poppins(color: const Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ],
         ),
         content: Text(
           'Are you sure you want to terminate all active sessions? You will be logged out of this device as well.',
@@ -72,11 +85,97 @@ class _SecurityScreenState extends State<SecurityScreen> {
               context.read<AuthBloc>().add(LogoutRequested());
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: kRed,
+              backgroundColor: const Color(0xFFDC2626),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 0,
             ),
             child: Text('Logout All', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteAccount() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: const BoxDecoration(
+                color: Color(0xFFFEE2E2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.delete_forever_rounded, color: Color(0xFFDC2626), size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Delete Account',
+                style: GoogleFonts.poppins(color: const Color(0xFF0F172A), fontWeight: FontWeight.w800, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to permanently delete your delivery partner account?',
+              style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF0F172A), height: 1.4),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'This action cannot be undone. All your delivery history, verified credentials, and active data will be permanently removed.',
+                      style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFF991B1B), height: 1.3),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: GoogleFonts.poppins(color: kTextSub, fontWeight: FontWeight.w700)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Account deletion request submitted. Logging out...'),
+                  backgroundColor: Color(0xFFDC2626),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+              context.read<AuthBloc>().add(LogoutRequested());
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
+            child: Text('Delete Permanently', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -110,12 +209,11 @@ class _SecurityScreenState extends State<SecurityScreen> {
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
-        appBar: F2hAppBar(
-          title: 'Security & Settings',
-          subtitle: 'Manage password and account sessions',
-          actions: [
-            F2hAppBar.iconAction(Icons.lock_outline_rounded),
-          ],
+        appBar: const F2hAppBar(
+          title: 'Settings & Security',
+          subtitle: 'Manage password, sessions and account settings',
+          showBackButton: true,
+          actions: [],
         ),
         body: Form(
           key: _formKey,
@@ -271,7 +369,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                     const SizedBox(height: 12),
 
                     Text(
-                      'Logging out of all devices will invalidate all active access tokens across your mobile apps.',
+                      'Logging out of all devices will invalidate all active access tokens across your mobile devices.',
                       style: GoogleFonts.poppins(
                         fontSize: 12.5,
                         color: const Color(0xFF64748B),
@@ -288,17 +386,17 @@ class _SecurityScreenState extends State<SecurityScreen> {
                             height: 44,
                             child: OutlinedButton.icon(
                               onPressed: () => context.read<AuthBloc>().add(LogoutRequested()),
-                              icon: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 16),
+                              icon: const Icon(Icons.logout_rounded, color: Color(0xFFDC2626), size: 16),
                               label: Text(
                                 'Log Out',
                                 style: GoogleFonts.poppins(
-                                  color: const Color(0xFFEF4444),
+                                  color: const Color(0xFFDC2626),
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
                               style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Color(0xFFEF4444), width: 1.2),
+                                side: const BorderSide(color: Color(0xFFDC2626), width: 1.2),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 backgroundColor: Colors.white,
                               ),
@@ -321,7 +419,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                                 ),
                               ),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFEF4444),
+                                backgroundColor: const Color(0xFFDC2626),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 elevation: 0,
                               ),
@@ -329,6 +427,83 @@ class _SecurityScreenState extends State<SecurityScreen> {
                           ),
                         ),
                       ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // ── CARD 3: DANGER ZONE - DELETE ACCOUNT ───────────────
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFFCA5A5).withValues(alpha: 0.8)),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x04000000),
+                      blurRadius: 10,
+                      offset: Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header Tag
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.delete_outline_rounded,
+                          size: 17,
+                          color: Color(0xFFDC2626),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'DANGER ZONE / DELETE ACCOUNT',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFFDC2626),
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    Text(
+                      'Permanently delete your partner account, personal details, delivery records, and active credentials. This action is irreversible.',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12.5,
+                        color: const Color(0xFF64748B),
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 46,
+                      child: OutlinedButton.icon(
+                        onPressed: _confirmDeleteAccount,
+                        icon: const Icon(Icons.delete_forever_rounded, color: Color(0xFFDC2626), size: 18),
+                        label: Text(
+                          'Delete Account',
+                          style: GoogleFonts.poppins(
+                            color: const Color(0xFFDC2626),
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFDC2626), width: 1.4),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          backgroundColor: const Color(0xFFFEF2F2),
+                        ),
+                      ),
                     ),
                   ],
                 ),

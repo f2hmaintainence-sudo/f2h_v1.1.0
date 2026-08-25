@@ -847,6 +847,22 @@ class ProfileScreen extends StatelessWidget {
     final bloc = context.read<ProfileBloc>();
     final preferenceItems = [
       _PrefItem(
+        icon: Icons.settings_outlined,
+        iconBg: const Color(0xFFF1F5F9),
+        iconColor: const Color(0xFF475569),
+        title: 'Settings',
+        subtitle: 'Security, password & account controls',
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BlocProvider.value(
+              value: bloc,
+              child: const SecurityScreen(),
+            ),
+          ),
+        ),
+      ),
+      _PrefItem(
         icon: Icons.shield_outlined,
         iconBg: const Color(0xFFFAF5FF),
         iconColor: const Color(0xFF9333EA),
@@ -869,19 +885,6 @@ class ProfileScreen extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder: (_) => const TermsConditionsScreen(),
-          ),
-        ),
-      ),
-      _PrefItem(
-        icon: Icons.headset_mic_outlined,
-        iconBg: const Color(0xFFECFDF5),
-        iconColor: const Color(0xFF16A34A),
-        title: 'Help & Support',
-        subtitle: 'Contact supervisor or submit tickets',
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const SupportScreen(initialTabIndex: 0),
           ),
         ),
       ),
