@@ -58,7 +58,8 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
   @override
   Widget build(BuildContext context) {
     final p = widget.product;
-    return Container(
+
+    Widget content = Container(
       decoration: const BoxDecoration(
         color: kSurface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -382,6 +383,20 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
         ],
       ),
     );
+
+    if (p.isOutOfStock) {
+      content = ColorFiltered(
+        colorFilter: const ColorFilter.matrix(<double>[
+          0.2126, 0.7152, 0.0722, 0, 0,
+          0.2126, 0.7152, 0.0722, 0, 0,
+          0.2126, 0.7152, 0.0722, 0, 0,
+          0,      0,      0,      1, 0,
+        ]),
+        child: content,
+      );
+    }
+
+    return content;
   }
 }
 

@@ -62,6 +62,99 @@ class ProductGridCard extends StatelessWidget {
     final subPrice = _subPrice;
     final showSubscribe = product.isSubscribable && !product.isOutOfStock;
 
+    Widget cardContent = Container(
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: _cardBorder, width: 1.1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.fromLTRB(7, 7, 7, 7),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _TopStrip(
+            discountPercent: _discountPercent,
+            isOutOfStock: product.isOutOfStock,
+            subscriptionPrice: showSubscribe ? subPrice : null,
+            rating: product.rating,
+            reviews: product.reviews,
+          ),
+          const SizedBox(height: 4),
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F7F6),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Center(
+                  child: Hero(
+                    tag: 'product-v-${product.id}',
+                    child: buildProductImage(
+                      product.name,
+                      imageAsset: product.imageAsset,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (showSubscribe && subPrice != null) ...[
+            const SizedBox(height: 4),
+            _SubscriptionPillButton(
+              product: product,
+              subscriptionPrice: subPrice,
+            ),
+          ],
+          const SizedBox(height: 5),
+          Text(
+            product.name,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: kText,
+              letterSpacing: -0.2,
+              height: 1.15,
+            ),
+          ),
+          const SizedBox(height: 2),
+          _UnitLine(unit: unit, showSubscribeHint: false),
+          const SizedBox(height: 4),
+          _PriceRow(
+            price: product.price,
+            originalPrice: product.originalPrice,
+            muted: false,
+          ),
+          const SizedBox(height: 6),
+          _CardAction(product: product),
+        ],
+      ),
+    );
+
+    if (product.isOutOfStock) {
+      cardContent = ColorFiltered(
+        colorFilter: const ColorFilter.matrix(<double>[
+          0.2126, 0.7152, 0.0722, 0, 0,
+          0.2126, 0.7152, 0.0722, 0, 0,
+          0.2126, 0.7152, 0.0722, 0, 0,
+          0,      0,      0,      1, 0,
+        ]),
+        child: cardContent,
+      );
+    }
+
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
@@ -72,86 +165,7 @@ class ProductGridCard extends StatelessWidget {
           transitionDuration: const Duration(milliseconds: 220),
         ),
       ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: kSurface,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: _cardBorder, width: 1.1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.fromLTRB(7, 7, 7, 7),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _TopStrip(
-              discountPercent: _discountPercent,
-              isOutOfStock: product.isOutOfStock,
-              subscriptionPrice: showSubscribe ? subPrice : null,
-              rating: product.rating,
-              reviews: product.reviews,
-            ),
-            const SizedBox(height: 4),
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F7F6),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Center(
-                    child: Hero(
-                      tag: 'product-v-${product.id}',
-                      child: buildProductImage(
-                        product.name,
-                        imageAsset: product.imageAsset,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            if (showSubscribe && subPrice != null) ...[
-              const SizedBox(height: 4),
-              _SubscriptionPillButton(
-                product: product,
-                subscriptionPrice: subPrice,
-              ),
-            ],
-            const SizedBox(height: 5),
-            Text(
-              product.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: kText,
-                letterSpacing: -0.2,
-                height: 1.15,
-              ),
-            ),
-            const SizedBox(height: 2),
-            _UnitLine(unit: unit, showSubscribeHint: false),
-            const SizedBox(height: 4),
-            _PriceRow(
-              price: product.price,
-              originalPrice: product.originalPrice,
-              muted: false,
-            ),
-            const SizedBox(height: 6),
-            _CardAction(product: product),
-          ],
-        ),
-      ),
+      child: cardContent,
     );
   }
 }

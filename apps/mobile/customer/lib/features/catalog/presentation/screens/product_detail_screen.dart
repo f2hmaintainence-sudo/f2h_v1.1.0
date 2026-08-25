@@ -90,12 +90,21 @@ class _BrowseState extends State<BrowseScreen> {
 
   List<Product> _getFilteredProducts(List<Product> sourceProducts) {
     final q = _searchQuery.toLowerCase().trim();
-    if (q.isEmpty) return sourceProducts;
-    return sourceProducts.where((p) {
-      return p.name.toLowerCase().contains(q) ||
-          p.vendor.toLowerCase().contains(q) ||
-          p.category.toLowerCase().contains(q);
-    }).toList();
+    List<Product> list;
+    if (q.isEmpty) {
+      list = List<Product>.from(sourceProducts);
+    } else {
+      list = sourceProducts.where((p) {
+        return p.name.toLowerCase().contains(q) ||
+            p.vendor.toLowerCase().contains(q) ||
+            p.category.toLowerCase().contains(q);
+      }).toList();
+    }
+    list.sort((a, b) {
+      if (a.isOutOfStock == b.isOutOfStock) return 0;
+      return a.isOutOfStock ? 1 : -1;
+    });
+    return list;
   }
 
   @override

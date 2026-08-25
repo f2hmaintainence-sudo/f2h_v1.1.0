@@ -14,6 +14,15 @@ class CatalogBloc extends Bloc<CatalogEvent, CatalogState> {
     on<SearchCatalog>(_onSearchCatalog);
   }
 
+  List<Product> _sortOutOfStockToBottom(List<Product> list) {
+    final sorted = List<Product>.from(list);
+    sorted.sort((a, b) {
+      if (a.isOutOfStock == b.isOutOfStock) return 0;
+      return a.isOutOfStock ? 1 : -1;
+    });
+    return sorted;
+  }
+
   Future<void> _onLoadCatalog(LoadCatalog event, Emitter<CatalogState> emit) async {
     emit(CatalogLoading());
     try {
@@ -21,7 +30,8 @@ class CatalogBloc extends Bloc<CatalogEvent, CatalogState> {
         catalogRepository.getProducts(branchId: event.branchId),
         catalogRepository.getCategories(),
       ]);
-      final products = results[0] as List<Product>;
+      final rawProducts = results[0] as List<Product>;
+      final products = _sortOutOfStockToBottom(rawProducts);
       final categories = results[1] as List<Map<String, dynamic>>;
       emit(CatalogLoaded(
         products: products,
@@ -104,6 +114,8 @@ class CatalogBloc extends Bloc<CatalogEvent, CatalogState> {
           }).toList();
         }
 
+        categoryProducts = _sortOutOfStockToBottom(categoryProducts);
+
         emit(CatalogLoaded(
           products: allProducts,
           filteredProducts: categoryProducts,
@@ -136,7 +148,7 @@ class CatalogBloc extends Bloc<CatalogEvent, CatalogState> {
         }).toList();
         emit(CatalogLoaded(
           products: currentState.products,
-          filteredProducts: filtered,
+          filteredProducts: _sortOutOfStockToBottom(filtered),
           categories: currentState.categories,
           searchQuery: event.query,
         ));
