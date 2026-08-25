@@ -2653,14 +2653,20 @@ class _CategoryProductGroupsState extends State<_CategoryProductGroups> {
     if (rawUrl.isEmpty) return '';
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
       final uri = Uri.tryParse(rawUrl);
-      const localHosts = {'localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2'};
-      final apiHost = Uri.tryParse(ApiEndpoints.host)?.host;
-      if (uri != null &&
-          uri.path.isNotEmpty &&
-          (localHosts.contains(uri.host) || uri.host == apiHost)) {
-        return '${ApiEndpoints.host}${uri.path}';
+      if (uri != null) {
+        const devHosts = {'localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2'};
+        if (devHosts.contains(uri.host) || uri.path.contains('/uploads/')) {
+          final pathAfterUploads = uri.path.contains('/uploads/')
+              ? uri.path.substring(uri.path.indexOf('/uploads/'))
+              : uri.path;
+          return '${ApiEndpoints.host}$pathAfterUploads';
+        }
+        return rawUrl;
       }
-      return rawUrl;
+    }
+    if (rawUrl.contains('/uploads/')) {
+      final pathAfterUploads = rawUrl.substring(rawUrl.indexOf('/uploads/'));
+      return '${ApiEndpoints.host}$pathAfterUploads';
     }
     final clean = rawUrl.startsWith('/') ? rawUrl : '/$rawUrl';
     return '${ApiEndpoints.host}$clean';
