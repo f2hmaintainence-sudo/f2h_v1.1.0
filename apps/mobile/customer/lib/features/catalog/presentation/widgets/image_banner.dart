@@ -252,7 +252,33 @@ class _ImageBannerState extends State<ImageBanner> {
                   borderRadius: BorderRadius.circular(16),
                   child: GestureDetector(
                     onTap: () => _onBannerTap(banner),
-                    child: _buildOfferCard(banner, imageUrl),
+                    child: imageUrl.isNotEmpty
+                        ? Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                            loadingBuilder: (_, child, progress) {
+                              if (progress == null) return child;
+                              return Container(
+                                color: const Color(0xFF16A34A),
+                                child: const Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              return _buildOfferCard(banner, imageUrl);
+                            },
+                          )
+                        : _buildOfferCard(banner, ''),
                   ),
                 ),
               ),
