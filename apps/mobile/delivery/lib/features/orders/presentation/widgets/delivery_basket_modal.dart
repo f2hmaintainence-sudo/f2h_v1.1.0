@@ -576,9 +576,27 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: F2hAppBar(title: 'Delivery Basket Ledger'),
-      body: Column(
-        children: [
-          // White Elevation Dashboard Banner with Light Gradient Cards
+      body: _isLoadingSummary && _apiProductBreakdown == null
+          ? const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(color: Color(0xFF059669), strokeWidth: 3),
+                  SizedBox(height: 16),
+                  Text(
+                    'Loading Delivery Basket Ledger…',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : Column(
+              children: [
+                // White Elevation Dashboard Banner with Light Gradient Cards
           Container(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
             decoration: const BoxDecoration(
