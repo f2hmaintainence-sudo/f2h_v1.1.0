@@ -5,8 +5,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/core/utils/app_snackbar.dart';
+import 'package:f2h_delivery/core/utils/stop_status_helper.dart';
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
+import 'package:f2h_delivery/features/orders/presentation/screens/orders_screen.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/delivery_confirmation_sheet.dart';
 import 'package:f2h_delivery/features/orders/domain/repositories/orders_repository.dart';
 import 'package:f2h_delivery/services/location_service.dart';
@@ -413,8 +415,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final cancelledActiveStops = activeQueue.where((s) => s.status == 'failed' || s.status == 'cancelled').length;
 
         final GroupedStop? nextStop = (() {
-          for (final s in activeQueue) {
-            if (s.status == 'out_for_delivery' || s.status == 'pending') return s;
+          for (final s in listQueue) {
+            if (!StopStatusHelper.isDelivered(s.status) && !StopStatusHelper.isFailed(s.status)) {
+              return s;
+            }
           }
           return null;
         })();
@@ -607,7 +611,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                             GestureDetector(
                               onTap: () {
-                                MockDataService().tabNavigationNotifier.value = 1;
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const OrdersScreen()),
+                                );
                               },
                               child: Text(
                                 'View Details',

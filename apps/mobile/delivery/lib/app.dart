@@ -74,13 +74,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   late final LocationTrackingService _locationTrackingService;
   static const _screens = [
     DashboardScreen(),
-    OrdersScreen(),
     MapScreen(),
     ReferralScreen(),
   ];
   static const _tabs = [
     (Icons.explore_rounded, 'Home'),
-    (Icons.assignment_rounded, 'Orders'),
     (Icons.map_rounded, 'Map'),
     (Icons.card_giftcard_rounded, 'Referral'),
   ];
@@ -166,16 +164,15 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   child: Row(
                     children: List.generate(_tabs.length, (i) {
                       final on = i == _i;
-                      final isReferral = i == 3;
+                      final isReferral = i == 2;
                       final isTabEnabled =
-                          (i == 0 || i == 3) || (isVerified && isAccountActive);
+                          (i == 0 || i == 2) || (isVerified && isAccountActive);
                       const activeColor = kPrimary;
-                      const referralBlue = Color(0xFF2563EB);
 
                       return Expanded(
                         child: GestureDetector(
                           onTap: () {
-                            if (i == 1 || i == 2) {
+                            if (i == 1) {
                               if (!isVerified) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(

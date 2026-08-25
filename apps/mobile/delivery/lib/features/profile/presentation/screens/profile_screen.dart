@@ -110,13 +110,11 @@ class ProfileScreen extends StatelessWidget {
         },
         child: Scaffold(
           backgroundColor: const Color(0xFFF8FAFC),
-          appBar: F2hAppBar(
+          appBar: const F2hAppBar(
             title: 'Profile',
-            subtitle: 'Manage your account, documents & settings',
-            showBackButton: false,
-            actions: [
-              F2hAppBar.settingsAction(context),
-            ],
+            subtitle: 'Manage your account, documents & preferences',
+            showBackButton: true,
+            actions: [],
           ),
           body: BlocBuilder<ProfileBloc, ProfileState>(
             builder: (context, state) {
@@ -253,6 +251,62 @@ class ProfileScreen extends StatelessWidget {
                     _buildSectionTitle('Preferences & Support'),
                     const SizedBox(height: 12),
                     _buildPreferencesCard(context),
+
+                    const SizedBox(height: 20),
+
+                    // ── LOGOUT BUTTON ─────────────────────────────────────────
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFFFCA5A5).withValues(alpha: 0.6)),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x06000000),
+                            blurRadius: 8,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(18),
+                        child: InkWell(
+                          onTap: () => _showLogoutConfirmation(context),
+                          borderRadius: BorderRadius.circular(18),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(7),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFFEE2E2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.logout_rounded,
+                                    color: Color(0xFFDC2626),
+                                    size: 18,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  'Log Out of Account',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFFDC2626),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
 
                     const SizedBox(height: 28),
 
@@ -793,22 +847,6 @@ class ProfileScreen extends StatelessWidget {
     final bloc = context.read<ProfileBloc>();
     final preferenceItems = [
       _PrefItem(
-        icon: Icons.settings_outlined,
-        iconBg: const Color(0xFFF1F5F9),
-        iconColor: const Color(0xFF475569),
-        title: 'Settings',
-        subtitle: 'App preferences and account settings',
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => BlocProvider.value(
-              value: bloc,
-              child: const SecurityScreen(),
-            ),
-          ),
-        ),
-      ),
-      _PrefItem(
         icon: Icons.shield_outlined,
         iconBg: const Color(0xFFFAF5FF),
         iconColor: const Color(0xFF9333EA),
@@ -945,6 +983,64 @@ class ProfileScreen extends StatelessWidget {
             ],
           );
         }).toList(),
+      ),
+    );
+  }
+
+  void _showLogoutConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: const BoxDecoration(
+                color: Color(0xFFFEE2E2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.logout_rounded, color: Color(0xFFDC2626), size: 20),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'Log Out',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to log out of your delivery partner account?',
+          style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFF64748B), height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.poppins(color: const Color(0xFF64748B), fontWeight: FontWeight.w700),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<AuthBloc>().add(LogoutRequested());
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text(
+              'Log Out',
+              style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
       ),
     );
   }
