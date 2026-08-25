@@ -35,6 +35,11 @@ import {
   Clock,
   Eye,
   EyeOff,
+  Edit2,
+  Package,
+  UserCheck,
+  TrendingDown,
+  RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
 import CustomerSpecialPriceModal from '@/components/f2h/CustomerSpecialPriceModal';
@@ -52,6 +57,7 @@ export default function CustomerDetailsPage() {
   const [activeTab, setActiveTab] = useState('Overview & Insights');
   const [isPostpaidModalOpen, setIsPostpaidModalOpen] = useState(false);
   const [isSpecialPriceModalOpen, setIsSpecialPriceModalOpen] = useState(false);
+  const [editingSpecialPriceRule, setEditingSpecialPriceRule] = useState<any>(null);
   const [postpaidInput, setPostpaidInput] = useState('');
   const [savingPostpaid, setSavingPostpaid] = useState(false);
   const [showSensitive, setShowSensitive] = useState(false);
@@ -321,14 +327,21 @@ export default function CustomerDetailsPage() {
       {/* Customer Special Price Modal */}
       <CustomerSpecialPriceModal
         isOpen={isSpecialPriceModalOpen}
-        onClose={() => setIsSpecialPriceModalOpen(false)}
-        onSaved={() => fetchPortfolio()}
+        onClose={() => {
+          setIsSpecialPriceModalOpen(false);
+          setEditingSpecialPriceRule(null);
+        }}
+        onSaved={() => {
+          fetchPortfolio();
+          setEditingSpecialPriceRule(null);
+        }}
         initialCustomer={{
           id: customer.customer_id || id,
           name: customer.full_name || customer.first_name || 'Customer',
           email: customer.email || '',
           phone: customer.phone || '',
         }}
+        editingRule={editingSpecialPriceRule}
       />
 
 
@@ -367,12 +380,25 @@ export default function CustomerDetailsPage() {
           {activeTab === 'Special Prices' && (
             <SpecialPricesTab
               specialPrices={data.special_prices || []}
+              customer={customer}
               customerId={customer.customer_id || id}
               customerName={customer.full_name || customer.first_name || 'Customer'}
               onRefresh={fetchPortfolio}
-              onOpenModal={() => setIsSpecialPriceModalOpen(true)}
+              onOpenModal={() => {
+                setEditingSpecialPriceRule(null);
+                setIsSpecialPriceModalOpen(true);
+              }}
+              onEditRule={(rule: any) => {
+                setEditingSpecialPriceRule({
+                  ...rule,
+                  customer_id: customer.customer_id || id,
+                  customer_name: customer.full_name || customer.first_name || 'Customer',
+                  customer_phone: customer.phone || '',
+                  customer_email: customer.email || '',
+                });
+                setIsSpecialPriceModalOpen(true);
+              }}
             />
-
           )}
           {activeTab === 'Containers & Returns' && (
             <ContainersTab 
@@ -2454,22 +2480,28 @@ function getAvatarColors(name: string) {
 
 function SpecialPricesTab({
   specialPrices,
+  customer,
   customerId,
   customerName,
   onRefresh,
   onOpenModal,
+  onEditRule,
 }: {
   specialPrices: any[];
+  customer?: any;
   customerId: string;
   customerName: string;
   onRefresh: () => void;
   onOpenModal: () => void;
+  onEditRule: (rule: any) => void;
 }) {
   const rules = specialPrices || [];
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isCustomerCollapsed, setIsCustomerCollapsed] = useState(false);
 
-  const handleDeleteRule = async (variantId: string) => {
-    if (!confirm('Are you sure you want to remove this special price rule?')) return;
+  const handleDeleteRule = async (variantId: string, productName?: string, variantName?: string) => {
+    const label = productName ? `${productName} (${variantName || ''})` : 'this product variant';
+    if (!confirm(`Are you sure you want to remove the special price rule for ${label}?`)) return;
     try {
       setDeletingId(variantId);
       const res = await api.delete(`/admin/customer/${customerId}/special-prices/${variantId}`);
@@ -2487,6 +2519,9 @@ function SpecialPricesTab({
   const avgDiscount = rules.length > 0
     ? (rules.reduce((acc, r) => acc + Number(r.discount || 0), 0) / rules.length).toFixed(1)
     : '0';
+
+  const customerPhone = customer?.phone || customer?.mobile || '';
+  const customerEmail = customer?.email || '';
 
   return (
     <div className="space-y-6 font-sans">
@@ -2534,9 +2569,9 @@ function SpecialPricesTab({
         </div>
       </div>
 
-      {/* Rules Table */}
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-2xs">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-slate-50/50">
+      {/* Unified Master Rules Table */}
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-2xs">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-slate-50/50">
           <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">Configured Product Rules ({rules.length})</span>
           <span className="text-[10px] font-mono px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold rounded-md">Live Price Overrides</span>
         </div>
@@ -2546,52 +2581,158 @@ function SpecialPricesTab({
             No custom special prices configured for this customer yet. Click &quot;Add Special Price Rule&quot; above to create one.
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
-            {rules.map((rule: any) => {
-              const actualPrice = Number(rule.actual_price || rule.selling_price || 0);
-              const sellingPrice = Number(rule.selling_price || 0);
-              const specPrice = Number(rule.special_price || 0);
-              const overallPct = actualPrice > 0 ? (((actualPrice - specPrice) / actualPrice) * 100).toFixed(1) : '0';
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-700 border-collapse">
+              <thead className="bg-slate-100/80 text-slate-500 text-xs uppercase tracking-wider border-b border-gray-200 font-bold">
+                <tr>
+                  <th className="py-3.5 px-4">Customer / Product &amp; Variant</th>
+                  <th className="py-3.5 px-4 text-right">Original Price</th>
+                  <th className="py-3.5 px-4 text-right">Selling Price</th>
+                  <th className="py-3.5 px-4 text-right">Sub Price</th>
+                  <th className="py-3.5 px-4 text-right">Final Sub Price</th>
+                  <th className="py-3.5 px-4 text-center">Overall Savings</th>
+                  <th className="py-3.5 px-4 text-center">Special Discount</th>
+                  <th className="py-3.5 px-4 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {/* Customer Row Group Header */}
+                <tr
+                  onClick={() => setIsCustomerCollapsed(!isCustomerCollapsed)}
+                  className="bg-slate-50/90 font-bold border-t border-b border-slate-200 hover:bg-emerald-50/40 cursor-pointer transition-colors"
+                >
+                  <td colSpan={6} className="py-3 px-4">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        className="text-slate-400 hover:text-emerald-700 p-0.5 rounded transition cursor-pointer"
+                      >
+                        {isCustomerCollapsed ? (
+                          <ChevronRight className="w-4 h-4 text-slate-500" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-emerald-700" />
+                        )}
+                      </button>
 
-              return (
-                <div key={rule.id || rule.product_variant_id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/50 transition-colors">
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs shrink-0 border border-emerald-100">
-                      <Tag size={18} />
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-slate-900">{rule.product_name} — <span className="text-emerald-700">{rule.variant_name}</span></p>
-                      <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-0.5 flex-wrap">
-                        <span>MRP: <span className="line-through text-slate-400">₹{actualPrice.toFixed(2)}</span></span>
-                        <span>•</span>
-                        <span>Selling: <span className="font-semibold text-slate-700">₹{sellingPrice.toFixed(2)}</span></span>
-                        <span>•</span>
-                        <span className="text-amber-600 font-bold">Special Disc: {rule.discount}%</span>
-                        <span>•</span>
-                        <span className="text-purple-700 font-bold">Overall: {overallPct}% OFF MRP</span>
+                      <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs border border-emerald-200 shrink-0">
+                        <UserCheck className="w-4 h-4" />
+                      </div>
+
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-slate-900 text-sm">{customerName}</span>
+                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[11px] font-bold rounded-full border border-emerald-200">
+                            {rules.length} Rule{rules.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-400 font-normal flex items-center gap-2 mt-0.5">
+                          {customerPhone && <span>📞 {customerPhone}</span>}
+                          {customerEmail && <span>✉️ {customerEmail}</span>}
+                          <span>· ID: #{customer?.customer_id || customerId}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  </td>
 
-                  <div className="flex items-center gap-6 shrink-0">
-                    <div className="text-right">
-                      <p className="text-sm font-black text-emerald-700">₹{specPrice.toFixed(2)}</p>
-                      <p className="text-[10px] text-emerald-600 font-semibold">Special Selling Price</p>
-                    </div>
-
+                  <td colSpan={2} className="py-3 px-4 text-right">
                     <button
                       type="button"
-                      disabled={deletingId === rule.product_variant_id}
-                      onClick={() => handleDeleteRule(rule.product_variant_id)}
-                      className="p-2 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 rounded-xl border border-rose-200/60 transition-all cursor-pointer disabled:opacity-50"
-                      title="Remove Special Price Rule"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenModal();
+                      }}
+                      className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition shadow-2xs cursor-pointer"
                     >
-                      <Trash2 size={15} />
+                      <Plus className="w-3.5 h-3.5" /> Add Rule
                     </button>
-                  </div>
-                </div>
-              );
-            })}
+                  </td>
+                </tr>
+
+                {/* Nested Product Variant Rows */}
+                {!isCustomerCollapsed &&
+                  rules.map((rule: any) => {
+                    const originalPrice = Number(rule.original_price ?? rule.selling_price ?? 0);
+                    const sellingPrice = Number(rule.selling_price ?? 0);
+                    const subscriptionPrice = Number(rule.subscription_price ?? rule.selling_price ?? 0);
+                    const finalSubPrice = Number(rule.final_subscription_price ?? rule.special_price ?? 0);
+                    const discount = Number(rule.discount ?? rule.discount_percentage ?? 0);
+                    const overallPct = Number(
+                      rule.overall_savings_pct ?? (originalPrice > 0 ? ((originalPrice - finalSubPrice) / originalPrice) * 100 : 0)
+                    );
+
+                    const variantKey = rule.product_variant_id || rule.id;
+
+                    return (
+                      <tr key={variantKey} className="hover:bg-slate-50/70 transition-colors bg-white">
+                        {/* Indented Product Variant Name */}
+                        <td className="py-3 px-4 pl-12">
+                          <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></div>
+                            <span className="font-semibold text-slate-900">{rule.product_name}</span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <Package className="w-3 h-3" />
+                              {rule.variant_name}
+                            </span>
+                          </div>
+                        </td>
+
+                        <td className="py-3 px-4 text-right font-medium text-slate-400 line-through">
+                          ₹{originalPrice.toFixed(2)}
+                        </td>
+
+                        <td className="py-3 px-4 text-right font-semibold text-slate-800">
+                          ₹{sellingPrice.toFixed(2)}
+                        </td>
+
+                        <td className="py-3 px-4 text-right font-semibold text-sky-700">
+                          ₹{subscriptionPrice.toFixed(2)}
+                        </td>
+
+                        <td className="py-3 px-4 text-right">
+                          <span className="text-sm font-extrabold text-emerald-700 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-lg">
+                            ₹{finalSubPrice.toFixed(2)}
+                          </span>
+                        </td>
+
+                        <td className="py-3 px-4 text-center font-bold text-purple-700">
+                          <span className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded-md border border-purple-100 text-xs">
+                            {overallPct.toFixed(2)}% OFF
+                          </span>
+                        </td>
+
+                        <td className="py-3 px-4 text-center">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                            <TrendingDown className="w-3.5 h-3.5 text-amber-600" />
+                            {discount.toFixed(2)}% OFF
+                          </span>
+                        </td>
+
+                        <td className="py-3 px-4 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => onEditRule(rule)}
+                              className="p-1.5 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition cursor-pointer"
+                              title="Edit Rule"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={deletingId === variantKey}
+                              onClick={() => handleDeleteRule(variantKey, rule.product_name, rule.variant_name)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer disabled:opacity-50"
+                              title="Delete Rule"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
