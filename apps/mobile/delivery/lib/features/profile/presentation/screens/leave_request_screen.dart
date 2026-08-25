@@ -284,17 +284,19 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen>
           appBar: F2hAppBar(
         title: 'Leave Requests',
         bottom: TabBar(
-              controller: _tabController,
-              indicatorColor: kAccent,
-              indicatorWeight: 3,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white54,
-              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-              tabs: const [
-                Tab(text: '📋 Apply Leave'),
-                Tab(text: '🕑 History'),
-              ],
-            ),
+          controller: _tabController,
+          indicatorColor: kPrimary,
+          indicatorWeight: 3.5,
+          indicatorSize: TabBarIndicatorSize.label,
+          labelColor: kPrimary,
+          unselectedLabelColor: const Color(0xFF64748B),
+          labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+          tabs: const [
+            Tab(text: 'Apply Leave', icon: Icon(Icons.assignment_outlined, size: 20)),
+            Tab(text: 'History', icon: Icon(Icons.history_rounded, size: 20)),
+          ],
+        ),
       ),
           body: TabBarView(
             controller: _tabController,

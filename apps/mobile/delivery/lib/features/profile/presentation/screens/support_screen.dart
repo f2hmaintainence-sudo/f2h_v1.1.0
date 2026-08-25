@@ -302,11 +302,13 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
         title: 'Support Center',
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: kAccent,
-          indicatorWeight: 3,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          indicatorColor: kPrimary,
+          indicatorWeight: 3.5,
+          indicatorSize: TabBarIndicatorSize.label,
+          labelColor: kPrimary,
+          unselectedLabelColor: const Color(0xFF64748B),
+          labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
           tabs: const [
             Tab(text: 'Raise Ticket', icon: Icon(Icons.add_comment_rounded, size: 20)),
             Tab(text: 'My Tickets', icon: Icon(Icons.all_inbox_rounded, size: 20)),
