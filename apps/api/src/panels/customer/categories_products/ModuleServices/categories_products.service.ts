@@ -36,25 +36,29 @@ export class CategoriesProductsService {
       let params: any[];
 
       if (isPopup) {
-        queryStr = `SELECT id, title, description, discount_text, action_type, action_value,
-                           category_id, cta_label, background_color, banner_type,
-                           is_popup, display_order, image_url, image_path
-                      FROM product_banner
-                     WHERE deleted_at IS NULL
-                       AND is_active = TRUE
-                       AND (COALESCE(is_popup, FALSE) = TRUE OR banner_type = 'popup')
-                     ORDER BY display_order ASC, id ASC`;
+        queryStr = `SELECT pb.id, pb.title, pb.description, pb.discount_text, pb.action_type, pb.action_value,
+                           pb.category_id, pb.cta_label, pb.background_color, pb.banner_type,
+                           pb.is_popup, pb.display_order, pb.image_url, pb.image_path,
+                           c.category_name
+                      FROM product_banner pb
+                      LEFT JOIN categories c ON (c.category_id = pb.category_id OR c.id::text = pb.category_id)
+                     WHERE pb.deleted_at IS NULL
+                       AND pb.is_active = TRUE
+                       AND (COALESCE(pb.is_popup, FALSE) = TRUE OR pb.banner_type = 'popup')
+                     ORDER BY pb.display_order ASC, pb.id ASC`;
         params = [];
       } else {
-        queryStr = `SELECT id, title, description, discount_text, action_type, action_value,
-                           category_id, cta_label, background_color, banner_type,
-                           is_popup, display_order, image_url, image_path
-                      FROM product_banner
-                     WHERE deleted_at IS NULL
-                       AND is_active = TRUE
-                       AND COALESCE(is_popup, FALSE) = FALSE
-                       AND COALESCE(banner_type, 'home_carousel') = ANY($1::text[])
-                     ORDER BY display_order ASC, id ASC`;
+        queryStr = `SELECT pb.id, pb.title, pb.description, pb.discount_text, pb.action_type, pb.action_value,
+                           pb.category_id, pb.cta_label, pb.background_color, pb.banner_type,
+                           pb.is_popup, pb.display_order, pb.image_url, pb.image_path,
+                           c.category_name
+                      FROM product_banner pb
+                      LEFT JOIN categories c ON (c.category_id = pb.category_id OR c.id::text = pb.category_id)
+                     WHERE pb.deleted_at IS NULL
+                       AND pb.is_active = TRUE
+                       AND COALESCE(pb.is_popup, FALSE) = FALSE
+                       AND COALESCE(pb.banner_type, 'home_carousel') = ANY($1::text[])
+                     ORDER BY pb.display_order ASC, pb.id ASC`;
         params = [bannerTypes];
       }
 

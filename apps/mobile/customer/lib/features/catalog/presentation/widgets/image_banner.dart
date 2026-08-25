@@ -229,164 +229,281 @@ class _ImageBannerState extends State<ImageBanner> {
             final rawUrl = banner['imageUrl']?.toString() ?? '';
             final imageUrl = _formatImageUrl(rawUrl);
 
+            final hasRichContent = (banner['title'] != null && banner['title'].toString().isNotEmpty) ||
+                (banner['discountText'] != null && banner['discountText'].toString().isNotEmpty) ||
+                (banner['discount_text'] != null && banner['discount_text'].toString().isNotEmpty) ||
+                (banner['categoryName'] != null && banner['categoryName'].toString().isNotEmpty) ||
+                (banner['category_name'] != null && banner['category_name'].toString().isNotEmpty) ||
+                (banner['backgroundColor'] != null && banner['backgroundColor'].toString().isNotEmpty) ||
+                (banner['background_color'] != null && banner['background_color'].toString().isNotEmpty);
+
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: GestureDetector(
-                    onTap: () => _onBannerTap(banner),
-                    child: Image.network(
-                      imageUrl,
-                      fit: BoxFit.fill,
-                      width: double.infinity,
-                      loadingBuilder: (_, child, progress) {
-                        if (progress == null) return child;
-                        return Container(
-                          color: const Color(0xFF16A34A),
-                          child: const Center(
-                            child: SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
+              child: GestureDetector(
+                onTap: () => _onBannerTap(banner),
+                child: hasRichContent
+                    ? _buildOfferCard(banner, imageUrl)
+                    : Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.08),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
-                          ),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        final isRefer =
-                            banner['route'] == 'refer' ||
-                            imageUrl.contains('sub_banner_2');
-                        final isMenu =
-                            banner['route'] == 'menu' ||
-                            imageUrl.contains('sub_banner_3');
-                        return Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: isRefer
-                                  ? [
-                                      const Color(0xFFD97706),
-                                      const Color(0xFFF59E0B),
-                                    ]
-                                  : isMenu
-                                  ? [
-                                      const Color(0xFF0284C7),
-                                      const Color(0xFF38BDF8),
-                                    ]
-                                  : [
-                                      const Color(0xFF15803D),
-                                      const Color(0xFF22C55E),
-                                    ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 3,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white24,
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        isRefer
-                                            ? 'REFER & EARN'
-                                            : isMenu
-                                            ? 'FARM FRESH'
-                                            : 'DAILY SUBSCRIPTION',
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                          letterSpacing: 0.8,
-                                        ),
-                                      ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Image.network(
+                            imageUrl,
+                            fit: BoxFit.fill,
+                            width: double.infinity,
+                            loadingBuilder: (_, child, progress) {
+                              if (progress == null) return child;
+                              return Container(
+                                color: const Color(0xFF16A34A),
+                                child: const Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
                                     ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      banner['title']?.toString() ??
-                                          (isRefer
-                                              ? 'Refer & Earn'
-                                              : isMenu
-                                              ? 'Farm Fresh Essentials'
-                                              : 'VIP Member'),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      banner['subtitle']?.toString() ??
-                                          (isRefer
-                                              ? 'Invite friends and earn rewards on every referral.'
-                                              : isMenu
-                                              ? 'Pure, fresh and natural milk, curd, paneer & ghee.'
-                                              : 'Exclusive benefits & premium experience.'),
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 11,
-                                      ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Container(
-                                width: 48,
-                                height: 48,
-                                decoration: const BoxDecoration(
-                                  color: Colors.white24,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  isRefer
-                                      ? Icons.card_giftcard_rounded
-                                      : isMenu
-                                      ? Icons.shopping_bag_rounded
-                                      : Icons.calendar_month_rounded,
-                                  color: Colors.amber,
-                                  size: 26,
-                                ),
-                              ),
-                            ],
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              return _buildOfferCard(banner, imageUrl);
+                            },
                           ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
+                        ),
+                      ),
               ),
             );
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildOfferCard(Map<String, dynamic> banner, String imageUrl) {
+    final title = banner['title']?.toString() ?? 'Special Offer';
+    final subtitle = banner['subtitle']?.toString() ?? banner['description']?.toString() ?? '';
+    final discountText = banner['discountText']?.toString() ?? banner['discount_text']?.toString();
+    final categoryName = banner['categoryName']?.toString() ?? banner['category_name']?.toString();
+    final couponCode = banner['couponCode']?.toString() ?? banner['coupon_code']?.toString() ?? banner['promoCode']?.toString();
+    final ctaText = banner['cta']?.toString() ?? banner['cta_label']?.toString() ?? 'Shop Now';
+    final bannerType = banner['bannerType']?.toString() ?? banner['banner_type']?.toString() ?? 'home_carousel';
+    final bgHex = banner['backgroundColor']?.toString() ?? banner['background_color']?.toString();
+
+    Color bgColor = const Color(0xFF8B1214); // Dynamic crimson red matching admin preview
+    if (bgHex != null && bgHex.isNotEmpty) {
+      final cleanHex = bgHex.replaceAll('#', '').trim();
+      if (cleanHex.length == 6) {
+        bgColor = Color(int.parse('0xFF$cleanHex'));
+      } else if (cleanHex.length == 8) {
+        bgColor = Color(int.parse('0x$cleanHex'));
+      }
+    }
+
+    String placementLabel = 'SPECIAL OFFER';
+    IconData placementIcon = Icons.local_offer_rounded;
+    if (bannerType == 'category_slide') {
+      placementLabel = 'CATEGORY SLIDE';
+      placementIcon = Icons.folder_copy_rounded;
+    } else if (bannerType == 'checkout_promo' || bannerType == 'checkout_banner') {
+      placementLabel = 'CHECKOUT PROMO';
+      placementIcon = Icons.shopping_bag_rounded;
+    } else if (bannerType == 'home_carousel') {
+      placementLabel = 'HOME CAROUSEL';
+      placementIcon = Icons.tag_rounded;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Left text & badges section
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Top pill badges row
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      // Badge 1: Banner Placement
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(placementIcon, size: 10, color: Colors.white),
+                            const SizedBox(width: 3),
+                            Text(
+                              placementLabel,
+                              style: const TextStyle(
+                                fontSize: 8,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (categoryName != null && categoryName.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.20),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            categoryName,
+                            style: const TextStyle(
+                              fontSize: 8,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                      if (discountText != null && discountText.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            discountText.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 8,
+                              fontWeight: FontWeight.w900,
+                              color: bgColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 5),
+
+                // Title
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                    height: 1.15,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+
+                // Subtitle / Description
+                if (subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 10,
+                      height: 1.1,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+
+                const SizedBox(height: 6),
+
+                // CTA / Coupon Code Button Pill
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        (couponCode != null && couponCode.isNotEmpty)
+                            ? 'USE CODE: $couponCode'
+                            : ctaText,
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w900,
+                          color: bgColor,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 11,
+                        color: bgColor,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Right side product/banner image (if available)
+          if (imageUrl.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                width: 95,
+                height: 70,
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

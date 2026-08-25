@@ -34,15 +34,27 @@ export class CategoriesController {
     return {
       id: `banner-${row.id}`,
       imageUrl,
+      image_url: imageUrl,
       title: row.title || '',
       subtitle: row.description || row.discount_text || '',
+      description: row.description || '',
       discountText: row.discount_text || null,
+      discount_text: row.discount_text || null,
       backgroundColor: row.background_color || null,
+      background_color: row.background_color || null,
       cta: row.cta_label || 'Shop Now',
+      cta_label: row.cta_label || 'Shop Now',
       route,
       actionType,
       actionValue,
       bannerType: row.banner_type || 'home_carousel',
+      banner_type: row.banner_type || 'home_carousel',
+      categoryId: row.category_id || null,
+      category_id: row.category_id || null,
+      categoryName: row.category_name || null,
+      category_name: row.category_name || null,
+      couponCode: row.coupon_code || row.promo_code || null,
+      coupon_code: row.coupon_code || row.promo_code || null,
       isActive: true,
     };
   }
@@ -54,7 +66,7 @@ export class CategoriesController {
 
     // Admin-managed carousel banners win; the bundled files are the fallback.
     const managed = await this.service.getManagedBanners(
-      ['home_carousel'],
+      ['home_carousel', 'offer_banner', 'category_slide', 'checkout_promo', 'checkout_banner'],
       false,
     );
     if (managed.length > 0) {
@@ -132,7 +144,7 @@ export class CategoriesController {
     const host = `${req.protocol}://${req.get('host')}`;
 
     const managed = await this.service.getManagedBanners(
-      ['offer_banner', 'category_slide'],
+      ['home_carousel', 'offer_banner', 'category_slide', 'checkout_promo', 'checkout_banner', 'popup'],
       false,
     );
     if (managed.length > 0) {
