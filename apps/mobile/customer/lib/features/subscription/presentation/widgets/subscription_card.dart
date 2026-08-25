@@ -323,66 +323,35 @@ class SubCard extends StatelessWidget {
                 ],
               ),
 
-              // ── Divider ──────────────────────────────────────────────
+              // Tap to view details hint
               const SizedBox(height: 10),
               Container(height: 1, color: const Color(0xFFF1F5F9)),
-              const SizedBox(height: 10),
-
-              // ── Quick Status Action Row ───────────────────────────────
-              if (!isTerminal) ...[
-                Row(
-                  children: [
-                    // Pause / Resume button
-                    Expanded(
-                      child: _QuickActionButton(
-                        label: isPaused ? 'Resume' : 'Pause',
-                        icon: isPaused
-                            ? Icons.play_circle_outline_rounded
-                            : Icons.pause_circle_outline_rounded,
-                        color: isPaused ? kPrimary : kAccent,
-                        bgColor: isPaused
-                            ? kPrimary.withValues(alpha: 0.07)
-                            : kAccentLt.withValues(alpha: 0.6),
-                        borderColor: isPaused
-                            ? kPrimary.withValues(alpha: 0.15)
-                            : kAccent.withValues(alpha: 0.25),
-                        onTap: onPauseResume,
-                      ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 11,
+                    color: kTextSub.withValues(alpha: 0.6),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    isTerminal
+                        ? 'Tap to view details'
+                        : 'Tap to manage subscription',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: kTextSub.withValues(alpha: 0.6),
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(width: 8),
-
-                    // Skip Day button (only for active)
-                    if (isActive)
-                      Expanded(
-                        child: _QuickActionButton(
-                          label: 'Skip Day',
-                          icon: Icons.skip_next_rounded,
-                          color: const Color(0xFF0369A1),
-                          bgColor: const Color(0xFFEFF6FF),
-                          borderColor: const Color(0xFFBAE6FD),
-                          onTap: onSkip,
-                        ),
-                      ),
-
-                    if (isActive) const SizedBox(width: 8),
-
-                    // Cancel button
-                    _QuickActionButton(
-                      label: 'Cancel',
-                      icon: Icons.cancel_outlined,
-                      color: kRed,
-                      bgColor: kRed.withValues(alpha: 0.06),
-                      borderColor: kRed.withValues(alpha: 0.2),
-                      onTap: onDelete,
-                      compact: true,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-              ],
-
-              // ── Completed: Renew button ───────────────────────────────
+                  ),
+                  const Spacer(),
+                  const Icon(Icons.chevron_right_rounded, size: 14, color: kMuted),
+                ],
+              ),
               if (isCompleted) ...[
+                const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
                   height: 38,
@@ -436,37 +405,8 @@ class SubCard extends StatelessWidget {
                     ),
                   ),
                 ),
-              ],
-
-              // ── Terminal hint ─────────────────────────────────────────
-              if (isTerminal && !isCompleted) ...[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.info_outline_rounded, size: 11, color: kTextSub.withValues(alpha: 0.5)),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Tap to view details',
-                      style: TextStyle(fontSize: 10, color: kTextSub.withValues(alpha: 0.5), fontWeight: FontWeight.w600),
-                    ),
-                    const Spacer(),
-                    const Icon(Icons.chevron_right_rounded, size: 14, color: kMuted),
-                  ],
-                ),
-              ] else if (!isTerminal) ...[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.touch_app_outlined, size: 11, color: kTextSub.withValues(alpha: 0.5)),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Tap card for full details',
-                      style: TextStyle(fontSize: 10, color: kTextSub.withValues(alpha: 0.5), fontWeight: FontWeight.w600),
-                    ),
-                    const Spacer(),
-                    const Icon(Icons.chevron_right_rounded, size: 14, color: kMuted),
-                  ],
-                ),
+              ] else if (isExpired) ...[
+                // No button for expired — user can tap to view details
               ],
 
             ],
@@ -476,65 +416,6 @@ class SubCard extends StatelessWidget {
     );
   }
 
-}
-
-// ─── Quick Action Button ───────────────────────────────────────────────────────
-class _QuickActionButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final Color color;
-  final Color bgColor;
-  final Color borderColor;
-  final VoidCallback? onTap;
-  final bool compact;
-
-  const _QuickActionButton({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.bgColor,
-    required this.borderColor,
-    this.onTap,
-    this.compact = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(11),
-          border: Border.all(color: borderColor, width: 1.2),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: color),
-            if (!compact) ...[
-              const SizedBox(width: 5),
-              Flexible(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: color,
-                    letterSpacing: 0.1,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 String _prettifyName(String name) {

@@ -289,10 +289,16 @@ export default function PaymentGatewayIntegrationsPage() {
                         {maskKey(data.private_api_key)}
                       </span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center">
                       <span className="text-slate-400 font-sans">Mode:</span>
-                      <span className="font-semibold text-slate-700 uppercase">
-                        {data.mode || "N/A"}
+                      <span
+                        className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full ${
+                          (data.mode || "").toLowerCase() === "live"
+                            ? "bg-emerald-100 text-[#16a34a] border border-emerald-200"
+                            : "bg-amber-100 text-amber-700 border border-amber-200"
+                        }`}
+                      >
+                        {data.mode ? data.mode.toUpperCase() : "TEST"}
                       </span>
                     </div>
                   </div>

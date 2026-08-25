@@ -11,7 +11,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, CreditCard, RotateCw } from "lucide-react";
+import { X, CreditCard, RotateCw, CheckCircle2, XCircle, Zap, FlaskConical } from "lucide-react";
 
 interface PaymentGatewayConfigModalProps {
   isOpen: boolean;
@@ -35,6 +35,8 @@ export function PaymentGatewayConfigModal({
     private_api_key: "",
     merchant_id: "",
     webhook_secret: "",
+    mode: "test",
+    is_active: true,
   });
 
   useEffect(() => {
@@ -48,6 +50,8 @@ export function PaymentGatewayConfigModal({
         private_api_key: cfg.private_api_key || "",
         merchant_id: cfg.merchant_id || "",
         webhook_secret: cfg.webhook_secret || "",
+        mode: cfg.mode || "test",
+        is_active: initialData.is_active ?? true,
       });
     } else {
       setFormData({
@@ -58,6 +62,8 @@ export function PaymentGatewayConfigModal({
         private_api_key: "",
         merchant_id: "",
         webhook_secret: "",
+        mode: "test",
+        is_active: true,
       });
     }
   }, [initialData, isOpen]);
@@ -208,6 +214,73 @@ export function PaymentGatewayConfigModal({
                 onChange={(e) => setFormData({ ...formData, webhook_secret: e.target.value })}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#16a34a]/20 focus:border-[#16a34a] text-slate-800 placeholder:text-slate-400 bg-slate-50/30 font-mono text-[11px]"
               />
+            </div>
+          </div>
+
+          {/* Status & Mode Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Active Status Toggle */}
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Gateway Status</label>
+              <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/30">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                    formData.is_active ? "bg-[#16a34a]" : "bg-slate-300"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                      formData.is_active ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+                <div className="flex items-center gap-1.5">
+                  {formData.is_active ? (
+                    <>
+                      <CheckCircle2 size={14} className="text-[#16a34a]" />
+                      <span className="text-[#16a34a] font-bold text-xs">Active</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle size={14} className="text-slate-400" />
+                      <span className="text-slate-400 font-bold text-xs">Inactive</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Mode: Test / Live */}
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Payment Mode</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, mode: "test" })}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border text-xs font-bold transition-all ${
+                    formData.mode === "test"
+                      ? "bg-amber-50 border-amber-300 text-amber-700"
+                      : "bg-slate-50 border-slate-200 text-slate-400 hover:border-slate-300"
+                  }`}
+                >
+                  <FlaskConical size={13} />
+                  Test
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, mode: "live" })}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border text-xs font-bold transition-all ${
+                    formData.mode === "live"
+                      ? "bg-emerald-50 border-emerald-400 text-[#16a34a]"
+                      : "bg-slate-50 border-slate-200 text-slate-400 hover:border-slate-300"
+                  }`}
+                >
+                  <Zap size={13} />
+                  Live
+                </button>
+              </div>
             </div>
           </div>
 
