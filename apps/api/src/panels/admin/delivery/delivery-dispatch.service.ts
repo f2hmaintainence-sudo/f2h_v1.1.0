@@ -371,7 +371,7 @@ export class DeliveryDispatchService {
           ddi.*,
           dd.warehouse_id,
           dr.run_id, dr.delivery_slot, dr.status AS run_status,
-          db.full_name AS delivery_partner_name,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Delivery Partner') AS delivery_partner_name,
           pv.name AS variant_name, pv.sku,
           p.name AS product_name,
           w.name AS warehouse_name
@@ -379,11 +379,12 @@ export class DeliveryDispatchService {
         JOIN delivery_dispatch dd ON dd.dispatch_id = ddi.dispatch_id
         JOIN delivery_runs dr ON (dr.run_id = dd.delivery_run_id OR dr.id::varchar = dd.delivery_run_id)
         LEFT JOIN delivery_partners db ON db.delivery_partner_id = dr.delivery_partner_id
+        LEFT JOIN users u ON u.user_id = dr.delivery_partner_id
         LEFT JOIN product_variants pv ON pv.variant_id = ddi.product_variant_id
         LEFT JOIN products p ON p.product_id = pv.product_id
         LEFT JOIN warehouses w ON w.warehouse_id = dd.warehouse_id
         WHERE ${where.join(' AND ')}
-        ORDER BY dr.delivery_slot, db.full_name, p.name
+        ORDER BY dr.delivery_slot, delivery_partner_name, p.name
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
       `;
       params.push(parseInt(limit, 10), offset);
@@ -718,7 +719,7 @@ WHERE ${where.join(' AND ')}
           COALESCE(dd.status, 'draft') AS dispatch_status,
           COALESCE(dr.warehouse_id, w.warehouse_id) AS warehouse_id,
           COALESCE(w.name, b.branch_name) AS warehouse_name,
-          dp.full_name AS delivery_partner_name,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Delivery Partner') AS delivery_partner_name,
           dp.delivery_partner_id,
           COUNT(ddi.id)::int AS total_items,
           COALESCE(SUM(ddi.loaded_qty), 0) AS total_loaded,
@@ -732,6 +733,7 @@ WHERE ${where.join(' AND ')}
           OR (dr.warehouse_id IS NULL AND w.branch_id = dr.branch_id AND w.is_active = true)
         ) AND w.deleted_at IS NULL
         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
+        LEFT JOIN users u ON u.user_id = dr.delivery_partner_id
         LEFT JOIN delivery_dispatch dd ON (dd.delivery_run_id = dr.run_id OR dd.delivery_run_id = dr.id::text)
         LEFT JOIN delivery_dispatch_items ddi ON ddi.dispatch_id = dd.dispatch_id AND ddi.deleted_at IS NULL
         WHERE ${where.join(' AND ')}
@@ -740,7 +742,7 @@ WHERE ${where.join(' AND ')}
           dr.id, dr.run_id, dr.run_number, dr.delivery_slot, dr.run_date, dr.status,
           dd.status,
           dr.warehouse_id, w.warehouse_id, dd.warehouse_id, w.name, b.branch_name,
-          dp.full_name, dp.delivery_partner_id
+          u.first_name, u.last_name, u.user_name, dp.delivery_partner_id
         HAVING COUNT(ddi.id) > 0
         ORDER BY (COALESCE(dd.status, 'draft') = 'return_pending') DESC, dr.delivery_slot, dr.run_date DESC
       `;
@@ -800,7 +802,7 @@ WHERE ${where.join(' AND ')}
         SELECT dr.*,
                COALESCE(dr.warehouse_id, w.warehouse_id) AS resolved_warehouse_id,
                COALESCE(w.name, b.branch_name) AS warehouse_name,
-               dp.full_name AS delivery_partner_name
+               COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Delivery Partner') AS delivery_partner_name
         FROM delivery_runs dr
         LEFT JOIN branches b ON b.branch_id = dr.branch_id
         LEFT JOIN warehouses w ON (
@@ -808,6 +810,7 @@ WHERE ${where.join(' AND ')}
           OR (dr.warehouse_id IS NULL AND w.branch_id = dr.branch_id AND w.is_active = true)
         ) AND w.deleted_at IS NULL
         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
+        LEFT JOIN users u ON u.user_id = dr.delivery_partner_id
         WHERE dr.id::varchar = $1 OR dr.run_id = $1
         LIMIT 1
       `;
@@ -875,7 +878,7 @@ WHERE ${where.join(' AND ')}
           COALESCE(ddi.delivered_qty, 0) AS delivered_qty,
           COALESCE(ddi.returned_qty, 0) AS returned_qty,
           COALESCE(ddi.damaged_qty, 0) AS damaged_qty,
-          dp.full_name AS delivery_partner_name,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Delivery Partner') AS delivery_partner_name,
           ddi.created_at
         FROM delivery_dispatch_items ddi
         JOIN delivery_dispatch dd ON dd.dispatch_id = ddi.dispatch_id
@@ -887,6 +890,7 @@ WHERE ${where.join(' AND ')}
         LEFT JOIN product_variants pv ON pv.variant_id = ddi.product_variant_id
         LEFT JOIN products p ON p.product_id = pv.product_id
         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
+        LEFT JOIN users u ON u.user_id = dr.delivery_partner_id
         WHERE ${where.join(' AND ')}
         ORDER BY dr.run_date DESC, dr.delivery_slot, p.name
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
@@ -942,8 +946,8 @@ WHERE ${where.join(' AND ')}
       const sql = `
         SELECT
           dr.delivery_partner_id,
-          dp.full_name AS delivery_partner_name,
-          dp.phone AS delivery_partner_phone,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Delivery Partner') AS delivery_partner_name,
+          COALESCE(u.phone, '') AS delivery_partner_phone,
           ddi.dispatch_id,
           dr.run_id,
           dr.run_number,
@@ -965,13 +969,14 @@ WHERE ${where.join(' AND ')}
         )
         LEFT JOIN warehouses w ON w.warehouse_id = dd.warehouse_id
         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
+        LEFT JOIN users u ON u.user_id = dr.delivery_partner_id
         WHERE ${where.join(' AND ')}
         GROUP BY
-          dr.delivery_partner_id, dp.full_name, dp.phone,
+          dr.delivery_partner_id, u.first_name, u.last_name, u.user_name, u.phone,
           ddi.dispatch_id, dr.run_id, dr.run_number,
           dr.run_date, dr.delivery_slot, dr.status,
           dd.warehouse_id, w.name
-        ORDER BY dr.run_date DESC, dp.full_name, dr.delivery_slot
+        ORDER BY dr.run_date DESC, delivery_partner_name, dr.delivery_slot
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
       `;
       params.push(parseInt(limit, 10), offset);

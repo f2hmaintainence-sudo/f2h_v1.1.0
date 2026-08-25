@@ -455,8 +455,8 @@ export class DeliveryManagementService {
           o.created_at,
           o.branch_id,
           b.branch_name,
-          COALESCE(NULLIF(TRIM(db.full_name), ''), NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), u.user_name) AS partner_name,
-          COALESCE(NULLIF(TRIM(db.phone), ''), NULLIF(TRIM(u.phone), ''), NULLIF(TRIM(db.email), ''), NULLIF(TRIM(u.email), ''), '—') AS partner_phone,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name) AS partner_name,
+          COALESCE(NULLIF(TRIM(u.phone), ''), NULLIF(TRIM(u.email), ''), '—') AS partner_phone,
           ca.latitude  AS lat,
           ca.longitude AS lng,
           COALESCE(
@@ -491,7 +491,7 @@ export class DeliveryManagementService {
             ), '[]'::json
           ) AS items
         FROM orders o
-        LEFT JOIN delivery_partners db ON (db.delivery_partner_id = o.delivery_partner_id OR db.user_id = o.delivery_partner_id)
+        LEFT JOIN delivery_partners db ON db.delivery_partner_id = o.delivery_partner_id
         LEFT JOIN users u ON u.user_id = o.delivery_partner_id
         LEFT JOIN branches b ON b.branch_id = o.branch_id
         LEFT JOIN customer_addresses ca ON ca.address_id::text = o.address_id::text
@@ -1126,10 +1126,10 @@ export class DeliveryManagementService {
           o.created_at,
           o.branch_id,
           b.branch_name,
-          COALESCE(NULLIF(TRIM(db.full_name), ''), NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), u.user_name) AS partner_name,
-          COALESCE(NULLIF(TRIM(db.phone), ''), NULLIF(TRIM(u.phone), '')) AS partner_phone
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name) AS partner_name,
+          COALESCE(NULLIF(TRIM(u.phone), ''), '') AS partner_phone
         FROM orders o
-        LEFT JOIN delivery_partners db ON (db.delivery_partner_id = o.delivery_partner_id OR db.user_id = o.delivery_partner_id)
+        LEFT JOIN delivery_partners db ON db.delivery_partner_id = o.delivery_partner_id
         LEFT JOIN users u ON u.user_id = o.delivery_partner_id
         LEFT JOIN branches b ON b.branch_id = o.branch_id
         WHERE o.order_id = $1 OR o.id::text = $1
@@ -1560,7 +1560,7 @@ export class DeliveryManagementService {
       if (search && search.trim().length > 0) {
         params.push(`%${search.trim().toLowerCase()}%`);
         whereClauses.push(`(
-          LOWER(COALESCE(u.first_name || ' ' || COALESCE(u.last_name, ''), u.user_name, dp.full_name, '')) LIKE $${params.length}
+          LOWER(COALESCE(u.first_name || ' ' || COALESCE(u.last_name, ''), u.user_name, '')) LIKE $${params.length}
           OR LOWER(COALESCE(dpb.partner_id, '')) LIKE $${params.length}
           OR LOWER(COALESCE(dpb.referee_name, '')) LIKE $${params.length}
           OR LOWER(COALESCE(dpb.referee_phone, '')) LIKE $${params.length}
@@ -1574,8 +1574,8 @@ export class DeliveryManagementService {
           dpb.id,
           dpb.bonus_id,
           dpb.partner_id,
-          COALESCE(NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''), u.user_name, dp.full_name, 'Delivery Partner') AS partner_name,
-          COALESCE(u.phone, dp.phone, '') AS partner_phone,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''), u.user_name, 'Delivery Partner') AS partner_name,
+          COALESCE(u.phone, '') AS partner_phone,
           dp.branch_id,
           COALESCE(b.branch_name, 'Main Branch') AS branch_name,
           dpb.refer_id,

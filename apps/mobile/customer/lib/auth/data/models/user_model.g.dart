@@ -15,7 +15,7 @@ extension GetUserModelCollection on Isar {
 
 const UserModelSchema = CollectionSchema(
   name: r'UserModel',
-  id: 7195426469378571114,
+  id: 7195426469378571,
   properties: {
     r'cachedAt': PropertySchema(
       id: 0,
