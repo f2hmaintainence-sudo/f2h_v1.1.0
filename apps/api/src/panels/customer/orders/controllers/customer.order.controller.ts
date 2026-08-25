@@ -816,11 +816,11 @@ export class CustomerOrderController {
       // Fetch driver profile (name & phone) from users / delivery_partners
       const driverProfile = await this.db.query(
         `SELECT 
-           COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), dp.full_name, 'Delivery Partner') AS driver_name,
-           COALESCE(u.phone, dp.phone) AS phone
+           COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Delivery Partner') AS driver_name,
+           COALESCE(u.phone, '') AS phone
          FROM users u
-         LEFT JOIN delivery_partners dp ON (dp.user_id = u.user_id OR dp.delivery_partner_id = u.user_id)
-         WHERE u.user_id = $1 OR dp.delivery_partner_id = $1 OR dp.id::text = $1
+         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = u.user_id
+         WHERE u.user_id = $1 OR dp.delivery_partner_id = $1
          LIMIT 1`,
         [order.delivery_partner_id],
       );

@@ -288,8 +288,8 @@ export class CustomersService {
                 u.phone as delivery_partner_phone
          FROM orders o
          LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = o.delivery_partner_id
-         LEFT JOIN users u ON u.user_id = dp.user_id
-         WHERE o.customer_id = ?
+         LEFT JOIN users u ON u.user_id = o.delivery_partner_id
+         WHERE o.customer_id = $1
          ORDER BY o.created_at DESC`,
         [customerId]
       );

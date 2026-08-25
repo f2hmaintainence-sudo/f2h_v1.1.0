@@ -309,14 +309,7 @@ export class NotificationService {
       await this.db.query(
         `UPDATE notification_recipients
          SET status = 'read', read_at = NOW(), updated_at = NOW()
-         WHERE (
-           user_id = $1
-           OR user_id IN (
-             SELECT dp.delivery_partner_id FROM delivery_partners dp WHERE dp.user_id = $1
-             UNION
-             SELECT dp.user_id FROM delivery_partners dp WHERE dp.delivery_partner_id = $1
-           )
-         )
+         WHERE user_id = $1
          AND (
            id = ANY($2::bigint[])
            OR notification_id = ANY($3::text[])
@@ -341,14 +334,7 @@ export class NotificationService {
       await this.db.query(
         `UPDATE notification_recipients
          SET status = 'read', read_at = NOW(), updated_at = NOW()
-         WHERE (
-           user_id = $1
-           OR user_id IN (
-             SELECT dp.delivery_partner_id FROM delivery_partners dp WHERE dp.user_id = $1
-             UNION
-             SELECT dp.user_id FROM delivery_partners dp WHERE dp.delivery_partner_id = $1
-           )
-         )
+         WHERE user_id = $1
          AND status != 'read'`,
         [userId],
       );

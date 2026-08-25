@@ -148,13 +148,11 @@ export class PushNotificationService implements OnModuleInit {
             const rows = await this.db.query(
                 `SELECT DISTINCT u.fcm_token, u.user_id
                  FROM users u
-                 LEFT JOIN delivery_partners dp ON dp.user_id = u.user_id
-                 LEFT JOIN customers c ON c.user_id = u.user_id
+                 LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = u.user_id
+                 LEFT JOIN customers c ON c.customer_id = u.user_id
                  WHERE u.user_id = ANY($1::text[])
                     OR dp.delivery_partner_id = ANY($1::text[])
-                    OR dp.id::text = ANY($1::text[])
-                    OR c.customer_id = ANY($1::text[])
-                    OR c.id::text = ANY($1::text[])`,
+                    OR c.customer_id = ANY($1::text[])`,
                 [ids]
             );
 

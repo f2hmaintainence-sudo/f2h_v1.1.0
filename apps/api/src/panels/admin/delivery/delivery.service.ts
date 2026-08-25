@@ -1324,7 +1324,7 @@ export class DeliveryManagementService {
           u.phone AS partner_phone
         FROM delivery_leave_requests dlr
         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dlr.delivery_partner_id
-        LEFT JOIN users u ON u.user_id = dp.user_id
+        LEFT JOIN users u ON u.user_id = dlr.delivery_partner_id
         ${whereClause}
         ORDER BY dlr.leave_date DESC, dlr.created_at DESC
       `;
@@ -1404,8 +1404,8 @@ export class DeliveryManagementService {
                 u.profile_image_url AS profile_image
          FROM delivery_partners dp
          LEFT JOIN branches b ON b.branch_id = dp.branch_id
-         LEFT JOIN users u ON u.user_id = dp.user_id
-         WHERE dp.delivery_partner_id = $1 OR dp.user_id = $1`,
+         LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
+         WHERE dp.delivery_partner_id = $1`,
         [id],
       );
 
