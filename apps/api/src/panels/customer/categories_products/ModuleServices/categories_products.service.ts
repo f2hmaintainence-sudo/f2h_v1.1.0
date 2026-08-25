@@ -45,7 +45,7 @@ export class CategoriesProductsService {
                      WHERE pb.deleted_at IS NULL
                        AND pb.is_active = TRUE
                        AND (COALESCE(pb.is_popup, FALSE) = TRUE OR pb.banner_type = 'popup')
-                     ORDER BY pb.display_order ASC, pb.id ASC`;
+                     ORDER BY pb.display_order ASC, pb.id DESC`;
         params = [];
       } else {
         queryStr = `SELECT pb.id, pb.title, pb.description, pb.discount_text, pb.action_type, pb.action_value,
@@ -57,9 +57,8 @@ export class CategoriesProductsService {
                      WHERE pb.deleted_at IS NULL
                        AND pb.is_active = TRUE
                        AND COALESCE(pb.is_popup, FALSE) = FALSE
-                       AND COALESCE(pb.banner_type, 'home_carousel') = ANY($1::text[])
-                     ORDER BY pb.display_order ASC, pb.id ASC`;
-        params = [bannerTypes];
+                     ORDER BY pb.display_order ASC, pb.id DESC`;
+        params = [];
       }
 
       const rows = await this.db.query(queryStr, params);

@@ -15,7 +15,7 @@ class AppConfig {
   AppConfig._();
 
   static const String clientRole = 'DELIVERY_BOY';
-  static const String appVersion = String.fromEnvironment('F2H_APP_VERSION', defaultValue: '1.0.7+12');
+  static const String appVersion = String.fromEnvironment('F2H_APP_VERSION', defaultValue: '1.0.8+13');
 
   static String get roleCode => 'D';
 

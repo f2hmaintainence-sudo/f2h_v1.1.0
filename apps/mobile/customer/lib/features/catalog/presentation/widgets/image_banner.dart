@@ -239,26 +239,25 @@ class _ImageBannerState extends State<ImageBanner> {
 
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: GestureDetector(
-                onTap: () => _onBannerTap(banner),
-                child: hasRichContent
-                    ? _buildOfferCard(banner, imageUrl)
-                    : Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
-                          child: Image.network(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: GestureDetector(
+                    onTap: () => _onBannerTap(banner),
+                    child: imageUrl.isNotEmpty
+                        ? Image.network(
                             imageUrl,
-                            fit: BoxFit.fill,
+                            fit: BoxFit.cover,
                             width: double.infinity,
                             loadingBuilder: (_, child, progress) {
                               if (progress == null) return child;
@@ -279,9 +278,10 @@ class _ImageBannerState extends State<ImageBanner> {
                             errorBuilder: (context, error, stackTrace) {
                               return _buildOfferCard(banner, imageUrl);
                             },
-                          ),
-                        ),
-                      ),
+                          )
+                        : _buildOfferCard(banner, ''),
+                  ),
+                ),
               ),
             );
           },
