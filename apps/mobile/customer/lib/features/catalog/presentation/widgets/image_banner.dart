@@ -120,32 +120,31 @@ class _ImageBannerState extends State<ImageBanner> {
   }
 
   void _onBannerTap(Map<String, dynamic> banner) {
+    final actionType = (banner['actionType'] ?? banner['action_type'] ?? banner['route'] ?? '').toString().toUpperCase();
+    final actionValue = (banner['actionValue'] ?? banner['action_value'] ?? banner['categoryId'] ?? banner['category_id'] ?? banner['productId'] ?? banner['product_id'] ?? '').toString();
     final route = banner['route']?.toString().toLowerCase() ?? '';
-    final imageUrl = banner['imageUrl']?.toString().toLowerCase() ?? '';
-    final id = banner['id']?.toString().toLowerCase() ?? '';
 
-    // Admin-managed banners carry an explicit destination.
-    final actionType = banner['actionType']?.toString().toUpperCase() ?? '';
-    final actionValue = banner['actionValue']?.toString();
-    if (actionType == 'PRODUCT' &&
-        actionValue != null &&
-        actionValue.startsWith('PRD')) {
+    if (actionType == 'PRODUCT' && actionValue.isNotEmpty) {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) =>
-              ProductDetailViewScreen(product: getProductById(actionValue)),
+          builder: (_) => ProductDetailViewScreen(product: getProductById(actionValue)),
         ),
       );
       return;
     }
-    if (actionType == 'CATEGORY' &&
-        actionValue != null &&
-        actionValue.isNotEmpty) {
+
+    if ((actionType == 'CATEGORY' || route == 'category') && actionValue.isNotEmpty) {
       AppShell.of(context)?.setTab(1, category: actionValue);
       return;
     }
-    if (actionType == 'WALLET') {
+
+    if (actionType == 'SUBSCRIPTION' || route == 'subscribe') {
+      AppShell.of(context)?.setTab(2);
+      return;
+    }
+
+    if (actionType == 'WALLET' || route == 'wallet' || banner['imageUrl'].toString().toLowerCase().contains('wallet_banner')) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const WalletScreen()),
@@ -153,22 +152,21 @@ class _ImageBannerState extends State<ImageBanner> {
       return;
     }
 
-    if (route == 'subscribe' ||
-        imageUrl.contains('sub_banner_1') ||
-        id.contains('sub-banner-1')) {
-      final shellState = context.findAncestorStateOfType<AppShellState>();
-      shellState?.setTab(2); // Redirect to Subscription tab
-    } else if (route == 'refer' ||
-        imageUrl.contains('sub_banner_2') ||
-        id.contains('sub-banner-2')) {
+    if (actionType == 'REFERRAL' || route == 'refer') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const ReferralScreen()),
       );
-    } else {
-      final shellState = context.findAncestorStateOfType<AppShellState>();
-      shellState?.setTab(1); // Redirect to Menu tab (BrowseScreen)
+      return;
     }
+
+    if (actionType == 'MENU' || route == 'menu') {
+      AppShell.of(context)?.setTab(1);
+      return;
+    }
+
+    // Default fallback to Menu tab
+    AppShell.of(context)?.setTab(1);
   }
 
   String _formatImageUrl(String rawUrl) {

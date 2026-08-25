@@ -113,45 +113,45 @@ class _PromoBannerState extends State<PromoBanner> {
   }
 
   void _onBannerTap(Map<String, dynamic> banner) {
+    final actionType = (banner['actionType'] ?? banner['action_type'] ?? banner['route'] ?? '').toString().toUpperCase();
+    final actionValue = (banner['actionValue'] ?? banner['action_value'] ?? banner['categoryId'] ?? banner['category_id'] ?? banner['productId'] ?? banner['product_id'] ?? '').toString();
     final route = banner['route']?.toString().toLowerCase() ?? '';
-    final imageUrl = banner['imageUrl']?.toString().toLowerCase() ?? '';
 
-    // Admin-managed banners carry an explicit destination.
-    final actionType = banner['actionType']?.toString().toUpperCase() ?? '';
-    final actionValue = banner['actionValue']?.toString();
-    if (actionType == 'PRODUCT' &&
-        actionValue != null &&
-        actionValue.startsWith('PRD')) {
+    if (actionType == 'PRODUCT' && actionValue.isNotEmpty) {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) =>
-              ProductDetailViewScreen(product: getProductById(actionValue)),
+          builder: (_) => ProductDetailViewScreen(product: getProductById(actionValue)),
         ),
       );
       return;
     }
-    if (actionType == 'CATEGORY' &&
-        actionValue != null &&
-        actionValue.isNotEmpty) {
+
+    if ((actionType == 'CATEGORY' || route == 'category') && actionValue.isNotEmpty) {
       AppShell.of(context)?.setTab(1, category: actionValue);
       return;
     }
+
+    if (actionType == 'SUBSCRIPTION' || route == 'subscribe') {
+      AppShell.of(context)?.setTab(2);
+      return;
+    }
+
+    if (actionType == 'WALLET' || route == 'wallet' || banner['imageUrl'].toString().toLowerCase().contains('wallet_banner')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const WalletScreen()),
+      );
+      return;
+    }
+
     if (actionType == 'MENU' || route == 'menu') {
       AppShell.of(context)?.setTab(1);
       return;
     }
 
-    if (route == 'wallet' || imageUrl.contains('wallet_banner')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const WalletScreen()),
-      );
-    } else {
-      // Default to subscribe tab (tab 3 in AppShell)
-      final shellState = context.findAncestorStateOfType<AppShellState>();
-      shellState?.setTab(2);
-    }
+    // Default fallback to Menu tab
+    AppShell.of(context)?.setTab(1);
   }
 
   String _formatImageUrl(String rawUrl) {
