@@ -893,15 +893,80 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
 
     switch (_pickupAction) {
       case 'confirmed':
-        return _buildDispatchStateCard(
-          accent: const Color(0xFF16A34A),
-          background: const Color(0xFFDCFCE7),
-          border: const Color(0xFF86EFAC),
-          icon: Icons.verified_rounded,
-          title: 'Dispatch Confirmed — Orders Out for Delivery',
-          subtitle: _totalExtraBuffer > 0
-              ? 'You are carrying $_totalInitialStock unit(s), including $_totalExtraBuffer extra loaded at the warehouse.'
-              : 'You are carrying $_totalInitialStock unit(s) for your assigned orders.',
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFDCFCE7),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF86EFAC)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.verified_rounded, color: Color(0xFF16A34A), size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Dispatch Confirmed — Orders Out for Delivery',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF16A34A),
+                                ),
+                              ),
+                            ),
+                            _buildDispatchStatusChip(const Color(0xFF16A34A)),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          _totalExtraBuffer > 0
+                              ? 'You are carrying $_totalInitialStock unit(s), including $_totalExtraBuffer extra loaded at the warehouse.'
+                              : 'You are carrying $_totalInitialStock unit(s) for your assigned orders.',
+                          style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFF475569)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 40,
+                child: ElevatedButton.icon(
+                  onPressed: _isReturningProducts ? null : _returnProductsToHub,
+                  icon: _isReturningProducts
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Icon(Icons.assignment_return_rounded, size: 16, color: Colors.white),
+                  label: Text(
+                    _isReturningProducts ? 'Submitting Return…' : 'Initiate Shift Return to Hub',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF059669),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+            ],
+          ),
         );
 
       case 'unavailable':

@@ -832,7 +832,16 @@ export class BasketService {
       [activeRunId, dispatchIds],
     );
 
-    // 3. Update delivery_baskets status to 'RETURNING' or 'CLOSED'
+    // 3. Update delivery_dispatch status to 'return_pending'
+    await this.db.query(
+      `UPDATE delivery_dispatch
+       SET status = 'return_pending', updated_at = NOW()
+       WHERE (delivery_run_id = $1 OR dispatch_id = ANY($2::varchar[]) OR delivery_partner_id = $3)
+         AND status != 'completed'`,
+      [activeRunId, dispatchIds, partnerId],
+    );
+
+    // 4. Update delivery_baskets status to 'RETURNING' or 'CLOSED'
     await this.db.query(
       `UPDATE delivery_baskets
        SET
@@ -845,7 +854,7 @@ export class BasketService {
       [body.notes || null, partnerId],
     );
 
-    // 4. Fetch refreshed summary
+    // 5. Fetch refreshed summary
     const summary = await this.getBasketSummary(partnerId, activeRunId);
 
     return {
