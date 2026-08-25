@@ -884,7 +884,7 @@ export class ProfileService {
         `SELECT u.user_id, u.first_name, u.last_name, u.phone, u.referral_code, dp.delivery_partner_id
          FROM delivery_partners dp
          LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
-         WHERE dp.delivery_partner_id = $1 OR dp.user_id = $1
+         WHERE dp.delivery_partner_id = $1
          LIMIT 1`,
         [deliveryPartnerId],
       );
@@ -903,45 +903,53 @@ export class ProfileService {
       }
 
       // Fetch all referral records
-      const referrals = await this.db.query(
-        `SELECT r.id, r.refer_id, r.referred_customer_id, r.status, r.created_at, r.rewarded_at,
-                COALESCE(u.first_name || ' ' || COALESCE(u.last_name, ''), u.user_name, 'Referee') AS referee_name,
-                u.phone AS referee_phone,
-                dpb.status AS bonus_status,
-                dpb.paid_at,
-                dpb.payment_reference,
-                dpb.remarks AS payment_remarks,
-                COALESCE(dpb.paid_amount, dpb.amount, 75.00)::numeric AS bonus_amount
-         FROM referrals r
-         LEFT JOIN users u ON u.user_id = r.referred_customer_id
-         LEFT JOIN delivery_partner_referral_bonuses dpb ON (dpb.refer_id = r.refer_id OR dpb.partner_id = $1)
-         WHERE r.referrer_customer_id = $1 OR r.referrer_customer_id = $2
-         ORDER BY r.created_at DESC`,
-        [deliveryPartnerId, partnerUser.user_id || deliveryPartnerId],
-      ).catch(() => []);
+      let referrals: any[] = [];
+      try {
+        referrals = await this.db.query(
+          `SELECT r.id, r.refer_id, r.referred_customer_id, r.status, r.created_at, r.rewarded_at,
+                  COALESCE(u.first_name || ' ' || COALESCE(u.last_name, ''), u.user_name, 'Referee') AS referee_name,
+                  u.phone AS referee_phone,
+                  COALESCE(r.referrer_reward_amount, 75.00)::numeric AS bonus_amount
+           FROM referrals r
+           LEFT JOIN users u ON u.user_id = r.referred_customer_id OR u.user_id = r.referred_user_id
+           WHERE r.referrer_customer_id = $1 OR r.referrer_user_id = $1
+           ORDER BY r.created_at DESC`,
+          [deliveryPartnerId],
+        );
+      } catch (e) {
+        this.developerService.warn('[getDeliveryPartnerReferrals] referrals query error:', e);
+      }
 
       // Fetch all bonus records directly
-      const bonuses = await this.db.query(
-        `SELECT dpb.*,
-                COALESCE(dpb.paid_amount, dpb.amount, 75.00)::numeric AS paid_amount
-         FROM delivery_partner_referral_bonuses dpb
-         WHERE dpb.partner_id = $1 OR dpb.partner_id = $2
-         ORDER BY dpb.created_at DESC`,
-        [deliveryPartnerId, partnerUser.user_id || deliveryPartnerId],
-      ).catch(() => []);
+      let bonuses: any[] = [];
+      try {
+        bonuses = await this.db.query(
+          `SELECT dpb.*,
+                  COALESCE(dpb.paid_amount, dpb.amount, 75.00)::numeric AS paid_amount
+           FROM delivery_partner_referral_bonuses dpb
+           WHERE dpb.partner_id = $1
+           ORDER BY dpb.created_at DESC`,
+          [deliveryPartnerId],
+        );
+      } catch (e) {
+        this.developerService.warn('[getDeliveryPartnerReferrals] bonuses query error:', e);
+      }
 
       const totalReferrals = Math.max(referrals.length, bonuses.length);
       const eligibleBonuses = bonuses.filter((b: any) => b.status === 'paid' || b.status === 'pending');
       const paidBonuses = bonuses.filter((b: any) => b.status === 'paid');
       const pendingBonuses = bonuses.filter((b: any) => b.status === 'pending');
 
-      const eligibleCount = eligibleBonuses.length;
+      const eligibleCount = Math.max(
+        eligibleBonuses.length,
+        referrals.filter((r: any) => ['rewarded', 'completed', 'paid', 'success', 'credited'].includes(String(r.status).toLowerCase())).length
+      );
       const paidCount = paidBonuses.length;
       const pendingCount = Math.max(0, totalReferrals - eligibleCount);
 
       const totalEarned = eligibleCount * 75.00;
       const totalPaid = paidBonuses.reduce((acc: number, b: any) => acc + Number(b.paid_amount || b.amount || 75.00), 0);
-      const outstandingAmount = pendingBonuses.reduce((acc: number, b: any) => acc + Number(b.amount || 75.00), 0);
+      const outstandingAmount = Math.max(0, totalEarned - totalPaid);
 
       const paymentsHistory = paidBonuses.map((b: any) => ({
         id: b.id,
@@ -950,7 +958,7 @@ export class ProfileService {
         paid_at: b.paid_at,
         payment_reference: b.payment_reference || 'Physical / Cash',
         remarks: b.remarks || 'Monthly offline referral payout',
-        referee_name: b.referee_name || 'Delivery Partner / Customer',
+        referee_name: b.referee_name || 'Customer Referral',
       }));
 
       return {
@@ -967,13 +975,14 @@ export class ProfileService {
             outstanding_amount: outstandingAmount,
             reward_per_referral: 75.00,
           },
-          referrals: (bonuses.length > 0 ? bonuses : referrals).map((r: any) => {
-            const isEligible = r.status === 'rewarded' || r.status === 'completed' || r.status === 'paid' || r.status === 'pending' || r.bonus_id;
-            const isPaid = r.status === 'paid' || r.bonus_status === 'paid';
+          referrals: (referrals.length > 0 ? referrals : bonuses).map((r: any) => {
+            const statusStr = String(r.status || '').toLowerCase();
+            const isEligible = ['rewarded', 'completed', 'paid', 'success', 'credited'].includes(statusStr);
+            const isPaid = statusStr === 'paid' || r.bonus_status === 'paid';
             return {
               id: r.id,
               refer_id: r.refer_id || r.bonus_id,
-              referee_name: r.referee_name || 'Partner Referee',
+              referee_name: r.referee_name || 'Customer Referee',
               referee_phone: r.referee_phone ? `${r.referee_phone.slice(0, 3)}****${r.referee_phone.slice(-3)}` : '******',
               created_at: r.created_at,
               status: isEligible ? 'eligible' : 'pending',
@@ -988,7 +997,7 @@ export class ProfileService {
       };
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
-      this.developerService.error('[Profile] Error fetching referral dashboard', { error, deliveryPartnerId });
+      this.developerService.error(`[Profile] Error fetching referrals for partner: ${deliveryPartnerId}`, { error });
       throw new InternalServerErrorException('Failed to fetch referral dashboard');
     }
   }
