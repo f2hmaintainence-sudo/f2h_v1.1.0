@@ -123,14 +123,11 @@ export default function GenerateOrdersPage() {
   useEffect(() => {
     async function fetchBranches() {
       try {
-        const res = await fetch(`${API_URL}/admin/zone/branches-list`, {
-          credentials: 'include',
-        });
-        if (res.ok) {
-          const json = await res.json();
-          if (json.status && Array.isArray(json.data)) {
-            setBranches(json.data);
-          }
+        const res = await api.get<any>('/admin/zone/branches-list');
+        if (res.data?.status && Array.isArray(res.data.data)) {
+          setBranches(res.data.data);
+        } else if (Array.isArray(res.data)) {
+          setBranches(res.data);
         }
       } catch (e) {
         console.error('Failed to load branches', e);
@@ -142,20 +139,17 @@ export default function GenerateOrdersPage() {
   // Fetch pre-summary metrics
   const fetchSummary = useCallback(async () => {
     try {
-      const q = new URLSearchParams({
+      const params: any = {
         date: selectedDate,
         slot: selectedSlot,
-      });
+      };
       if (selectedBranch) {
-        q.set('branchId', selectedBranch);
+        params.branchId = selectedBranch;
       }
 
-      const res = await fetch(`${API_URL}/admin/orders/dispatch/pre-summary?${q.toString()}`, {
-        credentials: 'include',
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setDispatchItems(getDispatchItems(data));
+      const res = await api.get<any>('/admin/orders/dispatch/pre-summary', { params });
+      if (res.data) {
+        setDispatchItems(getDispatchItems(res.data));
       }
     } catch (e) {
       console.error('Failed to load pre-summary metrics', e);
@@ -221,21 +215,17 @@ export default function GenerateOrdersPage() {
   const fetchBranchStats = useCallback(async () => {
     setLoadingBranchStats(true);
     try {
-      const q = new URLSearchParams({
+      const params: any = {
         date: selectedDate,
         slot: selectedSlot,
-      });
+      };
       if (selectedBranch) {
-        q.set('branchId', selectedBranch);
+        params.branchId = selectedBranch;
       }
-      const res = await fetch(`${API_URL}/admin/orders/dispatch/branch-stats?${q.toString()}`, {
-        credentials: 'include',
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setBranchStats(data);
-        }
+      const res = await api.get<any>('/admin/orders/dispatch/branch-stats', { params });
+      if (res.data) {
+        const data = Array.isArray(res.data) ? res.data : Array.isArray(res.data?.data) ? res.data.data : [];
+        setBranchStats(data);
       }
     } catch (e) {
       console.error('Failed to load branch stats', e);
@@ -264,25 +254,15 @@ export default function GenerateOrdersPage() {
     setGenerateError(null);
     setGenerationResult(null);
     try {
-      const res = await fetch(`${API_URL}/admin/orders/dispatch/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date: selectedDate,
-          slot: selectedSlot,
-          branchId: selectedBranch || undefined,
-        }),
-        credentials: 'include',
+      const res = await api.post<any>('/admin/orders/dispatch/generate', {
+        date: selectedDate,
+        slot: selectedSlot,
+        branchId: selectedBranch || undefined,
       });
 
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => null);
-        throw new Error(errJson?.message || 'Order generation failed');
-      }
-
-      const result = await res.json();
+      const result = res.data?.data || res.data;
       setGenerationResult(result);
-      if (Array.isArray(result.branchStats)) {
+      if (Array.isArray(result?.branchStats)) {
         setBranchStats(result.branchStats);
       }
       setIsConfirmModalOpen(false);
@@ -291,7 +271,8 @@ export default function GenerateOrdersPage() {
       fetchSubscriptions();
       fetchBranchStats();
     } catch (e: any) {
-      setGenerateError(e.message || 'Error occurred during generation');
+      const errMsg = e.response?.data?.message || e.message || 'Error occurred during generation';
+      setGenerateError(errMsg);
     } finally {
       setGenerating(false);
     }
