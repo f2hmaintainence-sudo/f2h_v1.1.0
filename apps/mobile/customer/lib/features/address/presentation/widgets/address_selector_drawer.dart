@@ -32,6 +32,7 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
   static const Color _panelBorder = Color(0xFF9BB2AA);
   String? _expandedAddressId;
   String? _selectedAddressId;
+  bool _isUpdating = false;
 
   void _openAddAddress(BuildContext context, {AddressModel? existing}) {
     final authState = context.read<AuthBloc>().state;
@@ -70,7 +71,6 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
     return BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
       builder: (context, sessionState) {
         final addresses = sessionState.addresses;
-        final isEmpty = addresses.isEmpty;
 
         return SafeArea(
           top: false,
@@ -240,7 +240,15 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
                                 color: isSelected ? kPrimary : Colors.transparent,
                               ),
                               child: isSelected
-                                  ? const Icon(Icons.check, color: Colors.white, size: 12)
+                                  ? (_isUpdating
+                                      ? const Padding(
+                                          padding: EdgeInsets.all(3),
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                          ),
+                                        )
+                                      : const Icon(Icons.check, color: Colors.white, size: 12))
                                   : null,
                             ),
                           ),
@@ -400,9 +408,34 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
     );
   }
 
-  void _selectAddress(BuildContext context, AddressModel addr) {
-    if (addr.addressId == null) return;
-    Navigator.pop(context, addr);
+  Future<void> _selectAddress(BuildContext context, AddressModel addr) async {
+    final addrId = addr.addressId;
+    if (addrId == null || addrId.isEmpty) {
+      Navigator.pop(context, addr);
+      return;
+    }
+
+    if (_isUpdating) return;
+
+    setState(() {
+      _selectedAddressId = addrId;
+      _isUpdating = true;
+    });
+
+    try {
+      if (!addr.isDefault) {
+        await context.read<CustomerSessionCubit>().updateDefaultAddress(addrId);
+      }
+      if (context.mounted) {
+        F2HToast.success(context, 'Delivery address set to ${addr.area.isNotEmpty ? addr.area : (addr.city.isNotEmpty ? addr.city : addr.name)}');
+        Navigator.pop(context, addr);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        F2HToast.error(context, 'Failed to update delivery address.');
+        setState(() => _isUpdating = false);
+      }
+    }
   }
 
   void _editAddress(BuildContext context, AddressModel addr) {
