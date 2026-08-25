@@ -39,12 +39,24 @@ export class DeliveryOrderService {
   }
 
   async resolveDeliveryPartner(userId: string) {
+    // delivery_partners has no surrogate `id` and no separate `user_id` — the
+    // partner is keyed by delivery_partner_id, which is also the users.user_id.
+    // The `id`/`user_id` aliases keep the shape callers in this service expect.
     const boyRes = await this.db.query(
-      `SELECT dp.id, dp.user_id, dp.delivery_partner_id, dp.branch_id,
-              u.first_name || ' ' || u.last_name AS full_name
+      `SELECT dp.delivery_partner_id AS id,
+              dp.delivery_partner_id AS user_id,
+              dp.delivery_partner_id,
+              dp.branch_id,
+              COALESCE(
+                NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''),
+                u.user_name,
+                dp.delivery_partner_id
+              ) AS full_name
        FROM delivery_partners dp
        LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
-       WHERE dp.user_id = $1 OR dp.delivery_partner_id = $1 LIMIT 1`,
+       WHERE dp.delivery_partner_id = $1
+         AND dp.deleted_at IS NULL
+       LIMIT 1`,
       [userId],
     );
     if (!boyRes?.length) {

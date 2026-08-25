@@ -253,18 +253,20 @@ export class BasketService {
   async getBasketSummary(partnerId: string, runId?: string): Promise<any> {
     const basket = await this.getOrCreateActiveBasket(partnerId, runId);
 
-    // 1. Resolve Delivery Partner profile to support user_id, delivery_partner_id, or integer id
+    // 1. Resolve Delivery Partner profile. delivery_partner_id is the only key on
+    // this table — it doubles as the users.user_id for the partner.
     const partnerRes = await this.db.query(
-      `SELECT dp.id, dp.user_id, dp.delivery_partner_id, dp.branch_id
+      `SELECT dp.delivery_partner_id, dp.branch_id
        FROM delivery_partners dp
-       WHERE dp.user_id = $1 OR dp.delivery_partner_id = $1 OR dp.id::text = $1
+       WHERE dp.delivery_partner_id = $1
+         AND dp.deleted_at IS NULL
        LIMIT 1`,
       [partnerId],
     );
     const partner = partnerRes?.length ? partnerRes[0] : null;
-    const partnerIds = partner
-      ? [partner.user_id, partner.delivery_partner_id, String(partner.id), partnerId].filter(Boolean)
-      : [partnerId];
+    const partnerIds = [...new Set(
+      [partner?.delivery_partner_id, partnerId].filter(Boolean),
+    )];
 
     // 2. Fetch active delivery_run for this partner on today's date
     const kolkataHour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getHours();
@@ -299,8 +301,7 @@ export class BasketService {
             SELECT dr.run_id FROM delivery_runs dr
             WHERE (dr.delivery_partner_id = ANY($2) OR dr.run_id = $3 OR dr.id::text = $3)
               AND dr.status != 'cancelled'
-          )
-          OR dd.delivery_partner_id = ANY($2))
+          ))
        ORDER BY
          (dd.delivery_run_id = $3) DESC,
          dd.created_at DESC,

@@ -6,7 +6,7 @@ import {
   Truck, Zap, Users, RefreshCw, ChevronRight, AlertTriangle,
   CheckCircle2, Clock, ArrowRight, Home, BarChart3, Target,
   Play, Route, MapPin, Search, ArrowRightLeft, ChevronDown,
-  ChevronUp, Calendar, Filter, Package, AlertCircle, Sparkles, Loader2
+  ChevronUp, Calendar, Filter, Package, AlertCircle, Sparkles, Loader2, Info
 } from "lucide-react";
 import Link from "next/link";
 import { showSuccessToast } from "@/components/Toast";
@@ -113,6 +113,7 @@ export default function DeliveryRunsPage() {
   const [selectedBranch, setSelectedBranch] = useState("");
   const [generateDate, setGenerateDate] = useState<string>(getTodayIST());
   const [error, setError] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [availability, setAvailability] = useState<{
     total_partners: number;
     available_partners: number;
@@ -225,6 +226,7 @@ export default function DeliveryRunsPage() {
     setConfirmOpen(false);
     setCreating(true);
     setError(null);
+    setInfoMessage(null);
     setResult(null);
     try {
       const body: any = {
@@ -237,7 +239,7 @@ export default function DeliveryRunsPage() {
       if (res.data?.data) {
         const data = res.data.data;
         if (data.runs_created === 0 && data.total_assigned === 0) {
-          setError(`No unassigned orders found for date ${generateDate} / selected criteria.`);
+          setInfoMessage(`No unassigned orders found for date ${generateDate} / selected criteria.`);
         } else {
           setResult(data);
           showSuccessToast(`${data.runs_created} delivery runs created with ${data.total_assigned} orders for ${generateDate}!`);
@@ -246,11 +248,21 @@ export default function DeliveryRunsPage() {
         fetchAvailability(selectedBranch, generateDate);
         fetchRunsWithOrders();
       } else {
-        setError(res.data?.message || "Failed to generate delivery runs");
+        const msg = res.data?.message || "Failed to generate delivery runs";
+        if (msg.toLowerCase().includes("no unassigned orders")) {
+          setInfoMessage(msg);
+        } else {
+          setError(msg);
+        }
       }
     } catch (err: any) {
       console.error(err);
-      setError(err?.response?.data?.message || err?.message || "Failed to generate delivery runs");
+      const errMsg = err?.response?.data?.message || err?.message || "Failed to generate delivery runs";
+      if (errMsg.toLowerCase().includes("no unassigned orders")) {
+        setInfoMessage(errMsg);
+      } else {
+        setError(errMsg);
+      }
     } finally { setCreating(false); }
   };
 
@@ -652,6 +664,17 @@ export default function DeliveryRunsPage() {
               </div>
             </div>
           </div>
+
+          {/* Info Alert */}
+          {infoMessage && (
+            <div className="rounded-xl border border-sky-200 bg-sky-50/80 p-4 text-sm text-sky-900 flex items-start gap-3 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+              <Info size={18} className="text-sky-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-sky-900">Information</p>
+                <p className="text-xs text-sky-700 mt-1">{infoMessage}</p>
+              </div>
+            </div>
+          )}
 
           {/* Error Alert */}
           {error && (

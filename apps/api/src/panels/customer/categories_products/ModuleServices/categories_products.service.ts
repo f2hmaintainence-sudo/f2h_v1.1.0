@@ -39,7 +39,7 @@ export class CategoriesProductsService {
         queryStr = `SELECT pb.id, pb.title, pb.description, pb.discount_text, pb.action_type, pb.action_value,
                            pb.category_id, pb.cta_label, pb.background_color, pb.banner_type,
                            pb.is_popup, pb.display_order, pb.image_url, pb.image_path,
-                           c.category_name
+                           c.name AS category_name
                       FROM product_banner pb
                       LEFT JOIN categories c ON (c.category_id = pb.category_id OR c.id::text = pb.category_id)
                      WHERE pb.deleted_at IS NULL
@@ -51,7 +51,7 @@ export class CategoriesProductsService {
         queryStr = `SELECT pb.id, pb.title, pb.description, pb.discount_text, pb.action_type, pb.action_value,
                            pb.category_id, pb.cta_label, pb.background_color, pb.banner_type,
                            pb.is_popup, pb.display_order, pb.image_url, pb.image_path,
-                           c.category_name
+                           c.name AS category_name
                       FROM product_banner pb
                       LEFT JOIN categories c ON (c.category_id = pb.category_id OR c.id::text = pb.category_id)
                      WHERE pb.deleted_at IS NULL

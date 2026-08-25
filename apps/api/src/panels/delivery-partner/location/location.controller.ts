@@ -131,7 +131,7 @@ export class LocationController {
             FROM orders o
             JOIN customers c ON c.customer_id = o.customer_id
             LEFT JOIN customer_addresses ca ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
-            WHERE (o.delivery_partner_id = $1 OR o.delivery_partner_id IN (SELECT delivery_partner_id FROM delivery_partners WHERE user_id = $1))
+            WHERE o.delivery_partner_id = $1
               AND o.scheduled_date = CURRENT_DATE
               AND o.status IN ('pending', 'out_for_delivery')
             ORDER BY o.run_sequence ASC NULLS LAST, o.created_at ASC
