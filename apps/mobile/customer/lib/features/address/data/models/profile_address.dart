@@ -57,6 +57,9 @@ class AddressModel {
 
   // Compatibility getters for Address class interfaces
   String? get id => addressId;
+  String get uniqueId => (addressId != null && addressId!.isNotEmpty)
+      ? addressId!
+      : '${flatNo}_${buildingName}_${area}_${pincode}_$contactMobile';
   String get name => contactName;
   String get mobileNumber => contactMobile;
   String get houseNumber => flatNo.isNotEmpty ? '$flatNo ${floorNo.isNotEmpty ? 'Floor $floorNo' : ''} $buildingName'.trim() : buildingName;

@@ -173,13 +173,13 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
 
         // Find primary address
         final primaryAddress = list.firstWhere((a) => a.isDefault, orElse: () => list.first);
-        _selectedAddressId ??= primaryAddress.addressId;
-        if (!list.any((a) => a.addressId == _selectedAddressId)) {
-          _selectedAddressId = primaryAddress.addressId;
+        _selectedAddressId ??= primaryAddress.uniqueId;
+        if (!list.any((a) => a.uniqueId == _selectedAddressId)) {
+          _selectedAddressId = primaryAddress.uniqueId;
         }
 
         if (_expandedAddressId == null && list.isNotEmpty) {
-          _expandedAddressId = primaryAddress.addressId;
+          _expandedAddressId = primaryAddress.uniqueId;
         }
 
         return Container(
@@ -213,8 +213,8 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
                 separatorBuilder: (_, _) => const Divider(color: kBorderLt, height: 1),
                 itemBuilder: (context, index) {
                   final addr = list[index];
-                  final isSelected = addr.addressId == _selectedAddressId;
-                  final isExpanded = addr.addressId == _expandedAddressId;
+                  final isSelected = addr.uniqueId == _selectedAddressId;
+                  final isExpanded = addr.uniqueId == _expandedAddressId;
 
                   return Container(
                     color: isSelected ? kPrimaryPl.withValues(alpha: 0.12) : Colors.transparent,
@@ -407,22 +407,21 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
   }
 
   Future<void> _selectAddress(BuildContext context, AddressModel addr) async {
-    final addrId = addr.addressId;
-    if (addrId == null || addrId.isEmpty) {
-      Navigator.pop(context, addr);
-      return;
-    }
+    final targetUniqueId = addr.uniqueId;
+    final dbAddressId = addr.addressId ?? addr.id;
 
     if (_isUpdating) return;
 
     setState(() {
-      _selectedAddressId = addrId;
-      _expandedAddressId = addrId;
+      _selectedAddressId = targetUniqueId;
+      _expandedAddressId = targetUniqueId;
       _isUpdating = true;
     });
 
     try {
-      await context.read<CustomerSessionCubit>().updateDefaultAddress(addrId);
+      if (dbAddressId != null && dbAddressId.isNotEmpty) {
+        await context.read<CustomerSessionCubit>().updateDefaultAddress(dbAddressId);
+      }
       if (context.mounted) {
         final labelName = addr.area.isNotEmpty
             ? addr.area
