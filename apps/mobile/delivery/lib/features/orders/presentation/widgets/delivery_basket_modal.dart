@@ -843,6 +843,28 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
       );
     }
 
+    if (_dispatchStatus == 'return_pending') {
+      return _buildDispatchStateCard(
+        accent: const Color(0xFF0D9488),
+        background: const Color(0xFFCCFBF1),
+        border: const Color(0xFF5EEAD4),
+        icon: Icons.assignment_return_rounded,
+        title: 'Deliveries Complete — Return Pending',
+        subtitle: 'All deliveries are complete. Please return remaining items and empty containers to the hub.',
+      );
+    }
+
+    if (_dispatchStatus == 'completed' || _pickupAction == 'completed') {
+      return _buildDispatchStateCard(
+        accent: const Color(0xFF059669),
+        background: const Color(0xFFDCFCE7),
+        border: const Color(0xFF86EFAC),
+        icon: Icons.task_alt_rounded,
+        title: 'Dispatch & Returns Completed',
+        subtitle: 'Warehouse has verified and processed all returns for this shift.',
+      );
+    }
+
     switch (_pickupAction) {
       case 'confirmed':
         return _buildDispatchStateCard(

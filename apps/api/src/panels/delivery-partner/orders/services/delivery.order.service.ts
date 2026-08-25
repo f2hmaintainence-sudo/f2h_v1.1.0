@@ -247,7 +247,7 @@ export class DeliveryOrderService {
        FROM delivery_dispatch dd
        WHERE dd.delivery_run_id = ANY($1)
          AND dd.deleted_at IS NULL
-         AND dd.status <> 'draft'
+         AND dd.status NOT IN ('draft', 'completed')
        ORDER BY dd.created_at DESC
        LIMIT 1`,
       [runIds],
@@ -701,6 +701,14 @@ export class DeliveryOrderService {
         [run.id],
       );
 
+      await client.query(
+        `UPDATE delivery_dispatch
+         SET status = 'in_progress', updated_at = NOW()
+         WHERE delivery_run_id = ANY($1)
+           AND status IN ('collected', 'loaded')`,
+        [this.getRunIdentifiers(run)],
+      );
+
       const runAddressesRes = await client.query(
         `SELECT order_id FROM orders WHERE delivery_run_id = ANY($1)`,
         [this.getRunIdentifiers(run)],
@@ -733,8 +741,6 @@ export class DeliveryOrderService {
     const boy = await this.resolveDeliveryPartner(userId);
     const run = await this.findDeliveryRunByIdAndBoy(runId, boy);
     const runIds = this.getRunIdentifiers(run);
-    const runIdentifier = run.run_id || String(run.id);
-
     const stopsRes = await this.db.query(
       `SELECT order_id, customer_id, status, total_amount, payment_mode FROM orders
        WHERE delivery_run_id = ANY($1) AND address_id = $2`,
@@ -749,6 +755,7 @@ export class DeliveryOrderService {
     const status = body.status || 'delivered';
 
     await this.db.transaction(async (client) => {
+      // 1. Mark each order in the stop as delivered/failed & process containers
       let isFirstOrder = true;
       for (const order of stopsRes) {
         if (['delivered', 'failed'].includes(order.status)) continue;
@@ -797,6 +804,30 @@ export class DeliveryOrderService {
           `UPDATE orders 
            SET status = $1, payment_mode = COALESCE($2, payment_mode),
                payment_status = COALESCE($3, payment_status),
+               actual_delivery_time = NOW(),
+               delivered_at = NOW(),
+               pod_image_url = COALESCE($4, pod_image_url),
+               delivery_notes = COALESCE($5, delivery_notes),
+               cash_collected = $6,
+               updated_at = NOW()
+           WHERE order_id = $7`,
+          [
+            status,
+            norm.paymentMode,
+            norm.paymentStatus,
+            norm.deliveryImage,
+            norm.notes,
+            cashCollected,
+            order.order_id,
+          ],
+        );
+
+        // Update stop status in delivery_run_addresses
+        await client.query(
+          `UPDATE delivery_run_addresses
+           SET delivery_status = $1,
+               payment_mode = COALESCE($2, payment_mode),
+               payment_status = COALESCE($3, payment_status),
                delivery_image = COALESCE($4, delivery_image),
                updated_at = NOW()
            WHERE order_id = $5`,
@@ -813,6 +844,15 @@ export class DeliveryOrderService {
         isFirstOrder = false;
       }
 
+      // Ensure dispatch status is in_progress once deliveries are taking place
+      await client.query(
+        `UPDATE delivery_dispatch
+         SET status = 'in_progress', updated_at = NOW()
+         WHERE delivery_run_id = ANY($1)
+           AND status IN ('collected', 'loaded')`,
+        [runIds],
+      );
+
       // Auto-complete the run if all orders are delivered or failed
       const pendingRes = await client.query(
         `SELECT COUNT(*)::int AS count FROM orders
@@ -825,6 +865,14 @@ export class DeliveryOrderService {
           `UPDATE delivery_runs
            SET status = 'completed', actual_end_time = COALESCE(actual_end_time, NOW()), updated_at = NOW()
            WHERE (id::text = ANY($1) OR run_id = ANY($1)) AND status != 'handed_over'`,
+          [runIds],
+        );
+        // When all orders are finished, update dispatch status to 'return_pending'
+        await client.query(
+          `UPDATE delivery_dispatch
+           SET status = 'return_pending', updated_at = NOW()
+           WHERE delivery_run_id = ANY($1)
+             AND status IN ('in_progress', 'collected', 'loaded')`,
           [runIds],
         );
       }
@@ -905,6 +953,14 @@ export class DeliveryOrderService {
            updated_at = NOW()
        WHERE id::text = ANY($2) OR run_id = ANY($2)`,
       [totalBottles, runIds],
+    );
+
+    await this.db.query(
+      `UPDATE delivery_dispatch
+       SET status = 'return_pending', updated_at = NOW()
+       WHERE delivery_run_id = ANY($1)
+         AND status != 'completed'`,
+      [runIds],
     );
 
     return {

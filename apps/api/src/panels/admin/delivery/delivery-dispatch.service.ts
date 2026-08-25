@@ -323,15 +323,24 @@ export class DeliveryDispatchService {
         // 5. Update run status to 'completed'
         await client.query(
           `UPDATE delivery_runs
+           SET status = 'completed', actual_end_time = COALESCE(actual_end_time, NOW()), updated_at = NOW()
+           WHERE id::text = $1 OR run_id = $1`,
+          [runId],
+        );
+
+        // 6. Update delivery_dispatch status to 'completed'
+        await client.query(
+          `UPDATE delivery_dispatch
            SET status = 'completed', updated_at = NOW()
-           WHERE id = $1`,
+           WHERE delivery_run_id = $1
+              OR delivery_run_id = (SELECT run_id FROM delivery_runs WHERE id::text = $1 OR run_id = $1 LIMIT 1)`,
           [runId],
         );
 
         return {
           status: true,
           data: { run_id: runId, items: results },
-          message: 'Delivery return processed successfully',
+          message: 'Delivery return processed successfully and dispatch marked as completed',
         };
       });
     } catch (error) {

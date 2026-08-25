@@ -280,8 +280,8 @@ export class BasketService {
          AND dr.status != 'cancelled'
        ORDER BY
          (dr.run_id = $2 OR dr.id::text = $2) DESC,
-         (dr.status IN ('in_progress', 'handed_over', 'dispatched') AND dd.dispatch_id IS NOT NULL) DESC,
-         (dd.dispatch_id IS NOT NULL) DESC,
+         (dr.status IN ('in_progress', 'handed_over', 'dispatched') AND dd.dispatch_id IS NOT NULL AND dd.status != 'completed') DESC,
+         (dd.dispatch_id IS NOT NULL AND dd.status != 'completed') DESC,
          (dr.delivery_slot = $3) DESC,
          dr.created_at DESC
        LIMIT 1`,
@@ -296,19 +296,48 @@ export class BasketService {
     const dispatchRes = await this.db.query(
       `SELECT dd.id, dd.dispatch_id, dd.delivery_run_id, dd.status AS dispatch_status, dd.loaded_at, dd.collected_at
        FROM delivery_dispatch dd
-       WHERE dd.delivery_run_id = ANY($1)
+       WHERE (dd.delivery_run_id = ANY($1)
           OR dd.delivery_run_id IN (
             SELECT dr.run_id FROM delivery_runs dr
             WHERE (dr.delivery_partner_id = ANY($2) OR dr.run_id = $3 OR dr.id::text = $3)
               AND dr.status != 'cancelled'
-          )
-       ORDER BY dd.created_at DESC
+          ))
+          AND (dd.status != 'completed' OR $3 != '')
+       ORDER BY (dd.status != 'completed') DESC, dd.created_at DESC
        LIMIT 1`,
       [runIds.length ? runIds : ['NONE'], partnerIds, runId || ''],
     );
     const activeDispatch = dispatchRes?.length ? dispatchRes[0] : null;
     const activeDispatchId = activeDispatch?.dispatch_id;
     const dispatchStatus = activeDispatch?.dispatch_status || 'draft';
+
+    if (activeDispatch?.dispatch_status === 'completed' && !runId) {
+      return {
+        status: 'CLOSED',
+        is_sufficient_for_orders: true,
+        pickup_confirmed: true,
+        has_dispatch: false,
+        dispatch_status: 'completed',
+        pickup_action: 'completed',
+        insufficient_items: [],
+        total_ordered: 0,
+        total_planned: 0,
+        total_loaded: 0,
+        total_extra: 0,
+        total_shortage: 0,
+        total_returned: 0,
+        total_in_bag_now: 0,
+        customer_items_count: 0,
+        emergency_items_count: 0,
+        delivered_count: 0,
+        pending_count: 0,
+        returned_count: 0,
+        damaged_count: 0,
+        cancelled_count: 0,
+        current_basket: 0,
+        product_breakdown: [],
+      };
+    }
 
     const runSlot = activeRun?.delivery_slot || currentSlot;
 
