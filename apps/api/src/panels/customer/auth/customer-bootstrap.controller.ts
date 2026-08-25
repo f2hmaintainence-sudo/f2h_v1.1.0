@@ -633,9 +633,12 @@ export class CustomerBootstrapController {
   ) {
     try {
       const existing = await this.findCustomerAddress(customerId, addressId);
-      const targetId = existing.address_id || existing.id || addressId;
+      const targetAddressId = existing.address_id || null;
+      const targetId = existing.id || null;
+      const primaryKeyId = targetAddressId || targetId || addressId;
+
       const addressData = this.buildAddressData(body, customerId, existing);
-      addressData.address_id = targetId;
+      addressData.address_id = primaryKeyId;
 
       if (addressData.latitude != null && addressData.longitude != null) {
         const { branch_id, h3_index } = await this.assignBranchAndH3(
@@ -646,7 +649,7 @@ export class CustomerBootstrapController {
         addressData.h3_index = h3_index || '';
       }
 
-      const { address_id, ...updatePayload } = addressData;
+      const { address_id, id, ...updatePayload } = addressData;
 
       if (addressData.is_default === true) {
         await this.clearDefaultAddresses(customerId);
@@ -654,15 +657,27 @@ export class CustomerBootstrapController {
 
       const filteredUpdatePayload = await this.filterValidFields('customer_addresses', updatePayload);
 
-      const idColumn = existing.address_id ? 'address_id' : 'id';
-      await this.Data.update(
-        'customer_addresses',
-        filteredUpdatePayload,
-        [
-          { column: idColumn, operator: '=', value: targetId },
+      // Force explicit is_default: true if provided
+      if (body?.is_default === true || body?.is_default === 'true' || body?.is_default === 1) {
+        filteredUpdatePayload.is_default = true;
+      }
+
+      if (targetAddressId) {
+        await this.Data.update('customer_addresses', filteredUpdatePayload, [
+          { column: 'address_id', operator: '=', value: targetAddressId },
           { column: 'customer_id', operator: '=', value: customerId },
-        ],
-      );
+        ]);
+      } else if (targetId) {
+        await this.Data.update('customer_addresses', filteredUpdatePayload, [
+          { column: 'id', operator: '=', value: targetId },
+          { column: 'customer_id', operator: '=', value: customerId },
+        ]);
+      } else {
+        await this.Data.update('customer_addresses', filteredUpdatePayload, [
+          { column: 'address_id', operator: '=', value: addressId },
+          { column: 'customer_id', operator: '=', value: customerId },
+        ]);
+      }
 
       if (addressData.branch_id) {
         try {
@@ -682,7 +697,7 @@ export class CustomerBootstrapController {
 
       let updatedQueryResult = await this.Data.query('customer_addresses', {
         where: [
-          { column: idColumn, operator: '=', value: targetId },
+          { column: targetAddressId ? 'address_id' : 'id', operator: '=', value: targetAddressId || targetId || addressId },
           { column: 'customer_id', operator: '=', value: customerId },
         ],
         limit: 1,
@@ -693,7 +708,7 @@ export class CustomerBootstrapController {
       return {
         status: true,
         message: 'Address updated successfully',
-        address_id: targetId,
+        address_id: primaryKeyId,
         data: this.normalizeAddress(updatedRecord),
       };
     } catch (error: any) {
