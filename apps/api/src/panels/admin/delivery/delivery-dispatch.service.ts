@@ -715,6 +715,7 @@ WHERE ${where.join(' AND ')}
           dr.delivery_slot,
           dr.run_date,
           dr.status AS run_status,
+          COALESCE(dd.status, 'draft') AS dispatch_status,
           COALESCE(dr.warehouse_id, w.warehouse_id) AS warehouse_id,
           COALESCE(w.name, b.branch_name) AS warehouse_name,
           dp.full_name AS delivery_partner_name,
@@ -731,16 +732,17 @@ WHERE ${where.join(' AND ')}
           OR (dr.warehouse_id IS NULL AND w.branch_id = dr.branch_id AND w.is_active = true)
         ) AND w.deleted_at IS NULL
         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
-        LEFT JOIN delivery_dispatch dd ON dd.delivery_run_id = dr.run_id
+        LEFT JOIN delivery_dispatch dd ON (dd.delivery_run_id = dr.run_id OR dd.delivery_run_id = dr.id::text)
         LEFT JOIN delivery_dispatch_items ddi ON ddi.dispatch_id = dd.dispatch_id AND ddi.deleted_at IS NULL
         WHERE ${where.join(' AND ')}
           AND dr.deleted_at IS NULL
         GROUP BY
           dr.id, dr.run_id, dr.run_number, dr.delivery_slot, dr.run_date, dr.status,
+          dd.status,
           dr.warehouse_id, w.warehouse_id, dd.warehouse_id, w.name, b.branch_name,
           dp.full_name, dp.delivery_partner_id
         HAVING COUNT(ddi.id) > 0
-        ORDER BY dr.delivery_slot, dr.run_date DESC
+        ORDER BY (COALESCE(dd.status, 'draft') = 'return_pending') DESC, dr.delivery_slot, dr.run_date DESC
       `;
 
       const rows = await this.db.query(sql, params);

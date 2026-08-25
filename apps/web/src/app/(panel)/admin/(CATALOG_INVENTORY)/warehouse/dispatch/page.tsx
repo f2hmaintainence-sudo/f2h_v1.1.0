@@ -607,17 +607,27 @@ function ReturnsTab({ warehouses }: { warehouses: any[] }) {
                   </div>
 
                   <div className="flex items-center gap-3 self-end md:self-auto">
-                    {pendingQty > 0 && (
+                    {pendingQty > 0 && run.dispatch_status !== "completed" && (
                       <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] font-black text-amber-700">
                         <AlertTriangle size={11} /> {pendingQty} pending
                       </div>
                     )}
-                    <button
-                      onClick={() => openReturnModal(run)}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#2E7D32] hover:bg-[#1B5E20] text-white text-xs font-bold rounded-xl shadow-md shadow-[#2E7D32]/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                    >
-                      <RotateCcw size={12} /> Process Return
-                    </button>
+                    {run.dispatch_status === "return_pending" ? (
+                      <button
+                        onClick={() => openReturnModal(run)}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#2E7D32] hover:bg-[#1B5E20] text-white text-xs font-bold rounded-xl shadow-md shadow-[#2E7D32]/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                      >
+                        <RotateCcw size={12} /> Process Return
+                      </button>
+                    ) : run.dispatch_status === "completed" ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold">
+                        <CheckCircle2 size={12} /> Return Completed
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-500 border border-slate-200 rounded-xl text-xs font-medium">
+                        <Clock size={12} /> In Transit (Return Not Initiated)
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

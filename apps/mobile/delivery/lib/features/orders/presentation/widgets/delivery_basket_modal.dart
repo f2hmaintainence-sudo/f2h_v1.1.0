@@ -767,8 +767,8 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
             ),
           ),
 
-          // Bottom Action Button: Return Remaining Products to Hub (Shows only when all deliveries completed & _totalInBagNow > 0)
-          if (allOrders.isNotEmpty && allOrders.every((o) => o.status == 'delivered' || o.status == 'completed' || o.status == 'failed' || o.status == 'cancelled') && _totalInBagNow > 0)
+          // Bottom Action Button: Return Items to Warehouse (Available whenever partner holds custody of the dispatch)
+          if (_dispatchStatus != 'completed' && _dispatchStatus != 'draft' && (_apiPickupConfirmed == true || _dispatchStatus == 'collected' || _dispatchStatus == 'in_progress' || _dispatchStatus == 'return_pending'))
             Container(
               padding: EdgeInsets.fromLTRB(14, 10, 14, MediaQuery.of(context).padding.bottom + 10),
               decoration: const BoxDecoration(
@@ -777,47 +777,73 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                   BoxShadow(color: Color(0x0F0F172A), blurRadius: 12, offset: Offset(0, -3)),
                 ],
               ),
-              child: Container(
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF16A34A), Color(0xFF15803D)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(26),
-                  boxShadow: const [
-                    BoxShadow(color: Color(0x3316A34A), blurRadius: 10, offset: Offset(0, 4)),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: _isReturningProducts ? null : _returnProductsToHub,
-                    borderRadius: BorderRadius.circular(26),
-                    child: Center(
-                      child: _isReturningProducts
-                          ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                          : const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.inventory_rounded, size: 20, color: Colors.white),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Return Remaining Products to Hub',
-                                  style: TextStyle(
-                                    fontSize: 14.5,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.white,
-                                    letterSpacing: 0.2,
-                                  ),
-                                ),
-                              ],
+              child: _dispatchStatus == 'return_pending'
+                  ? Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFCCFBF1),
+                        borderRadius: BorderRadius.circular(26),
+                        border: Border.all(color: const Color(0xFF5EEAD4), width: 1.2),
+                      ),
+                      child: const Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.assignment_return_rounded, size: 19, color: Color(0xFF0D9488)),
+                            SizedBox(width: 8),
+                            Text(
+                              'Return Pending at Warehouse',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF0F766E),
+                              ),
                             ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF059669), Color(0xFF047857)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(26),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0x33059669), blurRadius: 10, offset: Offset(0, 4)),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _isReturningProducts ? null : _returnProductsToHub,
+                          borderRadius: BorderRadius.circular(26),
+                          child: Center(
+                            child: _isReturningProducts
+                                ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                                : const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.assignment_return_rounded, size: 19, color: Colors.white),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Return Items to Warehouse',
+                                        style: TextStyle(
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                          letterSpacing: 0.2,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ),
             ),
         ],
       ),
