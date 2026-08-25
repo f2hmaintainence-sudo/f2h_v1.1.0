@@ -271,7 +271,7 @@ export class BasketService {
     const currentSlot = kolkataHour < 12 ? 'morning' : 'evening';
 
     const runRes = await this.db.query(
-      `SELECT dr.id, dr.run_id, dr.delivery_partner_id, dr.warehouse_id, dr.delivery_slot, dr.status,
+      `SELECT dr.id, dr.run_id, dr.delivery_partner_id, dr.warehouse_id, dr.delivery_slot, dr.status AS run_status,
               dd.dispatch_id, dd.status AS dispatch_status
        FROM delivery_runs dr
        LEFT JOIN delivery_dispatch dd ON (dd.delivery_run_id = dr.run_id OR dd.delivery_run_id = dr.id::text)
@@ -280,19 +280,17 @@ export class BasketService {
          AND dr.status != 'cancelled'
        ORDER BY
          (dr.run_id = $2 OR dr.id::text = $2) DESC,
-         (dr.status IN ('in_progress', 'handed_over', 'dispatched') AND dd.dispatch_id IS NOT NULL AND dd.status NOT IN ('completed', 'return_pending')) DESC,
-         (dd.dispatch_id IS NOT NULL AND dd.status NOT IN ('completed', 'return_pending')) DESC,
-         (dr.delivery_slot = $3) DESC,
-         dr.created_at DESC
+         dr.created_at DESC,
+         dr.id DESC
        LIMIT 1`,
-      [partnerIds, runId || '', currentSlot],
+      [partnerIds, runId || ''],
     );
 
     const activeRun = runRes?.length ? runRes[0] : null;
     const activeRunId = activeRun ? (activeRun.run_id || String(activeRun.id)) : (runId || basket.delivery_run_id);
     const runIds = activeRun ? [String(activeRun.id), activeRun.run_id].filter(Boolean) : (activeRunId ? [activeRunId] : []);
 
-    // 3. Fetch active delivery_dispatch record for this run
+    // 3. Fetch latest delivery_dispatch record for this run / partner
     const dispatchRes = await this.db.query(
       `SELECT dd.id, dd.dispatch_id, dd.delivery_run_id, dd.status AS dispatch_status, dd.loaded_at, dd.collected_at
        FROM delivery_dispatch dd
@@ -301,24 +299,29 @@ export class BasketService {
             SELECT dr.run_id FROM delivery_runs dr
             WHERE (dr.delivery_partner_id = ANY($2) OR dr.run_id = $3 OR dr.id::text = $3)
               AND dr.status != 'cancelled'
-          ))
-          AND (dd.status NOT IN ('completed', 'return_pending') OR $3 != '')
-       ORDER BY (dd.status NOT IN ('completed', 'return_pending')) DESC, dd.created_at DESC
+          )
+          OR dd.delivery_partner_id = ANY($2))
+       ORDER BY
+         (dd.delivery_run_id = $3) DESC,
+         dd.created_at DESC,
+         dd.id DESC
        LIMIT 1`,
-      [runIds.length ? runIds : ['NONE'], partnerIds, runId || ''],
+      [runIds.length ? runIds : ['NONE'], partnerIds, runId || (activeRun?.run_id || '')],
     );
-    const activeDispatch = dispatchRes?.length ? dispatchRes[0] : null;
+    const activeDispatch = dispatchRes?.length ? dispatchRes[0] : (activeRun?.dispatch_id ? activeRun : null);
     const activeDispatchId = activeDispatch?.dispatch_id;
     const dispatchStatus = activeDispatch?.dispatch_status || 'draft';
 
-    if ((activeDispatch?.dispatch_status === 'completed' || activeDispatch?.dispatch_status === 'return_pending') && !runId) {
+    // If dispatch status is 'return_pending' or 'completed', partner has already returned items:
+    // No need to show items in basket!
+    if (dispatchStatus === 'return_pending' || dispatchStatus === 'completed') {
       return {
-        status: activeDispatch?.dispatch_status === 'return_pending' ? 'RETURNING' : 'CLOSED',
+        status: dispatchStatus === 'return_pending' ? 'RETURNING' : 'CLOSED',
         is_sufficient_for_orders: true,
         pickup_confirmed: true,
-        has_dispatch: false,
-        dispatch_status: activeDispatch?.dispatch_status,
-        pickup_action: activeDispatch?.dispatch_status === 'return_pending' ? 'return_pending' : 'completed',
+        has_dispatch: true,
+        dispatch_status: dispatchStatus,
+        pickup_action: dispatchStatus,
         insufficient_items: [],
         total_ordered: 0,
         total_planned: 0,
