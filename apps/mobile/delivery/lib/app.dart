@@ -8,9 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/screens/dashboard_screen.dart';
-import 'package:f2h_delivery/features/orders/presentation/screens/orders_screen.dart';
 import 'package:f2h_delivery/features/tracking/presentation/screens/map_screen.dart';
-import 'package:f2h_delivery/features/profile/presentation/screens/profile_screen.dart';
 import 'package:f2h_delivery/features/profile/presentation/screens/referral_screen.dart';
 import 'package:f2h_delivery/auth/presentation/screens/login_screen.dart';
 import 'package:f2h_delivery/auth/presentation/screens/splash_screen.dart';
@@ -22,8 +20,6 @@ import 'package:f2h_delivery/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/services/location_tracking_service.dart';
 import 'package:f2h_delivery/services/mock_data_service.dart';
-
-import 'package:f2h_delivery/core/app_bootstrap.dart';
 
 class F2HApp extends StatelessWidget {
   const F2HApp({super.key});
@@ -204,64 +200,102 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  gradient: isReferral
-                                      ? const LinearGradient(
-                                          colors: [Color(0xFFF59E0B), Color(0xFFE11D48), Color(0xFF7C3AED)],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        )
-                                      : null,
-                                  color: isReferral
-                                      ? null
-                                      : (on ? activeColor : Colors.transparent),
-                                  shape: BoxShape.circle,
-                                  boxShadow: isReferral
-                                      ? [
-                                          BoxShadow(
-                                            color: const Color(0xFFE11D48).withValues(alpha: on ? 0.45 : 0.25),
-                                            blurRadius: on ? 10 : 6,
-                                            offset: const Offset(0, 2),
+                              if (isReferral)
+                                Container(
+                                  height: 36,
+                                  alignment: Alignment.center,
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    alignment: Alignment.center,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: on ? kPrimary.withValues(alpha: 0.12) : const Color(0xFFF1F5F9),
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(
+                                            color: on ? kPrimary.withValues(alpha: 0.35) : const Color(0xFFE2E8F0),
+                                            width: 1.2,
                                           ),
-                                        ]
-                                      : (on
-                                          ? [
+                                        ),
+                                        child: Text(
+                                          'referral',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: -0.4,
+                                            color: on ? kPrimary : (isTabEnabled ? kPrimary.withValues(alpha: 0.75) : kMuted),
+                                          ),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        top: -6,
+                                        right: -6,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFEC4899),
+                                            borderRadius: BorderRadius.circular(6),
+                                            boxShadow: const [
                                               BoxShadow(
-                                                color: activeColor.withValues(alpha: 0.35),
-                                                blurRadius: 8,
-                                                offset: const Offset(0, 3),
+                                                color: Color(0x33EC4899),
+                                                blurRadius: 4,
+                                                offset: Offset(0, 1.5),
                                               ),
-                                            ]
-                                          : []),
+                                            ],
+                                          ),
+                                          child: Text(
+                                            '₹75',
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 8.5,
+                                              fontWeight: FontWeight.w900,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: on ? activeColor : Colors.transparent,
+                                    shape: BoxShape.circle,
+                                    boxShadow: on
+                                        ? [
+                                            BoxShadow(
+                                              color: activeColor.withValues(alpha: 0.35),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 3),
+                                            ),
+                                          ]
+                                        : [],
+                                  ),
+                                  child: Icon(
+                                    _tabs[i].$1,
+                                    color: on
+                                        ? Colors.white
+                                        : (isTabEnabled
+                                            ? kMuted
+                                            : kMuted.withValues(alpha: 0.3)),
+                                    size: 20,
+                                  ),
                                 ),
-                                child: Icon(
-                                  _tabs[i].$1,
-                                  color: isReferral
-                                      ? Colors.white
-                                      : (on
-                                          ? Colors.white
-                                          : (isTabEnabled
-                                              ? kMuted
-                                              : kMuted.withValues(alpha: 0.3))),
-                                  size: 20,
-                                ),
-                              ),
                               const SizedBox(height: 4),
                               Text(
                                 _tabs[i].$2,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  fontWeight: (on || isReferral)
+                                  fontWeight: on
                                       ? FontWeight.w800
-                                      : FontWeight.w500,
-                                  letterSpacing: isReferral ? 0.3 : 0,
-                                  color: isReferral
-                                      ? (on ? const Color(0xFFE11D48) : const Color(0xFFBE123C))
-                                      : (on
-                                          ? activeColor
+                                      : (isReferral ? FontWeight.w700 : FontWeight.w500),
+                                  color: on
+                                      ? activeColor
+                                      : (isReferral
+                                          ? kPrimary.withValues(alpha: 0.85)
                                           : (isTabEnabled
                                               ? kMuted
                                               : kMuted.withValues(alpha: 0.3))),
