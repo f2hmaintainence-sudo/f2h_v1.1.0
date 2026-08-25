@@ -76,11 +76,56 @@ export class CustomerBootstrapController {
 
   private normalizeAddress(addr: any) {
     if (!addr) return addr;
+    const resolvedId = String(addr.address_id || addr.id || addr.action_id || '');
     return {
       ...addr,
+      address_id: resolvedId,
+      id: resolvedId,
       is_default: (addr.is_default === true || addr.is_default === 'true' || addr.is_default === 1 || addr.is_default === '1') ? true : false,
       status: (addr.status === false || addr.status === 'false' || addr.status === '0') ? false : true
     };
+  }
+
+  private async findCustomerAddress(customerId: string, addressId: string) {
+    let addressCheck = await this.Data.query('customer_addresses', {
+      where: [
+        { column: 'address_id', operator: '=', value: addressId },
+        { column: 'customer_id', operator: '=', value: customerId },
+      ],
+      limit: 1,
+    });
+
+    if (!addressCheck?.data || addressCheck.data.length === 0) {
+      addressCheck = await this.Data.query('customer_addresses', {
+        where: [
+          { column: 'id', operator: '=', value: addressId },
+          { column: 'customer_id', operator: '=', value: customerId },
+        ],
+        limit: 1,
+      });
+    }
+
+    if (!addressCheck?.data || addressCheck.data.length === 0) {
+      const allAddresses = await this.Data.query('customer_addresses', {
+        where: [
+          { column: 'customer_id', operator: '=', value: customerId },
+        ],
+      });
+      const list = allAddresses?.data || [];
+      const matched = list.find((a: any) => {
+        const uId = (a.address_id || a.id || '')?.toString();
+        if (uId && uId === addressId) return true;
+        const fallbackKey = `${a.flat_no || ''}_${a.building_name || ''}_${a.area || ''}_${a.pincode || ''}_${a.contact_mobile || ''}`;
+        return fallbackKey === addressId;
+      });
+      if (matched) return matched;
+    }
+
+    if (!addressCheck?.data || addressCheck.data.length === 0) {
+      throw new BadRequestException('Address not found or unauthorized');
+    }
+
+    return addressCheck.data[0];
   }
 
   @Get('bootstrap')
@@ -598,32 +643,6 @@ export class CustomerBootstrapController {
         { column: 'customer_id', operator: '=', value: customerId },
       ],
     );
-  }
-
-  private async findCustomerAddress(customerId: string, addressId: string) {
-    let addressCheck = await this.Data.query('customer_addresses', {
-      where: [
-        { column: 'address_id', operator: '=', value: addressId },
-        { column: 'customer_id', operator: '=', value: customerId },
-      ],
-      limit: 1,
-    });
-
-    if (!addressCheck?.data || addressCheck.data.length === 0) {
-      addressCheck = await this.Data.query('customer_addresses', {
-        where: [
-          { column: 'id', operator: '=', value: addressId },
-          { column: 'customer_id', operator: '=', value: customerId },
-        ],
-        limit: 1,
-      });
-    }
-
-    if (!addressCheck?.data || addressCheck.data.length === 0) {
-      throw new BadRequestException('Address not found or unauthorized');
-    }
-
-    return addressCheck.data[0];
   }
 
   private async saveExistingAddress(
