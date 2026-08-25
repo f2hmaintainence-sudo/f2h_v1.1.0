@@ -601,13 +601,23 @@ export class CustomerBootstrapController {
   }
 
   private async findCustomerAddress(customerId: string, addressId: string) {
-    const addressCheck = await this.Data.query('customer_addresses', {
+    let addressCheck = await this.Data.query('customer_addresses', {
       where: [
         { column: 'address_id', operator: '=', value: addressId },
         { column: 'customer_id', operator: '=', value: customerId },
       ],
       limit: 1,
     });
+
+    if (!addressCheck?.data || addressCheck.data.length === 0) {
+      addressCheck = await this.Data.query('customer_addresses', {
+        where: [
+          { column: 'id', operator: '=', value: addressId },
+          { column: 'customer_id', operator: '=', value: customerId },
+        ],
+        limit: 1,
+      });
+    }
 
     if (!addressCheck?.data || addressCheck.data.length === 0) {
       throw new BadRequestException('Address not found or unauthorized');
@@ -623,8 +633,9 @@ export class CustomerBootstrapController {
   ) {
     try {
       const existing = await this.findCustomerAddress(customerId, addressId);
+      const targetId = existing.address_id || existing.id || addressId;
       const addressData = this.buildAddressData(body, customerId, existing);
-      addressData.address_id = existing.address_id;
+      addressData.address_id = targetId;
 
       if (addressData.latitude != null && addressData.longitude != null) {
         const { branch_id, h3_index } = await this.assignBranchAndH3(
@@ -643,11 +654,12 @@ export class CustomerBootstrapController {
 
       const filteredUpdatePayload = await this.filterValidFields('customer_addresses', updatePayload);
 
+      const idColumn = existing.address_id ? 'address_id' : 'id';
       await this.Data.update(
         'customer_addresses',
         filteredUpdatePayload,
         [
-          { column: 'address_id', operator: '=', value: addressId },
+          { column: idColumn, operator: '=', value: targetId },
           { column: 'customer_id', operator: '=', value: customerId },
         ],
       );
@@ -668,9 +680,9 @@ export class CustomerBootstrapController {
         }
       }
 
-      const updatedQueryResult = await this.Data.query('customer_addresses', {
+      let updatedQueryResult = await this.Data.query('customer_addresses', {
         where: [
-          { column: 'address_id', operator: '=', value: addressId },
+          { column: idColumn, operator: '=', value: targetId },
           { column: 'customer_id', operator: '=', value: customerId },
         ],
         limit: 1,
@@ -681,7 +693,7 @@ export class CustomerBootstrapController {
       return {
         status: true,
         message: 'Address updated successfully',
-        address_id: addressId,
+        address_id: targetId,
         data: this.normalizeAddress(updatedRecord),
       };
     } catch (error: any) {

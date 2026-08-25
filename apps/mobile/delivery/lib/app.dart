@@ -82,7 +82,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     (Icons.explore_rounded, 'Home'),
     (Icons.assignment_rounded, 'Orders'),
     (Icons.map_rounded, 'Map'),
-    (Icons.stars_rounded, 'REFER'),
+    (Icons.card_giftcard_rounded, 'Referral'),
   ];
 
   Future<bool> _handlePop() async {
@@ -212,37 +212,30 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
                                   gradient: isReferral
-                                      ? (on
-                                          ? const LinearGradient(
-                                              colors: [Color(0xFF2563EB), Color(0xFF7C3AED)],
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                            )
-                                          : null)
+                                      ? const LinearGradient(
+                                          colors: [Color(0xFFF59E0B), Color(0xFFE11D48), Color(0xFF7C3AED)],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        )
                                       : null,
                                   color: isReferral
-                                      ? (on ? null : const Color(0xFFEFF6FF))
+                                      ? null
                                       : (on ? activeColor : Colors.transparent),
                                   shape: BoxShape.circle,
-                                  border: isReferral && !on
-                                      ? Border.all(color: const Color(0xFFDBEAFE), width: 1.2)
-                                      : null,
-                                  boxShadow: on
+                                  boxShadow: isReferral
                                       ? [
                                           BoxShadow(
-                                            color: (isReferral ? referralBlue : activeColor).withValues(
-                                              alpha: 0.35,
-                                            ),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 3),
+                                            color: const Color(0xFFE11D48).withValues(alpha: on ? 0.45 : 0.25),
+                                            blurRadius: on ? 10 : 6,
+                                            offset: const Offset(0, 2),
                                           ),
                                         ]
-                                      : (isReferral
+                                      : (on
                                           ? [
                                               BoxShadow(
-                                                color: referralBlue.withValues(alpha: 0.08),
-                                                blurRadius: 4,
-                                                offset: const Offset(0, 1),
+                                                color: activeColor.withValues(alpha: 0.35),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 3),
                                               ),
                                             ]
                                           : []),
@@ -250,7 +243,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                 child: Icon(
                                   _tabs[i].$1,
                                   color: isReferral
-                                      ? (on ? Colors.white : referralBlue)
+                                      ? Colors.white
                                       : (on
                                           ? Colors.white
                                           : (isTabEnabled
@@ -267,9 +260,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                   fontWeight: (on || isReferral)
                                       ? FontWeight.w800
                                       : FontWeight.w500,
-                                  letterSpacing: isReferral ? 0.4 : 0,
+                                  letterSpacing: isReferral ? 0.3 : 0,
                                   color: isReferral
-                                      ? (on ? referralBlue : const Color(0xFF1D4ED8))
+                                      ? (on ? const Color(0xFFE11D48) : const Color(0xFFBE123C))
                                       : (on
                                           ? activeColor
                                           : (isTabEnabled
