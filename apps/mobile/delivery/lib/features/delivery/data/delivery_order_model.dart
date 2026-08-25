@@ -253,6 +253,9 @@ class DeliveryOrderItem {
 
 class GroupedStop {
   final String customerId;
+  /// The delivery address ID — the canonical grouping key for stops.
+  /// Orders at the same address belong to the same stop, regardless of customer_id.
+  final String addressId;
   final String customerName;
   final String customerPhone;
   final String address;
@@ -264,6 +267,7 @@ class GroupedStop {
 
   GroupedStop({
     required this.customerId,
+    required this.addressId,
     required this.customerName,
     required this.customerPhone,
     required this.address,

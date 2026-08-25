@@ -536,11 +536,22 @@ class _HomeScreenState extends State<HomeScreen>
 
         return GestureDetector(
           onTap: () async {
+            final sessionCubit = context.read<CustomerSessionCubit>();
+            final catalogBloc = context.read<CatalogBloc>();
             final chosen = await AddressSelectorDrawer.show(context);
-            if (chosen != null && context.mounted) {
-              context.read<CustomerSessionCubit>().refreshSilently();
-              if (chosen.branchId.isNotEmpty) {
-                context.read<CatalogBloc>().add(LoadCatalog(branchId: chosen.branchId));
+            if (context.mounted) {
+              await sessionCubit.refreshSilently();
+              final session = sessionCubit.state;
+              AddressModel? activeAddr = chosen;
+              if (activeAddr == null && session.addresses.isNotEmpty) {
+                try {
+                  activeAddr = session.addresses.firstWhere((a) => a.isDefault);
+                } catch (_) {
+                  activeAddr = session.addresses.first;
+                }
+              }
+              if (activeAddr != null && activeAddr.branchId.isNotEmpty) {
+                catalogBloc.add(LoadCatalog(branchId: activeAddr.branchId));
               }
             }
           },
@@ -682,11 +693,22 @@ class _HomeScreenState extends State<HomeScreen>
               const SizedBox(width: 8),
               ElevatedButton(
                 onPressed: () async {
+                  final sessionCubit = context.read<CustomerSessionCubit>();
+                  final catalogBloc = context.read<CatalogBloc>();
                   final chosen = await AddressSelectorDrawer.show(context);
-                  if (chosen != null && context.mounted) {
-                    context.read<CustomerSessionCubit>().refreshSilently();
-                    if (chosen.branchId.isNotEmpty) {
-                      context.read<CatalogBloc>().add(LoadCatalog(branchId: chosen.branchId));
+                  if (context.mounted) {
+                    await sessionCubit.refreshSilently();
+                    final session = sessionCubit.state;
+                    AddressModel? activeAddr = chosen;
+                    if (activeAddr == null && session.addresses.isNotEmpty) {
+                      try {
+                        activeAddr = session.addresses.firstWhere((a) => a.isDefault);
+                      } catch (_) {
+                        activeAddr = session.addresses.first;
+                      }
+                    }
+                    if (activeAddr != null && activeAddr.branchId.isNotEmpty) {
+                      catalogBloc.add(LoadCatalog(branchId: activeAddr.branchId));
                     }
                   }
                 },

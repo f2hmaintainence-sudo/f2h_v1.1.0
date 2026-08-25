@@ -580,8 +580,8 @@ export class DeliveryOrderService {
           o.payment_screenshot,
           o.created_at,
           o.updated_at,
-          COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '') AS customer_name,
-          cu.phone AS customer_phone,
+          COALESCE(ca.contact_name, NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), cu.user_name, 'Customer') AS customer_name,
+          COALESCE(ca.contact_mobile, cu.phone) AS customer_phone,
           COALESCE(ca.flat_no, '') || ' ' ||
           COALESCE(ca.building_name, '') || ' ' ||
           COALESCE(ca.street, '') || ' ' ||
@@ -1132,7 +1132,7 @@ export class DeliveryOrderService {
              o.address_id,
              o.order_id,
              o.customer_id,
-             COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '') AS customer_name,
+             COALESCE(ca.contact_name, NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), cu.user_name, 'Customer') AS customer_name,
              COALESCE(ca.flat_no, '') || ' ' || COALESCE(ca.building_name, '') || ' ' || COALESCE(ca.street, '') || ' ' || COALESCE(ca.area, '') AS customer_address,
              COALESCE(ca.landmark, '') AS customer_landmark
            FROM orders o
@@ -1158,7 +1158,7 @@ export class DeliveryOrderService {
            o.address_id,
            o.order_id,
            o.customer_id,
-           COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '') AS customer_name,
+           COALESCE(ca.contact_name, NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), cu.user_name, 'Customer') AS customer_name,
            COALESCE(ca.flat_no, '') || ' ' || COALESCE(ca.building_name, '') || ' ' || COALESCE(ca.street, '') || ' ' || COALESCE(ca.area, '') AS customer_address,
            COALESCE(ca.landmark, '') AS customer_landmark
          FROM orders o

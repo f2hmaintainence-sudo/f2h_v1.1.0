@@ -413,12 +413,6 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
       return;
     }
 
-    // Tapping the already-selected address dismisses the drawer
-    if (addrId == _selectedAddressId && !_isUpdating) {
-      Navigator.pop(context, addr);
-      return;
-    }
-
     if (_isUpdating) return;
 
     setState(() {
@@ -434,7 +428,7 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
             ? addr.area
             : (addr.city.isNotEmpty ? addr.city : addr.name);
         F2HToast.success(context, 'Delivery address set to $labelName');
-        setState(() => _isUpdating = false);
+        Navigator.pop(context, addr);
       }
     } catch (e) {
       if (context.mounted) {

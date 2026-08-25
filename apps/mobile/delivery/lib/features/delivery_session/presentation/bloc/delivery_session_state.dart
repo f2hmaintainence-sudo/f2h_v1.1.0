@@ -39,16 +39,21 @@ class DeliverySessionLoaded extends DeliverySessionState {
   bool get isAccountActive => accountStatus.toLowerCase() == 'active';
 
   List<GroupedStop> get groupedStops {
+    // Group orders by address_id — the delivery stop is defined by WHERE we deliver,
+    // not WHO the customer is. The same customer at two different addresses must be
+    // two separate stops.
     final Map<String, List<DeliveryOrderModel>> groups = {};
     for (final order in orders) {
-      groups.putIfAbsent(order.customerId, () => []).add(order);
+      final key = order.addressId.isNotEmpty ? order.addressId : order.customerId;
+      groups.putIfAbsent(key, () => []).add(order);
     }
     final List<GroupedStop> grouped = [];
-    groups.forEach((customerId, list) {
+    groups.forEach((addressKey, list) {
       list.sort((a, b) => a.stop.compareTo(b.stop));
       final primary = list.first;
       grouped.add(GroupedStop(
-        customerId: customerId,
+        customerId: primary.customerId,
+        addressId: primary.addressId,
         customerName: primary.customerName,
         customerPhone: primary.customerPhone,
         address: primary.address,
