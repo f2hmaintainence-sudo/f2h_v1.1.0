@@ -1225,6 +1225,33 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
     );
   }, [availableVariants, searchQueryVariant]);
 
+  const variantStockMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    availableVariants.forEach((v) => {
+      if (v.product_variant_id) {
+        map[v.product_variant_id] = Number(v.available_quantity ?? 0);
+      }
+    });
+    return map;
+  }, [availableVariants]);
+
+  const getItemAvailableStock = (item: any) => {
+    if (item.product_variant_id && variantStockMap[item.product_variant_id] !== undefined) {
+      return variantStockMap[item.product_variant_id];
+    }
+    const pName = (item.product_name || "").toLowerCase().trim();
+    const vName = (item.variant_name || "").toLowerCase().trim();
+    const found = availableVariants.find((v) => {
+      const matchP = (v.product_name || "").toLowerCase().trim() === pName;
+      const matchV =
+        (v.variant_name || "").toLowerCase().trim() === vName ||
+        `${v.unit_value || ""} ${v.unit_type || ""}`.toLowerCase().trim() === vName ||
+        `${v.unit_value || ""}${v.unit_type || ""}`.toLowerCase().trim() === vName.replace(/\s+/g, "");
+      return matchP && (matchV || !vName);
+    });
+    return found ? Number(found.available_quantity ?? 0) : undefined;
+  };
+
   /** Units on hand for the row currently chosen in the picker. */
   const selectedVariantStock = useMemo(() => {
     const v = availableVariants.find((x) => x.product_variant_id === selectedVariantToAdd);
@@ -1239,8 +1266,13 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
     setActivePlanForModal(plan);
     setModalItems(
       Object.values(plan.totals || {}).map((item) => {
-        const planned = item.planned_qty !== undefined ? Number(item.planned_qty) : (item.orderCount === 0 ? 0 : Number(item.quantity || 0));
-        const loaded = item.loaded_qty !== undefined ? Number(item.loaded_qty) : Number(item.quantity || 0);
+        const planned = item.planned_qty !== undefined
+          ? Number(item.planned_qty)
+          : (item.orderCount === 0 ? 0 : Number(item.quantity || 0));
+        // Default loaded_qty to required (planned_qty)
+        const loaded = (item.loaded_qty !== undefined && Number(item.loaded_qty) > 0)
+          ? Number(item.loaded_qty)
+          : planned;
         return {
           ...item,
           planned_qty: planned,
@@ -1256,6 +1288,23 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
 
   const handleConfirmModalApproval = async () => {
     if (!activePlanForModal || !selectedWarehouse) return;
+
+    // Check for insufficient stock across modalItems
+    const whId = activePlanForModal.warehouse_id || selectedWarehouse;
+    const whObj = warehouses.find((w) => (w.warehouse_id || w.id) === whId);
+    const whName = whObj?.warehouse_name || activePlanForModal.warehouse_name || "Selected Warehouse";
+
+    for (const item of modalItems) {
+      const loaded = Number(item.loaded_qty || 0);
+      const onHand = getItemAvailableStock(item);
+      if (onHand !== undefined && loaded > onHand) {
+        showErrorToast(
+          `Insufficient stock for "${item.product_name} (${item.variant_name || ''})" at "${whName}". Available: ${onHand}, Loaded: ${loaded}.`
+        );
+        return;
+      }
+    }
+
     setApprovingRuns((prev) => ({ ...prev, [activePlanForModal.run_id]: true }));
     setIsApproveModalOpen(false);
     try {
@@ -1879,18 +1928,42 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
                           const extra = loaded - planned;
                           const hasExtra = extra > 0;
                           const isShort = extra < 0;
+                          const onHandStock = getItemAvailableStock(item);
+                          const remainingStock = onHandStock !== undefined ? onHandStock - loaded : undefined;
+                          const isOverStock = onHandStock !== undefined && loaded > onHandStock;
 
                           return (
-                            <tr key={item.product_variant_id || idx} className={`hover:bg-slate-50/40 transition-colors ${hasExtra ? "bg-amber-50/30" : isShort ? "bg-rose-50/30" : ""}`}>
+                            <tr key={item.product_variant_id || idx} className={`hover:bg-slate-50/40 transition-colors ${isOverStock ? "bg-rose-50/50" : hasExtra ? "bg-amber-50/30" : isShort ? "bg-rose-50/30" : ""}`}>
                               <td className="px-4 py-3.5 font-semibold text-slate-800">
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span>{item.product_name}</span>
+                                  <span className="font-bold text-slate-900">{item.product_name}</span>
                                   {planned === 0 && (
                                     <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-purple-100 text-purple-800 border border-purple-200 uppercase">
                                       Extra Added
                                     </span>
                                   )}
                                 </div>
+                                {onHandStock !== undefined ? (
+                                  <div className="flex items-center gap-1.5 mt-1 text-[11px] flex-wrap">
+                                    <span className="text-slate-400 font-medium">Stock:</span>
+                                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded font-black text-[10.5px] ${
+                                      isOverStock
+                                        ? "text-rose-700 bg-rose-100 border border-rose-200"
+                                        : (remainingStock ?? 0) <= 2
+                                        ? "text-amber-700 bg-amber-50 border border-amber-200"
+                                        : "text-emerald-700 bg-emerald-50 border border-emerald-200"
+                                    }`}>
+                                      {onHandStock} on hand
+                                    </span>
+                                    <span className={`text-[10.5px] font-semibold ${isOverStock ? "text-rose-600 font-bold" : "text-slate-500"}`}>
+                                      ({remainingStock !== undefined && remainingStock >= 0
+                                        ? `${remainingStock} remaining`
+                                        : `${Math.abs(remainingStock ?? 0)} short in warehouse!`})
+                                    </span>
+                                  </div>
+                                ) : loadingVariants ? (
+                                  <div className="text-[10px] text-slate-400 mt-1 animate-pulse">Checking stock…</div>
+                                ) : null}
                               </td>
                               <td className="px-4 py-3.5 text-slate-500 font-medium">{item.variant_name || "—"}</td>
                               <td className="px-4 py-3.5 text-center font-black text-slate-600">

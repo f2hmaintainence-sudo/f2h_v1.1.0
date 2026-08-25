@@ -118,8 +118,25 @@ export class StockMovementCoreService {
     // 2. Validate — no negative available stock for OUT movements (except adjustments)
     if (direction === -1 && movement_type !== 'stock_adjustment') {
       if (stock.available_quantity < quantity) {
+        const [varRes, whRes] = await Promise.all([
+          client.query(
+            `SELECT p.product_name, pv.variant_name, pv.unit_value, pv.unit_type
+             FROM product_variants pv
+             JOIN products p ON p.product_id = pv.product_id
+             WHERE pv.product_variant_id = $1`,
+            [product_variant_id],
+          ),
+          client.query(
+            `SELECT warehouse_name FROM warehouses WHERE warehouse_id = $1`,
+            [warehouse_id],
+          ),
+        ]);
+        const pName = varRes.rows[0]
+          ? `${varRes.rows[0].product_name} (${varRes.rows[0].variant_name || `${varRes.rows[0].unit_value || ''} ${varRes.rows[0].unit_type || ''}`.trim()})`
+          : product_variant_id;
+        const wName = whRes.rows[0]?.warehouse_name || warehouse_id;
         throw new BadRequestException(
-          `Insufficient stock. Available: ${stock.available_quantity}, Requested: ${quantity} (${movement_type})`,
+          `Insufficient stock for "${pName}" at "${wName}". Available: ${stock.available_quantity}, Requested: ${quantity}`,
         );
       }
     }

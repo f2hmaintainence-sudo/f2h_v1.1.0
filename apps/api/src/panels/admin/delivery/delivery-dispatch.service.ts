@@ -31,6 +31,7 @@ export class DeliveryDispatchService {
       planned_qty: number;
       loaded_qty: number;
       unit?: string;
+      product_name?: string;
     }>,
     adminId: string,
   ) {
@@ -93,16 +94,35 @@ export class DeliveryDispatchService {
           const plannedQty = Number(item.planned_qty ?? 0);
           const loadedQty = item.loaded_qty !== undefined ? Number(item.loaded_qty) : plannedQty;
 
+          const targetWarehouseId = item.warehouse_id || warehouseId;
+
           // 1. Validate warehouse stock
           const stock = await this.stockCore.getLockedStockBalance(
             client,
-            item.warehouse_id,
+            targetWarehouseId,
             item.product_variant_id,
           );
 
           if (stock.available_quantity < loadedQty) {
+            const [varRes, whRes] = await Promise.all([
+              client.query(
+                `SELECT p.product_name, pv.variant_name, pv.unit_value, pv.unit_type
+                 FROM product_variants pv
+                 JOIN products p ON p.product_id = pv.product_id
+                 WHERE pv.product_variant_id = $1`,
+                [item.product_variant_id],
+              ),
+              client.query(
+                `SELECT warehouse_name FROM warehouses WHERE warehouse_id = $1`,
+                [targetWarehouseId],
+              ),
+            ]);
+            const pName = varRes.rows[0]
+              ? `${varRes.rows[0].product_name} (${varRes.rows[0].variant_name || `${varRes.rows[0].unit_value || ''} ${varRes.rows[0].unit_type || ''}`.trim()})`
+              : ((item as any).product_name || item.product_variant_id);
+            const wName = whRes.rows[0]?.warehouse_name || 'Warehouse';
             throw new BadRequestException(
-              `Insufficient stock for variant ${item.product_variant_id} in warehouse ${item.warehouse_id}. Available: ${stock.available_quantity}, Requested: ${loadedQty}`,
+              `Insufficient stock for "${pName}" at "${wName}". Available: ${stock.available_quantity}, Requested: ${loadedQty}`,
             );
           }
 
