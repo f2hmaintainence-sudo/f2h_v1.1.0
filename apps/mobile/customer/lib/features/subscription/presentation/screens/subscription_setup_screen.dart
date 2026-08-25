@@ -305,11 +305,10 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     if (picked != null && mounted) {
       setState(() => _selectedAddress = picked);
       // Sync with session so the address widget always reflects the new default
-      if (picked.addressId != null) {
-        await context.read<CustomerSessionCubit>().updateDefaultAddress(
-          picked.addressId!,
-        );
-      }
+      final addrId = (picked.addressId != null && picked.addressId!.isNotEmpty)
+          ? picked.addressId!
+          : ((picked.id != null && picked.id!.isNotEmpty) ? picked.id! : picked.uniqueId);
+      await context.read<CustomerSessionCubit>().updateDefaultAddress(addrId);
     }
   }
 

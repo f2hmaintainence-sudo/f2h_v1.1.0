@@ -545,16 +545,26 @@ class _HomeScreenState extends State<HomeScreen>
             final catalogBloc = context.read<CatalogBloc>();
 
             if (value is AddressModel) {
-              if (value.addressId != null) {
-                await sessionCubit.updateDefaultAddress(value.addressId!);
-                if (context.mounted) {
-                  final labelName = value.area.isNotEmpty
-                      ? value.area
-                      : (value.city.isNotEmpty ? value.city : value.name);
-                  F2HToast.success(context, 'Delivery address set to $labelName');
-                  if (value.branchId.isNotEmpty) {
-                    catalogBloc.add(LoadCatalog(branchId: value.branchId));
-                  }
+              final addrId = (value.addressId != null && value.addressId!.isNotEmpty)
+                  ? value.addressId!
+                  : ((value.id != null && value.id!.isNotEmpty) ? value.id! : value.uniqueId);
+
+              await sessionCubit.updateDefaultAddress(addrId);
+              if (context.mounted) {
+                final labelName = value.area.isNotEmpty
+                    ? value.area
+                    : (value.city.isNotEmpty ? value.city : value.name);
+                F2HToast.success(context, 'Delivery address set to $labelName');
+                final latestSession = sessionCubit.state;
+                AddressModel? activeAddr;
+                try {
+                  activeAddr = latestSession.addresses.firstWhere((a) => a.isDefault);
+                } catch (_) {}
+                final targetBranchId = (activeAddr?.branchId.isNotEmpty == true)
+                    ? activeAddr!.branchId
+                    : (value.branchId.isNotEmpty ? value.branchId : (latestSession.profile?.branchId ?? ''));
+                if (targetBranchId.isNotEmpty) {
+                  catalogBloc.add(LoadCatalog(branchId: targetBranchId));
                 }
               }
             } else if (value == 'manage') {
@@ -563,15 +573,18 @@ class _HomeScreenState extends State<HomeScreen>
                 await sessionCubit.refreshSilently();
                 final latestSession = sessionCubit.state;
                 AddressModel? activeAddr = chosen;
-                if (activeAddr == null && latestSession.addresses.isNotEmpty) {
+                if (latestSession.addresses.isNotEmpty) {
                   try {
                     activeAddr = latestSession.addresses.firstWhere((a) => a.isDefault);
                   } catch (_) {
-                    activeAddr = latestSession.addresses.first;
+                    activeAddr ??= latestSession.addresses.first;
                   }
                 }
-                if (activeAddr != null && activeAddr.branchId.isNotEmpty) {
-                  catalogBloc.add(LoadCatalog(branchId: activeAddr.branchId));
+                final targetBranchId = (activeAddr?.branchId.isNotEmpty == true)
+                    ? activeAddr!.branchId
+                    : (latestSession.profile?.branchId ?? '');
+                if (targetBranchId.isNotEmpty) {
+                  catalogBloc.add(LoadCatalog(branchId: targetBranchId));
                 }
               }
             }
@@ -838,15 +851,18 @@ class _HomeScreenState extends State<HomeScreen>
                     await sessionCubit.refreshSilently();
                     final session = sessionCubit.state;
                     AddressModel? activeAddr = chosen;
-                    if (activeAddr == null && session.addresses.isNotEmpty) {
+                    if (session.addresses.isNotEmpty) {
                       try {
                         activeAddr = session.addresses.firstWhere((a) => a.isDefault);
                       } catch (_) {
-                        activeAddr = session.addresses.first;
+                        activeAddr ??= session.addresses.first;
                       }
                     }
-                    if (activeAddr != null && activeAddr.branchId.isNotEmpty) {
-                      catalogBloc.add(LoadCatalog(branchId: activeAddr.branchId));
+                    final targetBranchId = (activeAddr?.branchId.isNotEmpty == true)
+                        ? activeAddr!.branchId
+                        : (session.profile?.branchId ?? '');
+                    if (targetBranchId.isNotEmpty) {
+                      catalogBloc.add(LoadCatalog(branchId: targetBranchId));
                     }
                   }
                 },

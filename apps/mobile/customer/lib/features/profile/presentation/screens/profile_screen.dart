@@ -1495,14 +1495,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           await AddressSelectorDrawer.show(
                                             context,
                                           );
-                                      if (selected != null &&
-                                          selected.addressId != null &&
-                                          context.mounted) {
+                                      if (selected != null && context.mounted) {
+                                        final addrId = (selected.addressId !=
+                                                    null &&
+                                                selected.addressId!.isNotEmpty)
+                                            ? selected.addressId!
+                                            : ((selected.id != null &&
+                                                    selected.id!.isNotEmpty)
+                                                ? selected.id!
+                                                : selected.uniqueId);
                                         await context
                                             .read<CustomerSessionCubit>()
-                                            .updateDefaultAddress(
-                                              selected.addressId!,
-                                            );
+                                            .updateDefaultAddress(addrId);
                                         if (context.mounted) {
                                           F2HToast.success(
                                             context,

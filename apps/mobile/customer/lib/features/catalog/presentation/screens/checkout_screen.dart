@@ -777,28 +777,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                           const SizedBox(width: 8),
                                           TextButton(
                                             onPressed: () async {
-                                              final AddressModel?
-                                              selectedAddress =
-                                                  await AddressSelectorDrawer.show(
-                                                    context,
-                                                  );
-                                              if (selectedAddress != null &&
-                                                  selectedAddress.addressId !=
-                                                      null &&
-                                                  context.mounted) {
+                                              final AddressModel? selectedAddress = await AddressSelectorDrawer.show(context);
+                                              if (selectedAddress != null && context.mounted) {
                                                 setState(() {
                                                   _isAddressLoading = true;
                                                 });
                                                 try {
-                                                  final sessionCubit = context
-                                                      .read<
-                                                        CustomerSessionCubit
-                                                      >();
-                                                  await sessionCubit
-                                                      .updateDefaultAddress(
-                                                        selectedAddress
-                                                            .addressId!,
-                                                      );
+                                                  final sessionCubit = context.read<CustomerSessionCubit>();
+                                                  final addrId = (selectedAddress.addressId != null && selectedAddress.addressId!.isNotEmpty)
+                                                      ? selectedAddress.addressId!
+                                                      : ((selectedAddress.id != null && selectedAddress.id!.isNotEmpty) ? selectedAddress.id! : selectedAddress.uniqueId);
+                                                  await sessionCubit.updateDefaultAddress(addrId);
                                                   if (context.mounted) {
                                                     F2HToast.success(
                                                       context,

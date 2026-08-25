@@ -408,7 +408,9 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
 
   Future<void> _selectAddress(BuildContext context, AddressModel addr) async {
     final targetUniqueId = addr.uniqueId;
-    final dbAddressId = addr.addressId ?? addr.id;
+    final dbAddressId = (addr.addressId != null && addr.addressId!.isNotEmpty)
+        ? addr.addressId!
+        : ((addr.id != null && addr.id!.isNotEmpty) ? addr.id! : addr.uniqueId);
 
     if (_isUpdating) return;
 
@@ -419,7 +421,7 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
     });
 
     try {
-      if (dbAddressId != null && dbAddressId.isNotEmpty) {
+      if (dbAddressId.isNotEmpty) {
         await context.read<CustomerSessionCubit>().updateDefaultAddress(dbAddressId);
       }
       if (context.mounted) {

@@ -86,7 +86,8 @@ export class CustomerBootstrapController {
     };
   }
 
-  private async findCustomerAddress(customerId: string, addressId: string) {
+  private async findCustomerAddress(customerId: string, rawAddressId: string) {
+    const addressId = decodeURIComponent(String(rawAddressId || '')).trim();
     let addressCheck = await this.Data.query('customer_addresses', {
       where: [
         { column: 'address_id', operator: '=', value: addressId },
