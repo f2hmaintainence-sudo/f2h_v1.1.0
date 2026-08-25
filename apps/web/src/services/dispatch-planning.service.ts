@@ -39,6 +39,8 @@ export interface DeliveryPartnerPlan {
   status: string;
   hasActualDispatch?: boolean;
   isDispatched?: boolean;
+  /** Actual delivery_dispatch.status from DB: 'loaded', 'collected', 'short', 'returned', etc. */
+  dispatchStatus?: string | null;
   orders: DispatchOrder[];
   totals: Record<string, DispatchItem>;
   extraItems?: DispatchItem[];
@@ -107,11 +109,17 @@ export class DispatchPlanningService {
       ]).then(([addrRes, dispRes]) => {
         const dispatchItems = dispRes.data?.data || [];
         const hasActualDispatch = Array.isArray(dispatchItems) && dispatchItems.length > 0;
+        // Surface the actual delivery_dispatch.status (loaded/collected/short/returned)
+        // The dispatch items API response joins delivery_dispatch, so grab status from first row
+        const dispatchStatus: string | null = hasActualDispatch
+          ? (dispatchItems[0]?.dispatch_status ?? dispatchItems[0]?.dd_status ?? null)
+          : null;
         return {
           run,
           addresses: addrRes.data?.data || [],
           dispatchItems: dispatchItems,
           hasActualDispatch,
+          dispatchStatus,
         };
       });
     });
@@ -119,8 +127,19 @@ export class DispatchPlanningService {
     const runsWithDetails = await Promise.all(runDetailsPromises);
 
     // Process and construct plans
-    return runsWithDetails.map(({ run, addresses, dispatchItems, hasActualDispatch }) => {
+    return runsWithDetails.map(({ run, addresses, dispatchItems, hasActualDispatch, dispatchStatus }) => {
+      // Each address row contains a `orders` JSON array of actual orders at that stop.
+      // Build the stop-level display from address rows, but track the actual orders
+      // for correct counting.
       const orders: DispatchOrder[] = addresses.map((row: any) => {
+        // Parse the embedded orders JSON from the address row
+        let embeddedOrders: any[] = [];
+        if (typeof row.orders === 'string') {
+          try { embeddedOrders = JSON.parse(row.orders) ?? []; } catch { embeddedOrders = []; }
+        } else if (Array.isArray(row.orders)) {
+          embeddedOrders = row.orders;
+        }
+
         let items: any[] = [];
         if (typeof row.items_json === 'string') {
           try {
@@ -152,12 +171,15 @@ export class DispatchPlanningService {
         });
 
         return {
-          order_id: row.order_id,
-          customer_name: row.customer_name || 'Customer',
+          // order_id here represents the stop/address, not a single order
+          order_id: row.order_id || row.run_address_id || row.address_id,
+          customer_name: row.contact_name || row.customer_name || 'Customer',
           address_line: row.address_line || 'Address not listed',
           delivery_slot: row.delivery_slot || run.delivery_slot,
-          items: parsedItems
-        };
+          items: parsedItems,
+          // Carry the embedded actual orders count for this address stop
+          _actualOrders: embeddedOrders,
+        } as DispatchOrder & { _actualOrders: any[] };
       });
 
       // Calculate delivery-boy-wise product aggregates (grouped by product_name + variant_name combo)
@@ -252,6 +274,24 @@ export class DispatchPlanningService {
       const totalExtraQty = Object.values(totals).reduce((sum, item) => sum + (item.extra_qty || 0), 0);
       const extraItems = Object.values(totals).filter(item => (item.extra_qty || 0) > 0 || (item.orderCount === 0 && item.quantity > 0));
 
+      // Compute actual order count from embedded orders within each address stop
+      // (delivery_run_addresses row has a `orders` JSON array of actual orders)
+      let actualOrderCount = 0;
+      const actualCustomerNames = new Set<string>();
+      for (const stop of orders as any[]) {
+        const embedded = (stop._actualOrders as any[]) || [];
+        if (embedded.length > 0) {
+          actualOrderCount += embedded.length;
+          embedded.forEach((o: any) => {
+            if (o.customer_name) actualCustomerNames.add(o.customer_name);
+          });
+        } else {
+          // Fallback: count the address row itself as 1 order
+          actualOrderCount += 1;
+          if (stop.customer_name) actualCustomerNames.add(stop.customer_name);
+        }
+      }
+
       return {
         id: run.id, // Primary key
         run_id: run.run_id,
@@ -267,13 +307,14 @@ export class DispatchPlanningService {
         status: run.status,
         hasActualDispatch,
         isDispatched,
+        dispatchStatus,
         orders,
         totals,
         extraItems,
         totalExtraQty,
         totalPlannedQty,
-        totalOrders: orders.length,
-        totalCustomers: new Set(orders.map(o => o.customer_name)).size,
+        totalOrders: actualOrderCount,
+        totalCustomers: actualCustomerNames.size > 0 ? actualCustomerNames.size : new Set(orders.map(o => o.customer_name)).size,
         totalQuantity: totalQty,
         totalProducts: Object.keys(totals).length
       };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { api } from "@/services/api.client";
 import {
   DispatchPlanningService,
@@ -70,7 +70,22 @@ function SlotBadge({ slot }: { slot: string }) {
   );
 }
 
-function StatusBadge({ dispatched }: { dispatched: boolean }) {
+function StatusBadge({ dispatched, dispatchStatus }: { dispatched: boolean; dispatchStatus?: string | null }) {
+  // Show the actual delivery_dispatch.status when available
+  const statusMap: Record<string, { cls: string; label: string; icon: React.ReactNode }> = {
+    loaded:    { cls: "bg-emerald-50 text-emerald-700 border-emerald-200/60", label: "Loaded",    icon: <CheckCircle2 size={10} /> },
+    collected: { cls: "bg-sky-50 text-sky-700 border-sky-200/60",             label: "Collected", icon: <CheckCircle2 size={10} /> },
+    short:     { cls: "bg-orange-50 text-orange-700 border-orange-200/60",   label: "Short",     icon: <AlertTriangle size={10} /> },
+    returned:  { cls: "bg-violet-50 text-violet-700 border-violet-200/60",   label: "Returned",  icon: <RotateCcw size={10} /> },
+  };
+  if (dispatchStatus && statusMap[dispatchStatus]) {
+    const s = statusMap[dispatchStatus];
+    return (
+      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${s.cls}`}>
+        {s.icon} {s.label}
+      </span>
+    );
+  }
   return dispatched ? (
     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
       <CheckCircle2 size={10} /> Dispatched
@@ -1519,6 +1534,7 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
                                   </div>
                                 ))}
                               </div>
+                              <StatusBadge dispatched={isDispatched} dispatchStatus={plan.dispatchStatus} />
                               {!isDispatched && (
                                 <button onClick={(e) => { e.stopPropagation(); if (!isApproving) handleApproveDispatch(plan); }} disabled={isApproving}
                                   className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all no-print shadow-sm ${

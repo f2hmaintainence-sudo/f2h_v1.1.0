@@ -354,6 +354,7 @@ WHERE ${where.join(' AND ')}
         SELECT
           ddi.*,
           dd.warehouse_id,
+          dd.status AS dispatch_status,
           pv.name AS variant_name, pv.sku,
           pv.unit_value,
           pv.unit_type,

@@ -678,7 +678,7 @@ export class DeliveryRunService {
             SELECT json_agg(json_build_object(
               'order_id', o.order_id,
               'customer_id', o.customer_id,
-              'customer_name', o.customer_name,
+              'customer_name', COALESCE(ca.contact_name, NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Customer'),
               'total_amount', o.total_amount,
               'status', o.status,
               'delivery_slot', o.delivery_slot,
@@ -742,7 +742,7 @@ export class DeliveryRunService {
             SELECT json_agg(json_build_object(
               'order_id', o.order_id,
               'customer_id', o.customer_id,
-              'customer_name', o.customer_name,
+              'customer_name', COALESCE(ca.contact_name, NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Customer'),
               'status', o.status,
               'total_amount', o.total_amount,
               'items', (
