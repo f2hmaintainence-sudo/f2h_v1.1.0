@@ -247,8 +247,8 @@ class ProfileScreen extends StatelessWidget {
 
                     const SizedBox(height: 20),
 
-                    // ── PREFERENCES & SUPPORT ───────────────────────────────
-                    _buildSectionTitle('Preferences & Support'),
+                    // ── SETTINGS & POLICIES ─────────────────────────────────
+                    _buildSectionTitle('Settings & Policies'),
                     const SizedBox(height: 12),
                     _buildPreferencesCard(context),
 

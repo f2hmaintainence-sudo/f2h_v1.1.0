@@ -1362,34 +1362,38 @@ class _HomeScreenState extends State<HomeScreen>
                 right: 6,
                 child: Container(
                   height: 22,
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                   decoration: BoxDecoration(
                     color: kPrimary,
                     borderRadius: BorderRadius.circular(100),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.autorenew_rounded,
-                        size: 10.5,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        'Subscribe @ ₹${(p.subscriptionPrice != null && p.subscriptionPrice! > 0 ? p.subscriptionPrice! : p.price).toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.autorenew_rounded,
+                          size: 10,
                           color: Colors.white,
                         ),
-                      ),
-                      const SizedBox(width: 2),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        size: 11,
-                        color: Colors.white,
-                      ),
-                    ],
+                        const SizedBox(width: 2),
+                        Text(
+                          'Subscribe @ ₹${(p.subscriptionPrice != null && p.subscriptionPrice! > 0 ? p.subscriptionPrice! : p.price).toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          size: 11,
+                          color: Colors.white,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -2521,34 +2525,38 @@ Widget oneTimeProductCard(BuildContext context, Product p) {
               right: 6,
               child: Container(
                 height: 22,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 decoration: BoxDecoration(
                   color: kPrimary,
                   borderRadius: BorderRadius.circular(100),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.autorenew_rounded,
-                      size: 10.5,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: 3),
-                    Text(
-                      'Subscribe @ ₹${(p.subscriptionPrice != null && p.subscriptionPrice! > 0 ? p.subscriptionPrice! : p.price).toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.autorenew_rounded,
+                        size: 10,
                         color: Colors.white,
                       ),
-                    ),
-                    const SizedBox(width: 2),
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      size: 11,
-                      color: Colors.white,
-                    ),
-                  ],
+                      const SizedBox(width: 2),
+                      Text(
+                        'Subscribe @ ₹${(p.subscriptionPrice != null && p.subscriptionPrice! > 0 ? p.subscriptionPrice! : p.price).toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        size: 11,
+                        color: Colors.white,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

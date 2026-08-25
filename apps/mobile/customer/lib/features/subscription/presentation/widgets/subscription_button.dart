@@ -91,21 +91,24 @@ class _CompactBadge extends StatelessWidget {
             ),
           ],
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.autorenew_rounded, size: 9, color: Colors.white),
-            const SizedBox(width: 3),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 7.5,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                letterSpacing: 0.2,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.autorenew_rounded, size: 9, color: Colors.white),
+              const SizedBox(width: 3),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: 0.2,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
