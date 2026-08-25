@@ -43,7 +43,7 @@ export class CategoriesProductsService {
                       FROM product_banner pb
                       LEFT JOIN categories c ON (c.category_id = pb.category_id OR c.id::text = pb.category_id)
                      WHERE pb.deleted_at IS NULL
-                       AND pb.is_active = TRUE
+                       AND (pb.is_active IS TRUE OR pb.is_active IS NULL OR pb.is_active::text = 'true' OR pb.is_active::text = '1')
                        AND (COALESCE(pb.is_popup, FALSE) = TRUE OR pb.banner_type = 'popup')
                      ORDER BY pb.display_order ASC, pb.id DESC`;
         params = [];
@@ -55,7 +55,7 @@ export class CategoriesProductsService {
                       FROM product_banner pb
                       LEFT JOIN categories c ON (c.category_id = pb.category_id OR c.id::text = pb.category_id)
                      WHERE pb.deleted_at IS NULL
-                       AND pb.is_active = TRUE
+                       AND (pb.is_active IS TRUE OR pb.is_active IS NULL OR pb.is_active::text = 'true' OR pb.is_active::text = '1')
                        AND COALESCE(pb.is_popup, FALSE) = FALSE
                      ORDER BY pb.display_order ASC, pb.id DESC`;
         params = [];

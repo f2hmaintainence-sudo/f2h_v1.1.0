@@ -156,22 +156,26 @@ class _PromoBannerState extends State<PromoBanner> {
 
   String _formatImageUrl(String rawUrl) {
     if (rawUrl.isEmpty) return '';
+
+    String cleanPath = rawUrl;
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
       final uri = Uri.tryParse(rawUrl);
-      // Admin banners may point at an external image host — only URLs served
-      // by the API itself (or a stale dev host) get rewritten to the current
-      // host, otherwise the external image would 404 against our domain.
-      const localHosts = {'localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2'};
-      final apiHost = Uri.tryParse(ApiEndpoints.host)?.host;
-      if (uri != null &&
-          uri.path.isNotEmpty &&
-          (localHosts.contains(uri.host) || uri.host == apiHost)) {
-        return '${ApiEndpoints.host}${uri.path}';
+      if (uri != null && uri.path.isNotEmpty) {
+        cleanPath = uri.path;
       }
-      return rawUrl;
     }
-    final cleanPath = rawUrl.startsWith('/') ? rawUrl : '/$rawUrl';
-    return '${ApiEndpoints.host}$cleanPath';
+
+    if (cleanPath.contains('/uploads/')) {
+      final pathAfterUploads = cleanPath.substring(cleanPath.indexOf('/uploads/'));
+      return '${ApiEndpoints.host}$pathAfterUploads';
+    }
+
+    if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) {
+      return cleanPath;
+    }
+
+    final formatted = cleanPath.startsWith('/') ? cleanPath : '/$cleanPath';
+    return '${ApiEndpoints.host}$formatted';
   }
 
   @override
