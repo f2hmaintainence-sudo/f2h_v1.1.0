@@ -8,6 +8,8 @@ class F2hHeroHeader extends StatelessWidget {
   final bool isOnline;
   final ValueChanged<bool> onToggleOnline;
   final VoidCallback? onNotifications;
+  final VoidCallback? onProfile;
+  final String? avatarUrl;
   final int unreadCount;
   final String? address;
   final String? addressLabel;
@@ -18,6 +20,8 @@ class F2hHeroHeader extends StatelessWidget {
     required this.isOnline,
     required this.onToggleOnline,
     this.onNotifications,
+    this.onProfile,
+    this.avatarUrl,
     this.unreadCount = 0,
     this.address,
     this.addressLabel,
@@ -77,14 +81,14 @@ class F2hHeroHeader extends StatelessWidget {
             ),
           ),
 
-          // 3. Top Header Content (Greeting, Bell, Online Pill)
+          // 3. Top Header Content (Greeting, Bell, Profile Avatar, Online Pill)
           Padding(
             padding: EdgeInsets.fromLTRB(16, topInset + 16, 16, 28),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Top Bar with Greeting and Notification Icon
+                // Top Bar with Greeting, Notification Icon, and Profile Avatar
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -123,8 +127,15 @@ class F2hHeroHeader extends StatelessWidget {
                       ),
                     ),
 
-                    // Notification Bell Pill Button
-                    _buildBellButton(onTap: onNotifications, unreadCount: unreadCount),
+                    // Top Right Actions: Bell + Profile Avatar
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildBellButton(onTap: onNotifications, unreadCount: unreadCount),
+                        const SizedBox(width: 8),
+                        _buildProfileButton(onTap: onProfile, driverName: driverName, avatarUrl: avatarUrl),
+                      ],
+                    ),
                   ],
                 ),
 
@@ -244,6 +255,57 @@ class F2hHeroHeader extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildProfileButton({VoidCallback? onTap, required String driverName, String? avatarUrl}) {
+    final initial = driverName.trim().isNotEmpty ? driverName.trim()[0].toUpperCase() : 'P';
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: const Color(0xFF16A34A),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 1.5),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x14000000),
+              blurRadius: 6,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ClipOval(
+          child: avatarUrl != null && avatarUrl.isNotEmpty
+              ? Image.network(
+                  avatarUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Center(
+                    child: Text(
+                      initial,
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                )
+              : Center(
+                  child: Text(
+                    initial,
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+        ),
       ),
     );
   }

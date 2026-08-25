@@ -20,6 +20,7 @@ import 'package:f2h_delivery/features/dashboard/presentation/widgets/collect_que
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/pickup_status_card.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/pickup_selection_screen.dart';
 import 'package:f2h_delivery/features/profile/presentation/screens/notifications_screen.dart';
+import 'package:f2h_delivery/features/profile/presentation/screens/profile_screen.dart';
 import 'package:f2h_delivery/features/profile/presentation/screens/support_screen.dart';
 import 'package:f2h_delivery/core/widgets/f2h_hero_header.dart';
 import 'package:f2h_delivery/features/orders/presentation/widgets/delivery_basket_modal.dart';
@@ -441,6 +442,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   );
                   _loadUnreadNotifications();
                 },
+                onProfile: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                  );
+                },
               ),
 
               // ── SCROLLABLE DASHBOARD BODY ───────────────────────────
@@ -566,7 +573,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             Text(
                               "Today's Progress",
                               style: GoogleFonts.poppins(
-                                fontSize: 15,
+                                fontSize: 16,
                                 fontWeight: FontWeight.w700,
                                 color: const Color(0xFF0F172A),
                                 letterSpacing: -0.2,
@@ -579,7 +586,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               child: Text(
                                 'View Details',
                                 style: GoogleFonts.poppins(
-                                  fontSize: 12,
+                                  fontSize: 12.5,
                                   fontWeight: FontWeight.w700,
                                   color: const Color(0xFF16A34A),
                                 ),
@@ -587,59 +594,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 12),
 
-                        // 4 Progress Counter Cards
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x04000000),
-                                blurRadius: 8,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              _buildProgressItem(
-                                count: completedActiveStops,
-                                label: 'Completed',
-                                icon: Icons.shopping_bag_outlined,
-                                iconBg: const Color(0xFFDCFCE7),
-                                iconColor: const Color(0xFF16A34A),
-                                labelColor: const Color(0xFF15803D),
-                              ),
-                              _buildProgressItem(
-                                count: ongoingActiveStops,
-                                label: 'Ongoing',
-                                icon: Icons.access_time_rounded,
-                                iconBg: const Color(0xFFFEF3C7),
-                                iconColor: const Color(0xFFD97706),
-                                labelColor: const Color(0xFFB45309),
-                              ),
-                              _buildProgressItem(
-                                count: acceptedActiveStops,
-                                label: 'Accepted',
-                                icon: Icons.sync_rounded,
-                                iconBg: const Color(0xFFDBEAFE),
-                                iconColor: const Color(0xFF2563EB),
-                                labelColor: const Color(0xFF1D4ED8),
-                              ),
-                              _buildProgressItem(
-                                count: cancelledActiveStops,
-                                label: 'Cancelled',
-                                icon: Icons.cancel_outlined,
-                                iconBg: const Color(0xFFF1F5F9),
-                                iconColor: const Color(0xFF64748B),
-                                labelColor: const Color(0xFF475569),
-                              ),
-                            ],
-                          ),
+                        // 4 Progress Counter Cards (Matching UI spec: DONE, ACTIVE, TOTAL, CANCELLED)
+                        Row(
+                          children: [
+                            _buildProgressCard(
+                              count: completedActiveStops,
+                              label: 'DONE',
+                              bgColor: const Color(0xFFF0FDF4),
+                              borderColor: const Color(0xFFDCFCE7),
+                              numColor: const Color(0xFF0F172A),
+                              labelColor: const Color(0xFF15803D),
+                            ),
+                            const SizedBox(width: 8),
+                            _buildProgressCard(
+                              count: ongoingActiveStops,
+                              label: 'ACTIVE',
+                              bgColor: const Color(0xFFFFFBEB),
+                              borderColor: const Color(0xFFFEF3C7),
+                              numColor: const Color(0xFF0F172A),
+                              labelColor: const Color(0xFFB45309),
+                            ),
+                            const SizedBox(width: 8),
+                            _buildProgressCard(
+                              count: acceptedActiveStops,
+                              label: 'TOTAL',
+                              bgColor: const Color(0xFFEFF6FF),
+                              borderColor: const Color(0xFFDBEAFE),
+                              numColor: const Color(0xFF0F172A),
+                              labelColor: const Color(0xFF1D4ED8),
+                            ),
+                            const SizedBox(width: 8),
+                            _buildProgressCard(
+                              count: cancelledActiveStops,
+                              label: 'CANCELLED',
+                              bgColor: const Color(0xFFF8FAFC),
+                              borderColor: const Color(0xFFE2E8F0),
+                              numColor: const Color(0xFF0F172A),
+                              labelColor: const Color(0xFF64748B),
+                            ),
+                          ],
                         ),
 
                         const SizedBox(height: 24),
@@ -723,48 +718,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildProgressItem({
+  Widget _buildProgressCard({
     required int count,
     required String label,
-    required IconData icon,
-    required Color iconBg,
-    required Color iconColor,
+    required Color bgColor,
+    required Color borderColor,
+    required Color numColor,
     required Color labelColor,
   }) {
     return Expanded(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: iconBg,
-              shape: BoxShape.circle,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor, width: 1.2),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x04000000),
+              blurRadius: 4,
+              offset: Offset(0, 1),
             ),
-            child: Icon(icon, color: iconColor, size: 18),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '$count',
-            style: GoogleFonts.poppins(
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F172A),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$count',
+              style: GoogleFonts.poppins(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                color: numColor,
+                height: 1.1,
+              ),
             ),
-          ),
-          const SizedBox(height: 1),
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: labelColor,
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: labelColor,
+                letterSpacing: 0.6,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

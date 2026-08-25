@@ -728,6 +728,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ],
       ),
     );
+  }
 
   Widget _buildBottleLedgerCard() {
     final outstanding = (_currentStop.bottlesWithCustomer).clamp(0, 9999);

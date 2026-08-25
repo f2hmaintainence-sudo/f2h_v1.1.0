@@ -140,9 +140,14 @@ class _CustomerSessionGateState extends State<CustomerSessionGate> {
 
             String? branchId;
             try {
-              final defaultAddr = state.addresses.firstWhere((a) => a.isDefault);
-              if (defaultAddr.branchId.isNotEmpty) {
-                branchId = defaultAddr.branchId;
+              if (state.addresses.isNotEmpty) {
+                final defaultAddr = state.addresses.firstWhere(
+                  (a) => a.isDefault,
+                  orElse: () => state.addresses.first,
+                );
+                if (defaultAddr.branchId.isNotEmpty) {
+                  branchId = defaultAddr.branchId;
+                }
               }
             } catch (_) {}
             context.read<CatalogBloc>().add(LoadCatalog(branchId: branchId));

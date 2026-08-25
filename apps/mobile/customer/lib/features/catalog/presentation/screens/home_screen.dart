@@ -65,7 +65,11 @@ class _HomeScreenState extends State<HomeScreen>
   String? _getBranchId(BuildContext context) {
     try {
       final session = context.read<CustomerSessionCubit>().state;
-      final defaultAddr = session.addresses.firstWhere((a) => a.isDefault);
+      if (session.addresses.isEmpty) return null;
+      final defaultAddr = session.addresses.firstWhere(
+        (a) => a.isDefault,
+        orElse: () => session.addresses.first,
+      );
       if (defaultAddr.branchId.isNotEmpty) {
         return defaultAddr.branchId;
       }
@@ -119,13 +123,15 @@ class _HomeScreenState extends State<HomeScreen>
       body: BlocListener<CustomerSessionCubit, CustomerSessionState>(
         listenWhen: (prev, curr) {
           final prevBranch = prev.addresses
-              .where((a) => a.isDefault)
-              .map((a) => a.branchId)
-              .firstOrNull;
+                  .where((a) => a.isDefault)
+                  .map((a) => a.branchId)
+                  .firstOrNull ??
+              prev.addresses.firstOrNull?.branchId;
           final currBranch = curr.addresses
-              .where((a) => a.isDefault)
-              .map((a) => a.branchId)
-              .firstOrNull;
+                  .where((a) => a.isDefault)
+                  .map((a) => a.branchId)
+                  .firstOrNull ??
+              curr.addresses.firstOrNull?.branchId;
           return prevBranch != currBranch;
         },
         listener: (context, sessionState) {
@@ -613,10 +619,7 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _noAddressPromptCard(BuildContext context) {
     return BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
       builder: (context, session) {
-        final hasDefaultWithBranch = session.addresses.any(
-          (a) => a.isDefault && a.branchId.isNotEmpty,
-        );
-        if (hasDefaultWithBranch) return const SizedBox.shrink();
+        if (session.addresses.isNotEmpty) return const SizedBox.shrink();
 
         return Container(
           margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),

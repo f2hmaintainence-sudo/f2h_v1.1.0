@@ -13,6 +13,7 @@ import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_event.dart';
 import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
+import 'package:f2h_delivery/features/profile/presentation/screens/profile_screen.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -243,14 +244,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
       backgroundColor: kBg,
       appBar: F2hAppBar(
         title: 'Stops Ledger',
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, color: kDanger, size: 20),
-            tooltip: 'Logout',
-            onPressed: () => _showLogoutDialog(context),
-          ),
-          const SizedBox(width: 4),
-        ],
+        actions: const [],
         bottom: TabBar(
           controller: _tabController,
           labelColor: kPrimary,
@@ -366,12 +360,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                    statusLower == 'failed' || 
                    statusLower == 'completed' || 
                    statusLower == 'cancelled';
-    final hasSubscription = stop.orders.any((o) => o.orderType == 'subscription');
-    final hasOneTime = stop.orders.any((o) => o.orderType == 'one-time' || o.orderType == 'single');
-    
-    // Choose primary theme color (subscription gets primary kPrimary, else kAccent)
-    final primaryColor = hasSubscription ? kPrimary : kAccent;
-    final primaryPlColor = hasSubscription ? kPrimaryPl : kAccentLt;
+    const primaryColor = kPrimary;
 
     return GestureDetector(
       onTap: () => Navigator.push(
@@ -386,8 +375,8 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
           border: Border.all(
             color: stop.status == 'delivered'
                 ? kSuccess.withValues(alpha: 0.3)
-                : (stop.status == 'failed' ? kDanger.withValues(alpha: 0.3) : primaryColor.withValues(alpha: 0.15)),
-            width: 1.5,
+                : (stop.status == 'failed' ? kDanger.withValues(alpha: 0.3) : const Color(0xFFE2E8F0)),
+            width: 1.2,
           ),
           boxShadow: [
             BoxShadow(
@@ -402,484 +391,151 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Card Header
+              // Customer Details & Quick Action Icons (Phone + Navigate)
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: primaryPlColor,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            'Stop #${stop.stop}',
-                            style: TextStyle(color: primaryColor, fontWeight: FontWeight.w900, fontSize: 11),
-                          ),
-                        ),
-                        if (hasSubscription && hasOneTime)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEEF2FF), // Indigo background
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Icon(Icons.all_inclusive_rounded, color: Colors.indigo, size: 12),
-                                SizedBox(width: 2),
-                                Text(
-                                  'Subscription & One-Time',
-                                  style: TextStyle(color: Colors.indigo, fontWeight: FontWeight.w900, fontSize: 11),
-                                ),
-                              ],
-                            ),
-                          )
-                        else if (hasSubscription)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE0F2FE),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.cached_rounded, color: Colors.blue, size: 12),
-                                const SizedBox(width: 2),
-                                Text(
-                                  'Subscription · ${stop.orders.firstWhere((o) => o.orderType == 'subscription').frequency ?? 'Daily'}',
-                                  style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.w900, fontSize: 11),
-                                ),
-                              ],
-                            ),
-                          )
-                        else if (hasOneTime)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.purple.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.shopping_bag_rounded, color: Colors.purple.shade400, size: 12),
-                                const SizedBox(width: 2),
-                                const Text(
-                                  'One-Time',
-                                  style: TextStyle(color: Colors.purple, fontWeight: FontWeight.w900, fontSize: 11),
-                                ),
-                              ],
-                            ),
-                          ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: stop.deliverySlot.toLowerCase() == 'morning'
-                                ? Colors.green.shade50
-                                : Colors.orange.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                stop.deliverySlot.toLowerCase() == 'morning'
-                                    ? Icons.wb_sunny_rounded
-                                    : Icons.wb_twilight_rounded,
-                                color: stop.deliverySlot.toLowerCase() == 'morning'
-                                    ? Colors.green.shade700
-                                    : Colors.orange.shade700,
-                                size: 12,
-                              ),
-                              const SizedBox(width: 2),
-                              Text(
-                                stop.deliverySlot.toLowerCase() == 'morning' ? 'Morning' : 'Evening',
-                                style: TextStyle(
-                                  color: stop.deliverySlot.toLowerCase() == 'morning'
-                                      ? Colors.green.shade800
-                                      : Colors.orange.shade800,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildStatusBadge(stop.status),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              // Customer Details
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   CircleAvatar(
                     backgroundColor: primaryColor.withValues(alpha: 0.12),
-                    radius: 24,
+                    radius: 22,
                     child: Text(
                       stop.customerName.isNotEmpty ? stop.customerName[0].toUpperCase() : '?',
-                      style: TextStyle(fontWeight: FontWeight.w900, color: primaryColor, fontSize: 18),
+                      style: const TextStyle(fontWeight: FontWeight.w900, color: primaryColor, fontSize: 17),
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           stop.customerName,
-                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: kText),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          stop.customerPhone,
-                          style: const TextStyle(fontSize: 12, color: kTextSub, fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          stop.address,
-                          style: const TextStyle(fontSize: 12, color: kTextSub, height: 1.3),
-                          maxLines: 2,
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15.5, color: kText),
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        const SizedBox(height: 2),
+                        Text(
+                          stop.customerPhone,
+                          style: const TextStyle(fontSize: 13, color: kTextSub, fontWeight: FontWeight.w700),
+                        ),
                       ],
                     ),
                   ),
+                  // Quick Action Icons: Call & Navigate
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      GestureDetector(
+                        onTap: () => _callPhone(stop.customerPhone),
+                        child: Container(
+                          padding: const EdgeInsets.all(9),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xFFDBEAFE)),
+                          ),
+                          child: const Icon(Icons.phone_rounded, color: Color(0xFF2563EB), size: 18),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => _openNav(stop),
+                        child: Container(
+                          padding: const EdgeInsets.all(9),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0FDF4),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xFFDCFCE7)),
+                          ),
+                          child: const Icon(Icons.navigation_rounded, color: Color(0xFF16A34A), size: 18),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
-              const Divider(height: 24, color: kBorder),
+              const SizedBox(height: 10),
 
-              // Items and Total Value
+              // Address Row
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const Icon(Icons.location_on_outlined, color: kMuted, size: 16),
+                  const SizedBox(width: 6),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'ORDER TYPE',
-                          style: TextStyle(fontSize: 10, color: kTextSub, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          stop.orderType == 'subscription & one-time'
-                              ? 'Subscription & One-Time'
-                              : (stop.orderType == 'subscription' ? 'Subscription' : 'One-Time'),
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: kText),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          stop.itemCountLabel,
-                          style: const TextStyle(fontSize: 11, color: kTextSub, fontWeight: FontWeight.w800),
-                        ),
-                      ],
+                    child: Text(
+                      stop.address,
+                      style: const TextStyle(fontSize: 12.5, color: kTextSub, height: 1.35),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const Text(
-                        'VALUE',
-                        style: TextStyle(fontSize: 10, color: kTextSub, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '₹${stop.totalAmount.round()}',
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: kText),
-                      ),
-                      if (stop.isCod)
-                        Text(
-                          'Collect ₹${stop.codAmount.round()}',
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: kDanger),
-                        )
-                      else
-                        Text(
-                          'Prepaid',
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.green.shade600),
-                        ),
-                    ],
                   ),
                 ],
               ),
 
-              // Bottle Outstanding & Collection Status (Only show if customer has containers to return)
-              if (stop.bottlesWithCustomer > 0 || (isDone && stop.emptyBottlesCollected > 0)) ...[
-                const Divider(height: 24, color: kBorder),
-                if (stop.bottlesWithCustomer > 0)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'OUTSTANDING BOTTLES',
-                        style: TextStyle(fontSize: 10, color: kTextSub, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                      ),
-                      Text(
-                        '${stop.bottlesWithCustomer} empty bottle${stop.bottlesWithCustomer == 1 ? '' : 's'}',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Colors.teal),
-                      ),
-                    ],
-                  ),
-                if (isDone && stop.emptyBottlesCollected > 0) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'COLLECTED BOTTLES',
-                        style: TextStyle(fontSize: 10, color: kTextSub, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                      ),
-                      Text(
-                        '${stop.emptyBottlesCollected} bottles',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: kSuccess),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-
-              // Actions
+              // Deliver Button or Delivered Status
               if (!isDone) ...[
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildActionBtn(Icons.call_rounded, 'Call', Colors.blue, () => _callPhone(stop.customerPhone)),
+                const SizedBox(height: 14),
+                GestureDetector(
+                  onTap: () => _showConfirmation(context, stop),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: primaryColor,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withValues(alpha: 0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        )
+                      ],
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _buildActionBtn(Icons.navigation_rounded, 'Navigate', kPrimary, () => _openNav(stop)),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => _showConfirmation(context, stop),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 11),
-                          decoration: BoxDecoration(
-                            color: primaryColor,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: primaryColor.withValues(alpha: 0.15),
-                                blurRadius: 6,
-                                offset: const Offset(0, 3),
-                              )
-                            ],
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.check_circle_rounded, color: Colors.white, size: 15),
-                              SizedBox(width: 6),
-                              Text(
-                                'Deliver',
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12),
-                              ),
-                            ],
-                          ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.check_circle_rounded, color: Colors.white, size: 17),
+                        SizedBox(width: 6),
+                        Text(
+                          'Deliver',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ] else ...[
                 const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: stop.status == 'delivered'
-                        ? kSuccess.withValues(alpha: 0.05)
-                        : kDanger.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(16),
+                        ? kSuccess.withValues(alpha: 0.08)
+                        : kDanger.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: stop.status == 'delivered'
-                          ? kSuccess.withValues(alpha: 0.15)
-                          : kDanger.withValues(alpha: 0.15),
-                      width: 1,
+                          ? kSuccess.withValues(alpha: 0.2)
+                          : kDanger.withValues(alpha: 0.2),
                     ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Row(
-                        children: [
-                          Icon(
-                            stop.status == 'delivered'
-                                ? Icons.check_circle_rounded
-                                : Icons.cancel_rounded,
-                            color: stop.status == 'delivered' ? kSuccess : kDanger,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            stop.status == 'delivered'
-                                ? 'DELIVERED SUCCESSFULLY'
-                                : 'DELIVERY FAILED',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 12,
-                              color: stop.status == 'delivered' ? kSuccess : kDanger,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
+                      Icon(
+                        stop.status == 'delivered' ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                        color: stop.status == 'delivered' ? kSuccess : kDanger,
+                        size: 16,
                       ),
-                      const SizedBox(height: 10),
-                      
-                      // Grid of delivery metrics
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // Payment Method
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'PAYMENT METHOD',
-                                  style: TextStyle(fontSize: 9, color: kTextSub, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      stop.orders.first.paymentMode == 'prepaid'
-                                          ? Icons.payment_rounded
-                                          : (stop.orders.first.paymentMode == 'upi' ? Icons.qr_code_rounded : Icons.money_rounded),
-                                      size: 14,
-                                      color: kText,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      stop.orders.first.paymentMode == 'prepaid'
-                                          ? 'Prepaid Online'
-                                          : (stop.orders.first.paymentMode == 'upi' ? 'UPI' : (stop.orders.first.paymentMode == 'cash' ? 'Cash' : 'COD')),
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kText),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          
-                          // Empty Bottles
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'BOTTLES COLLECTED',
-                                  style: TextStyle(fontSize: 9, color: kTextSub, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    const Icon(Icons.opacity_rounded, size: 14, color: kText),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '${stop.emptyBottlesCollected} bottles',
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kText),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      
-                      // Proof photo and Notes
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // Proof Photo
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'PROOF PHOTO',
-                                  style: TextStyle(fontSize: 9, color: kTextSub, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      stop.orders.first.deliveryImage != null && stop.orders.first.deliveryImage!.isNotEmpty
-                                          ? Icons.photo_camera_back_rounded
-                                          : Icons.no_photography_rounded,
-                                      size: 14,
-                                      color: stop.orders.first.deliveryImage != null && stop.orders.first.deliveryImage!.isNotEmpty ? kSuccess : kTextSub,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      stop.orders.first.deliveryImage != null && stop.orders.first.deliveryImage!.isNotEmpty
-                                          ? 'Uploaded ✅'
-                                          : 'Not Uploaded',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w800,
-                                        color: stop.orders.first.deliveryImage != null && stop.orders.first.deliveryImage!.isNotEmpty ? kSuccess : kTextSub,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          
-                          // Handover Location/Notes
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'HANDOVER DETAILS',
-                                  style: TextStyle(fontSize: 9, color: kTextSub, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  (stop.orders.first.deliveryNotes != null && stop.orders.first.deliveryNotes!.isNotEmpty)
-                                      ? stop.orders.first.deliveryNotes!.split(' · ').first
-                                      : 'No details available',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kText),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      const SizedBox(width: 6),
+                      Text(
+                        stop.status == 'delivered' ? 'Delivered' : 'Delivery Failed / Cancelled',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: stop.status == 'delivered' ? kSuccess : kDanger,
+                        ),
                       ),
                     ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _buildActionBtn(
-                  Icons.info_outline_rounded,
-                  'View Details',
-                  primaryColor,
-                  () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => OrderDetailScreen(stop: stop)),
                   ),
                 ),
               ],

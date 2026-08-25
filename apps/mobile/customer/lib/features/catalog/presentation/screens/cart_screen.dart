@@ -73,8 +73,13 @@ class _CartScreenState extends State<CartScreen> {
       if (catBloc.state is! CatalogLoaded) {
         String? branchId;
         try {
-          final def = sessionState.addresses.firstWhere((a) => a.isDefault);
-          if (def.branchId.isNotEmpty) branchId = def.branchId;
+          if (sessionState.addresses.isNotEmpty) {
+            final def = sessionState.addresses.firstWhere(
+              (a) => a.isDefault,
+              orElse: () => sessionState.addresses.first,
+            );
+            if (def.branchId.isNotEmpty) branchId = def.branchId;
+          }
         } catch (_) {}
         catBloc.add(LoadCatalog(branchId: branchId));
       }

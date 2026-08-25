@@ -11,6 +11,7 @@ import 'package:f2h_delivery/features/dashboard/presentation/screens/dashboard_s
 import 'package:f2h_delivery/features/orders/presentation/screens/orders_screen.dart';
 import 'package:f2h_delivery/features/tracking/presentation/screens/map_screen.dart';
 import 'package:f2h_delivery/features/profile/presentation/screens/profile_screen.dart';
+import 'package:f2h_delivery/features/profile/presentation/screens/referral_screen.dart';
 import 'package:f2h_delivery/auth/presentation/screens/login_screen.dart';
 import 'package:f2h_delivery/auth/presentation/screens/splash_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -75,13 +76,13 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     DashboardScreen(),
     OrdersScreen(),
     MapScreen(),
-    ProfileScreen(),
+    ReferralScreen(),
   ];
   static const _tabs = [
     (Icons.explore_rounded, 'Home'),
     (Icons.assignment_rounded, 'Orders'),
     (Icons.map_rounded, 'Map'),
-    (Icons.person_rounded, 'Profile'),
+    (Icons.stars_rounded, 'REFER'),
   ];
 
   Future<bool> _handlePop() async {
@@ -165,9 +166,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   child: Row(
                     children: List.generate(_tabs.length, (i) {
                       final on = i == _i;
+                      final isReferral = i == 3;
                       final isTabEnabled =
                           (i == 0 || i == 3) || (isVerified && isAccountActive);
                       const activeColor = kPrimary;
+                      const referralBlue = Color(0xFF2563EB);
+
                       return Expanded(
                         child: GestureDetector(
                           onTap: () {
@@ -207,27 +211,51 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                 duration: const Duration(milliseconds: 200),
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: on ? activeColor : Colors.transparent,
+                                  gradient: isReferral
+                                      ? (on
+                                          ? const LinearGradient(
+                                              colors: [Color(0xFF2563EB), Color(0xFF7C3AED)],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            )
+                                          : null)
+                                      : null,
+                                  color: isReferral
+                                      ? (on ? null : const Color(0xFFEFF6FF))
+                                      : (on ? activeColor : Colors.transparent),
                                   shape: BoxShape.circle,
+                                  border: isReferral && !on
+                                      ? Border.all(color: const Color(0xFFDBEAFE), width: 1.2)
+                                      : null,
                                   boxShadow: on
                                       ? [
                                           BoxShadow(
-                                            color: activeColor.withValues(
-                                              alpha: 0.3,
+                                            color: (isReferral ? referralBlue : activeColor).withValues(
+                                              alpha: 0.35,
                                             ),
                                             blurRadius: 8,
                                             offset: const Offset(0, 3),
                                           ),
                                         ]
-                                      : [],
+                                      : (isReferral
+                                          ? [
+                                              BoxShadow(
+                                                color: referralBlue.withValues(alpha: 0.08),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 1),
+                                              ),
+                                            ]
+                                          : []),
                                 ),
                                 child: Icon(
                                   _tabs[i].$1,
-                                  color: on
-                                      ? Colors.white
-                                      : (isTabEnabled
-                                            ? kMuted
-                                            : kMuted.withValues(alpha: 0.3)),
+                                  color: isReferral
+                                      ? (on ? Colors.white : referralBlue)
+                                      : (on
+                                          ? Colors.white
+                                          : (isTabEnabled
+                                              ? kMuted
+                                              : kMuted.withValues(alpha: 0.3))),
                                   size: 20,
                                 ),
                               ),
@@ -236,14 +264,17 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                 _tabs[i].$2,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  fontWeight: on
+                                  fontWeight: (on || isReferral)
                                       ? FontWeight.w800
                                       : FontWeight.w500,
-                                  color: on
-                                      ? activeColor
-                                      : (isTabEnabled
-                                            ? kMuted
-                                            : kMuted.withValues(alpha: 0.3)),
+                                  letterSpacing: isReferral ? 0.4 : 0,
+                                  color: isReferral
+                                      ? (on ? referralBlue : const Color(0xFF1D4ED8))
+                                      : (on
+                                          ? activeColor
+                                          : (isTabEnabled
+                                              ? kMuted
+                                              : kMuted.withValues(alpha: 0.3))),
                                 ),
                               ),
                             ],
