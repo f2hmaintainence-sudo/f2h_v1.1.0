@@ -70,8 +70,6 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
 
     return BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
       builder: (context, sessionState) {
-        final addresses = sessionState.addresses;
-
         return SafeArea(
           top: false,
           child: Padding(
@@ -419,15 +417,17 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
 
     setState(() {
       _selectedAddressId = addrId;
+      _expandedAddressId = addrId;
       _isUpdating = true;
     });
 
     try {
-      if (!addr.isDefault) {
-        await context.read<CustomerSessionCubit>().updateDefaultAddress(addrId);
-      }
+      await context.read<CustomerSessionCubit>().updateDefaultAddress(addrId);
       if (context.mounted) {
-        F2HToast.success(context, 'Delivery address set to ${addr.area.isNotEmpty ? addr.area : (addr.city.isNotEmpty ? addr.city : addr.name)}');
+        final labelName = addr.area.isNotEmpty
+            ? addr.area
+            : (addr.city.isNotEmpty ? addr.city : addr.name);
+        F2HToast.success(context, 'Delivery address set to $labelName');
         Navigator.pop(context, addr);
       }
     } catch (e) {
