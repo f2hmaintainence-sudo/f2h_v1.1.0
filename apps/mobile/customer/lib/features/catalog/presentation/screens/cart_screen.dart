@@ -897,7 +897,7 @@ class _CartScreenState extends State<CartScreen> {
         // Filter out subscription products AND products already in cart
         final cartVariantIds = filteredItems.map((i) => i.variantId).toSet();
         final relatedProducts = state.products
-            .where((p) => !p.isSubscribable && !cartVariantIds.contains(p.id))
+            .where((p) => !p.isSubscribable && !cartVariantIds.contains(p.id) && !p.isOutOfStock)
             .toList();
 
         if (relatedProducts.isEmpty) {

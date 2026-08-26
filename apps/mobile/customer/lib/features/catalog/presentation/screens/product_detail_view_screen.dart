@@ -110,10 +110,10 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
     }
 
     final related = allProducts
-        .where((prod) => prod.id != p.id && prod.category == p.category)
+        .where((prod) => prod.id != p.id && prod.category == p.category && !prod.isOutOfStock)
         .toList();
     if (related.isEmpty) {
-      related.addAll(allProducts.where((prod) => prod.id != p.id).take(4));
+      related.addAll(allProducts.where((prod) => prod.id != p.id && !prod.isOutOfStock).take(4));
     }
 
     final categoryProducts = allProducts
@@ -782,26 +782,28 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                           const SizedBox(height: 16),
 
                           // You may also like
-                          const Text(
-                            'You may also like',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: kText,
+                          if (related.isNotEmpty) ...[
+                            const Text(
+                              'You may also like',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: kText,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            height: 220,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: related.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 10),
-                              itemBuilder: (_, i) => ProductCardH(related[i]),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              height: 220,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: related.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(width: 10),
+                                itemBuilder: (_, i) => ProductCardH(related[i]),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 24),
+                            const SizedBox(height: 24),
+                          ],
 
 
                           // Customer Reviews Feed Section
