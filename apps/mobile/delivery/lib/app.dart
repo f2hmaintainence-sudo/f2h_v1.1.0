@@ -76,7 +76,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   static const _tabs = [
     (Icons.explore_rounded, 'Home'),
     (Icons.map_rounded, 'Map'),
-    (Icons.card_giftcard_rounded, 'Referral'),
+    (Icons.card_giftcard_rounded, ''),
   ];
 
   Future<bool> _handlePop() async {

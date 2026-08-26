@@ -20,6 +20,7 @@ import { SystemConfigService } from './system-config.service';
 import { UpdateSystemConfigDto } from './system-config.dto';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
+import { Public } from 'src/auth/decorators/public.decorator';
 
 @Controller({ path: 'admin/developer/config', version: '1' })
 export class SystemConfigController {
@@ -28,6 +29,7 @@ export class SystemConfigController {
   /**
    * Public endpoint for customer app & web to fetch fee rules, slot cutoffs, and thresholds.
    */
+  @Public()
   @Get('public')
   async getPublicConfig() {
     return this.configService.getPublicConfig();

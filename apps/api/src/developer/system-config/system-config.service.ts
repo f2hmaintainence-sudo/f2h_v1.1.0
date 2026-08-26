@@ -249,12 +249,12 @@ export class SystemConfigService implements OnModuleInit {
 
       return {
         status: true,
-        data: configMap,
+        data: configMap as Record<string, any>,
         list: rows || [],
       };
     } catch (error) {
       this.developer.error('Error fetching system configurations', { error });
-      return { status: false, message: 'Failed to fetch configurations', data: {}, list: [] };
+      return { status: false, message: 'Failed to fetch configurations', data: {} as Record<string, any>, list: [] };
     }
   }
 
@@ -358,7 +358,7 @@ export class SystemConfigService implements OnModuleInit {
   async getPublicConfig() {
     try {
       const all = await this.getAllConfigs();
-      const data = all.data || {};
+      const data: Record<string, any> = (all.data as Record<string, any>) || {};
 
       const deliveryRules: DeliveryFeeRules = data.delivery_rules?.config_data || {
         base_delivery_fee: 39.0,
