@@ -25,7 +25,7 @@ describe('ProfileService company profile', () => {
       updated_at: new Date('2026-08-20T00:00:00Z'),
     };
     const client = {
-      query: jest.fn(async (sql: string) => {
+      query: jest.fn(async (sql: string, params?: unknown[]) => {
         if (sql.includes('pg_advisory_xact_lock')) return { rows: [] };
         if (sql.includes('SELECT id')) return { rows: [{ id: profile.id }] };
         if (sql.includes('UPDATE company_profile')) return { rows: [profile] };

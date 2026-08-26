@@ -47,9 +47,11 @@ class SubscriptionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!product.isSubscribable) return const SizedBox.shrink();
-
     final subPrice = selectedVariant?.subscriptionPrice ?? product.subscriptionPrice;
+    final isSub = product.isSubscribable ||
+        (subPrice != null && subPrice > 0) ||
+        product.allVariants.any((v) => v.subscriptionPrice != null && v.subscriptionPrice! > 0);
+    if (!isSub) return const SizedBox.shrink();
 
     if (isCompact) {
       return _CompactBadge(
@@ -127,20 +129,27 @@ class _FullButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasPrice = subscriptionPrice != null && subscriptionPrice! > 0;
-    final label = hasPrice ? 'Subscribe @ ₹${subscriptionPrice!.toStringAsFixed(0)}' : 'Subscribe & Save';
+    final label = hasPrice ? 'SUBSCRIBE @ ₹${subscriptionPrice!.toStringAsFixed(0)}' : 'SUBSCRIBE & SAVE';
 
-    return OutlinedButton.icon(
-      onPressed: onTap,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: const Color(0xFF1B4332),
-        side: const BorderSide(color: Color(0xFF1B4332), width: 1.5),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      icon: const Icon(Icons.autorenew_rounded, size: 16),
-      label: Text(
-        label,
-        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+    return SizedBox(
+      height: 48,
+      child: ElevatedButton.icon(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF1B4332),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+        icon: const Icon(Icons.autorenew_rounded, size: 16),
+        label: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.3),
+          ),
+        ),
       ),
     );
   }

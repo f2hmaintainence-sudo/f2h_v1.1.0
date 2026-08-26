@@ -89,13 +89,11 @@ export class DeliveryRunService {
     if (!partnerIdOrUserId) return null;
     try {
       const rows = await this.db.query<any>(
-        `SELECT dp.delivery_partner_id, dp.user_id,
+        `SELECT dp.delivery_partner_id,
                 COALESCE(NULLIF(TRIM(CONCAT(u.first_name, ' ', u.last_name)), ''), u.user_name, 'Delivery Partner') AS partner_name
          FROM delivery_partners dp
-         LEFT JOIN users u ON (u.user_id = dp.user_id OR u.user_id = dp.delivery_partner_id)
+         LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
          WHERE dp.delivery_partner_id = $1 
-            OR dp.user_id = $1 
-            OR dp.id::varchar = $1 
             OR u.user_id = $1
          LIMIT 1`,
         [partnerIdOrUserId],
@@ -104,7 +102,7 @@ export class DeliveryRunService {
         return { userId: partnerIdOrUserId, partnerName: 'Delivery Partner' };
       }
       return {
-        userId: rows[0].user_id || rows[0].delivery_partner_id || partnerIdOrUserId,
+        userId: rows[0].delivery_partner_id || partnerIdOrUserId,
         partnerName: rows[0].partner_name || 'Delivery Partner',
       };
     } catch {
@@ -244,6 +242,7 @@ export class DeliveryRunService {
         LEFT JOIN branches b ON b.branch_id = db.branch_id
         WHERE db.is_active = true
           AND db.is_available = true
+          AND (db.is_online = true OR db.duty_status = 'on_duty')
           ${branchId ? 'AND db.branch_id = $2' : ''}
           AND NOT EXISTS (
             SELECT 1 FROM delivery_leave_requests dlr
@@ -762,12 +761,12 @@ export class DeliveryRunService {
           ca.contact_mobile,
           COALESCE(ca.latitude, dra.latitude) AS latitude,
           COALESCE(ca.longitude, dra.longitude) AS longitude,
-          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Customer') AS customer_name,
+          COALESCE(NULLIF(TRIM(ca.contact_name), ''), NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Customer') AS customer_name,
           (
             SELECT json_agg(json_build_object(
               'order_id', o.order_id,
               'customer_id', o.customer_id,
-              'customer_name', COALESCE(ca.contact_name, NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Customer'),
+              'customer_name', COALESCE(NULLIF(TRIM(ca.contact_name), ''), NULLIF(TRIM(o.customer_name), ''), NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Customer'),
               'total_amount', o.total_amount,
               'status', o.status,
               'delivery_slot', o.delivery_slot,
@@ -824,14 +823,14 @@ export class DeliveryRunService {
           ca.contact_mobile,
           COALESCE(ca.latitude, dra.latitude) AS latitude,
           COALESCE(ca.longitude, dra.longitude) AS longitude,
-          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Customer') AS customer_name,
+          COALESCE(NULLIF(TRIM(ca.contact_name), ''), NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Customer') AS customer_name,
           dr.delivery_partner_id,
           dr.delivery_slot,
           (
             SELECT json_agg(json_build_object(
               'order_id', o.order_id,
               'customer_id', o.customer_id,
-              'customer_name', COALESCE(ca.contact_name, NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Customer'),
+              'customer_name', COALESCE(NULLIF(TRIM(ca.contact_name), ''), NULLIF(TRIM(o.customer_name), ''), NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Customer'),
               'status', o.status,
               'total_amount', o.total_amount,
               'items', (
@@ -1165,6 +1164,7 @@ export class DeliveryRunService {
           COUNT(db.delivery_partner_id)::int AS total,
           COUNT(db.delivery_partner_id) FILTER (
             WHERE db.is_available = true
+              AND (db.is_online = true OR db.duty_status = 'on_duty')
               AND NOT EXISTS (
                 SELECT 1 FROM delivery_leave_requests dlr
                 WHERE dlr.delivery_partner_id = db.delivery_partner_id
@@ -1515,7 +1515,7 @@ export class DeliveryRunService {
           COALESCE(NULLIF(TRIM(ca.address_line), ''), ca.landmark, 'Customer Address') AS address_line,
           ca.contact_name,
           ca.contact_mobile,
-          COALESCE(NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''), u.user_name, 'Customer') AS customer_name,
+          COALESCE(NULLIF(TRIM(ca.contact_name), ''), NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''), u.user_name, 'Customer') AS customer_name,
           (
             SELECT COUNT(*)::int FROM orders o
             WHERE o.delivery_run_id = dr.run_id
@@ -1763,7 +1763,7 @@ export class DeliveryRunService {
     try {
       const orderRes = await this.db.query(
         `SELECT o.order_id, o.customer_id,
-                COALESCE(NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), o.customer_name, 'Customer') AS customer_name,
+                COALESCE(NULLIF(TRIM(ca.contact_name), ''), NULLIF(TRIM(o.customer_name), ''), NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), cu.user_name, 'Customer') AS customer_name,
                 o.address_id,
                 COALESCE(o.address_line, NULLIF(TRIM(ca.address_line), ''), 'Customer Address') AS address_line,
                 o.branch_id, o.delivery_slot, o.scheduled_date, o.status,
@@ -1812,7 +1812,7 @@ export class DeliveryRunService {
       // Find ALL orders at this address stop in current run
       const addressOrders = await this.db.query(
         `SELECT o.order_id, o.customer_id,
-                COALESCE(NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), o.customer_name, 'Customer') AS customer_name,
+                COALESCE(NULLIF(TRIM(ca.contact_name), ''), NULLIF(TRIM(o.customer_name), ''), NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), cu.user_name, 'Customer') AS customer_name,
                 o.address_id,
                 COALESCE(o.address_line, NULLIF(TRIM(ca.address_line), ''), 'Customer Address') AS address_line,
                 o.delivery_slot, o.status, o.total_amount,
@@ -1888,7 +1888,7 @@ export class DeliveryRunService {
                       dra.sequence_no,
                       COALESCE(dra.delivery_status, 'pending') AS delivery_status,
                       COALESCE(NULLIF(TRIM(ca.address_line), ''), ca.landmark, 'Customer Address') AS address_line,
-                      COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Customer') AS customer_name,
+                      COALESCE(NULLIF(TRIM(ca.contact_name), ''), NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Customer') AS customer_name,
                       COALESCE(
                         (SELECT json_agg(json_build_object(
                           'order_id', o.order_id,
@@ -2233,7 +2233,7 @@ export class DeliveryRunService {
         try {
           const stopDetailRes = await client.query<any>(
             `SELECT dra.address_id, dra.customer_id,
-                    COALESCE(NULLIF(TRIM(CONCAT(cu.first_name, ' ', cu.last_name)), ''), cu.user_name, 'Customer') AS customer_name,
+                    COALESCE(NULLIF(TRIM(ca.contact_name), ''), NULLIF(TRIM(CONCAT(cu.first_name, ' ', cu.last_name)), ''), cu.user_name, 'Customer') AS customer_name,
                     COALESCE(NULLIF(TRIM(ca.address_line), ''), ca.landmark, 'Customer Address') AS address_line
              FROM delivery_run_addresses dra
              LEFT JOIN customer_addresses ca ON ca.address_id = dra.address_id
@@ -2250,11 +2250,11 @@ export class DeliveryRunService {
         let sourcePartnerName = 'Delivery Partner';
         try {
           const srcPartnerRes = await client.query<any>(
-            `SELECT dp.delivery_partner_id, dp.user_id,
+            `SELECT dp.delivery_partner_id,
                     COALESCE(NULLIF(TRIM(CONCAT(u.first_name, ' ', u.last_name)), ''), u.user_name, 'Delivery Partner') AS partner_name
              FROM delivery_partners dp
-             LEFT JOIN users u ON (u.user_id = dp.user_id OR u.user_id = dp.delivery_partner_id)
-             WHERE dp.delivery_partner_id = $1 OR dp.user_id = $1 OR dp.id::varchar = $1 LIMIT 1`,
+             LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
+             WHERE dp.delivery_partner_id = $1 OR u.user_id = $1 LIMIT 1`,
             [sourceRun.delivery_partner_id],
           );
           sourcePartnerName = srcPartnerRes.rows[0]?.partner_name || 'Delivery Partner';
@@ -2580,7 +2580,7 @@ export class DeliveryRunService {
         try {
           const stopDetailARes = await client.query<any>(
             `SELECT dra.address_id, dra.customer_id,
-                    COALESCE(NULLIF(TRIM(CONCAT(cu.first_name, ' ', cu.last_name)), ''), cu.user_name, 'Customer') AS customer_name,
+                    COALESCE(NULLIF(TRIM(ca.contact_name), ''), NULLIF(TRIM(CONCAT(cu.first_name, ' ', cu.last_name)), ''), cu.user_name, 'Customer') AS customer_name,
                     COALESCE(NULLIF(TRIM(ca.address_line), ''), ca.landmark, 'Customer Address') AS address_line
              FROM delivery_run_addresses dra
              LEFT JOIN customer_addresses ca ON ca.address_id = dra.address_id
@@ -2594,7 +2594,7 @@ export class DeliveryRunService {
           }
           const stopDetailBRes = await client.query<any>(
             `SELECT dra.address_id, dra.customer_id,
-                    COALESCE(NULLIF(TRIM(CONCAT(cu.first_name, ' ', cu.last_name)), ''), cu.user_name, 'Customer') AS customer_name,
+                    COALESCE(NULLIF(TRIM(ca.contact_name), ''), NULLIF(TRIM(CONCAT(cu.first_name, ' ', cu.last_name)), ''), cu.user_name, 'Customer') AS customer_name,
                     COALESCE(NULLIF(TRIM(ca.address_line), ''), ca.landmark, 'Customer Address') AS address_line
              FROM delivery_run_addresses dra
              LEFT JOIN customer_addresses ca ON ca.address_id = dra.address_id
@@ -2732,7 +2732,7 @@ export class DeliveryRunService {
                 'sequence_no', dra.sequence_no,
                 'address_id', dra.address_id,
                 'customer_id', dra.customer_id,
-                'customer_name', COALESCE(NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), cu.user_name, 'Customer'),
+                'customer_name', COALESCE(NULLIF(TRIM(ca.contact_name), ''), NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), cu.user_name, 'Customer'),
                 'address_line', COALESCE(NULLIF(TRIM(ca.address_line), ''), ca.landmark, 'Customer Address'),
                 'delivery_status', COALESCE(dra.delivery_status, 'pending'),
                 'orders', COALESCE(
@@ -2740,7 +2740,7 @@ export class DeliveryRunService {
                     json_build_object(
                       'order_id', o.order_id,
                       'customer_id', o.customer_id,
-                      'customer_name', COALESCE(NULLIF(TRIM(COALESCE(ocu.first_name, '') || ' ' || COALESCE(ocu.last_name, '')), ''), ocu.user_name, 'Customer'),
+                      'customer_name', COALESCE(NULLIF(TRIM(oca.contact_name), ''), NULLIF(TRIM(o.customer_name), ''), NULLIF(TRIM(COALESCE(ocu.first_name, '') || ' ' || COALESCE(ocu.last_name, '')), ''), ocu.user_name, 'Customer'),
                       'address_id', o.address_id,
                       'address_line', COALESCE(o.address_line, NULLIF(TRIM(oca.address_line), ''), 'Customer Address'),
                       'delivery_slot', o.delivery_slot,
@@ -2776,7 +2776,7 @@ export class DeliveryRunService {
               json_build_object(
                 'order_id', o.order_id,
                 'customer_id', o.customer_id,
-                'customer_name', COALESCE(NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), o.customer_name, 'Customer'),
+                'customer_name', COALESCE(NULLIF(TRIM(ca.contact_name), ''), NULLIF(TRIM(o.customer_name), ''), NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), o.customer_name, 'Customer'),
                 'address_id', o.address_id,
                 'address_line', COALESCE(o.address_line, NULLIF(TRIM(ca.address_line), ''), 'Customer Address'),
                 'delivery_slot', o.delivery_slot,
@@ -2851,7 +2851,7 @@ export class DeliveryRunService {
                 'sequence_no', dra.sequence_no,
                 'address_id', dra.address_id,
                 'customer_id', dra.customer_id,
-                'customer_name', COALESCE(NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), cu.user_name, 'Customer'),
+                'customer_name', COALESCE(NULLIF(TRIM(ca.contact_name), ''), NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), cu.user_name, 'Customer'),
                 'address_line', COALESCE(NULLIF(TRIM(ca.address_line), ''), ca.landmark, 'Customer Address'),
                 'delivery_status', COALESCE(dra.delivery_status, 'pending'),
                 'orders', COALESCE(
@@ -2859,7 +2859,7 @@ export class DeliveryRunService {
                     json_build_object(
                       'order_id', o.order_id,
                       'customer_id', o.customer_id,
-                      'customer_name', COALESCE(NULLIF(TRIM(COALESCE(ocu.first_name, '') || ' ' || COALESCE(ocu.last_name, '')), ''), ocu.user_name, 'Customer'),
+                      'customer_name', COALESCE(NULLIF(TRIM(oca.contact_name), ''), NULLIF(TRIM(o.customer_name), ''), NULLIF(TRIM(COALESCE(ocu.first_name, '') || ' ' || COALESCE(ocu.last_name, '')), ''), ocu.user_name, 'Customer'),
                       'address_id', o.address_id,
                       'address_line', COALESCE(o.address_line, NULLIF(TRIM(oca.address_line), ''), 'Customer Address'),
                       'delivery_slot', o.delivery_slot,

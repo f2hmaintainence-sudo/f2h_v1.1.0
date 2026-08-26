@@ -587,24 +587,37 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                             const SizedBox(height: 12),
                           ],
 
-                          // 1. ADD TO CART Button (Full Screen Width)
-                          SizedBox(
-                            width: double.infinity,
-                            child: _buildAddButton(p),
-                          ),
+                          // Action Buttons (Add to Cart & Subscribe)
+                          Builder(
+                            builder: (context) {
+                              final isSubscribableProduct = p.isSubscribable ||
+                                  _selectedVariant.subscriptionPrice != null ||
+                                  p.subscriptionPrice != null ||
+                                  p.allVariants.any((v) => v.subscriptionPrice != null && v.subscriptionPrice! > 0);
 
-                          // 2. Subscription section (Full Screen Width Subscription Button)
-                          if (p.isSubscribable) ...[
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              child: SubscriptionButton(
-                                product: p,
-                                selectedVariant: _selectedVariant,
-                                isCompact: false,
-                              ),
-                            ),
-                          ],
+                              if (isSubscribableProduct) {
+                                return Row(
+                                  children: [
+                                    Expanded(
+                                      child: _buildAddButton(p),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: SubscriptionButton(
+                                        product: p,
+                                        selectedVariant: _selectedVariant,
+                                        isCompact: false,
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }
+                              return SizedBox(
+                                width: double.infinity,
+                                child: _buildAddButton(p),
+                              );
+                            },
+                          ),
                           const SizedBox(height: 16),
 
                           // Divider
