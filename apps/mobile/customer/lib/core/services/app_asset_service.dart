@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -163,6 +164,41 @@ class AppAssetImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final imageUrl = AppAssetService.getAssetUrl(assetKey);
+
+    if (kIsWeb) {
+      return Image.network(
+        imageUrl,
+        width: width,
+        height: height,
+        fit: fit,
+        alignment: alignment,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return SizedBox(
+            width: width,
+            height: height,
+            child: const Center(
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 1.5),
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          if (errorBuilder != null) {
+            return errorBuilder!(context, error, stackTrace);
+          }
+          return Container(
+            width: width,
+            height: height,
+            color: Colors.grey.shade200,
+            child: const Icon(Icons.image_not_supported_outlined, size: 20, color: Colors.grey),
+          );
+        },
+      );
+    }
 
     return CachedNetworkImage(
       imageUrl: imageUrl,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/core/services/app_asset_service.dart';
@@ -385,9 +386,6 @@ IconData getProductFallbackIcon(String name) {
   return (const Color(0xFFF5F5F5), const Color(0xFF16653A));
 }
 
-final Map<String, int> _failedUrlAttempts = {};
-final Set<String> _failedImageUrls = {};
-
 /// Renders the product image using the remote URL if available, falling back to an icon.
 Widget buildProductImage(
   String name, {
@@ -399,43 +397,49 @@ Widget buildProductImage(
 }) {
   String? asset = imageAsset;
 
-  if (asset != null && asset.isNotEmpty) {
+  if (asset != null && asset.trim().isNotEmpty) {
+    asset = asset.trim();
     if (asset.startsWith('assets/')) {
       final imageUrl = AppAssetService.getAssetUrl(asset);
-      if (_failedImageUrls.contains(imageUrl)) {
-        return _fallbackIconWidget(name, width, height, fallbackColor);
+      if (kIsWeb) {
+        return Image.network(
+          imageUrl,
+          width: width,
+          height: height,
+          fit: fit,
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return _fallbackIconWidget(name, width, height, fallbackColor);
+          },
+          errorBuilder: (context, error, stackTrace) =>
+              _fallbackIconWidget(name, width, height, fallbackColor),
+        );
       }
       return CachedNetworkImage(
         imageUrl: imageUrl,
         width: width,
         height: height,
         fit: fit,
-        errorWidget: (context, url, error) {
-          _failedImageUrls.add(url);
-          return _fallbackIconWidget(name, width, height, fallbackColor);
-        },
+        placeholder: (context, url) =>
+            _fallbackIconWidget(name, width, height, fallbackColor),
+        errorWidget: (context, url, error) =>
+            _fallbackIconWidget(name, width, height, fallbackColor),
       );
     } else {
       String resolvedAsset = asset;
-      // 1. Convert relative path (e.g. '/uploads/...' or 'uploads/...' or 'products/...' or 'categories/...') to absolute URL using the active baseUrl
-      if (resolvedAsset.startsWith('/uploads/') ||
-          resolvedAsset.startsWith('uploads/')) {
-        final activeBase = ApiEndpoints.baseUrl.replaceAll(
-          RegExp(r'/+$'),
-          '',
-        ); // strip trailing slash
-        final cleanAsset = resolvedAsset.startsWith('/')
-            ? resolvedAsset
-            : '/$resolvedAsset';
-        resolvedAsset = '$activeBase$cleanAsset';
+      // 1. Convert relative path (e.g. '/uploads/...' or 'uploads/...' or 'products/...' or 'categories/...' or 'variants/...') to absolute URL using the active host
+      final activeHost = ApiEndpoints.host.replaceAll(RegExp(r'/+$'), '');
+      if (resolvedAsset.startsWith('/uploads/') || resolvedAsset.startsWith('uploads/')) {
+        final cleanAsset = resolvedAsset.startsWith('/') ? resolvedAsset : '/$resolvedAsset';
+        resolvedAsset = '$activeHost$cleanAsset';
       } else if (resolvedAsset.startsWith('products/') ||
-          resolvedAsset.startsWith('categories/')) {
-        final activeBase = ApiEndpoints.baseUrl.replaceAll(RegExp(r'/+$'), '');
-        resolvedAsset = '$activeBase/uploads/$resolvedAsset';
+          resolvedAsset.startsWith('categories/') ||
+          resolvedAsset.startsWith('variants/')) {
+        resolvedAsset = '$activeHost/uploads/$resolvedAsset';
       } else if (resolvedAsset.startsWith('/products/') ||
-          resolvedAsset.startsWith('/categories/')) {
-        final activeBase = ApiEndpoints.baseUrl.replaceAll(RegExp(r'/+$'), '');
-        resolvedAsset = '$activeBase/uploads$resolvedAsset';
+          resolvedAsset.startsWith('/categories/') ||
+          resolvedAsset.startsWith('/variants/')) {
+        resolvedAsset = '$activeHost/uploads$resolvedAsset';
       }
 
       if (resolvedAsset.startsWith('http://') ||
@@ -448,16 +452,15 @@ Widget buildProductImage(
           resolvedAsset = resolvedAsset.replaceFirst('https://', 'http://');
         }
 
-        // 3. Dynamically rewrite local development/private network IP address hosts to match the active baseUrl.
+        // 3. Dynamically rewrite local development/private network IP address hosts to match the active host.
         try {
-          final activeBase = ApiEndpoints.baseUrl;
           final uri = Uri.parse(resolvedAsset);
           if ((uri.host.startsWith('192.168.') ||
                   uri.host == 'localhost' ||
                   uri.host == '127.0.0.1' ||
                   uri.host == '10.0.2.2') &&
-              !activeBase.contains(uri.host)) {
-            final activeUri = Uri.parse(activeBase);
+              !activeHost.contains(uri.host)) {
+            final activeUri = Uri.parse(activeHost);
             resolvedAsset = uri
                 .replace(
                   scheme: activeUri.scheme,
@@ -470,9 +473,19 @@ Widget buildProductImage(
           // Fallback if URL parsing fails
         }
 
-        // Stop retrying / polling if image URL failed 3 times or is marked failed
-        if ((_failedUrlAttempts[resolvedAsset] ?? 0) >= 3 || _failedImageUrls.contains(resolvedAsset)) {
-          return _fallbackIconWidget(name, width, height, fallbackColor);
+        if (kIsWeb) {
+          return Image.network(
+            resolvedAsset,
+            width: width,
+            height: height,
+            fit: fit,
+            loadingBuilder: (context, child, progress) {
+              if (progress == null) return child;
+              return _fallbackIconWidget(name, width, height, fallbackColor);
+            },
+            errorBuilder: (context, error, stackTrace) =>
+                _fallbackIconWidget(name, width, height, fallbackColor),
+          );
         }
 
         return CachedNetworkImage(
@@ -482,14 +495,8 @@ Widget buildProductImage(
           fit: fit,
           placeholder: (context, url) =>
               _fallbackIconWidget(name, width, height, fallbackColor),
-          errorWidget: (context, url, err) {
-            final attempts = (_failedUrlAttempts[url] ?? 0) + 1;
-            _failedUrlAttempts[url] = attempts;
-            if (attempts >= 3) {
-              _failedImageUrls.add(url);
-            }
-            return _fallbackIconWidget(name, width, height, fallbackColor);
-          },
+          errorWidget: (context, url, err) =>
+              _fallbackIconWidget(name, width, height, fallbackColor),
         );
       }
     }
