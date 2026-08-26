@@ -657,7 +657,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
                 // 2. Google Maps Attribution / Watermark pill
                 Positioned(
-                  bottom: 230,
+                  bottom: 24,
                   left: 16,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -729,12 +729,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
                 // 4. Floating Shortest Route Summary Card
                 if (!_showSearch)
-                  // Positioned(
-                  //   top: MediaQuery.of(context).padding.top + 70,
-                  //   left: 16,
-                  //   right: 72,
-                  //   child: _buildShortestRouteCard(),
-                  // ),
+                  Positioned(
+                    top: MediaQuery.of(context).padding.top + 70,
+                    left: 16,
+                    right: 72,
+                    child: _buildShortestRouteCard(),
+                  ),
 
                 // 5. Floating Side Map Options
                 Positioned(
@@ -788,9 +788,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     ],
                   ),
                 ),
-
-                // 6. Bottom Active Delivery Details HUD
-                _buildBottomHUD(state, effectiveStops),
               ],
             ),
           );
@@ -1203,71 +1200,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildBottomHUD(DeliverySessionLoaded state, List<GroupedStop> effectiveStops) {
-    final pendingStops = effectiveStops.where((s) => s.status != 'delivered' && s.status != 'completed' && s.status != 'failed').toList();
-    final defaultNext = pendingStops.isNotEmpty ? pendingStops.first : (effectiveStops.isNotEmpty ? effectiveStops.first : null);
-    final nextStop = _selectedStop ?? defaultNext;
-
-    if (nextStop == null) {
-      if (_hideAllClearedCard) {
-        return const Positioned(
-          bottom: 0,
-          left: 0,
-          child: SizedBox.shrink(),
-        );
-      }
-      return Positioned(
-        bottom: 96,
-        left: 16,
-        right: 16,
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFFBBF7D0)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x1A000000),
-                blurRadius: 16,
-                offset: Offset(0, 4),
-              )
-            ],
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 44),
-              const SizedBox(height: 12),
-              Text(
-                'All Deliveries Cleared!',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: 17, color: const Color(0xFF0F172A)),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'No pending orders remaining on your route sheet.',
-                style: GoogleFonts.poppins(color: const Color(0xFF64748B), fontSize: 12.5),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return MapDeliverySheet(
-      groupedStops: effectiveStops,
-      nextStop: nextStop,
-      onStopSelected: (stop) {
-        setState(() {
-          _selectedStop = stop;
-        });
-        _mapController.move(LatLng(stop.addressLat, stop.addressLng), 16.5);
-      },
-      onShowConfirmation: (stop) => _showConfirmation(context, stop),
     );
   }
 }
