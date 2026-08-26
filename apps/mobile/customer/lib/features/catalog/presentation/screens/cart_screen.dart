@@ -98,6 +98,10 @@ class _CartScreenState extends State<CartScreen> {
         backgroundColor: kSurface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: kText),
+          onPressed: () => Navigator.maybePop(context),
+        ),
         iconTheme: const IconThemeData(color: kText, size: 20),
         title: const Text(
           'Your Cart',

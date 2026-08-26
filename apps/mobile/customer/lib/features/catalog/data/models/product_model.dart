@@ -513,6 +513,35 @@ Widget _fallbackIconWidget(
   );
 }
 
+String formatUnitName(String raw) {
+  if (raw.isEmpty) return '';
+  final trimmed = raw.trim();
+
+  // If snake_case like fresh_cow_milk_1ltr or 1_ltr or 500_ml
+  if (trimmed.contains('_')) {
+    final parts = trimmed.split('_');
+    final last = parts.last.toLowerCase();
+    final match = RegExp(r'^(\d+)\s*([a-z]+)?$').firstMatch(last);
+    if (match != null) {
+      final qty = match.group(1);
+      final u = (match.group(2) ?? '').toLowerCase();
+      final formattedU = u == 'ltr' || u == 'l' ? 'Ltr' : (u == 'ml' ? 'ml' : (u == 'kg' ? 'kg' : (u == 'g' ? 'g' : u.toUpperCase())));
+      return formattedU.isNotEmpty ? '$qty $formattedU' : (qty ?? trimmed);
+    }
+  }
+
+  // Handle 1ltr, 500ml, 250g, 1kg
+  final match = RegExp(r'^(\d+)\s*([a-zA-Z]+)$').firstMatch(trimmed);
+  if (match != null) {
+    final qty = match.group(1);
+    final u = match.group(2)!.toLowerCase();
+    final formattedU = u == 'ltr' || u == 'l' ? 'Ltr' : (u == 'ml' ? 'ml' : (u == 'kg' ? 'kg' : (u == 'g' ? 'g' : u)));
+    return '$qty $formattedU';
+  }
+
+  return trimmed;
+}
+
 Product getProductById(
   String id, {
   String? name,
@@ -523,11 +552,12 @@ Product getProductById(
   bool isSubscribable = true,
   bool isOneTime = true,
 }) {
+  final cleanUnit = variantName != null ? formatUnitName(variantName) : 'Unit';
   return Product(
     id: id,
     name: name?.replaceAll('_', ' ') ?? 'Product',
     vendor: 'Farm to Home',
-    unit: variantName ?? 'Unit',
+    unit: cleanUnit,
     category: 'General',
     emoji: '📦',
     price: price ?? 0.0,
