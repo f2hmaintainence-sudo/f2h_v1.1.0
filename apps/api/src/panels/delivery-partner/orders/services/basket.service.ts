@@ -815,15 +815,15 @@ export class BasketService {
 
     // 1. Fetch dispatch IDs for active run
     const dispatchRes = await this.db.query(
-      `SELECT dispatch_id FROM delivery_dispatch
-       WHERE (delivery_run_id = $1 OR delivery_partner_id = $2) AND status != 'cancelled'`,
+      `SELECT dd.dispatch_id FROM delivery_dispatch dd
+       LEFT JOIN delivery_runs dr ON (dd.delivery_run_id = dr.run_id OR dd.delivery_run_id = dr.id::text)
+       WHERE (dd.delivery_run_id = $1 OR dr.run_id = $1 OR dr.id::text = $1 OR dr.delivery_partner_id = $2)
+         AND dd.status != 'cancelled'`,
       [activeRunId, partnerId],
     );
     const dispatchIds = (dispatchRes || []).map((d: any) => d.dispatch_id);
 
     // 2. Update delivery_dispatch_items: set returned_qty = (loaded_qty - delivered_qty - damaged_qty).
-    //    delivery_dispatch_items has no run column of its own — it is reached through
-    //    delivery_dispatch.delivery_run_id.
     await this.db.query(
       `UPDATE delivery_dispatch_items ddi
        SET
@@ -833,16 +833,16 @@ export class BasketService {
        WHERE dd.dispatch_id = ddi.dispatch_id
          AND (dd.delivery_run_id = $1 OR dd.dispatch_id = ANY($2::varchar[]))
          AND ddi.deleted_at IS NULL`,
-      [activeRunId, dispatchIds],
+      [activeRunId, dispatchIds.length ? dispatchIds : ['NONE']],
     );
 
     // 3. Update delivery_dispatch status to 'return_pending'
     await this.db.query(
       `UPDATE delivery_dispatch
-       SET status = 'return_pending', updated_at = NOW()
-       WHERE (delivery_run_id = $1 OR dispatch_id = ANY($2::varchar[]) OR delivery_partner_id = $3)
+       SET status = 'return_pending', returned_at = NOW(), updated_at = NOW()
+       WHERE (delivery_run_id = $1 OR dispatch_id = ANY($2::varchar[]))
          AND status != 'completed'`,
-      [activeRunId, dispatchIds, partnerId],
+      [activeRunId, dispatchIds.length ? dispatchIds : ['NONE']],
     );
 
     // 4. Update delivery_baskets status to 'RETURNING' or 'CLOSED'
