@@ -2408,41 +2408,38 @@ Widget oneTimeProductCard(BuildContext context, Product p) {
                 padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Flexible(
-                            child: Text(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
                               '₹${p.price.toStringAsFixed(0)}',
                               style: const TextStyle(
-                                fontSize: 14,
+                                fontSize: 15.5,
                                 fontWeight: FontWeight.w900,
                                 color: kText,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                          if (p.originalPrice > p.price) ...[
-                            const SizedBox(width: 3),
-                            Flexible(
-                              child: Text(
+                            if (p.originalPrice > p.price) ...[
+                              const SizedBox(width: 3.5),
+                              Text(
                                 '₹${p.originalPrice.toStringAsFixed(0)}',
                                 style: const TextStyle(
-                                  fontSize: 9.5,
+                                  fontSize: 10.5,
                                   color: kMuted,
                                   decoration: TextDecoration.lineThrough,
                                   fontWeight: FontWeight.w600,
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                     const SizedBox(width: 4),
