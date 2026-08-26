@@ -114,13 +114,13 @@ export class DeliveryOrderService {
 
     // 1. Fetch expected containers by order
     const expectedContainersRes = await this.db.query(
-      `SELECT oi.order_id, COALESCE(pv.container_id, p.container_id) AS container_id, COALESCE(c.name, 'Glass Bottle') AS container_name, SUM(oi.quantity)::int AS expected
+      `SELECT oi.order_id, pv.container_id, COALESCE(c.name, 'Glass Bottle') AS container_name, SUM(oi.quantity)::int AS expected
        FROM order_items oi
        JOIN product_variants pv ON pv.variant_id = oi.variant_id
        JOIN products p ON p.product_id = pv.product_id
-       LEFT JOIN containers c ON (c.container_id = pv.container_id OR c.container_id = p.container_id OR c.id::text = pv.container_id OR c.id::text = p.container_id)
-       WHERE oi.order_id = ANY($1) AND (COALESCE(c.is_returnable, p.is_returnable, false) = true OR pv.container_id IS NOT NULL OR p.container_id IS NOT NULL)
-       GROUP BY oi.order_id, COALESCE(pv.container_id, p.container_id), c.name`,
+       LEFT JOIN containers c ON (c.container_id = pv.container_id OR c.id::text = pv.container_id)
+       WHERE oi.order_id = ANY($1) AND (COALESCE(c.is_returnable, p.is_returnable, false) = true OR pv.container_id IS NOT NULL)
+       GROUP BY oi.order_id, pv.container_id, c.name`,
       [orderIds],
     );
 
@@ -792,13 +792,13 @@ export class DeliveryOrderService {
             }
           } else {
             const returnableItems = await client.query(
-              `SELECT oi.quantity, COALESCE(pv.container_id, p.container_id, 'CONT-001') AS container_id
+              `SELECT oi.quantity, pv.container_id AS container_id
                FROM order_items oi
                JOIN product_variants pv ON pv.variant_id = oi.variant_id
                JOIN products p ON p.product_id = pv.product_id
-               LEFT JOIN containers c ON (c.container_id = pv.container_id OR c.container_id = p.container_id)
+               LEFT JOIN containers c ON c.container_id = pv.container_id
                WHERE oi.order_id = $1
-                 AND (pv.container_id IS NOT NULL OR p.container_id IS NOT NULL)
+                 AND pv.container_id IS NOT NULL
                  AND COALESCE(c.is_returnable, p.is_returnable, false) = true`,
               [order.order_id],
             );
@@ -1152,13 +1152,13 @@ export class DeliveryOrderService {
           }
         } else {
           const returnableItems = await client.query(
-            `SELECT oi.quantity, COALESCE(pv.container_id, p.container_id, 'CONT-001') AS container_id
+            `SELECT oi.quantity, pv.container_id AS container_id
              FROM order_items oi
              JOIN product_variants pv ON pv.variant_id = oi.variant_id
              JOIN products p ON p.product_id = pv.product_id
-             LEFT JOIN containers c ON (c.container_id = pv.container_id OR c.container_id = p.container_id)
+             LEFT JOIN containers c ON c.container_id = pv.container_id
              WHERE oi.order_id = $1
-               AND (pv.container_id IS NOT NULL OR p.container_id IS NOT NULL)
+               AND pv.container_id IS NOT NULL
                AND COALESCE(c.is_returnable, p.is_returnable, false) = true`,
             [order.order_id],
           );

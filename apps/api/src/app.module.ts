@@ -72,10 +72,12 @@ import { CustomerAppAssetsModule } from './panels/customer/app_assets/app_assets
 import { FinanceModule } from './panels/admin/finance/finance.module';
 import { PaymentGatewayModule } from './shared/payments/payment-gateway.module';
 import { CustomerPaymentModule } from './panels/customer/payment/payment.module';
+import { SystemConfigModule } from './developer/system-config/system-config.module';
 @Module({
   imports: [
     FinanceModule,
     ApiIntegrationsModule,
+    SystemConfigModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env', //

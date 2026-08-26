@@ -324,9 +324,8 @@ export class DiscountEngineService {
       const meetsMinimum = minAmount <= 0 || subtotal >= minAmount;
       const isEligible = meetsMinimum && isFirstOrderEligible;
 
-      const reason = !meetsMinimum
-        ? `Add ₹${(minAmount - subtotal).toFixed(0)} more to use this coupon`
-        : (!isFirstOrderEligible ? firstOrderReason : null);
+      // Show only eligible coupons that the customer qualifies for and cart subtotal meets minimum
+      if (!isEligible) continue;
 
       const promo: PromotionRow = {
         promotion_id: row.promotion_id,
@@ -364,8 +363,8 @@ export class DiscountEngineService {
         applies_to_all_products: appliesToWholeCart,
         end_at: row.end_at ? new Date(row.end_at).toISOString() : null,
         first_order_only: !!row.first_order_only,
-        eligible: isEligible,
-        reason: reason,
+        eligible: true,
+        reason: null,
         discount_preview:
           isEligible && appliesToWholeCart
             ? this.calcRawItemDiscount(promo, subtotal)

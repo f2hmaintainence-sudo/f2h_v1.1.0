@@ -226,13 +226,17 @@ class ReferralInviteCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: const [
-                  _RewardPill(label: '₹100 for you'),
-                  _RewardPill(label: 'On first order delivered'),
-                ],
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    _RewardPill(label: '₹100 for you'),
+                    SizedBox(width: 6),
+                    _RewardPill(label: 'On first order delivered'),
+                  ],
+                ),
               ),
             ],
           ),
