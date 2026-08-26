@@ -57,7 +57,7 @@ export class SubscriptionSnapshotRepository {
         ON pv.variant_id = si.product_variant_id
       LEFT JOIN products p
         ON p.product_id = pv.product_id
-      WHERE s.status = 'active'
+      WHERE (s.status = 'active' OR (s.status = 'paused' AND s.pause_to_date IS NOT NULL AND s.pause_to_date < $1::date))
         AND s.start_date <= $1::date
         AND (s.end_date IS NULL OR s.end_date >= $1::date)
         AND (
@@ -131,7 +131,7 @@ export class SubscriptionSnapshotRepository {
           ON (ws.subscription_item_id = si.subscription_item_id OR ws.subscription_item_id = si.id::text)
         LEFT JOIN customer_addresses ca
           ON ca.address_id = s.address_id
-        WHERE s.status = 'active'
+        WHERE (s.status = 'active' OR (s.status = 'paused' AND s.pause_to_date IS NOT NULL AND s.pause_to_date < $1::date))
           AND s.start_date <= $1::date
           AND (s.end_date IS NULL OR s.end_date >= $1::date)
           AND (
@@ -439,7 +439,7 @@ export class SubscriptionSnapshotRepository {
           ON si.subscription_id = s.subscription_id
         INNER JOIN subscription_weekly_schedule ws
           ON (ws.subscription_item_id = si.subscription_item_id OR ws.subscription_item_id = si.id::text)
-        WHERE s.status = 'active'
+        WHERE (s.status = 'active' OR (s.status = 'paused' AND s.pause_to_date IS NOT NULL AND s.pause_to_date < $1::date))
           AND s.start_date <= $1::date
           AND (s.end_date IS NULL OR s.end_date >= $1::date)
           AND (

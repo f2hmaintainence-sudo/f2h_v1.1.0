@@ -287,14 +287,10 @@ class _BrandMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Image.asset(
-    'assets/icon/app_logo.png',
+    'assets/icon/app_icon.png',
     fit: BoxFit.contain,
-    errorBuilder: (_, _, _) => Image.asset(
-      'assets/icon/app_icon.png',
-      fit: BoxFit.contain,
-      errorBuilder: (_, _, _) =>
-          const Icon(Icons.eco_rounded, color: kPrimary, size: 34),
-    ),
+    errorBuilder: (_, _, _) =>
+        const Icon(Icons.eco_rounded, color: kPrimary, size: 34),
   );
 }
 

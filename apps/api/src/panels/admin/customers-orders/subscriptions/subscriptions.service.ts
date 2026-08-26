@@ -317,6 +317,8 @@ export class SubscriptionsService {
 
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
+      await this.autoUnpauseExpiredSubscriptions();
+
       const sql = `
         SELECT
           COUNT(*)::int                                          AS total,
@@ -670,6 +672,37 @@ export class SubscriptionsService {
       if (error instanceof BadRequestException) throw error;
       this.developer.error('updateAutoRenew error', { error, subscriptionId });
       throw new BadRequestException('Failed to update auto renew setting');
+    }
+  }
+
+  /**
+   * Automatically resumes subscriptions whose pause end date has expired (pause_to_date < CURRENT_DATE).
+   */
+  async autoUnpauseExpiredSubscriptions(): Promise<void> {
+    try {
+      await this.databaseService.query(`
+        UPDATE subscriptions
+        SET status = 'active',
+            pause_from_date = NULL,
+            pause_to_date = NULL,
+            pause_reason = NULL,
+            updated_at = NOW(),
+            updated_by = 'system_auto_resume'
+        WHERE (status = 'paused' OR pause_to_date IS NOT NULL)
+          AND pause_to_date IS NOT NULL
+          AND pause_to_date < CURRENT_DATE;
+      `);
+
+      await this.databaseService.query(`
+        UPDATE subscription_pauses
+        SET status = 'completed',
+            updated_at = NOW()
+        WHERE status = 'paused'
+          AND end_date IS NOT NULL
+          AND end_date < CURRENT_DATE;
+      `);
+    } catch (error) {
+      this.developer.error('Error auto-unpausing expired subscriptions', { error });
     }
   }
 }

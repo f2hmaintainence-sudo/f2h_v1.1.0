@@ -1179,8 +1179,8 @@ class InitialLoadingScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(17),
                   child: Padding(
                     padding: const EdgeInsets.all(12.0),
-                    child: AppAssetImage(
-                      assetKey: 'assets/icon/app_icon.png',
+                    child: Image.asset(
+                      'assets/icon/app_icon.png',
                       fit: BoxFit.contain,
                       errorBuilder: (_, _, _) => const Icon(Icons.spa, color: kPrimary, size: 36),
                     ),

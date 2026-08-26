@@ -722,14 +722,7 @@ export class SubscriptionsService {
       return { status: true, data: [] };
     }
 
-    const baseUrl = process.env.MOBILE_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:5001';
-    const mapImagePath = (imagePath: string | null) => {
-      if (!imagePath) return null;
-      if (imagePath.startsWith('http')) return imagePath;
-      let cleanedPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
-      if (cleanedPath.startsWith('uploads/')) return `${baseUrl}/${cleanedPath}`;
-      return `${baseUrl}/uploads/${cleanedPath}`;
-    };
+    await this.autoUnpauseExpiredSubscriptions();
 
     const subsDetails = await this.db.query(`
       SELECT
@@ -818,6 +811,15 @@ export class SubscriptionsService {
       customDates = customDateRes.data || [];
     }
 
+
+    const baseUrl = process.env.MOBILE_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:5001';
+    const mapImagePath = (imagePath: string | null) => {
+      if (!imagePath) return null;
+      if (imagePath.startsWith('http')) return imagePath;
+      let cleanedPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
+      if (cleanedPath.startsWith('uploads/')) return `${baseUrl}/${cleanedPath}`;
+      return `${baseUrl}/uploads/${cleanedPath}`;
+    };
 
     for (const item of items) {
       item.url = mapImagePath(item.storage_key);
@@ -983,12 +985,17 @@ export class SubscriptionsService {
           throw new BadRequestException('Pause end date cannot be before pause start date');
         }
 
-        // Update subscription
+        // Update subscription status: set 'paused' if pause applies today, or auto-resume if past
         await client.query(
           `UPDATE subscriptions
            SET pause_from_date = $1,
                pause_to_date = $2,
                pause_reason = $3,
+               status = CASE 
+                 WHEN $1::date <= CURRENT_DATE AND $2::date >= CURRENT_DATE THEN 'paused'
+                 WHEN $2::date < CURRENT_DATE THEN 'active'
+                 ELSE status 
+               END,
                updated_at = now()
            WHERE subscription_id = $4`,
           [startStr, endStr, reason || 'Customer vacation pause', subscriptionId],
@@ -1497,6 +1504,37 @@ export class SubscriptionsService {
     } catch (error) {
       this.developer.error('getSubscriptionBills error', { error, subscriptionId });
       return { status: false, data: [] };
+    }
+  }
+
+  /**
+   * Automatically resumes subscriptions whose pause end date has expired (pause_to_date < CURRENT_DATE).
+   */
+  async autoUnpauseExpiredSubscriptions(): Promise<void> {
+    try {
+      await this.db.query(`
+        UPDATE subscriptions
+        SET status = 'active',
+            pause_from_date = NULL,
+            pause_to_date = NULL,
+            pause_reason = NULL,
+            updated_at = NOW(),
+            updated_by = 'system_auto_resume'
+        WHERE (status = 'paused' OR pause_to_date IS NOT NULL)
+          AND pause_to_date IS NOT NULL
+          AND pause_to_date < CURRENT_DATE;
+      `);
+
+      await this.db.query(`
+        UPDATE subscription_pauses
+        SET status = 'completed',
+            updated_at = NOW()
+        WHERE status = 'paused'
+          AND end_date IS NOT NULL
+          AND end_date < CURRENT_DATE;
+      `);
+    } catch (error) {
+      this.developer.error('Error auto-unpausing expired subscriptions', { error });
     }
   }
 }

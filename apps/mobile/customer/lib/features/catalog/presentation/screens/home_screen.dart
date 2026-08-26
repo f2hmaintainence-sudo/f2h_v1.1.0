@@ -2199,8 +2199,8 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: AppAssetImage(
-                      assetKey: 'assets/icon/app_icon.png',
+                    child: Image.asset(
+                      'assets/icon/app_icon.png',
                       width: 32,
                       height: 32,
                       fit: BoxFit.cover,
