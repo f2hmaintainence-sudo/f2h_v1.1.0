@@ -172,29 +172,29 @@ class _ImageBannerState extends State<ImageBanner> {
   String _formatImageUrl(String rawUrl) {
     if (rawUrl.isEmpty) return '';
 
-    if (rawUrl.contains('/assets/')) {
-      final pathAfterAssets = rawUrl.substring(rawUrl.indexOf('/assets/'));
-      return '${ApiEndpoints.host}$pathAfterAssets';
-    }
-
-    if (rawUrl.contains('/uploads/')) {
-      final pathAfterUploads = rawUrl.substring(rawUrl.indexOf('/uploads/'));
-      return '${ApiEndpoints.host}$pathAfterUploads';
-    }
-
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
       final uri = Uri.tryParse(rawUrl);
       if (uri != null) {
         const devHosts = {'localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2'};
         if (devHosts.contains(uri.host)) {
-          return '${ApiEndpoints.host}${uri.path}';
+          return 'https://f2hfresh.com${uri.path}';
         }
         return rawUrl;
       }
     }
 
+    if (rawUrl.contains('/uploads/')) {
+      final pathAfterUploads = rawUrl.substring(rawUrl.indexOf('/uploads/'));
+      return 'https://f2hfresh.com$pathAfterUploads';
+    }
+
+    if (rawUrl.contains('/assets/')) {
+      final pathAfterAssets = rawUrl.substring(rawUrl.indexOf('/assets/'));
+      return 'https://f2hfresh.com$pathAfterAssets';
+    }
+
     final formatted = rawUrl.startsWith('/') ? rawUrl : '/$rawUrl';
-    return '${ApiEndpoints.host}$formatted';
+    return 'https://f2hfresh.com$formatted';
   }
 
   @override
