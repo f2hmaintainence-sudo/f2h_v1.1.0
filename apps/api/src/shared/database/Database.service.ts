@@ -111,6 +111,15 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           ADD COLUMN IF NOT EXISTS paid_by VARCHAR(50),
           ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(100),
           ADD COLUMN IF NOT EXISTS paid_amount NUMERIC(10,2);
+
+        UPDATE public.delivery_dispatch 
+          SET status = 'in_progress', updated_at = NOW() 
+          WHERE status = 'return_pending' 
+            AND delivery_run_id IN (SELECT run_id FROM public.delivery_runs WHERE status != 'handed_over');
+
+        UPDATE public.delivery_runs 
+          SET status = 'in_progress', updated_at = NOW() 
+          WHERE status = 'completed' AND run_date = CURRENT_DATE;
       `);
     } catch (_) { }
   }

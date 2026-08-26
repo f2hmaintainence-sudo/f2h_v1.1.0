@@ -554,65 +554,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ],
                           ),
                         ),
-                      ] else if (isShiftCompleted) ...[
-                        HandoverStatusCard(currentRun: session.currentRun),
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x06000000),
-                                blurRadius: 10,
-                                offset: Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFDCFCE7),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.done_all_rounded,
-                                  color: Color(0xFF16A34A),
-                                  size: 36,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                "You're All Done!",
-                                style: GoogleFonts.poppins(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF0F172A),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                "Your deliveries, empty containers, and returns have been processed and confirmed. Rest up and have a great day!",
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12.5,
-                                  color: const Color(0xFF64748B),
-                                  height: 1.4,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ] else ...[
-                        // ── WAREHOUSE PICKUP REQUIRED CARD (When handover pending) ──
-                        if (!pickupConfirmed && currentRun != null && listQueue.isNotEmpty) ...[
-                          PickupStatusCard(currentRun: currentRun),
+                        if (isShiftCompleted) ...[
+                          HandoverStatusCard(currentRun: session.currentRun),
                           const SizedBox(height: 12),
+                        ] else ...[
+                          // ── WAREHOUSE PICKUP REQUIRED CARD (When handover pending) ──
+                          if (!pickupConfirmed && currentRun != null && listQueue.isNotEmpty) ...[
+                            PickupStatusCard(currentRun: currentRun),
+                            const SizedBox(height: 12),
+                          ],
                         ],
 
                         // ── SECTION 1: TODAY'S PROGRESS ─────────────────────
