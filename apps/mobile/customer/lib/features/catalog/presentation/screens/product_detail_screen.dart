@@ -400,22 +400,22 @@ class _SidebarItem extends StatelessWidget {
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutCubic,
             width: double.infinity,
-            margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+            margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
             padding: const EdgeInsets.fromLTRB(4, 10, 4, 10),
             decoration: BoxDecoration(
               color: isSelected ? Colors.white : Colors.transparent,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(24),
               border: isSelected
                   ? Border.all(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.25),
+                      color: const Color(0xFF10B981).withValues(alpha: 0.3),
                       width: 1.2,
                     )
                   : Border.all(color: Colors.transparent, width: 1.2),
               boxShadow: isSelected
                   ? [
                       BoxShadow(
-                        color: const Color(0xFF059669).withValues(alpha: 0.10),
-                        blurRadius: 12,
+                        color: const Color(0xFF059669).withValues(alpha: 0.12),
+                        blurRadius: 14,
                         offset: const Offset(0, 4),
                       ),
                       BoxShadow(
@@ -429,16 +429,17 @@ class _SidebarItem extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ── Icon circle / squircle ──────────────────────
+                // ── Icon Circle Badge (100% Circle Shape) ──────────────────────
                 AnimatedScale(
                   scale: isSelected ? 1.06 : 1.0,
                   duration: const Duration(milliseconds: 220),
                   curve: Curves.easeOutBack,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 220),
-                    width: 52,
-                    height: 52,
+                    width: 54,
+                    height: 54,
                     decoration: BoxDecoration(
+                      shape: BoxShape.circle,
                       gradient: isAll
                           ? const LinearGradient(
                               colors: [Color(0xFF059669), Color(0xFF10B981)],
@@ -449,23 +450,22 @@ class _SidebarItem extends StatelessWidget {
                       color: isAll
                           ? null
                           : (isSelected ? const Color(0xFFECFDF5) : Colors.white),
-                      borderRadius: BorderRadius.circular(26),
                       border: Border.all(
                         color: isAll
                             ? Colors.white
                             : (isSelected
                                 ? const Color(0xFF10B981)
                                 : const Color(0xFFE2E8F0)),
-                        width: isSelected ? 2.2 : 1.2,
+                        width: isSelected ? 2.5 : 1.2,
                       ),
                       boxShadow: [
                         BoxShadow(
                           color: isAll
                               ? const Color(0xFF059669).withValues(alpha: 0.35)
                               : (isSelected
-                                  ? const Color(0xFF10B981).withValues(alpha: 0.22)
+                                  ? const Color(0xFF10B981).withValues(alpha: 0.25)
                                   : Colors.black.withValues(alpha: 0.04)),
-                          blurRadius: isSelected ? 8 : 4,
+                          blurRadius: isSelected ? 10 : 4,
                           offset: const Offset(0, 3),
                         ),
                       ],
@@ -475,12 +475,11 @@ class _SidebarItem extends StatelessWidget {
                             child: Icon(
                               Icons.grid_view_rounded,
                               color: Colors.white,
-                              size: 25,
+                              size: 26,
                             ),
                           )
                         : (imagePath != null && imagePath.isNotEmpty
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(24),
+                              ? ClipOval(
                                   child: Padding(
                                     padding: const EdgeInsets.all(2),
                                     child: buildProductImage(
