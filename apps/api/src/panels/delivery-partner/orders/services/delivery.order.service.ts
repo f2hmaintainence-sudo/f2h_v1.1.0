@@ -915,6 +915,30 @@ export class DeliveryOrderService {
            AND status IN ('collected', 'loaded')`,
         [runIds],
       );
+
+      // Auto-complete the run if all orders are delivered or failed
+      const pendingRes = await client.query(
+        `SELECT COUNT(*)::int AS count FROM orders
+         WHERE delivery_run_id = ANY($1)
+           AND status NOT IN ('delivered', 'failed', 'completed', 'cancelled')`,
+        [runIds],
+      );
+      if (Number(pendingRes.rows?.[0]?.count || 0) === 0) {
+        await client.query(
+          `UPDATE delivery_runs
+           SET status = 'completed', actual_end_time = COALESCE(actual_end_time, NOW()), updated_at = NOW()
+           WHERE (id::text = ANY($1) OR run_id = ANY($1)) AND status != 'handed_over'`,
+          [runIds],
+        );
+        // When all orders are finished, update dispatch status to 'return_pending'
+        // await client.query(
+        //   `UPDATE delivery_dispatch
+        //    SET status = 'return_pending', updated_at = NOW()
+        //    WHERE delivery_run_id = ANY($1)
+        //      AND status IN ('in_progress', 'collected', 'loaded')`,
+        //   [runIds],
+        // );
+      }
     });
 
     // Send FCM push notifications to customers for delivered orders
@@ -1230,6 +1254,24 @@ export class DeliveryOrderService {
          VALUES ($1, $2, $3, $4)`,
         [order.order_id, status, norm.notes || `Order marked as ${status} by driver`, boy.full_name],
       );
+
+      // Auto-complete the run if all orders are delivered or failed
+      if (order.delivery_run_id) {
+        const pendingRes = await client.query(
+          `SELECT COUNT(*)::int AS count FROM orders
+           WHERE delivery_run_id = $1
+             AND status NOT IN ('delivered', 'failed', 'completed', 'cancelled')`,
+          [order.delivery_run_id],
+        );
+        if (Number(pendingRes.rows?.[0]?.count || 0) === 0) {
+          await client.query(
+            `UPDATE delivery_runs
+             SET status = 'completed', actual_end_time = COALESCE(actual_end_time, NOW()), updated_at = NOW()
+             WHERE (id::text = $1 OR run_id = $1) AND status != 'handed_over'`,
+            [order.delivery_run_id],
+          );
+        }
+      }
     });
 
     if (status === 'delivered' && order.customer_id && order.order_id) {

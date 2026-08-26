@@ -393,117 +393,118 @@ class _SidebarItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
+      child: Container(
         width: double.infinity,
-        margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
-        padding: const EdgeInsets.fromLTRB(4, 10, 4, 12),
-        decoration: BoxDecoration(
-          gradient: isSelected
-              ? const LinearGradient(
-                  colors: [Color(0xFFFFFFFF), Color(0xFFF0FDF4)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                )
-              : null,
-          color: isSelected ? null : Colors.transparent,
-          borderRadius: BorderRadius.circular(44),
-          border: isSelected
-              ? Border.all(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.45),
-                  width: 1.5,
-                )
-              : Border.all(color: Colors.transparent, width: 1.5),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.18),
-                    blurRadius: 16,
-                    spreadRadius: 1,
-                    offset: const Offset(0, 4),
-                  ),
-                  BoxShadow(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    blurRadius: 6,
-                    spreadRadius: -2,
-                    offset: const Offset(0, -2),
-                  ),
-                ]
-              : null,
-        ),
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Icon Circle Badge (iPhone Glass Circle) ──────────────────────
+            // ── ONLY THE CIRCLE BADGE HAS THE IPHONE GLASS HIGHLIGHT ──────────
             AnimatedScale(
               scale: isSelected ? 1.08 : 1.0,
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOutBack,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 220),
-                width: 56,
-                height: 56,
+                width: 58,
+                height: 58,
+                padding: EdgeInsets.all(isSelected ? 3 : 0),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: isAll
+                  gradient: isSelected
                       ? const LinearGradient(
-                          colors: [Color(0xFF059669), Color(0xFF10B981)],
+                          colors: [Color(0xFFFFFFFF), Color(0xFFE6F4EA)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         )
                       : null,
-                  color: isAll
-                      ? null
-                      : (isSelected ? const Color(0xFFECFDF5) : Colors.white),
-                  border: Border.all(
-                    color: isAll
-                        ? Colors.white
-                        : (isSelected
-                            ? const Color(0xFF10B981)
-                            : const Color(0xFFE2E8F0)),
-                    width: isSelected ? 2.5 : 1.2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: isAll
-                          ? const Color(0xFF059669).withValues(alpha: 0.35)
-                          : (isSelected
-                              ? const Color(0xFF10B981).withValues(alpha: 0.30)
-                              : Colors.black.withValues(alpha: 0.04)),
-                      blurRadius: isSelected ? 10 : 4,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
+                  color: isSelected ? null : Colors.transparent,
+                  border: isSelected
+                      ? Border.all(
+                          color: const Color(0xFF10B981),
+                          width: 2.5,
+                        )
+                      : Border.all(color: Colors.transparent, width: 0),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.35),
+                            blurRadius: 14,
+                            spreadRadius: 1,
+                            offset: const Offset(0, 4),
+                          ),
+                          BoxShadow(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            blurRadius: 6,
+                            spreadRadius: -1,
+                            offset: const Offset(0, -2),
+                          ),
+                        ]
+                      : null,
                 ),
-                child: isAll
-                    ? const Center(
-                        child: Icon(
-                          Icons.grid_view_rounded,
-                          color: Colors.white,
-                          size: 26,
-                        ),
-                      )
-                    : (imagePath != null && imagePath.isNotEmpty
-                          ? ClipOval(
-                              child: Padding(
-                                padding: const EdgeInsets.all(2),
-                                child: buildProductImage(
-                                  catName,
-                                  imageAsset: imagePath,
-                                  fit: BoxFit.cover,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: isAll
+                        ? const LinearGradient(
+                            colors: [Color(0xFF059669), Color(0xFF10B981)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : null,
+                    color: isAll
+                        ? null
+                        : (isSelected ? const Color(0xFFECFDF5) : Colors.white),
+                    border: Border.all(
+                      color: isAll
+                          ? Colors.white
+                          : (isSelected
+                              ? const Color(0xFF059669).withValues(alpha: 0.4)
+                              : const Color(0xFFE2E8F0)),
+                      width: isSelected ? 1.5 : 1.2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: isAll
+                            ? const Color(0xFF059669).withValues(alpha: 0.35)
+                            : (isSelected
+                                ? const Color(0xFF10B981).withValues(alpha: 0.20)
+                                : Colors.black.withValues(alpha: 0.04)),
+                        blurRadius: isSelected ? 8 : 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: isAll
+                      ? const Center(
+                          child: Icon(
+                            Icons.grid_view_rounded,
+                            color: Colors.white,
+                            size: 26,
+                          ),
+                        )
+                      : (imagePath != null && imagePath.isNotEmpty
+                            ? ClipOval(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(2),
+                                  child: buildProductImage(
+                                    catName,
+                                    imageAsset: imagePath,
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
-                              ),
-                            )
-                          : Center(
-                              child: Icon(
-                                Icons.water_drop_rounded,
-                                color: isSelected
-                                    ? const Color(0xFF059669)
-                                    : const Color(0xFF64748B),
-                                size: 24,
-                              ),
-                            )),
+                              )
+                            : Center(
+                                child: Icon(
+                                  Icons.water_drop_rounded,
+                                  color: isSelected
+                                      ? const Color(0xFF059669)
+                                      : const Color(0xFF64748B),
+                                  size: 24,
+                                ),
+                              )),
+                ),
               ),
             ),
             const SizedBox(height: 6),
