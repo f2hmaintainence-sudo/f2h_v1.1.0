@@ -884,16 +884,14 @@ export class DeliveryOrderService {
         if (status === 'delivered') {
           await client.query(
             `UPDATE delivery_dispatch_items ddi
-             SET delivered_qty = ddi.delivered_qty + sub.delivered_item_qty,
+             SET delivered_qty = ddi.delivered_qty + oi.quantity,
                  updated_at = NOW()
-             FROM (
-               SELECT oi.variant_id, SUM(oi.quantity)::numeric AS delivered_item_qty
-               FROM order_items oi
-               WHERE oi.order_id = $1
-               GROUP BY oi.variant_id
-             ) sub
-             WHERE (ddi.delivery_run_id = ANY($2) OR ddi.dispatch_id IN (SELECT dispatch_id FROM delivery_dispatch WHERE delivery_run_id = ANY($2)))
-               AND ddi.product_variant_id = sub.variant_id
+             FROM orders o
+             JOIN delivery_dispatch dd ON (dd.delivery_run_id = o.delivery_run_id OR dd.delivery_run_id = ANY($2))
+             JOIN order_items oi ON oi.order_id = o.order_id
+             WHERE o.order_id = $1
+               AND ddi.dispatch_id = dd.dispatch_id
+               AND ddi.product_variant_id = oi.variant_id
                AND ddi.deleted_at IS NULL`,
             [order.order_id, runIds],
           );
@@ -1235,21 +1233,19 @@ export class DeliveryOrderService {
       );
 
       // Update delivery_dispatch_items delivered quantities
-      if (status === 'delivered' && order.delivery_run_id) {
+      if (status === 'delivered') {
         await client.query(
           `UPDATE delivery_dispatch_items ddi
-           SET delivered_qty = ddi.delivered_qty + sub.delivered_item_qty,
+           SET delivered_qty = ddi.delivered_qty + oi.quantity,
                updated_at = NOW()
-           FROM (
-             SELECT oi.variant_id, SUM(oi.quantity)::numeric AS delivered_item_qty
-             FROM order_items oi
-             WHERE oi.order_id = $1
-             GROUP BY oi.variant_id
-           ) sub
-           WHERE (ddi.delivery_run_id = $2 OR ddi.dispatch_id IN (SELECT dispatch_id FROM delivery_dispatch WHERE delivery_run_id = $2))
-             AND ddi.product_variant_id = sub.variant_id
+           FROM orders o
+           JOIN delivery_dispatch dd ON dd.delivery_run_id = o.delivery_run_id
+           JOIN order_items oi ON oi.order_id = o.order_id
+           WHERE o.order_id = $1
+             AND ddi.dispatch_id = dd.dispatch_id
+             AND ddi.product_variant_id = oi.variant_id
              AND ddi.deleted_at IS NULL`,
-          [order.order_id, order.delivery_run_id],
+          [order.order_id],
         );
       }
 
