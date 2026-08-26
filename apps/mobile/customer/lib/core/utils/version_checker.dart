@@ -13,7 +13,7 @@ import 'package:f2h_customer/core/api/api_endpoints.dart';
 
 class VersionChecker {
   static final _updater = ShorebirdUpdater();
-  static const String _defaultPlayStoreUrl = 'https://play.google.com/store/apps/details?id=com.f2h.customer';
+  static const String _defaultPlayStoreUrl = 'https://play.google.com/store/apps/details?id=com.f2h.customer&pcampaignid=web_share';
   static String get _versionApiUrl => '${ApiEndpoints.baseUrl}${ApiEndpoints.appVersion}';
 
   static Future<void> checkUpdates(BuildContext context) async {

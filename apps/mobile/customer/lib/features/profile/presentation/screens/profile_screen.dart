@@ -1555,67 +1555,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   'Rate App',
                                   const Color(0xFFFFFDE7),
                                   const Color(0xFFFBC02D),
-                                  () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (_) => AlertDialog(
-                                        title: const Text('Rate F2H App'),
-                                        content: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Text(
-                                              'How would you rate F2H App?',
-                                            ),
-                                            const SizedBox(height: 16),
-                                            Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                for (int i = 1; i <= 5; i++)
-                                                  IconButton(
-                                                    icon: Icon(
-                                                      Icons.star,
-                                                      color: i <= 3
-                                                          ? Colors.grey
-                                                          : Colors.orange,
-                                                    ),
-                                                    onPressed: () {
-                                                      Navigator.pop(context);
-                                                      if (i <= 3) {
-                                                        ScaffoldMessenger.of(
-                                                          context,
-                                                        ).showSnackBar(
-                                                          const SnackBar(
-                                                            content: Text(
-                                                              'Thank you for your feedback!',
-                                                            ),
-                                                            behavior:
-                                                                SnackBarBehavior
-                                                                    .floating,
-                                                          ),
-                                                        );
-                                                      } else {
-                                                        ScaffoldMessenger.of(
-                                                          context,
-                                                        ).showSnackBar(
-                                                          const SnackBar(
-                                                            content: Text(
-                                                              'Thank you for rating F2H App 5 stars!',
-                                                            ),
-                                                            behavior:
-                                                                SnackBarBehavior
-                                                                    .floating,
-                                                          ),
-                                                        );
-                                                      }
-                                                    },
-                                                  ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
+                                  () async {
+                                    const playStoreUrl =
+                                        'https://play.google.com/store/apps/details?id=com.f2h.customer&pcampaignid=web_share';
+                                    final uri = Uri.parse(playStoreUrl);
+                                    try {
+                                      await launchUrl(uri,
+                                          mode: LaunchMode.externalApplication);
+                                    } catch (_) {
+                                      await launchUrl(uri);
+                                    }
                                   },
                                 ),
                               ],
