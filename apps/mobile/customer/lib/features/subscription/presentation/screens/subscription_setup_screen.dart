@@ -1215,13 +1215,15 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
             label: 'Plan & Payment',
           ),
           const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: _buildStartDateRow()),
-              const SizedBox(width: 10),
-              Expanded(child: _buildAutoRenewalRow()),
-            ],
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _buildStartDateRow()),
+                const SizedBox(width: 10),
+                Expanded(child: _buildAutoRenewalRow()),
+              ],
+            ),
           ),
           const SizedBox(height: 14),
           const Divider(color: Color(0xFFE5E7EB), height: 1),
@@ -1229,80 +1231,6 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
           _buildPaymentTypeContent(),
         ],
       ),
-    );
-  }
-
-  /// Shared layout for the two option rows so their icons, titles and
-  /// controls line up no matter how long the copy is.
-  Widget _buildPlanRow({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Widget trailing,
-    VoidCallback? onTap,
-  }) {
-    final row = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      child: Row(
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: kPrimaryPl,
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Icon(icon, size: 16, color: kPrimary),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w800,
-                    color: kText,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 9.5,
-                    color: kTextSub,
-                    height: 1.2,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 4),
-          trailing,
-        ],
-      ),
-    );
-
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFFBFCFB),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFEFF2F0)),
-      ),
-      child: onTap == null
-          ? row
-          : InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(14),
-              child: row,
-            ),
     );
   }
 
@@ -1323,39 +1251,86 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       'Nov',
       'Dec',
     ];
+    final dateStr = '${_startDate.day} ${monthNames[_startDate.month - 1]} ${_startDate.year}';
 
-    return _buildPlanRow(
-      icon: Icons.play_circle_fill_rounded,
-      title: 'Start From',
-      subtitle: 'First delivery date',
-      onTap: () {
-        HapticFeedback.selectionClick();
-        _pickStartDate();
-      },
-      trailing: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: kPrimaryPl,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: kPrimary.withValues(alpha: 0.35),
-            width: 1.2,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.calendar_today_rounded, size: 13, color: kPrimary),
-            const SizedBox(width: 6),
-            Text(
-              '${_startDate.day} ${monthNames[_startDate.month - 1]} ${_startDate.year}',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-                color: kPrimary,
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFFBFCFB),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFEFF2F0)),
+      ),
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          _pickStartDate();
+        },
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.all(11),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      color: kPrimaryPl,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.play_circle_fill_rounded, size: 14, color: kPrimary),
+                  ),
+                  const SizedBox(width: 7),
+                  const Expanded(
+                    child: Text(
+                      'Start From',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: kText,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                decoration: BoxDecoration(
+                  color: kPrimaryPl,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: kPrimary.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.calendar_today_rounded, size: 11, color: kPrimary),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        dateStr,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          color: kPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1364,21 +1339,71 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
   // ── Auto Renewal row (inside the plan options card) ───────
 
   Widget _buildAutoRenewalRow() {
-    return _buildPlanRow(
-      icon: Icons.autorenew_rounded,
-      title: 'Auto Renewal',
-      subtitle: _autoRenew
-          ? 'Renews automatically each month'
-          : 'Ends after the first month',
-      trailing: Switch(
-        value: _autoRenew,
-        onChanged: (v) {
-          HapticFeedback.lightImpact();
-          setState(() => _autoRenew = v);
-        },
-        activeThumbColor: Colors.white,
-        activeTrackColor: kPrimary,
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFFBFCFB),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFEFF2F0)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(11),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: kPrimaryPl,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.autorenew_rounded, size: 14, color: kPrimary),
+                ),
+                const SizedBox(width: 6),
+                const Expanded(
+                  child: Text(
+                    'Auto Renew',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: kText,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Transform.scale(
+                  scale: 0.75,
+                  alignment: Alignment.centerRight,
+                  child: Switch(
+                    value: _autoRenew,
+                    onChanged: (v) {
+                      HapticFeedback.lightImpact();
+                      setState(() => _autoRenew = v);
+                    },
+                    activeThumbColor: Colors.white,
+                    activeTrackColor: kPrimary,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _autoRenew ? 'Renews automatically' : 'Single month only',
+              style: const TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w600,
+                color: kTextSub,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
