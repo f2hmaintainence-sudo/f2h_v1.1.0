@@ -477,7 +477,7 @@ class ProductCardH extends StatelessWidget {
         ),
       ),
       child: Container(
-        width: 144,
+        width: 160,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: kSurface,
@@ -617,26 +617,35 @@ class ProductCardH extends StatelessWidget {
                   const SizedBox(height: 6),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Expanded(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Flexible(
-                              child: Text('₹${p.price.toStringAsFixed(0)}',
-                                style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w900, color: kText),
-                                maxLines: 1, overflow: TextOverflow.ellipsis),
-                            ),
-                            if (p.originalPrice > p.price) ...[
-                              const SizedBox(width: 3),
-                              Flexible(
-                                child: Text('₹${p.originalPrice.toStringAsFixed(0)}',
-                                  style: const TextStyle(fontSize: 12, color: kMuted, decoration: TextDecoration.lineThrough, fontWeight: FontWeight.w700),
-                                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                            Text(
+                              '₹${p.price.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w900,
+                                color: kText,
                               ),
-                            ],
-
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (p.originalPrice > p.price)
+                              Text(
+                                '₹${p.originalPrice.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  color: kMuted,
+                                  decoration: TextDecoration.lineThrough,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                           ],
                         ),
                       ),
