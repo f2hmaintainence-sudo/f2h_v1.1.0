@@ -124,7 +124,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
       backgroundColor: Colors.transparent,
       builder: (_) => DeliveryConfirmationSheet(
         stop: stop,
-        onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns) {
+        onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns, containerDeliveries) {
           if (stop.orders.isEmpty) return;
           final orderId = stop.orders.first.orderId;
 
@@ -151,6 +151,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
             paymentStatus: paymentStatus,
             deliveryImage: deliveryImage,
             containerReturns: containerReturns,
+            containerDeliveries: containerDeliveries,
             onSuccess: () {
               if (mounted) {
                 Navigator.pop(context); // pop loading dialog

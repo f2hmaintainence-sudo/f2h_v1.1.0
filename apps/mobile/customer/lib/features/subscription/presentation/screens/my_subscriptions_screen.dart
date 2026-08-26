@@ -571,157 +571,163 @@ class _SubsScreenState extends State<SubsScreen> {
             .where((s) => s.isActive && s.paymentType == 'postpaid')
             .fold<double>(0, (sum, s) => sum + s.totalMonthlyCost);
 
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final isCompact = constraints.maxWidth < 360;
+        return Align(
+          alignment: Alignment.center,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isCompact = constraints.maxWidth < 360;
 
-            return Container(
-              margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: kPrimary.withValues(alpha: 0.08),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  )
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xFF123E24), Color(0xFF1F8A4D), Color(0xFF38A169)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+                return Container(
+                  margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: kPrimary.withValues(alpha: 0.08),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      )
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Color(0xFF123E24), Color(0xFF1F8A4D), Color(0xFF38A169)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                    Positioned(
-                      right: -15,
-                      top: -15,
-                      child: Container(
-                        width: 70,
-                        height: 70,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withValues(alpha: 0.04),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isCompact ? 12 : 18,
-                        vertical: isCompact ? 14 : 16,
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: EdgeInsets.all(isCompact ? 6 : 8),
+                        Positioned(
+                          right: -15,
+                          top: -15,
+                          child: Container(
+                            width: 70,
+                            height: 70,
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.1),
                               shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              isPostpaidEnabled ? Icons.credit_card_rounded : Icons.credit_card_off_rounded,
-                              color: kAccent,
-                              size: isCompact ? 18 : 22,
+                              color: Colors.white.withValues(alpha: 0.04),
                             ),
                           ),
-                          SizedBox(width: isCompact ? 8 : 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  isPostpaidEnabled ? 'POSTPAID CREDIT LIMIT' : 'POSTPAID STATUS',
-                                  style: TextStyle(
-                                    fontSize: isCompact ? 8.5 : 9.5,
-                                    color: Colors.white.withValues(alpha: 0.6),
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: isCompact ? 0.4 : 1.0,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 2),
-                                FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    isPostpaidEnabled
-                                        ? '₹${creditLimit.toStringAsFixed(0)} · Used: ₹${usedLimit.toStringAsFixed(0)}'
-                                        : 'Not Enabled',
-                                    style: TextStyle(
-                                      fontSize: isCompact ? 15 : 18,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: -0.2,
-                                    ),
-                                    maxLines: 1,
-                                  ),
-                                ),
-                              ],
-                            ),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isCompact ? 12 : 16,
+                            vertical: isCompact ? 14 : 16,
                           ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            fit: FlexFit.loose,
-                            child: GestureDetector(
-                              onTap: () => _showContactSupportOptions(context),
-                              child: Container(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: isCompact ? 8 : 12,
-                                  vertical: isCompact ? 5 : 6,
-                                ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.all(isCompact ? 6 : 8),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.25),
-                                    width: 1,
-                                  ),
+                                  color: Colors.white.withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
                                 ),
-                                child: Row(
+                                child: Icon(
+                                  isPostpaidEnabled ? Icons.credit_card_rounded : Icons.credit_card_off_rounded,
+                                  color: kAccent,
+                                  size: isCompact ? 18 : 22,
+                                ),
+                              ),
+                              SizedBox(width: isCompact ? 8 : 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(
-                                      isPostpaidEnabled ? Icons.check_circle_rounded : Icons.info_outline_rounded,
-                                      color: isPostpaidEnabled ? kAccent : Colors.orangeAccent,
-                                      size: isCompact ? 12 : 14,
-                                    ),
-                                    SizedBox(width: isCompact ? 4 : 6),
-                                    Flexible(
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
                                       child: Text(
-                                        isPostpaidEnabled ? 'Postpaid Active' : 'Contact Support',
+                                        isPostpaidEnabled ? 'POSTPAID CREDIT LIMIT' : 'POSTPAID STATUS',
                                         style: TextStyle(
-                                          fontSize: isCompact ? 10 : 11,
+                                          fontSize: isCompact ? 8.5 : 9.5,
+                                          color: Colors.white.withValues(alpha: 0.6),
                                           fontWeight: FontWeight.w900,
-                                          color: Colors.white,
+                                          letterSpacing: isCompact ? 0.4 : 1.0,
                                         ),
                                         maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        isPostpaidEnabled
+                                            ? '₹${creditLimit.toStringAsFixed(0)} · Used: ₹${usedLimit.toStringAsFixed(0)}'
+                                            : 'Not Enabled',
+                                        style: TextStyle(
+                                          fontSize: isCompact ? 14 : 17,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: -0.2,
+                                        ),
+                                        maxLines: 1,
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: () => _showContactSupportOptions(context),
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: isCompact ? 8 : 12,
+                                    vertical: isCompact ? 5 : 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.25),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        isPostpaidEnabled ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                                        color: isPostpaidEnabled ? kAccent : Colors.orangeAccent,
+                                        size: isCompact ? 12 : 14,
+                                      ),
+                                      SizedBox(width: isCompact ? 4 : 6),
+                                      FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          isPostpaidEnabled ? 'Postpaid Active' : 'Contact Support',
+                                          style: TextStyle(
+                                            fontSize: isCompact ? 10 : 11,
+                                            fontWeight: FontWeight.w900,
+                                            color: Colors.white,
+                                          ),
+                                          maxLines: 1,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-            );
-          },
+                  ),
+                );
+              },
+            ),
+          ),
         );
       },
     );

@@ -8,27 +8,43 @@ import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/features/orders/presentation/widgets/pickup_required_dialog.dart';
 
-
-class ContainerReturnInput {
+class ContainerItemState {
   final String containerId;
   final String name;
-  final int balance;
-  final int expected;
-  bool isChecked;
+
+  /// Containers in current order being delivered today (editable by partner/customer)
+  int deliveringToday;
+  final int initialDeliveringToday;
+
+  /// Containers customer currently holds from previous orders (editable by partner/customer)
+  int customerBalance;
+  final int initialCustomerBalance;
+
+  /// Empty container collection at delivery time
+  bool isCollecting;
   int returned;
   int damaged;
   int lost;
 
-  ContainerReturnInput({
+  ContainerItemState({
     required this.containerId,
     required this.name,
-    required this.balance,
-    this.expected = 0,
-    this.isChecked = false,
+    required this.deliveringToday,
+    required this.customerBalance,
+    int? initialDeliveringToday,
+    int? initialCustomerBalance,
+    this.isCollecting = false,
     this.returned = 0,
     this.damaged = 0,
     this.lost = 0,
-  });
+  })  : initialDeliveringToday = initialDeliveringToday ?? deliveringToday,
+        initialCustomerBalance = initialCustomerBalance ?? customerBalance;
+
+  /// Maximum empties collectable = what customer already held + what is delivered today
+  int get maxCollectable => (customerBalance + deliveringToday).clamp(0, 999);
+
+  /// Net balance remaining with customer after delivery & returns
+  int get projectedBalance => customerBalance + deliveringToday - returned - damaged - lost;
 }
 
 class DeliveryConfirmationSheet extends StatefulWidget {
@@ -44,6 +60,7 @@ class DeliveryConfirmationSheet extends StatefulWidget {
     String? paymentStatus,
     String? deliveryImage,
     List<Map<String, dynamic>> containerReturns,
+    List<Map<String, dynamic>>? containerDeliveries,
   ) onConfirm;
 
   const DeliveryConfirmationSheet({
@@ -57,67 +74,58 @@ class DeliveryConfirmationSheet extends StatefulWidget {
 }
 
 class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
-  int _currentStep = 1; // 1 to 4
-  int _returnedContainers = 0;
-  int _damagedContainers = 0;
-  int _lostContainers = 0;
-  
+  int _currentStep = 1; // 1: Arrived, 2: Handover & Pay, 3: Containers, 4: Photo, 5: Success
+
   bool _directHandover = true;
   bool _photoTaken = false;
   bool _isUpi = true;
   bool _paymentConfirmed = false;
   String? _imagePath;
-  final Map<String, ContainerReturnInput> _containerInputs = {};
 
-  void _syncLegacyCounts() {
-    int returned = 0;
-    int damaged = 0;
-    int lost = 0;
-    for (var input in _containerInputs.values) {
-      returned += input.returned;
-      damaged += input.damaged;
-      lost += input.lost;
-    }
-    _returnedContainers = returned;
-    _damagedContainers = damaged;
-    _lostContainers = lost;
-  }
-  
+  final Map<String, ContainerItemState> _containerStates = {};
+
   @override
   void initState() {
     super.initState();
-    
-    // Populate container inputs from stop containerBalances
+
+    // Populate container items from stop containerBalances
     for (var bal in widget.stop.containerBalances) {
-      final expected = widget.stop.emptyBottlesExpected;
-      final isGlass = bal.name.toLowerCase().contains('bottle') || bal.containerId == 'PKG_GLASS_BOTTLE';
-      
-      _containerInputs[bal.containerId] = ContainerReturnInput(
+      final isGlass = bal.name.toLowerCase().contains('bottle') ||
+          bal.containerId == 'PKG_GLASS_BOTTLE' ||
+          bal.containerId == 'CONT-001';
+      final exp = bal.expected > 0
+          ? bal.expected
+          : (isGlass ? widget.stop.emptyBottlesExpected : 0);
+      final withCust = bal.balance > 0
+          ? bal.balance
+          : (isGlass ? widget.stop.bottlesWithCustomer : 0);
+
+      _containerStates[bal.containerId] = ContainerItemState(
         containerId: bal.containerId,
-        name: bal.name,
-        balance: bal.balance,
-        expected: isGlass ? expected : 0,
-        isChecked: (isGlass && expected > 0),
-        returned: (isGlass && expected > 0) ? expected : 0,
+        name: bal.name.isNotEmpty ? bal.name : 'Glass Bottle',
+        deliveringToday: exp,
+        customerBalance: withCust,
+        isCollecting: withCust > 0 || exp > 0,
+        returned: (withCust > 0) ? withCust : (exp > 0 ? exp : 0),
       );
     }
-    
-    // Also support fallback default Glass Bottle if containerBalances is empty
-    if (_containerInputs.isEmpty) {
+
+    // Support fallback default Glass Bottle if containerBalances is empty but stop has bottles
+    if (_containerStates.isEmpty) {
+      final exp = widget.stop.emptyBottlesExpected;
       final outstanding = widget.stop.bottlesWithCustomer;
-      if (outstanding > 0) {
-        _containerInputs['PKG_GLASS_BOTTLE'] = ContainerReturnInput(
-          containerId: 'PKG_GLASS_BOTTLE',
+      if (exp > 0 || outstanding > 0) {
+        _containerStates['CONT-001'] = ContainerItemState(
+          containerId: 'CONT-001',
           name: 'Glass Bottle',
-          balance: outstanding,
-          expected: outstanding,
-          isChecked: true,
-          returned: outstanding,
+          deliveringToday: exp > 0 ? exp : 1,
+          customerBalance: outstanding,
+          isCollecting: true,
+          returned: outstanding > 0 ? outstanding : (exp > 0 ? exp : 0),
         );
       }
     }
 
-    _syncLegacyCounts();
     _checkLostImage();
   }
 
@@ -130,10 +138,8 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         setState(() {
           _imagePath = response.file!.path;
           _photoTaken = true;
-          // Only restore to step 3 if user had already reached step 3.
-          // Do NOT skip steps 1→2 by jumping to 3 from the start.
-          if (_currentStep >= 3) {
-            _currentStep = 3;
+          if (_currentStep >= 4) {
+            _currentStep = 4;
           }
         });
       }
@@ -141,11 +147,11 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
   }
 
   void _nextStep() {
-    if (_currentStep < 4) {
+    if (_currentStep < 5) {
       setState(() {
         _currentStep++;
       });
-      if (_currentStep == 4) {
+      if (_currentStep == 5) {
         _triggerSuccess();
       }
     }
@@ -167,7 +173,6 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         });
       }
     } catch (e) {
-      print('Error picking image: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -232,38 +237,58 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         ? 'Collected via ${_isUpi ? "UPI" : "Cash"}'
         : 'Prepaid Online';
     String handoverDetails = _directHandover ? 'Handed over directly' : 'Left with security/doorstep';
-    String finalPaymentMode = widget.stop.isCod
-        ? (_isUpi ? 'upi' : 'cash')
-        : 'prepaid';
+    String finalPaymentMode = widget.stop.isCod ? (_isUpi ? 'upi' : 'cash') : 'prepaid';
     String finalPaymentStatus = 'paid';
     String mockPhotoPath = _photoTaken
         ? (_imagePath ?? 'https://images.unsplash.com/photo-1550583724-b2692b85b150?q=80&w=600&auto=format&fit=crop')
         : '';
 
-    final totalEmptyBottles = _returnedContainers + _damagedContainers + _lostContainers;
+    int totalReturned = 0;
+    int totalDamaged = 0;
+    int totalLost = 0;
 
-    final List<Map<String, dynamic>> containerReturns = _containerInputs.entries.map((e) {
-      final input = e.value;
-      return {
-        'container_id': input.containerId,
-        'returned': input.returned,
-        'damaged': input.damaged,
-        'lost': input.lost,
-      };
-    }).toList();
+    final List<Map<String, dynamic>> containerReturns = [];
+    final List<Map<String, dynamic>> containerDeliveries = [];
 
-    // Immediately trigger status update so data is submitted right away
+    for (var entry in _containerStates.entries) {
+      final s = entry.value;
+      totalReturned += s.returned;
+      totalDamaged += s.damaged;
+      totalLost += s.lost;
+
+      containerReturns.add({
+        'container_id': s.containerId,
+        'name': s.name,
+        'returned': s.returned,
+        'damaged': s.damaged,
+        'lost': s.lost,
+        'customer_balance': s.customerBalance,
+        'projected_balance': s.projectedBalance,
+      });
+
+      containerDeliveries.add({
+        'container_id': s.containerId,
+        'name': s.name,
+        'quantity': s.deliveringToday,
+        'delivered': s.deliveringToday,
+      });
+    }
+
+    final totalEmptyBottles = totalReturned + totalDamaged + totalLost;
+
+    // Immediately trigger status update with container returns and container deliveries
     widget.onConfirm(
       'delivered',
       totalEmptyBottles,
-      _returnedContainers,
-      _damagedContainers,
-      _lostContainers,
+      totalReturned,
+      totalDamaged,
+      totalLost,
       '$handoverDetails · $paymentDetails',
       finalPaymentMode,
       finalPaymentStatus,
       mockPhotoPath,
       containerReturns,
+      containerDeliveries,
     );
 
     // Show success animation briefly then pop sheet safely
@@ -300,11 +325,11 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // Stepper Header
-            if (_currentStep < 4) _buildStepperProgress(),
+            if (_currentStep < 5) _buildStepperProgress(),
             const SizedBox(height: 20),
-  
+
             // Step Content
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
@@ -317,45 +342,38 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
   }
 
   Widget _buildStepperProgress() {
-    final stepLabels = ['Arrived', 'Confirm Details', 'Proof Photo'];
+    final stepLabels = ['Arrived', 'Handover & Pay', 'Containers', 'Proof Photo'];
     return Stack(
       alignment: Alignment.topCenter,
       children: [
         // Background Connecting Lines
         Positioned(
-          top: 17, // Center height of 34px circles
-          left: 40,
-          right: 40,
+          top: 17,
+          left: 28,
+          right: 28,
           child: Row(
-            children: [
-              Expanded(
+            children: List.generate(stepLabels.length - 1, (index) {
+              final isPassed = _currentStep > (index + 1);
+              return Expanded(
                 child: Container(
                   height: 3,
-                  color: _currentStep > 1 ? kPrimary : kBorder,
+                  color: isPassed ? kPrimary : kBorder,
                 ),
-              ),
-              Expanded(
-                child: Container(
-                  height: 3,
-                  color: _currentStep > 2 ? kPrimary : kBorder,
-                ),
-              ),
-            ],
+              );
+            }),
           ),
         ),
-        
+
         // Step Indicators and Labels
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(3, (index) {
+          children: List.generate(stepLabels.length, (index) {
             final stepNum = index + 1;
             final isActive = _currentStep == stepNum;
             final isCompleted = _currentStep > stepNum;
-            
+
             return GestureDetector(
               onTap: () {
-                // Only allow going BACK to already-completed steps.
-                // Forward skipping (e.g. 1→3) is NOT allowed.
                 if (stepNum < _currentStep) {
                   setState(() {
                     _currentStep = stepNum;
@@ -379,19 +397,20 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                         color: isCompleted || isActive ? kPrimary : kBorder,
                         width: 2,
                       ),
-                      boxShadow: isActive ? [
-                        BoxShadow(
-                          color: kPrimary.withValues(alpha: 0.25),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        )
-                      ] : null,
+                      boxShadow: isActive
+                          ? [
+                              BoxShadow(
+                                color: kPrimary.withValues(alpha: 0.25),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              )
+                            ]
+                          : null,
                     ),
                     child: Center(
                       child: isCompleted
                           ? const Icon(Icons.check_rounded, color: kPrimary, size: 18)
                           : stepNum > _currentStep
-                              // Future step: show lock icon to signal it's not tappable
                               ? Icon(Icons.lock_outline_rounded, color: kMuted, size: 14)
                               : Text(
                                   '$stepNum',
@@ -403,11 +422,11 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                                 ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
                     stepLabels[index],
                     style: TextStyle(
-                      fontSize: 10.5,
+                      fontSize: 10,
                       fontWeight: isActive || isCompleted ? FontWeight.w900 : FontWeight.w700,
                       color: isActive || isCompleted ? kPrimary : kTextSub,
                       letterSpacing: 0.1,
@@ -427,16 +446,21 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
       case 1:
         return _buildStepArrived();
       case 2:
-        return _buildStepConfirmCustomer();
+        return _buildStepHandoverAndPayment();
       case 3:
-        return _buildStepPhoto();
+        return _buildStepContainerManagement();
       case 4:
+        return _buildStepPhoto();
+      case 5:
         return _buildStepSuccess();
       default:
         return const SizedBox();
     }
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // STEP 1: ARRIVED AT LOCATION
+  // ══════════════════════════════════════════════════════════════════════════
   Widget _buildStepArrived() {
     return Column(
       key: const ValueKey('step_arrived'),
@@ -447,13 +471,15 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: kText),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Text(
           'Confirm that you are at ${widget.stop.customerName}\'s delivery location.',
-          style: const TextStyle(fontSize: 13, color: kTextSub),
+          style: const TextStyle(fontSize: 12.5, color: kTextSub),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
+
+        // Customer Info Card
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -481,7 +507,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                       widget.stop.customerName,
                       style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: kText),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Text(
                       widget.stop.address,
                       style: const TextStyle(fontSize: 12, color: kTextSub, height: 1.3),
@@ -493,8 +519,10 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
           ),
         ),
         const SizedBox(height: 16),
+
         _buildItemsSection(showReturnsInfo: true),
         const SizedBox(height: 8),
+
         ElevatedButton(
           onPressed: _nextStep,
           style: ElevatedButton.styleFrom(
@@ -510,7 +538,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
               Icon(Icons.check_circle_outline_rounded, size: 20),
               SizedBox(width: 8),
               Text(
-                'ARRIVED AT LOCATION',
+                'ARRIVED AT LOCATION →',
                 style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5),
               ),
             ],
@@ -520,107 +548,28 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
     );
   }
 
-  /// Compact section label with icon used across Step 2 sections
-  Widget _buildSectionHeader(IconData icon, String label) {
-    return Row(
-      children: [
-        Icon(icon, size: 15, color: kTextSub),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w900,
-            color: kTextSub,
-            letterSpacing: 0.8,
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Compact stepper widget: label on top, [−] value [+] in a pill card
-  Widget _buildCompactCounter({
-    required String label,
-    required int value,
-    required Color color,
-    required VoidCallback? onDec,
-    required VoidCallback? onInc,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
-      decoration: BoxDecoration(
-        color: value > 0 ? color.withAlpha(20) : kBgDeep,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: value > 0 ? color.withAlpha(80) : kBorder),
-      ),
-      child: Column(
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
-              color: value > 0 ? color : kTextSub,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              GestureDetector(
-                onTap: onDec,
-                child: Icon(
-                  Icons.remove_circle_rounded,
-                  size: 20,
-                  color: onDec != null ? color : kMuted,
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Text(
-                  '$value',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    color: value > 0 ? color : kText,
-                  ),
-                ),
-              ),
-              GestureDetector(
-                onTap: onInc,
-                child: Icon(
-                  Icons.add_circle_rounded,
-                  size: 20,
-                  color: onInc != null ? color : kMuted,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStepConfirmCustomer() {
+  // ══════════════════════════════════════════════════════════════════════════
+  // STEP 2: HANDOVER & PAYMENT
+  // ══════════════════════════════════════════════════════════════════════════
+  Widget _buildStepHandoverAndPayment() {
     return Column(
-      key: const ValueKey('step_confirm'),
+      key: const ValueKey('step_handover_payment'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Text(
-          'Step 2: Confirm & Collect',
+          'Step 2: Handover & Payment',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: kText),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 4),
         const Text(
-          'Collect containers, confirm handover & payment.',
+          'Select delivery handover mode and confirm payment.',
           style: TextStyle(fontSize: 12, color: kTextSub),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 20),
 
-        // ── Handover Mode Selector ──────────────────────────────────────────
+        // Handover Mode Selector
         _buildSectionHeader(Icons.swap_horiz_rounded, 'HANDOVER MODE'),
         const SizedBox(height: 10),
         IntrinsicHeight(
@@ -699,205 +648,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         ),
         const SizedBox(height: 20),
 
-        // ── Container / Bottle Returns ──────────────────────────────────────
-        if (_containerInputs.isNotEmpty) ...[
-          _buildSectionHeader(Icons.swap_vert_circle_outlined, 'EMPTY CONTAINER RETURNS'),
-          const SizedBox(height: 10),
-          Container(
-            decoration: BoxDecoration(
-              color: kSurface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: kBorder),
-            ),
-            child: Column(
-              children: [
-                // Summary row at the top
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.inventory_2_outlined, size: 16, color: Colors.teal),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          '${_containerInputs.values.where((i) => i.isChecked).length} of ${_containerInputs.length} container type(s) being returned',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: kTextSub),
-                        ),
-                      ),
-                      if (_containerInputs.values.any((i) => i.isChecked))
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFECFDF5),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFF6EE7B7)),
-                          ),
-                          child: Text(
-                            '${_containerInputs.values.fold(0, (s, i) => s + i.returned)} returned',
-                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.teal),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1, color: kBorderLt),
-
-                // One row per container type
-                ..._containerInputs.values.map((input) {
-                  final outstanding = input.balance;
-                  final maxAllowed = outstanding > input.expected ? outstanding : input.expected;
-                  final projected = outstanding - input.returned - input.damaged - input.lost;
-
-                  return Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Row 1: checkbox + name + balance badge
-                            Row(
-                              children: [
-                                SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: Checkbox(
-                                    value: input.isChecked,
-                                    activeColor: kPrimary,
-                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    onChanged: (val) {
-                                      setState(() {
-                                        input.isChecked = val ?? false;
-                                        if (input.isChecked) {
-                                          input.returned = input.expected > 0
-                                              ? input.expected
-                                              : (outstanding > 0 ? outstanding : 0);
-                                          input.damaged = 0;
-                                          input.lost = 0;
-                                        } else {
-                                          input.returned = 0;
-                                          input.damaged = 0;
-                                          input.lost = 0;
-                                        }
-                                        _syncLegacyCounts();
-                                      });
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    input.name,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 13,
-                                      color: input.isChecked ? kText : kTextSub,
-                                    ),
-                                  ),
-                                ),
-                                // Balance badge
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: outstanding > 0 ? const Color(0xFFFFF7ED) : kBgDeep,
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: outstanding > 0 ? const Color(0xFFFED7AA) : kBorder,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    outstanding > 0 ? 'Balance: $outstanding' : 'None due',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w900,
-                                      color: outstanding > 0 ? Colors.orange.shade700 : kMuted,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            // Row 2 (when checked): Returned, Damaged, Lost counters
-                            if (input.isChecked) ...[
-                              const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  // Returned counter
-                                  Expanded(
-                                    child: _buildCompactCounter(
-                                      label: 'Returned',
-                                      value: input.returned,
-                                      color: Colors.teal,
-                                      onDec: input.returned > 0
-                                          ? () => setState(() { input.returned--; _syncLegacyCounts(); })
-                                          : null,
-                                      onInc: (input.returned + input.lost) < maxAllowed
-                                          ? () => setState(() { input.returned++; _syncLegacyCounts(); })
-                                          : null,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  // Lost / Damaged counter
-                                  Expanded(
-                                    child: _buildCompactCounter(
-                                      label: 'Lost/Damaged',
-                                      value: input.lost,
-                                      color: Colors.red,
-                                      onDec: input.lost > 0
-                                          ? () => setState(() { input.lost--; _syncLegacyCounts(); })
-                                          : null,
-                                      onInc: (input.returned + input.lost) < maxAllowed
-                                          ? () => setState(() { input.lost++; _syncLegacyCounts(); })
-                                          : null,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              // Projected balance chip
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  const Icon(Icons.account_balance_wallet_outlined, size: 12, color: kTextSub),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'After return: ',
-                                    style: const TextStyle(fontSize: 10, color: kTextSub),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: projected <= 0
-                                          ? const Color(0xFFECFDF5)
-                                          : const Color(0xFFFFF1F2),
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      projected <= 0 ? 'Cleared ✓' : '$projected remaining',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w900,
-                                        color: projected <= 0 ? Colors.teal : kDanger,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const Divider(height: 1, color: kBorderLt),
-                    ],
-                  );
-                }),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-
-        // ── Payment Details ─────────────────────────────────────────────────
+        // Payment Details Card
         _buildSectionHeader(Icons.payments_outlined, 'PAYMENT'),
         const SizedBox(height: 10),
         Container(
@@ -1020,7 +771,6 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: kPrimary),
                         ),
                         const SizedBox(height: 12),
-                        // Dynamic UPI QR Code Image
                         Container(
                           width: 140,
                           height: 140,
@@ -1132,6 +882,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
           ),
         ),
         const SizedBox(height: 24),
+
         Row(
           children: [
             ElevatedButton(
@@ -1155,7 +906,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
                 child: const Text(
-                  'DONE — TAKE PROOF PHOTO →',
+                  'PROCEED TO CONTAINERS (STEP 3) →',
                   style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5),
                 ),
               ),
@@ -1166,23 +917,435 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
     );
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // STEP 3: CONTAINER MANAGEMENT & COLLECTION (AFTER STEP TWO)
+  // ══════════════════════════════════════════════════════════════════════════
+  Widget _buildStepContainerManagement() {
+    final hasContainers = _containerStates.isNotEmpty;
+
+    return Column(
+      key: const ValueKey('step_container_management'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Step 3: Container Management',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: kText),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Review delivered containers, update customer holding count & collect empties.',
+          style: TextStyle(fontSize: 12, color: kTextSub),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 20),
+
+        if (!hasContainers) ...[
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: kSurface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: kBorder),
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.inventory_2_outlined, color: kMuted, size: 36),
+                const SizedBox(height: 12),
+                const Text(
+                  'No Returnable Containers',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: kText),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'This order does not include returnable containers, and the customer has no active container balance.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: kTextSub, height: 1.3),
+                ),
+              ],
+            ),
+          ),
+        ] else ...[
+          ..._containerStates.values.map((state) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: kSurface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: kBorder),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x06000000),
+                    blurRadius: 8,
+                    offset: Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. Container Header
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(19)),
+                      border: Border(bottom: BorderSide(color: kBorderLt)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: kPrimaryPl,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.inventory_2_rounded, color: kPrimary, size: 18),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                state.name,
+                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: kText),
+                              ),
+                              Text(
+                                'ID: ${state.containerId}',
+                                style: const TextStyle(fontSize: 10, color: kTextSub),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFECFDF5),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFA7F3D0)),
+                          ),
+                          child: Text(
+                            'Delivering: ${state.deliveringToday}',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.teal),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── SECTION A: Current Order Container Quantity (Editable) ──
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Current Order Containers',
+                                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: kText),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Delivering today (modify if adjusted)',
+                                  style: TextStyle(fontSize: 10.5, color: kTextSub),
+                                ),
+                              ],
+                            ),
+                            _buildMiniStepper(
+                              value: state.deliveringToday,
+                              color: kPrimary,
+                              onDec: state.deliveringToday > 0
+                                  ? () => setState(() => state.deliveringToday--)
+                                  : null,
+                              onInc: () => setState(() => state.deliveringToday++),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        const Divider(height: 1, color: kBorderLt),
+                        const SizedBox(height: 14),
+
+                        // ── SECTION B: Customer Held Balance (Editable) ──
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Customer Held Containers',
+                                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: kText),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Containers currently held with customer',
+                                  style: TextStyle(fontSize: 10.5, color: kTextSub),
+                                ),
+                              ],
+                            ),
+                            _buildMiniStepper(
+                              value: state.customerBalance,
+                              color: Colors.orange.shade800,
+                              onDec: state.customerBalance > 0
+                                  ? () => setState(() => state.customerBalance--)
+                                  : null,
+                              onInc: () => setState(() => state.customerBalance++),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // ── SECTION C: Container Returns & Collection ──
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0FDF4),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFBBF7D0)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.swap_vertical_circle_rounded, color: Colors.teal, size: 18),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        'Collect Empties Today',
+                                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Colors.teal),
+                                      ),
+                                    ],
+                                  ),
+                                  // Quick Presets
+                                  Row(
+                                    children: [
+                                      GestureDetector(
+                                        onTap: () {
+                                          setState(() {
+                                            state.returned = state.maxCollectable;
+                                            state.damaged = 0;
+                                            state.lost = 0;
+                                          });
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: Colors.teal.shade300),
+                                          ),
+                                          child: const Text(
+                                            'Collect All',
+                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.teal),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      GestureDetector(
+                                        onTap: () {
+                                          setState(() {
+                                            state.returned = 0;
+                                            state.damaged = 0;
+                                            state.lost = 0;
+                                          });
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: kBorder),
+                                          ),
+                                          child: const Text(
+                                            'None',
+                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: kTextSub),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+
+                              // Counters Row
+                              Row(
+                                children: [
+                                  // Returned Stepper
+                                  Expanded(
+                                    child: _buildCompactCounter(
+                                      label: 'Returned / Collected',
+                                      value: state.returned,
+                                      color: Colors.teal,
+                                      onDec: state.returned > 0
+                                          ? () => setState(() => state.returned--)
+                                          : null,
+                                      onInc: (state.returned + state.damaged + state.lost) < state.maxCollectable
+                                          ? () => setState(() => state.returned++)
+                                          : null,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  // Damaged/Lost Stepper
+                                  Expanded(
+                                    child: _buildCompactCounter(
+                                      label: 'Damaged / Lost',
+                                      value: state.damaged + state.lost,
+                                      color: Colors.red.shade700,
+                                      onDec: (state.damaged + state.lost) > 0
+                                          ? () => setState(() {
+                                                if (state.lost > 0) {
+                                                  state.lost--;
+                                                } else if (state.damaged > 0) {
+                                                  state.damaged--;
+                                                }
+                                              })
+                                          : null,
+                                      onInc: (state.returned + state.damaged + state.lost) < state.maxCollectable
+                                          ? () => setState(() => state.lost++)
+                                          : null,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        // ── SECTION D: Dynamic Balance Preview Card ──
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: kBgDeep,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: kBorder),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Net Balance with Customer:',
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: kTextSub),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '(${state.customerBalance} held + ${state.deliveringToday} deliv - ${state.returned} ret - ${state.damaged + state.lost} lost)',
+                                    style: const TextStyle(fontSize: 9.5, color: kMuted),
+                                  ),
+                                ],
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: state.projectedBalance <= 0
+                                      ? const Color(0xFFECFDF5)
+                                      : const Color(0xFFFFF1F2),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: state.projectedBalance <= 0
+                                        ? const Color(0xFF6EE7B7)
+                                        : const Color(0xFFFECDD3),
+                                  ),
+                                ),
+                                child: Text(
+                                  state.projectedBalance <= 0
+                                      ? '0 Cleared ✓'
+                                      : '${state.projectedBalance} with Customer',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                    color: state.projectedBalance <= 0 ? Colors.teal : kDanger,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+
+        const SizedBox(height: 16),
+
+        Row(
+          children: [
+            ElevatedButton(
+              onPressed: () => setState(() => _currentStep = 2),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kBgDeep,
+                foregroundColor: kTextSub,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              child: const Icon(Icons.arrow_back_rounded),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: _nextStep,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kPrimary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 2,
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'CONFIRM CONTAINERS (PROCEED) →',
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // STEP 4: PROOF PHOTO
+  // ══════════════════════════════════════════════════════════════════════════
   Widget _buildStepPhoto() {
     return Column(
       key: const ValueKey('step_photo'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Text(
-          'Step 3: Delivery Proof Photo',
+          'Step 4: Delivery Proof Photo',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: kText),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         const Text(
           'Upload photo of items placed at location for delivery validation.',
           style: TextStyle(fontSize: 12, color: kTextSub),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
+
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
@@ -1196,7 +1359,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Take a photo of: ' + widget.stop.products.map((p) => '${p.quantity}x ${p.productName}').join(', '),
+                  'Delivering: ' + widget.stop.products.map((p) => '${p.quantity}x ${p.productName}').join(', '),
                   style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5, color: kPrimary),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -1206,7 +1369,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
           ),
         ),
         const SizedBox(height: 16),
-        
+
         // Camera Viewfinder
         GestureDetector(
           onTap: _showImageSourcePicker,
@@ -1240,7 +1403,6 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                       ],
                     ),
                   ] else ...[
-                    // Captured photo or fallback simulated photo
                     if (_imagePath != null)
                       Image.file(
                         File(_imagePath!),
@@ -1250,38 +1412,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                       Image.network(
                         'https://images.unsplash.com/photo-1550583724-b2692b85b150?q=80&w=600&auto=format&fit=crop',
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          color: kPrimaryPl,
-                          child: const Center(
-                            child: Icon(Icons.check_circle_outline_rounded, color: kPrimary, size: 64),
-                          ),
-                        ),
                       ),
-                    Container(
-                      color: Colors.black.withValues(alpha: 0.2),
-                    ),
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: kPrimary,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.check_rounded, color: Colors.white, size: 12),
-                            SizedBox(width: 4),
-                            Text(
-                              'CAPTURED',
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 9),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                   ],
                 ],
               ),
@@ -1289,10 +1420,11 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
           ),
         ),
         const SizedBox(height: 24),
+
         Row(
           children: [
             ElevatedButton(
-              onPressed: () => setState(() => _currentStep = 2),
+              onPressed: () => setState(() => _currentStep = 3),
               style: ElevatedButton.styleFrom(
                 backgroundColor: kBgDeep,
                 foregroundColor: kTextSub,
@@ -1340,7 +1472,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
                 child: Text(
-                  _photoTaken ? 'CONFIRM & NEXT' : 'TAKE PHOTO',
+                  _photoTaken ? 'COMPLETE DELIVERY' : 'TAKE PHOTO',
                   style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5),
                 ),
               ),
@@ -1351,6 +1483,9 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
     );
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // STEP 5: SUCCESS ANIMATION
+  // ══════════════════════════════════════════════════════════════════════════
   Widget _buildStepSuccess() {
     return Column(
       key: const ValueKey('step_success'),
@@ -1387,7 +1522,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Automatically routing to the next delivery...',
+          'Automatically updating and routing...',
           style: TextStyle(fontSize: 11, color: kPrimary, fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
@@ -1396,9 +1531,134 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
     );
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // HELPER WIDGETS
+  // ══════════════════════════════════════════════════════════════════════════
+  Widget _buildSectionHeader(IconData icon, String label) {
+    return Row(
+      children: [
+        Icon(icon, size: 15, color: kTextSub),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+            color: kTextSub,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMiniStepper({
+    required int value,
+    required Color color,
+    required VoidCallback? onDec,
+    required VoidCallback? onInc,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: kBgDeep,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kBorder),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onTap: onDec,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              child: Icon(Icons.remove_rounded, size: 18, color: onDec != null ? color : kMuted),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              '$value',
+              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: color),
+            ),
+          ),
+          GestureDetector(
+            onTap: onInc,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              child: Icon(Icons.add_rounded, size: 18, color: onInc != null ? color : kMuted),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactCounter({
+    required String label,
+    required int value,
+    required Color color,
+    required VoidCallback? onDec,
+    required VoidCallback? onInc,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+      decoration: BoxDecoration(
+        color: value > 0 ? color.withValues(alpha: 0.08) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: value > 0 ? color.withValues(alpha: 0.4) : kBorder),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              color: value > 0 ? color : kTextSub,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              GestureDetector(
+                onTap: onDec,
+                child: Icon(
+                  Icons.remove_circle_rounded,
+                  size: 20,
+                  color: onDec != null ? color : kMuted,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  '$value',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: value > 0 ? color : kText,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: onInc,
+                child: Icon(
+                  Icons.add_circle_rounded,
+                  size: 20,
+                  color: onInc != null ? color : kMuted,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildItemsSection({bool showReturnsInfo = true}) {
     final outstanding = widget.stop.bottlesWithCustomer;
-    final hasReturnable = outstanding > 0;
+    final hasReturnable = outstanding > 0 || widget.stop.emptyBottlesExpected > 0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -1464,45 +1724,34 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
           // Returns Info Section if applicable
           if (showReturnsInfo && hasReturnable) ...[
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
               decoration: const BoxDecoration(
-                border: Border(top: BorderSide(color: kBorder, width: 1)),
+                color: Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.vertical(bottom: Radius.circular(19)),
+                border: Border(top: BorderSide(color: Color(0xFFBBF7D0))),
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.swap_horizontal_circle_rounded, color: Colors.teal, size: 18),
-                  const SizedBox(width: 8),
-                  Text(
-                    'CONTAINER RETURNS',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 11,
-                      color: Colors.teal.shade700,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Empty Bottles to Collect',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                      color: kText,
-                    ),
+                  Row(
+                    children: [
+                      const Icon(Icons.swap_vertical_circle_rounded, color: Colors.teal, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Container Management Active',
+                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: Colors.teal.shade800),
+                      ),
+                    ],
                   ),
-                  Text(
-                    '$outstanding bottle${outstanding == 1 ? '' : 's'}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 13,
-                      color: Colors.teal,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Configured in Step 3',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.teal.shade700),
                     ),
                   ),
                 ],
@@ -1539,7 +1788,7 @@ class _ScannerAnimationWrapperState extends State<_ScannerAnimationWrapper> {
           children: [
             widget.child,
             Positioned(
-              top: 124 * value, // Adjusted top boundary for QR box inside container
+              top: 124 * value,
               left: 0,
               right: 0,
               child: Container(
@@ -1570,34 +1819,23 @@ class _QrCodePainter extends CustomPainter {
       ..color = Colors.black
       ..style = PaintingStyle.fill;
 
-    // Draw the 3 QR Code positioning markers (square boxes with inner squares)
     void drawPositioningMarker(double x, double y, double s) {
-      // Outer square
       canvas.drawRect(Rect.fromLTWH(x, y, s, s), paint);
-      // Inner white square
       canvas.drawRect(Rect.fromLTWH(x + s / 7, y + s / 7, s * 5 / 7, s * 5 / 7), Paint()..color = Colors.white);
-      // Center black square
       canvas.drawRect(Rect.fromLTWH(x + s * 2 / 7, y + s * 2 / 7, s * 3 / 7, s * 3 / 7), paint);
     }
 
-    final mSize = size.width * 0.28; // Marker size (28% of size)
-    
-    // Top-left marker
+    final mSize = size.width * 0.28;
     drawPositioningMarker(0, 0, mSize);
-    // Top-right marker
     drawPositioningMarker(size.width - mSize, 0, mSize);
-    // Bottom-left marker
     drawPositioningMarker(0, size.height - mSize, mSize);
 
-    // Draw random-looking QR grid blocks
     final cellSize = size.width / 15;
     for (int r = 0; r < 15; r++) {
       for (int c = 0; c < 15; c++) {
-        // Skip positioning markers areas
         if ((r < 5 && c < 5) || (r < 5 && c >= 10) || (r >= 10 && c < 5)) {
           continue;
         }
-        // Deterministic pseudo-random pattern based on coordinates
         final val = (r * 7 + c * 13 + (r + c) * 3) % 5 == 0 || (r * c + r + c) % 3 == 0;
         if (val) {
           canvas.drawRect(
@@ -1608,7 +1846,6 @@ class _QrCodePainter extends CustomPainter {
       }
     }
 
-    // Draw a small center block for UPI logo placeholder
     final logoSize = size.width * 0.22;
     final logoRect = Rect.fromLTWH(
       (size.width - logoSize) / 2,
@@ -1618,10 +1855,9 @@ class _QrCodePainter extends CustomPainter {
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(logoRect, const Radius.circular(4)),
-      Paint()..color = const Color(0xFF1B5E20), // Forest green background
+      Paint()..color = const Color(0xFF1B5E20),
     );
-    
-    // Draw a small white plus/icon inside the logo placeholder
+
     canvas.drawRect(
       Rect.fromLTWH(size.width / 2 - 2, size.height / 2 - 6, 4, 12),
       Paint()..color = Colors.white,

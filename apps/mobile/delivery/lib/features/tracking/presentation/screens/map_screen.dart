@@ -478,6 +478,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           paymentStatus,
           deliveryImage,
           containerReturns,
+          containerDeliveries,
         ) {
           showDialog(
             context: context,
@@ -498,6 +499,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             paymentStatus: paymentStatus,
             deliveryImage: deliveryImage,
             containerReturns: containerReturns,
+            containerDeliveries: containerDeliveries,
             onSuccess: () {
               if (mounted) {
                 Navigator.pop(context); // pop loading dialog

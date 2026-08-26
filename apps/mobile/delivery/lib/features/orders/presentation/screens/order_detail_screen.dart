@@ -153,7 +153,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => DeliveryConfirmationSheet(
         stop: _currentStop,
-        onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns) {
+        onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns, containerDeliveries) {
           if (_currentStop.orders.isEmpty) return;
           final orderId = _currentStop.orders.first.orderId;
 
@@ -169,6 +169,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             paymentStatus: paymentStatus,
             deliveryImage: deliveryImage,
             containerReturns: containerReturns,
+            containerDeliveries: containerDeliveries,
           ));
           if (mounted && Navigator.canPop(context)) {
             Navigator.pop(context); // Pop order detail screen if still open
@@ -260,11 +261,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               const SizedBox(height: 16),
             ],
 
-            // Bottle Returns Ledger Card (Only show if customer has outstanding bottles at home)
-            if (_currentStop.bottlesWithCustomer > 0 || (isDone && _currentStop.emptyBottlesCollected > 0)) ...[
-              _buildBottleLedgerCard(),
-              const SizedBox(height: 16),
-            ],
+            // Container & Packaging Overview Card
+            _buildContainerOverviewCard(),
+            const SizedBox(height: 16),
 
             // Order-wise Details Cards
             ..._buildOrderWiseCards(),
@@ -744,8 +743,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  Widget _buildBottleLedgerCard() {
-    final outstanding = (_currentStop.bottlesWithCustomer).clamp(0, 9999);
+  Widget _buildContainerOverviewCard() {
+    final outstanding = (_currentStop.totalContainersWithCustomer).clamp(0, 9999);
+    final delivering = (_currentStop.totalContainersDelivering).clamp(0, 9999);
     final statusLower = _currentStop.status.toLowerCase();
     final isDone = statusLower == 'delivered' ||
                    statusLower == 'failed' ||
@@ -753,7 +753,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                    statusLower == 'cancelled';
     final collected = isDone ? _currentStop.emptyBottlesCollected : 0;
 
-    if (outstanding <= 0 && collected <= 0) {
+    if (outstanding <= 0 && delivering <= 0 && collected <= 0 && _currentStop.containerBalances.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -761,36 +761,52 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: kSurface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: kBorder),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.opacity_rounded, color: Colors.teal, size: 20),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(
+                  color: kPrimaryPl,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.inventory_2_rounded, color: kPrimary, size: 18),
+              ),
               const SizedBox(width: 8),
               const Text(
-                'BOTTLE RETURNS',
+                'CONTAINER & PACKAGING STATUS',
                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: kTextSub, letterSpacing: 0.8),
               ),
               const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.teal.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '$outstanding to collect',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.teal.shade800,
+              if (!isDone)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF6EE7B7)),
+                  ),
+                  child: const Text(
+                    'Step 3 Collection',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.teal,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -798,9 +814,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             children: [
               Expanded(
                 child: _buildBottleIndicator(
-                  'Outstanding at Home',
+                  'Delivering Today',
+                  '$delivering',
+                  kPrimary,
+                ),
+              ),
+              Container(width: 1, height: 40, color: kBorderLt),
+              Expanded(
+                child: _buildBottleIndicator(
+                  'With Customer',
                   '$outstanding',
-                  Colors.teal,
+                  Colors.orange.shade800,
                 ),
               ),
               if (isDone) ...[
@@ -812,17 +836,31 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     kSuccess,
                   ),
                 ),
-                Container(width: 1, height: 40, color: kBorderLt),
-                Expanded(
-                  child: _buildBottleIndicator(
-                    'Remaining',
-                    '${(outstanding - collected).clamp(0, 9999)}',
-                    (outstanding - collected) > 0 ? Colors.orange.shade700 : kSuccess,
-                  ),
-                ),
               ],
             ],
           ),
+          if (!isDone) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: kBgDeep,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 14, color: kTextSub),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'You can update delivered container quantities and record empties in Step 3.',
+                      style: TextStyle(fontSize: 11, color: kTextSub, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
