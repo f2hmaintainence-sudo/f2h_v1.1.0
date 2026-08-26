@@ -393,163 +393,141 @@ class _SidebarItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            width: double.infinity,
-            margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-            padding: const EdgeInsets.fromLTRB(4, 10, 4, 10),
-            decoration: BoxDecoration(
-              color: isSelected ? Colors.white : Colors.transparent,
-              borderRadius: BorderRadius.circular(24),
-              border: isSelected
-                  ? Border.all(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.3),
-                      width: 1.2,
-                    )
-                  : Border.all(color: Colors.transparent, width: 1.2),
-              boxShadow: isSelected
-                  ? [
-                      BoxShadow(
-                        color: const Color(0xFF059669).withValues(alpha: 0.12),
-                        blurRadius: 14,
-                        offset: const Offset(0, 4),
-                      ),
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.03),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
-                      ),
-                    ]
-                  : null,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // ── Icon Circle Badge (100% Circle Shape) ──────────────────────
-                AnimatedScale(
-                  scale: isSelected ? 1.06 : 1.0,
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.easeOutBack,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: isAll
-                          ? const LinearGradient(
-                              colors: [Color(0xFF059669), Color(0xFF10B981)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            )
-                          : null,
-                      color: isAll
-                          ? null
-                          : (isSelected ? const Color(0xFFECFDF5) : Colors.white),
-                      border: Border.all(
-                        color: isAll
-                            ? Colors.white
-                            : (isSelected
-                                ? const Color(0xFF10B981)
-                                : const Color(0xFFE2E8F0)),
-                        width: isSelected ? 2.5 : 1.2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: isAll
-                              ? const Color(0xFF059669).withValues(alpha: 0.35)
-                              : (isSelected
-                                  ? const Color(0xFF10B981).withValues(alpha: 0.25)
-                                  : Colors.black.withValues(alpha: 0.04)),
-                          blurRadius: isSelected ? 10 : 4,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: isAll
-                        ? const Center(
-                            child: Icon(
-                              Icons.grid_view_rounded,
-                              color: Colors.white,
-                              size: 26,
-                            ),
-                          )
-                        : (imagePath != null && imagePath.isNotEmpty
-                              ? ClipOval(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(2),
-                                    child: buildProductImage(
-                                      catName,
-                                      imageAsset: imagePath,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                )
-                              : Center(
-                                  child: Icon(
-                                    Icons.water_drop_rounded,
-                                    color: isSelected
-                                        ? const Color(0xFF059669)
-                                        : const Color(0xFF64748B),
-                                    size: 24,
-                                  ),
-                                )),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        width: double.infinity,
+        margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+        padding: const EdgeInsets.fromLTRB(4, 10, 4, 12),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? const LinearGradient(
+                  colors: [Color(0xFFFFFFFF), Color(0xFFF0FDF4)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                )
+              : null,
+          color: isSelected ? null : Colors.transparent,
+          borderRadius: BorderRadius.circular(44),
+          border: isSelected
+              ? Border.all(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.45),
+                  width: 1.5,
+                )
+              : Border.all(color: Colors.transparent, width: 1.5),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.18),
+                    blurRadius: 16,
+                    spreadRadius: 1,
+                    offset: const Offset(0, 4),
                   ),
-                ),
-                const SizedBox(height: 6),
-                // ── Label ────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: Text(
-                    catName,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
-                      color: isSelected
-                          ? const Color(0xFF059669)
-                          : const Color(0xFF475569),
-                      height: 1.18,
-                      letterSpacing: isSelected ? -0.1 : 0,
-                    ),
+                  BoxShadow(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    blurRadius: 6,
+                    spreadRadius: -2,
+                    offset: const Offset(0, -2),
                   ),
-                ),
-              ],
-            ),
-          ),
-          // ── Left Glossy Indicator Bar ──────────────────────
-          if (isSelected)
-            Positioned(
-              left: 2,
-              top: 18,
-              bottom: 18,
+                ]
+              : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Icon Circle Badge (iPhone Glass Circle) ──────────────────────
+            AnimatedScale(
+              scale: isSelected ? 1.08 : 1.0,
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutBack,
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 250),
-                width: 3.5,
+                duration: const Duration(milliseconds: 220),
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF059669), Color(0xFF10B981)],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+                  shape: BoxShape.circle,
+                  gradient: isAll
+                      ? const LinearGradient(
+                          colors: [Color(0xFF059669), Color(0xFF10B981)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : null,
+                  color: isAll
+                      ? null
+                      : (isSelected ? const Color(0xFFECFDF5) : Colors.white),
+                  border: Border.all(
+                    color: isAll
+                        ? Colors.white
+                        : (isSelected
+                            ? const Color(0xFF10B981)
+                            : const Color(0xFFE2E8F0)),
+                    width: isSelected ? 2.5 : 1.2,
                   ),
-                  borderRadius: BorderRadius.circular(4),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.5),
-                      blurRadius: 4,
-                      offset: const Offset(1, 0),
+                      color: isAll
+                          ? const Color(0xFF059669).withValues(alpha: 0.35)
+                          : (isSelected
+                              ? const Color(0xFF10B981).withValues(alpha: 0.30)
+                              : Colors.black.withValues(alpha: 0.04)),
+                      blurRadius: isSelected ? 10 : 4,
+                      offset: const Offset(0, 3),
                     ),
                   ],
                 ),
+                child: isAll
+                    ? const Center(
+                        child: Icon(
+                          Icons.grid_view_rounded,
+                          color: Colors.white,
+                          size: 26,
+                        ),
+                      )
+                    : (imagePath != null && imagePath.isNotEmpty
+                          ? ClipOval(
+                              child: Padding(
+                                padding: const EdgeInsets.all(2),
+                                child: buildProductImage(
+                                  catName,
+                                  imageAsset: imagePath,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            )
+                          : Center(
+                              child: Icon(
+                                Icons.water_drop_rounded,
+                                color: isSelected
+                                    ? const Color(0xFF059669)
+                                    : const Color(0xFF64748B),
+                                size: 24,
+                              ),
+                            )),
               ),
             ),
-        ],
+            const SizedBox(height: 6),
+            // ── Label ────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Text(
+                catName,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                  color: isSelected
+                      ? const Color(0xFF059669)
+                      : const Color(0xFF475569),
+                  height: 1.18,
+                  letterSpacing: isSelected ? -0.1 : 0,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
