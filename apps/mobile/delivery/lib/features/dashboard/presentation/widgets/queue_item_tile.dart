@@ -354,54 +354,6 @@ class QueueItemTile extends StatelessWidget {
                   ],
                 ),
               ],
-
-              // Next Stop Prominent Delivery CTA
-              if (isHighlightedNext) ...[
-                const SizedBox(height: 12),
-                GestureDetector(
-                  onTap: isPickupConfirmed ? onDeliverTap : (onPickupRequiredTap ?? onDeliverTap),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 11),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: isPickupConfirmed
-                            ? const [Color(0xFF16A34A), Color(0xFF15803D)]
-                            : const [Color(0xFFD97706), Color(0xFFB45309)],
-                      ),
-                      borderRadius: BorderRadius.circular(13),
-                      boxShadow: [
-                        BoxShadow(
-                          color: (isPickupConfirmed ? const Color(0xFF16A34A) : const Color(0xFFD97706)).withValues(alpha: 0.28),
-                          blurRadius: 7,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          isPickupConfirmed ? Icons.check_circle_rounded : Icons.warehouse_rounded,
-                          color: Colors.white,
-                          size: 17,
-                        ),
-                        const SizedBox(width: 7),
-                        Text(
-                          isPickupConfirmed
-                              ? 'Deliver Stop #${stop.stop}'
-                              : 'Pickup Required from Warehouse',
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
             ],
           ),
         ),

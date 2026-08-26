@@ -219,7 +219,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                           ),
                                         ),
                                         child: Text(
-                                          'referral',
+                                          'REFERRAL',
                                           style: GoogleFonts.poppins(
                                             fontSize: 14,
                                             fontWeight: FontWeight.w900,
