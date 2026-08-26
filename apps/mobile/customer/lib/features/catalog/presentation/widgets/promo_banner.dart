@@ -157,23 +157,25 @@ class _PromoBannerState extends State<PromoBanner> {
   String _formatImageUrl(String rawUrl) {
     if (rawUrl.isEmpty) return '';
 
-    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
-      final uri = Uri.tryParse(rawUrl);
-      if (uri != null) {
-        const devHosts = {'localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2'};
-        if (devHosts.contains(uri.host) || uri.path.contains('/uploads/')) {
-          final pathAfterUploads = uri.path.contains('/uploads/')
-              ? uri.path.substring(uri.path.indexOf('/uploads/'))
-              : uri.path;
-          return '${ApiEndpoints.host}$pathAfterUploads';
-        }
-        return rawUrl;
-      }
+    if (rawUrl.contains('/assets/')) {
+      final pathAfterAssets = rawUrl.substring(rawUrl.indexOf('/assets/'));
+      return '${ApiEndpoints.host}$pathAfterAssets';
     }
 
     if (rawUrl.contains('/uploads/')) {
       final pathAfterUploads = rawUrl.substring(rawUrl.indexOf('/uploads/'));
       return '${ApiEndpoints.host}$pathAfterUploads';
+    }
+
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      final uri = Uri.tryParse(rawUrl);
+      if (uri != null) {
+        const devHosts = {'localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2'};
+        if (devHosts.contains(uri.host)) {
+          return '${ApiEndpoints.host}${uri.path}';
+        }
+        return rawUrl;
+      }
     }
 
     final formatted = rawUrl.startsWith('/') ? rawUrl : '/$rawUrl';
