@@ -108,6 +108,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   List<Map<String, dynamic>> _availableCoupons = const [];
   bool _loadingAvailableCoupons = false;
   double _couponsListedForSubtotal = -1;
+  bool _couponsExpanded = true;
 
   // ===== Checkout Item Filtering =====
 
@@ -1444,18 +1445,47 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
           ] else if (!applied && _availableCoupons.isNotEmpty) ...[
             const SizedBox(height: 12),
-            const Text(
-              'AVAILABLE FOR YOU',
-              style: TextStyle(
-                fontSize: 9.5,
-                fontWeight: FontWeight.w900,
-                color: kTextSub,
-                letterSpacing: 0.6,
+            InkWell(
+              onTap: () {
+                setState(() => _couponsExpanded = !_couponsExpanded);
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.local_offer_outlined,
+                      size: 13,
+                      color: kPrimary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'AVAILABLE FOR YOU (${_availableCoupons.length})',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: kTextSub,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                    const Spacer(),
+                    Icon(
+                      _couponsExpanded
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                      size: 18,
+                      color: kTextSub,
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 8),
-            for (final coupon in _availableCoupons)
-              _buildCouponOffer(coupon, checkoutItems, subtotal, customerId),
+            if (_couponsExpanded) ...[
+              const SizedBox(height: 8),
+              for (final coupon in _availableCoupons)
+                _buildCouponOffer(coupon, checkoutItems, subtotal, customerId),
+            ],
           ],
           if (_couponError != null) ...[
             const SizedBox(height: 8),
