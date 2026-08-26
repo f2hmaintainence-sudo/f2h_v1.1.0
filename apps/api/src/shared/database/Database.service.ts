@@ -33,7 +33,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly config: ConfigService,
     private readonly developer: DeveloperService,
-  ) {}
+  ) { }
 
   async onModuleInit() {
     const password = this.resolveDbPassword();
@@ -112,7 +112,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(100),
           ADD COLUMN IF NOT EXISTS paid_amount NUMERIC(10,2);
       `);
-    } catch (_) {}
+    } catch (_) { }
   }
 
   private resolveConnectionTarget(): {

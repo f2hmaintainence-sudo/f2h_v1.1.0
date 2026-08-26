@@ -852,22 +852,18 @@ export class DeliveryOrderService {
         // Update order record
         await client.query(
           `UPDATE orders 
-           SET status = $1, payment_mode = COALESCE($2, payment_mode),
+           SET status = $1,
+               payment_mode = COALESCE($2, payment_mode),
                payment_status = COALESCE($3, payment_status),
-               actual_delivery_time = NOW(),
                delivered_at = NOW(),
-               pod_image_url = COALESCE($4, pod_image_url),
-               delivery_notes = COALESCE($5, delivery_notes),
-               cash_collected = $6,
+               delivery_image = COALESCE($4, delivery_image),
                updated_at = NOW()
-           WHERE order_id = $7`,
+           WHERE order_id = $5`,
           [
             status,
             norm.paymentMode,
             norm.paymentStatus,
             norm.deliveryImage,
-            norm.notes,
-            cashCollected,
             order.order_id,
           ],
         );
@@ -876,13 +872,32 @@ export class DeliveryOrderService {
         await client.query(
           `UPDATE delivery_run_addresses
            SET delivery_status = $1,
-               payment_mode = COALESCE($2, payment_mode),
-               payment_status = COALESCE($3, payment_status),
-               delivery_image = COALESCE($4, delivery_image),
+               delivered_at = NOW(),
+               failed_reason = '',
+               delivery_image = COALESCE($2, delivery_image),
                updated_at = NOW()
-           WHERE order_id = $5`,
-          [status, norm.paymentMode, norm.paymentStatus, norm.deliveryImage, order.order_id],
+           WHERE run_id = ANY($3) AND address_id = $4`,
+          [status, norm.deliveryImage, runIds, addressId],
         );
+
+        // Update delivery_dispatch_items delivered quantities
+        if (status === 'delivered') {
+          await client.query(
+            `UPDATE delivery_dispatch_items ddi
+             SET delivered_qty = ddi.delivered_qty + sub.delivered_item_qty,
+                 updated_at = NOW()
+             FROM (
+               SELECT oi.variant_id, SUM(oi.quantity)::numeric AS delivered_item_qty
+               FROM order_items oi
+               WHERE oi.order_id = $1
+               GROUP BY oi.variant_id
+             ) sub
+             WHERE (ddi.delivery_run_id = ANY($2) OR ddi.dispatch_id IN (SELECT dispatch_id FROM delivery_dispatch WHERE delivery_run_id = ANY($2)))
+               AND ddi.product_variant_id = sub.variant_id
+               AND ddi.deleted_at IS NULL`,
+            [order.order_id, runIds],
+          );
+        }
 
         // Add order status log
         await client.query(
@@ -1209,13 +1224,34 @@ export class DeliveryOrderService {
 
       await client.query(
         `UPDATE orders 
-         SET status = $1, payment_mode = COALESCE($2, payment_mode),
+         SET status = $1,
+             payment_mode = COALESCE($2, payment_mode),
              payment_status = COALESCE($3, payment_status),
+             delivered_at = NOW(),
              delivery_image = COALESCE($4, delivery_image),
              updated_at = NOW()
          WHERE order_id = $5`,
         [status, norm.paymentMode, norm.paymentStatus, norm.deliveryImage, order.order_id],
       );
+
+      // Update delivery_dispatch_items delivered quantities
+      if (status === 'delivered' && order.delivery_run_id) {
+        await client.query(
+          `UPDATE delivery_dispatch_items ddi
+           SET delivered_qty = ddi.delivered_qty + sub.delivered_item_qty,
+               updated_at = NOW()
+           FROM (
+             SELECT oi.variant_id, SUM(oi.quantity)::numeric AS delivered_item_qty
+             FROM order_items oi
+             WHERE oi.order_id = $1
+             GROUP BY oi.variant_id
+           ) sub
+           WHERE (ddi.delivery_run_id = $2 OR ddi.dispatch_id IN (SELECT dispatch_id FROM delivery_dispatch WHERE delivery_run_id = $2))
+             AND ddi.product_variant_id = sub.variant_id
+             AND ddi.deleted_at IS NULL`,
+          [order.order_id, order.delivery_run_id],
+        );
+      }
 
       await client.query(
         `INSERT INTO order_status_logs (order_id, status, notes, changed_by)
@@ -1373,7 +1409,7 @@ export class DeliveryOrderService {
     //    so EXTRA quantities loaded at the warehouse come through untouched.
     const dispatchItemsRes = dispatch
       ? await this.db.query(
-          `SELECT
+        `SELECT
              ddi.id,
              ddi.dispatch_id,
              ddi.product_variant_id,
@@ -1393,8 +1429,8 @@ export class DeliveryOrderService {
            WHERE ddi.dispatch_id = $1
              AND ddi.deleted_at IS NULL
            ORDER BY pv.name`,
-          [dispatch.dispatch_id],
-        )
+        [dispatch.dispatch_id],
+      )
       : [];
 
     // 3. Quantities the assigned orders require, from order_items.

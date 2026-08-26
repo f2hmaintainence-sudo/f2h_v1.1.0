@@ -307,8 +307,16 @@ class _BrowseState extends State<BrowseScreen> {
     });
 
     return Container(
-      width: 78,
-      decoration: const BoxDecoration(color: Color(0xFFF1F4F6)),
+      width: 88,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        border: Border(
+          right: BorderSide(
+            color: const Color(0xFFE2E8F0).withValues(alpha: 0.8),
+            width: 1,
+          ),
+        ),
+      ),
       child: isLoadingState
           ? const Center(child: CircularProgressIndicator(color: kPrimary))
           : ListView.builder(
@@ -364,7 +372,7 @@ class _EmptyResults extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════
-//  CLEAN SIDEBAR ITEM — minimal, Blinkit/Zepto style
+//  GLASSIE SIDEBAR ITEM — Glossy glassmorphic indicator UI
 // ══════════════════════════════════════════════════════════
 class _SidebarItem extends StatelessWidget {
   final Map<String, dynamic> cat;
@@ -385,107 +393,164 @@ class _SidebarItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeInOut,
-        width: double.infinity,
-        margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+            padding: const EdgeInsets.fromLTRB(4, 10, 4, 10),
+            decoration: BoxDecoration(
+              color: isSelected ? Colors.white : Colors.transparent,
+              borderRadius: BorderRadius.circular(18),
+              border: isSelected
+                  ? Border.all(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.25),
+                      width: 1.2,
+                    )
+                  : Border.all(color: Colors.transparent, width: 1.2),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFF059669).withValues(alpha: 0.10),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ── Icon circle / squircle ──────────────────────
+                AnimatedScale(
+                  scale: isSelected ? 1.06 : 1.0,
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutBack,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      gradient: isAll
+                          ? const LinearGradient(
+                              colors: [Color(0xFF059669), Color(0xFF10B981)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : null,
+                      color: isAll
+                          ? null
+                          : (isSelected ? const Color(0xFFECFDF5) : Colors.white),
+                      borderRadius: BorderRadius.circular(26),
+                      border: Border.all(
+                        color: isAll
+                            ? Colors.white
+                            : (isSelected
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFFE2E8F0)),
+                        width: isSelected ? 2.2 : 1.2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: isAll
+                              ? const Color(0xFF059669).withValues(alpha: 0.35)
+                              : (isSelected
+                                  ? const Color(0xFF10B981).withValues(alpha: 0.22)
+                                  : Colors.black.withValues(alpha: 0.04)),
+                          blurRadius: isSelected ? 8 : 4,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: isAll
+                        ? const Center(
+                            child: Icon(
+                              Icons.grid_view_rounded,
+                              color: Colors.white,
+                              size: 25,
+                            ),
+                          )
+                        : (imagePath != null && imagePath.isNotEmpty
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(24),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(2),
+                                    child: buildProductImage(
+                                      catName,
+                                      imageAsset: imagePath,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                )
+                              : Center(
+                                  child: Icon(
+                                    Icons.water_drop_rounded,
+                                    color: isSelected
+                                        ? const Color(0xFF059669)
+                                        : const Color(0xFF64748B),
+                                    size: 24,
+                                  ),
+                                )),
                   ),
-                ]
-              : null,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // ── Icon circle / squircle ──────────────────────
-            AnimatedScale(
-              scale: isSelected ? 1.05 : 1.0,
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutBack,
+                ),
+                const SizedBox(height: 6),
+                // ── Label ────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Text(
+                    catName,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                      color: isSelected
+                          ? const Color(0xFF059669)
+                          : const Color(0xFF475569),
+                      height: 1.18,
+                      letterSpacing: isSelected ? -0.1 : 0,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // ── Left Glossy Indicator Bar ──────────────────────
+          if (isSelected)
+            Positioned(
+              left: 2,
+              top: 18,
+              bottom: 18,
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 52,
-                height: 52,
+                duration: const Duration(milliseconds: 250),
+                width: 3.5,
                 decoration: BoxDecoration(
-                  color: isAll
-                      ? kPrimary
-                      : (isSelected ? Colors.white : Colors.white),
-                  borderRadius: isAll
-                      ? BorderRadius.circular(16)
-                      : BorderRadius.circular(26),
-                  shape: BoxShape.rectangle,
-                  border: Border.all(
-                    color: isSelected ? kPrimary : const Color(0xFFEBEFF0),
-                    width: isSelected ? 2.0 : 1.0,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF059669), Color(0xFF10B981)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
                   ),
+                  borderRadius: BorderRadius.circular(4),
                   boxShadow: [
                     BoxShadow(
-                      color: isSelected
-                          ? kPrimary.withValues(alpha: 0.15)
-                          : Colors.black.withValues(alpha: 0.03),
-                      blurRadius: isSelected ? 8 : 4,
-                      offset: const Offset(0, 2),
+                      color: const Color(0xFF10B981).withValues(alpha: 0.5),
+                      blurRadius: 4,
+                      offset: const Offset(1, 0),
                     ),
                   ],
                 ),
-                child: isAll
-                    ? const Center(
-                        child: Icon(
-                          Icons.grid_view_rounded,
-                          color: Colors.white,
-                          size: 26,
-                        ),
-                      )
-                    : (imagePath != null && imagePath.isNotEmpty
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(24),
-                              child: Padding(
-                                padding: const EdgeInsets.all(2),
-                                child: buildProductImage(
-                                  catName,
-                                  imageAsset: imagePath,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            )
-                          : const Center(
-                              child: Icon(
-                                Icons.shopping_bag_outlined,
-                                color: kPrimary,
-                                size: 22,
-                              ),
-                            )),
               ),
             ),
-            const SizedBox(height: 5),
-            // ── Label ────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: Text(
-                catName,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
-                  color: isSelected ? kPrimary : kText,
-                  height: 1.15,
-                ),
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
