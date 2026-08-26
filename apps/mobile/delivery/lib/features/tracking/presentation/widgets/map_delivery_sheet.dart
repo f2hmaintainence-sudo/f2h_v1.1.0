@@ -24,111 +24,6 @@ class MapDeliverySheet extends StatefulWidget {
 }
 
 class _MapDeliverySheetState extends State<MapDeliverySheet> {
-  bool _showAllStopsList = false;
-
-  Widget _buildAllStopsList(BuildContext context, List<GroupedStop> stops) {
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: stops.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final stop = stops[index];
-        Color statusColor = StopStatusHelper.colorFor(stop.status);
-        String statusLabel = StopStatusHelper.labelFor(stop.status);
-
-        return InkWell(
-          onTap: () {
-            widget.onStopSelected(stop);
-            setState(() {
-              _showAllStopsList = false;
-            });
-          },
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: kSurface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: kBorder),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.02),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                )
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.12),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: statusColor, width: 1.5),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '${stop.stop}',
-                          style: TextStyle(
-                            color: statusColor,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        stop.customerName,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                          color: kText,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        statusLabel,
-                        style: TextStyle(
-                          color: statusColor,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  stop.address,
-                  style: const TextStyle(fontSize: 11, color: kTextSub),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                StopActionButtons(stop: stop, compact: true),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final nextStop = widget.nextStop;
@@ -172,98 +67,7 @@ class _MapDeliverySheetState extends State<MapDeliverySheet> {
                 ),
               ),
               
-              // modern segmented selector/toggle capsule control
-              Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: kBorder.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _showAllStopsList = false),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: !_showAllStopsList ? kSurface : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: !_showAllStopsList
-                                ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]
-                                : null,
-                          ),
-                          child: Center(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.gps_fixed_rounded,
-                                  size: 14,
-                                  color: !_showAllStopsList ? kPrimary : kTextSub,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Current Stop',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w900,
-                                    color: !_showAllStopsList ? kPrimary : kTextSub,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _showAllStopsList = true),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: _showAllStopsList ? kSurface : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: _showAllStopsList
-                                ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]
-                                : null,
-                          ),
-                          child: Center(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.format_list_bulleted_rounded,
-                                  size: 14,
-                                  color: _showAllStopsList ? kPrimary : kTextSub,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'All Stops (${widget.groupedStops.length})',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w900,
-                                    color: _showAllStopsList ? kPrimary : kTextSub,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 4),
-
-              if (_showAllStopsList)
-                _buildAllStopsList(context, widget.groupedStops)
-              else ...[
-                // Collapsed Header summary (always visible at top of scroll)
+              // Collapsed Header summary (always visible at top of scroll)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -508,7 +312,6 @@ class _MapDeliverySheetState extends State<MapDeliverySheet> {
                   ],
                 ),
                 const SizedBox(height: 20),
-              ]
             ],
           ),
         );
