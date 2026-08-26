@@ -275,12 +275,14 @@ export class DiscountEngineService {
          p.allow_subscription_orders, p.first_order_only,
          p.apply_to_all_products,
          p.usage_limit_per_customer AS promo_upc,
-          (
-            SELECT COUNT(*) FROM coupon_redemptions cr
-              WHERE cr.coupon_id = c.coupon_id AND cr.customer_id = $1
-          ) + (
-            SELECT COUNT(*) FROM orders o
-              WHERE UPPER(o.coupon_code) = UPPER(c.code) AND o.customer_id = $1 AND o.status != 'cancelled'
+          COALESCE(
+            (SELECT COUNT(*) FROM coupon_redemptions cr
+              WHERE cr.coupon_id = c.coupon_id AND cr.customer_id = NULLIF($1, '')),
+            0
+          ) + COALESCE(
+            (SELECT COUNT(*) FROM orders o
+              WHERE UPPER(o.coupon_code) = UPPER(c.code) AND o.customer_id = NULLIF($1, '') AND o.status != 'cancelled'),
+            0
           ) AS customer_used,
          COALESCE(
            (SELECT ARRAY_AGG(pp.product_variant_id) FROM promotion_products pp
@@ -297,7 +299,7 @@ export class DiscountEngineService {
          AND (p.end_at IS NULL OR p.end_at >= NOW())
          AND (c.usage_limit IS NULL OR c.used_count < c.usage_limit)
        ORDER BY p.discount_value DESC`,
-      [customerId],
+      [customerId || ''],
     );
 
     const available: Array<any> = [];
