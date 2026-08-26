@@ -114,20 +114,20 @@ export class DeliveryOrderService {
 
     // 1. Fetch expected containers by order
     const expectedContainersRes = await this.db.query(
-      `SELECT oi.order_id, pv.container_id, c.name AS container_name, SUM(oi.quantity)::int AS expected
+      `SELECT oi.order_id, COALESCE(pv.container_id, p.container_id) AS container_id, COALESCE(c.name, 'Glass Bottle') AS container_name, SUM(oi.quantity)::int AS expected
        FROM order_items oi
        JOIN product_variants pv ON pv.variant_id = oi.variant_id
        JOIN products p ON p.product_id = pv.product_id
-       JOIN containers c ON c.container_id = pv.container_id
-       WHERE oi.order_id = ANY($1) AND COALESCE(c.is_returnable, p.is_returnable, false) = true
-       GROUP BY oi.order_id, pv.container_id, c.name`,
+       LEFT JOIN containers c ON (c.container_id = pv.container_id OR c.container_id = p.container_id OR c.id::text = pv.container_id OR c.id::text = p.container_id)
+       WHERE oi.order_id = ANY($1) AND (COALESCE(c.is_returnable, p.is_returnable, false) = true OR pv.container_id IS NOT NULL OR p.container_id IS NOT NULL)
+       GROUP BY oi.order_id, COALESCE(pv.container_id, p.container_id), c.name`,
       [orderIds],
     );
 
     const expectedContainersMap: Record<string, Record<string, { name: string; expected: number }>> = {};
     for (const row of expectedContainersRes || []) {
       const oid = String(row.order_id);
-      const cid = String(row.container_id);
+      const cid = String(row.container_id || 'CONT-001');
       if (!expectedContainersMap[oid]) expectedContainersMap[oid] = {};
       expectedContainersMap[oid][cid] = { name: row.container_name, expected: row.expected };
     }
@@ -184,7 +184,9 @@ export class DeliveryOrderService {
         containersToCollect.push({
           container_id: cid,
           name,
+          expected: expected,
           expected_delivery: expected,
+          balance: balance,
           customer_balance: balance,
           max_collectable: expected + balance,
           collected,
@@ -232,6 +234,7 @@ export class DeliveryOrderService {
         empty_bottles_collected: collectedBottlesByOrder[ordId] || 0,
         bottles_with_customer: bottlesWithCustomerByCustomer[custId] || 0,
         containers_to_collect: containersToCollect,
+        container_balances: containersToCollect,
         products: itemsByOrder[ordId] || [],
       };
     });
@@ -774,39 +777,74 @@ export class DeliveryOrderService {
 
         // Issue containers FIRST (so the balance exists before we try to collect empties)
         if (status === 'delivered') {
-          const returnableItems = await client.query(
-            `SELECT oi.quantity, pv.container_id
-             FROM order_items oi
-             JOIN product_variants pv ON pv.variant_id = oi.variant_id
-             JOIN products p ON p.product_id = pv.product_id
-             LEFT JOIN containers c ON c.container_id = pv.container_id
-             WHERE oi.order_id = $1
-               AND pv.container_id IS NOT NULL
-               AND COALESCE(c.is_returnable, p.is_returnable, false) = true`,
-            [order.order_id],
-          );
-          for (const item of returnableItems.rows || []) {
-            await this.handleContainerIssue(client, {
-              customerId: order.customer_id,
-              referenceOrderId: order.order_id,
-              containerId: item.container_id,
-              quantity: Number(item.quantity),
-              createdBy: boy.full_name,
-            });
+          if (Array.isArray(body.container_deliveries) && body.container_deliveries.length > 0) {
+            for (const item of body.container_deliveries) {
+              const qty = Number(item.quantity ?? item.delivered ?? item.expected ?? 0);
+              if (qty > 0) {
+                await this.handleContainerIssue(client, {
+                  customerId: order.customer_id,
+                  referenceOrderId: order.order_id,
+                  containerId: item.container_id || 'CONT-001',
+                  quantity: qty,
+                  createdBy: boy.full_name,
+                });
+              }
+            }
+          } else {
+            const returnableItems = await client.query(
+              `SELECT oi.quantity, COALESCE(pv.container_id, p.container_id, 'CONT-001') AS container_id
+               FROM order_items oi
+               JOIN product_variants pv ON pv.variant_id = oi.variant_id
+               JOIN products p ON p.product_id = pv.product_id
+               LEFT JOIN containers c ON (c.container_id = pv.container_id OR c.container_id = p.container_id)
+               WHERE oi.order_id = $1
+                 AND (pv.container_id IS NOT NULL OR p.container_id IS NOT NULL)
+                 AND COALESCE(c.is_returnable, p.is_returnable, false) = true`,
+              [order.order_id],
+            );
+            for (const item of returnableItems.rows || []) {
+              await this.handleContainerIssue(client, {
+                customerId: order.customer_id,
+                referenceOrderId: order.order_id,
+                containerId: item.container_id,
+                quantity: Number(item.quantity),
+                createdBy: boy.full_name,
+              });
+            }
           }
         }
 
         // Perform bottle/container collection ONLY ONCE for the stop to prevent duplication
-        if (norm.bottles > 0 && isFirstOrder) {
-          await this.handleBottleReturn(client, {
-            customerId: order.customer_id,
-            referenceOrderId: order.order_id,
-            returned: norm.bottles,
-            damaged: norm.damagedContainers,
-            lost: norm.lostContainers,
-            remarks: norm.notes,
-            createdBy: boy.full_name,
-          });
+        if (isFirstOrder) {
+          if (Array.isArray(body.container_returns) && body.container_returns.length > 0) {
+            for (const cr of body.container_returns) {
+              const ret = Number(cr.returned ?? 0);
+              const dam = Number(cr.damaged ?? 0);
+              const lost = Number(cr.lost ?? 0);
+              if (ret > 0 || dam > 0 || lost > 0) {
+                await this.handleContainerReturn(client, {
+                  customerId: order.customer_id,
+                  referenceOrderId: order.order_id,
+                  containerId: cr.container_id || 'CONT-001',
+                  returned: ret,
+                  damaged: dam,
+                  lost: lost,
+                  remarks: norm.notes,
+                  createdBy: boy.full_name,
+                });
+              }
+            }
+          } else if (norm.bottles > 0) {
+            await this.handleBottleReturn(client, {
+              customerId: order.customer_id,
+              referenceOrderId: order.order_id,
+              returned: norm.bottles,
+              damaged: norm.damagedContainers,
+              lost: norm.lostContainers,
+              remarks: norm.notes,
+              createdBy: boy.full_name,
+            });
+          }
         }
 
         const cashCollected = this.computeCashCollected(norm, [order], status, norm.paymentMode);
@@ -1099,30 +1137,63 @@ export class DeliveryOrderService {
     await this.db.transaction(async (client) => {
       // Issue containers FIRST so the balance exists before collection check
       if (status === 'delivered') {
-        const returnableItems = await client.query(
-          `SELECT oi.quantity, pv.container_id
-           FROM order_items oi
-           JOIN product_variants pv ON pv.variant_id = oi.variant_id
-           JOIN products p ON p.product_id = pv.product_id
-           LEFT JOIN containers c ON c.container_id = pv.container_id
-           WHERE oi.order_id = $1
-             AND pv.container_id IS NOT NULL
-             AND COALESCE(c.is_returnable, p.is_returnable, false) = true`,
-          [order.order_id],
-        );
-        for (const item of returnableItems.rows || []) {
-          await this.handleContainerIssue(client, {
-            customerId: order.customer_id,
-            referenceOrderId: order.order_id,
-            containerId: item.container_id,
-            quantity: Number(item.quantity),
-            createdBy: boy.full_name,
-          });
+        if (Array.isArray(body.container_deliveries) && body.container_deliveries.length > 0) {
+          for (const item of body.container_deliveries) {
+            const qty = Number(item.quantity ?? item.delivered ?? item.expected ?? 0);
+            if (qty > 0) {
+              await this.handleContainerIssue(client, {
+                customerId: order.customer_id,
+                referenceOrderId: order.order_id,
+                containerId: item.container_id || 'CONT-001',
+                quantity: qty,
+                createdBy: boy.full_name,
+              });
+            }
+          }
+        } else {
+          const returnableItems = await client.query(
+            `SELECT oi.quantity, COALESCE(pv.container_id, p.container_id, 'CONT-001') AS container_id
+             FROM order_items oi
+             JOIN product_variants pv ON pv.variant_id = oi.variant_id
+             JOIN products p ON p.product_id = pv.product_id
+             LEFT JOIN containers c ON (c.container_id = pv.container_id OR c.container_id = p.container_id)
+             WHERE oi.order_id = $1
+               AND (pv.container_id IS NOT NULL OR p.container_id IS NOT NULL)
+               AND COALESCE(c.is_returnable, p.is_returnable, false) = true`,
+            [order.order_id],
+          );
+          for (const item of returnableItems.rows || []) {
+            await this.handleContainerIssue(client, {
+              customerId: order.customer_id,
+              referenceOrderId: order.order_id,
+              containerId: item.container_id,
+              quantity: Number(item.quantity),
+              createdBy: boy.full_name,
+            });
+          }
         }
       }
 
       // Now collect returned containers (balance already updated above)
-      if (norm.bottles > 0) {
+      if (Array.isArray(body.container_returns) && body.container_returns.length > 0) {
+        for (const cr of body.container_returns) {
+          const ret = Number(cr.returned ?? 0);
+          const dam = Number(cr.damaged ?? 0);
+          const lost = Number(cr.lost ?? 0);
+          if (ret > 0 || dam > 0 || lost > 0) {
+            await this.handleContainerReturn(client, {
+              customerId: order.customer_id,
+              referenceOrderId: order.order_id,
+              containerId: cr.container_id || 'CONT-001',
+              returned: ret,
+              damaged: dam,
+              lost: lost,
+              remarks: norm.notes,
+              createdBy: boy.full_name,
+            });
+          }
+        }
+      } else if (norm.bottles > 0) {
         await this.handleBottleReturn(client, {
           customerId: order.customer_id,
           referenceOrderId: order.order_id,

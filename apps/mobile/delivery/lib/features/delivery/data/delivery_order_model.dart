@@ -109,9 +109,26 @@ class DeliveryOrderModel {
     final items = (json['products'] as List<dynamic>? ?? [])
         .map((e) => DeliveryOrderItem.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
-    final containerBalancesList = (json['container_balances'] as List<dynamic>? ?? [])
+    final rawContainers = (json['container_balances'] as List<dynamic>?) ??
+        (json['containers_to_collect'] as List<dynamic>?) ??
+        (json['containers'] as List<dynamic>?);
+    List<CustomerContainerBalance> containerBalancesList = (rawContainers ?? [])
         .map((e) => CustomerContainerBalance.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
+
+    final emptyExp = _toInt(json['empty_bottles_expected']);
+    final withCust = _toInt(json['bottles_with_customer']);
+    if (containerBalancesList.isEmpty && (emptyExp > 0 || withCust > 0)) {
+      containerBalancesList = [
+        CustomerContainerBalance(
+          containerId: 'CONT-001',
+          name: 'Glass Bottle',
+          balance: withCust,
+          expected: emptyExp,
+          collected: _toInt(json['empty_bottles_collected']),
+        ),
+      ];
+    }
     return DeliveryOrderModel(
       orderId: json['order_id']?.toString() ?? '',
       subscriptionId: json['subscription_id']?.toString(),
@@ -299,7 +316,33 @@ class GroupedStop {
 
   int get bottlesWithCustomer => orders.isEmpty ? 0 : (orders.first.bottlesWithCustomer ?? 0);
 
-  List<CustomerContainerBalance> get containerBalances => orders.isEmpty ? const [] : orders.first.containerBalances;
+  int get totalContainersDelivering =>
+      containerBalances.fold(0, (sum, cb) => sum + cb.expected);
+
+  int get totalContainersWithCustomer =>
+      containerBalances.fold(0, (sum, cb) => sum + cb.balance);
+
+  List<CustomerContainerBalance> get containerBalances {
+    if (orders.isEmpty) return const [];
+    final Map<String, CustomerContainerBalance> map = {};
+    for (var o in orders) {
+      for (var cb in o.containerBalances) {
+        if (!map.containsKey(cb.containerId)) {
+          map[cb.containerId] = cb;
+        } else {
+          final existing = map[cb.containerId]!;
+          map[cb.containerId] = CustomerContainerBalance(
+            containerId: existing.containerId,
+            name: existing.name,
+            balance: existing.balance,
+            expected: existing.expected + cb.expected,
+            collected: existing.collected + cb.collected,
+          );
+        }
+      }
+    }
+    return map.values.toList();
+  }
 
   List<DeliveryOrderItem> get products {
     final List<DeliveryOrderItem> items = [];
@@ -402,18 +445,32 @@ class CustomerContainerBalance {
   final String containerId;
   final String name;
   final int balance;
+  final int expected;
+  final int collected;
 
   const CustomerContainerBalance({
     required this.containerId,
     required this.name,
     required this.balance,
+    this.expected = 0,
+    this.collected = 0,
   });
 
   factory CustomerContainerBalance.fromJson(Map<String, dynamic> json) {
     return CustomerContainerBalance(
-      containerId: json['container_id']?.toString() ?? json['packaging_type_id']?.toString() ?? '',
-      name: json['name']?.toString() ?? '',
-      balance: _toInt(json['balance']),
+      containerId: json['container_id']?.toString() ?? json['packaging_type_id']?.toString() ?? 'CONT-001',
+      name: json['name']?.toString() ?? json['container_name']?.toString() ?? 'Glass Bottle',
+      balance: _toInt(json['balance'] ?? json['customer_balance'] ?? json['bottles_with_customer']),
+      expected: _toInt(json['expected'] ?? json['expected_delivery'] ?? json['empty_bottles_expected']),
+      collected: _toInt(json['collected'] ?? json['empty_bottles_collected']),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'container_id': containerId,
+    'name': name,
+    'balance': balance,
+    'expected': expected,
+    'collected': collected,
+  };
 }

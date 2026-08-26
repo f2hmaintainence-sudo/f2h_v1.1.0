@@ -45,6 +45,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
     String? paymentStatus,
     String? deliveryImage,
     List<Map<String, dynamic>>? containerReturns,
+    List<Map<String, dynamic>>? containerDeliveries,
   }) async {
     try {
       String? resolvedImageUrl = deliveryImage;
@@ -89,6 +90,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
           if (paymentStatus != null) 'payment_status': paymentStatus,
           if (resolvedImageUrl != null) 'delivery_image': resolvedImageUrl,
           if (containerReturns != null) 'container_returns': containerReturns,
+          if (containerDeliveries != null) 'container_deliveries': containerDeliveries,
         },
       );
       final data = response.data;
@@ -146,6 +148,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
     double? latitude,
     double? longitude,
     List<Map<String, dynamic>>? containerReturns,
+    List<Map<String, dynamic>>? containerDeliveries,
   }) async {
     try {
       String? resolvedImageUrl = deliveryImage;
@@ -193,6 +196,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
           if (latitude != null) 'latitude': latitude,
           if (longitude != null) 'longitude': longitude,
           if (containerReturns != null) 'container_returns': containerReturns,
+          if (containerDeliveries != null) 'container_deliveries': containerDeliveries,
         },
       );
       final data = response.data;

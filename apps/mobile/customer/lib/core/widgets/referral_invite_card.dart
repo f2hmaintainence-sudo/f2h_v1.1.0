@@ -47,99 +47,105 @@ class ReferralInviteCard extends StatelessWidget {
 
         return Padding(
           padding: margin,
-          child: GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ReferralScreen(
-                  referralCode: rawCode,
-                  referralStatus: rawStatus,
-                ),
-              ),
-            ),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: _forest.withValues(alpha: 0.28),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
+          child: Align(
+            alignment: Alignment.center,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 500),
+              child: GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ReferralScreen(
+                      referralCode: rawCode,
+                      referralStatus: rawStatus,
+                    ),
                   ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Stack(
-                  children: [
-                    // Base gradient matching profile card theme
-                    Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Color(0xFF0D331E),
-                              Color(0xFF16A34A),
-                              Color(0xFF15803D),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
+                ),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _forest.withValues(alpha: 0.28),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
                       ),
-                    ),
-                    // Leaf watermark background decor
-                    Positioned(
-                      right: -15,
-                      bottom: -20,
-                      child: Icon(
-                        Icons.eco_rounded,
-                        size: 140,
-                        color: Colors.white.withValues(alpha: 0.08),
-                      ),
-                    ),
-                    // Soft light bloom
-                    Positioned(right: -34, top: -46, child: _glow(126, 0.08)),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 15),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _header(isLocked: isLocked, isLoggedIn: isLoggedIn),
-                          const SizedBox(height: 13),
-                          Divider(
-                            height: 1,
-                            thickness: 1,
-                            color: Colors.white.withValues(alpha: 0.12),
-                          ),
-                          const SizedBox(height: 13),
-                          if (code != null)
-                            _activeRow(context, code)
-                          else if (isLocked)
-                            _noticeRow(
-                              icon: Icons.lock_clock_rounded,
-                              text:
-                                  'Place your first order to unlock your invite code.',
-                            )
-                          else
-                            _noticeRow(
-                              icon: Icons.login_rounded,
-                              text: 'Sign in to get your personal invite code.',
-                              actionLabel: 'View',
-                              onAction: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ReferralScreen(
-                                    referralCode: rawCode,
-                                    referralStatus: rawStatus,
-                                  ),
-                                ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Stack(
+                      children: [
+                        // Base gradient matching profile card theme
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Color(0xFF0D331E),
+                                  Color(0xFF16A34A),
+                                  Color(0xFF15803D),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
                               ),
                             ),
-                        ],
-                      ),
+                          ),
+                        ),
+                        // Leaf watermark background decor
+                        Positioned(
+                          right: -15,
+                          bottom: -20,
+                          child: Icon(
+                            Icons.eco_rounded,
+                            size: 140,
+                            color: Colors.white.withValues(alpha: 0.08),
+                          ),
+                        ),
+                        // Soft light bloom
+                        Positioned(right: -34, top: -46, child: _glow(126, 0.08)),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 15),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _header(isLocked: isLocked, isLoggedIn: isLoggedIn),
+                              const SizedBox(height: 13),
+                              Divider(
+                                height: 1,
+                                thickness: 1,
+                                color: Colors.white.withValues(alpha: 0.12),
+                              ),
+                              const SizedBox(height: 13),
+                              if (code != null)
+                                _activeRow(context, code)
+                              else if (isLocked)
+                                _noticeRow(
+                                  icon: Icons.lock_clock_rounded,
+                                  text:
+                                      'Place your first order to unlock your invite code.',
+                                )
+                              else
+                                _noticeRow(
+                                  icon: Icons.login_rounded,
+                                  text: 'Sign in to get your personal invite code.',
+                                  actionLabel: 'View',
+                                  onAction: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ReferralScreen(
+                                        referralCode: rawCode,
+                                        referralStatus: rawStatus,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -204,16 +210,19 @@ class ReferralInviteCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 3),
-              const Text(
-                'Invite friends, earn ₹100 each',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  height: 1.15,
-                  letterSpacing: -0.3,
+              const FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Invite friends, earn ₹100 each',
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    height: 1.15,
+                    letterSpacing: -0.3,
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -235,104 +244,112 @@ class ReferralInviteCard extends StatelessWidget {
   // ── Bottom half: the code block plus the share button ──────────────────
 
   Widget _activeRow(BuildContext context, String code) {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _copyCode(context, code),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.4),
-                    width: 1.2,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            'YOUR CODE',
-                            style: TextStyle(
-                              fontSize: 8.5,
-                              fontWeight: FontWeight.w900,
-                              color: _mint,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              code,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                                letterSpacing: 1.6,
-                              ),
-                            ),
-                          ),
-                        ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 340;
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _copyCode(context, code),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isNarrow ? 10 : 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.4),
+                        width: 1.2,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Icon(
-                      Icons.copy_rounded,
-                      size: 16,
-                      color: Colors.white.withValues(alpha: 0.85),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text(
+                                'YOUR CODE',
+                                style: TextStyle(
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: _mint,
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  code,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                    letterSpacing: 1.6,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Icon(
+                          Icons.copy_rounded,
+                          size: 15,
+                          color: Colors.white.withValues(alpha: 0.85),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          GestureDetector(
-            onTap: () => _shareCode(context, code),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.14),
-                    blurRadius: 6,
-                    offset: const Offset(0, 3),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () => _shareCode(context, code),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: isNarrow ? 12 : 18),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.14),
+                        blurRadius: 6,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.share_rounded, color: _forest, size: 15),
-                  SizedBox(width: 6),
-                  Text(
-                    'Share',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      color: _forest,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.share_rounded, color: _forest, size: 15),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Share',
+                        style: TextStyle(
+                          fontSize: isNarrow ? 12 : 13,
+                          fontWeight: FontWeight.w900,
+                          color: _forest,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

@@ -276,6 +276,7 @@ class DeliverySessionBloc
           latitude: lat,
           longitude: lng,
           containerReturns: event.containerReturns,
+          containerDeliveries: event.containerDeliveries,
         );
       } else {
         success = await _ordersRepo.updateOrderStatus(
@@ -290,6 +291,7 @@ class DeliverySessionBloc
           paymentStatus: event.paymentStatus,
           deliveryImage: event.deliveryImage,
           containerReturns: event.containerReturns,
+          containerDeliveries: event.containerDeliveries,
         );
       }
 
