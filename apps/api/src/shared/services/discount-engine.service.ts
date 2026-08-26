@@ -279,10 +279,6 @@ export class DiscountEngineService {
             (SELECT COUNT(*) FROM coupon_redemptions cr
               WHERE cr.coupon_id = c.coupon_id AND cr.customer_id = NULLIF($1, '')),
             0
-          ) + COALESCE(
-            (SELECT COUNT(*) FROM orders o
-              WHERE UPPER(o.coupon_code) = UPPER(c.code) AND o.customer_id = NULLIF($1, '') AND o.status != 'cancelled'),
-            0
           ) AS customer_used,
          COALESCE(
            (SELECT ARRAY_AGG(pp.product_variant_id) FROM promotion_products pp
@@ -743,12 +739,10 @@ export class DiscountEngineService {
     if (row.coupon_usage_limit != null && row.used_count >= row.coupon_usage_limit)
       return { valid: false, message: 'This coupon has reached its usage limit', coupon: null, promotion: null };
 
-    // Per-customer usage limit (checks both coupon_redemptions and placed orders)
+    // Per-customer usage limit
     const usedRows = await this.db.query(
-      `SELECT
-        (SELECT COUNT(*) FROM coupon_redemptions WHERE coupon_id = $1 AND customer_id = $2) +
-        (SELECT COUNT(*) FROM orders WHERE UPPER(coupon_code) = UPPER($3) AND customer_id = $2 AND status != 'cancelled') AS cnt`,
-      [row.coupon_id, customerId, row.code],
+      `SELECT COUNT(*) AS cnt FROM coupon_redemptions WHERE coupon_id = $1 AND customer_id = $2`,
+      [row.coupon_id, customerId],
     );
     const customerUsed = Number(usedRows?.[0]?.cnt ?? 0);
     const perCustLimit = Number(row.coupon_upc ?? row.promo_upc ?? 1);

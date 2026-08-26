@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post, Query, Req } from '@nestjs/common';
 import { CartDto, CheckOutDto } from '../dto/cart.dto';
 import { CartService } from '../ModuleServices/cartAndCheckout.service';
 import { Request } from 'express';
+import { Public } from 'src/auth/decorators/public.decorator';
 
 @Controller({ path: 'customer', version: '1' })
 export class CartController {
@@ -29,6 +30,7 @@ export class CartController {
     return this.cartService.checkout(body, req);
   }
 
+  @Public()
   @Post('/coupon/validate')
   async validateCoupon(@Req() req: Request, @Body() body: { coupon_code: string; subtotal?: number }) {
     const customerId = (req.user as any)?.user_id;
@@ -36,6 +38,7 @@ export class CartController {
   }
 
   /** Coupons this customer can pick from, priced against the cart subtotal. */
+  @Public()
   @Get('/coupons')
   async listCoupons(@Req() req: Request, @Query('subtotal') subtotal?: string) {
     const customerId = (req.user as any)?.user_id;
