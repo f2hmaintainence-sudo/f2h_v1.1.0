@@ -216,6 +216,12 @@ class Product {
     ];
   }
 
+  bool get hasSubscription {
+    if (isSubscribable) return true;
+    if (subscriptionPrice != null && subscriptionPrice! > 0) return true;
+    return allVariants.any((v) => v.subscriptionPrice != null && v.subscriptionPrice! > 0);
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,

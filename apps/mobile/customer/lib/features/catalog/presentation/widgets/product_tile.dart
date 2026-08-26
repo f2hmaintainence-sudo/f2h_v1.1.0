@@ -588,7 +588,7 @@ class ProductCardH extends StatelessWidget {
                     ),
                   ),
                 // Subscribe badge — opens SubscriptionSetupScreen when tapped
-                if (p.isSubscribable || p.subscriptionPrice != null || p.allVariants.any((v) => v.subscriptionPrice != null && v.subscriptionPrice! > 0))
+                if (p.hasSubscription)
                   Positioned(
                     bottom: 6,
                     left: 6,
@@ -827,7 +827,7 @@ class ProductCardV extends StatelessWidget {
                                       ),
                                     ),
                                   ),
-                                if (p.isSubscribable || p.subscriptionPrice != null || p.allVariants.any((v) => v.subscriptionPrice != null && v.subscriptionPrice! > 0))
+                                if (p.hasSubscription)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 4, bottom: 2),
                                     child: SubscriptionButton(
