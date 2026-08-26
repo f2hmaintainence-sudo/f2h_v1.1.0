@@ -161,28 +161,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _loadAvailableCoupons(double subtotal) async {
     if (_loadingAvailableCoupons) return;
-    _loadingAvailableCoupons = true;
-    _couponsListedForSubtotal = subtotal;
+    setState(() => _loadingAvailableCoupons = true);
 
     try {
       final coupons = await sl<CheckoutRepository>().getAvailableCoupons(
         subtotal,
       );
       if (!mounted) return;
-      setState(() => _availableCoupons = coupons);
+      setState(() {
+        _availableCoupons = coupons;
+        _couponsListedForSubtotal = subtotal;
+      });
     } catch (_) {
-      // A failed lookup just means no suggestions — typing a code still works.
       if (mounted && _availableCoupons.isNotEmpty) {
         setState(() => _availableCoupons = const []);
       }
     } finally {
-      _loadingAvailableCoupons = false;
+      if (mounted) {
+        setState(() => _loadingAvailableCoupons = false);
+      }
     }
   }
 
   /// Fetches the coupon list on first build and after the subtotal changes.
   void _refreshAvailableCouponsIfNeeded(double subtotal) {
-    if ((subtotal - _couponsListedForSubtotal).abs() < 0.01) return;
+    if ((subtotal - _couponsListedForSubtotal).abs() < 0.01 && _availableCoupons.isNotEmpty) return;
+    if (_loadingAvailableCoupons) return;
     _couponsListedForSubtotal = subtotal;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _loadAvailableCoupons(subtotal);
@@ -1426,7 +1430,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ),
               ],
             ),
-          if (!applied && _availableCoupons.isNotEmpty) ...[
+          if (!applied && _loadingAvailableCoupons && _availableCoupons.isEmpty) ...[
+            const SizedBox(height: 12),
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary),
+                ),
+              ),
+            ),
+          ] else if (!applied && _availableCoupons.isNotEmpty) ...[
             const SizedBox(height: 12),
             const Text(
               'AVAILABLE FOR YOU',
