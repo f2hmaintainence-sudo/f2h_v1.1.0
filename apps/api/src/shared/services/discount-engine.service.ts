@@ -308,19 +308,29 @@ export class DiscountEngineService {
       if (orderSource === 'subscription' && !row.allow_subscription_orders) continue;
 
       const perCustLimit = Number(row.coupon_upc ?? row.promo_upc ?? 1);
-      if (Number(row.customer_used ?? 0) >= perCustLimit) continue;
+      if (customerId && Number(row.customer_used ?? 0) >= perCustLimit) continue;
 
+      let isFirstOrderEligible = true;
+      let firstOrderReason: string | null = null;
       if (row.first_order_only) {
         const variantIds: string[] = row.product_variant_ids || [];
         const spent =
           row.apply_to_all_products || variantIds.length === 0
             ? await this.customerHasAnyPriorOrder(customerId)
             : await this.customerHasPriorPurchaseOfVariants(customerId, variantIds);
-        if (spent) continue;
+        if (spent) {
+          isFirstOrderEligible = false;
+          firstOrderReason = 'Valid on first order only';
+        }
       }
 
       const minAmount = Number(row.minimum_order_amount || 0);
       const meetsMinimum = minAmount <= 0 || subtotal >= minAmount;
+      const isEligible = meetsMinimum && isFirstOrderEligible;
+
+      const reason = !meetsMinimum
+        ? `Add ₹${(minAmount - subtotal).toFixed(0)} more to use this coupon`
+        : (!isFirstOrderEligible ? firstOrderReason : null);
 
       const promo: PromotionRow = {
         promotion_id: row.promotion_id,
@@ -358,12 +368,10 @@ export class DiscountEngineService {
         applies_to_all_products: appliesToWholeCart,
         end_at: row.end_at ? new Date(row.end_at).toISOString() : null,
         first_order_only: !!row.first_order_only,
-        eligible: meetsMinimum,
-        reason: meetsMinimum
-          ? null
-          : `Add ₹${(minAmount - subtotal).toFixed(0)} more to use this coupon`,
+        eligible: isEligible,
+        reason: reason,
         discount_preview:
-          meetsMinimum && appliesToWholeCart
+          isEligible && appliesToWholeCart
             ? this.calcRawItemDiscount(promo, subtotal)
             : 0,
       });
