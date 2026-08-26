@@ -275,11 +275,13 @@ export class DiscountEngineService {
          p.allow_subscription_orders, p.first_order_only,
          p.apply_to_all_products,
          p.usage_limit_per_customer AS promo_upc,
-         COALESCE(
-           (SELECT COUNT(*) FROM coupon_redemptions cr
-             WHERE cr.coupon_id = c.coupon_id AND cr.customer_id = $1),
-           0
-         ) AS customer_used,
+          (
+            SELECT COUNT(*) FROM coupon_redemptions cr
+              WHERE cr.coupon_id = c.coupon_id AND cr.customer_id = $1
+          ) + (
+            SELECT COUNT(*) FROM orders o
+              WHERE UPPER(o.coupon_code) = UPPER(c.code) AND o.customer_id = $1 AND o.status != 'cancelled'
+          ) AS customer_used,
          COALESCE(
            (SELECT ARRAY_AGG(pp.product_variant_id) FROM promotion_products pp
              WHERE pp.promotion_id = p.promotion_id),
@@ -731,15 +733,17 @@ export class DiscountEngineService {
     if (row.coupon_usage_limit != null && row.used_count >= row.coupon_usage_limit)
       return { valid: false, message: 'This coupon has reached its usage limit', coupon: null, promotion: null };
 
-    // Per-customer usage limit
+    // Per-customer usage limit (checks both coupon_redemptions and placed orders)
     const usedRows = await this.db.query(
-      `SELECT COUNT(*) AS cnt FROM coupon_redemptions WHERE coupon_id = $1 AND customer_id = $2`,
-      [row.coupon_id, customerId],
+      `SELECT
+        (SELECT COUNT(*) FROM coupon_redemptions WHERE coupon_id = $1 AND customer_id = $2) +
+        (SELECT COUNT(*) FROM orders WHERE UPPER(coupon_code) = UPPER($3) AND customer_id = $2 AND status != 'cancelled') AS cnt`,
+      [row.coupon_id, customerId, row.code],
     );
     const customerUsed = Number(usedRows?.[0]?.cnt ?? 0);
     const perCustLimit = Number(row.coupon_upc ?? row.promo_upc ?? 1);
     if (customerUsed >= perCustLimit)
-      return { valid: false, message: 'You have already used this coupon', coupon: null, promotion: null };
+      return { valid: false, message: 'You have already used this coupon code', coupon: null, promotion: null };
 
     // First order check if coupon requires first order
     if (row.first_order_only) {
