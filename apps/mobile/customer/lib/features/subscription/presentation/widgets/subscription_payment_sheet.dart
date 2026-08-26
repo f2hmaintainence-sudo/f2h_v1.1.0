@@ -61,303 +61,310 @@ class SubscriptionPaymentSheet extends StatelessWidget {
     final combinedPostpaidTotal = existingPostpaidCommitted + monthlyEstimateForCreditCheck;
     final isPostpaidOverLimit = !isPostpaidEnabled || (creditLimit > 0 && combinedPostpaidTotal > creditLimit);
 
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).viewInsets.bottom + 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Drag handle
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 500),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).viewInsets.bottom + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
-          // Header
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: paymentType == 'prepaid'
-                      ? const Color(0xFFE8F5E9)
-                      : const Color(0xFFE3F2FD),
-                  borderRadius: BorderRadius.circular(12),
+            // Header
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: paymentType == 'prepaid'
+                        ? const Color(0xFFE8F5E9)
+                        : const Color(0xFFE3F2FD),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    paymentType == 'prepaid'
+                        ? Icons.account_balance_wallet_rounded
+                        : Icons.credit_card_rounded,
+                    color: paymentType == 'prepaid' ? kPrimary : const Color(0xFF1976D2),
+                    size: 22,
+                  ),
                 ),
-                child: Icon(
-                  paymentType == 'prepaid'
-                      ? Icons.account_balance_wallet_rounded
-                      : Icons.credit_card_rounded,
-                  color: paymentType == 'prepaid' ? kPrimary : const Color(0xFF1976D2),
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      paymentType == 'prepaid'
-                          ? 'Prepaid Checkout'
-                          : 'Postpaid Verification',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: kText,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      paymentType == 'postpaid'
-                          ? 'Monthly Est: ₹${monthlyEstimateForCreditCheck.toStringAsFixed(0)}/mo'
-                          : 'Estimation: ₹${estimatedTotal.toStringAsFixed(0)}',
-                      style: const TextStyle(fontSize: 12, color: kTextSub, fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close_rounded, size: 20, color: kTextSub),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // ── PREPAID CONTENT ─────────────────────────────
-          if (paymentType == 'prepaid') ...[
-            // Wallet Card
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: isWalletSufficient ? const Color(0xFFF0FDF4) : const Color(0xFFFFFBEB),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isWalletSufficient ? const Color(0xFFBBF7D0) : const Color(0xFFFDE68A),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.account_balance_wallet_rounded, size: 18, color: kPrimary),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'F2H Wallet Balance',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: kText),
-                      ),
-                      const Spacer(),
                       Text(
-                        '₹${walletBalance.toStringAsFixed(2)}',
-                        style: TextStyle(
+                        paymentType == 'prepaid'
+                            ? 'Prepaid Checkout'
+                            : 'Postpaid Verification',
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w900,
-                          color: isWalletSufficient ? const Color(0xFF166534) : const Color(0xFF92400E),
+                          color: kText,
                         ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        paymentType == 'postpaid'
+                            ? 'Monthly Est: ₹${monthlyEstimateForCreditCheck.toStringAsFixed(0)}/mo'
+                            : 'Estimation: ₹${estimatedTotal.toStringAsFixed(0)}',
+                        style: const TextStyle(fontSize: 12, color: kTextSub, fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  if (isWalletSufficient) ...[
-                    Row(
-                      children: [
-                        const Icon(Icons.check_circle_outline_rounded, size: 14, color: Color(0xFF166534)),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Sufficient balance for this subscription estimation (₹${estimatedTotal.toStringAsFixed(0)})',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF166534), fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          HapticFeedback.mediumImpact();
-                          Navigator.pop(context);
-                          onConfirm(paymentType: 'prepaid', paymentMethod: 'wallet');
-                        },
-                        icon: const Icon(Icons.check_rounded, size: 18),
-                        label: Text(
-                          'Pay ₹${estimatedTotal.toStringAsFixed(0)} from Wallet',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1B4332),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          elevation: 0,
-                        ),
-                      ),
-                    ),
-                  ] else ...[
-                    Row(
-                      children: [
-                        Icon(Icons.warning_amber_rounded, size: 14, color: Colors.amber.shade900),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Need ₹${(estimatedTotal - walletBalance).toStringAsFixed(2)} more for wallet checkout',
-                            style: TextStyle(fontSize: 11, color: Colors.amber.shade900, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const WalletScreen()),
-                          );
-                        },
-                        icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
-                        label: const Text(
-                          'Top Up Wallet',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: kPrimary,
-                          side: const BorderSide(color: kPrimary, width: 1.5),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 18),
-            // Razorpay online payment option
-            Row(
-              children: [
-                const Expanded(child: Divider(color: Color(0xFFE5E7EB))),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Text(
-                    'OR PAY ONLINE VIA RAZORPAY',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.grey.shade500,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
                 ),
-                const Expanded(child: Divider(color: Color(0xFFE5E7EB))),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 20, color: kTextSub),
+                  onPressed: () => Navigator.pop(context),
+                ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 20),
 
-            // Razorpay Online Payment Tile
-            InkWell(
-              onTap: () {
-                HapticFeedback.lightImpact();
-                Navigator.pop(context);
-                onConfirm(paymentType: 'prepaid', paymentMethod: 'online');
-              },
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+            // ── PREPAID CONTENT ─────────────────────────────
+            if (paymentType == 'prepaid') ...[
+              // Wallet Card
+              Container(
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDF4),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                  color: isWalletSufficient ? const Color(0xFFF0FDF4) : const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isWalletSufficient ? const Color(0xFFBBF7D0) : const Color(0xFFFDE68A),
+                  ),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF16A34A).withOpacity(0.12),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.bolt_rounded,
-                        color: Color(0xFF16A34A),
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Text(
-                                'Razorpay Online Payment',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF14532D),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF16A34A).withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text(
-                                  'FAST & SECURE',
-                                  style: TextStyle(
-                                    fontSize: 8.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF15803D),
-                                  ),
-                                ),
-                              ),
-                            ],
+                    Row(
+                      children: [
+                        const Icon(Icons.account_balance_wallet_rounded, size: 18, color: kPrimary),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'F2H Wallet Balance',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: kText),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '₹${walletBalance.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: isWalletSufficient ? const Color(0xFF166534) : const Color(0xFF92400E),
                           ),
-                          const SizedBox(height: 2),
-                          const Text(
-                            'UPI, Cards, NetBanking & Wallets',
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              color: Color(0xFF166534),
-                              fontWeight: FontWeight.w500,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    if (isWalletSufficient) ...[
+                      Row(
+                        children: [
+                          const Icon(Icons.check_circle_outline_rounded, size: 14, color: Color(0xFF166534)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Sufficient balance for this subscription estimation (₹${estimatedTotal.toStringAsFixed(0)})',
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF166534), fontWeight: FontWeight.w600),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    const Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 14,
-                      color: Color(0xFF16A34A),
-                    ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            HapticFeedback.mediumImpact();
+                            Navigator.pop(context);
+                            onConfirm(paymentType: 'prepaid', paymentMethod: 'wallet');
+                          },
+                          icon: const Icon(Icons.check_rounded, size: 18),
+                          label: Text(
+                            'Pay ₹${estimatedTotal.toStringAsFixed(0)} from Wallet',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1B4332),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded, size: 14, color: Colors.amber.shade900),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Need ₹${(estimatedTotal - walletBalance).toStringAsFixed(2)} more for wallet checkout',
+                              style: TextStyle(fontSize: 11, color: Colors.amber.shade900, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const WalletScreen()),
+                            );
+                          },
+                          icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                          label: const Text(
+                            'Top Up Wallet',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: kPrimary,
+                            side: const BorderSide(color: kPrimary, width: 1.5),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
-            ),
-          ],
+
+              const SizedBox(height: 18),
+              // Razorpay online payment option
+              Row(
+                children: [
+                  const Expanded(child: Divider(color: Color(0xFFE5E7EB))),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Text(
+                      'OR PAY ONLINE VIA RAZORPAY',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.grey.shade500,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                  const Expanded(child: Divider(color: Color(0xFFE5E7EB))),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // Razorpay Online Payment Tile
+              InkWell(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.pop(context);
+                  onConfirm(paymentType: 'prepaid', paymentMethod: 'online');
+                },
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFBBF7D0)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF16A34A).withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.bolt_rounded,
+                          color: Color(0xFF16A34A),
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Flexible(
+                                  child: Text(
+                                    'Razorpay Online Payment',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF14532D),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF16A34A).withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'FAST & SECURE',
+                                    style: TextStyle(
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF15803D),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            const Text(
+                              'UPI, Cards, NetBanking & Wallets',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                color: Color(0xFF166534),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 14,
+                        color: Color(0xFF16A34A),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
 
           // ── POSTPAID CONTENT ────────────────────────────
           if (paymentType == 'postpaid') ...[
@@ -633,8 +640,9 @@ class SubscriptionPaymentSheet extends StatelessWidget {
           ],
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class _CreditRow extends StatelessWidget {
