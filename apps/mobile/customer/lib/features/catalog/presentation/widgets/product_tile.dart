@@ -256,13 +256,14 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                     children: [
                       Text(
                         '₹${displayPrice.toStringAsFixed(0)}',
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: kPrimary),
+                        style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w900, color: kPrimary),
                       ),
                       Text(
                         '₹${_selected.originalPrice.toStringAsFixed(0)}',
                         style: const TextStyle(
-                          fontSize: 12, color: kMuted,
+                          fontSize: 15, color: kMuted,
                           decoration: TextDecoration.lineThrough,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
@@ -624,14 +625,14 @@ class ProductCardH extends StatelessWidget {
                           children: [
                             Flexible(
                               child: Text('₹${p.price.toStringAsFixed(0)}',
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: kText),
+                                style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w900, color: kText),
                                 maxLines: 1, overflow: TextOverflow.ellipsis),
                             ),
                             if (p.originalPrice > p.price) ...[
                               const SizedBox(width: 3),
                               Flexible(
                                 child: Text('₹${p.originalPrice.toStringAsFixed(0)}',
-                                  style: const TextStyle(fontSize: 9.5, color: kMuted, decoration: TextDecoration.lineThrough, fontWeight: FontWeight.w600),
+                                  style: const TextStyle(fontSize: 12, color: kMuted, decoration: TextDecoration.lineThrough, fontWeight: FontWeight.w700),
                                   maxLines: 1, overflow: TextOverflow.ellipsis),
                               ),
                             ],
@@ -850,7 +851,7 @@ class ProductCardV extends StatelessWidget {
                                       Text(
                                         '₹${p.price.toStringAsFixed(0)}',
                                         style: const TextStyle(
-                                          fontSize: 14,
+                                          fontSize: 16.5,
                                           fontWeight: FontWeight.w900,
                                           color: kText,
                                         ),

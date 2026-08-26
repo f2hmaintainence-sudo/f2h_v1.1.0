@@ -949,8 +949,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                                           Text(
                                                             '${p.unit} · ₹${displayPrice.toStringAsFixed(0)}',
                                                             style: TextStyle(
-                                                              fontSize: 10 * s,
-                                                              color: kTextSub,
+                                                              fontSize: 12 * s,
+                                                              fontWeight: FontWeight.w700,
+                                                              color: kPrimary,
                                                             ),
                                                             maxLines: 1,
                                                             overflow:
@@ -976,9 +977,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                                     Text(
                                                       '₹${(displayPrice * qty).toStringAsFixed(0)}',
                                                       style: TextStyle(
-                                                        fontSize: 12 * s,
+                                                        fontSize: 16 * s,
                                                         fontWeight:
-                                                            FontWeight.w800,
+                                                            FontWeight.w900,
                                                         color: kText,
                                                       ),
                                                     ),

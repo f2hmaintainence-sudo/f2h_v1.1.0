@@ -1082,9 +1082,9 @@ class _CartItemTileState extends State<_CartItemTile> {
                           Text(
                             '${p.unit}  ·  ₹${displayPrice.toStringAsFixed(0)}',
                             style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: kTextSub,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: kPrimary,
                             ),
                           ),
                         ],
@@ -1127,8 +1127,8 @@ class _CartItemTileState extends State<_CartItemTile> {
                     Text(
                       '₹${(displayPrice * effectiveQty).toStringAsFixed(0)}',
                       style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
                         color: kText,
                       ),
                     ),
