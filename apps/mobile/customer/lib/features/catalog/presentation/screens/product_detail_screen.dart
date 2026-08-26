@@ -113,15 +113,19 @@ class _BrowseState extends State<BrowseScreen> {
     if (pending != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final state = context.read<CatalogBloc>().state;
-        String catId = 'All';
         if (state is CatalogLoaded) {
           final cat = state.categories.firstWhere(
-            (c) => c['name'] == pending,
+            (c) =>
+                c['name'] == pending ||
+                c['category_id'] == pending ||
+                c['id']?.toString() == pending ||
+                c['slug'] == pending,
             orElse: () => <String, dynamic>{},
           );
-          catId = cat['category_id']?.toString() ?? 'All';
+          final catId = cat['category_id']?.toString() ?? cat['id']?.toString() ?? pending;
+          final catName = cat['name']?.toString() ?? cat['category_name']?.toString() ?? pending;
+          _selectCat(catName, catId);
         }
-        _selectCat(pending, catId);
       });
     }
 
