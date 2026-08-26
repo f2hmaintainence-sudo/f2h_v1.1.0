@@ -1215,9 +1215,14 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
             label: 'Plan & Payment',
           ),
           const SizedBox(height: 12),
-          _buildStartDateRow(),
-          const SizedBox(height: 10),
-          _buildAutoRenewalRow(),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _buildStartDateRow()),
+              const SizedBox(width: 10),
+              Expanded(child: _buildAutoRenewalRow()),
+            ],
+          ),
           const SizedBox(height: 14),
           const Divider(color: Color(0xFFE5E7EB), height: 1),
           const SizedBox(height: 14),
@@ -1241,40 +1246,45 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       child: Row(
         children: [
           Container(
-            width: 32,
-            height: 32,
+            width: 30,
+            height: 30,
             decoration: BoxDecoration(
               color: kPrimaryPl,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(9),
             ),
-            child: Icon(icon, size: 17, color: kPrimary),
+            child: Icon(icon, size: 16, color: kPrimary),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 13.5,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w800,
                     color: kText,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
                   style: const TextStyle(
-                    fontSize: 10.5,
+                    fontSize: 9.5,
                     color: kTextSub,
-                    height: 1.3,
+                    height: 1.2,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 4),
           trailing,
         ],
       ),
