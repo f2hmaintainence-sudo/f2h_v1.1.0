@@ -759,8 +759,8 @@ export class DeliveryRunService {
           COALESCE(NULLIF(TRIM(ca.address_line), ''), ca.landmark, 'Customer Address') AS address_line,
           ca.contact_name,
           ca.contact_mobile,
-          COALESCE(ca.latitude, dra.latitude) AS latitude,
-          COALESCE(ca.longitude, dra.longitude) AS longitude,
+          COALESCE(ca.latitude) AS latitude,
+          COALESCE(ca.longitude) AS longitude,
           COALESCE(NULLIF(TRIM(ca.contact_name), ''), NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Customer') AS customer_name,
           (
             SELECT json_agg(json_build_object(
@@ -821,8 +821,8 @@ export class DeliveryRunService {
           COALESCE(NULLIF(TRIM(ca.address_line), ''), ca.landmark, 'Customer Address') AS address_line,
           ca.contact_name,
           ca.contact_mobile,
-          COALESCE(ca.latitude, dra.latitude) AS latitude,
-          COALESCE(ca.longitude, dra.longitude) AS longitude,
+          COALESCE(ca.latitude) AS latitude,
+          COALESCE(ca.longitude) AS longitude,
           COALESCE(NULLIF(TRIM(ca.contact_name), ''), NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Customer') AS customer_name,
           dr.delivery_partner_id,
           dr.delivery_slot,
@@ -954,15 +954,15 @@ export class DeliveryRunService {
       }
 
       const currentRow = await this.db.query(
-        'SELECT run_id, status, order_id FROM delivery_run_addresses WHERE id::varchar = $1', [addressId],
+        'SELECT run_id, delivery_status AS status, order_ids FROM delivery_run_addresses WHERE id::varchar = $1', [addressId],
       );
       if (!currentRow[0]) return { status: false, message: 'Address not found' };
 
       const fromStatus = currentRow[0].status;
       const runId = currentRow[0].run_id;
-      const orderId = currentRow[0].order_id;
+      const orderIds: string[] = Array.isArray(currentRow[0].order_ids) ? currentRow[0].order_ids : [];
 
-      const updateFields: string[] = ['status = $2', 'updated_at = NOW()'];
+      const updateFields: string[] = ['delivery_status = $2', 'updated_at = NOW()'];
       const params: any[] = [addressId, newStatus];
 
       if (newStatus === 'delivered') {
@@ -974,7 +974,7 @@ export class DeliveryRunService {
       }
       if (data?.proof_url) {
         params.push(data.proof_url);
-        updateFields.push(`proof_photo_url = $${params.length}`);
+        updateFields.push(`delivery_image = $${params.length}`);
       }
 
       await this.db.query(
@@ -982,48 +982,52 @@ export class DeliveryRunService {
         params,
       );
 
-      // Also update the order status
-      if (newStatus === 'delivered') {
-        await this.db.query(
-          `UPDATE orders SET status = 'delivered', delivered_at = NOW(), updated_at = NOW() WHERE order_id = $1`,
-          [orderId],
-        );
+      // Also update the order status for all orders in this stop
+      if (orderIds.length > 0) {
+        if (newStatus === 'delivered') {
+          await this.db.query(
+            `UPDATE orders SET status = 'delivered', delivered_at = NOW(), updated_at = NOW() WHERE order_id = ANY($1)`,
+            [orderIds],
+          );
 
-        // Process referral rewards only when order is delivered
-        try {
-          const ordRows = await this.db.query(`SELECT customer_id FROM orders WHERE order_id = $1 LIMIT 1`, [orderId]);
-          const custId = ordRows?.[0]?.customer_id;
-          if (custId) {
-            await this.firstOrderDetector.detectAndMarkFirstOrder(custId, orderId);
-            await this.firstOrderDetector.unlockReferralCode(custId);
-            await this.referralRewardEngine.processReferralReward(custId, orderId);
+          // Process referral rewards only when order is delivered
+          for (const orderId of orderIds) {
+            try {
+              const ordRows = await this.db.query(`SELECT customer_id FROM orders WHERE order_id = $1 LIMIT 1`, [orderId]);
+              const custId = ordRows?.[0]?.customer_id;
+              if (custId) {
+                await this.firstOrderDetector.detectAndMarkFirstOrder(custId, orderId);
+                await this.firstOrderDetector.unlockReferralCode(custId);
+                await this.referralRewardEngine.processReferralReward(custId, orderId);
+              }
+            } catch (refErr) {
+              this.developer.error('DeliveryRunService: Failed to process referral reward on order delivery', refErr);
+            }
           }
-        } catch (refErr) {
-          this.developer.error('DeliveryRunService: Failed to process referral reward on order delivery', refErr);
-        }
-      } else if (newStatus === 'failed') {
-        await this.db.query(
-          `UPDATE orders SET status = 'failed', updated_at = NOW() WHERE order_id = $1`,
-          [orderId],
-        );
+        } else if (newStatus === 'failed') {
+          await this.db.query(
+            `UPDATE orders SET status = 'failed', updated_at = NOW() WHERE order_id = ANY($1)`,
+            [orderIds],
+          );
 
-        // A failed delivery on a prepaid subscription order is money owed back.
-        // Best-effort: never let refund bookkeeping fail the status update.
-        try {
-          await this.refundEligibility.onDeliveryFailed(orderId);
-        } catch (refundErr) {
-          this.developer.error('Failed to raise refund candidate for failed delivery', {
-            refundErr,
-            orderId,
-          });
+          for (const orderId of orderIds) {
+            try {
+              await this.refundEligibility.onDeliveryFailed(orderId);
+            } catch (refundErr) {
+              this.developer.error('Failed to raise refund candidate for failed delivery', {
+                refundErr,
+                orderId,
+              });
+            }
+          }
         }
       }
 
       // Update run counts
       await this.db.query(
         `UPDATE delivery_runs SET
-          completed_addresses = (SELECT COUNT(*) FROM delivery_run_addresses WHERE run_id = $1 AND status = 'delivered'),
-          failed_addresses = (SELECT COUNT(*) FROM delivery_run_addresses WHERE run_id = $1 AND status = 'failed'),
+          completed_addresses = (SELECT COUNT(*) FROM delivery_run_addresses WHERE run_id = $1 AND delivery_status = 'delivered'),
+          failed_addresses = (SELECT COUNT(*) FROM delivery_run_addresses WHERE run_id = $1 AND delivery_status = 'failed'),
           updated_at = NOW()
         WHERE id::varchar = $1 OR run_id = $1`,
         [runId],

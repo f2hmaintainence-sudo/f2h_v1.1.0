@@ -1645,7 +1645,6 @@ export class DeliveryOrderService {
       await client.query(
         `UPDATE delivery_run_addresses
          SET delivery_status = 'in_transit',
-             status = 'in_transit',
              updated_at = NOW()
          WHERE run_id = ANY($1)
            AND deleted_at IS NULL

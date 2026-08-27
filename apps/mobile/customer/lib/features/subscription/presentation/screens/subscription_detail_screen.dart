@@ -702,8 +702,13 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
 
   Widget _buildPostpaidSummaryCard(CustomerSessionState sessionState) {
     final profile = sessionState.profile;
-    final creditLimit = profile?.postpaidCreditLimit ?? 0.0;
-    final usedCredit = _detailInfo?.outstandingAmount ?? 0.0;
+    final creditLimit = profile?.postpaidCreditLimit ?? 5000.0;
+    double usedCredit = _detailInfo?.outstandingAmount ?? 0.0;
+    if (usedCredit <= 0.0 && _bills.isNotEmpty) {
+      usedCredit = _bills
+          .where((b) => b['status'] != 'paid' && b['status'] != 'cancelled')
+          .fold<double>(0.0, (sum, b) => sum + (double.tryParse(b['due_amount']?.toString() ?? '') ?? double.tryParse(b['total_amount']?.toString() ?? '') ?? 0.0));
+    }
     final remainingLimit = (creditLimit - usedCredit).clamp(0.0, double.infinity);
     final usagePercent = creditLimit > 0 ? (usedCredit / creditLimit).clamp(0.0, 1.0) : 0.0;
 
