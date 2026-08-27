@@ -20,6 +20,7 @@ import { DeliverySaveEditService } from './services/saveEdit.service';
 import { DeliveryLeaveTableService } from './services/table.service';
 import { DeliveryLeaveShowEditService, DeliveryLeaveSaveEditService } from './services/leave-edit.service';
 import { DeliveryPartnerRequestService } from './services/partner-request.service';
+import { DeliveryPartnerTicketService } from './services/partner-ticket.service';
 
 import { ReferralModule } from '../../customer/referral/referral.module';
 import { RefundCandidatesModule } from '../customers-orders/subscriptions/refund-candidates/refund-candidates.module';
@@ -52,6 +53,7 @@ import { RefundCandidatesModule } from '../customers-orders/subscriptions/refund
     DeliveryLeaveShowEditService,
     DeliveryLeaveSaveEditService,
     DeliveryPartnerRequestService,
+    DeliveryPartnerTicketService,
   ],
   exports: [
     DeliveryManagementService,
@@ -65,6 +67,7 @@ import { RefundCandidatesModule } from '../customers-orders/subscriptions/refund
     DeliveryLeaveShowEditService,
     DeliveryLeaveSaveEditService,
     DeliveryPartnerRequestService,
+    DeliveryPartnerTicketService,
   ],
 })
 export class DeliveryManagementModule {}

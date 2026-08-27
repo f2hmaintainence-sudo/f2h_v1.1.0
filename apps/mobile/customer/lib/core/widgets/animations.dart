@@ -1154,36 +1154,37 @@ class InitialLoadingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kBg,
+      backgroundColor: Colors.white,
       body: SafeArea(
-        child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo
+              const Spacer(flex: 3),
+              // Brand Logo & Title Header
               Container(
-                width: 80,
-                height: 80,
+                width: 86,
+                height: 86,
                 decoration: BoxDecoration(
-                  color: kSurface,
-                  borderRadius: BorderRadius.circular(20),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(22),
                   border: Border.all(color: kBorderLt),
                   boxShadow: [
                     BoxShadow(
-                      color: kPrimary.withValues(alpha: 0.08),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
+                      color: kPrimary.withValues(alpha: 0.10),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
                     ),
                   ],
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(19),
+                  borderRadius: BorderRadius.circular(21),
                   child: Padding(
                     padding: const EdgeInsets.all(12.0),
                     child: Image.asset(
                       'assets/icon/app_icon.png',
                       fit: BoxFit.contain,
-                      errorBuilder: (_, _, _) => const Icon(Icons.spa, color: kPrimary, size: 36),
+                      errorBuilder: (_, _, _) => const Icon(Icons.spa, color: kPrimary, size: 40),
                     ),
                   ),
                 ),
@@ -1192,24 +1193,28 @@ class InitialLoadingScreen extends StatelessWidget {
               const Text(
                 'F2H Fresh',
                 style: TextStyle(
-                  fontSize: 24,
+                  fontSize: 26,
                   fontWeight: FontWeight.w900,
                   color: kPrimary,
-                  letterSpacing: -0.3,
+                  letterSpacing: -0.4,
                 ),
               ),
               const SizedBox(height: 4),
               const Text(
                 'Fresh Daily Essentials',
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: kTextSub,
                   letterSpacing: 0.8,
                 ),
               ),
-              const SizedBox(height: 20),
-              const CowLoadingWidget(size: 110),
+              const Spacer(flex: 2),
+
+              // Big Cow Drinking Milk Animation (size 240) further down
+              const CowLoadingWidget(size: 240),
+
+              const Spacer(flex: 3),
             ],
           ),
         ),

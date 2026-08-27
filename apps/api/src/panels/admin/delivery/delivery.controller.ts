@@ -10,6 +10,7 @@ import { DeliverySaveEditService } from './services/saveEdit.service';
 import { DeliveryLeaveTableService } from './services/table.service';
 import { DeliveryLeaveShowEditService, DeliveryLeaveSaveEditService } from './services/leave-edit.service';
 import { DeliveryPartnerRequestService } from './services/partner-request.service';
+import { DeliveryPartnerTicketService } from './services/partner-ticket.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
@@ -30,7 +31,32 @@ export class DeliveryManagementController {
     private readonly leaveShowEditService: DeliveryLeaveShowEditService,
     private readonly leaveSaveEditService: DeliveryLeaveSaveEditService,
     private readonly partnerRequestService: DeliveryPartnerRequestService,
+    private readonly partnerTicketService: DeliveryPartnerTicketService,
   ) { }
+
+  // ── Delivery Partner Support Tickets ──
+
+  @Get('support-tickets')
+  async getDeliveryPartnerTickets(@Query() query: any) {
+    return this.partnerTicketService.getTickets(query);
+  }
+
+  @Patch('support-tickets/:id/status')
+  async updatePartnerTicketStatus(
+    @Param('id') id: string,
+    @Body() body: { status: string; notes?: string; admin_notes?: string },
+  ) {
+    return this.partnerTicketService.updateTicketStatus(
+      id,
+      body.status,
+      body.notes ?? body.admin_notes,
+    );
+  }
+
+  @Delete('support-tickets/:id')
+  async deletePartnerTicket(@Param('id') id: string) {
+    return this.partnerTicketService.deleteTicket(id);
+  }
 
   // ── Delivery Partner Onboarding Requests ──
 
