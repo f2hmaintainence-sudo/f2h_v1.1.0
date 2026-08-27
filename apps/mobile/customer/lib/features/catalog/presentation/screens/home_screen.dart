@@ -20,6 +20,7 @@ import '../../../address/presentation/widgets/address_selector_drawer.dart';
 import '../../../address/data/models/profile_address.dart';
 import '../../data/models/product_model.dart';
 import '../widgets/product_tile.dart';
+import '../widgets/product_grid_card.dart';
 import '../widgets/image_banner.dart';
 import '../widgets/home_coupon_banner.dart';
 import '../widgets/promo_banner.dart';
@@ -259,7 +260,7 @@ class _HomeScreenState extends State<HomeScreen>
                             state is CatalogInitial ||
                             isOffline) {
                           return SizedBox(
-                            height: 245,
+                            height: 285,
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
                               padding: const EdgeInsets.symmetric(
@@ -269,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen>
                               separatorBuilder: (_, __) =>
                                   const SizedBox(width: 12),
                               itemBuilder: (_, __) => const SizedBox(
-                                width: 162,
+                                width: 165,
                                 child: _HomeSkeletonCard(),
                               ),
                             ),
@@ -278,7 +279,7 @@ class _HomeScreenState extends State<HomeScreen>
 
                         if (state is CatalogError) {
                           return SizedBox(
-                            height: 245,
+                            height: 285,
                             child: Center(
                               child: TextButton.icon(
                                 onPressed: () => context
@@ -299,7 +300,7 @@ class _HomeScreenState extends State<HomeScreen>
                         }
                         if (products.isEmpty) {
                           return SizedBox(
-                            height: 245,
+                            height: 285,
                             child: Center(
                               child: TextButton.icon(
                                 onPressed: () => context
@@ -312,8 +313,8 @@ class _HomeScreenState extends State<HomeScreen>
                           );
                         }
                         return InfiniteAutoScrollList(
-                          height: 245,
-                          itemWidth: 170,
+                          height: 285,
+                          itemWidth: 165,
                           autoScrollInterval: const Duration(
                             milliseconds: 10000,
                           ),
@@ -404,7 +405,7 @@ class _HomeScreenState extends State<HomeScreen>
                             state is CatalogInitial ||
                             isOffline) {
                           return SizedBox(
-                            height: 245,
+                            height: 285,
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
                               padding: const EdgeInsets.symmetric(
@@ -414,7 +415,7 @@ class _HomeScreenState extends State<HomeScreen>
                               separatorBuilder: (_, __) =>
                                   const SizedBox(width: 12),
                               itemBuilder: (_, __) => const SizedBox(
-                                width: 162,
+                                width: 165,
                                 child: _HomeSkeletonCard(),
                               ),
                             ),
@@ -441,8 +442,8 @@ class _HomeScreenState extends State<HomeScreen>
                           return const SizedBox.shrink();
                         }
                         return InfiniteAutoScrollList(
-                          height: 245,
-                          itemWidth: 170,
+                          height: 285,
+                          itemWidth: 165,
                           autoScrollInterval: const Duration(
                             milliseconds: 12000,
                           ),
@@ -1191,286 +1192,16 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _subscriptionProductCard(BuildContext context, Product p) {
-    int discountPercent = 0;
-    if (p.originalPrice > p.price && p.originalPrice > 0) {
-      discountPercent = (((p.originalPrice - p.price) / p.originalPrice) * 100).round();
-    }
+    return SizedBox(
+      width: 165,
+      child: ProductGridCard(p),
+    );
+  }
 
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (_, a, __) => ProductDetailViewScreen(product: p),
-          transitionsBuilder: (_, a, __, child) =>
-              FadeTransition(opacity: a, child: child),
-          transitionDuration: const Duration(milliseconds: 220),
-        ),
-      ),
-      child: Container(
-        width: 162,
-        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: kBorderLt, width: 1.1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  height: 120,
-                  width: double.infinity,
-                  color: const Color(0xFFF8FAFC),
-                  child: Padding(
-                    padding: const EdgeInsets.all(6.0),
-                    child: buildProductImage(
-                      p.name,
-                      imageAsset: p.imageAsset,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        p.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: kText,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                      if ((p.formattedUnit.isNotEmpty
-                                  ? p.formattedUnit
-                                  : p.unit)
-                              .isNotEmpty &&
-                          (p.formattedUnit.isNotEmpty
-                                      ? p.formattedUnit
-                                      : p.unit)
-                                  .toLowerCase() !=
-                              p.name.toLowerCase()) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          p.formattedUnit.isNotEmpty
-                              ? p.formattedUnit
-                              : p.unit,
-                          style: const TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w500,
-                            color: kTextSub,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                '₹${p.price.toStringAsFixed(0)}',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w900,
-                                  color: kText,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (p.originalPrice > p.price) ...[
-                              const SizedBox(width: 3),
-                              Flexible(
-                                child: Text(
-                                  '₹${p.originalPrice.toStringAsFixed(0)}',
-                                  style: const TextStyle(
-                                    fontSize: 9.5,
-                                    color: kMuted,
-                                    decoration: TextDecoration.lineThrough,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      ZeptoAddButton(p: p, isSmall: true),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            // Top Overlay Badges (Discount + Rating) - Auto Responsive Scaling for All Mobile Sizes
-            Positioned(
-              top: 6,
-              left: 6,
-              right: 6,
-              child: SizedBox(
-                height: 20,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      if (p.isOutOfStock)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: const Color(0xFFEF4444), width: 0.9),
-                          ),
-                          child: const Text(
-                            'OUT OF STOCK',
-                            style: TextStyle(
-                              fontSize: 7.5,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFFEF4444),
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                        )
-                      else if (discountPercent > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF047857),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '$discountPercent% OFF',
-                            style: const TextStyle(
-                              fontSize: 8,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                        )
-                      else
-                        const SizedBox.shrink(),
-                      const SizedBox(width: 4),
-                      // Top Right: Rating Badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: const Color(0xFFE5E7EB), width: 0.8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.02),
-                              blurRadius: 2,
-                              offset: const Offset(0, 1),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.star_rounded,
-                              size: 10,
-                              color: Color(0xFFF59E0B),
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              '${(p.rating > 0 ? p.rating : 5.0).toStringAsFixed(1)} (${p.reviews > 0 ? p.reviews : 1})',
-                              style: const TextStyle(
-                                fontSize: 8,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF374151),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            // Bottom of Image: Subscribe pill
-            if (p.isSubscribable && !p.isOutOfStock)
-              Positioned(
-                top: 94,
-                left: 6,
-                right: 6,
-                child: Container(
-                  height: 22,
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: kPrimary,
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.center,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.autorenew_rounded,
-                          size: 10,
-                          color: Colors.white,
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          'Subscribe @ ₹${(p.subscriptionPrice != null && p.subscriptionPrice! > 0 ? p.subscriptionPrice! : p.price).toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 2),
-                        const Icon(
-                          Icons.chevron_right_rounded,
-                          size: 11,
-                          color: Colors.white,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
+  Widget oneTimeProductCard(BuildContext context, Product p) {
+    return SizedBox(
+      width: 165,
+      child: ProductGridCard(p),
     );
   }
 
@@ -2959,15 +2690,15 @@ class _CategorySection extends StatelessWidget {
 
         // ── Horizontal product scroll for this category ──────────────────────
         SizedBox(
-          height: 245,
+          height: 285,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: products.length,
             separatorBuilder: (_, __) => const SizedBox(width: 10),
             itemBuilder: (ctx, i) => SizedBox(
-              width: 162,
-              child: oneTimeProductCard(ctx, products[i]),
+              width: 165,
+              child: ProductGridCard(products[i]),
             ),
           ),
         ),
