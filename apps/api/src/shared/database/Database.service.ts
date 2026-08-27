@@ -107,6 +107,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         CREATE UNIQUE INDEX IF NOT EXISTS stock_balances_warehouse_variant_unique 
         ON stock_balances (warehouse_id, product_variant_id);
 
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_dcr_run_container 
+        ON delivery_container_reconciliation (run_id, container_id) WHERE deleted_at IS NULL;
+
         ALTER TABLE public.delivery_partner_referral_bonuses 
           ADD COLUMN IF NOT EXISTS paid_by VARCHAR(50),
           ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(100),

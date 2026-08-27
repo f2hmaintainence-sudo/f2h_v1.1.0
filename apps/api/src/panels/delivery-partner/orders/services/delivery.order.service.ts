@@ -412,6 +412,9 @@ export class DeliveryOrderService {
       lost: number;
       remarks: string | null;
       createdBy: string;
+      runId?: string;
+      partnerId?: string;
+      warehouseId?: string;
     },
   ): Promise<void> {
     const total = Number(params.returned || 0) + Number(params.damaged || 0) + Number(params.lost || 0);
@@ -445,11 +448,108 @@ export class DeliveryOrderService {
       );
     }
 
+    // 1. Update customer running balance
     await this.applyBalanceDelta(executor, params.customerId, params.containerId, {
       returned: params.returned,
       damaged: params.damaged,
       lost: params.lost,
     });
+
+    // 2. Upsert into delivery_container_reconciliation for this (run_id, container_id)
+    if (params.runId) {
+      await this.upsertContainerReconciliation(executor, {
+        runId: params.runId,
+        containerId: params.containerId,
+        returned: params.returned,
+        damaged: params.damaged,
+        lost: params.lost,
+        remarks: params.remarks,
+        submittedBy: params.partnerId || params.createdBy,
+        warehouseId: params.warehouseId,
+      });
+    }
+  }
+
+  private async upsertContainerReconciliation(
+    executor: { query: (sql: string, params?: any[]) => Promise<any> },
+    params: {
+      runId: string;
+      containerId: string;
+      returned: number;
+      damaged: number;
+      lost: number;
+      remarks?: string | null;
+      submittedBy: string;
+      warehouseId?: string;
+    },
+  ): Promise<void> {
+    const runId = params.runId;
+    const containerId = params.containerId;
+    const collectedQty = Number(params.returned || 0);
+    const damagedQty = Number(params.damaged || 0);
+    const lostQty = Number(params.lost || 0);
+
+    let warehouseId = params.warehouseId;
+    if (!warehouseId) {
+      const whRes = await executor.query(
+        `SELECT warehouse_id FROM delivery_dispatch
+         WHERE (delivery_run_id = $1 OR delivery_run_id IN (SELECT run_id FROM delivery_runs WHERE id::text = $1 OR run_id = $1))
+           AND deleted_at IS NULL
+         LIMIT 1`,
+        [runId],
+      );
+      warehouseId = whRes.rows?.[0]?.warehouse_id || 'WH-MAIN';
+    }
+
+    // Check if record exists for (run_id, container_id)
+    const existing = await executor.query(
+      `SELECT id, collected_quantity, damaged_quantity, lost_quantity
+       FROM delivery_container_reconciliation
+       WHERE (run_id = $1 OR run_id IN (SELECT run_id FROM delivery_runs WHERE id::text = $1 OR run_id = $1))
+         AND container_id = $2 AND deleted_at IS NULL
+       LIMIT 1 FOR UPDATE`,
+      [runId, containerId],
+    );
+
+    if (existing.rows && existing.rows.length > 0) {
+      await executor.query(
+        `UPDATE delivery_container_reconciliation
+         SET collected_quantity = collected_quantity + $1,
+             damaged_quantity = damaged_quantity + $2,
+             lost_quantity = lost_quantity + $3,
+             collection_notes = COALESCE($4, collection_notes),
+             warehouse_id = COALESCE(warehouse_id, $5),
+             updated_at = NOW()
+         WHERE id = $6`,
+        [collectedQty, damagedQty, lostQty, params.remarks || null, warehouseId, existing.rows[0].id],
+      );
+    } else {
+      await executor.query(
+        `INSERT INTO delivery_container_reconciliation (
+           warehouse_id, run_id, container_id,
+           collected_quantity, submitted_quantity,
+           damaged_quantity, lost_quantity, discrepancy_quantity,
+           status, collection_notes, submitted_by,
+           created_at, updated_at
+         ) VALUES (
+           $1, $2, $3,
+           $4, 0,
+           $5, $6, 0,
+           'pending', $7, $8,
+           NOW(), NOW()
+         )`,
+        [
+          warehouseId,
+          runId,
+          containerId,
+          collectedQty,
+          damagedQty,
+          lostQty,
+          params.remarks || 'Collected on route delivery',
+          params.submittedBy,
+        ],
+      );
+    }
   }
 
   /**
@@ -499,6 +599,9 @@ export class DeliveryOrderService {
       lost: number;
       remarks: string | null;
       createdBy: string;
+      runId?: string;
+      partnerId?: string;
+      warehouseId?: string;
     },
   ): Promise<void> {
     return this.handleContainerReturn(executor, {
@@ -510,6 +613,9 @@ export class DeliveryOrderService {
       lost: params.lost,
       remarks: params.remarks,
       createdBy: params.createdBy,
+      runId: params.runId,
+      partnerId: params.partnerId,
+      warehouseId: params.warehouseId,
     });
   }
 
@@ -756,6 +862,7 @@ export class DeliveryOrderService {
     const boy = await this.resolveDeliveryPartner(userId);
     const run = await this.findDeliveryRunByIdAndBoy(runId, boy);
     const runIds = this.getRunIdentifiers(run);
+    const runIdentifier = run.run_id || String(run.id) || runId;
     const stopsRes = await this.db.query(
       `SELECT order_id, customer_id, status, total_amount, payment_mode FROM orders
        WHERE delivery_run_id = ANY($1) AND address_id = $2`,
@@ -816,6 +923,7 @@ export class DeliveryOrderService {
 
         // Perform bottle/container collection ONLY ONCE for the stop to prevent duplication
         if (isFirstOrder) {
+          const runIdToUse = runIdentifier || runIds?.[0] || order.delivery_run_id;
           if (Array.isArray(body.container_returns) && body.container_returns.length > 0) {
             for (const cr of body.container_returns) {
               const ret = Number(cr.returned ?? 0);
@@ -831,6 +939,8 @@ export class DeliveryOrderService {
                   lost: lost,
                   remarks: norm.notes,
                   createdBy: boy.full_name,
+                  runId: runIdToUse,
+                  partnerId: boy.user_id,
                 });
               }
             }
@@ -843,6 +953,8 @@ export class DeliveryOrderService {
               lost: norm.lostContainers,
               remarks: norm.notes,
               createdBy: boy.full_name,
+              runId: runIdToUse,
+              partnerId: boy.user_id,
             });
           }
         }
@@ -1188,6 +1300,7 @@ export class DeliveryOrderService {
       }
 
       // Now collect returned containers (balance already updated above)
+      const runIdToUse = order.delivery_run_id;
       if (Array.isArray(body.container_returns) && body.container_returns.length > 0) {
         for (const cr of body.container_returns) {
           const ret = Number(cr.returned ?? 0);
@@ -1203,6 +1316,8 @@ export class DeliveryOrderService {
               lost: lost,
               remarks: norm.notes,
               createdBy: boy.full_name,
+              runId: runIdToUse,
+              partnerId: boy.user_id,
             });
           }
         }
@@ -1215,6 +1330,8 @@ export class DeliveryOrderService {
           lost: norm.lostContainers,
           remarks: norm.notes,
           createdBy: boy.full_name,
+          runId: runIdToUse,
+          partnerId: boy.user_id,
         });
       }
 

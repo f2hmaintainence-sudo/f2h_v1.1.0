@@ -717,7 +717,8 @@ export class BasketService {
          COALESCE(SUM(GREATEST(0, collected_quantity - submitted_quantity - damaged_quantity - lost_quantity)), 0)::int AS total_remaining,
          COUNT(*)::int AS container_types_count
        FROM delivery_container_reconciliation
-       WHERE run_id = $1 AND deleted_at IS NULL`,
+       WHERE (run_id = $1 OR run_id IN (SELECT run_id FROM delivery_runs WHERE id::text = $1 OR run_id = $1))
+         AND deleted_at IS NULL`,
       [activeRunId],
     );
 
@@ -733,7 +734,8 @@ export class BasketService {
          COALESCE(GREATEST(0, dcr.collected_quantity - dcr.submitted_quantity - dcr.damaged_quantity - dcr.lost_quantity), 0)::int AS remaining_quantity
        FROM delivery_container_reconciliation dcr
        LEFT JOIN containers c ON (c.container_id = dcr.container_id OR c.id::text = dcr.container_id)
-       WHERE dcr.run_id = $1 AND dcr.deleted_at IS NULL
+       WHERE (dcr.run_id = $1 OR dcr.run_id IN (SELECT dr.run_id FROM delivery_runs dr WHERE dr.id::text = $1 OR dr.run_id = $1))
+         AND dcr.deleted_at IS NULL
        ORDER BY dcr.id ASC`,
       [activeRunId],
     );
@@ -781,7 +783,8 @@ export class BasketService {
          submitted_by = $1,
          submission_notes = COALESCE($2, 'Submitted all containers back to hub via mobile app'),
          updated_at = NOW()
-       WHERE run_id = $3 AND deleted_at IS NULL
+       WHERE (run_id = $3 OR run_id IN (SELECT run_id FROM delivery_runs WHERE id::text = $3 OR run_id = $3))
+         AND deleted_at IS NULL
        RETURNING *`,
       [partnerId, body.notes || null, activeRunId],
     );

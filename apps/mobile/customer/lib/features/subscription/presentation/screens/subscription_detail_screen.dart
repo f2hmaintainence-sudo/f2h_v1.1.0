@@ -702,13 +702,18 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
 
   Widget _buildPostpaidSummaryCard(CustomerSessionState sessionState) {
     final profile = sessionState.profile;
-    final creditLimit = profile?.postpaidCreditLimit ?? 5000.0;
-    double usedCredit = _detailInfo?.outstandingAmount ?? 0.0;
-    if (usedCredit <= 0.0 && _bills.isNotEmpty) {
-      usedCredit = _bills
-          .where((b) => b.status.toLowerCase() != 'paid' && b.status.toLowerCase() != 'cancelled')
-          .fold<double>(0.0, (sum, b) => sum + (b.dueAmount > 0 ? b.dueAmount : b.totalAmount));
-    }
+    final creditLimit = profile?.postpaidCreditLimit ?? 0.0;
+
+    final outstandingFromInfo = _detailInfo?.outstandingAmount ?? 0.0;
+    final isPostpaidSub = widget.subscription.paymentType.toLowerCase() == 'postpaid';
+    final thisSubCost = (widget.subscription.totalMonthlyCost > 0
+        ? widget.subscription.totalMonthlyCost
+        : (widget.subscription.monthlyEstimate ?? 0.0));
+
+    final usedCredit = outstandingFromInfo > 0
+        ? outstandingFromInfo
+        : (isPostpaidSub ? thisSubCost : 0.0);
+
     final remainingLimit = (creditLimit - usedCredit).clamp(0.0, double.infinity);
     final usagePercent = creditLimit > 0 ? (usedCredit / creditLimit).clamp(0.0, 1.0) : 0.0;
 
@@ -1730,7 +1735,9 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   _buildDeliveryAddressCard(defaultAddress, addressString),
                   const SizedBox(height: 12),
 
-                  // ── 4. Postpaid Summary Card (Hidden per user request) ─────
+                  // ── 4. Postpaid Summary Card (if Postpaid) ─────
+                  if (s.paymentType == 'postpaid')
+                    _buildPostpaidSummaryCard(sessionState),
 
                   // ── 5. Subscription Details (collapsible, includes Delivery Details) ──
                   _buildSubscriptionDetailsSection(s),

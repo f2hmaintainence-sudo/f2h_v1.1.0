@@ -1408,55 +1408,31 @@ export class SubscriptionsService {
       });
       const walletBalance = Number(custRes?.data?.[0]?.wallet_balance || 0);
 
-      // 3. Fetch outstanding bills (by subscription reference or customer_id)
+      // 3. Fetch outstanding bills
       const billsRes = await this.db.query(
         `SELECT
            bill_id, status, total_amount, paid_amount, due_amount, due_date,
            billing_from, billing_to, payment_type, payment_method, created_at
          FROM customer_bills
-         WHERE (reference_id = $1 OR customer_id = $2)
+         WHERE reference_id = $1
          ORDER BY created_at DESC
          LIMIT 5`,
-        [subscriptionId, customerId],
+        [subscriptionId],
       );
       const latestBills = Array.isArray(billsRes) ? billsRes : [];
 
-      // 4. Outstanding count & amount from customer_bills
+      // 4. Outstanding count & amount
       const outstandingRes = await this.db.query(
         `SELECT COUNT(*) as count, COALESCE(SUM(due_amount), 0) as total_due
          FROM customer_bills
-         WHERE (reference_id = $1 OR customer_id = $2)
-           AND status NOT IN ('paid', 'cancelled')
+         WHERE reference_id = $1
+           AND status IN ('unpaid', 'draft')
            AND due_amount > 0`,
-        [subscriptionId, customerId],
+        [subscriptionId],
       );
       const outstandingRow = Array.isArray(outstandingRes) ? outstandingRes[0] : {};
-      let outstandingBillCount = Number(outstandingRow?.count || 0);
-      let outstandingAmount = Number(outstandingRow?.total_due || 0);
-
-      // 4b. Add unbilled delivered/active postpaid orders for this customer
-      const isPostpaidSub = sub.payment_type === 'postpaid';
-      const unbilledRes = await this.db.query(
-        `SELECT COALESCE(SUM(total_amount), 0) as unbilled_due, COUNT(*) as unbilled_count
-         FROM public.orders
-         WHERE customer_id = $1
-           AND (payment_type = 'postpaid' OR payment_method = 'postpaid' OR $2 = true)
-           AND payment_status NOT IN ('paid', 'refunded')
-           AND status NOT IN ('cancelled', 'returned')
-           AND NOT EXISTS (
-             SELECT 1 FROM public.customer_bill_items cbi
-             WHERE cbi.reference_id = orders.order_id
-           )`,
-        [customerId, isPostpaidSub],
-      );
-      const unbilledRow = Array.isArray(unbilledRes) ? unbilledRes[0] : {};
-      const unbilledDue = Number(unbilledRow?.unbilled_due || 0);
-      const unbilledCount = Number(unbilledRow?.unbilled_count || 0);
-
-      outstandingAmount += unbilledDue;
-      if (outstandingBillCount === 0 && unbilledCount > 0) {
-        outstandingBillCount = unbilledCount;
-      }
+      const outstandingBillCount = Number(outstandingRow?.count || 0);
+      const outstandingAmount = Number(outstandingRow?.total_due || 0);
 
       // 5. Alert flags
       const isAutoRenew = Boolean(sub.auto_renew === true || sub.auto_renew === 't' || sub.auto_renew === 'true');
