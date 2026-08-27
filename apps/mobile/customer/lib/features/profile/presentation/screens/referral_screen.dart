@@ -46,7 +46,8 @@ class _ReferralScreenState extends State<ReferralScreen>
 
   bool get _isLocked => _code.isEmpty || (_status.toLowerCase() != 'unlocked' && _status.toLowerCase() != 'active');
   String get _activeCode => _code;
-  String get _referralLink => 'https://f2h.app.link/$_activeCode';
+  static const String _playStoreUrl = 'https://play.google.com/store/apps/details?id=com.f2h.customer';
+  String get _referralLink => _playStoreUrl;
 
   @override
   void initState() {
@@ -135,13 +136,13 @@ class _ReferralScreenState extends State<ReferralScreen>
   // ── WHATSAPP SHARING ──────────────────────────────────────
   Future<void> _shareOnWhatsApp() async {
     final message = _isLocked
-        ? 'Join F2H — Farm To Home & Get fresh farm produce delivered! 🥬🍓\n'
+        ? 'Join F2H — Farm To Home & Get fresh farm produce delivered! 🥬🥛\n\n'
           'Fresh farm products, delivered to your doorstep.\n'
-          'https://f2h.app.link/invite'
-        : 'Your F2H Invite is Ready\n\n'
+          '$_playStoreUrl'
+        : 'Your F2H Invite is Ready 🥬🥛\n\n'
           'Fresh farm products, delivered to your doorstep.\n\n'
-          'Invite Code: $_activeCode\n'
-          '$_referralLink\n\n'
+          'Use Referral Code: $_activeCode\n'
+          'Download App: $_playStoreUrl\n\n'
           'F2H — Farm To Home\n'
           'Fresh. Smart. Rewarding.';
 
@@ -214,8 +215,8 @@ class _ReferralScreenState extends State<ReferralScreen>
   }
 
   void _copyToClipboard(String text, String toastMsg) {
-    final copyText = _isLocked ? 'https://f2h.app.link/invite' : text;
-    final message = _isLocked ? 'App Invite link copied to clipboard! 📋' : toastMsg;
+    final copyText = _isLocked ? _playStoreUrl : text;
+    final message = _isLocked ? 'Play Store app link copied to clipboard! 📋' : toastMsg;
     Clipboard.setData(ClipboardData(text: copyText));
     F2HToast.success(context, message);
   }
@@ -600,7 +601,7 @@ class _ReferralScreenState extends State<ReferralScreen>
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    _isLocked ? 'https://f2h.app.link/invite' : _referralLink,
+                    _playStoreUrl,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 12,
@@ -612,8 +613,8 @@ class _ReferralScreenState extends State<ReferralScreen>
                 const SizedBox(width: 8),
                 GestureDetector(
                   onTap: () => _copyToClipboard(
-                    _referralLink,
-                    'Referral link copied!',
+                    _playStoreUrl,
+                    'Play Store link copied!',
                   ),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

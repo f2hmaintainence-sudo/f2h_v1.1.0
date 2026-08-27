@@ -433,11 +433,12 @@ class ReferralInviteCard extends StatelessWidget {
   }
 
   static Future<void> _shareCode(BuildContext context, String code) async {
+    const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.f2h.customer';
     final message =
-        'Your F2H Invite is Ready\n\n'
+        'Your F2H Invite is Ready 🥬🥛\n\n'
         'Fresh farm products, delivered to your doorstep.\n\n'
-        'Invite Code: $code\n'
-        'https://f2h.app.link/$code\n\n'
+        'Use Referral Code: $code\n'
+        'Download App: $playStoreUrl\n\n'
         'F2H — Farm To Home\n'
         'Fresh. Smart. Rewarding.';
     final encodedMsg = Uri.encodeComponent(message);

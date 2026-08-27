@@ -201,25 +201,26 @@ class ReferralBannerWidget extends StatelessWidget {
                             );
                           } else {
                             // Allow customer to share app referral link at any stage
-                            const inviteMsg = 'Join F2H — Farm To Home & Get fresh farm produce delivered! 🥬🍓\nFresh farm products, delivered to your doorstep.\nhttps://f2h.app.link/invite';
+                            const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.f2h.customer';
+                            const inviteMsg = 'Join F2H — Farm To Home & Get fresh farm produce delivered! 🥬🥛\nFresh farm products, delivered to your doorstep.\n$playStoreUrl';
                             try {
                               final encodedMsg = Uri.encodeComponent(inviteMsg);
                               final whatsappUri = Uri.parse('https://wa.me/?text=$encodedMsg');
                               if (await canLaunchUrl(whatsappUri)) {
                                 await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
                               } else {
-                                await Clipboard.setData(const ClipboardData(text: 'https://f2h.app.link/invite'));
+                                await Clipboard.setData(const ClipboardData(text: playStoreUrl));
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('App Invite link copied to clipboard! 📋'),
+                                      content: Text('Play Store app link copied to clipboard! 📋'),
                                       behavior: SnackBarBehavior.floating,
                                     ),
                                   );
                                 }
                               }
                             } catch (_) {
-                              await Clipboard.setData(const ClipboardData(text: 'https://f2h.app.link/invite'));
+                              await Clipboard.setData(const ClipboardData(text: playStoreUrl));
                             }
                           }
                         },
