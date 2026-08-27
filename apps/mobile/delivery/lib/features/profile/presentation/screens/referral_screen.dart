@@ -24,6 +24,11 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
   Map<String, dynamic>? _data;
   late TabController _tabController;
 
+  // Filter & Search
+  String _searchQuery = '';
+  String _selectedStatusFilter = 'all';
+  final TextEditingController _searchController = TextEditingController();
+
   static const String _customerAppUrl =
       'https://play.google.com/store/apps/details?id=com.f2h.customer&pcampaignid=web_share';
 
@@ -37,27 +42,40 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   Future<void> _loadReferrals() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final dioClient = DioClient();
       final res = await dioClient.dio.get(ApiEndpoints.profileReferrals);
       final body = res.data is Map ? Map<String, dynamic>.from(res.data as Map) : <String, dynamic>{};
       final data = body['data'] is Map ? Map<String, dynamic>.from(body['data'] as Map) : <String, dynamic>{};
-      setState(() { _data = data; _loading = false; });
+      setState(() {
+        _data = data;
+        _loading = false;
+      });
     } on DioException catch (e) {
-      setState(() { _error = e.response?.data?['message'] ?? 'Failed to load referrals. Please try again.'; _loading = false; });
+      setState(() {
+        _error = e.response?.data?['message'] ?? 'Failed to load referral dashboard. Please try again.';
+        _loading = false;
+      });
     } catch (_) {
-      setState(() { _error = 'Failed to load referrals. Please try again.'; _loading = false; });
+      setState(() {
+        _error = 'Failed to load referral dashboard. Please try again.';
+        _loading = false;
+      });
     }
   }
 
   String _getShareMessage(String code) {
     return '🥛 Order 100% Pure, Farm-Fresh Milk, Organic Vegetables & Daily Groceries delivered to your doorstep with Farm to Home (F2H)!\n\n'
-        '🎁 Use my Customer Referral Code: $code to get special discounts on your first order!\n\n'
+        '🎁 Use my Exclusive Customer Referral Code: *$code* to get special introductory discounts on your first order!\n\n'
         '📲 Download the F2H Customer App now:\n'
         '$_customerAppUrl';
   }
@@ -65,7 +83,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
   void _copyCode(String code) {
     final fullMessage = _getShareMessage(code);
     Clipboard.setData(ClipboardData(text: fullMessage));
-    AppSnackBar.success(context, 'Customer referral link & code copied!');
+    AppSnackBar.success(context, 'Referral code & app link copied to clipboard!');
   }
 
   Future<void> _shareCode(String code) async {
@@ -80,6 +98,17 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
     }
   }
 
+  Future<void> _shareWhatsApp(String code) async {
+    final message = _getShareMessage(code);
+    final encoded = Uri.encodeComponent(message);
+    final url = Uri.parse('https://wa.me/?text=$encoded');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      _copyCode(code);
+    }
+  }
+
   void _showShareBottomSheet(String code) {
     final message = _getShareMessage(code);
     final encoded = Uri.encodeComponent(message);
@@ -88,41 +117,56 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 40,
-                height: 4,
+                width: 44,
+                height: 5,
                 decoration: BoxDecoration(
                   color: const Color(0xFFCBD5E1),
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(3),
                 ),
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Share Customer Referral Link',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF0F172A),
-                ),
+              const SizedBox(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.share_rounded, color: Color(0xFF16A34A), size: 22),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Share Customer Referral',
+                    style: GoogleFonts.poppins(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 6),
               Text(
-                'Invite customers to order fresh farm products & earn \u20b975 per customer',
+                'Invite customers to order fresh milk & produce. You earn ₹75 per customer upon their first delivery!',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(
                   fontSize: 12,
                   color: const Color(0xFF64748B),
+                  height: 1.4,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
@@ -130,14 +174,9 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                     icon: Icons.chat_rounded,
                     label: 'WhatsApp',
                     color: const Color(0xFF25D366),
-                    onTap: () async {
+                    onTap: () {
                       Navigator.pop(ctx);
-                      final url = Uri.parse('https://wa.me/?text=$encoded');
-                      if (await canLaunchUrl(url)) {
-                        await launchUrl(url, mode: LaunchMode.externalApplication);
-                      } else {
-                        _copyCode(code);
-                      }
+                      _shareWhatsApp(code);
                     },
                   ),
                   _buildShareOption(
@@ -146,7 +185,8 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                     color: const Color(0xFF0088CC),
                     onTap: () async {
                       Navigator.pop(ctx);
-                      final url = Uri.parse('https://t.me/share/url?url=${Uri.encodeComponent(_customerAppUrl)}&text=${Uri.encodeComponent(message)}');
+                      final url = Uri.parse(
+                          'https://t.me/share/url?url=${Uri.encodeComponent(_customerAppUrl)}&text=${Uri.encodeComponent(message)}');
                       if (await canLaunchUrl(url)) {
                         await launchUrl(url, mode: LaunchMode.externalApplication);
                       } else {
@@ -169,15 +209,12 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                     },
                   ),
                   _buildShareOption(
-                    icon: Icons.share_rounded,
-                    label: 'All Apps',
-                    color: const Color(0xFF16A34A),
+                    icon: Icons.copy_rounded,
+                    label: 'Copy Text',
+                    color: const Color(0xFF2563EB),
                     onTap: () {
                       Navigator.pop(ctx);
-                      Share.share(
-                        message,
-                        subject: 'Farm to Home (F2H) - Fresh Milk & Groceries Referral',
-                      );
+                      _copyCode(code);
                     },
                   ),
                 ],
@@ -197,18 +234,19 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(18),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 52,
-              height: 52,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
+                border: Border.all(color: color.withValues(alpha: 0.25), width: 1.2),
               ),
               child: Icon(icon, color: color, size: 26),
             ),
@@ -222,6 +260,110 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _showQrCodeDialog(String code) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Customer QR Code',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 170,
+                      height: 170,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.qr_code_2_rounded, size: 100, color: Color(0xFF16A34A)),
+                            Text(
+                              code,
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                                letterSpacing: 1.5,
+                                color: const Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Ask customer to scan to download app with your referral tag applied!',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        color: const Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _shareCode(code);
+                  },
+                  icon: const Icon(Icons.share_rounded, size: 18),
+                  label: const Text('Share Code Now'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF16A34A),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -246,12 +388,13 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
     final totalEarned = (stats['total_earned'] ?? (eligible * 75)).toDouble();
     final totalPaid = (stats['total_paid'] ?? 0).toDouble();
     final outstanding = (stats['outstanding_amount'] ?? (totalEarned - totalPaid)).toDouble();
+    final code = _data?['referral_code'] as String? ?? 'F2HDR-789';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: const F2hAppBar(
-        title: 'Refer & Earn \u20b975',
-        subtitle: 'Earn \u20b975 for every customer referred',
+        title: 'Referral Hub',
+        subtitle: 'Earn ₹75 for every new customer',
         icon: Icons.card_giftcard_rounded,
       ),
       body: _loading
@@ -260,53 +403,77 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
               ? _buildError()
               : RefreshIndicator(
                   onRefresh: _loadReferrals,
-                  color: kPrimary,
+                  color: const Color(0xFF16A34A),
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                     children: [
-                      _buildReferralCodeCard(),
+                      _buildHeroCard(code, totalEarned),
                       const SizedBox(height: 16),
-                      _buildStatsRow(
+                      _buildMetricCards(
                         total: total,
                         eligible: eligible,
                         totalPaid: totalPaid,
                         outstanding: outstanding,
                       ),
                       const SizedBox(height: 16),
-                      _buildOfflinePaymentNotice(),
+                      _buildMilestoneTracker(eligible: eligible),
                       const SizedBox(height: 16),
-                      _buildHowItWorks(),
+                      _buildQuickShareStrip(code),
+                      const SizedBox(height: 16),
+                      _buildHowItWorksCard(),
                       const SizedBox(height: 20),
-                      _buildTabsSection(),
+                      _buildLedgerSection(),
+                      const SizedBox(height: 20),
+                      _buildFaqSection(),
                     ],
                   ),
                 ),
+      bottomNavigationBar: _loading || _error != null
+          ? null
+          : _buildStickyBottomBar(code),
     );
   }
 
   Widget _buildError() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(28),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 56, color: kDanger),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: Color(0xFFFEE2E2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.error_outline_rounded, size: 48, color: kDanger),
+            ),
             const SizedBox(height: 16),
+            Text(
+              'Unable to load referrals',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 6),
             Text(
               _error!,
               textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(color: const Color(0xFF64748B), fontSize: 13.5),
+              style: GoogleFonts.poppins(color: const Color(0xFF64748B), fontSize: 13),
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: _loadReferrals,
-              icon: const Icon(Icons.refresh_rounded, size: 16),
-              label: const Text('Retry'),
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Try Again'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF16A34A),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
             ),
           ],
@@ -315,18 +482,472 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildReferralCodeCard() {
-    final code = _data?['referral_code'] as String? ?? 'F2HDR-789';
+  Widget _buildHeroCard(String code, double totalEarned) {
     return Container(
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF15803D), Color(0xFF16A34A), Color(0xFF22C55E)],
+          colors: [
+            Color(0xFF0F172A),
+            Color(0xFF1E293B),
+            Color(0xFF064E3B),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(26),
         boxShadow: const [
-          BoxShadow(color: Color(0x2816A34A), blurRadius: 16, offset: Offset(0, 6)),
+          BoxShadow(
+            color: Color(0x33064E3B),
+            blurRadius: 20,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // Background decorative glow shapes
+          Positioned(
+            right: -20,
+            top: -20,
+            child: Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF22C55E).withValues(alpha: 0.15),
+              ),
+            ),
+          ),
+          Positioned(
+            left: -30,
+            bottom: -30,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF38BDF8).withValues(alpha: 0.10),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF22C55E).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF22C55E).withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.bolt_rounded, color: Color(0xFF4ADE80), size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            'UNLIMITED EARNINGS',
+                            style: GoogleFonts.poppins(
+                              color: const Color(0xFF4ADE80),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 10,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureCarbonQrButton(
+                      onTap: () => _showQrCodeDialog(code),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Earn ₹75 Per Customer',
+                  style: GoogleFonts.poppins(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Share your referral link with customers on your route. When they place their first order, ₹75 is credited to your settlement.',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: const Color(0xFF94A3B8),
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                // Referral Code Highlight Box
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.16),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'YOUR REFERRAL CODE',
+                            style: GoogleFonts.poppins(
+                              color: const Color(0xFF94A3B8),
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            code,
+                            style: GoogleFonts.poppins(
+                              color: const Color(0xFF4ADE80),
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 2.0,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      ElevatedButton.icon(
+                        onPressed: () => _copyCode(code),
+                        icon: const Icon(Icons.copy_rounded, size: 14),
+                        label: const Text('Copy'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF22C55E),
+                          foregroundColor: const Color(0xFF0F172A),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricCards({
+    required dynamic total,
+    required dynamic eligible,
+    required double totalPaid,
+    required double outstanding,
+  }) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            _buildMetricTile(
+              title: 'Total Referrals',
+              value: '$total',
+              subtitle: 'Customers invited',
+              icon: Icons.people_alt_rounded,
+              accentColor: const Color(0xFF2563EB),
+              bgGradient: const [Color(0xFFEFF6FF), Color(0xFFDBEAFE)],
+            ),
+            const SizedBox(width: 12),
+            _buildMetricTile(
+              title: 'Eligible (₹75)',
+              value: '$eligible',
+              subtitle: '1st order placed',
+              icon: Icons.verified_rounded,
+              accentColor: const Color(0xFF16A34A),
+              bgGradient: const [Color(0xFFF0FDF4), Color(0xFFDCFCE7)],
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            _buildMetricTile(
+              title: 'Paid Out',
+              value: '₹${totalPaid.toStringAsFixed(0)}',
+              subtitle: 'Transferred / Cash',
+              icon: Icons.payments_rounded,
+              accentColor: const Color(0xFF0D9488),
+              bgGradient: const [Color(0xFFF0FDFA), Color(0xFFCCFBF1)],
+            ),
+            const SizedBox(width: 12),
+            _buildMetricTile(
+              title: 'Pending Payout',
+              value: '₹${outstanding.toStringAsFixed(0)}',
+              subtitle: 'Settlement due',
+              icon: Icons.account_balance_wallet_rounded,
+              accentColor: const Color(0xFFD97706),
+              bgGradient: const [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMetricTile({
+    required String title,
+    required String value,
+    required String subtitle,
+    required IconData icon,
+    required Color accentColor,
+    required List<Color> bgGradient,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x06000000),
+              blurRadius: 10,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: bgGradient),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: accentColor, size: 18),
+                ),
+                const Spacer(),
+                Text(
+                  title,
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              value,
+              style: GoogleFonts.poppins(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF0F172A),
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: GoogleFonts.poppins(
+                fontSize: 10.5,
+                color: const Color(0xFF94A3B8),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMilestoneTracker({required dynamic eligible}) {
+    final count = (eligible is num ? eligible : int.tryParse(eligible.toString()) ?? 0).toInt();
+    int nextMilestone = 5;
+    if (count >= 5 && count < 10) nextMilestone = 10;
+    if (count >= 10 && count < 25) nextMilestone = 25;
+    if (count >= 25 && count < 50) nextMilestone = 50;
+    if (count >= 50) nextMilestone = 100;
+
+    final progress = (count / nextMilestone).clamp(0.0, 1.0);
+    final remaining = (nextMilestone - count).clamp(0, nextMilestone);
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFFD97706), size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Rider Milestone Reward',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF0F172A),
+                      ),
+                    ),
+                    Text(
+                      remaining > 0
+                          ? '$remaining more customer referrals to unlock Milestone bonus'
+                          : 'Milestone reached! Claim bonus with admin.',
+                      style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$count / $nextMilestone',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 8,
+              backgroundColor: const Color(0xFFF1F5F9),
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF16A34A)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickShareStrip(String code) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFBBF7D0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.flash_on_rounded, color: Color(0xFF16A34A), size: 18),
+              const SizedBox(width: 6),
+              Text(
+                'Instant One-Tap Share',
+                style: GoogleFonts.poppins(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF14532D),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: ElevatedButton.icon(
+                  onPressed: () => _shareWhatsApp(code),
+                  icon: const Icon(Icons.chat_rounded, size: 18, color: Colors.white),
+                  label: const Text('WhatsApp'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF25D366),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: 13),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: OutlinedButton.icon(
+                  onPressed: () => _shareCode(code),
+                  icon: const Icon(Icons.share_rounded, size: 16, color: Color(0xFF16A34A)),
+                  label: const Text('More'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF16A34A),
+                    side: const BorderSide(color: Color(0xFF16A34A), width: 1.4),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 13),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHowItWorksCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x04000000),
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
         ],
       ),
       padding: const EdgeInsets.all(20),
@@ -338,332 +959,211 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.20),
-                  shape: BoxShape.circle,
+                  color: const Color(0xFFDBEAFE),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.card_giftcard_rounded, color: Colors.white, size: 20),
+                child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF2563EB), size: 18),
               ),
               const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Your Customer Referral Code',
-                      style: GoogleFonts.poppins(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w600),
-                    ),
-                    Text(
-                      'Share & Earn \u20b975 per customer',
-                      style: GoogleFonts.poppins(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w800),
-                    ),
-                  ],
+              Text(
+                'How Referral Works',
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1.2),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    code,
-                    style: GoogleFonts.poppins(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      letterSpacing: 2.0,
-                    ),
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () => _copyCode(code),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.25),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.copy_rounded, color: Colors.white, size: 18),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => _copyCode(code),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1.2),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.copy_rounded, color: Colors.white, size: 16),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Copy Code',
-                          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => _shareCode(code),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: const [
-                        BoxShadow(color: Color(0x1A000000), blurRadius: 8, offset: Offset(0, 2)),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.share_rounded, color: Color(0xFF16A34A), size: 16),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Share Now',
-                          style: GoogleFonts.poppins(color: const Color(0xFF16A34A), fontWeight: FontWeight.w800, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+          _buildJourneyStep('1', 'Share Your Code', 'Send your customer invite link via WhatsApp, SMS, or QR code.', const Color(0xFF2563EB), const Color(0xFFDBEAFE)),
+          const SizedBox(height: 12),
+          _buildJourneyStep('2', 'Friend Installs App', 'Customer signs up on the F2H Customer App using your referral code.', const Color(0xFFD97706), const Color(0xFFFEF3C7)),
+          const SizedBox(height: 12),
+          _buildJourneyStep('3', 'First Order Placed', 'Customer receives pure milk / fresh produce at their doorstep.', const Color(0xFF16A34A), const Color(0xFFDCFCE7)),
+          const SizedBox(height: 12),
+          _buildJourneyStep('4', '₹75 Cash Credited', '₹75 per eligible referral is paid out offline in your monthly settlement.', const Color(0xFF9333EA), const Color(0xFFF3E8FF)),
         ],
       ),
     );
   }
 
-  Widget _buildStatsRow({
-    required dynamic total,
-    required dynamic eligible,
-    required double totalPaid,
-    required double outstanding,
-  }) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            _buildStatCard('Total Referrals', '$total', Icons.people_outline_rounded, const Color(0xFF2563EB), const Color(0xFFDBEAFE)),
-            const SizedBox(width: 10),
-            _buildStatCard('Eligible (\u20b975)', '$eligible', Icons.check_circle_outline_rounded, const Color(0xFF16A34A), const Color(0xFFDCFCE7)),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            _buildStatCard('Paid Out', '\u20b9${totalPaid.toStringAsFixed(0)}', Icons.payments_outlined, const Color(0xFF0D9488), const Color(0xFFCCFBF1)),
-            const SizedBox(width: 10),
-            _buildStatCard('Outstanding', '\u20b9${outstanding.toStringAsFixed(0)}', Icons.hourglass_bottom_rounded, const Color(0xFFD97706), const Color(0xFFFEF3C7)),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatCard(String label, String value, IconData icon, Color color, Color bg) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x04000000),
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-              child: Icon(icon, color: color, size: 18),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    value,
-                    style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
-                  ),
-                  Text(
-                    label,
-                    style: GoogleFonts.poppins(fontSize: 10.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w600),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOfflinePaymentNotice() {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0FDF4),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFBBF7D0)),
-      ),
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        children: [
-          const Icon(Icons.info_outline_rounded, color: Color(0xFF16A34A), size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Offline Monthly Settlement',
-                  style: GoogleFonts.poppins(fontSize: 12.5, fontWeight: FontWeight.w800, color: const Color(0xFF14532D)),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Referral bonuses (\u20b975 per eligible customer) are disbursed offline via cash or direct bank transfer at month-end.',
-                  style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF166534), fontWeight: FontWeight.w500),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHowItWorks() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x04000000),
-            blurRadius: 10,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFF2563EB), size: 18),
-              const SizedBox(width: 8),
-              Text(
-                'How Customer Referral Works',
-                style: GoogleFonts.poppins(fontSize: 14.5, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _buildStep('1', 'Share your customer referral link with friends, family & neighbors', const Color(0xFF2563EB), const Color(0xFFDBEAFE)),
-          const SizedBox(height: 10),
-          _buildStep('2', 'Customer downloads the F2H Customer App using your link', const Color(0xFFD97706), const Color(0xFFFEF3C7)),
-          const SizedBox(height: 10),
-          _buildStep('3', 'Customer signs up, adds your code, and places their first order', const Color(0xFF16A34A), const Color(0xFFDCFCE7)),
-          const SizedBox(height: 10),
-          _buildStep('4', 'You earn \u20b975 per customer, paid out offline at month-end settlement!', const Color(0xFF9333EA), const Color(0xFFF3E8FF)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStep(String number, String text, Color fg, Color bg) {
+  Widget _buildJourneyStep(String number, String title, String subtitle, Color fg, Color bg) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 24,
-          height: 24,
-          decoration: BoxDecoration(
-            color: bg,
-            shape: BoxShape.circle,
-          ),
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
           alignment: Alignment.center,
-          child: Text(number, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w800, color: fg)),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
           child: Text(
-            text,
-            style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFF475569), fontWeight: FontWeight.w500),
+            number,
+            style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w900, color: fg),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+              Text(
+                subtitle,
+                style: GoogleFonts.poppins(
+                  fontSize: 11.5,
+                  color: const Color(0xFF64748B),
+                  height: 1.3,
+                ),
+              ),
+            ],
           ),
         ),
       ],
     );
   }
 
-  Widget _buildTabsSection() {
-    final referrals = _data?['referrals'] as List<dynamic>? ?? [];
+  Widget _buildLedgerSection() {
+    final rawReferrals = _data?['referrals'] as List<dynamic>? ?? [];
     final payments = _data?['payments_history'] as List<dynamic>? ?? [];
+
+    // Filter referrals by status and search query
+    final referrals = rawReferrals.where((r) {
+      final item = r as Map<String, dynamic>;
+      final name = (item['referee_name'] as String? ?? '').toLowerCase();
+      final phone = (item['referee_phone'] as String? ?? '').toLowerCase();
+      final status = (item['status'] as String? ?? '').toLowerCase();
+      final paymentStatus = (item['payment_status'] as String? ?? '').toLowerCase();
+
+      final matchesQuery = _searchQuery.isEmpty || name.contains(_searchQuery) || phone.contains(_searchQuery);
+      if (!matchesQuery) return false;
+
+      if (_selectedStatusFilter == 'eligible') {
+        return status == 'eligible' || status == 'rewarded' || status == 'completed';
+      } else if (_selectedStatusFilter == 'paid') {
+        return paymentStatus == 'paid';
+      } else if (_selectedStatusFilter == 'pending') {
+        return status == 'pending';
+      }
+      return true;
+    }).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Row(
+          children: [
+            Text(
+              'Activity Ledger',
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+            const Spacer(),
+            Text(
+              '${rawReferrals.length} Total',
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF64748B),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Segmented Tabs
         Container(
           decoration: BoxDecoration(
             color: const Color(0xFFE2E8F0),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
           ),
-          padding: const EdgeInsets.all(3),
+          padding: const EdgeInsets.all(4),
           child: TabBar(
             controller: _tabController,
             indicator: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
               boxShadow: const [
-                BoxShadow(color: Color(0x0A000000), blurRadius: 4, offset: Offset(0, 1)),
+                BoxShadow(color: Color(0x14000000), blurRadius: 6, offset: Offset(0, 2)),
               ],
             ),
             labelColor: const Color(0xFF0F172A),
             unselectedLabelColor: const Color(0xFF64748B),
-            labelStyle: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w800),
-            unselectedLabelStyle: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600),
+            labelStyle: GoogleFonts.poppins(fontSize: 12.5, fontWeight: FontWeight.w800),
+            unselectedLabelStyle: GoogleFonts.poppins(fontSize: 12.5, fontWeight: FontWeight.w600),
             tabs: [
-              Tab(text: 'Referred Customers (${referrals.length})'),
+              Tab(text: 'Referred Customers (${rawReferrals.length})'),
               Tab(text: 'Payouts (${payments.length})'),
             ],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
+
+        // Search & Filter Bar for Referrals Tab
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: TextField(
+            controller: _searchController,
+            onChanged: (val) {
+              setState(() {
+                _searchQuery = val.trim().toLowerCase();
+              });
+            },
+            decoration: InputDecoration(
+              hintText: 'Search customer name or phone...',
+              hintStyle: GoogleFonts.poppins(color: const Color(0xFF94A3B8), fontSize: 12.5),
+              prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF94A3B8)),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _searchQuery = '');
+                      },
+                    )
+                  : null,
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+            style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFF0F172A)),
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // Filter chips
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _buildFilterChip('All', 'all'),
+              const SizedBox(width: 8),
+              _buildFilterChip('Eligible (₹75)', 'eligible'),
+              const SizedBox(width: 8),
+              _buildFilterChip('Paid', 'paid'),
+              const SizedBox(width: 8),
+              _buildFilterChip('Pending', 'pending'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Content Area
         SizedBox(
-          height: 380,
+          height: 420,
           child: TabBarView(
             controller: _tabController,
             children: [
@@ -676,29 +1176,64 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
     );
   }
 
+  Widget _buildFilterChip(String label, String value) {
+    final isSelected = _selectedStatusFilter == value;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedStatusFilter = value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF16A34A) : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF16A34A) : const Color(0xFFCBD5E1),
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+            color: isSelected ? Colors.white : const Color(0xFF475569),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildReferralsList(List<dynamic> referrals) {
     if (referrals.isEmpty) {
       return Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
-        padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.people_outline_rounded, size: 42, color: Color(0xFF94A3B8)),
-            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: Color(0xFFF1F5F9),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.people_outline_rounded, size: 36, color: Color(0xFF94A3B8)),
+            ),
+            const SizedBox(height: 14),
             Text(
-              'No referrals yet',
+              _searchQuery.isNotEmpty ? 'No matches found' : 'No referrals yet',
               style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
             ),
             const SizedBox(height: 4),
             Text(
-              'Share your code and earn \u20b975 for each new customer who orders!',
+              _searchQuery.isNotEmpty
+                  ? 'Try a different search term or filter'
+                  : 'Share your referral code to start earning ₹75 on each new customer!',
               textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
+              style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF64748B)),
             ),
           ],
         ),
@@ -708,13 +1243,13 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: ListView.separated(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: referrals.length,
-        separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+        separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
         itemBuilder: (_, i) {
           final r = referrals[i] as Map<String, dynamic>;
           final name = r['referee_name'] as String? ?? 'Customer';
@@ -730,19 +1265,19 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
             child: Row(
               children: [
                 Container(
-                  width: 38,
-                  height: 38,
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
                     color: isPaid
                         ? const Color(0xFFDCFCE7)
                         : (isEligible ? const Color(0xFFFEF3C7) : const Color(0xFFF1F5F9)),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   alignment: Alignment.center,
                   child: Text(
                     name.isNotEmpty ? name[0].toUpperCase() : 'C',
                     style: GoogleFonts.poppins(
-                      fontSize: 14,
+                      fontSize: 15,
                       fontWeight: FontWeight.w900,
                       color: isPaid
                           ? const Color(0xFF15803D)
@@ -757,7 +1292,13 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                     children: [
                       Text(
                         name,
-                        style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
+                        style: GoogleFonts.poppins(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF0F172A),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       if (phone.isNotEmpty)
                         Text(
@@ -776,26 +1317,26 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '+\u20b975.00',
+                      '+₹75.00',
                       style: GoogleFonts.poppins(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w800,
-                        color: isEligible ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        color: isEligible || isPaid ? const Color(0xFF16A34A) : const Color(0xFF64748B),
                       ),
                     ),
                     const SizedBox(height: 3),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: isPaid
                             ? const Color(0xFFDCFCE7)
                             : (isEligible ? const Color(0xFFFEF3C7) : const Color(0xFFF1F5F9)),
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         isPaid ? 'PAID' : (isEligible ? 'ELIGIBLE' : 'PENDING'),
                         style: GoogleFonts.poppins(
-                          fontSize: 9,
+                          fontSize: 9.5,
                           fontWeight: FontWeight.w800,
                           color: isPaid
                               ? const Color(0xFF15803D)
@@ -818,15 +1359,22 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
       return Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
-        padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.receipt_long_rounded, size: 42, color: Color(0xFF94A3B8)),
-            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: Color(0xFFF1F5F9),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.receipt_long_rounded, size: 36, color: Color(0xFF94A3B8)),
+            ),
+            const SizedBox(height: 14),
             Text(
               'No payout history yet',
               style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
@@ -835,7 +1383,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
             Text(
               'Referral earnings will appear here once settled offline by admin.',
               textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
+              style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF64748B)),
             ),
           ],
         ),
@@ -845,33 +1393,33 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: ListView.separated(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: payments.length,
-        separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+        separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
         itemBuilder: (_, i) {
           final p = payments[i] as Map<String, dynamic>;
           final amount = (p['amount'] is num ? p['amount'] : double.tryParse(p['amount']?.toString() ?? '75') ?? 75.0).toDouble();
           final date = _formatDate(p['paid_at']);
-          final ref = p['payment_reference'] as String? ?? 'Physical / Cash Payout';
-          final referee = p['referee_name'] as String? ?? 'Customer';
+          final ref = p['payment_reference'] as String? ?? 'Physical / Bank Settlement';
+          final referee = p['referee_name'] as String? ?? 'Customer Referral';
 
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
                 Container(
-                  width: 38,
-                  height: 38,
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
                     color: const Color(0xFFDCFCE7),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   alignment: Alignment.center,
-                  child: const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 20),
+                  child: const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 22),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -880,7 +1428,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                     children: [
                       Text(
                         'Payout: $ref',
-                        style: GoogleFonts.poppins(fontSize: 12.5, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
+                        style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
                       ),
                       Text(
                         'Referee: $referee',
@@ -895,13 +1443,163 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                   ),
                 ),
                 Text(
-                  '\u20b9${amount.toStringAsFixed(2)}',
-                  style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w800, color: const Color(0xFF15803D)),
+                  '₹${amount.toStringAsFixed(2)}',
+                  style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w900, color: const Color(0xFF15803D)),
                 ),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildFaqSection() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x04000000),
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.help_outline_rounded, color: Color(0xFF16A34A), size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Frequently Asked Questions',
+                style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildFaqItem(
+            'When do I receive my ₹75 referral bonus?',
+            'Referral bonuses become eligible once the referred customer places and successfully receives their first order. Payouts are settled offline at month-end.',
+          ),
+          _buildFaqItem(
+            'Is there any limit on referrals?',
+            'No! You can refer as many customers, apartments, and neighbors as you want. There is no ceiling on your earnings.',
+          ),
+          _buildFaqItem(
+            'What benefit does the customer get?',
+            'Customers signing up with your code receive special introductory discounts and bonus milk credits on their subscription.',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFaqItem(String question, String answer) {
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: const EdgeInsets.only(bottom: 8),
+        title: Text(
+          question,
+          style: GoogleFonts.poppins(fontSize: 12.5, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B)),
+        ),
+        children: [
+          Text(
+            answer,
+            style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFF64748B), height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStickyBottomBar(String code) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 16,
+            offset: Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _shareWhatsApp(code),
+                icon: const Icon(Icons.chat_rounded, size: 20, color: Colors.white),
+                label: const Text('Share on WhatsApp'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF25D366),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: 13.5),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            IconButton.filled(
+              onPressed: () => _copyCode(code),
+              icon: const Icon(Icons.copy_rounded, size: 18),
+              style: IconButton.styleFrom(
+                backgroundColor: const Color(0xFFF1F5F9),
+                foregroundColor: const Color(0xFF0F172A),
+                padding: const EdgeInsets.all(14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class GestureCarbonQrButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const GestureCarbonQrButton({super.key, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.qr_code_rounded, color: Colors.white, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              'QR Code',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 11.5,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

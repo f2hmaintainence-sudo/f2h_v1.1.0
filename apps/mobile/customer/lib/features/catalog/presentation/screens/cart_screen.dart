@@ -926,8 +926,8 @@ class _CartScreenState extends State<CartScreen> {
             ),
             const SizedBox(height: 10),
             InfiniteAutoScrollList(
-              height: 245,
-              itemWidth: 170,
+              height: 285,
+              itemWidth: 165,
               autoScrollInterval: const Duration(milliseconds: 10000),
               scrollDuration: const Duration(milliseconds: 1000),
               animateClockwise: false,
@@ -939,8 +939,6 @@ class _CartScreenState extends State<CartScreen> {
                     ),
                   )
                   .toList(),
-
-
             ),
           ],
         );
