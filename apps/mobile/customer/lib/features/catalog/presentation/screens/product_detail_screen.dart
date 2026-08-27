@@ -400,119 +400,83 @@ class _SidebarItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── LIGHT SOFT GLASS CIRCLE BADGE ──────────
+            // ── SINGLE CLEAN CIRCLE BADGE (Down-to-Top Gradient Fade) ──────────
             AnimatedScale(
               scale: isSelected ? 1.08 : 1.0,
-              duration: const Duration(milliseconds: 300),
+              duration: const Duration(milliseconds: 250),
               curve: Curves.easeOutBack,
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
+                duration: const Duration(milliseconds: 250),
                 curve: Curves.easeOutCubic,
-                width: 60,
-                height: 60,
-                padding: EdgeInsets.all(isSelected ? 3 : 0),
+                width: 58,
+                height: 58,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: isSelected
+                  gradient: isAll
                       ? const LinearGradient(
-                          colors: [Color(0xFFA7F3D0), Color(0xFFECFDF5), Color(0xFFFFFFFF)],
+                          colors: [Color(0xFF047857), Color(0xFF10B981), Color(0xFF34D399)],
                           begin: Alignment.bottomCenter,
                           end: Alignment.topCenter,
                         )
-                      : null,
-                  color: isSelected ? null : Colors.transparent,
-                  border: isSelected
-                      ? Border.all(
-                          color: const Color(0xFF6EE7B7),
-                          width: 1.8,
-                        )
-                      : Border.all(color: Colors.transparent, width: 0),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.16),
-                            blurRadius: 12,
-                            spreadRadius: 1,
-                            offset: const Offset(0, 3),
-                          ),
-                          BoxShadow(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            blurRadius: 4,
-                            spreadRadius: -1,
-                            offset: const Offset(0, -1),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: isAll
-                        ? const LinearGradient(
-                            colors: [Color(0xFF047857), Color(0xFF10B981), Color(0xFF34D399)],
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
-                          )
+                      : (isSelected
+                          ? const LinearGradient(
+                              colors: [Color(0xFFA7F3D0), Color(0xFFECFDF5), Color(0xFFFFFFFF)],
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.topCenter,
+                            )
+                          : const LinearGradient(
+                              colors: [Color(0xFFF1F5F9), Color(0xFFF8FAFC), Color(0xFFFFFFFF)],
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.topCenter,
+                            )),
+                  border: Border.all(
+                    color: isAll
+                        ? Colors.white
                         : (isSelected
-                            ? const LinearGradient(
-                                colors: [Color(0xFFDCFCE7), Color(0xFFF0FDF4), Color(0xFFFFFFFF)],
-                                begin: Alignment.bottomCenter,
-                                end: Alignment.topCenter,
-                              )
-                            : const LinearGradient(
-                                colors: [Color(0xFFF1F5F9), Color(0xFFF8FAFC), Color(0xFFFFFFFF)],
-                                begin: Alignment.bottomCenter,
-                                end: Alignment.topCenter,
-                              )),
-                    border: Border.all(
-                      color: isAll
-                          ? Colors.white
-                          : (isSelected
-                              ? const Color(0xFF86EFAC)
-                              : const Color(0xFFE2E8F0)),
-                      width: isSelected ? 1.5 : 1.2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: isAll
-                            ? const Color(0xFF10B981).withValues(alpha: 0.25)
-                            : (isSelected
-                                ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                                : Colors.black.withValues(alpha: 0.04)),
-                        blurRadius: isSelected ? 6 : 3,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                            ? const Color(0xFF10B981)
+                            : const Color(0xFFE2E8F0)),
+                    width: isSelected ? 2.2 : 1.2,
                   ),
-                  child: isAll
-                      ? const Center(
-                          child: Icon(
-                            Icons.grid_view_rounded,
-                            color: Colors.white,
-                            size: 26,
-                          ),
-                        )
-                      : (imagePath != null && imagePath.isNotEmpty
-                            ? ClipOval(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(2),
-                                  child: buildProductImage(
-                                    catName,
-                                    imageAsset: imagePath,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                              )
-                            : Center(
-                                child: Icon(
-                                  Icons.water_drop_rounded,
-                                  color: isSelected
-                                      ? const Color(0xFF059669)
-                                      : const Color(0xFF64748B),
-                                  size: 24,
-                                ),
-                              )),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isAll
+                          ? const Color(0xFF047857).withValues(alpha: 0.35)
+                          : (isSelected
+                              ? const Color(0xFF10B981).withValues(alpha: 0.22)
+                              : Colors.black.withValues(alpha: 0.04)),
+                      blurRadius: isSelected ? 8 : 4,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
+                child: isAll
+                    ? const Center(
+                        child: Icon(
+                          Icons.grid_view_rounded,
+                          color: Colors.white,
+                          size: 26,
+                        ),
+                      )
+                    : (imagePath != null && imagePath.isNotEmpty
+                          ? ClipOval(
+                              child: Padding(
+                                padding: const EdgeInsets.all(2),
+                                child: buildProductImage(
+                                  catName,
+                                  imageAsset: imagePath,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            )
+                          : Center(
+                              child: Icon(
+                                Icons.water_drop_rounded,
+                                color: isSelected
+                                    ? const Color(0xFF059669)
+                                    : const Color(0xFF64748B),
+                                size: 24,
+                              ),
+                            )),
               ),
             ),
             const SizedBox(height: 6),
