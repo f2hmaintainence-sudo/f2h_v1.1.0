@@ -139,9 +139,10 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
   }
 
   void _handlePause() async {
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
     final picked = await showCustomDateRangePicker(
       context: context,
-      firstDate: DateTime.now(),
+      firstDate: tomorrow,
       lastDate: DateTime.now().add(const Duration(days: 60)),
       title: 'Select Pause Dates',
     );

@@ -1155,36 +1155,49 @@ export class AuthService {
         ? `f2h_user_jwt_${user_id}`
         : `f2h_user_jwt_email_${email}`;
 
-      try {
-        const sessionData = await this.redisService.fetch(userPrefix);
-        if (!sessionData) {
-          throw new UnauthorizedException('Token has been revoked');
-        }
-
-        const parsed = typeof sessionData === 'string' ? JSON.parse(sessionData) : sessionData;
-        const sessionExists = parsed.sessions?.some((session: any) => session.refreshJti === jti);
-
-        if (!sessionExists) {
-          throw new UnauthorizedException('Token has been revoked');
-        }
-
-        const storedSessions = await this.DataBase.query(
-          `SELECT id FROM device_sessions
-           WHERE refresh_jti = $1 AND refresh_token_hash = $2
-             AND revoked_at IS NULL
-           LIMIT 1`,
-          [jti, this.hashValue(token)],
-        );
-        if (!storedSessions.length) {
-          throw new UnauthorizedException('Token has been revoked');
-        }
-      } catch (parseError) {
-        throw new UnauthorizedException('Token validation failed - token revoked or invalid');
+      const user = user_id
+        ? await this.findUserById(user_id)
+        : (email ? await this.findUserByEmail(email) : null);
+      if (!user) {
+        throw new UnauthorizedException('User not found');
       }
 
-      return { email, user_id };
+      // Check if session is explicitly blacklisted in Redis
+      try {
+        const sessionData = await this.redisService.fetch(userPrefix);
+        if (sessionData) {
+          const parsed = typeof sessionData === 'string' ? JSON.parse(sessionData) : sessionData;
+          if (parsed.is_logged_out === true || (parsed.blacklistedJtis && parsed.blacklistedJtis.includes(jti))) {
+            throw new UnauthorizedException('Token has been revoked');
+          }
+        }
+      } catch (redisError) {
+        if (redisError instanceof UnauthorizedException) throw redisError;
+      }
+
+      // Check if session is explicitly marked revoked in device_sessions
+      if (jti) {
+        try {
+          const storedSessions = await this.DataBase.query(
+            `SELECT id, revoked_at FROM device_sessions
+             WHERE refresh_jti = $1
+             LIMIT 1`,
+            [jti],
+          );
+          if (storedSessions.length && storedSessions[0].revoked_at) {
+            throw new UnauthorizedException('Token has been revoked');
+          }
+        } catch (dbError) {
+          if (dbError instanceof UnauthorizedException) throw dbError;
+        }
+      }
+
+      return { email: user.email, user_id: user.user_id };
     } catch (error) {
-      throw new UnauthorizedException('Invalid refresh token');
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new UnauthorizedException('Invalid or expired refresh token');
     }
   }
 
