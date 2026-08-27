@@ -121,6 +121,9 @@ interface KpiData {
   total_variants: number;
   low_stock_count: number;
   out_of_stock_count: number;
+  pending_leave_requests_count?: number;
+  total_outstandings_amount?: number;
+  pending_outstandings_count?: number;
   insights?: OperationalInsight[];
   date: string;
 }
@@ -337,106 +340,174 @@ export default function AdminDashboard() {
           <span className="text-[11px] text-slate-400 font-medium">1-Click Dispatch Actions</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
           {/* Shortcut 1: Auto-Assign Deliveries */}
           <Link
             href="/admin/delivery/assign"
-            className="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-sky-50/60 p-4 rounded-2xl border border-slate-200 hover:border-sky-300 shadow-sm hover:shadow-md transition-all flex items-start justify-between"
+            className="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-sky-50/60 p-4 rounded-2xl border border-slate-200 hover:border-sky-300 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
           >
-            <div className="flex items-start gap-3.5">
-              <div className="p-3 rounded-xl bg-sky-50 group-hover:bg-sky-500 text-sky-600 group-hover:text-white transition-colors border border-sky-100">
-                <Truck size={20} />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="p-2.5 rounded-xl bg-sky-50 group-hover:bg-sky-500 text-sky-600 group-hover:text-white transition-colors border border-sky-100">
+                  <Truck size={18} />
+                </div>
+                {unassignedOrders > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-black bg-amber-500 text-white animate-pulse">
+                    {unassignedOrders} Unassigned
+                  </span>
+                )}
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-slate-900 group-hover:text-sky-900 transition-colors">
-                    Assign Deliveries
-                  </h3>
-                  {unassignedOrders > 0 && (
-                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white animate-pulse">
-                      {unassignedOrders} Unassigned
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">Auto cluster &amp; route optimization</p>
-                <div className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-600 mt-2">
-                  <span>Open Assign Studio</span>
-                  <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
-                </div>
+                <h3 className="text-xs font-bold text-slate-900 group-hover:text-sky-900 transition-colors">
+                  Assign Deliveries
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">Auto cluster &amp; route optimize</p>
               </div>
+            </div>
+            <div className="inline-flex items-center gap-1 text-[10.5px] font-bold text-sky-600 mt-3 pt-2 border-t border-slate-100">
+              <span>Assign Routes</span>
+              <ArrowRight size={11} className="group-hover:translate-x-1 transition-transform" />
             </div>
           </Link>
 
           {/* Shortcut 2: Live Delivery Runs */}
           <Link
             href="/admin/delivery-tracking"
-            className="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-emerald-50/60 p-4 rounded-2xl border border-slate-200 hover:border-emerald-300 shadow-sm hover:shadow-md transition-all flex items-start justify-between"
+            className="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-emerald-50/60 p-4 rounded-2xl border border-slate-200 hover:border-emerald-300 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
           >
-            <div className="flex items-start gap-3.5">
-              <div className="p-3 rounded-xl bg-emerald-50 group-hover:bg-emerald-600 text-emerald-600 group-hover:text-white transition-colors border border-emerald-100">
-                <Navigation size={20} />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="p-2.5 rounded-xl bg-emerald-50 group-hover:bg-emerald-600 text-emerald-600 group-hover:text-white transition-colors border border-emerald-100">
+                  <Navigation size={18} />
+                </div>
+                {runsSummary.in_progress_runs > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-black bg-emerald-600 text-white">
+                    {runsSummary.in_progress_runs} On Road
+                  </span>
+                )}
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-slate-900 group-hover:text-emerald-900 transition-colors">
-                    Live Delivery Runs
-                  </h3>
-                  {runsSummary.in_progress_runs > 0 && (
-                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-600 text-white">
-                      {runsSummary.in_progress_runs} On Road
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">GPS telemetry &amp; live stop tracking</p>
-                <div className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 mt-2">
-                  <span>Track Fleet Live</span>
-                  <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
-                </div>
+                <h3 className="text-xs font-bold text-slate-900 group-hover:text-emerald-900 transition-colors">
+                  Live Delivery Runs
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">GPS telemetry &amp; live stops</p>
               </div>
+            </div>
+            <div className="inline-flex items-center gap-1 text-[10.5px] font-bold text-emerald-600 mt-3 pt-2 border-t border-slate-100">
+              <span>Track Live</span>
+              <ArrowRight size={11} className="group-hover:translate-x-1 transition-transform" />
             </div>
           </Link>
 
-          {/* Shortcut 3: Dispatch & Packaging Center */}
+          {/* Shortcut 3: Dispatch & Crates */}
           <Link
             href="/admin/dispatch"
-            className="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-indigo-50/60 p-4 rounded-2xl border border-slate-200 hover:border-indigo-300 shadow-sm hover:shadow-md transition-all flex items-start justify-between"
+            className="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-indigo-50/60 p-4 rounded-2xl border border-slate-200 hover:border-indigo-300 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
           >
-            <div className="flex items-start gap-3.5">
-              <div className="p-3 rounded-xl bg-indigo-50 group-hover:bg-indigo-600 text-indigo-600 group-hover:text-white transition-colors border border-indigo-100">
-                <Box size={20} />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="p-2.5 rounded-xl bg-indigo-50 group-hover:bg-indigo-600 text-indigo-600 group-hover:text-white transition-colors border border-indigo-100">
+                  <Box size={18} />
+                </div>
+                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-md">Hub</span>
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-900 group-hover:text-indigo-900 transition-colors">
+                <h3 className="text-xs font-bold text-slate-900 group-hover:text-indigo-900 transition-colors">
                   Dispatch &amp; Crates
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">Barcode scanning &amp; crate handover</p>
-                <div className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 mt-2">
-                  <span>Open Dispatch Hub</span>
-                  <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
-                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">Barcode scan &amp; handover</p>
               </div>
+            </div>
+            <div className="inline-flex items-center gap-1 text-[10.5px] font-bold text-indigo-600 mt-3 pt-2 border-t border-slate-100">
+              <span>Dispatch Center</span>
+              <ArrowRight size={11} className="group-hover:translate-x-1 transition-transform" />
             </div>
           </Link>
 
-          {/* Shortcut 4: Partner Support & Requests */}
+          {/* Shortcut 4: Partner Availability */}
           <Link
-            href="/admin/delivery/partner-requests"
-            className="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-amber-50/60 p-4 rounded-2xl border border-slate-200 hover:border-amber-300 shadow-sm hover:shadow-md transition-all flex items-start justify-between"
+            href="/admin/delivery/partner-availability"
+            className="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-teal-50/60 p-4 rounded-2xl border border-slate-200 hover:border-teal-300 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
           >
-            <div className="flex items-start gap-3.5">
-              <div className="p-3 rounded-xl bg-amber-50 group-hover:bg-amber-600 text-amber-600 group-hover:text-white transition-colors border border-amber-100">
-                <Ticket size={20} />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="p-2.5 rounded-xl bg-teal-50 group-hover:bg-teal-600 text-teal-600 group-hover:text-white transition-colors border border-teal-100">
+                  <Radio size={18} />
+                </div>
+                {k.active_delivery_partners > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-black bg-teal-600 text-white">
+                    {k.active_delivery_partners} Online
+                  </span>
+                )}
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-900 group-hover:text-amber-900 transition-colors">
-                  Partner Helpdesk &amp; Inquiries
+                <h3 className="text-xs font-bold text-slate-900 group-hover:text-teal-900 transition-colors">
+                  Partner Availability
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">Support tickets &amp; onboarding requests</p>
-                <div className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 mt-2">
-                  <span>View Partner Queue</span>
-                  <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
-                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">Duty roster &amp; online status</p>
               </div>
+            </div>
+            <div className="inline-flex items-center gap-1 text-[10.5px] font-bold text-teal-700 mt-3 pt-2 border-t border-slate-100">
+              <span>Check Roster</span>
+              <ArrowRight size={11} className="group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+
+          {/* Shortcut 5: Leave Requests */}
+          <Link
+            href="/admin/delivery/leave-requests"
+            className="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-purple-50/60 p-4 rounded-2xl border border-slate-200 hover:border-purple-300 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+          >
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="p-2.5 rounded-xl bg-purple-50 group-hover:bg-purple-600 text-purple-600 group-hover:text-white transition-colors border border-purple-100">
+                  <Calendar size={18} />
+                </div>
+                {(k.pending_leave_requests_count || 0) > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-black bg-purple-600 text-white animate-pulse">
+                    {k.pending_leave_requests_count} Pending
+                  </span>
+                )}
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-slate-900 group-hover:text-purple-900 transition-colors">
+                  Leave Requests
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">Partner time-off &amp; approvals</p>
+              </div>
+            </div>
+            <div className="inline-flex items-center gap-1 text-[10.5px] font-bold text-purple-700 mt-3 pt-2 border-t border-slate-100">
+              <span>Review Leaves</span>
+              <ArrowRight size={11} className="group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+
+          {/* Shortcut 6: Customer Outstandings */}
+          <Link
+            href="/admin/finance/outstandings"
+            className="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-rose-50/60 p-4 rounded-2xl border border-slate-200 hover:border-rose-300 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+          >
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="p-2.5 rounded-xl bg-rose-50 group-hover:bg-rose-600 text-rose-600 group-hover:text-white transition-colors border border-rose-100">
+                  <IndianRupee size={18} />
+                </div>
+                {(k.total_outstandings_amount || 0) > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-black bg-rose-600 text-white">
+                    {formatMoney(k.total_outstandings_amount)}
+                  </span>
+                )}
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-slate-900 group-hover:text-rose-900 transition-colors">
+                  Outstandings
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">Subscriber dues &amp; collections</p>
+              </div>
+            </div>
+            <div className="inline-flex items-center gap-1 text-[10.5px] font-bold text-rose-700 mt-3 pt-2 border-t border-slate-100">
+              <span>Manage Dues</span>
+              <ArrowRight size={11} className="group-hover:translate-x-1 transition-transform" />
             </div>
           </Link>
         </div>

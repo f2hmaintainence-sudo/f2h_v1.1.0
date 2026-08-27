@@ -105,6 +105,20 @@ export class DashboardService {
           WHERE scheduled_date = $1 
             AND (delivery_partner_id IS NULL OR delivery_partner_id = '')
             AND status IN ('pending', 'placed', 'confirmed', 'packed')
+        ),
+        leave_stats AS (
+          SELECT COUNT(*)::int AS pending_leave_requests_count
+          FROM delivery_leave_requests
+          WHERE status = 'pending' AND deleted_at IS NULL
+        ),
+        outstandings_stats AS (
+          SELECT 
+            COALESCE(SUM(due_amount), 0)::numeric AS total_outstandings_amount,
+            COUNT(*)::int AS pending_outstandings_count
+          FROM customer_bills
+          WHERE deleted_at IS NULL
+            AND due_amount > 0
+            AND LOWER(status::text) NOT IN ('paid', 'cancelled')
         )
         SELECT
           cs.*,
@@ -115,7 +129,9 @@ export class DashboardService {
           ws.*,
           invs.*,
           pd.*,
-          us.*
+          us.*,
+          ls.*,
+          os.*
         FROM customer_stats cs
         CROSS JOIN subscription_stats ss
         CROSS JOIN today_orders tod
@@ -125,6 +141,8 @@ export class DashboardService {
         CROSS JOIN inventory_stats invs
         CROSS JOIN pending_deliveries pd
         CROSS JOIN unassigned_stats us
+        CROSS JOIN leave_stats ls
+        CROSS JOIN outstandings_stats os
       `;
 
       const runsSql = `
@@ -297,6 +315,11 @@ export class DashboardService {
           total_variants: kpi.total_variants ?? 0,
           low_stock_count: kpi.low_stock_count ?? 0,
           out_of_stock_count: kpi.out_of_stock_count ?? 0,
+
+          // Leave & Operations
+          pending_leave_requests_count: kpi.pending_leave_requests_count ?? 0,
+          total_outstandings_amount: Number(kpi.total_outstandings_amount ?? 0),
+          pending_outstandings_count: kpi.pending_outstandings_count ?? 0,
 
           // Insights
           insights,
