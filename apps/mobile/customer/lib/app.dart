@@ -499,18 +499,18 @@ class _NavItem extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            width: 36,
-            height: 36,
-            child: Stack(
-              clipBehavior: Clip.none,
-              alignment: Alignment.center,
-              children: [
-                AnimatedScale(
-                  scale: isActive ? 1.10 : 1.0,
-                  duration: const Duration(milliseconds: 150),
-                  curve: Curves.easeOutCubic,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
+            width: 40,
+            height: 40,
+            child: AnimatedScale(
+              scale: isActive ? 1.10 : 1.0,
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.center,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: isActive ? activeColor : Colors.transparent,
@@ -522,14 +522,14 @@ class _NavItem extends StatelessWidget {
                       size: 20,
                     ),
                   ),
-                ),
-                if (badge != null)
-                  Positioned(
-                    top: -4,
-                    right: -5,
-                    child: badge!,
-                  ),
-              ],
+                  if (badge != null)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: badge!,
+                    ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 3),
