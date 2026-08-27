@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/features/wallet/data/models/transaction_model.dart';
+import 'package:f2h_customer/core/widgets/cow_loading_widget.dart';
 
 // For fetching order details
 import 'package:f2h_customer/core/api/api_endpoints.dart';
@@ -401,7 +402,7 @@ class _TransactionDetaildScreenState extends State<TransactionDetaildScreen> {
           border: Border.all(color: kBorderLt),
         ),
         child: const Center(
-          child: CircularProgressIndicator(color: kPrimary),
+          child: CowLoadingWidget(size: 100),
         ),
       );
     }
@@ -588,7 +589,7 @@ class _TransactionDetaildScreenState extends State<TransactionDetaildScreen> {
           border: Border.all(color: kBorderLt),
         ),
         child: const Center(
-          child: CircularProgressIndicator(color: kPrimary),
+          child: CowLoadingWidget(size: 100),
         ),
       );
     }

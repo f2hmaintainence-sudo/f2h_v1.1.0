@@ -74,7 +74,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         elevation: 0,
       ),
       body: _isLoading
-          ? const CowLoadingWidget(size: 180)
+          ? const Center(child: CowLoadingWidget(size: 140, message: 'Tracking live delivery...'))
           : _error != null
               ? Center(
                   child: Column(

@@ -395,7 +395,7 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
       ),
       body: SafeArea(
         child: _isLoading
-            ? const CowLoadingWidget(size: 180)
+            ? const Center(child: CowLoadingWidget(size: 140, message: 'Loading calendar...'))
             : Column(
                 children: [
                   // 1. Product info header

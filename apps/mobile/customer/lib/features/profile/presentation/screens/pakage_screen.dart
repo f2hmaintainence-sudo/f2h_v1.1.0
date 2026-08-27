@@ -126,7 +126,9 @@ class _ContainerBalanceScreenState extends State<ContainerBalanceScreen> {
         future: _dataFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const CowLoadingWidget(size: 180);
+            return const Center(
+              child: CowLoadingWidget(size: 140, message: 'Loading container balance...'),
+            );
           }
           if (snapshot.hasError) {
             return Center(

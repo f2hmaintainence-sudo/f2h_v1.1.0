@@ -319,7 +319,7 @@ class _BrowseState extends State<BrowseScreen> {
         ),
       ),
       child: isLoadingState
-          ? const CowLoadingWidget(size: 100)
+          ? const Center(child: CowLoadingWidget(size: 120))
           : ListView.builder(
               padding: const EdgeInsets.only(top: 8, bottom: _kBottomInset),
               itemCount: categories.length,
