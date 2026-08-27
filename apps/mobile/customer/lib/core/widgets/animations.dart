@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/services/app_asset_service.dart';
+import 'cow_loading_widget.dart';
 // NOTE: Removed circular self-import that was here previously
 
 
@@ -1161,11 +1162,11 @@ class InitialLoadingScreen extends StatelessWidget {
             children: [
               // Logo
               Container(
-                width: 76,
-                height: 76,
+                width: 80,
+                height: 80,
                 decoration: BoxDecoration(
                   color: kSurface,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: kBorderLt),
                   boxShadow: [
                     BoxShadow(
@@ -1176,7 +1177,7 @@ class InitialLoadingScreen extends StatelessWidget {
                   ],
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(17),
+                  borderRadius: BorderRadius.circular(19),
                   child: Padding(
                     padding: const EdgeInsets.all(12.0),
                     child: Image.asset(
@@ -1187,14 +1188,14 @@ class InitialLoadingScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
               const Text(
-                'F2H Freshby',
+                'F2H Fresh',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
                   color: kPrimary,
-                  letterSpacing: 0.5,
+                  letterSpacing: -0.3,
                 ),
               ),
               const SizedBox(height: 4),
@@ -1207,15 +1208,8 @@ class InitialLoadingScreen extends StatelessWidget {
                   letterSpacing: 0.8,
                 ),
               ),
-              const SizedBox(height: 32),
-              const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.2,
-                  color: kPrimary,
-                ),
-              ),
+              const SizedBox(height: 20),
+              const CowLoadingWidget(size: 110),
             ],
           ),
         ),

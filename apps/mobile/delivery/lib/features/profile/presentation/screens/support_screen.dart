@@ -1,5 +1,5 @@
 import 'package:url_launcher/url_launcher.dart';
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -45,7 +45,8 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
 
   // Image Attachment state
   final ImagePicker _picker = ImagePicker();
-  File? _attachmentFile;
+  XFile? _attachmentXFile;
+  Uint8List? _attachmentBytes;
   bool _isSubmitting = false;
 
   // Tickets List state
@@ -197,8 +198,10 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
     try {
       final picked = await _picker.pickImage(source: source, imageQuality: 80);
       if (picked != null) {
+        final bytes = await picked.readAsBytes();
         setState(() {
-          _attachmentFile = File(picked.path);
+          _attachmentXFile = picked;
+          _attachmentBytes = bytes;
         });
       }
     } catch (e) {
@@ -219,11 +222,13 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
       List<String> attachments = [];
 
       // 1. Upload file if any is selected
-      if (_attachmentFile != null) {
-        final String fileName = _attachmentFile!.path.split('/').last;
+      if (_attachmentBytes != null && _attachmentXFile != null) {
+        final String fileName = _attachmentXFile!.name.isNotEmpty
+            ? _attachmentXFile!.name
+            : 'attachment_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final formData = FormData.fromMap({
-          'file': await MultipartFile.fromFile(
-            _attachmentFile!.path,
+          'file': MultipartFile.fromBytes(
+            _attachmentBytes!,
             filename: fileName,
           ),
         });
@@ -253,7 +258,8 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
       if (mounted) {
         setState(() {
           _isSubmitting = false;
-          _attachmentFile = null;
+          _attachmentXFile = null;
+          _attachmentBytes = null;
           _subjectController.clear();
           _descriptionController.clear();
         });
@@ -443,7 +449,7 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
               // Image Attachment Selector
               const Text('Attachment (Optional Image)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: kTextMid)),
               const SizedBox(height: 8),
-              if (_attachmentFile != null) ...[
+              if (_attachmentBytes != null) ...[
                 Stack(
                   children: [
                     Container(
@@ -455,14 +461,17 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(9),
-                        child: Image.file(_attachmentFile!, fit: BoxFit.cover),
+                        child: Image.memory(_attachmentBytes!, fit: BoxFit.cover),
                       ),
                     ),
                     Positioned(
                       top: 8,
                       right: 8,
                       child: GestureDetector(
-                        onTap: () => setState(() => _attachmentFile = null),
+                        onTap: () => setState(() {
+                          _attachmentXFile = null;
+                          _attachmentBytes = null;
+                        }),
                         child: Container(
                           decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
                           padding: const EdgeInsets.all(6),

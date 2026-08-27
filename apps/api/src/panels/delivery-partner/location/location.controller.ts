@@ -345,9 +345,10 @@ export class LocationController {
              o.delivery_slot, 
              o.delivery_run_id::text AS route_id, 
              COALESCE(o.delivery_run_id::text, 'Run') AS route_name,
-             COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '') AS customer_name
+             COALESCE(NULLIF(TRIM(ca.contact_name), ''), NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Customer') AS customer_name
            FROM orders o
-           JOIN customers c ON c.customer_id = o.customer_id
+           LEFT JOIN users u ON u.user_id = o.customer_id
+           LEFT JOIN customer_addresses ca ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
            WHERE o.delivery_partner_id = $1 AND o.scheduled_date = CURRENT_DATE`,
           [driver.delivery_partner_id]
         );

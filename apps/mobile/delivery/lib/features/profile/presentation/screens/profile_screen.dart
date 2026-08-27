@@ -533,15 +533,6 @@ class ProfileScreen extends StatelessWidget {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '$deliveriesCount Deliveries',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: const Color(0xFF64748B),
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -558,7 +549,7 @@ class ProfileScreen extends StatelessWidget {
 
                 // Sub Banner / Level Row
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(14),
@@ -584,7 +575,7 @@ class ProfileScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Level',
+                              'Partner Status',
                               style: GoogleFonts.poppins(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w500,
@@ -592,9 +583,9 @@ class ProfileScreen extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              isVerified ? 'Verified Partner' : 'Standard Partner',
+                              isVerified ? 'Verified Delivery Partner' : 'Standard Delivery Partner',
                               style: GoogleFonts.poppins(
-                                fontSize: 12,
+                                fontSize: 12.5,
                                 fontWeight: FontWeight.w700,
                                 color: const Color(0xFF0F172A),
                               ),
@@ -603,32 +594,19 @@ class ProfileScreen extends StatelessWidget {
                         ),
                       ),
                       Container(
-                        height: 24,
-                        width: 1,
-                        color: const Color(0xFFE2E8F0),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'This Week',
-                              style: GoogleFonts.poppins(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                                color: const Color(0xFF94A3B8),
-                              ),
-                            ),
-                            Text(
-                              '$deliveriesCount Deliveries',
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF0F172A),
-                              ),
-                            ),
-                          ],
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isVerified ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          isVerified ? 'ACTIVE' : 'PENDING',
+                          style: GoogleFonts.poppins(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            color: isVerified ? const Color(0xFF15803D) : const Color(0xFF64748B),
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
                     ],

@@ -674,8 +674,8 @@ export class ProfileService {
            o.payment_status,
            o.total_amount,
            o.delivery_slot as slot,
-           cu.first_name || ' ' || cu.last_name AS customer_name,
-           cu.phone AS customer_phone,
+           COALESCE(NULLIF(TRIM(ca.contact_name), ''), NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), cu.user_name, 'Customer') AS customer_name,
+           COALESCE(NULLIF(TRIM(ca.contact_mobile), ''), cu.phone, '') AS customer_phone,
            COALESCE(ca.flat_no, '') || ' ' || COALESCE(ca.building_name, '') || ' ' || COALESCE(ca.street, '') || ' ' || COALESCE(ca.area, '') AS customer_address,
            o.status AS log_status,
            -- Per-order container collection is no longer recorded; the
