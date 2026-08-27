@@ -987,8 +987,10 @@ export class CartService {
           o.created_at,
           o.branch_id,
           b.branch_name,
-          COALESCE(NULLIF(TRIM(db.full_name), ''), NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), u.user_name) AS partner_name,
-          COALESCE(NULLIF(TRIM(db.phone), ''), NULLIF(TRIM(u.phone), ''), NULLIF(TRIM(db.email), ''), NULLIF(TRIM(u.email), ''), '—') AS partner_phone,
+          -- delivery_partners carries no name/phone/email: delivery_partner_id is
+          -- the users.user_id, so contact details come from the users join below.
+          COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), u.user_name) AS partner_name,
+          COALESCE(NULLIF(TRIM(u.phone), ''), NULLIF(TRIM(u.email), ''), '—') AS partner_phone,
           COALESCE(
             (
               SELECT json_agg(
@@ -1021,7 +1023,6 @@ export class CartService {
             ), '[]'::json
           ) AS items
         FROM orders o
-        LEFT JOIN delivery_partners db ON (db.delivery_partner_id = o.delivery_partner_id OR db.user_id = o.delivery_partner_id)
         LEFT JOIN users u ON u.user_id = o.delivery_partner_id
         LEFT JOIN branches b ON b.branch_id = o.branch_id
         WHERE o.order_id = $1 OR o.id::text = $1

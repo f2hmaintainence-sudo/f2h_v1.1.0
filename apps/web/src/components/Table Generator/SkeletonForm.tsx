@@ -159,52 +159,66 @@ const getCroppedBase64WithRotation = (
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
+      // 1. Calculate base rendered size in the 320x320 container with object-fit: contain
+      const containerSize = 320;
+      const naturalWidth = img.naturalWidth || img.width || 800;
+      const naturalHeight = img.naturalHeight || img.height || 800;
+      const imgRatio = naturalWidth / naturalHeight;
+
+      let baseW = containerSize;
+      let baseH = containerSize;
+      if (imgRatio >= 1) {
+        baseW = containerSize;
+        baseH = containerSize / imgRatio;
+      } else {
+        baseH = containerSize;
+        baseW = containerSize * imgRatio;
+      }
+
+      // 2. Compute output dimensions based on cropBox aspect ratio
+      const boxW = Math.max(10, cropBox.w);
+      const boxH = Math.max(10, cropBox.h);
+      const targetRatio = boxW / boxH;
+
+      // Maintain crisp resolution (proportional to natural image size)
+      const scaleMultiplier = Math.max(
+        1.5,
+        Math.min(4, Math.round(Math.max(naturalWidth, naturalHeight) / containerSize))
+      );
+      const outputW = Math.round(boxW * scaleMultiplier);
+      const outputH = Math.round(outputW / targetRatio);
+
       const canvas = document.createElement('canvas');
-      canvas.width = cropWidth;
-      canvas.height = cropHeight;
+      canvas.width = Math.max(100, outputW);
+      canvas.height = Math.max(100, outputH);
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         resolve(src);
         return;
       }
 
+      // Clean canvas background
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, cropWidth, cropHeight);
-
-      const cx = cropWidth / 2;
-      const cy = cropHeight / 2;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate((rotate * Math.PI) / 180);
+      // Map cropBox rectangle [cropBox.x, cropBox.y, boxW, boxH] in container space to [0, 0, canvas.width, canvas.height]
+      const scale = canvas.width / boxW;
+      ctx.scale(scale, scale);
+      ctx.translate(-cropBox.x, -cropBox.y);
 
-      const boxCenterX = cropBox.x + cropBox.w / 2;
-      const boxCenterY = cropBox.y + cropBox.h / 2;
-      const offX = boxCenterX - 160;
-      const offY = boxCenterY - 160;
-
-      const scaleFactor = cropWidth / cropBox.w;
-      ctx.translate((panX - offX) * scaleFactor, (panY - offY) * scaleFactor);
-
-      const imgRatio = img.width / img.height;
-      const cropRatio = cropWidth / cropHeight;
-
-      let drawWidth = cropWidth;
-      let drawHeight = cropHeight;
-      if (imgRatio > cropRatio) {
-        drawWidth = cropHeight * imgRatio;
-      } else {
-        drawHeight = cropWidth / imgRatio;
+      // In 320x320 container coordinates, image center is at (containerSize/2 + panX, containerSize/2 + panY)
+      ctx.translate(containerSize / 2 + panX, containerSize / 2 + panY);
+      if (rotate) {
+        ctx.rotate((rotate * Math.PI) / 180);
       }
+      ctx.scale(zoom, zoom);
 
-      const containerScale = 320 / cropBox.w;
-      drawWidth *= zoom * containerScale;
-      drawHeight *= zoom * containerScale;
-
-      ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+      // Draw image centered at origin
+      ctx.drawImage(img, -baseW / 2, -baseH / 2, baseW, baseH);
       ctx.restore();
 
-      resolve(canvas.toDataURL('image/jpeg', 0.9));
+      resolve(canvas.toDataURL('image/jpeg', 0.95));
     };
     img.onerror = () => resolve(src);
     img.src = src;

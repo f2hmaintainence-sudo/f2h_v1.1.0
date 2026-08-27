@@ -134,12 +134,23 @@ export class CustomerPaymentService {
 
     // For bills the amount is always recomputed server-side — a client must
     // never be able to settle a ₹4,000 bill by asking to pay ₹1.
-    if (purpose === 'bill' || purpose === 'subscription') {
-      const billId = body?.bill_id || body?.reference_id;
-      if (!billId) {
-        throw new BadRequestException('bill_id is required for bill payments');
-      }
+    //
+    // A 'subscription' payment is not necessarily a bill payment. The first
+    // charge for a new subscription is taken *before* the subscription — and so
+    // its first bill — exists, leaving nothing to recompute against; it is priced
+    // like an order. Demanding bill_id here made every new subscription checkout
+    // fail with "bill_id is required for bill payments". A later subscription
+    // bill still settles through the bill path by naming the bill explicitly.
+    const billId =
+      purpose === 'bill'
+        ? body?.bill_id || body?.reference_id
+        : body?.bill_id;
 
+    if (purpose === 'bill' && !billId) {
+      throw new BadRequestException('bill_id is required for bill payments');
+    }
+
+    if (billId && (purpose === 'bill' || purpose === 'subscription')) {
       const billRows = await this.db.query(
         `SELECT bill_id, total_amount, paid_amount,
                 CASE
@@ -435,7 +446,16 @@ export class CustomerPaymentService {
     if (!pre) {
       throw new NotFoundException('Payment transaction not found');
     }
-    if (pre.purpose === 'order') {
+    // A 'subscription' payment that names no bill is the first charge for a new
+    // subscription. Like an order it is consumed by the checkout call that
+    // creates the subscription (see consumeOrderPayment, which accepts exactly
+    // these two purposes), so it must not be settled here — fulfilBillPayment
+    // would fail on the missing bill *after* the money had been captured.
+    const awaitsCheckout =
+      pre.purpose === 'order' ||
+      (pre.purpose === 'subscription' && !pre.reference_id);
+
+    if (awaitsCheckout) {
       return {
         status: pre.status === 'paid' || pre.status === 'fulfilled',
         message:

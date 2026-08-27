@@ -2221,7 +2221,7 @@ export default function PromotionsCouponsOffersPage() {
                         setOfferForm((prev) => ({
                           ...prev,
                           banner_image: src,
-                          image_url: prev.image_url || "banner_image.webp",
+                          image_url: src.startsWith("data:") ? "" : src,
                         }));
                       }}
                       crop={true}
@@ -2539,7 +2539,7 @@ export default function PromotionsCouponsOffersPage() {
                         setEditOfferForm((prev) => ({
                           ...prev,
                           banner_image: src,
-                          image_url: prev.image_url || "banner_image.webp",
+                          image_url: src.startsWith("data:") ? "" : src,
                         }));
                       }}
                       crop={true}
