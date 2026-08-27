@@ -415,9 +415,9 @@ class _SidebarItem extends StatelessWidget {
                   shape: BoxShape.circle,
                   gradient: isSelected
                       ? const LinearGradient(
-                          colors: [Color(0xFFFFFFFF), Color(0xFFECFDF5), Color(0xFFD1FAE5)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                          colors: [Color(0xFFA7F3D0), Color(0xFFECFDF5), Color(0xFFFFFFFF)],
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
                         )
                       : null,
                   color: isSelected ? null : Colors.transparent,
@@ -430,7 +430,7 @@ class _SidebarItem extends StatelessWidget {
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.14),
+                            color: const Color(0xFF10B981).withValues(alpha: 0.16),
                             blurRadius: 12,
                             spreadRadius: 1,
                             offset: const Offset(0, 3),
@@ -449,20 +449,20 @@ class _SidebarItem extends StatelessWidget {
                     shape: BoxShape.circle,
                     gradient: isAll
                         ? const LinearGradient(
-                            colors: [Color(0xFF10B981), Color(0xFF059669)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+                            colors: [Color(0xFF047857), Color(0xFF10B981), Color(0xFF34D399)],
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
                           )
                         : (isSelected
                             ? const LinearGradient(
-                                colors: [Color(0xFFF0FDF4), Color(0xFFDCFCE7)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
+                                colors: [Color(0xFFDCFCE7), Color(0xFFF0FDF4), Color(0xFFFFFFFF)],
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
                               )
                             : const LinearGradient(
-                                colors: [Color(0xFFFFFFFF), Color(0xFFF1F5F9)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
+                                colors: [Color(0xFFF1F5F9), Color(0xFFF8FAFC), Color(0xFFFFFFFF)],
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
                               )),
                     border: Border.all(
                       color: isAll
