@@ -936,7 +936,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                 if (!_subscriptionDetailsExpanded)
                   Flexible(
                     child: Text(
-                      '#${s.id} · $frequency · $slot',
+                      '#${s.id}',
                       textAlign: TextAlign.end,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -973,15 +973,9 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                         'Product Price',
                         '₹${unitPrice.toStringAsFixed(2)} / unit',
                       ),
-                      _buildDetailRow('Frequency', frequency),
-                      _buildDetailRow('Delivery Slot', slot),
                       _buildDetailRow('Start Date', _formatDate(s.startDate)),
                       if (hasEndDate)
                         _buildDetailRow('End Date', _formatDate(s.endDate)),
-                      _buildDetailRow(
-                        'Auto Renew',
-                        s.autoRenew ? 'Enabled' : 'Disabled',
-                      ),
                       _buildDetailRow(
                         'Payment Method',
                         isPostpaid ? 'Postpaid' : 'Wallet',
