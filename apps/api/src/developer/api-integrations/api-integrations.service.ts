@@ -65,8 +65,18 @@ export class ApiIntegrationsService {
 
   async saveConfig(category: string, body: any) {
     try {
-      const { id, config_key, name, provider, is_active, ...restConfig } = body;
+      let { id, config_key, name, provider, is_active, ...restConfig } = body;
       const configDataJson = JSON.stringify(this.stripBlankSecrets(restConfig));
+
+      // For payment-gateway, allow only one payment gateway configuration in the system
+      if (category === 'payment-gateway' && !id) {
+        const existing = await this.db.query(
+          `SELECT id FROM api_integrations_config WHERE category = 'payment-gateway' AND deleted_at IS NULL LIMIT 1`,
+        );
+        if (existing && existing.length > 0) {
+          id = existing[0].id;
+        }
+      }
 
       if (id) {
         // `||` merges rather than replaces. A wholesale assignment here deleted
@@ -89,6 +99,14 @@ export class ApiIntegrationsService {
           id,
           category,
         ]);
+
+        if (category === 'payment-gateway' && (is_active === true || is_active === undefined)) {
+          await this.db.query(
+            `UPDATE api_integrations_config SET is_active = false WHERE category = 'payment-gateway' AND id != $1`,
+            [id],
+          );
+        }
+
         return { status: true, message: 'Configuration updated successfully', data: rows[0] };
       } else {
         const sql = `
@@ -104,6 +122,14 @@ export class ApiIntegrationsService {
           is_active !== undefined ? is_active : true,
           configDataJson,
         ]);
+
+        if (category === 'payment-gateway' && (is_active === true || is_active === undefined) && rows[0]?.id) {
+          await this.db.query(
+            `UPDATE api_integrations_config SET is_active = false WHERE category = 'payment-gateway' AND id != $1`,
+            [rows[0].id],
+          );
+        }
+
         return { status: true, message: 'Configuration saved successfully', data: rows[0] };
       }
     } catch (error: any) {

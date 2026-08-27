@@ -518,7 +518,7 @@ class _NavItem extends StatelessWidget {
                     size: 20,
                   ),
                   if (badge != null)
-                    Positioned(top: -4, right: -4, child: badge!),
+                    Positioned(top: -7, right: -9, child: badge!),
                 ],
               ),
             ),
@@ -573,15 +573,31 @@ class _CountPip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(3),
-    decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-    child: Text(
-      count > 99 ? '99+' : '$count',
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 7,
-        fontWeight: FontWeight.w900,
-      ),
-    ),
-  );
+        constraints: const BoxConstraints(minWidth: 19, minHeight: 19),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEF4444),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.white, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 3,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Text(
+            count > 99 ? '99+' : '$count',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w900,
+              height: 1.0,
+            ),
+          ),
+        ),
+      );
 }

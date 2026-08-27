@@ -1051,13 +1051,78 @@ export class CartService {
 
   async previewDiscounts(customerId: string, body: CheckOutDto) {
     body.customer_id = customerId;
-    const plan = await this.buildCheckoutPlan(body);
-    return {
-      subtotal: plan.groups.reduce((s, g) => s + g.subtotal, 0),
-      discount_amount: plan.groups.reduce((s, g) => s + g.discountAmount, 0),
-      total_amount: plan.onetimeTotal,
-      coupon_summary: plan.discountResolution?.summary || null,
-      groups: plan.groups,
-    };
+    try {
+      const rawItems = Array.isArray(body.items) ? body.items : [];
+      let itemsToCheckout: any[] = rawItems;
+      if (itemsToCheckout.length === 0 && customerId) {
+        const cartRes = await this.getCartItems(customerId);
+        itemsToCheckout = (cartRes?.items || []).map((ci: any) => ({
+          product_id: ci.cart_data?.product_id || '',
+          product_variant_id: ci.cart_data?.product_variant_id || ci.variant_id,
+          quantity: ci.cart_data?.quantity || ci.quantity || 1,
+          purchase_type: 'onetime',
+          onetime_details: ci.cart_data?.onetime_details || { quantity: ci.cart_data?.quantity || 1 },
+        }));
+      }
+
+      const variantIds = Array.from(
+        new Set(itemsToCheckout.map((item: any) => item.product_variant_id).filter(Boolean)),
+      );
+
+      const variantRows = variantIds.length
+        ? await this.db.query(
+            `SELECT pv.variant_id, pv.price, pv.original_price, p.name AS product_name
+               FROM product_variants pv
+               LEFT JOIN products p ON pv.product_id = p.product_id
+              WHERE pv.variant_id = ANY($1)`,
+            [variantIds],
+          )
+        : [];
+
+      const variantById = new Map(
+        (variantRows || []).map((row: any) => [row.variant_id, row]),
+      );
+
+      const discountItems = itemsToCheckout.map((item: any) => {
+        const row = variantById.get(item.product_variant_id);
+        const qty = item.onetime_details?.quantity || item.quantity || 1;
+        const price = Number(row?.price || 0);
+        const origPrice = Number(row?.original_price || price);
+        return {
+          variant_id: item.product_variant_id,
+          unit_price: price,
+          original_price: origPrice,
+          quantity: qty,
+        };
+      });
+
+      const discountResolution = await this.discountEngine.resolveDiscounts({
+        customer_id: customerId,
+        order_source: 'one-time',
+        coupon_code: body.coupon_code || null,
+        items: discountItems,
+      });
+
+      const subtotal = discountItems.reduce((s, i) => s + i.unit_price * i.quantity, 0);
+      const totalDiscount = discountResolution?.summary?.total_discount || 0;
+      const finalAmount = Math.max(0, subtotal - totalDiscount);
+
+      return {
+        subtotal,
+        discount_amount: totalDiscount,
+        total_amount: finalAmount,
+        coupon_summary: discountResolution?.summary || null,
+      };
+    } catch (err) {
+      this.developer.error('previewDiscounts calculation error', { err });
+      const rawItems = Array.isArray(body.items) ? body.items : [];
+      const subtotal = rawItems.reduce((s: number, i: any) => s + Number(i.price || 0) * (i.quantity || 1), 0);
+      return {
+        subtotal,
+        discount_amount: 0,
+        total_amount: subtotal,
+        coupon_summary: null,
+      };
+    }
   }
 }
