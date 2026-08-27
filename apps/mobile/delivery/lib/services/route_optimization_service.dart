@@ -131,12 +131,18 @@ class RouteOptimizationService {
             !s.addressLng.isNaN)
         .toList();
 
-    if (validPendingStops.isEmpty && orderedStops.isNotEmpty) {
-      validPendingStops.addAll(orderedStops.where((s) =>
-          s.addressLat.isFinite &&
-          !s.addressLat.isNaN &&
-          s.addressLng.isFinite &&
-          !s.addressLng.isNaN));
+    if (validPendingStops.isEmpty) {
+      return OptimizedRouteResult(
+        orderedStops: orderedStops,
+        activeLegPoints: [],
+        remainingRoutePoints: [],
+        fullRoutePoints: [],
+        totalDistanceKm: 0,
+        totalDurationMinutes: 0,
+        activeLegDistanceKm: 0,
+        activeLegDurationMinutes: 0,
+        isRoadGeometry: false,
+      );
     }
 
     final List<LatLng> waypoints = [];

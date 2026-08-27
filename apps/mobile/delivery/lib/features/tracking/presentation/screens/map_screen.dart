@@ -569,47 +569,34 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           }
 
           final List<Polyline> polylines = [];
-          if (_optimizedRoute != null && _optimizedRoute!.fullRoutePoints.length >= 2) {
-            if (_optimizedRoute!.remainingRoutePoints.length >= 2) {
-              polylines.add(
-                Polyline(
-                  points: _optimizedRoute!.remainingRoutePoints,
-                  strokeWidth: 4.0,
-                  color: const Color(0xFF2563EB),
-                  borderStrokeWidth: 1.5,
-                  borderColor: Colors.white.withOpacity(0.8),
-                ),
-              );
-            }
-            if (_optimizedRoute!.activeLegPoints.length >= 2) {
-              polylines.add(
-                Polyline(
-                  points: _optimizedRoute!.activeLegPoints,
-                  strokeWidth: 5.5,
-                  color: const Color(0xFF10B981),
-                  borderStrokeWidth: 2.5,
-                  borderColor: Colors.white,
-                ),
-              );
-            }
-          } else if (effectiveStops.length > 1) {
-            final List<LatLng> fallbackPoints = [];
-            if (_currentPosition != null) fallbackPoints.add(_currentPosition!);
-            for (var stop in effectiveStops) {
-              if (stop.addressLat.isFinite && !stop.addressLat.isNaN && stop.addressLng.isFinite && !stop.addressLng.isNaN) {
-                fallbackPoints.add(LatLng(stop.addressLat, stop.addressLng));
+          final pendingStops = effectiveStops.where(
+            (s) => s.status != 'delivered' && s.status != 'completed' && s.status != 'failed',
+          ).toList();
+
+          if (pendingStops.isNotEmpty) {
+            if (_optimizedRoute != null && _optimizedRoute!.fullRoutePoints.length >= 2) {
+              if (_optimizedRoute!.remainingRoutePoints.length >= 2) {
+                polylines.add(
+                  Polyline(
+                    points: _optimizedRoute!.remainingRoutePoints,
+                    strokeWidth: 4.0,
+                    color: const Color(0xFF2563EB),
+                    borderStrokeWidth: 1.5,
+                    borderColor: Colors.white.withOpacity(0.8),
+                  ),
+                );
               }
-            }
-            if (fallbackPoints.length >= 2) {
-              polylines.add(
-                Polyline(
-                  points: fallbackPoints,
-                  strokeWidth: 4.5,
-                  color: const Color(0xFF16A34A),
-                  borderStrokeWidth: 2.0,
-                  borderColor: Colors.white,
-                ),
-              );
+              if (_optimizedRoute!.activeLegPoints.length >= 2) {
+                polylines.add(
+                  Polyline(
+                    points: _optimizedRoute!.activeLegPoints,
+                    strokeWidth: 5.5,
+                    color: const Color(0xFF10B981),
+                    borderStrokeWidth: 2.5,
+                    borderColor: Colors.white,
+                  ),
+                );
+              }
             }
           }
 
@@ -1035,15 +1022,73 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildShortestRouteCard() {
-    if (_optimizedRoute == null || _optimizedRoute!.fullRoutePoints.length < 2) {
-      return const SizedBox.shrink();
-    }
+    final route = _optimizedRoute;
+    if (route == null) return const SizedBox.shrink();
 
-    final route = _optimizedRoute!;
     final pendingStops = route.orderedStops.where(
       (s) => s.status != 'delivered' && s.status != 'completed' && s.status != 'failed',
     ).toList();
-    final nextPending = pendingStops.isNotEmpty ? pendingStops.first : route.orderedStops.first;
+
+    if (pendingStops.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.96),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFDCFCE7), width: 1.5),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x1F000000),
+              blurRadius: 14,
+              offset: Offset(0, 4),
+            )
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: const BoxDecoration(
+                color: Color(0xFFDCFCE7),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'All Deliveries Completed! 🎉',
+                    style: GoogleFonts.poppins(
+                      color: const Color(0xFF0F172A),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
+                  ),
+                  Text(
+                    'All route stops finished. Return to hub for return ledger.',
+                    style: GoogleFonts.poppins(
+                      color: const Color(0xFF64748B),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (route.fullRoutePoints.length < 2) {
+      return const SizedBox.shrink();
+    }
+
+    final nextPending = pendingStops.first;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
