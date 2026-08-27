@@ -250,6 +250,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
 
       double discount = _toDouble(result['discount_preview']);
+      double promoDiscount = 0;
       double? previewTotal;
 
       // Authoritative pricing — also folds in any auto-applied promotions.
@@ -265,8 +266,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
         );
         final summary = preview['coupon_summary'];
-        if (summary is Map && summary['coupon_discount'] != null) {
-          discount = _toDouble(summary['coupon_discount']);
+        if (summary is Map) {
+          promoDiscount = _toDouble(summary['promotion_discount']);
+          final couponFromSummary = _toDouble(summary['coupon_discount']);
+          if (couponFromSummary > 0) {
+            discount = couponFromSummary;
+          } else if (preview['discount_amount'] != null) {
+            discount = _toDouble(preview['discount_amount']);
+          }
         } else if (preview['discount_amount'] != null) {
           discount = _toDouble(preview['discount_amount']);
         }
@@ -282,6 +289,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       setState(() {
         _isCouponLoading = false;
         _appliedCouponCode = code;
+        _autoPromotionDiscount = promoDiscount;
         _couponDiscount = discount;
         _couponPreviewTotal = previewTotal;
         _couponPricedForSubtotal = subtotal;
@@ -357,7 +365,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
         if (summary is Map) {
           promoDiscount = _toDouble(summary['promotion_discount']);
-          couponDisc = _toDouble(summary['coupon_discount']);
+          final summaryCoupon = _toDouble(summary['coupon_discount']);
+          if (_appliedCouponCode != null && _appliedCouponCode!.isNotEmpty) {
+            couponDisc = summaryCoupon > 0 ? summaryCoupon : _toDouble(preview['discount_amount']);
+          }
         } else if (preview['discount_amount'] != null) {
           if (_appliedCouponCode != null && _appliedCouponCode!.isNotEmpty) {
             couponDisc = _toDouble(preview['discount_amount']);
@@ -399,7 +410,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// Subtotal after auto-applied promotion and applied coupon. Prefers server total.
   double _payableFor(double subtotal) {
     if (_couponPreviewTotal != null) return _couponPreviewTotal!;
-    final total = subtotal - _autoPromotionDiscount - _couponDiscount;
+    final discount = _appliedCouponCode != null ? _couponDiscount : _autoPromotionDiscount;
+    final total = subtotal - discount;
     return total < 0 ? 0 : total;
   }
 
@@ -1165,15 +1177,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                         value:
                                             '₹${onetimeTotal.toStringAsFixed(0)}',
                                       ),
-                                      if (_autoPromotionDiscount > 0) ...[
-                                        const SizedBox(height: 8),
-                                        SummaryRow(
-                                          label: 'Promotion Discount',
-                                          value:
-                                              '-₹${_autoPromotionDiscount.toStringAsFixed(0)}',
-                                          valueColor: kPrimaryLt,
-                                        ),
-                                      ],
                                       if (_appliedCouponCode != null && _couponDiscount > 0) ...[
                                         const SizedBox(height: 8),
                                         SummaryRow(

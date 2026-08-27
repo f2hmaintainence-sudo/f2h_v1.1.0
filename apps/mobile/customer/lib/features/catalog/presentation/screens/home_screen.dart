@@ -2658,6 +2658,30 @@ class _CategorySection extends StatelessWidget {
   });
 
   void _onBannerTap(BuildContext context) {
+    if (banner != null) {
+      final actionType = (banner!['actionType'] ?? banner!['action_type'] ?? banner!['type'] ?? '').toString().toUpperCase();
+      final actionVal = (banner!['actionValue'] ?? banner!['action_value'] ?? banner!['productId'] ?? banner!['product_id'] ?? '').toString();
+      final bannerType = (banner!['bannerType'] ?? banner!['banner_type'] ?? '').toString().toLowerCase();
+
+      final isProduct = actionType == 'PRODUCT' ||
+          actionType == 'PRD' ||
+          bannerType == 'product' ||
+          actionVal.startsWith('PRD') ||
+          banner!['productId'] != null ||
+          banner!['product_id'] != null;
+
+      if (isProduct && actionVal.isNotEmpty) {
+        final title = banner!['title']?.toString() ?? banner!['name']?.toString() ?? 'Product';
+        final product = getProductById(actionVal, name: title);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProductDetailViewScreen(product: product),
+          ),
+        );
+        return;
+      }
+    }
     Navigator.push(
       context,
       MaterialPageRoute(

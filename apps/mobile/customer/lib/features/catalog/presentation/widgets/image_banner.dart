@@ -120,30 +120,44 @@ class _ImageBannerState extends State<ImageBanner> {
   }
 
   void _onBannerTap(Map<String, dynamic> banner) {
-    final actionType = (banner['actionType'] ?? banner['action_type'] ?? banner['route'] ?? '').toString().toUpperCase();
-    final actionValue = (banner['actionValue'] ?? banner['action_value'] ?? banner['categoryId'] ?? banner['category_id'] ?? banner['productId'] ?? banner['product_id'] ?? '').toString();
+    final actionType = (banner['actionType'] ?? banner['action_type'] ?? banner['type'] ?? banner['route'] ?? '').toString().toUpperCase();
+    final actionValue = (banner['actionValue'] ?? banner['action_value'] ?? banner['productId'] ?? banner['product_id'] ?? banner['categoryId'] ?? banner['category_id'] ?? '').toString();
     final route = banner['route']?.toString().toLowerCase() ?? '';
+    final bannerType = (banner['bannerType'] ?? banner['banner_type'] ?? '').toString().toLowerCase();
 
-    if (actionType == 'PRODUCT' && actionValue.isNotEmpty) {
+    // 1. PRODUCT REDIRECTION
+    final isProduct = actionType == 'PRODUCT' ||
+        actionType == 'PRD' ||
+        bannerType == 'product' ||
+        actionValue.startsWith('PRD') ||
+        banner['productId'] != null ||
+        banner['product_id'] != null;
+
+    if (isProduct && actionValue.isNotEmpty) {
+      final title = banner['title']?.toString() ?? banner['name']?.toString() ?? 'Product';
+      final product = getProductById(actionValue, name: title);
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => ProductDetailViewScreen(product: getProductById(actionValue)),
+          builder: (_) => ProductDetailViewScreen(product: product),
         ),
       );
       return;
     }
 
-    if ((actionType == 'CATEGORY' || route == 'category') && actionValue.isNotEmpty) {
+    // 2. CATEGORY REDIRECTION
+    if ((actionType == 'CATEGORY' || route == 'category' || bannerType == 'category_slide' || bannerType == 'category') && actionValue.isNotEmpty) {
       AppShell.of(context)?.setTab(1, category: actionValue);
       return;
     }
 
-    if (actionType == 'SUBSCRIPTION' || route == 'subscribe') {
+    // 3. SUBSCRIPTION REDIRECTION
+    if (actionType == 'SUBSCRIPTION' || route == 'subscribe' || bannerType == 'subscribe') {
       AppShell.of(context)?.setTab(2);
       return;
     }
 
+    // 4. WALLET REDIRECTION
     if (actionType == 'WALLET' || route == 'wallet' || banner['imageUrl'].toString().toLowerCase().contains('wallet_banner')) {
       Navigator.push(
         context,
@@ -152,6 +166,7 @@ class _ImageBannerState extends State<ImageBanner> {
       return;
     }
 
+    // 5. REFERRAL REDIRECTION
     if (actionType == 'REFERRAL' || route == 'refer') {
       Navigator.push(
         context,
@@ -160,12 +175,7 @@ class _ImageBannerState extends State<ImageBanner> {
       return;
     }
 
-    if (actionType == 'MENU' || route == 'menu') {
-      AppShell.of(context)?.setTab(1);
-      return;
-    }
-
-    // Default fallback to Menu tab
+    // Default fallback to Shop tab
     AppShell.of(context)?.setTab(1);
   }
 

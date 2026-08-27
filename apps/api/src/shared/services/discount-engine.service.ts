@@ -627,7 +627,11 @@ export class DiscountEngineService {
     items: Array<{ variant_id: string; quantity: number }>,
   ): void {
     for (const p of promotions) {
-      if (p.max_discount_amount == null || p.max_discount_amount <= 0) continue;
+      const cap = (p.max_discount_amount != null && p.max_discount_amount > 0)
+        ? p.max_discount_amount
+        : (p.promotion_type === 'fixed_amount' ? p.discount_value : null);
+
+      if (cap == null || cap <= 0) continue;
 
       const matchingResults = itemResults.filter((r) => r.promotion_id === p.promotion_id);
       if (matchingResults.length === 0) continue;
@@ -637,8 +641,8 @@ export class DiscountEngineService {
         return sum + r.discount_amount * qty;
       }, 0);
 
-      if (totalPromoDiscount > p.max_discount_amount) {
-        const scaleFactor = p.max_discount_amount / totalPromoDiscount;
+      if (totalPromoDiscount > cap) {
+        const scaleFactor = cap / totalPromoDiscount;
         for (const r of matchingResults) {
           r.discount_amount = Math.round(r.discount_amount * scaleFactor * 100) / 100;
         }
@@ -655,7 +659,7 @@ export class DiscountEngineService {
     items: Array<{ variant_id: string; quantity: number }>,
   ): void {
     const matchingResults = itemResults.filter((r) => r.coupon_id === couponId);
-    if (matchingResults.length === 0) continue_loop: return;
+    if (matchingResults.length === 0) return;
 
     const totalCouponDiscount = matchingResults.reduce((sum, r) => {
       const qty = items.find((i) => i.variant_id === r.variant_id)?.quantity ?? 1;
