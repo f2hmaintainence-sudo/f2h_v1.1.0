@@ -176,38 +176,33 @@ class PopupBannerWidget {
 
             Widget imageWidget;
             if (hasCustomImage) {
-              if (imageAspectRatio != null) {
-                final naturalHeight = containerWidth / imageAspectRatio!;
-                final clampedHeight = naturalHeight.clamp(120.0, maxImageHeight);
-                imageWidget = SizedBox(
-                  width: double.infinity,
-                  height: clampedHeight,
-                  child: Image.network(
-                    imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, e) => Container(
-                      height: 160,
-                      color: bannerBgColor.withValues(alpha: 0.15),
-                      child: Center(
-                        child: Icon(Icons.local_offer_rounded, size: 48, color: bannerBgColor),
+              imageWidget = Image.network(
+                imageUrl,
+                width: double.infinity,
+                fit: BoxFit.fitWidth,
+                errorBuilder: (_, _, e) => Container(
+                  height: 160,
+                  color: bannerBgColor.withValues(alpha: 0.15),
+                  child: Center(
+                    child: Icon(Icons.local_offer_rounded, size: 48, color: bannerBgColor),
+                  ),
+                ),
+                loadingBuilder: (_, child, progress) {
+                  if (progress == null) return child;
+                  return Container(
+                    height: 180,
+                    width: double.infinity,
+                    color: const Color(0xFFF1F5F9),
+                    child: const Center(
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary),
                       ),
                     ),
-                  ),
-                );
-              } else {
-                imageWidget = Container(
-                  height: 180,
-                  width: double.infinity,
-                  color: const Color(0xFFF1F5F9),
-                  child: const Center(
-                    child: SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary),
-                    ),
-                  ),
-                );
-              }
+                  );
+                },
+              );
             } else {
               imageWidget = Container(
                 height: 140,

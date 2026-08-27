@@ -480,6 +480,9 @@ class _HomeScreenState extends State<HomeScreen>
                   // 8. Referral Banner (Invite Friends, Earn Rewards!)
                   const SliverToBoxAdapter(child: ReferralInviteCard()),
 
+                  // 8B. Promotional Offer Cards (Live Preview Style)
+                  const SliverToBoxAdapter(child: _HomeBottomPromoBanners()),
+
                   // 9. The F2H Promise
                   SliverToBoxAdapter(child: _promiseStrip()),
 
@@ -2666,6 +2669,7 @@ class _CategorySection extends StatelessWidget {
     if (banner != null) {
       final actionType = (banner!['actionType'] ?? banner!['action_type'] ?? banner!['type'] ?? '').toString().toUpperCase();
       final actionVal = (banner!['actionValue'] ?? banner!['action_value'] ?? banner!['productId'] ?? banner!['product_id'] ?? '').toString();
+      final categoryId = (banner!['categoryId'] ?? banner!['category_id'] ?? '').toString();
       final bannerType = (banner!['bannerType'] ?? banner!['banner_type'] ?? '').toString().toLowerCase();
 
       final isProduct = actionType == 'PRODUCT' ||
@@ -2686,6 +2690,18 @@ class _CategorySection extends StatelessWidget {
         );
         return;
       }
+
+      final targetCategory = categoryId.isNotEmpty
+          ? categoryId
+          : (actionVal.isNotEmpty && actionType == 'CATEGORY' ? actionVal : categoryName);
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BrowseScreen(initialCategory: targetCategory),
+        ),
+      );
+      return;
     }
     Navigator.push(
       context,
@@ -2743,16 +2759,16 @@ class _CategorySection extends StatelessWidget {
           ),
         ),
 
-        // ── Inline category banner (if admin set one for this category) ─────
+        // ── Inline category banner (Image ONLY - pure and clean) ─────
         if (banner != null) ...[
           GestureDetector(
             onTap: () => _onBannerTap(context),
             child: Container(
               margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              height: 90,
+              height: 100,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(14),
-                color: const Color(0xFF15803D),
+                color: const Color(0xFFF1F5F9),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.08),
@@ -2768,12 +2784,7 @@ class _CategorySection extends StatelessWidget {
                   fit: BoxFit.cover,
                   width: double.infinity,
                   height: double.infinity,
-                  errorBuilder: (_, __, ___) => Image.asset(
-                    'assets/splash/splash.png',
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                  ),
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                 ),
               ),
             ),
@@ -2797,6 +2808,290 @@ class _CategorySection extends StatelessWidget {
 
         const SizedBox(height: 8),
       ],
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  HOME BOTTOM PROMO BANNERS (LIVE PREVIEW STYLE CARDS)
+//  Renders promo / special offer cards at the bottom of
+//  HomeScreen near the referral card.
+// ══════════════════════════════════════════════════════════
+
+class _HomeBottomPromoBanners extends StatefulWidget {
+  const _HomeBottomPromoBanners();
+
+  @override
+  State<_HomeBottomPromoBanners> createState() => _HomeBottomPromoBannersState();
+}
+
+class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
+  List<Map<String, dynamic>> _promoBanners = [];
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchPromoBanners();
+  }
+
+  Future<void> _fetchPromoBanners() async {
+    try {
+      final resp = await DioClient().dio.get(ApiEndpoints.promoBanners);
+      dynamic data = resp.data;
+      if (data is String) data = jsonDecode(data);
+      if (data is Map && data['status'] == true && data['data'] is List) {
+        final list = (data['data'] as List)
+            .where((b) {
+              final isActive = b['isActive'] ?? b['is_active'] ?? true;
+              if (isActive == false) return false;
+              final bType = (b['bannerType'] ?? b['banner_type'] ?? '').toString().toLowerCase();
+              return bType == 'checkout_promo' ||
+                  bType == 'checkout_banner' ||
+                  bType == 'offer_banner' ||
+                  bType == 'promo';
+            })
+            .map((b) => Map<String, dynamic>.from(b as Map))
+            .toList();
+
+        if (mounted && list.isNotEmpty) {
+          setState(() {
+            _promoBanners = list;
+            _loaded = true;
+          });
+          return;
+        }
+      }
+    } catch (_) {}
+
+    if (mounted) setState(() => _loaded = true);
+  }
+
+  String _formatImg(String raw) {
+    if (raw.isEmpty) return '';
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+    final clean = raw.startsWith('/') ? raw : '/$raw';
+    return '${ApiEndpoints.host}$clean';
+  }
+
+  void _onPromoTap(BuildContext context, Map<String, dynamic> banner) {
+    final actionType = (banner['actionType'] ?? banner['action_type'] ?? '').toString().toUpperCase();
+    final actionVal = (banner['actionValue'] ?? banner['action_value'] ?? banner['productId'] ?? banner['product_id'] ?? '').toString();
+    final categoryId = (banner['categoryId'] ?? banner['category_id'] ?? '').toString();
+    final bannerType = (banner['bannerType'] ?? banner['banner_type'] ?? '').toString().toLowerCase();
+
+    final isProduct = actionType == 'PRODUCT' ||
+        actionType == 'PRD' ||
+        bannerType == 'product' ||
+        actionVal.startsWith('PRD') ||
+        banner['productId'] != null ||
+        banner['product_id'] != null;
+
+    if (isProduct && actionVal.isNotEmpty) {
+      final title = banner['title']?.toString() ?? banner['name']?.toString() ?? 'Product';
+      final product = getProductById(actionVal, name: title);
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProductDetailViewScreen(product: product),
+        ),
+      );
+      return;
+    }
+
+    if (actionType == 'CATEGORY' || categoryId.isNotEmpty) {
+      final cat = categoryId.isNotEmpty ? categoryId : actionVal;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BrowseScreen(initialCategory: cat),
+        ),
+      );
+      return;
+    }
+
+    if (actionType == 'SUBSCRIPTION') {
+      AppShell.of(context)?.setTab(2);
+      return;
+    }
+
+    if (actionType == 'WALLET') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const WalletScreen()),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const BrowseScreen(initialCategory: 'All')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loaded || _promoBanners.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      children: _promoBanners.map((banner) {
+        final title = banner['title']?.toString() ?? 'Special Offer';
+        final description = banner['description']?.toString() ?? banner['subtitle']?.toString() ?? '';
+        final discountText = banner['discountText']?.toString() ?? banner['discount_text']?.toString();
+        final ctaLabel = banner['ctaLabel']?.toString() ?? banner['cta_label']?.toString() ?? banner['cta']?.toString() ?? 'Grab Offer';
+        final imageUrl = _formatImg(banner['imageUrl']?.toString() ?? banner['image_url']?.toString() ?? '');
+
+        Color accentColor = const Color(0xFF16A34A);
+        if (banner['backgroundColor'] != null || banner['background_color'] != null) {
+          try {
+            final hex = (banner['backgroundColor'] ?? banner['background_color']).toString().replaceAll('#', '');
+            if (hex.length == 6) accentColor = Color(int.parse('0xFF$hex'));
+          } catch (_) {}
+        }
+
+        return Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0FDF4),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: const Color(0xFF86EFAC),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: accentColor.withValues(alpha: 0.06),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top tag
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.shopping_bag_outlined, size: 12, color: Color(0xFFB45309)),
+                    const SizedBox(width: 4),
+                    Text(
+                      discountText?.isNotEmpty == true ? discountText!.toUpperCase() : 'SPECIAL OFFER',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFB45309),
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Content Row: Thumbnail -> Text -> CTA Button
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Thumbnail
+                  if (imageUrl.isNotEmpty)
+                    Container(
+                      width: 58,
+                      height: 58,
+                      margin: const EdgeInsets.only(right: 12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.white,
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(11),
+                        child: Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(
+                            Icons.local_offer_rounded,
+                            color: Color(0xFF16A34A),
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Middle details
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            color: kText,
+                            height: 1.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (description.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            description,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: kTextSub,
+                              height: 1.3,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // CTA Button
+                  ElevatedButton(
+                    onPressed: () => _onPromoTap(context, banner),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accentColor,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          ctaLabel,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.arrow_forward_rounded, size: 13),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 }

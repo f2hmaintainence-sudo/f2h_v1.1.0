@@ -159,13 +159,13 @@ function BannerVisualPreview({
           ✕
         </div>
 
-        {/* 1. TOP: Banner Image (Full width, edge-to-edge) */}
+        {/* 1. TOP: Banner Image (Full width, edge-to-edge, natural aspect ratio) */}
         {cleanSrc ? (
-          <div className="relative w-full h-[190px] overflow-hidden bg-slate-100 flex items-center justify-center">
+          <div className="relative w-full overflow-hidden bg-slate-50 flex items-center justify-center">
             <img
               src={cleanSrc}
               alt={title || "App Launch Popup"}
-              className="w-full h-full object-cover"
+              className="w-full h-auto object-contain block max-h-[360px]"
               onError={(e) => {
                 (e.target as HTMLElement).style.display = "none";
               }}
