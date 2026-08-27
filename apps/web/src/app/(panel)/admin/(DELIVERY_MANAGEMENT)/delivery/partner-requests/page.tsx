@@ -10,6 +10,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { api as apiClient } from "@/services/api.client";
 import {
   UserPlus,
   Search,
@@ -154,16 +155,12 @@ export default function PartnerRequestsPage() {
       params.set("page", String(ticketPage));
       params.set("limit", "20");
 
-      const res = await fetch(`/api/v1/admin/delivery/support-tickets?${params.toString()}`, {
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
+      const res = await apiClient.get<any>(`/admin/delivery/support-tickets?${params.toString()}`);
 
-      if (res.ok) {
-        const data = await res.json();
-        setTickets(data.data || []);
-        setTicketSummary(data.summary || { open: 0, in_progress: 0, resolved: 0, closed: 0, total: 0 });
-        setTicketTotalPages(data.meta?.totalPages || 1);
+      if (res.data) {
+        setTickets(res.data.data || []);
+        setTicketSummary(res.data.summary || { open: 0, in_progress: 0, resolved: 0, closed: 0, total: 0 });
+        setTicketTotalPages(res.data.meta?.totalPages || 1);
       }
     } catch (err) {
       console.error("Failed to load partner support tickets:", err);
@@ -183,16 +180,12 @@ export default function PartnerRequestsPage() {
       params.set("page", String(requestPage));
       params.set("limit", "20");
 
-      const res = await fetch(`/api/v1/admin/delivery/partner-requests?${params.toString()}`, {
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
+      const res = await apiClient.get<any>(`/admin/delivery/partner-requests?${params.toString()}`);
 
-      if (res.ok) {
-        const data = await res.json();
-        setRequests(data.data || []);
-        setRequestSummary(data.summary || { pending: 0, contacted: 0, approved: 0, rejected: 0, total: 0 });
-        setRequestTotalPages(data.meta?.totalPages || 1);
+      if (res.data) {
+        setRequests(res.data.data || []);
+        setRequestSummary(res.data.summary || { pending: 0, contacted: 0, approved: 0, rejected: 0, total: 0 });
+        setRequestTotalPages(res.data.meta?.totalPages || 1);
       }
     } catch (err) {
       console.error("Failed to load partner requests:", err);
@@ -213,13 +206,11 @@ export default function PartnerRequestsPage() {
   const handleUpdateTicketStatus = async (ticketId: string, newStatus: string, notes?: string) => {
     setUpdatingTicketId(ticketId);
     try {
-      const res = await fetch(`/api/v1/admin/delivery/support-tickets/${ticketId}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status: newStatus, admin_notes: notes }),
+      const res = await apiClient.patch<any>(`/admin/delivery/support-tickets/${ticketId}/status`, {
+        status: newStatus,
+        admin_notes: notes,
       });
-      if (res.ok) {
+      if (!res.error && res.data) {
         setTickets((prev) =>
           prev.map((t) =>
             t.ticket_id === ticketId
@@ -233,6 +224,8 @@ export default function PartnerRequestsPage() {
           );
         }
         fetchTickets();
+      } else if (res.error) {
+        alert(`Failed to update ticket: ${res.error}`);
       }
     } catch (err) {
       console.error("Failed to update ticket status:", err);
@@ -244,14 +237,13 @@ export default function PartnerRequestsPage() {
   const handleDeleteTicket = async (ticketId: string) => {
     if (!window.confirm(`Are you sure you want to delete support ticket #${ticketId}?`)) return;
     try {
-      const res = await fetch(`/api/v1/admin/delivery/support-tickets/${ticketId}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (res.ok) {
+      const res = await apiClient.delete<any>(`/admin/delivery/support-tickets/${ticketId}`);
+      if (!res.error) {
         setTickets((prev) => prev.filter((t) => t.ticket_id !== ticketId));
         if (selectedTicket?.ticket_id === ticketId) setSelectedTicket(null);
         fetchTickets();
+      } else {
+        alert(`Failed to delete ticket: ${res.error}`);
       }
     } catch (err) {
       console.error("Failed to delete ticket:", err);
@@ -262,13 +254,11 @@ export default function PartnerRequestsPage() {
   const handleUpdateRequestStatus = async (id: string, newStatus: string, notes?: string) => {
     setUpdatingRequestId(id);
     try {
-      const res = await fetch(`/api/v1/admin/delivery/partner-requests/${id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status: newStatus, notes }),
+      const res = await apiClient.patch<any>(`/admin/delivery/partner-requests/${id}/status`, {
+        status: newStatus,
+        notes,
       });
-      if (res.ok) {
+      if (!res.error && res.data) {
         setRequests((prev) =>
           prev.map((r) =>
             r.id === id
@@ -278,6 +268,8 @@ export default function PartnerRequestsPage() {
         );
         if (notesModal) setNotesModal(null);
         fetchRequests();
+      } else if (res.error) {
+        alert(`Failed to update application: ${res.error}`);
       }
     } catch (err) {
       console.error("Failed to update request status:", err);
@@ -289,13 +281,12 @@ export default function PartnerRequestsPage() {
   const handleDeleteRequest = async (id: string, name: string) => {
     if (!window.confirm(`Are you sure you want to delete the application from ${name}?`)) return;
     try {
-      const res = await fetch(`/api/v1/admin/delivery/partner-requests/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (res.ok) {
+      const res = await apiClient.delete<any>(`/admin/delivery/partner-requests/${id}`);
+      if (!res.error) {
         setRequests((prev) => prev.filter((r) => r.id !== id));
         fetchRequests();
+      } else {
+        alert(`Failed to delete application: ${res.error}`);
       }
     } catch (err) {
       console.error("Failed to delete request:", err);

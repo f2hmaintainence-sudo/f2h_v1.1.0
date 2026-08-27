@@ -536,6 +536,8 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
   }
 
   // ─── TAB 2: My Tickets List ────────────────────────────────────────────────
+  String _selectedStatusFilter = 'ALL';
+
   Widget _buildMyTicketsTab() {
     if (_isLoadingTickets) {
       return const Center(child: CircularProgressIndicator(color: kPrimary));
@@ -567,40 +569,97 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
       );
     }
 
-    if (_tickets.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: _fetchTickets,
-        color: kPrimary,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: [
-            SizedBox(height: MediaQuery.of(context).size.height * 0.25),
-            Center(
-              child: Column(
-                children: [
-                  Icon(Icons.confirmation_number_outlined, size: 64, color: kMuted.withValues(alpha: 0.5)),
-                  const SizedBox(height: 16),
-                  const Text('No tickets raised yet', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: kTextMid)),
-                  const SizedBox(height: 4),
-                  const Text('Any support tickets you create will appear here.', style: TextStyle(fontSize: 12, color: kTextSub)),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+    final filteredTickets = _tickets.where((t) {
+      if (_selectedStatusFilter == 'ALL') return true;
+      return (t['status'] ?? '').toString().toLowerCase() == _selectedStatusFilter.toLowerCase();
+    }).toList();
 
     return RefreshIndicator(
       onRefresh: _fetchTickets,
       color: kPrimary,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _tickets.length,
-        itemBuilder: (context, index) {
-          final ticket = _tickets[index];
-          return _buildTicketCard(ticket);
-        },
+      child: Column(
+        children: [
+          // Filter Chips Row
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            color: kSurface,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildStatusChip('ALL', 'All (${_tickets.length})'),
+                  const SizedBox(width: 8),
+                  _buildStatusChip('open', 'Open'),
+                  const SizedBox(width: 8),
+                  _buildStatusChip('in_progress', 'In Progress'),
+                  const SizedBox(width: 8),
+                  _buildStatusChip('resolved', 'Resolved'),
+                  const SizedBox(width: 8),
+                  _buildStatusChip('closed', 'Closed'),
+                ],
+              ),
+            ),
+          ),
+          const Divider(height: 1, color: kBorderLt),
+
+          // Tickets List
+          Expanded(
+            child: filteredTickets.isEmpty
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+                      Center(
+                        child: Column(
+                          children: [
+                            Icon(Icons.confirmation_number_outlined, size: 56, color: kMuted.withValues(alpha: 0.5)),
+                            const SizedBox(height: 14),
+                            Text(
+                              _selectedStatusFilter == 'ALL'
+                                  ? 'No support tickets raised yet'
+                                  : 'No $_selectedStatusFilter tickets found',
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: kTextMid),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text('Any tickets you create will appear here with live updates.', style: TextStyle(fontSize: 12, color: kTextSub)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filteredTickets.length,
+                    itemBuilder: (context, index) {
+                      final ticket = filteredTickets[index];
+                      return _buildTicketCard(ticket);
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusChip(String key, String label) {
+    final bool isSelected = _selectedStatusFilter == key;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedStatusFilter = key),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? kPrimary : kBgDeep,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isSelected ? kPrimary : kBorderLt),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+            color: isSelected ? Colors.white : kTextMid,
+          ),
+        ),
       ),
     );
   }
@@ -612,7 +671,7 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
     final String desc = (ticket['description'] ?? '').toString();
     final String priority = (ticket['priority'] ?? 'medium').toString().toLowerCase();
     final String status = (ticket['status'] ?? 'open').toString().toLowerCase();
-    final String resNotes = (ticket['resolution_notes'] ?? '').toString();
+    final String resNotes = (ticket['admin_notes'] ?? ticket['resolution_notes'] ?? '').toString();
 
     final dateStr = ticket['created_at'] != null
         ? DateTime.parse(ticket['created_at'].toString()).toLocal().toString().substring(0, 16)
@@ -649,9 +708,8 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
         attachmentsList = ticket['attachments'] as List;
       } else if (ticket['attachments'] is String) {
         try {
-          // jsonb might parse as string sometimes
-          // ignore: unused_local_variable
-          final parsed = ticket['attachments'];
+          // Attempt string parse
+          attachmentsList = [ticket['attachments']];
         } catch (_) {}
       }
     }
@@ -767,8 +825,10 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
                       scrollDirection: Axis.horizontal,
                       itemCount: attachmentsList.length,
                       itemBuilder: (context, idx) {
-                        final relativeUrl = attachmentsList[idx].toString();
-                        final fullUrl = '${ApiEndpoints.baseUrl}/$relativeUrl';
+                        final relativeUrl = attachmentsList[idx].toString().trim();
+                        final fullUrl = relativeUrl.startsWith('http')
+                            ? relativeUrl
+                            : '${ApiEndpoints.host}/${relativeUrl.replaceFirst(RegExp(r'^/+'), '')}';
                         return GestureDetector(
                           onTap: () => _showAttachmentViewer(fullUrl),
                           child: Container(
@@ -801,27 +861,27 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9).withValues(alpha: 0.6),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.green.shade100),
+                      color: const Color(0xFFE8F5E9).withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.green.shade200),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.check_circle_rounded, color: Colors.green.shade800, size: 14),
+                            Icon(Icons.support_agent_rounded, color: Colors.green.shade800, size: 16),
                             const SizedBox(width: 6),
                             Text(
-                              'RESOLUTION NOTES',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green.shade800, letterSpacing: 0.5),
+                              'ADMIN RESOLUTION & NOTES',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.green.shade800, letterSpacing: 0.5),
                             ),
                           ],
                         ),
                         const SizedBox(height: 6),
                         Text(
                           resNotes,
-                          style: const TextStyle(fontSize: 12, color: kTextMid, height: 1.4, fontWeight: FontWeight.w500),
+                          style: const TextStyle(fontSize: 12, color: kTextMid, height: 1.4, fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),
@@ -841,6 +901,12 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
       padding: const EdgeInsets.all(16),
       children: [
         _buildHelplineCard(),
+        const SizedBox(height: 16),
+        _buildWhatsAppCard(),
+        const SizedBox(height: 16),
+        _buildEmailCard(),
+        const SizedBox(height: 20),
+        _buildFaqSection(),
       ],
     );
   }
@@ -849,8 +915,15 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
     return Container(
       decoration: BoxDecoration(
         color: kSurface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kBorder),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kBorderLt),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -861,72 +934,195 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
               Text('📞', style: TextStyle(fontSize: 22)),
               SizedBox(width: 8),
               Text(
-                'Supervisor Hotline',
+                'Branch Supervisor Hotline',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: kPrimary),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           const Text(
-            'In case of deliveries blockage, route issues, accidents, or cash collections, directly reach your branch leader.',
+            'In case of deliveries blockage, route issues, accidents, or urgent route emergencies, directly call your branch operations desk.',
             style: TextStyle(fontSize: 12, color: kTextSub, height: 1.3),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: kBgDeep,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
                 const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Branch Manager', style: TextStyle(fontSize: 11, color: kTextSub, fontWeight: FontWeight.bold)),
+                    Text('Operations Lead', style: TextStyle(fontSize: 11, color: kTextSub, fontWeight: FontWeight.bold)),
                     SizedBox(height: 2),
-                    Text('+91 91487 73591', style: TextStyle(fontSize: 15, color: kText, fontWeight: FontWeight.w800)),
+                    Text('+91 91487 73591', style: TextStyle(fontSize: 14, color: kText, fontWeight: FontWeight.w800)),
                   ],
                 ),
                 const Spacer(),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kPrimary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  icon: const Icon(Icons.phone_forwarded, size: 16, color: Colors.white),
-                  label: const Text('Call Now', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Call Branch Leader'),
-                        content: const Text('Do you want to initiate a voice call to +91 91487 73591?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel', style: TextStyle(color: kTextSub)),
-                          ),
-                          TextButton(
-                            onPressed: () async {
-                              Navigator.pop(context);
-                              final url = Uri.parse('tel:+919148773591');
-                              if (await canLaunchUrl(url)) {
-                                await launchUrl(url);
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Could not open dialer'), backgroundColor: kRed),
-                                );
-                              }
-                            },
-                            child: const Text('Call', style: TextStyle(color: kPrimary, fontWeight: FontWeight.bold)),
-                          ),
-                        ],
-                      ),
-                    );
+                  icon: const Icon(Icons.phone_forwarded_rounded, size: 16, color: Colors.white),
+                  label: const Text('Call Now', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                  onPressed: () async {
+                    final url = Uri.parse('tel:+919148773591');
+                    if (await canLaunchUrl(url)) {
+                      await launchUrl(url);
+                    }
                   },
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWhatsAppCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kBorderLt),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Text('💬', style: TextStyle(fontSize: 22)),
+              SizedBox(width: 8),
+              Text(
+                'Partner WhatsApp Desk',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Instant messaging with the delivery support coordination desk for payout inquiries and shift timings.',
+            style: TextStyle(fontSize: 12, color: kTextSub, height: 1.3),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF25D366),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              icon: const Icon(Icons.chat_rounded, size: 18, color: Colors.white),
+              label: const Text('Chat on WhatsApp', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+              onPressed: () async {
+                final url = Uri.parse('https://wa.me/919148773591?text=Hi%20F2H%20Operations%20Support,%20I%20need%20assistance%20with%20my%20delivery%20partner%20account.');
+                if (await canLaunchUrl(url)) {
+                  await launchUrl(url, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmailCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kBorderLt),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          const Icon(Icons.email_outlined, color: kPrimary, size: 24),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Support Email Desk', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: kText)),
+                SizedBox(height: 2),
+                Text('support@f2hfresh.com', style: TextStyle(fontSize: 12, color: kTextSub)),
+              ],
+            ),
+          ),
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: kPrimary),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              final url = Uri.parse('mailto:support@f2hfresh.com?subject=Delivery%20Partner%20Assistance');
+              if (await canLaunchUrl(url)) {
+                await launchUrl(url);
+              }
+            },
+            child: const Text('Email', style: TextStyle(color: kPrimary, fontWeight: FontWeight.bold, fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFaqSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Frequently Asked Questions',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: kText),
+        ),
+        const SizedBox(height: 10),
+        _buildFaqItem(
+          'When are daily delivery payouts settled?',
+          'Daily earnings are credited to your partner wallet by 11:00 AM every business morning for the previous day completed shifts.',
+        ),
+        _buildFaqItem(
+          'What if a customer does not answer or address is wrong?',
+          'Attempt calling 2 times via the app dialer. If unreachable, tap "Report Issue" on the order stop and select "Customer Unreachable" to notify the dispatch desk.',
+        ),
+        _buildFaqItem(
+          'How do I report damaged stock received from branch hub?',
+          'Raise a support ticket under "Stock/Handover Discrepancy" and attach a clear photo of the damaged packet before leaving the dispatch center.',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFaqItem(String question, String answer) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kBorderLt),
+      ),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+        title: Text(question, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: kText)),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            child: Text(
+              answer,
+              style: const TextStyle(fontSize: 12, color: kTextSub, height: 1.4),
             ),
           ),
         ],

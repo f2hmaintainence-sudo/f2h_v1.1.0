@@ -1209,12 +1209,18 @@ class InitialLoadingScreen extends StatelessWidget {
                   letterSpacing: 0.8,
                 ),
               ),
+              const Spacer(flex: 1),
+
+              // Extra Large Cow Drinking Milk Animation further down
+              const Flexible(
+                flex: 5,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: CowLoadingWidget(size: 340),
+                ),
+              ),
+
               const Spacer(flex: 2),
-
-              // Big Cow Drinking Milk Animation (size 240) further down
-              const CowLoadingWidget(size: 240),
-
-              const Spacer(flex: 3),
             ],
           ),
         ),
