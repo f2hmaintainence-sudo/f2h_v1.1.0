@@ -201,7 +201,6 @@ export class CustomerBootstrapController {
     const query = `
       SELECT
         c.customer_id,
-        c.is_active AS customer_status,
         c.customer_type,
         c.is_blocked,
         c.block_reason,
@@ -215,17 +214,17 @@ export class CustomerBootstrapController {
         c.alternate_mobile,
         c.notes,
         c.branch_id,
-        c.referral_status,
-        c.referred_by,
         c.created_by,
         c.created_at,
         c.updated_at,
+        u.account_status AS customer_status,
         u.first_name,
         u.last_name,
         u.user_name,
         u.email,
         u.phone,
-        u.phone AS mobile
+        u.phone AS mobile,
+        u.referred_by
       FROM customers c
       JOIN users u ON u.user_id = c.customer_id
       WHERE c.customer_id = $1 OR (u.email IS NOT NULL AND u.email = $2 AND u.email != '')
@@ -253,7 +252,6 @@ export class CustomerBootstrapController {
             customer_id: userObj.user_id || userId,
             branch_id: activeBranchId,
             wallet_balance: 0,
-            is_active: true,
             customer_type: 'retail',
             created_at: now,
             updated_at: now,
@@ -287,7 +285,7 @@ export class CustomerBootstrapController {
           limit: 1,
         });
         const hasDeliveredOrder = (deliveredCheck?.data?.length || 0) > 0;
-        const isUnlocked = Boolean(customer.first_order_completed || hasDeliveredOrder || customer.referral_status === 'active');
+        const isUnlocked = Boolean(customer.first_order_completed || hasDeliveredOrder);
 
         if (isUnlocked) {
           customer.referral_code = customer.customer_id || userId;
@@ -300,7 +298,6 @@ export class CustomerBootstrapController {
         }
 
         const updatePayload = await this.filterValidFields('customers', {
-          referral_status: customer.referral_status,
           first_order_completed: customer.first_order_completed,
           updated_at: new Date(),
         });

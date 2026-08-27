@@ -255,20 +255,15 @@ export class ReferralRepository implements IReferralRepository {
       hasCompletedOrder = (orderCheck?.data?.length || 0) > 0;
     }
 
-    const isUnlocked = Boolean(cust.first_order_completed || hasCompletedOrder || cust.referral_status === 'active');
+    const isUnlocked = Boolean(cust.first_order_completed || hasCompletedOrder);
     const computedStatus = isUnlocked ? 'active' : 'locked';
 
     if (isUnlocked) {
       const code = targetId; // As per Rule 2: use customer's user_id as the referral code after first order is completed
       try {
         await this.dataService.update(
-          'users',
-          { referral_code: code, referral_status: 'active', first_order_completed: true, updated_at: new Date() },
-          [{ column: 'user_id', operator: '=', value: targetId }]
-        );
-        await this.dataService.update(
           'customers',
-          { referral_code: code, referral_status: 'active', first_order_completed: true, updated_at: new Date() },
+          { first_order_completed: true, updated_at: new Date() },
           [{ column: 'customer_id', operator: '=', value: targetId }]
         );
       } catch {

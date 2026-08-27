@@ -70,11 +70,12 @@ export class CustomerSaveEditService {
       }
 
       const customerFields = [
-        'referral_status',
         'postpaid_credit_limit',
         'is_postpaid_enabled',
         'is_blocked',
         'block_reason',
+        'customer_type',
+        'first_order_completed',
       ];
 
       for (const fieldName of customerFields) {
@@ -86,12 +87,16 @@ export class CustomerSaveEditService {
             value = value === '' || value === null ? 0 : Number(value);
           }
 
-          if (fieldName === 'is_postpaid_enabled' || fieldName === 'is_blocked') {
+          if (fieldName === 'is_postpaid_enabled' || fieldName === 'is_blocked' || fieldName === 'first_order_completed') {
             value = value === true || value === 'true' || value === 1 || value === '1';
           }
 
           customerUpdateData[fieldName] = value;
         }
+      }
+
+      if (body.referral_status !== undefined) {
+        customerUpdateData.first_order_completed = body.referral_status === 'active' || body.referral_status === 'unlocked';
       }
 
       if (Object.keys(userUpdateData).length === 0 && Object.keys(customerUpdateData).length === 0) {

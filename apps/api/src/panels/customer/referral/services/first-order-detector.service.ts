@@ -45,7 +45,7 @@ export class FirstOrderDetectorService {
       // Past delivered order exists - update flag and return false
       await this.dataService.update(
         'customers',
-        { first_order_completed: true, referral_status: 'active', updated_at: new Date() },
+        { first_order_completed: true, updated_at: new Date() },
         [{ column: 'customer_id', operator: '=', value: customerId }],
       );
       return false;
@@ -57,7 +57,6 @@ export class FirstOrderDetectorService {
       'customers',
       {
         first_order_completed: true,
-        referral_status: 'active',
         updated_at: now,
       },
       [{ column: 'customer_id', operator: '=', value: customerId }],
@@ -74,7 +73,6 @@ export class FirstOrderDetectorService {
     await this.dataService.update(
       'customers',
       {
-        referral_status: 'active',
         first_order_completed: true,
         updated_at: now,
       },

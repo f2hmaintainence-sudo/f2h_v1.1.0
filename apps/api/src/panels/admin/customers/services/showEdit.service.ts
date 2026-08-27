@@ -49,6 +49,7 @@ export class CustomerShowEditService {
 
       const custData = result.data[0];
       custData.full_name = custData.full_name || `${custData.first_name || ''} ${custData.last_name || ''}`.trim();
+      custData.referral_status = custData.first_order_completed ? 'active' : 'locked';
 
       // 2. Use SAME fields from showAdd (no duplication)
       const fields: FieldDef[] = [

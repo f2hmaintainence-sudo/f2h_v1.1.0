@@ -85,13 +85,12 @@ export class CustomerSaveAddService {
 
       const customerData = {
         customer_id: customerId,
-        customer_status: isBlocked ? 'blocked' : 'active',
         customer_type: body.customer_type || 'retail',
         is_blocked: isBlocked,
         block_reason: body.block_reason || null,
         is_postpaid_enabled: isPostpaid,
         postpaid_credit_limit: creditLimit,
-        referral_status: body.referral_status || 'unlocked',
+        first_order_completed: body.referral_status === 'active' || body.referral_status === 'unlocked' || body.first_order_completed === true,
         created_by: adminId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

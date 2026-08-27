@@ -524,29 +524,16 @@ export class AuthService {
             { transaction },
           );
         } else {
-          // Insert only valid customers table columns (referral_code locked until first order completed)
+          // Insert only valid customers table columns
           const custPayload: any = {
             customer_id: userId,
-            referral_code: null,
-            referral_status: 'locked',
             first_order_completed: false,
             branch_id: body.branch_id || null,
             created_at: now,
             updated_at: now,
           };
-          if (referrerId) {
-            custPayload.referred_by = referrerId;
-          }
           await this.Data.insert('customers', custPayload, { transaction });
         }
-
-        // Store initial locked referral state in users table
-        await this.Data.update(
-          'users',
-          { referral_code: null, referral_status: 'locked', first_order_completed: false, updated_at: now },
-          [{ column: 'user_id', operator: '=', value: userId }],
-          { transaction },
-        );
 
         // Insert row into referrals table if user registered with a referral code (status = 'pending')
         if (referrerId) {
@@ -988,28 +975,13 @@ export class AuthService {
       await this.Data.insert('users', userInsertData);
 
       try {
-        const cleanName = (email ? email.split('@')[0] : 'USR').replace(/[^a-zA-Z]/g, '').toUpperCase();
-        const prefix = cleanName.length >= 3 ? cleanName.slice(0, 3) : 'USR';
-        const phoneDigits = (phone || '').replace(/\D/g, '');
-        const suffix = phoneDigits.length >= 3 ? phoneDigits.slice(-3) : Math.floor(100 + Math.random() * 900).toString();
-        const generatedRefCode = `F2H${prefix}${suffix}`;
-
-        // Insert only valid customers table columns (no first_name/last_name/phone/email/mobile)
         const customerInsertData: any = {
           customer_id: userId,
-          referral_code: generatedRefCode,
-          referral_status: 'locked',
+          first_order_completed: false,
           created_at: now,
           updated_at: now,
         };
         await this.Data.insert('customers', customerInsertData);
-
-        // Store referral_code in users table for unified lookup
-        await this.Data.update(
-          'users',
-          { referral_code: generatedRefCode, updated_at: now },
-          [{ column: 'user_id', operator: '=', value: userId }],
-        );
       } catch (custErr) {
         console.error('[AuthService] Auto customer record creation failed during OTP verify:', custErr);
       }
