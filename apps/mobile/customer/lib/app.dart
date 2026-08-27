@@ -555,23 +555,49 @@ class _NavItem extends StatelessWidget {
 }
 
 /// Red pip carrying the number of active or paused subscriptions.
-class _SubscriptionBadgeCount extends StatelessWidget {
+///
+/// The count is latched from the last loaded state instead of being read
+/// straight off the current one. Tapping the Subscribe tab builds SubsScreen,
+/// which re-dispatches LoadSubscriptions, so the bloc briefly sits in
+/// SubscriptionLoading; reading that state directly made the pip blink out and
+/// reappear only once the API answered, trailing the tab's green circle.
+class _SubscriptionBadgeCount extends StatefulWidget {
   const _SubscriptionBadgeCount();
 
   @override
+  State<_SubscriptionBadgeCount> createState() =>
+      _SubscriptionBadgeCountState();
+}
+
+class _SubscriptionBadgeCountState extends State<_SubscriptionBadgeCount> {
+  late int _count;
+
+  /// Null for any state that carries no subscription list, so the latched
+  /// count is left untouched rather than reset to zero.
+  int? _countOf(SubscriptionState state) {
+    if (state is! SubscriptionLoaded) return null;
+    return state.subscriptions.where((s) {
+      final status = s.status.toLowerCase();
+      return status == 'active' || status == 'paused';
+    }).length;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _count = _countOf(context.read<SubscriptionBloc>().state) ?? 0;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return BlocBuilder<SubscriptionBloc, SubscriptionState>(
-      builder: (context, state) {
-        var count = 0;
-        if (state is SubscriptionLoaded) {
-          count = state.subscriptions.where((s) {
-            final status = s.status.toLowerCase();
-            return status == 'active' || status == 'paused';
-          }).length;
+    return BlocListener<SubscriptionBloc, SubscriptionState>(
+      listener: (context, state) {
+        final next = _countOf(state);
+        if (next != null && next != _count) {
+          setState(() => _count = next);
         }
-        if (count == 0) return const SizedBox.shrink();
-        return _CountPip(count: count);
       },
+      child: _count == 0 ? const SizedBox.shrink() : _CountPip(count: _count),
     );
   }
 }
