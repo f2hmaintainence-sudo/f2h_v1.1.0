@@ -815,7 +815,7 @@ export class DeliveryRunService {
           dra.sequence_no,
           dra.delivery_status AS status,
           dra.delivery_status,
-          dra.proof_photo_url,
+          dra.delivery_image AS proof_photo_url,
           dra.failed_reason,
           dra.delivered_at,
           COALESCE(NULLIF(TRIM(ca.address_line), ''), ca.landmark, 'Customer Address') AS address_line,
@@ -2245,7 +2245,7 @@ export class DeliveryRunService {
             customerName = stopDetailRes.rows[0].customer_name || 'Customer';
             addressLine = stopDetailRes.rows[0].address_line || 'Customer Address';
           }
-        } catch (_) {}
+        } catch (_) { }
 
         let sourcePartnerName = 'Delivery Partner';
         try {
@@ -2258,7 +2258,7 @@ export class DeliveryRunService {
             [sourceRun.delivery_partner_id],
           );
           sourcePartnerName = srcPartnerRes.rows[0]?.partner_name || 'Delivery Partner';
-        } catch (_) {}
+        } catch (_) { }
 
         const targetPartnerName = targetPartner?.partner_name || 'Delivery Partner';
 
@@ -2606,7 +2606,7 @@ export class DeliveryRunService {
             custNameB = stopDetailBRes.rows[0].customer_name || 'Customer';
             addrLineB = stopDetailBRes.rows[0].address_line || 'Customer Address';
           }
-        } catch (_) {}
+        } catch (_) { }
 
         const partnerAInfo = partnersRes.rows.find((p: any) => p.delivery_partner_id === runA.delivery_partner_id);
         const partnerBInfo = partnersRes.rows.find((p: any) => p.delivery_partner_id === runB.delivery_partner_id);
