@@ -86,13 +86,28 @@ export class DashboardService {
             COUNT(*) FILTER (WHERE wallet_balance > 0)::int AS wallets_with_balance
           FROM customers
         ),
+        -- product_variants has no stock column: on-hand quantity lives in
+        -- stock_balances, one row per (warehouse_id, product_variant_id). The
+        -- rows are collapsed to one per variant first, so a variant stocked in
+        -- several warehouses is counted once and judged on its total.
         inventory_stats AS (
           SELECT
             COUNT(*)::int AS total_variants,
-            COUNT(*) FILTER (WHERE stock <= low_stock_threshold AND stock >= 0)::int AS low_stock_count,
-            COUNT(*) FILTER (WHERE stock <= 0)::int AS out_of_stock_count
-          FROM product_variants
-          WHERE status = 'active'
+            COUNT(*) FILTER (WHERE available_quantity > 0 AND available_quantity <= low_stock_threshold)::int AS low_stock_count,
+            COUNT(*) FILTER (WHERE available_quantity <= 0)::int AS out_of_stock_count
+          FROM (
+            SELECT
+              pv.variant_id,
+              COALESCE(SUM(sb.available_quantity), 0) AS available_quantity,
+              COALESCE(MAX(sb.low_stock_threshold), MAX(pv.low_stock_threshold), 0) AS low_stock_threshold
+            FROM product_variants pv
+            LEFT JOIN stock_balances sb
+              ON sb.product_variant_id = pv.variant_id
+             AND sb.deleted_at IS NULL
+            WHERE pv.status = 'active'
+              AND pv.deleted_at IS NULL
+            GROUP BY pv.variant_id
+          ) variant_stock
         ),
         pending_deliveries AS (
           SELECT COUNT(*)::int AS pending_delivery_count
