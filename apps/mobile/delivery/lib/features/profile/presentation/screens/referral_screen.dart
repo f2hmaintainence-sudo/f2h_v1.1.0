@@ -10,6 +10,7 @@ import 'package:f2h_delivery/core/api/dio_client.dart';
 import 'package:f2h_delivery/core/api/api_endpoints.dart';
 import 'package:f2h_delivery/core/utils/app_snackbar.dart';
 import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 class ReferralScreen extends StatefulWidget {
   const ReferralScreen({super.key});
@@ -266,10 +267,12 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
   }
 
   void _showQrCodeDialog(String code) {
+    final qrData = 'https://play.google.com/store/apps/details?id=com.f2h.customer&referrer=$code';
+
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
         backgroundColor: Colors.white,
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -279,13 +282,26 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Customer QR Code',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF0F172A),
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.qr_code_2_rounded, color: Color(0xFF16A34A), size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Customer QR Code',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
                   ),
                   IconButton(
                     onPressed: () => Navigator.pop(ctx),
@@ -295,50 +311,72 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(22),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
                 child: Column(
                   children: [
                     Container(
-                      width: 170,
-                      height: 170,
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x0F000000),
+                            blurRadius: 12,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
                       ),
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.qr_code_2_rounded, size: 100, color: Color(0xFF16A34A)),
-                            Text(
-                              code,
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 13,
-                                letterSpacing: 1.5,
-                                color: const Color(0xFF0F172A),
-                              ),
-                            ),
-                          ],
+                      child: QrImageView(
+                        data: qrData,
+                        version: QrVersions.auto,
+                        size: 190.0,
+                        gapless: false,
+                        backgroundColor: Colors.white,
+                        eyeStyle: const QrEyeStyle(
+                          eyeShape: QrEyeShape.square,
+                          color: Color(0xFF0F172A),
+                        ),
+                        dataModuleStyle: const QrDataModuleStyle(
+                          dataModuleShape: QrDataModuleShape.square,
+                          color: Color(0xFF0F172A),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        'CODE: $code',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                          letterSpacing: 1.5,
+                          color: const Color(0xFF15803D),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     Text(
-                      'Ask customer to scan to download app with your referral tag applied!',
+                      'Scan using any Camera, Google Lens, or Scanner to download app with your referral tag applied!',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.poppins(
                         fontSize: 11,
                         color: const Color(0xFF64748B),
                         fontWeight: FontWeight.w500,
+                        height: 1.35,
                       ),
                     ),
                   ],
@@ -353,12 +391,13 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                     _shareCode(code);
                   },
                   icon: const Icon(Icons.share_rounded, size: 18),
-                  label: const Text('Share Code Now'),
+                  label: const Text('Share Referral Link'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF16A34A),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: 13.5),
                   ),
                 ),
               ),
