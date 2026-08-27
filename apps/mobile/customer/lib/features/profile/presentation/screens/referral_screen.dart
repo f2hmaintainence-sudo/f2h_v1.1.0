@@ -5,6 +5,7 @@ import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
+import 'package:f2h_customer/core/widgets/app_refresh_indicator.dart';
 import 'referral_faq_screen.dart';
 import 'referral_terms_screen.dart';
 
@@ -334,7 +335,7 @@ class _ReferralScreenState extends State<ReferralScreen>
           children: [
             _buildAppBar(),
             Expanded(
-              child: RefreshIndicator(
+              child: AppRefreshIndicator(
                 onRefresh: _fetchReferralDashboard,
                 color: _kGreenDark,
                 child: _isLoading

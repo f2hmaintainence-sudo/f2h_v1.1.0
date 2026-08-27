@@ -15,6 +15,7 @@ import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
 // import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_screen.dart';
 import 'package:f2h_customer/core/widgets/scrolling_items_loader.dart';
+import 'package:f2h_customer/core/widgets/app_refresh_indicator.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 class OrderHistoryScreen extends StatelessWidget {
@@ -198,7 +199,7 @@ class _OrderHistoryViewState extends State<OrderHistoryView>
         _buildSearchBar('Search one-time orders…'),
         _buildFilterChips(),
         Expanded(
-          child: RefreshIndicator(
+          child: AppRefreshIndicator(
             onRefresh: () async =>
                 context.read<OrderHistoryBloc>().add(LoadOrderHistory()),
             color: kPrimary,
@@ -232,7 +233,7 @@ class _OrderHistoryViewState extends State<OrderHistoryView>
         _buildSearchBar('Search subscription orders…'),
         _buildFilterChips(),
         Expanded(
-          child: RefreshIndicator(
+          child: AppRefreshIndicator(
             onRefresh: () async =>
                 context.read<OrderHistoryBloc>().add(LoadOrderHistory()),
             color: kPrimary,
@@ -265,7 +266,7 @@ class _OrderHistoryViewState extends State<OrderHistoryView>
       children: [
         _buildSearchBar('Search subscription plans…'),
         Expanded(
-          child: RefreshIndicator(
+          child: AppRefreshIndicator(
             onRefresh: () async =>
                 context.read<OrderHistoryBloc>().add(LoadOrderHistory()),
             color: kPrimary,

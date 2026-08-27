@@ -6,6 +6,7 @@ import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/auth/token_storage.dart';
 import 'package:f2h_customer/features/wallet/presentation/screens/wallet_screen.dart';
 import 'package:f2h_customer/core/widgets/cow_loading_widget.dart';
+import 'package:f2h_customer/core/widgets/app_refresh_indicator.dart';
 
 class CustomerBillsScreen extends StatefulWidget {
   const CustomerBillsScreen({super.key});
@@ -603,7 +604,7 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
                       children: [
                         _buildMonthFilterBar(),
                         Expanded(
-                          child: RefreshIndicator(
+                          child: AppRefreshIndicator(
                             color: kPrimary,
                             onRefresh: _fetchBills,
                             child: _displayItems.isEmpty

@@ -6,6 +6,7 @@ import 'package:f2h_customer/features/notifications/presentation/bloc/notificati
 import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_event.dart';
 import 'package:f2h_customer/features/notifications/presentation/bloc/notifications_state.dart';
 import 'package:f2h_customer/core/widgets/scrolling_items_loader.dart';
+import 'package:f2h_customer/core/widgets/app_refresh_indicator.dart';
 import 'package:f2h_customer/features/subscription/presentation/screens/my_subscriptions_screen.dart';
 import 'package:f2h_customer/features/orders/presentation/screens/order_history_screen.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/customer_bills_screen.dart';
@@ -228,7 +229,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             ],
                           ),
                         )
-                      : RefreshIndicator(
+                      : AppRefreshIndicator(
                           color: kPrimary,
                           onRefresh: () async {
                             context.read<NotificationsBloc>().add(LoadNotifications());
