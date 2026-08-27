@@ -43,6 +43,22 @@ export const welcomeEmailTemplate = (name: string) => ({
   ),
 });
 
+export const welcomeWithPasswordTemplate = (name: string, email: string, password: string) => ({
+  subject: 'Welcome to F2H Fresh — Your Login Credentials',
+  text: `Welcome to F2H Fresh, ${name}. Your account is ready.\n\nLogin Details:\nEmail: ${email}\nPassword: ${password}\n\nYou can log in anytime using this password or sign in with OTP.`,
+  html: shell(
+    'Welcome to F2H Fresh 🎉',
+    `<p>Hi <strong>${name}</strong>,</p>
+     <p>Your account has been created successfully! You can now explore fresh farm milk and daily essentials delivered directly to your doorstep.</p>
+     <div style="margin: 20px 0; padding: 18px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
+       <p style="margin: 0 0 10px 0; font-weight: bold; color: #166534; font-size: 15px;">Your Account Login Details:</p>
+       <p style="margin: 6px 0; font-size: 14px;"><strong>Email:</strong> <span style="color: #374151;">${email}</span></p>
+       <p style="margin: 6px 0; font-size: 14px;"><strong>Password:</strong> <code style="background: #ffffff; padding: 4px 10px; border-radius: 4px; font-size: 16px; font-weight: bold; color: #15803d; border: 1px solid #dcfce7;">${password}</code></p>
+     </div>
+     <p style="font-size: 13px; color: #6b7280; line-height: 1.5;">You can log in anytime using your email and password, or use OTP login with your registered mobile number. You can also update your password anytime from your profile settings.</p>`,
+  ),
+});
+
 export const passwordChangedTemplate = () => ({
   subject: 'Your F2H Fresh password was changed',
   text: 'Your F2H Fresh password was changed. Contact support immediately if this was not you.',

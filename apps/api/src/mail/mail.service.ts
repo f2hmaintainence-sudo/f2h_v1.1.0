@@ -8,6 +8,7 @@ import {
   passwordChangedTemplate,
   registrationOtpTemplate,
   welcomeEmailTemplate,
+  welcomeWithPasswordTemplate,
 } from './auth-email.templates';
 
 /** SMTP settings, whatever their source. */
@@ -147,6 +148,10 @@ export class MailService {
 
   async sendWelcomeEmail(email: string, name: string) {
     await this.sendAuthTemplate(email, welcomeEmailTemplate(name));
+  }
+
+  async sendWelcomeWithPasswordEmail(email: string, name: string, password: string) {
+    await this.sendAuthTemplate(email, welcomeWithPasswordTemplate(name, email, password));
   }
 
   async sendPasswordChangedAlert(email: string) {

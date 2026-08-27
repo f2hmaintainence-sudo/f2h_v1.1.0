@@ -438,9 +438,10 @@ export class AuthService {
     }
 
     const userId = existingUser ? existingUser.user_id : generateId('USER', 10);
-    const hashedPassword = body.password
-      ? await bcrypt.hash(body.password, 12)
-      : crypto.randomUUID();
+    const rawPassword = (body.password && body.password.trim() !== '')
+      ? body.password.trim()
+      : this.generateRandomPassword(email || undefined, phone || undefined);
+    const hashedPassword = await bcrypt.hash(rawPassword, 12);
 
     await this.Data.executeTransaction(async (transaction) => {
       if (existingUser) {
@@ -711,10 +712,11 @@ export class AuthService {
 
     if (email) {
       try {
-        const name = (firstName || userName || 'User').trim();
-        await this.mailService.sendWelcomeEmail(email, name);
+        const name = (firstName || userName || 'Customer').trim();
+        await this.mailService.sendWelcomeWithPasswordEmail(email, name, rawPassword);
       } catch (err) {
-        this.developer.error(`Failed to send welcome email to ${email}`, { err });
+        this.developer.warn(`Failed to send welcome credentials email to ${email}`, { err, rawPassword });
+        console.warn(`[AUTH] Welcome credentials email for ${email} (Password: ${rawPassword}):`, err);
       }
     }
 
@@ -733,7 +735,16 @@ export class AuthService {
     return {
       message: 'Registration successful',
       userId,
+      generatedPassword: rawPassword,
     };
+  }
+
+  private generateRandomPassword(email?: string | null, phone?: string | null): string {
+    const emailPrefix = email ? email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').slice(0, 4) : 'F2H';
+    const cleanPrefix = emailPrefix.length >= 3 ? emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1).toLowerCase() : 'F2H';
+    const phonePart = phone ? phone.replace(/\D/g, '').slice(-4) : Math.floor(1000 + Math.random() * 9000).toString();
+    const randPart = crypto.randomBytes(2).toString('hex').slice(0, 3).toUpperCase();
+    return `${cleanPrefix}@${phonePart}${randPart}`;
   }
 
   async findReferrer(code: string): Promise<any> {

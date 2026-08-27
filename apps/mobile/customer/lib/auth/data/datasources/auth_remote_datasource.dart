@@ -157,7 +157,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         'name': userName,
         'email': email,
         'phone': phone,
-        'password': password,
+        if (password.isNotEmpty) 'password': password,
         'role': 'CUSTOMER',
         'verification_token': verificationToken,
          if (fcmToken != null && fcmToken.isNotEmpty) 'fcm_token': fcmToken,

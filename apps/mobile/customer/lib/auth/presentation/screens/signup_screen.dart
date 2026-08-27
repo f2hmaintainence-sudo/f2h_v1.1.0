@@ -31,7 +31,6 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _referralCodeController = TextEditingController();
 
   bool _agreeToTerms = false;
@@ -55,7 +54,6 @@ class _SignupScreenState extends State<SignupScreen> {
     _referralCodeController.removeListener(_onReferralChanged);
     _phoneController.dispose();
     _emailController.dispose();
-    _passwordController.dispose();
     _referralCodeController.dispose();
     super.dispose();
   }
@@ -127,10 +125,9 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _onSignupPressed() async {
     final phone = _phoneController.text.trim();
     final email = _emailController.text.trim().toLowerCase();
-    final password = _passwordController.text;
 
-    if (phone.isEmpty || email.isEmpty || password.isEmpty) {
-      _toast('Please fill all required fields');
+    if (phone.isEmpty || email.isEmpty) {
+      _toast('Please enter your mobile number and email');
       return;
     }
 
@@ -141,11 +138,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
     if (!email.contains('@')) {
       _toast('Please enter a valid email address');
-      return;
-    }
-
-    if (password.length < 4) {
-      _toast('Password must be at least 4 characters');
       return;
     }
 
@@ -175,7 +167,6 @@ class _SignupScreenState extends State<SignupScreen> {
             userName: userName,
             email: email,
             phone: phone,
-            password: password,
             referralCode: referral,
           ),
         ),
@@ -233,13 +224,6 @@ class _SignupScreenState extends State<SignupScreen> {
                 hint: 'Email Address',
                 icon: Icons.mail_outline_rounded,
                 keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 14),
-              AuthField(
-                controller: _passwordController,
-                hint: 'Password',
-                icon: Icons.lock_outline_rounded,
-                isPassword: true,
               ),
               const SizedBox(height: 14),
               AuthField(

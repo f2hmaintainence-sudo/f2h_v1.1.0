@@ -434,34 +434,59 @@ class _BottomNav extends StatelessWidget {
         return Container(
           decoration: BoxDecoration(
             color: kSurface,
-            border: Border(
-              top: BorderSide(
-                color: isVip ? const Color(0xFFFFD700) : kBorderLt,
-                width: isVip ? 1.5 : 1.0,
+            boxShadow: [
+              BoxShadow(
+                color: (isVip ? const Color(0xFFFFD700) : kPrimary).withValues(alpha: 0.12),
+                blurRadius: 10,
+                offset: const Offset(0, -3),
               ),
-            ),
+            ],
           ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                children: List.generate(tabs.length, (i) {
-                  final tab = tabs[i];
-                  return Expanded(
-                    child: _NavItem(
-                      icon: tab.$1,
-                      activeIcon: tab.$2,
-                      label: tab.$3,
-                      isActive: i == activeIndex,
-                      activeColor: activeColor,
-                      badge: i == 2 ? const _SubscriptionBadgeCount() : null,
-                      onTap: () => onSelect(i),
-                    ),
-                  );
-                }),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Green Color Fade Line at the top of the bar
+              Container(
+                height: 3,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isVip
+                        ? [
+                            const Color(0xFFFFD700).withValues(alpha: 0.3),
+                            const Color(0xFFFFD700),
+                            const Color(0xFFFFD700).withValues(alpha: 0.3),
+                          ]
+                        : [
+                            kPrimary.withValues(alpha: 0.2),
+                            kPrimary,
+                            kPrimary.withValues(alpha: 0.2),
+                          ],
+                  ),
+                ),
               ),
-            ),
+              SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    children: List.generate(tabs.length, (i) {
+                      final tab = tabs[i];
+                      return Expanded(
+                        child: _NavItem(
+                          icon: tab.$1,
+                          activeIcon: tab.$2,
+                          label: tab.$3,
+                          isActive: i == activeIndex,
+                          activeColor: activeColor,
+                          badge: i == 2 ? const _SubscriptionBadgeCount() : null,
+                          onTap: () => onSelect(i),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },
