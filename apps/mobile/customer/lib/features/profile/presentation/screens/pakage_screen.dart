@@ -10,6 +10,7 @@ import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:f2h_customer/features/profile/data/models/container_balance_model.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_screen.dart';
+import 'package:f2h_customer/core/widgets/cow_loading_widget.dart';
 
 class ContainerBalanceScreen extends StatefulWidget {
   const ContainerBalanceScreen({super.key});
@@ -125,9 +126,7 @@ class _ContainerBalanceScreenState extends State<ContainerBalanceScreen> {
         future: _dataFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: kPrimary),
-            );
+            return const CowLoadingWidget(size: 180);
           }
           if (snapshot.hasError) {
             return Center(

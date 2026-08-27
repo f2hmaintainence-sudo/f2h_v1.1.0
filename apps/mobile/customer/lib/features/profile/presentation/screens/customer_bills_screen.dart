@@ -5,6 +5,7 @@ import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/auth/token_storage.dart';
 import 'package:f2h_customer/features/wallet/presentation/screens/wallet_screen.dart';
+import 'package:f2h_customer/core/widgets/cow_loading_widget.dart';
 
 class CustomerBillsScreen extends StatefulWidget {
   const CustomerBillsScreen({super.key});
