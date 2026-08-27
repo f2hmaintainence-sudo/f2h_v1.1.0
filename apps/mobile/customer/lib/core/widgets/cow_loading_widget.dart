@@ -39,11 +39,11 @@ class CowLoadingWidget extends StatelessWidget {
       children: [
         SizedBox(
           width: size,
-          height: size,
+          height: size * 0.65,
           child: Lottie.asset(
             'assets/loading/cow_drink_milk.json',
             width: size,
-            height: size,
+            height: size * 0.65,
             fit: BoxFit.contain,
             errorBuilder: (context, error, stackTrace) {
               return Center(

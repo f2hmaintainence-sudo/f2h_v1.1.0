@@ -1166,9 +1166,9 @@ class InitialLoadingScreen extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Cow Drinking Milk Animation
-                  const CowLoadingWidget(size: 220),
+                  const CowLoadingWidget(size: 260),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 2),
 
                   // F2H Fresh Brand Title & Subtitle
                   const Text(

@@ -50,11 +50,12 @@ export class DashboardService {
             COUNT(*) FILTER (WHERE status = 'pending')::int            AS today_pending,
             COUNT(*) FILTER (WHERE status = 'placed')::int             AS today_placed,
             COUNT(*) FILTER (WHERE status = 'confirmed')::int          AS today_confirmed,
+            COUNT(*) FILTER (WHERE status = 'assigned')::int           AS today_assigned,
             COUNT(*) FILTER (WHERE status = 'packed')::int             AS today_packed,
             COUNT(*) FILTER (WHERE status = 'out_for_delivery')::int   AS today_out_for_delivery,
             COUNT(*) FILTER (WHERE status = 'delivered')::int          AS today_delivered,
-            COUNT(*) FILTER (WHERE status = 'cancelled')::int          AS today_cancelled,
-            COALESCE(SUM(total_amount) FILTER (WHERE status != 'cancelled'), 0)::numeric AS today_revenue,
+            COUNT(*) FILTER (WHERE status IN ('failed', 'cancelled'))::int AS today_cancelled,
+            COALESCE(SUM(total_amount) FILTER (WHERE status NOT IN ('cancelled', 'failed')), 0)::numeric AS today_revenue,
             COUNT(*) FILTER (WHERE order_source = 'subscription')::int AS today_subscription_orders,
             COUNT(*) FILTER (WHERE order_source = 'one-time')::int     AS today_onetime_orders
           FROM orders
@@ -185,10 +186,37 @@ export class DashboardService {
         WHERE run_date = $1 AND deleted_at IS NULL
       `;
 
-      const [rows, runsRows, runsSummaryRes] = await Promise.all([
+      const leaveRequestsSql = `
+        SELECT
+          dlr.id,
+          dlr.delivery_partner_id,
+          dlr.leave_date,
+          dlr.end_date,
+          dlr.leave_type,
+          dlr.half_day_shift,
+          dlr.reason,
+          dlr.status,
+          dlr.admin_remarks,
+          dlr.created_at,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Partner') AS partner_name,
+          COALESCE(u.phone, '') AS partner_phone,
+          COALESCE(b.branch_name, dp.branch_id, 'Main Branch') AS branch_name
+        FROM delivery_leave_requests dlr
+        LEFT JOIN delivery_partners dp ON dp.id = dlr.delivery_partner_id
+        LEFT JOIN users u ON u.user_id = dlr.delivery_partner_id
+        LEFT JOIN branches b ON b.branch_id = dp.branch_id
+        WHERE dlr.deleted_at IS NULL
+        ORDER BY 
+          CASE WHEN dlr.status = 'pending' THEN 1 ELSE 2 END ASC,
+          dlr.created_at DESC
+        LIMIT 6
+      `;
+
+      const [rows, runsRows, runsSummaryRes, leaveRows] = await Promise.all([
         this.db.query(sql, [today]),
         this.db.query(runsSql, [today]),
         this.db.query(runsSummarySql, [today]),
+        this.db.query(leaveRequestsSql),
       ]);
 
       const kpi = rows[0] ?? {};
@@ -241,6 +269,18 @@ export class DashboardService {
         });
       }
 
+      const pendingLeaves = kpi.pending_leave_requests_count ?? 0;
+      if (pendingLeaves > 0) {
+        insights.push({
+          id: 'leave_requests_pending',
+          type: 'warning',
+          title: `${pendingLeaves} Unreviewed Partner Leave Request${pendingLeaves > 1 ? 's' : ''}`,
+          description: `Delivery partners have submitted time-off requests. Review and approve to ensure smooth shift coverage.`,
+          actionText: 'Review Leaves',
+          actionHref: '/admin/delivery/leave-requests',
+        });
+      }
+
       const lowStock = kpi.low_stock_count ?? 0;
       const outOfStock = kpi.out_of_stock_count ?? 0;
       if (outOfStock > 0 || lowStock > 0) {
@@ -286,6 +326,7 @@ export class DashboardService {
           today_pending: kpi.today_pending ?? 0,
           today_placed: kpi.today_placed ?? 0,
           today_confirmed: kpi.today_confirmed ?? 0,
+          today_assigned: kpi.today_assigned ?? 0,
           today_packed: kpi.today_packed ?? 0,
           today_out_for_delivery: kpi.today_out_for_delivery ?? 0,
           today_delivered: kpi.today_delivered ?? 0,
@@ -318,6 +359,8 @@ export class DashboardService {
 
           // Leave & Operations
           pending_leave_requests_count: kpi.pending_leave_requests_count ?? 0,
+          unreviewed_leave_requests_count: kpi.pending_leave_requests_count ?? 0,
+          today_recent_leave_requests: leaveRows || [],
           total_outstandings_amount: Number(kpi.total_outstandings_amount ?? 0),
           pending_outstandings_count: kpi.pending_outstandings_count ?? 0,
 
