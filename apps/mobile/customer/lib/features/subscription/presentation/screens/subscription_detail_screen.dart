@@ -706,8 +706,8 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     double usedCredit = _detailInfo?.outstandingAmount ?? 0.0;
     if (usedCredit <= 0.0 && _bills.isNotEmpty) {
       usedCredit = _bills
-          .where((b) => b['status'] != 'paid' && b['status'] != 'cancelled')
-          .fold<double>(0.0, (sum, b) => sum + (double.tryParse(b['due_amount']?.toString() ?? '') ?? double.tryParse(b['total_amount']?.toString() ?? '') ?? 0.0));
+          .where((b) => b.status.toLowerCase() != 'paid' && b.status.toLowerCase() != 'cancelled')
+          .fold<double>(0.0, (sum, b) => sum + (b.dueAmount > 0 ? b.dueAmount : b.totalAmount));
     }
     final remainingLimit = (creditLimit - usedCredit).clamp(0.0, double.infinity);
     final usagePercent = creditLimit > 0 ? (usedCredit / creditLimit).clamp(0.0, 1.0) : 0.0;
