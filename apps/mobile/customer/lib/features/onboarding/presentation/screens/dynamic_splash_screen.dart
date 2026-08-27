@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:f2h_customer/core/widgets/scrolling_items_loader.dart';
+import 'package:f2h_customer/core/widgets/animations.dart';
 import 'package:f2h_customer/core/services/app_asset_service.dart';
 
 class DynamicSplashScreen extends StatefulWidget {
@@ -58,8 +58,8 @@ class _DynamicSplashScreenState extends State<DynamicSplashScreen>
       debugPrint('Error preparing splash image: $e');
     }
 
-    // Step 1: First show loading animation for 1.5 seconds on app launch
-    await Future.delayed(const Duration(milliseconds: 1500));
+    // Step 1: First show loading animation for 4 seconds on app launch
+    await Future.delayed(const Duration(seconds: 4));
     if (!mounted || !_showSplash) return;
 
     // Step 2: Then switch to showing the splash banner image
@@ -111,7 +111,7 @@ class _DynamicSplashScreenState extends State<DynamicSplashScreen>
                 firstChild: Container(
                   color: Colors.white,
                   child: const Center(
-                    child: ScrollingItemsLoader(),
+                    child: InitialLoadingScreen(),
                   ),
                 ),
                 secondChild: _splashImage != null
