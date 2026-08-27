@@ -1538,14 +1538,20 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
               children: [
                 const Text(
                   'Est. this month',
-                  style: TextStyle(fontSize: 10, color: kTextSub),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: kTextSub,
+                  ),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   '₹${total.toStringAsFixed(0)}',
                   style: const TextStyle(
-                    fontSize: 20,
+                    fontSize: 24,
                     fontWeight: FontWeight.w900,
                     color: kText,
+                    letterSpacing: -0.5,
                   ),
                 ),
               ],

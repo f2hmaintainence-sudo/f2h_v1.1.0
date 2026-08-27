@@ -727,7 +727,12 @@ export class CartService {
         c.branch_id,
         c.is_postpaid_enabled,
         c.postpaid_credit_limit,
-        c.full_name,
+        -- customers has no full_name column; the name lives on users. Same
+        -- derivation this file already uses for partner_name below.
+        COALESCE(
+          NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''),
+          u.user_name
+        ) AS full_name,
         u.first_name,
         u.last_name,
         u.user_name,
@@ -760,7 +765,8 @@ export class CartService {
       customer_id: customerId,
       branch_id: activeBranchRes?.data?.[0]?.branch_id || 'BRANCH_KUPPAM_01',
       wallet_balance: 0,
-      customer_status: 'active',
+      // customer_status was dropped from customers; is_blocked is the live flag
+      // and its default (unblocked) already means active.
       created_at: now,
       updated_at: now,
     });
