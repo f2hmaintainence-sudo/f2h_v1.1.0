@@ -199,9 +199,11 @@ class CheckoutStatusWidget extends StatelessWidget {
                     ),
                     elevation: 0,
                   ),
-                  child: const Text(
-                    'Done',
-                    style: TextStyle(
+                  child: Text(
+                    status == 'success'
+                        ? (isSubscription ? 'View Subscription' : 'View Order Details')
+                        : 'Done',
+                    style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
                       color: Colors.white,

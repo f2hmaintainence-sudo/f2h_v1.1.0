@@ -1,39 +1,75 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:f2h_customer/features/orders/data/models/order_model.dart';
+import 'package:f2h_customer/features/orders/domain/repositories/orders_repository.dart';
 import 'package:f2h_customer/features/orders/presentation/bloc/order_history_bloc.dart';
 import 'package:f2h_customer/features/orders/presentation/bloc/order_history_event.dart';
 import 'package:f2h_customer/features/orders/presentation/bloc/order_history_state.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_view_screen.dart';
 import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
-// import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_bloc.dart';
-// import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_event.dart';
-// import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_state.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
-  final Order order;
-  const OrderDetailsScreen({super.key, required this.order});
+  final Order? order;
+  final String? orderId;
+  const OrderDetailsScreen({super.key, this.order, this.orderId});
 
   @override
   State<OrderDetailsScreen> createState() => _OrderDetailsScreenState();
 }
 
 class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
-  late Order _currentOrder; // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
+  Order? _currentOrder;
+  bool _isLoading = false;
   int _selectedRating = 0;
   final TextEditingController _feedbackController = TextEditingController();
   bool _isSubmittingRating = false;
-  
+
+  String get _orderId => _currentOrder?.id ?? widget.order?.id ?? widget.orderId ?? '';
 
   @override
   void initState() {
     super.initState();
-    _currentOrder = widget.order; // [ADDED BY ANTIGRAVITY]
-    _selectedRating = widget.order.rating ?? 0;
-    _feedbackController.text = widget.order.ratingFeedback ?? '';
+    if (widget.order != null) {
+      _currentOrder = widget.order;
+      _selectedRating = widget.order!.rating ?? 0;
+      _feedbackController.text = widget.order!.ratingFeedback ?? '';
+    } else if (widget.orderId != null && widget.orderId!.isNotEmpty) {
+      _fetchOrderById(widget.orderId!);
+    }
+  }
+
+  Future<void> _fetchOrderById(String orderId) async {
+    setState(() => _isLoading = true);
+    try {
+      final repository = sl<OrdersRepository>();
+      final data = await repository.getOrdersAndSubscriptions();
+      final oneTime = (data['one_time_orders'] as List<dynamic>? ?? [])
+          .map((e) => Order.fromJson(e as Map<String, dynamic>))
+          .toList();
+      final subOrders = (data['subscription_orders'] as List<dynamic>? ?? [])
+          .map((e) => Order.fromJson(e as Map<String, dynamic>))
+          .toList();
+      final all = [...oneTime, ...subOrders];
+      final cleanId = orderId.replaceAll('#F2H-', '').trim();
+      final found = all.firstWhere(
+        (o) => o.id == cleanId || o.id.contains(cleanId) || cleanId.contains(o.id),
+        orElse: () => all.isNotEmpty ? all.first : throw Exception('Order not found'),
+      );
+      if (mounted) {
+        setState(() {
+          _currentOrder = found;
+          _selectedRating = found.rating ?? 0;
+          _feedbackController.text = found.ratingFeedback ?? '';
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -103,7 +139,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
     context.read<OrderHistoryBloc>().add(
       RateOrderRequested(
-        orderId: widget.order.id,
+        orderId: _orderId,
         rating: _selectedRating,
         feedback: _feedbackController.text.trim(),
       ),
@@ -130,7 +166,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             onPressed: () {
               Navigator.pop(ctx);
               context.read<OrderHistoryBloc>().add(
-                CancelOrderRequested(orderId: widget.order.id),
+                CancelOrderRequested(orderId: _orderId),
               );
             },
             child: const Text('Yes, Cancel', style: TextStyle(color: kRed, fontWeight: FontWeight.bold)),
@@ -142,6 +178,32 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: kBg,
+        body: Center(child: CircularProgressIndicator(color: kPrimary)),
+      );
+    }
+
+    if (_currentOrder == null) {
+      return Scaffold(
+        backgroundColor: kBg,
+        appBar: AppBar(
+          backgroundColor: kSurface,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: kText),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: const Text('Order Details', style: TextStyle(color: kText, fontWeight: FontWeight.w700)),
+        ),
+        body: const Center(child: Text('Order not found')),
+      );
+    }
+
+    final order = _currentOrder!;
+    final bool cancelPossible = _canCancelOrder(order);
+
     // Resolve user address
     final sessionState = context.read<CustomerSessionCubit>().state;
     final addresses = sessionState.addresses;
@@ -151,7 +213,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
     if (addresses.isNotEmpty) {
       final matchedAddress = addresses.firstWhere(
-        (a) => a.addressId?.toString() == _currentOrder.addressId, // [ADDED BY ANTIGRAVITY]
+        (a) => a.addressId?.toString() == order.addressId,
         orElse: () => addresses.firstWhere(
           (a) => a.isDefault,
           orElse: () => addresses.first,
@@ -161,9 +223,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       contactName = matchedAddress.name;
       contactMobile = matchedAddress.mobileNumber;
     }
-
-    final order = _currentOrder; // [ADDED BY ANTIGRAVITY]
-    final bool cancelPossible = _canCancelOrder(order);
 
     return BlocListener<OrderHistoryBloc, OrderHistoryState>(
       listener: (context, state) {
@@ -182,14 +241,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           });
           F2HToast.error(context, state.message);
         } else if (state is OrderHistoryLoaded) {
-          // [ADDED BY ANTIGRAVITY]
-          // Find the updated order in the loaded state and update our local state!
           try {
             final updatedOrder = state.oneTimeOrders.firstWhere(
-              (o) => o.id == widget.order.id,
+              (o) => o.id == _orderId,
               orElse: () => state.subscriptionOrders.firstWhere(
-                (o) => o.id == widget.order.id,
-                orElse: () => _currentOrder,
+                (o) => o.id == _orderId,
+                orElse: () => _currentOrder!,
               ),
             );
             setState(() {

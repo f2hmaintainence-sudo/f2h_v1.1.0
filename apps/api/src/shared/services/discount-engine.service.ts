@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../database/Database.service';
 import { generateId } from 'src/helpers/RandomHelper';
 
@@ -72,6 +72,8 @@ interface PromotionRow {
 
 @Injectable()
 export class DiscountEngineService {
+  private readonly logger = new Logger(DiscountEngineService.name);
+
   constructor(private readonly db: DatabaseService) {}
 
   // ── Full resolution for checkout / preview ────────────────────────────────
@@ -397,31 +399,41 @@ export class DiscountEngineService {
     // Insert promotion_redemptions
     for (const [promotionId, discountAmount] of promoMap.entries()) {
       const redemptionId = generateId('PRRD', 20);
-      await client.query(
-        `INSERT INTO promotion_redemptions
-           (redemption_id, promotion_id, customer_id, order_id, discount_amount, redeemed_at, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $6)
-         ON CONFLICT (promotion_id, customer_id, order_id) DO NOTHING`,
-        [redemptionId, promotionId, customerId, orderId, discountAmount, now],
-      );
+      try {
+        await client.query(
+          `INSERT INTO promotion_redemptions
+             (redemption_id, promotion_id, customer_id, order_id, discount_amount, redeemed_at, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $6)`,
+          [redemptionId, promotionId, customerId, orderId, discountAmount, now],
+        );
+      } catch (err) {
+        this.logger.warn(`promotion_redemptions insert ignored error: ${err}`);
+      }
     }
 
     // Insert coupon_redemption
     if (couponId && couponPromotionId && couponDiscountTotal > 0) {
       const redemptionId = generateId('CPRD', 20);
-      await client.query(
-        `INSERT INTO coupon_redemptions
-           (redemption_id, coupon_id, promotion_id, customer_id, order_id, discount_amount, redeemed_at, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
-         ON CONFLICT (coupon_id, customer_id, order_id) DO NOTHING`,
-        [redemptionId, couponId, couponPromotionId, customerId, orderId, couponDiscountTotal, now],
-      );
+      try {
+        await client.query(
+          `INSERT INTO coupon_redemptions
+             (redemption_id, coupon_id, promotion_id, customer_id, order_id, discount_amount, redeemed_at, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $7)`,
+          [redemptionId, couponId, couponPromotionId, customerId, orderId, couponDiscountTotal, now],
+        );
+      } catch (err) {
+        this.logger.warn(`coupon_redemptions insert ignored error: ${err}`);
+      }
 
       // Increment used_count on coupon atomically
-      await client.query(
-        `UPDATE coupons SET used_count = used_count + 1, updated_at = NOW() WHERE coupon_id = $1`,
-        [couponId],
-      );
+      try {
+        await client.query(
+          `UPDATE coupons SET used_count = used_count + 1, updated_at = NOW() WHERE coupon_id = $1`,
+          [couponId],
+        );
+      } catch (err) {
+        this.logger.warn(`coupon used_count increment ignored error: ${err}`);
+      }
     }
   }
 

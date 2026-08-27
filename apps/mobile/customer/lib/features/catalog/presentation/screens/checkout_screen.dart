@@ -34,6 +34,9 @@ import '../widgets/cart_widgets.dart';
 import '../../../wallet/presentation/widgets/topup_drawer.dart';
 // [ADDED BY ANTIGRAVITY FOR ONLINE PAYMENT]
 import '../../../../core/payments/payment_service.dart';
+import '../../../orders/presentation/screens/order_details_screen.dart';
+import '../../../orders/presentation/bloc/order_history_bloc.dart';
+import '../../../orders/presentation/bloc/order_history_event.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  CHECKOUT SCREEN WIDGET
@@ -511,7 +514,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
       return CheckoutStatusWidget(
         onDone: () {
-          if (mounted) Navigator.pop(context);
+          if (!mounted) return;
+          if (_placedStatus == 'success' &&
+              _placedOrderId != null &&
+              _placedOrderId!.isNotEmpty) {
+            final cleanId = _placedOrderId!.replaceAll('#F2H-', '').trim();
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => BlocProvider<OrderHistoryBloc>(
+                  create: (_) => sl<OrderHistoryBloc>()..add(LoadOrderHistory()),
+                  child: OrderDetailsScreen(orderId: cleanId),
+                ),
+              ),
+            );
+          } else {
+            Navigator.pop(context);
+          }
         },
         status: _placedStatus,
         deliveryAddress: addressText,
