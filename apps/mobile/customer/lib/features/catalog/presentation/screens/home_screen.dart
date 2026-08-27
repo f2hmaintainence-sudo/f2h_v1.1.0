@@ -34,6 +34,7 @@ import '../bloc/cart/cart_event.dart';
 import '../../../notifications/presentation/bloc/notifications_bloc.dart';
 import '../../../notifications/presentation/bloc/notifications_state.dart';
 import '../../../notifications/presentation/bloc/notifications_event.dart';
+import '../../../notifications/presentation/screens/notifications_screen.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
 import '../../../../core/widgets/popup_banner_widget.dart';
 
@@ -1972,11 +1973,11 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
             ),
           ),
 
-          // 4. Top Row (App Logo, Title, Branch Info) - fades out
+          // 4. Top Row (App Logo, Title, Branch Info, Notification Bell) - fades out
           Positioned(
             top: topPadding + 10,
-            left: 16,
-            right: 16,
+            left: 14,
+            right: 14,
             child: Opacity(
               opacity: (1.0 - shrinkFactor * 1.8).clamp(0.0, 1.0),
               child: Row(
@@ -1985,34 +1986,40 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
                     borderRadius: BorderRadius.circular(8),
                     child: Image.asset(
                       'assets/icon/app_icon.png',
-                      width: 32,
-                      height: 32,
+                      width: 28,
+                      height: 28,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
-                          width: 32,
-                          height: 32,
-                          color: const Color(0xFF16653A),
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF16653A),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                           child: const Icon(
                             Icons.eco_rounded,
                             color: Colors.white,
-                            size: 20,
+                            size: 18,
                           ),
                         );
                       },
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 6),
                   const Text(
                     'Farm to Home',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.w900,
                       color: Color(0xFF16653A),
+                      letterSpacing: -0.3,
                     ),
                   ),
                   const Spacer(),
                   branchWidget,
+                  const SizedBox(width: 6),
+                  _buildNotificationBell(context),
                 ],
               ),
             ),
@@ -2077,6 +2084,69 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildNotificationBell(BuildContext context) {
+    return BlocBuilder<NotificationsBloc, NotificationsState>(
+      builder: (context, state) {
+        bool hasUnread = false;
+        if (state is NotificationsLoaded) {
+          hasUnread = state.unreadCount > 0;
+        }
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const NotificationsScreen(),
+              ),
+            );
+          },
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFF16653A).withValues(alpha: 0.15),
+                width: 1.0,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                const Icon(
+                  Icons.notifications_none_rounded,
+                  color: Color(0xFF16653A),
+                  size: 20,
+                ),
+                if (hasUnread)
+                  Positioned(
+                    top: 7,
+                    right: 7,
+                    child: Container(
+                      width: 7.5,
+                      height: 7.5,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFEF4444),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

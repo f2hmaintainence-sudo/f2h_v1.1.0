@@ -1147,58 +1147,88 @@ export class AuthService {
     );
   }
 
+  /**
+   * Validates a refresh token for rotation.
+   *
+   * Revocation is fail-closed: an explicitly revoked session is always rejected.
+   * Everything else is fail-open. Requiring the Redis registry and a matching
+   * `device_sessions` row to be *present* turned every Redis eviction and every
+   * INSERT that `generateTokens` swallowed into a permanent 401 — the token could
+   * never be refreshed again, so an expired access token became a hard logout.
+   * Absence proves nothing here; only an explicit revocation does.
+   */
   async verifyAndValidateRefreshToken(token: string) {
+    let decoded: any;
     try {
-      const decoded = this.jwtService.verify(token);
-      const { jti, sub: user_id, email } = decoded;
-      const userPrefix = user_id
-        ? `f2h_user_jwt_${user_id}`
-        : `f2h_user_jwt_email_${email}`;
-
-      const user = user_id
-        ? await this.findUserById(user_id)
-        : (email ? await this.findUserByEmail(email) : null);
-      if (!user) {
-        throw new UnauthorizedException('User not found');
-      }
-
-      // Check if session is explicitly blacklisted in Redis
-      try {
-        const sessionData = await this.redisService.fetch(userPrefix);
-        if (sessionData) {
-          const parsed = typeof sessionData === 'string' ? JSON.parse(sessionData) : sessionData;
-          if (parsed.is_logged_out === true || (parsed.blacklistedJtis && parsed.blacklistedJtis.includes(jti))) {
-            throw new UnauthorizedException('Token has been revoked');
-          }
-        }
-      } catch (redisError) {
-        if (redisError instanceof UnauthorizedException) throw redisError;
-      }
-
-      // Check if session is explicitly marked revoked in device_sessions
-      if (jti) {
-        try {
-          const storedSessions = await this.DataBase.query(
-            `SELECT id, revoked_at FROM device_sessions
-             WHERE refresh_jti = $1
-             LIMIT 1`,
-            [jti],
-          );
-          if (storedSessions.length && storedSessions[0].revoked_at) {
-            throw new UnauthorizedException('Token has been revoked');
-          }
-        } catch (dbError) {
-          if (dbError instanceof UnauthorizedException) throw dbError;
-        }
-      }
-
-      return { email: user.email, user_id: user.user_id };
+      decoded = this.jwtService.verify(token);
     } catch (error) {
-      if (error instanceof UnauthorizedException) {
-        throw error;
-      }
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
+
+    const { jti, sub: user_id, email: claimedEmail } = decoded;
+    const userPrefix = user_id
+      ? `f2h_user_jwt_${user_id}`
+      : `f2h_user_jwt_email_${claimedEmail}`;
+
+    // The refresh token carries only { sub, jti, access_jti, device_id }: no email
+    // and no role. They are re-read here so the rotated access token keeps the
+    // user's real identity instead of being minted with `email: undefined` and a
+    // default role.
+    const user = user_id
+      ? await this.findUserById(user_id)
+      : (claimedEmail ? await this.findUserByEmail(claimedEmail) : null);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Redis session registry: an explicit logout or blacklisted jti is decisive.
+    // A missing key is not — it only means the registry expired or was evicted.
+    try {
+      const sessionData = await this.redisService.fetch(userPrefix);
+      if (sessionData) {
+        const parsed =
+          typeof sessionData === 'string' ? JSON.parse(sessionData) : sessionData;
+        if (
+          parsed.is_logged_out === true ||
+          (Array.isArray(parsed.blacklistedJtis) && parsed.blacklistedJtis.includes(jti))
+        ) {
+          throw new UnauthorizedException('Token has been revoked');
+        }
+      }
+    } catch (redisError) {
+      if (redisError instanceof UnauthorizedException) throw redisError;
+      // A Redis fault must not read as a revocation.
+      this.logger.warn(
+        `[verifyAndValidateRefreshToken] Redis check skipped for ${userPrefix}: ${
+          (redisError as Error)?.message || redisError
+        }`,
+      );
+    }
+
+    // device_sessions: reject only when the row exists and is explicitly revoked.
+    if (jti) {
+      try {
+        const storedSessions = await this.DataBase.query(
+          `SELECT id, revoked_at FROM device_sessions
+           WHERE refresh_jti = $1
+           LIMIT 1`,
+          [jti],
+        );
+        if (storedSessions.length && storedSessions[0].revoked_at) {
+          throw new UnauthorizedException('Token has been revoked');
+        }
+      } catch (dbError) {
+        if (dbError instanceof UnauthorizedException) throw dbError;
+        // Likewise: a database fault must not read as a revocation.
+        this.logger.warn(
+          `[verifyAndValidateRefreshToken] device_sessions check skipped for jti ${String(
+            jti,
+          ).substring(0, 8)}: ${(dbError as Error)?.message || dbError}`,
+        );
+      }
+    }
+
+    return { email: user.email, user_id: user.user_id, role_id: user.role_id };
   }
 
 
@@ -1315,10 +1345,13 @@ export class AuthService {
 
     await this.revokeStoredSession(oldRefreshJti);
 
+    // `decoded.role` is never set: the refresh token is signed without a role
+    // claim, so this silently minted every rotated token as CUSTOMER. The role
+    // re-read from the user record wins.
     const newTokens = await this.generateTokens({
       email: validated.email,
       user_id: validated.user_id,
-      role_id: decoded.role || 'CUSTOMER',
+      role_id: validated.role_id || decoded.role || 'CUSTOMER',
       device_id: decoded.device_id,
     });
 
