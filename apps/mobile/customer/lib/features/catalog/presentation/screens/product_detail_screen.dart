@@ -449,29 +449,36 @@ class _SidebarItem extends StatelessWidget {
                     shape: BoxShape.circle,
                     gradient: isAll
                         ? const LinearGradient(
-                            colors: [Color(0xFF10B981), Color(0xFF34D399)],
+                            colors: [Color(0xFF10B981), Color(0xFF059669)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           )
-                        : null,
-                    color: isAll
-                        ? null
-                        : (isSelected ? const Color(0xFFF0FDF4) : Colors.white),
+                        : (isSelected
+                            ? const LinearGradient(
+                                colors: [Color(0xFFF0FDF4), Color(0xFFDCFCE7)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )
+                            : const LinearGradient(
+                                colors: [Color(0xFFFFFFFF), Color(0xFFF1F5F9)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )),
                     border: Border.all(
                       color: isAll
                           ? Colors.white
                           : (isSelected
-                              ? const Color(0xFFA7F3D0)
+                              ? const Color(0xFF86EFAC)
                               : const Color(0xFFE2E8F0)),
-                      width: isSelected ? 1.4 : 1.2,
+                      width: isSelected ? 1.5 : 1.2,
                     ),
                     boxShadow: [
                       BoxShadow(
                         color: isAll
                             ? const Color(0xFF10B981).withValues(alpha: 0.25)
                             : (isSelected
-                                ? const Color(0xFF10B981).withValues(alpha: 0.12)
-                                : Colors.black.withValues(alpha: 0.03)),
+                                ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                                : Colors.black.withValues(alpha: 0.04)),
                         blurRadius: isSelected ? 6 : 3,
                         offset: const Offset(0, 2),
                       ),
