@@ -1332,86 +1332,94 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ],
             ),
-            // Top Left: Discount or Out of Stock Badge
-            if (p.isOutOfStock)
-              Positioned(
-                top: 6,
-                left: 6,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: const Color(0xFFEF4444), width: 0.9),
-                  ),
-                  child: const Text(
-                    'OUT OF STOCK',
-                    style: TextStyle(
-                      fontSize: 7.5,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFFEF4444),
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ),
-              )
-            else if (discountPercent > 0)
-              Positioned(
-                top: 6,
-                left: 6,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF047857),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    '$discountPercent% OFF',
-                    style: const TextStyle(
-                      fontSize: 8,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ),
-              ),
-            // Top Right: Rating Badge
+            // Top Overlay Badges (Discount + Rating) - Auto Responsive Scaling for All Mobile Sizes
             Positioned(
               top: 6,
+              left: 6,
               right: 6,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: const Color(0xFFE5E7EB), width: 0.8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.02),
-                      blurRadius: 2,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.star_rounded,
-                      size: 10,
-                      color: Color(0xFFF59E0B),
-                    ),
-                    const SizedBox(width: 2),
-                    Text(
-                      '${(p.rating > 0 ? p.rating : 5.0).toStringAsFixed(1)} (${p.reviews > 0 ? p.reviews : 1})',
-                      style: const TextStyle(
-                        fontSize: 8,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF374151),
+              child: SizedBox(
+                height: 20,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (p.isOutOfStock)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: const Color(0xFFEF4444), width: 0.9),
+                          ),
+                          child: const Text(
+                            'OUT OF STOCK',
+                            style: TextStyle(
+                              fontSize: 7.5,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFEF4444),
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        )
+                      else if (discountPercent > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF047857),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '$discountPercent% OFF',
+                            style: const TextStyle(
+                              fontSize: 8,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        )
+                      else
+                        const SizedBox.shrink(),
+                      const SizedBox(width: 4),
+                      // Top Right: Rating Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFFE5E7EB), width: 0.8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.02),
+                              blurRadius: 2,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.star_rounded,
+                              size: 10,
+                              color: Color(0xFFF59E0B),
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              '${(p.rating > 0 ? p.rating : 5.0).toStringAsFixed(1)} (${p.reviews > 0 ? p.reviews : 1})',
+                              style: const TextStyle(
+                                fontSize: 8,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF374151),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -2494,86 +2502,94 @@ Widget oneTimeProductCard(BuildContext context, Product p) {
               ),
             ],
           ),
-          // Top Left: Discount or Out of Stock Badge
-          if (p.isOutOfStock)
-            Positioned(
-              top: 6,
-              left: 6,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: const Color(0xFFEF4444), width: 0.9),
-                ),
-                child: const Text(
-                  'OUT OF STOCK',
-                  style: TextStyle(
-                    fontSize: 7.5,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFFEF4444),
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ),
-            )
-          else if (discountPercent > 0)
-            Positioned(
-              top: 6,
-              left: 6,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF047857),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  '$discountPercent% OFF',
-                  style: const TextStyle(
-                    fontSize: 8,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ),
-            ),
-          // Top Right: Rating Badge
+          // Top Overlay Badges (Discount + Rating) - Auto Responsive Scaling for All Mobile Sizes
           Positioned(
             top: 6,
+            left: 6,
             right: 6,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: const Color(0xFFE5E7EB), width: 0.8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.02),
-                    blurRadius: 2,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.star_rounded,
-                    size: 10,
-                    color: Color(0xFFF59E0B),
-                  ),
-                  const SizedBox(width: 2),
-                  Text(
-                    '${(p.rating > 0 ? p.rating : 5.0).toStringAsFixed(1)} (${p.reviews > 0 ? p.reviews : 1})',
-                    style: const TextStyle(
-                      fontSize: 8,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF374151),
+            child: SizedBox(
+              height: 20,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    if (p.isOutOfStock)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFFEF4444), width: 0.9),
+                        ),
+                        child: const Text(
+                          'OUT OF STOCK',
+                          style: TextStyle(
+                            fontSize: 7.5,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFEF4444),
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      )
+                    else if (discountPercent > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF047857),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '$discountPercent% OFF',
+                          style: const TextStyle(
+                            fontSize: 8,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      )
+                    else
+                      const SizedBox.shrink(),
+                    const SizedBox(width: 4),
+                    // Top Right: Rating Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFFE5E7EB), width: 0.8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.02),
+                            blurRadius: 2,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.star_rounded,
+                            size: 10,
+                            color: Color(0xFFF59E0B),
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${(p.rating > 0 ? p.rating : 5.0).toStringAsFixed(1)} (${p.reviews > 0 ? p.reviews : 1})',
+                            style: const TextStyle(
+                              fontSize: 8,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF374151),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

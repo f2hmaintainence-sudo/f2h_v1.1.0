@@ -194,79 +194,90 @@ class _TopStrip extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Flexible(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (isOutOfStock)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: const Color(0xFFEF4444), width: 0.9),
-                  ),
-                  child: const Text(
-                    'OUT OF STOCK',
-                    style: TextStyle(
-                      fontSize: 8,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFFEF4444),
-                      letterSpacing: 0.2,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isOutOfStock)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFFEF4444), width: 0.9),
+                    ),
+                    child: const Text(
+                      'OUT OF STOCK',
+                      style: TextStyle(
+                        fontSize: 8,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFEF4444),
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  )
+                else if (discountPercent > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF047857),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      '$discountPercent% OFF',
+                      style: const TextStyle(
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: 0.2,
+                      ),
                     ),
                   ),
-                )
-              else if (discountPercent > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF047857),
-                    borderRadius: BorderRadius.circular(4),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerRight,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: const Color(0xFFE5E7EB), width: 0.8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 2,
+                    offset: const Offset(0, 1),
                   ),
-                  child: Text(
-                    '$discountPercent% OFF',
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.star_rounded,
+                    size: 11,
+                    color: Color(0xFFF59E0B),
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    '${(rating > 0 ? rating : 5.0).toStringAsFixed(1)} (${reviews > 0 ? reviews : 1})',
                     style: const TextStyle(
                       fontSize: 8.5,
                       fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      letterSpacing: 0.2,
+                      color: Color(0xFF374151),
                     ),
                   ),
-                ),
-            ],
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 2),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: const Color(0xFFE5E7EB), width: 0.8),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02),
-                blurRadius: 2,
-                offset: const Offset(0, 1),
+                ],
               ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.star_rounded,
-                size: 11,
-                color: Color(0xFFF59E0B),
-              ),
-              const SizedBox(width: 2),
-              Text(
-                '${(rating > 0 ? rating : 5.0).toStringAsFixed(1)} (${reviews > 0 ? reviews : 1})',
-                style: const TextStyle(
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF374151),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ],
