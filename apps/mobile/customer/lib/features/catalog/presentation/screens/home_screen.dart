@@ -1918,72 +1918,27 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    final double minHeight = minExtent;
-    final double maxHeight = maxExtent;
-    final double delta = maxHeight - minHeight;
-    final double shrinkFactor = delta > 0
-        ? (shrinkOffset / delta).clamp(0.0, 1.0)
-        : 0.0;
-
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: shrinkFactor > 0.8
-            ? [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : [],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // 1. Farm Background Image (fades out as header collapses)
-          Opacity(
-            opacity: (1.0 - shrinkFactor).clamp(0.0, 1.0),
-            child: AppAssetImage(
-              assetKey: 'api/uploads/app_assets/bg/home_bg.jpg',
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(color: const Color(0xFFE8F5E9));
-              },
-            ),
-          ),
-
-          // 2. Solid color background overlay (smooth fade to solid color as collapses)
-          Positioned.fill(
-            child: Container(
-              color: Colors.white.withValues(alpha: shrinkFactor),
-            ),
-          ),
-
-          // 3. Darker bottom gradient for expanded state
-          Opacity(
-            opacity: (1.0 - shrinkFactor).clamp(0.0, 1.0),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  stops: const [0.0, 1.0],
-                  colors: [Colors.transparent, kBg.withValues(alpha: 0.85)],
-                ),
-              ),
-            ),
-          ),
-
-          // 4. Top Row (App Logo, Title, Branch Info, Notification Bell) - fades out
-          Positioned(
-            top: topPadding + 10,
-            left: 12,
-            right: 12,
-            child: Opacity(
-              opacity: (1.0 - shrinkFactor * 1.8).clamp(0.0, 1.0),
-              child: Row(
+      child: SafeArea(
+        bottom: false,
+        top: true,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 1. Top Row (App Logo, Title, Branch Info, Notification Bell)
+              Row(
                 children: [
                   Flexible(
                     flex: 5,
@@ -2047,67 +2002,60 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
                   _buildNotificationBell(context),
                 ],
               ),
-            ),
-          ),
 
-          // 5. Search Bar (slides up to stick at top)
-          Positioned(
-            left: 16,
-            right: 16,
-            top:
-                topPadding +
-                208 -
-                (shrinkFactor *
-                    200), // Interpolates from topPadding+208 to topPadding+8
-            child: GestureDetector(
-              onTap: onSearchTap,
-              child: Container(
-                height: 46,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: const Color(0xFF16653A).withValues(alpha: 0.12),
-                    width: 1.0,
+              const SizedBox(height: 10),
+
+              // 2. Search Bar
+              GestureDetector(
+                onTap: onSearchTap,
+                child: Container(
+                  height: 44,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: const Color(0xFF16653A).withValues(alpha: 0.12),
+                      width: 1.0,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF16653A).withValues(alpha: 0.03),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF16653A).withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.search_rounded,
-                      color: Color(0xFF16653A),
-                      size: 20,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        searchHint,
-                        style: const TextStyle(
-                          color: kTextSub,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.search_rounded,
+                        color: Color(0xFF16653A),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          searchHint,
+                          style: const TextStyle(
+                            color: kTextSub,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-                    ),
-                    const Icon(
-                      Icons.tune_rounded,
-                      color: Color(0xFF16653A),
-                      size: 20,
-                    ),
-                  ],
+                      const Icon(
+                        Icons.tune_rounded,
+                        color: Color(0xFF16653A),
+                        size: 20,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -2176,10 +2124,10 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
   }
 
   @override
-  double get maxExtent => 300;
+  double get maxExtent => topPadding + 115;
 
   @override
-  double get minExtent => topPadding + 62;
+  double get minExtent => topPadding + 115;
 
   @override
   bool shouldRebuild(covariant HomeHeaderDelegate oldDelegate) {
