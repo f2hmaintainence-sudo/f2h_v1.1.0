@@ -627,6 +627,9 @@ export class DeliveryOrderService {
       containerId: string;
       quantity: number;
       createdBy: string;
+      runId?: string;
+      partnerId?: string;
+      warehouseId?: string;
     },
   ): Promise<void> {
     if (params.quantity <= 0) return;
@@ -634,6 +637,19 @@ export class DeliveryOrderService {
     await this.applyBalanceDelta(executor, params.customerId, params.containerId, {
       issued: params.quantity,
     });
+
+    if (params.runId) {
+      await this.upsertContainerReconciliation(executor, {
+        runId: params.runId,
+        containerId: params.containerId,
+        returned: 0,
+        damaged: 0,
+        lost: 0,
+        remarks: 'Delivered returnable container on route',
+        submittedBy: params.partnerId || params.createdBy,
+        warehouseId: params.warehouseId,
+      });
+    }
   }
 
 
@@ -884,6 +900,7 @@ export class DeliveryOrderService {
 
         // Issue containers FIRST (so the balance exists before we try to collect empties)
         if (status === 'delivered') {
+          const runIdToUse = runIdentifier || runIds?.[0] || order.delivery_run_id;
           if (Array.isArray(body.container_deliveries) && body.container_deliveries.length > 0) {
             for (const item of body.container_deliveries) {
               const qty = Number(item.quantity ?? item.delivered ?? item.expected ?? 0);
@@ -894,6 +911,8 @@ export class DeliveryOrderService {
                   containerId: item.container_id || 'CONT-001',
                   quantity: qty,
                   createdBy: boy.full_name,
+                  runId: runIdToUse,
+                  partnerId: boy.user_id,
                 });
               }
             }
@@ -916,6 +935,8 @@ export class DeliveryOrderService {
                 containerId: item.container_id,
                 quantity: Number(item.quantity),
                 createdBy: boy.full_name,
+                runId: runIdToUse,
+                partnerId: boy.user_id,
               });
             }
           }
@@ -1261,6 +1282,7 @@ export class DeliveryOrderService {
 
     await this.db.transaction(async (client) => {
       // Issue containers FIRST so the balance exists before collection check
+      const runIdToUse = order.delivery_run_id;
       if (status === 'delivered') {
         if (Array.isArray(body.container_deliveries) && body.container_deliveries.length > 0) {
           for (const item of body.container_deliveries) {
@@ -1272,6 +1294,8 @@ export class DeliveryOrderService {
                 containerId: item.container_id || 'CONT-001',
                 quantity: qty,
                 createdBy: boy.full_name,
+                runId: runIdToUse,
+                partnerId: boy.user_id,
               });
             }
           }
@@ -1294,13 +1318,14 @@ export class DeliveryOrderService {
               containerId: item.container_id,
               quantity: Number(item.quantity),
               createdBy: boy.full_name,
+              runId: runIdToUse,
+              partnerId: boy.user_id,
             });
           }
         }
       }
 
       // Now collect returned containers (balance already updated above)
-      const runIdToUse = order.delivery_run_id;
       if (Array.isArray(body.container_returns) && body.container_returns.length > 0) {
         for (const cr of body.container_returns) {
           const ret = Number(cr.returned ?? 0);

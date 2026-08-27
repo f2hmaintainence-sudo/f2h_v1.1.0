@@ -707,6 +707,53 @@ export class BasketService {
     const basket = await this.getOrCreateActiveBasket(partnerId, runId);
     const activeRunId = runId || basket.delivery_run_id;
 
+    // Auto-discover returnable containers from orders in this run if not already present
+    if (activeRunId) {
+      try {
+        const runContainers = await this.db.query(
+          `SELECT DISTINCT pv.container_id, COALESCE(c.name, 'Glass Bottle') AS container_name
+           FROM orders o
+           JOIN order_items oi ON oi.order_id = o.order_id
+           JOIN product_variants pv ON pv.variant_id = oi.variant_id
+           LEFT JOIN products p ON p.product_id = pv.product_id
+           LEFT JOIN containers c ON (c.container_id = pv.container_id OR c.id::text = pv.container_id)
+           WHERE (o.delivery_run_id = $1 OR o.delivery_run_id IN (SELECT run_id FROM delivery_runs WHERE id::text = $1 OR run_id = $1))
+             AND (COALESCE(c.is_returnable, p.is_returnable, false) = true OR pv.container_id IS NOT NULL)`,
+          [activeRunId],
+        );
+
+        for (const rc of runContainers || []) {
+          const cid = rc.container_id || 'CONT-001';
+          const existing = await this.db.query(
+            `SELECT id FROM delivery_container_reconciliation
+             WHERE (run_id = $1 OR run_id IN (SELECT run_id FROM delivery_runs WHERE id::text = $1 OR run_id = $1))
+               AND container_id = $2 AND deleted_at IS NULL LIMIT 1`,
+            [activeRunId, cid],
+          );
+
+          if (!existing || existing.length === 0) {
+            await this.db.query(
+              `INSERT INTO delivery_container_reconciliation (
+                 warehouse_id, run_id, container_id,
+                 collected_quantity, submitted_quantity,
+                 damaged_quantity, lost_quantity, discrepancy_quantity,
+                 status, collection_notes, submitted_by,
+                 created_at, updated_at
+               ) VALUES (
+                 (SELECT COALESCE(warehouse_id, 'WH-MAIN') FROM delivery_runs WHERE id::text = $1 OR run_id = $1 LIMIT 1),
+                 $1, $2,
+                 0, 0,
+                 0, 0, 0,
+                 'pending', 'Auto-tracked container for delivery run', $3,
+                 NOW(), NOW()
+               )`,
+              [activeRunId, cid, partnerId],
+            );
+          }
+        }
+      } catch (_) {}
+    }
+
     // Summary metrics come straight from delivery_container_reconciliation.
     const summaryRows = await this.db.query(
       `SELECT

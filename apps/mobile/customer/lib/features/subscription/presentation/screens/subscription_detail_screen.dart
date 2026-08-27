@@ -706,13 +706,16 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
 
     final outstandingFromInfo = _detailInfo?.outstandingAmount ?? 0.0;
     final isPostpaidSub = widget.subscription.paymentType.toLowerCase() == 'postpaid';
+
     final thisSubCost = (widget.subscription.totalMonthlyCost > 0
         ? widget.subscription.totalMonthlyCost
-        : (widget.subscription.monthlyEstimate ?? 0.0));
+        : (widget.subscription.monthlyEstimate ?? (widget.subscription.pricePerDay * 30)));
 
-    final usedCredit = outstandingFromInfo > 0
-        ? outstandingFromInfo
-        : (isPostpaidSub ? thisSubCost : 0.0);
+    double usedCredit = outstandingFromInfo;
+
+    if (usedCredit <= 0 && isPostpaidSub) {
+      usedCredit = thisSubCost;
+    }
 
     final remainingLimit = (creditLimit - usedCredit).clamp(0.0, double.infinity);
     final usagePercent = creditLimit > 0 ? (usedCredit / creditLimit).clamp(0.0, 1.0) : 0.0;
@@ -1406,6 +1409,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
         ),
         body: BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
           builder: (context, sessionState) {
+            final profile = sessionState.profile;
             final list = sessionState.addresses;
             final defaultAddress = list.firstWhere(
               (a) => a.isDefault,
@@ -1735,8 +1739,8 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   _buildDeliveryAddressCard(defaultAddress, addressString),
                   const SizedBox(height: 12),
 
-                  // ── 4. Postpaid Summary Card (if Postpaid) ─────
-                  if (s.paymentType == 'postpaid')
+                  // ── 4. Postpaid Summary Card (if Postpaid or Postpaid Enabled) ─────
+                  if (s.paymentType.toLowerCase() == 'postpaid' || (profile != null && profile.isPostpaidEnabled && profile.postpaidCreditLimit > 0))
                     _buildPostpaidSummaryCard(sessionState),
 
                   // ── 5. Subscription Details (collapsible, includes Delivery Details) ──

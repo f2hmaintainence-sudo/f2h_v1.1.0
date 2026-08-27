@@ -1425,14 +1425,28 @@ export class SubscriptionsService {
       const outstandingRes = await this.db.query(
         `SELECT COUNT(*) as count, COALESCE(SUM(due_amount), 0) as total_due
          FROM customer_bills
-         WHERE reference_id = $1
-           AND status IN ('unpaid', 'draft')
+         WHERE (reference_id = $1 OR customer_id = $2)
+           AND status IN ('unpaid', 'draft', 'due', 'overdue', 'pending')
            AND due_amount > 0`,
-        [subscriptionId],
+        [subscriptionId, customerId],
       );
       const outstandingRow = Array.isArray(outstandingRes) ? outstandingRes[0] : {};
-      const outstandingBillCount = Number(outstandingRow?.count || 0);
-      const outstandingAmount = Number(outstandingRow?.total_due || 0);
+      let outstandingBillCount = Number(outstandingRow?.count || 0);
+      let outstandingAmount = Number(outstandingRow?.total_due || 0);
+
+      // If no unpaid bill generated yet and subscription is postpaid, compute committed monthly estimate
+      if (outstandingAmount === 0 && sub.payment_type === 'postpaid') {
+        const committedRes = await this.db.query(
+          `SELECT COALESCE(SUM(monthly_estimate::numeric), 0) AS total_committed
+           FROM subscriptions
+           WHERE customer_id = $1
+             AND payment_type = 'postpaid'
+             AND LOWER(status) IN ('active', 'paused')`,
+          [customerId],
+        );
+        const committedVal = Number(committedRes?.[0]?.total_committed || 0);
+        outstandingAmount = committedVal > 0 ? committedVal : Number(sub.monthly_estimate || 0);
+      }
 
       // 5. Alert flags
       const isAutoRenew = Boolean(sub.auto_renew === true || sub.auto_renew === 't' || sub.auto_renew === 'true');
