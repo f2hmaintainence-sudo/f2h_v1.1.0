@@ -1239,7 +1239,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                         value:
                                             '₹${payableNow.toStringAsFixed(0)}',
                                         isBold: true,
-                                        fontSize: 16,
+                                        fontSize: 20,
                                       ),
                                     ],
                                   ),
@@ -1272,6 +1272,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           child: SafeArea(
                             child: SlideToPayButton(
                               key: ValueKey(_dragKey),
+                              amount: payableNow,
                               disabled:
                                   _selectedPayment == 'wallet' &&
                                   payableNow > walletBalance,
@@ -1911,9 +1912,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 class SlideToPayButton extends StatefulWidget {
   final VoidCallback onSwipeCompleted;
   final bool disabled;
+  final double? amount;
   const SlideToPayButton({
     required this.onSwipeCompleted,
     this.disabled = false,
+    this.amount,
     super.key,
   });
 
@@ -1950,6 +1953,18 @@ class _SlideToPayButtonState extends State<SlideToPayButton> {
                 ),
               ),
             ),
+            if (widget.amount != null)
+              Positioned(
+                right: 20,
+                child: Text(
+                  '₹${widget.amount!.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: kTextSub,
+                  ),
+                ),
+              ),
             Positioned(
               left: 0,
               child: Container(
@@ -1982,22 +1997,34 @@ class _SlideToPayButtonState extends State<SlideToPayButton> {
           decoration: BoxDecoration(
             color: kPrimaryPl,
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: kPrimary.withOpacity(0.12)),
+            border: Border.all(color: kPrimary.withOpacity(0.15)),
           ),
           child: Stack(
             alignment: Alignment.centerLeft,
             children: [
               Center(
                 child: Text(
-                  _isFinished ? 'PLACING ORDER...' : 'SWIPE TO PAY ➔',
+                  _isFinished ? 'PLACING ORDER...' : 'SWIPE TO PAY',
                   style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: FontWeight.w800,
                     color: kPrimary,
                     letterSpacing: 0.8,
                   ),
                 ),
               ),
+              if (widget.amount != null && !_isFinished)
+                Positioned(
+                  right: 20,
+                  child: Text(
+                    '₹${widget.amount!.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: kPrimary,
+                    ),
+                  ),
+                ),
               Positioned(
                 left: _dragValue,
                 child: GestureDetector(
