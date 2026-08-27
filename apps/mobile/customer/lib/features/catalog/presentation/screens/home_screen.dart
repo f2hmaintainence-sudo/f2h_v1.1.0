@@ -798,12 +798,12 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.35),
+                  color: const Color(0xFF16A34A).withValues(alpha: 0.45),
                   width: 1.2,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF059669).withValues(alpha: 0.12),
+                    color: const Color(0xFF16A34A).withValues(alpha: 0.12),
                     blurRadius: 14,
                     offset: const Offset(0, 4),
                   ),
@@ -816,7 +816,7 @@ class _HomeScreenState extends State<HomeScreen>
                     height: 42,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [Color(0xFF059669), Color(0xFF10B981)],
+                        colors: [Color(0xFF15803D), Color(0xFF16A34A)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -824,7 +824,7 @@ class _HomeScreenState extends State<HomeScreen>
                       border: Border.all(color: Colors.white, width: 1.5),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF059669).withValues(alpha: 0.35),
+                          color: const Color(0xFF16A34A).withValues(alpha: 0.35),
                           blurRadius: 8,
                           offset: const Offset(0, 3),
                         ),
@@ -846,7 +846,7 @@ class _HomeScreenState extends State<HomeScreen>
                           style: TextStyle(
                             fontSize: 13.5,
                             fontWeight: FontWeight.w900,
-                            color: Color(0xFF064E3B),
+                            color: Color(0xFF14532D),
                             letterSpacing: -0.2,
                           ),
                         ),
@@ -855,8 +855,8 @@ class _HomeScreenState extends State<HomeScreen>
                           'Set your location for accurate stock & delivery times.',
                           style: TextStyle(
                             fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF047857),
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF16A34A),
                             height: 1.25,
                           ),
                         ),
@@ -892,14 +892,14 @@ class _HomeScreenState extends State<HomeScreen>
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF047857), Color(0xFF059669)],
+                          colors: [Color(0xFF15803D), Color(0xFF16A34A)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF059669).withValues(alpha: 0.35),
+                            color: const Color(0xFF16A34A).withValues(alpha: 0.35),
                             blurRadius: 6,
                             offset: const Offset(0, 2),
                           ),
