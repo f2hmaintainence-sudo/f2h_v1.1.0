@@ -2519,18 +2519,44 @@ class _CategoryProductGroupsState extends State<_CategoryProductGroups> {
       if (data is String) data = jsonDecode(data);
       if (data is Map && data['status'] == true && data['data'] is List) {
         for (final b in data['data'] as List) {
+          final bannerMap = Map<String, dynamic>.from(b as Map);
+          final isActive = b['isActive'] ?? b['is_active'] ?? true;
+          if (isActive == false) continue;
+
           final bannerType = (b['bannerType'] ?? b['banner_type'] ?? '').toString().toLowerCase();
-          if (bannerType.isNotEmpty && bannerType != 'category_slide') continue;
-          final actionType = (b['actionType'] ?? '').toString().toUpperCase();
-          final actionValue = b['actionValue']?.toString() ?? '';
-          if (actionType == 'CATEGORY' && actionValue.isNotEmpty) {
-            _categoryBanners[actionValue.toLowerCase()] =
-                Map<String, dynamic>.from(b as Map);
+          final actionType = (b['actionType'] ?? b['action_type'] ?? '').toString().toUpperCase();
+          final actionVal = (b['actionValue'] ?? b['action_value'] ?? '').toString();
+          final catId = (b['categoryId'] ?? b['category_id'] ?? '').toString();
+          final catName = (b['categoryName'] ?? b['category_name'] ?? '').toString();
+
+          final isCategoryBanner = bannerType == 'category_slide' ||
+              bannerType == 'category' ||
+              actionType == 'CATEGORY' ||
+              catId.isNotEmpty ||
+              catName.isNotEmpty;
+
+          if (isCategoryBanner) {
+            final keys = <String>{};
+            if (actionVal.isNotEmpty) {
+              keys.add(actionVal.toLowerCase());
+              keys.add(cleanCategoryName(actionVal).toLowerCase());
+            }
+            if (catId.isNotEmpty) {
+              keys.add(catId.toLowerCase());
+            }
+            if (catName.isNotEmpty) {
+              keys.add(catName.toLowerCase());
+              keys.add(cleanCategoryName(catName).toLowerCase());
+            }
+
+            for (final k in keys) {
+              _categoryBanners[k] = bannerMap;
+            }
           }
         }
       }
-    } catch (_) {
-      // Non-critical — fall through, groups render without banners
+    } catch (e) {
+      debugPrint('Error fetching category banners: $e');
     }
     if (mounted) setState(() => _bannersLoaded = true);
   }
@@ -2595,10 +2621,15 @@ class _CategoryProductGroupsState extends State<_CategoryProductGroups> {
             products: entry.value,
             banner: _bannersLoaded
                 ? (_categoryBanners[entry.key.toLowerCase()] ??
+                    _categoryBanners[cleanCategoryName(entry.key).toLowerCase()] ??
                     _categoryBanners.entries
-                        .where((e) => entry.key
-                            .toLowerCase()
-                            .contains(e.key.toLowerCase()))
+                        .where((e) =>
+                            entry.key
+                                .toLowerCase()
+                                .contains(e.key.toLowerCase()) ||
+                            e.key
+                                .toLowerCase()
+                                .contains(entry.key.toLowerCase()))
                         .map((e) => e.value)
                         .firstOrNull)
                 : null,
