@@ -492,7 +492,7 @@ class _HomeScreenState extends State<HomeScreen>
               curve: Curves.easeOutCubic,
               left: 0,
               right: 0,
-              bottom: widget.isNavVisible ? 74 : 16,
+              bottom: 12,
               child: const FloatingCartBar(),
             ),
           ],
