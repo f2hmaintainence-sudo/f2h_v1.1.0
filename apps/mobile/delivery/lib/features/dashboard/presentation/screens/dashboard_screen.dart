@@ -104,44 +104,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
-  void _showItemsToCollectDialog(BuildContext context) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
-        ),
-      ),
-    );
-
-    try {
-      final ordersRepo = sl<OrdersRepository>();
-      final response = await ordersRepo.getPickupItems();
-      if (!mounted) return;
-      Navigator.pop(context);
-      if (response.status) {
-        if (response.items.isEmpty) {
-          _showNoItemsAlert(context);
-          return;
-        }
-        final success = await Navigator.push<bool>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => PickupSelectionScreen(response: response),
-          ),
-        );
-        if (success == true && mounted) {
-          AppSnackBar.success(context, '✅ Pickup confirmed. Starting deliveries!');
-          setState(() => _selectedTab = 1);
-        }
-      } else {
-        AppSnackBar.error(context, response.message ?? 'Failed to fetch items to collect');
-      }
-    } catch (err) {
-      if (!mounted) return;
-      Navigator.pop(context);
-      AppSnackBar.error(context, 'Error fetching items: $err');
+  void _showItemsToCollectDialog(BuildContext context) {
+    final sessionState = context.read<DeliverySessionBloc>().state;
+    if (sessionState is DeliverySessionLoaded) {
+      DeliveryBasketModal.show(
+        context,
+        sessionState.orders,
+        groupedStops: sessionState.groupedStops,
+        currentRun: sessionState.currentRun,
+      );
+    } else {
+      DeliveryBasketModal.show(
+        context,
+        const [],
+        groupedStops: const [],
+      );
     }
   }
 

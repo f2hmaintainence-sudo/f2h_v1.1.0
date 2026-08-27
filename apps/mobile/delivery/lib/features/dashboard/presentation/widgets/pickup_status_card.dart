@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
-import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
-import 'package:f2h_delivery/features/orders/presentation/bloc/pickup_bloc.dart';
-import 'package:f2h_delivery/features/orders/presentation/screens/pickup_selection_screen.dart';
-import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
+import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
+import 'package:f2h_delivery/features/orders/presentation/widgets/delivery_basket_modal.dart';
 
 class PickupStatusCard extends StatelessWidget {
   final DeliveryRun? currentRun;
@@ -178,46 +176,22 @@ class PickupStatusCard extends StatelessWidget {
             ),
             child: ElevatedButton(
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => BlocProvider(
-                      create: (_) => sl<PickupBloc>()..add(LoadPickupItems()),
-                      child: BlocBuilder<PickupBloc, PickupState>(
-                        builder: (context, state) {
-                          if (state is PickupLoading) {
-                            return const Scaffold(
-                              backgroundColor: kBg,
-                              body: Center(
-                                child: CircularProgressIndicator(color: kPrimary),
-                              ),
-                            );
-                          } else if (state is PickupLoaded) {
-                            return PickupSelectionScreen(response: state.response);
-                          } else if (state is PickupError) {
-                            return Scaffold(
-                              backgroundColor: kBg,
-                              appBar: F2hAppBar(title: 'Error'),
-                              body: Center(child: Text(state.message)),
-                            );
-                          } else if (state is PickupNoRun) {
-                            return Scaffold(
-                              backgroundColor: kBg,
-                              appBar: AppBar(title: const Text('Information')),
-                              body: Center(child: Text(state.message)),
-                            );
-                          }
-                          return const Scaffold(
-                            backgroundColor: kBg,
-                            body: Center(
-                              child: CircularProgressIndicator(color: kPrimary),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                );
+                final sessionState = context.read<DeliverySessionBloc>().state;
+                if (sessionState is DeliverySessionLoaded) {
+                  DeliveryBasketModal.show(
+                    context,
+                    sessionState.orders,
+                    groupedStops: sessionState.groupedStops,
+                    currentRun: run,
+                  );
+                } else {
+                  DeliveryBasketModal.show(
+                    context,
+                    const [],
+                    groupedStops: const [],
+                    currentRun: run,
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF16A34A),
