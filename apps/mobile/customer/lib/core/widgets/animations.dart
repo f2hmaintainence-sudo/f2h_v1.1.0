@@ -1148,35 +1148,8 @@ class _MarqueeItemData {
   const _MarqueeItemData(this.label, this.icon, this.bg, this.iconColor);
 }
 
-class InitialLoadingScreen extends StatefulWidget {
+class InitialLoadingScreen extends StatelessWidget {
   const InitialLoadingScreen({super.key});
-
-  @override
-  State<InitialLoadingScreen> createState() => _InitialLoadingScreenState();
-}
-
-class _InitialLoadingScreenState extends State<InitialLoadingScreen> {
-  bool _showText = false;
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    // Start Cow animation immediately, then fade in F2H Fresh name after 800ms
-    _timer = Timer(const Duration(milliseconds: 800), () {
-      if (mounted) {
-        setState(() {
-          _showText = true;
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1191,40 +1164,30 @@ class _InitialLoadingScreenState extends State<InitialLoadingScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
-                children: [
+                children: const [
                   // Cow Drinking Milk Animation (starts immediately)
-                  const CowLoadingWidget(size: 260),
+                  CowLoadingWidget(size: 260),
 
-                  const SizedBox(height: 2),
+                  SizedBox(height: 4),
 
-                  // F2H Fresh Brand Title & Subtitle (fades in smoothly)
-                  AnimatedOpacity(
-                    opacity: _showText ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 900),
-                    curve: Curves.easeOut,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Text(
-                          'F2H Fresh',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                            color: kPrimary,
-                            letterSpacing: -0.4,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Fresh Daily Essentials',
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w600,
-                            color: kTextSub,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                      ],
+                  // F2H Fresh Brand Title & Subtitle
+                  Text(
+                    'F2H Fresh',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      color: kPrimary,
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Fresh Daily Essentials',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: kTextSub,
+                      letterSpacing: 0.8,
                     ),
                   ),
                 ],

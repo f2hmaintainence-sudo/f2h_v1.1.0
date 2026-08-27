@@ -45,6 +45,8 @@ class CowLoadingWidget extends StatelessWidget {
             width: size,
             height: size * 0.65,
             fit: BoxFit.contain,
+            repeat: true,
+            animate: true,
             errorBuilder: (context, error, stackTrace) {
               return Center(
                 child: SizedBox(
