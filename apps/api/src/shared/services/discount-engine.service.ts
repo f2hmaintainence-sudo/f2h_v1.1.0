@@ -149,14 +149,11 @@ export class DiscountEngineService {
         const rawCouponDiscountPerUnit = this.calcRawItemDiscount(couponPromo, result.unit_price);
 
         if (promoApplied && (!promoIsStackable || !couponIsStackable)) {
-          // Non-stackable: compare and pick the superior discount for this item (or prefer explicit coupon if equal)
-          if (rawCouponDiscountPerUnit >= result.discount_amount) {
-            result.promotion_id = null;
-            result.discount_amount = 0;
-            result.coupon_id = resolvedCouponId;
-            result.coupon_amount = rawCouponDiscountPerUnit;
-          }
-          // otherwise keep promotion discount and do not apply coupon to this item
+          // If customer explicitly applies a coupon, apply the coupon and clear the auto promotion
+          result.promotion_id = null;
+          result.discount_amount = 0;
+          result.coupon_id = resolvedCouponId;
+          result.coupon_amount = rawCouponDiscountPerUnit;
         } else {
           // Stackable: apply coupon on top of promo, ensuring unit price is not exceeded
           const maxRemaining = Math.max(0, result.unit_price - result.discount_amount);

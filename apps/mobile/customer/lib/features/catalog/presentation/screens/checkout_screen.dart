@@ -329,15 +329,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
   }
 
-  /// Automatically requests preview from server to calculate auto-applied promotions & coupon discounts.
+  /// Automatically requests preview from server to calculate applied coupon discounts.
   void _repriceCouponIfNeeded(
     List<CartItemEntity> checkoutItems,
     double subtotal,
     String userId,
   ) {
     if (_isCouponLoading || _isPreviewingDiscounts) return;
+    if (_appliedCouponCode == null || _appliedCouponCode!.isEmpty) {
+      if (_couponDiscount != 0 || _couponPreviewTotal != null) {
+        setState(() {
+          _couponDiscount = 0;
+          _couponPreviewTotal = null;
+        });
+      }
+      return;
+    }
     final itemKey = checkoutItems.map((e) => '${e.variantId}_${e.quantity}').join(',');
-    final key = '$userId-$subtotal-$itemKey-${_appliedCouponCode ?? "none"}';
+    final key = '$userId-$subtotal-$itemKey-$_appliedCouponCode';
     if (_lastPreviewKey == key) return;
 
     _lastPreviewKey = key;
@@ -359,22 +368,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         if (!mounted) return;
 
         final summary = preview['coupon_summary'];
-        double promoDiscount = 0;
         double couponDisc = 0;
         double? previewTotal;
 
         if (summary is Map) {
-          promoDiscount = _toDouble(summary['promotion_discount']);
           final summaryCoupon = _toDouble(summary['coupon_discount']);
-          if (_appliedCouponCode != null && _appliedCouponCode!.isNotEmpty) {
-            couponDisc = summaryCoupon > 0 ? summaryCoupon : _toDouble(preview['discount_amount']);
-          }
+          couponDisc = summaryCoupon > 0 ? summaryCoupon : _toDouble(summary['total_discount']);
         } else if (preview['discount_amount'] != null) {
-          if (_appliedCouponCode != null && _appliedCouponCode!.isNotEmpty) {
-            couponDisc = _toDouble(preview['discount_amount']);
-          } else {
-            promoDiscount = _toDouble(preview['discount_amount']);
-          }
+          couponDisc = _toDouble(preview['discount_amount']);
         }
 
         if (preview['total_amount'] != null) {
@@ -382,10 +383,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         }
 
         setState(() {
-          _autoPromotionDiscount = promoDiscount;
-          if (_appliedCouponCode != null && _appliedCouponCode!.isNotEmpty) {
-            _couponDiscount = couponDisc;
-          }
+          _couponDiscount = couponDisc;
           _couponPreviewTotal = previewTotal;
           _couponPricedForSubtotal = subtotal;
         });
@@ -407,12 +405,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return calculateOneTimeTotal(checkoutItems);
   }
 
-  /// Subtotal after auto-applied promotion and applied coupon. Prefers server total.
+  /// Subtotal after applied coupon. Prefers server total.
   double _payableFor(double subtotal) {
-    if (_couponPreviewTotal != null) return _couponPreviewTotal!;
-    final discount = _appliedCouponCode != null ? _couponDiscount : _autoPromotionDiscount;
-    final total = subtotal - discount;
-    return total < 0 ? 0 : total;
+    if (_appliedCouponCode != null && _appliedCouponCode!.isNotEmpty) {
+      if (_couponPreviewTotal != null) return _couponPreviewTotal!;
+      final total = subtotal - _couponDiscount;
+      return total < 0 ? 0 : total;
+    }
+    return subtotal;
   }
 
   // ===== Order Placement =====

@@ -402,85 +402,63 @@ class _FloatingCartBarState extends State<FloatingCartBar>
 
           SizedBox(width: isCompact ? 8 : 10),
 
-          // Fluid Cross-Fade between Expanded and Compact text formats
-          AnimatedCrossFade(
-            duration: _resizeDuration,
-            firstCurve: Curves.easeOutCubic,
-            secondCurve: Curves.easeOutCubic,
-            sizeCurve: Curves.fastOutSlowIn,
-            crossFadeState: isCompact
-                ? CrossFadeState.showSecond
-                : CrossFadeState.showFirst,
-            firstChild: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'View cart',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    height: 1.1,
-                  ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  '$totalCount ${totalCount == 1 ? 'item' : 'items'}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white.withValues(alpha: 0.85),
-                    height: 1.1,
-                  ),
-                ),
-              ],
-            ),
-            secondChild: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'View cart • $totalCount',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    height: 1.1,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(
-                  Icons.chevron_right_rounded,
+          // One layout in both states — only the metrics change. Cross-fading
+          // between two different arrangements (two-line label vs a one-line
+          // "View cart • N", circled chevron vs an inline one) made the bar
+          // look like it was rebuilding itself mid-scroll instead of simply
+          // shrinking.
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedDefaultTextStyle(
+                duration: _resizeDuration,
+                curve: _resizeCurve,
+                style: TextStyle(
+                  fontSize: isCompact ? 12 : 14,
+                  fontWeight: FontWeight.w900,
                   color: Colors.white,
-                  size: 16,
+                  height: 1.1,
                 ),
-              ],
-            ),
+                child: const Text('View cart'),
+              ),
+              const SizedBox(height: 1),
+              AnimatedDefaultTextStyle(
+                duration: _resizeDuration,
+                curve: _resizeCurve,
+                style: TextStyle(
+                  fontSize: isCompact ? 10 : 11,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withValues(alpha: 0.85),
+                  height: 1.1,
+                ),
+                child: Text(
+                  '$totalCount ${totalCount == 1 ? 'item' : 'items'}',
+                ),
+              ),
+            ],
           ),
 
-          // Smoothly animate the right chevron circle
-          AnimatedSize(
-            duration: _resizeDuration,
-            curve: _resizeCurve,
-            child: isCompact
-                ? const SizedBox.shrink()
-                : Padding(
-                    padding: const EdgeInsets.only(left: 12),
-                    child: Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.22),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.chevron_right_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                  ),
+          // The chevron keeps its circle in both states and only scales, so
+          // the pill reads as one control throughout the scroll.
+          Padding(
+            padding: EdgeInsets.only(left: isCompact ? 8 : 12),
+            child: AnimatedContainer(
+              duration: _resizeDuration,
+              curve: _resizeCurve,
+              width: isCompact ? 22 : 28,
+              height: isCompact ? 22 : 28,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.22),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.white,
+                size: isCompact ? 16 : 20,
+              ),
+            ),
           ),
         ],
       ),
