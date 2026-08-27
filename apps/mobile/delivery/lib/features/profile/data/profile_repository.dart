@@ -18,8 +18,8 @@ class ProfileRepository {
     return remoteDataSource.updatePersonalInfo(data);
   }
 
-  Future<String> uploadProfilePhoto(File file) async {
-    return remoteDataSource.uploadProfilePhoto(file);
+  Future<String> uploadProfilePhoto(dynamic fileOrBytes, {String? filename}) async {
+    return remoteDataSource.uploadProfilePhoto(fileOrBytes, filename: filename);
   }
 
   Future<List<DocumentModel>> fetchDocuments() async {

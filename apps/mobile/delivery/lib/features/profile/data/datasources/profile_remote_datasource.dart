@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:f2h_delivery/core/api/dio_client.dart';
 import 'package:f2h_delivery/core/api/api_endpoints.dart';
@@ -11,7 +12,7 @@ import 'package:f2h_delivery/core/api/api_error.dart';
 abstract class ProfileRemoteDataSource {
   Future<ProfileModel> fetchPersonalInfo();
   Future<void> updatePersonalInfo(Map<String, dynamic> data);
-  Future<String> uploadProfilePhoto(File file);
+  Future<String> uploadProfilePhoto(dynamic fileOrBytes, {String? filename});
 
   Future<List<DocumentModel>> fetchDocuments();
   Future<void> addDocument(
@@ -98,13 +99,30 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
   }
 
   @override
-  Future<String> uploadProfilePhoto(File file) async {
+  Future<String> uploadProfilePhoto(dynamic fileOrBytes, {String? filename}) async {
     try {
+      MultipartFile multipartFile;
+      if (fileOrBytes is Uint8List) {
+        multipartFile = MultipartFile.fromBytes(
+          fileOrBytes,
+          filename: filename ?? 'profile_${DateTime.now().millisecondsSinceEpoch}.png',
+        );
+      } else if (fileOrBytes is File) {
+        multipartFile = await MultipartFile.fromFile(
+          fileOrBytes.path,
+          filename: filename ?? fileOrBytes.path.split('/').last,
+        );
+      } else if (fileOrBytes is List<int>) {
+        multipartFile = MultipartFile.fromBytes(
+          fileOrBytes,
+          filename: filename ?? 'profile_${DateTime.now().millisecondsSinceEpoch}.png',
+        );
+      } else {
+        throw Exception('Invalid file data provided');
+      }
+
       final formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(
-          file.path,
-          filename: file.path.split('/').last,
-        ),
+        'file': multipartFile,
       });
       final response = await dioClient.dio.post(
         ApiEndpoints.profilePhoto,

@@ -12,8 +12,9 @@ class UpdatePersonalInfoEvent extends ProfileEvent {
 }
 
 class UploadProfilePhotoEvent extends ProfileEvent {
-  final File file;
-  UploadProfilePhotoEvent(this.file);
+  final dynamic file;
+  final String? filename;
+  UploadProfilePhotoEvent(this.file, {this.filename});
 }
 
 class FetchDocumentsEvent extends ProfileEvent {}

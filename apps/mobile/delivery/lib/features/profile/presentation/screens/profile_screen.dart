@@ -56,22 +56,23 @@ class ProfileScreen extends StatelessWidget {
   Future<void> _processPhotoPick(BuildContext context, ImageSource source) async {
     try {
       final picker = ImagePicker();
-      final pickedFile = await picker.pickImage(source: source, imageQuality: 70);
+      final pickedFile = await picker.pickImage(source: source, imageQuality: 85);
       if (pickedFile != null) {
-        final file = File(pickedFile.path);
+        final bytes = await pickedFile.readAsBytes();
         if (context.mounted) {
-          final croppedFile = await Navigator.push<File?>(
+          final croppedResult = await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => CropPhotoScreen(
-                imageFile: file,
+                imageBytes: bytes,
+                imageName: pickedFile.name,
                 title: 'Crop Profile Photo',
                 message: 'Are you sure you want to update your profile photo to this cropped image?',
               ),
             ),
           );
-          if (croppedFile != null && context.mounted) {
-            context.read<ProfileBloc>().add(UploadProfilePhotoEvent(croppedFile));
+          if (croppedResult != null && context.mounted) {
+            context.read<ProfileBloc>().add(UploadProfilePhotoEvent(croppedResult, filename: pickedFile.name));
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Uploading profile photo...'),

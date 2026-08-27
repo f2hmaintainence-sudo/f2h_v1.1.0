@@ -1,18 +1,24 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
 
 class CropPhotoScreen extends StatefulWidget {
-  final File imageFile;
+  final File? imageFile;
+  final Uint8List? imageBytes;
+  final String? imageName;
   final String title;
   final String message;
 
   const CropPhotoScreen({
     super.key,
-    required this.imageFile,
+    this.imageFile,
+    this.imageBytes,
+    this.imageName,
     this.title = 'Crop Photo',
     this.message = 'Are you sure you want to update your profile photo to this cropped image?',
   });
@@ -80,12 +86,9 @@ class _CropPhotoScreenState extends State<CropPhotoScreen> {
       if (byteData == null) throw Exception("Failed to serialize cropped image");
 
       final bytes = byteData.buffer.asUint8List();
-      final tempDir = Directory.systemTemp;
-      final croppedFile = File('${tempDir.path}/profile_crop_${DateTime.now().millisecondsSinceEpoch}.png');
-      await croppedFile.writeAsBytes(bytes);
 
       if (mounted) {
-        Navigator.pop(context, croppedFile);
+        Navigator.pop(context, bytes);
       }
     } catch (e) {
       if (mounted) {
@@ -186,10 +189,17 @@ class _CropPhotoScreenState extends State<CropPhotoScreen> {
                             boundaryMargin: const EdgeInsets.all(140),
                             minScale: 0.1,
                             maxScale: 4.0,
-                            child: Image.file(
-                              widget.imageFile,
-                              fit: BoxFit.contain,
-                            ),
+                            child: widget.imageBytes != null
+                                ? Image.memory(
+                                    widget.imageBytes!,
+                                    fit: BoxFit.contain,
+                                  )
+                                : (widget.imageFile != null
+                                    ? Image.file(
+                                        widget.imageFile!,
+                                        fit: BoxFit.contain,
+                                      )
+                                    : const SizedBox.shrink()),
                           ),
                         ),
                       ),

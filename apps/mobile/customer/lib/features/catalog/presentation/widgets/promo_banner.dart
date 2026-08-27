@@ -63,7 +63,12 @@ class _PromoBannerState extends State<PromoBanner> {
           data['data'] is List &&
           (data['data'] as List).isNotEmpty) {
         final list = (data['data'] as List)
-            .where((b) => b['isActive'] == true)
+            .where((b) {
+              final isActive = b['isActive'] ?? b['is_active'] ?? true;
+              if (isActive == false) return false;
+              final bType = (b['bannerType'] ?? b['banner_type'] ?? '').toString().toLowerCase();
+              return bType == 'home_carousel' || bType == 'offer_banner' || bType.isEmpty;
+            })
             .map((b) => Map<String, dynamic>.from(b as Map))
             .toList();
         if (mounted && list.isNotEmpty) {
@@ -226,7 +231,7 @@ class _PromoBannerState extends State<PromoBanner> {
           itemCount: 100000,
           itemBuilder: (context, index) {
             final banner = _banners[index % _banners.length];
-            final rawUrl = banner['imageUrl']?.toString() ?? '';
+            final rawUrl = (banner['imageUrl'] ?? banner['image_url'] ?? banner['imagePath'] ?? banner['image_path'])?.toString() ?? '';
             final imageUrl = _formatImageUrl(rawUrl);
 
             return Padding(

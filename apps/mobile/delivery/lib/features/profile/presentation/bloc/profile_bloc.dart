@@ -148,7 +148,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       if (currentState is ProfileLoaded) {
         emit(ProfileLoading());
         try {
-          final photoUrl = await repository.uploadProfilePhoto(event.file);
+          final photoUrl = await repository.uploadProfilePhoto(event.file, filename: event.filename);
           final updatedProfile = currentState.profile.copyWith(profilePhotoUrl: photoUrl);
           emit(currentState.copyWith(
             profile: updatedProfile,

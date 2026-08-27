@@ -337,12 +337,12 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
 
                   // 5. Image Banner (Below Subscription Products)
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: ImageBanner(),
-                    ),
-                  ),
+                  // const SliverToBoxAdapter(
+                  //   child: Padding(
+                  //     padding: EdgeInsets.only(top: 8),
+                  //     child: ImageBanner(),
+                  //   ),
+                  // ),
 
                   const SliverToBoxAdapter(child: HomeCouponBanner()),
 
@@ -2593,10 +2593,10 @@ class _CategoryProductGroupsState extends State<_CategoryProductGroups> {
     return 'https://f2hfresh.com$clean';
   }
 
-  /// Group in-stock, non-subscribable, rated products by category.
+  /// Group in-stock products by category.
   Map<String, List<Product>> _groupByCategory() {
     final eligible = widget.allProducts
-        .where((p) => !p.isSubscribable && !p.isOutOfStock)
+        .where((p) => !p.isOutOfStock)
         .toList()
       ..sort((a, b) => b.rating.compareTo(a.rating));
 
@@ -2605,10 +2605,10 @@ class _CategoryProductGroupsState extends State<_CategoryProductGroups> {
       final cat = p.category.isNotEmpty ? p.category : 'Other';
       groups.putIfAbsent(cat, () => []).add(p);
     }
-    // Keep groups with at least 2 products; sort groups by name
+    // Keep groups with products; sort groups by name
     final filtered = Map.fromEntries(
       groups.entries
-          .where((e) => e.value.length >= 2)
+          .where((e) => e.value.isNotEmpty)
           .toList()
         ..sort((a, b) => a.key.compareTo(b.key)),
     );
