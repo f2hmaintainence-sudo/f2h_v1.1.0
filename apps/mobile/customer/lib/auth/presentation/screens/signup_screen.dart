@@ -29,12 +29,9 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
-  final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController =
-      TextEditingController();
   final TextEditingController _referralCodeController = TextEditingController();
 
   bool _agreeToTerms = false;
@@ -50,27 +47,29 @@ class _SignupScreenState extends State<SignupScreen> {
   void initState() {
     super.initState();
     _referralCodeController.addListener(_onReferralChanged);
-    _passwordController.addListener(_onPasswordChanged);
-    _confirmPasswordController.addListener(_onPasswordChanged);
   }
 
   @override
   void dispose() {
     _referralDebounce?.cancel();
     _referralCodeController.removeListener(_onReferralChanged);
-    _passwordController.removeListener(_onPasswordChanged);
-    _confirmPasswordController.removeListener(_onPasswordChanged);
-    _usernameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _confirmPasswordController.dispose();
     _referralCodeController.dispose();
     super.dispose();
   }
 
-  void _onPasswordChanged() {
-    if (mounted) setState(() {});
+  String _getNameFromEmail(String email) {
+    if (!email.contains('@')) return 'Customer';
+    final raw = email.split('@').first.trim();
+    if (raw.isEmpty) return 'Customer';
+    final formatted = raw.replaceAll(RegExp(r'[._-]+'), ' ').trim();
+    if (formatted.isEmpty) return 'Customer';
+    return formatted.split(' ').map((w) {
+      if (w.isEmpty) return '';
+      return w[0].toUpperCase() + (w.length > 1 ? w.substring(1) : '');
+    }).join(' ');
   }
 
   void _onReferralChanged() {
@@ -126,18 +125,12 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Future<void> _onSignupPressed() async {
-    final userName = _usernameController.text.trim();
     final phone = _phoneController.text.trim();
     final email = _emailController.text.trim().toLowerCase();
     final password = _passwordController.text;
-    final confirmPassword = _confirmPasswordController.text;
 
-    if (userName.isEmpty ||
-        phone.isEmpty ||
-        email.isEmpty ||
-        password.isEmpty ||
-        confirmPassword.isEmpty) {
-      _toast('Please fill all fields');
+    if (phone.isEmpty || email.isEmpty || password.isEmpty) {
+      _toast('Please fill all required fields');
       return;
     }
 
@@ -151,8 +144,8 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
-    if (password != confirmPassword) {
-      _toast('Passwords do not match');
+    if (password.length < 4) {
+      _toast('Password must be at least 4 characters');
       return;
     }
 
@@ -166,6 +159,8 @@ class _SignupScreenState extends State<SignupScreen> {
       _toast('Please agree to the Terms & Conditions and Privacy Policy');
       return;
     }
+
+    final userName = _getNameFromEmail(email);
 
     FocusScope.of(context).unfocus();
     setState(() => _isSendingOtp = true);
@@ -197,13 +192,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final passText = _passwordController.text;
-    final confirmText = _confirmPasswordController.text;
-    final hasConfirmText = confirmText.isNotEmpty;
-    final isPassMatching = hasConfirmText
-        ? (passText.isNotEmpty && passText == confirmText)
-        : null;
-
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is Authenticated) {
@@ -232,13 +220,6 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
             children: [
               AuthField(
-                controller: _usernameController,
-                hint: 'Full Name',
-                icon: Icons.person_outline_rounded,
-                keyboardType: TextInputType.name,
-              ),
-              const SizedBox(height: 14),
-              AuthField(
                 controller: _phoneController,
                 hint: '10-digit Mobile Number',
                 icon: Icons.phone_outlined,
@@ -260,20 +241,6 @@ class _SignupScreenState extends State<SignupScreen> {
                 icon: Icons.lock_outline_rounded,
                 isPassword: true,
               ),
-              const SizedBox(height: 14),
-              AuthField(
-                controller: _confirmPasswordController,
-                hint: 'Confirm Password',
-                icon: Icons.lock_outline_rounded,
-                isPassword: true,
-              ),
-              if (hasConfirmText && isPassMatching != null)
-                _FieldHint(
-                  message: isPassMatching
-                      ? 'Passwords match'
-                      : 'Passwords do not match',
-                  isPositive: isPassMatching,
-                ),
               const SizedBox(height: 14),
               AuthField(
                 controller: _referralCodeController,

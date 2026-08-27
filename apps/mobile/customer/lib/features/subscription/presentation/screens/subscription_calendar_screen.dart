@@ -4,6 +4,7 @@ import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/features/subscription/domain/repositories/subscription_repository.dart';
 import 'package:f2h_customer/features/subscription/data/models/subscription_model.dart';
 import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
+import 'package:f2h_customer/core/widgets/cow_loading_widget.dart';
 
 class SubscriptionCalendarScreen extends StatefulWidget {
   final Subscription subscription;
@@ -394,7 +395,7 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
       ),
       body: SafeArea(
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(kPrimary)))
+            ? const CowLoadingWidget(size: 180)
             : Column(
                 children: [
                   // 1. Product info header

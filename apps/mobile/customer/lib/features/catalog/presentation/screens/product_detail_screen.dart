@@ -13,6 +13,7 @@ import '../bloc/catalog_event.dart';
 import '../bloc/catalog_state.dart';
 import '../widgets/product_grid_card.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
+import '../../../../core/widgets/cow_loading_widget.dart';
 
 // ══════════════════════════════════════════════════════════
 //  SHOP SCREEN — category rail + 2-column product grid
@@ -318,7 +319,7 @@ class _BrowseState extends State<BrowseScreen> {
         ),
       ),
       child: isLoadingState
-          ? const Center(child: CircularProgressIndicator(color: kPrimary))
+          ? const CowLoadingWidget(size: 100)
           : ListView.builder(
               padding: const EdgeInsets.only(top: 8, bottom: _kBottomInset),
               itemCount: categories.length,
