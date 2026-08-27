@@ -602,10 +602,10 @@ class _HomeScreenState extends State<HomeScreen>
                   child: Text(
                     'SELECT DELIVERY ADDRESS',
                     style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
                       color: kTextSub,
-                      letterSpacing: 0.5,
+                      letterSpacing: 0.3,
                     ),
                   ),
                 ),
@@ -649,7 +649,7 @@ class _HomeScreenState extends State<HomeScreen>
                                         label,
                                         style: TextStyle(
                                           fontSize: 13,
-                                          fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+                                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                                           color: isSelected ? const Color(0xFF16653A) : kText,
                                         ),
                                         maxLines: 1,
@@ -667,7 +667,7 @@ class _HomeScreenState extends State<HomeScreen>
                                         typeBadge,
                                         style: const TextStyle(
                                           fontSize: 8,
-                                          fontWeight: FontWeight.w800,
+                                          fontWeight: FontWeight.w600,
                                           color: kPrimary,
                                         ),
                                       ),
@@ -677,7 +677,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 const SizedBox(height: 2),
                                 Text(
                                   subLabel,
-                                  style: const TextStyle(fontSize: 10, color: kTextSub),
+                                  style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w400, color: kTextSub),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -701,7 +701,7 @@ class _HomeScreenState extends State<HomeScreen>
                       'Manage / Add New Address',
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w600,
                         color: kPrimary,
                       ),
                     ),

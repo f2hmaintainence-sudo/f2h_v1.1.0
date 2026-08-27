@@ -149,8 +149,8 @@ export class DiscountEngineService {
         const rawCouponDiscountPerUnit = this.calcRawItemDiscount(couponPromo, result.unit_price);
 
         if (promoApplied && (!promoIsStackable || !couponIsStackable)) {
-          // Non-stackable: compare and pick the superior discount for this item
-          if (rawCouponDiscountPerUnit > result.discount_amount) {
+          // Non-stackable: compare and pick the superior discount for this item (or prefer explicit coupon if equal)
+          if (rawCouponDiscountPerUnit >= result.discount_amount) {
             result.promotion_id = null;
             result.discount_amount = 0;
             result.coupon_id = resolvedCouponId;

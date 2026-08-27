@@ -498,29 +498,38 @@ class _NavItem extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AnimatedScale(
-            scale: isActive ? 1.15 : 1.0,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOutBack,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: isActive ? activeColor : Colors.transparent,
-                shape: BoxShape.circle,
-              ),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Icon(
-                    isActive ? activeIcon : icon,
-                    color: isActive ? Colors.white : kTextSub,
-                    size: 20,
+          SizedBox(
+            width: 36,
+            height: 36,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                AnimatedScale(
+                  scale: isActive ? 1.10 : 1.0,
+                  duration: const Duration(milliseconds: 150),
+                  curve: Curves.easeOutCubic,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isActive ? activeColor : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isActive ? activeIcon : icon,
+                      color: isActive ? Colors.white : kTextSub,
+                      size: 20,
+                    ),
                   ),
-                  if (badge != null)
-                    Positioned(top: -7, right: -9, child: badge!),
-                ],
-              ),
+                ),
+                if (badge != null)
+                  Positioned(
+                    top: -4,
+                    right: -5,
+                    child: badge!,
+                  ),
+              ],
             ),
           ),
           const SizedBox(height: 3),
