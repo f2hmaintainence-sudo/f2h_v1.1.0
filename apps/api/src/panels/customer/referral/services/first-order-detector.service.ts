@@ -45,13 +45,8 @@ export class FirstOrderDetectorService {
       // Past delivered order exists - update flag and return false
       await this.dataService.update(
         'customers',
-        { first_order_completed: true, referral_status: 'active', referral_code: customerId, updated_at: new Date() },
+        { first_order_completed: true, referral_status: 'active', updated_at: new Date() },
         [{ column: 'customer_id', operator: '=', value: customerId }],
-      );
-      await this.dataService.update(
-        'users',
-        { first_order_completed: true, referral_status: 'active', referral_code: customerId, updated_at: new Date() },
-        [{ column: 'user_id', operator: '=', value: customerId }],
       );
       return false;
     }
@@ -62,23 +57,10 @@ export class FirstOrderDetectorService {
       'customers',
       {
         first_order_completed: true,
-        first_order_completed_at: now,
         referral_status: 'active',
-        referral_code: customerId,
         updated_at: now,
       },
       [{ column: 'customer_id', operator: '=', value: customerId }],
-    );
-
-    await this.dataService.update(
-      'users',
-      {
-        first_order_completed: true,
-        referral_status: 'active',
-        referral_code: customerId,
-        updated_at: now,
-      },
-      [{ column: 'user_id', operator: '=', value: customerId }],
     );
 
     return true;
@@ -93,22 +75,10 @@ export class FirstOrderDetectorService {
       'customers',
       {
         referral_status: 'active',
-        referral_code: customerId,
         first_order_completed: true,
         updated_at: now,
       },
       [{ column: 'customer_id', operator: '=', value: customerId }],
-    );
-
-    await this.dataService.update(
-      'users',
-      {
-        referral_status: 'active',
-        referral_code: customerId,
-        first_order_completed: true,
-        updated_at: now,
-      },
-      [{ column: 'user_id', operator: '=', value: customerId }],
     );
   }
 }

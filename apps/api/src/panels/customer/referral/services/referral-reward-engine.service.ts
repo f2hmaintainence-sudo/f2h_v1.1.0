@@ -233,7 +233,6 @@ export class ReferralRewardEngineService {
            SET wallet_balance = COALESCE(wallet_balance, 0) + $1,
                first_order_completed = true,
                referral_status = 'active',
-               referral_code = $2,
                updated_at = NOW()
            WHERE customer_id = $2 OR customer_id = $3
            RETURNING wallet_balance`,
@@ -264,23 +263,11 @@ export class ReferralRewardEngineService {
           `UPDATE customers
            SET first_order_completed = true,
                referral_status = 'active',
-               referral_code = $1,
                updated_at = NOW()
            WHERE customer_id = $1 OR customer_id = $2`,
           [realRefereeId, refereeCustomerId],
         );
       }
-
-      // Also set user referral_code and referral_status in users table
-      await client.query(
-        `UPDATE users
-         SET first_order_completed = true,
-             referral_status = 'active',
-             referral_code = $1,
-             updated_at = NOW()
-         WHERE user_id = $1`,
-        [realRefereeId],
-      );
 
       // ── C. Mark Referral = 'rewarded' ──────────────────────────────────────────
       await client.query(
