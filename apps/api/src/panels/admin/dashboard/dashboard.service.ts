@@ -31,7 +31,10 @@ export class DashboardService {
         WITH customer_stats AS (
           SELECT
             COUNT(*)::int                                          AS total_customers,
-            COUNT(*) FILTER (WHERE customer_status = 'active')::int        AS active_customers,
+            -- customers has no customer_status column; is_blocked is the live
+            -- flag, and the app's own block/unblock writes pair is_blocked=true
+            -- with 'blocked' and is_blocked=false with 'active'.
+            COUNT(*) FILTER (WHERE COALESCE(is_blocked, false) = false)::int AS active_customers,
             COUNT(*) FILTER (WHERE created_at::date >= CURRENT_DATE - INTERVAL '7 days')::int AS new_customers_7d,
             COUNT(*) FILTER (WHERE created_at::date >= CURRENT_DATE - INTERVAL '30 days')::int AS new_customers_30d
           FROM customers

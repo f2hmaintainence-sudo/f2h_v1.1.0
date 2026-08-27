@@ -45,6 +45,21 @@ function redactSensitive(value: any, depth = 0, seen = new WeakSet()): any {
     return value.map((item) => redactSensitive(item, depth + 1, seen));
   }
 
+  // `message` and `stack` are non-enumerable own properties, so Object.entries()
+  // silently drops them. A logged pg error kept `code` and `position` but lost the
+  // one field naming the missing column, which made 42703 failures readable only
+  // by counting bytes into the SQL. Errors are unwrapped explicitly.
+  if (value instanceof Error) {
+    const err: Record<string, any> = { name: value.name, message: value.message };
+    for (const [key, item] of Object.entries(value)) {
+      err[key] = REDACTED_KEYS.has(key.toLowerCase())
+        ? REDACTED
+        : redactSensitive(item, depth + 1, seen);
+    }
+    if (value.stack) err.stack = value.stack;
+    return err;
+  }
+
   const out: Record<string, any> = {};
   for (const [key, item] of Object.entries(value)) {
     out[key] = REDACTED_KEYS.has(key.toLowerCase())

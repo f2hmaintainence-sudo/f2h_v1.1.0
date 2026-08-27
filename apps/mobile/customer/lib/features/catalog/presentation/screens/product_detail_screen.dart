@@ -139,11 +139,13 @@ class _BrowseState extends State<BrowseScreen> {
                 Expanded(child: _buildGrid()),
               ],
             ),
-            const Positioned(
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeOutCubic,
               left: 0,
               right: 0,
-              bottom: _kCartBarLift,
-              child: FloatingCartBar(),
+              bottom: widget.isNavVisible ? 74 : 16,
+              child: const FloatingCartBar(),
             ),
           ],
         ),
