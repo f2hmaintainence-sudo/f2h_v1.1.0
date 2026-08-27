@@ -28,6 +28,17 @@ double floatingCartBarBottomOffset(
   return (mq.viewPadding.bottom + 4) - mq.padding.bottom;
 }
 
+/// Tail space a scroll view must reserve so its last item is not hidden behind
+/// the floating pill.
+///
+/// Only the pill needs clearing: the nav bar has auto-hidden by the time the
+/// list bottoms out, so reserving room for it too just left dead space on
+/// screen. Mirrors the pill's own footprint — the offset from
+/// [floatingCartBarBottomOffset], its 8px bottom padding and 48px expanded
+/// height — plus 16px of breathing room.
+double floatingCartBarClearance(BuildContext context) =>
+    MediaQuery.of(context).viewPadding.bottom + 76;
+
 /// Wrap a screen's body with this so any [FloatingCartBar] inside it collapses
 /// to a compact pill while the user scrolls down, and expands again when they
 /// scroll back up. Without the scope the bar simply stays expanded.
