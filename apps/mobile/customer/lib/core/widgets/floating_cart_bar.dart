@@ -8,6 +8,26 @@ import 'package:f2h_customer/features/catalog/presentation/screens/cart_screen.d
 import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 
+/// Bottom offset for the [AnimatedPositioned] that hosts a [FloatingCartBar].
+///
+/// AppShell's Scaffold sets `extendBody: true`, so Flutter hands the body a
+/// `MediaQuery.padding.bottom` equal to the bottom nav bar's height. The bar's
+/// own `SafeArea` consumes that, which already parks the pill directly on top
+/// of the nav bar — adding a positive offset as well stacked a second nav-bar
+/// height of empty space beneath it. Hence 0 while the nav bar is visible.
+///
+/// When the nav bar slides away it still occupies its layout slot, so the
+/// reported padding does not shrink; the offset goes negative to claw that
+/// space back and let the pill settle just above the device's gesture inset.
+double floatingCartBarBottomOffset(
+  BuildContext context, {
+  required bool isNavVisible,
+}) {
+  if (isNavVisible) return 0;
+  final mq = MediaQuery.of(context);
+  return (mq.viewPadding.bottom + 4) - mq.padding.bottom;
+}
+
 /// Wrap a screen's body with this so any [FloatingCartBar] inside it collapses
 /// to a compact pill while the user scrolls down, and expands again when they
 /// scroll back up. Without the scope the bar simply stays expanded.

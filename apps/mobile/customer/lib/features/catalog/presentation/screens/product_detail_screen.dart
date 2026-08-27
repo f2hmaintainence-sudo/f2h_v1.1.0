@@ -26,9 +26,6 @@ import '../../../../core/widgets/cow_loading_widget.dart';
 /// navigation bar and the floating cart pill.
 const double _kBottomInset = 160;
 
-/// How far above the navigation bar the floating cart pill sits.
-const double _kCartBarLift = 12;
-
 class BrowseScreen extends StatefulWidget {
   final String? initialCategory;
   final bool isNavVisible;
@@ -144,7 +141,10 @@ class _BrowseState extends State<BrowseScreen> {
               curve: Curves.easeOutCubic,
               left: 0,
               right: 0,
-              bottom: widget.isNavVisible ? 74 : 16,
+              bottom: floatingCartBarBottomOffset(
+                context,
+                isNavVisible: widget.isNavVisible,
+              ),
               child: const FloatingCartBar(),
             ),
           ],

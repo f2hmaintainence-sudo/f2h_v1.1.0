@@ -1177,10 +1177,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                         value:
                                             '₹${onetimeTotal.toStringAsFixed(0)}',
                                       ),
-                                      if (_appliedCouponCode != null && _couponDiscount > 0) ...[
+                                      if (couponSavings > 0) ...[
                                         const SizedBox(height: 8),
                                         SummaryRow(
-                                          label: 'Coupon ($_appliedCouponCode)',
+                                          label: _appliedCouponCode != null
+                                              ? 'Coupon ($_appliedCouponCode)'
+                                              : 'Promotion Discount (50% Off)',
                                           value:
                                               '-₹${couponSavings.toStringAsFixed(0)}',
                                           valueColor: kPrimaryLt,
