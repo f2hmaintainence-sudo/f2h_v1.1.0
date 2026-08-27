@@ -27,6 +27,7 @@ import '../../../address/presentation/screens/add_address_screen.dart';
 import '../../../../core/widgets/hot_toast.dart';
 import '../../../address/data/models/profile_address.dart';
 import '../../../../core/widgets/scrolling_items_loader.dart';
+import '../../../../core/widgets/cow_loading_widget.dart';
 import '../helpers/cart_helpers.dart';
 import '../widgets/cart_widgets.dart';
 // [ADDED BY ANTIGRAVITY FOR WALLET TOPUP]
@@ -1231,13 +1232,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               },
             ),
             if (_isLoading)
-              Positioned.fill(
-                child: Container(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  child: const Center(
-                    child: CircularProgressIndicator(color: kPrimary),
-                  ),
-                ),
+              const Positioned.fill(
+                child: CowLoadingOverlay(message: 'Placing your order...'),
               ),
           ],
         ),

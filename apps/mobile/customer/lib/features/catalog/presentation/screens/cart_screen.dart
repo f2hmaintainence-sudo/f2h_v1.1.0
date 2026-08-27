@@ -20,6 +20,7 @@ import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import '../../domain/entities/cart/cart_item_entity.dart';
 import '../../../../core/widgets/app_refresh_indicator.dart';
+import '../../../../core/widgets/cow_loading_widget.dart';
 import '../../../../core/guards/auth_guard.dart';
 import '../../../../core/network/network_bloc.dart';
 import '../../../../core/network/network_state.dart';
@@ -367,15 +368,8 @@ class _CartScreenState extends State<CartScreen> {
                         ),
                         // Loading overlay
                         if (state is CartLoadingState)
-                          Positioned.fill(
-                            child: Container(
-                              color: Colors.white24,
-                              child: const Center(
-                                child: CircularProgressIndicator(
-                                  color: kPrimary,
-                                ),
-                              ),
-                            ),
+                          const Positioned.fill(
+                            child: CowLoadingOverlay(message: 'Updating cart...'),
                           ),
                       ],
                     ),

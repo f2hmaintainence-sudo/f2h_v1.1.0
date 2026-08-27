@@ -74,6 +74,7 @@ dependencies:
   device_info_plus: ^12.4.0
   uuid: ^4.5.3
   video_player: ^2.9.2
+  lottie: ^3.3.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -103,6 +104,7 @@ flutter:
     - shorebird.yaml
     - assets/icon/
     - assets/icons/
+    - assets/loading/
 
 
   # To add custom fonts to your application, add a fonts section here,
