@@ -274,7 +274,11 @@ export class NotificationService {
         return [];
       }
 
-      return notifications as NotificationResponse[];
+      return notifications.map((n: any) => ({
+        ...n,
+        is_read: n.status === 'read' || !!n.read_at,
+        isRead: n.status === 'read' || !!n.read_at,
+      })) as NotificationResponse[];
     } catch (error) {
       this.developer.error(
         '🔔 [NotificationService] ERROR fetching notifications',

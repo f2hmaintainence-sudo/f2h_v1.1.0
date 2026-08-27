@@ -709,7 +709,8 @@ class _HomeScreenState extends State<HomeScreen>
             ];
           },
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            height: 36,
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
             constraints: const BoxConstraints(maxWidth: 160),
             decoration: BoxDecoration(
               color: Colors.white,
@@ -728,6 +729,7 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Icon(
                   hasBranch ? Icons.location_on_rounded : Icons.add_location_alt_rounded,
@@ -738,12 +740,13 @@ class _HomeScreenState extends State<HomeScreen>
                 Flexible(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         locationLabel,
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 10.5,
                           fontWeight: FontWeight.w800,
                           color: Color(0xFF16653A),
                           height: 1.1,
@@ -1976,48 +1979,70 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
           // 4. Top Row (App Logo, Title, Branch Info, Notification Bell) - fades out
           Positioned(
             top: topPadding + 10,
-            left: 14,
-            right: 14,
+            left: 12,
+            right: 12,
             child: Opacity(
               opacity: (1.0 - shrinkFactor * 1.8).clamp(0.0, 1.0),
               child: Row(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.asset(
-                      'assets/icon/app_icon.png',
-                      width: 28,
-                      height: 28,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF16653A),
+                  Flexible(
+                    flex: 5,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ClipRRect(
                             borderRadius: BorderRadius.circular(8),
+                            child: Image.asset(
+                              'assets/icon/app_icon.png',
+                              width: 28,
+                              height: 28,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  width: 28,
+                                  height: 28,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF16653A),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.eco_rounded,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                );
+                              },
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.eco_rounded,
-                            color: Colors.white,
-                            size: 18,
+                          const SizedBox(width: 6),
+                          const Text(
+                            'Farm to Home',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF16653A),
+                              letterSpacing: -0.3,
+                            ),
                           ),
-                        );
-                      },
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  const Text(
-                    'Farm to Home',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF16653A),
-                      letterSpacing: -0.3,
+                  const SizedBox(width: 4),
+                  Flexible(
+                    flex: 6,
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: branchWidget,
+                      ),
                     ),
                   ),
-                  const Spacer(),
-                  branchWidget,
                   const SizedBox(width: 6),
                   _buildNotificationBell(context),
                 ],

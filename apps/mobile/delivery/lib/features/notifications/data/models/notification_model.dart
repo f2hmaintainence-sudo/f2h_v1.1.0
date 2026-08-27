@@ -28,8 +28,15 @@ class DeliveryNotification {
       parsedDate = DateTime.now();
     }
 
+    final statusStr = json['status']?.toString().toLowerCase();
     final readVal = json['is_read'] ?? json['isRead'];
-    final bool read = readVal == true || readVal == 1 || readVal == 'true';
+    final bool read = readVal == true ||
+        readVal == 1 ||
+        readVal == 'true' ||
+        statusStr == 'read' ||
+        (json['read_at'] != null &&
+            json['read_at'].toString().isNotEmpty &&
+            json['read_at'].toString() != 'null');
 
     return DeliveryNotification(
       id: json['notification_id']?.toString() ?? json['id']?.toString() ?? '',
