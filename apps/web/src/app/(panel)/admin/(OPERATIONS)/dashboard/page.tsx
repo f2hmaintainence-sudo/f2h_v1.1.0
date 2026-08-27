@@ -1,104 +1,161 @@
+// ============================================================================
+// ChronoSparkSolutions — A Software Company
+// © 2026 ChronoSparkSolutions. All rights reserved.
+//
+// Project     : F2H Fresh
+// File        : page.tsx (Admin Command Center & Operations Dashboard)
+// Description : Executive Operations Intelligence, Fast Assign & Run Shortcuts,
+//               Interactive Graphs, Heuristic Insights, and Fleet Telemetry
+// ============================================================================
+
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/services/api.client";
 import {
-  ShoppingCart, Package, Truck, MapPin,
-  TrendingUp, AlertCircle, Clock, Sparkles,
-  Activity, ArrowRight, ArrowUpRight, CheckCircle2,
-  BarChart2, Bell, RefreshCw,
-  ChevronRight, Users, Box, Zap, Shield,
-  Wallet, IndianRupee, AlertTriangle, Building,
-  Layers, Orbit, Eye
+  ShoppingCart,
+  Package,
+  Truck,
+  MapPin,
+  TrendingUp,
+  AlertCircle,
+  Clock,
+  Sparkles,
+  Activity,
+  ArrowRight,
+  ArrowUpRight,
+  CheckCircle2,
+  BarChart2,
+  Bell,
+  RefreshCw,
+  ChevronRight,
+  Users,
+  Box,
+  Zap,
+  Shield,
+  Wallet,
+  IndianRupee,
+  AlertTriangle,
+  Building,
+  Layers,
+  Orbit,
+  Eye,
+  Navigation,
+  Check,
+  Send,
+  Ticket,
+  Calendar,
+  Compass,
+  CheckCheck,
+  Radio,
+  Flame,
+  LifeBuoy,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { showSuccessToast } from "@/components/Toast";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Interfaces ─────────────────────────────────────────────────────────────────
+interface DeliveryRunItem {
+  run_id: string;
+  run_number?: string;
+  delivery_partner_id: string;
+  branch_id: string;
+  run_date: string;
+  delivery_slot: string;
+  status: "assigned" | "in_progress" | "completed" | "cancelled";
+  total_addresses: number;
+  completed_addresses: number;
+  failed_addresses: number;
+  partner_name: string;
+  partner_phone: string;
+  branch_name: string;
+}
+
+interface OperationalInsight {
+  id: string;
+  type: "success" | "warning" | "info" | "critical";
+  title: string;
+  description: string;
+  actionText?: string;
+  actionHref?: string;
+}
+
 interface KpiData {
-  total_customers: number; active_customers: number; new_customers_7d: number; new_customers_30d: number;
-  active_subscriptions: number; paused_subscriptions: number; total_subscriptions: number; new_subscriptions_7d: number;
-  today_total: number; today_pending: number; today_placed: number; today_confirmed: number;
-  today_packed: number; today_out_for_delivery: number; today_delivered: number; today_cancelled: number;
-  today_revenue: number; today_subscription_orders: number; today_onetime_orders: number;
-  total_revenue: number; revenue_30d: number; revenue_7d: number;
-  total_delivery_partners: number; active_delivery_partners: number; pending_delivery_count: number;
-  total_wallet_balance: number; wallets_with_balance: number;
-  total_variants: number; low_stock_count: number; out_of_stock_count: number;
+  total_customers: number;
+  active_customers: number;
+  new_customers_7d: number;
+  new_customers_30d: number;
+  active_subscriptions: number;
+  paused_subscriptions: number;
+  total_subscriptions: number;
+  new_subscriptions_7d: number;
+  today_total: number;
+  today_pending: number;
+  today_placed: number;
+  today_confirmed: number;
+  today_packed: number;
+  today_out_for_delivery: number;
+  today_delivered: number;
+  today_cancelled: number;
+  today_revenue: number;
+  today_subscription_orders: number;
+  today_onetime_orders: number;
+  today_unassigned_orders?: number;
+  total_revenue: number;
+  revenue_30d: number;
+  revenue_7d: number;
+  total_delivery_partners: number;
+  active_delivery_partners: number;
+  pending_delivery_count: number;
+  today_runs_summary?: {
+    total_runs: number;
+    in_progress_runs: number;
+    assigned_runs: number;
+    completed_runs: number;
+  };
+  today_recent_runs?: DeliveryRunItem[];
+  total_wallet_balance: number;
+  wallets_with_balance: number;
+  total_variants: number;
+  low_stock_count: number;
+  out_of_stock_count: number;
+  insights?: OperationalInsight[];
   date: string;
 }
 
-interface BranchPerf { branch_id: string; branch_name: string; total_orders: number; delivered_orders: number; revenue: number; unique_customers: number; delivery_rate: number; }
-interface GrowthDay { day: string; orders: number; revenue: number; new_customers: number; new_subscriptions: number; }
-interface Alert { type: string; category: string; title: string; msg: string; time: string; }
+interface BranchPerf {
+  branch_id: string;
+  branch_name: string;
+  total_orders: number;
+  delivered_orders: number;
+  revenue: number;
+  unique_customers: number;
+  delivery_rate: number;
+}
+
+interface GrowthDay {
+  day: string;
+  orders: number;
+  revenue: number;
+  new_customers: number;
+  new_subscriptions: number;
+}
+
+interface Alert {
+  type: string;
+  category: string;
+  title: string;
+  msg: string;
+  time: string;
+}
 
 function formatMoney(v?: number | null) {
-  if (v == null) return '₹0';
-  return '₹' + v.toLocaleString('en-IN');
+  if (v == null) return "₹0";
+  return "₹" + Number(v).toLocaleString("en-IN");
 }
 
-function KpiCard({ label, value, sub, icon: Icon, color, href }: any) {
-  const colors: Record<string, string> = {
-    blue: 'border-l-blue-400 bg-blue-50/60', green: 'border-l-emerald-400 bg-emerald-50/60',
-    amber: 'border-l-amber-400 bg-amber-50/60', rose: 'border-l-rose-400 bg-rose-50/60',
-    indigo: 'border-l-indigo-400 bg-indigo-50/60', purple: 'border-l-purple-400 bg-purple-50/60',
-    teal: 'border-l-teal-400 bg-teal-50/60', sky: 'border-l-sky-400 bg-sky-50/60',
-  };
-  const iconColors: Record<string, string> = {
-    blue: 'text-blue-500 bg-blue-100', green: 'text-emerald-500 bg-emerald-100',
-    amber: 'text-amber-500 bg-amber-100', rose: 'text-rose-500 bg-rose-100',
-    indigo: 'text-indigo-500 bg-indigo-100', purple: 'text-purple-500 bg-purple-100',
-    teal: 'text-teal-500 bg-teal-100', sky: 'text-sky-500 bg-sky-100',
-  };
-  const Wrapper = href ? Link : 'div';
-  return (
-    <Wrapper href={href || '#'} className={`rounded-xl border-l-4 ${colors[color]} p-3 md:p-4 shadow-sm hover:shadow-md transition-all group cursor-pointer`}>
-      <div className="flex items-start justify-between mb-2">
-        <div className={`w-8 h-8 rounded-lg ${iconColors[color]} flex items-center justify-center`}><Icon size={16} /></div>
-        {href && <ArrowUpRight size={14} className="text-slate-300 group-hover:text-slate-500 transition-colors" />}
-      </div>
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">{label}</p>
-      <p className="text-xl font-black text-slate-900 tracking-tight">{value}</p>
-      {sub && <p className="text-[10px] text-slate-400 font-medium mt-0.5">{sub}</p>}
-    </Wrapper>
-  );
-}
-
-function MiniBar({ data, maxVal }: { data: number[]; maxVal: number }) {
-  return (
-    <div className="flex items-end gap-[3px] h-10">
-      {data.map((v, i) => (
-        <motion.div key={i} initial={{ height: 0 }} animate={{ height: `${Math.max(4, (v / Math.max(maxVal, 1)) * 100)}%` }}
-          transition={{ delay: i * 0.05, duration: 0.6 }}
-          className="flex-1 bg-gradient-to-t from-emerald-500 to-emerald-300 rounded-t-sm min-h-[2px]" />
-      ))}
-    </div>
-  );
-}
-
-function AlertRow({ alert }: { alert: Alert }) {
-  const typeColors: Record<string, string> = { critical: 'text-rose-500 bg-rose-50', warning: 'text-amber-500 bg-amber-50', info: 'text-blue-500 bg-blue-50' };
-  const tc = typeColors[alert.type] || typeColors.info;
-  return (
-    <div className="flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors border-l-2 border-transparent hover:border-l-rose-300">
-      <div className={`w-8 h-8 rounded-lg ${tc} flex items-center justify-center shrink-0`}>
-        <AlertCircle size={14} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-0.5">
-          <span className={`text-[9px] font-bold uppercase tracking-widest ${tc.split(' ')[0]}`}>{alert.type}</span>
-          <span className="text-[9px] text-slate-300 font-bold">{alert.time}</span>
-        </div>
-        <p className="text-xs font-semibold text-slate-800 truncate">{alert.title}</p>
-        <p className="text-[10px] text-slate-400 truncate">{alert.msg}</p>
-      </div>
-    </div>
-  );
-}
-
-// ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
   const { user } = useAuth();
   const [kpi, setKpi] = useState<KpiData | null>(null);
@@ -108,6 +165,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSynced, setLastSynced] = useState(new Date().toLocaleTimeString());
+  const [chartMetric, setChartMetric] = useState<"revenue" | "orders" | "subscriptions" | "customers">("revenue");
 
   const getGreeting = () => {
     const h = new Date().getHours();
@@ -115,7 +173,8 @@ export default function AdminDashboard() {
   };
 
   const fetchAll = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true); else setRefreshing(true);
+    if (!silent) setLoading(true);
+    else setRefreshing(true);
     try {
       const [kpiRes, branchRes, growthRes, alertRes] = await Promise.all([
         api.get<any>("/admin/dashboard/kpis"),
@@ -123,248 +182,775 @@ export default function AdminDashboard() {
         api.get<any>("/admin/dashboard/growth?days=7"),
         api.get<any>("/admin/dashboard/alerts"),
       ]);
-      // if (kpiRes.data?.data) setKpi(kpiRes.data.data);
-      setKpi(
-        kpiRes.data?.data ?? {
-          date: new Date().toISOString().split('T')[0],
-        } as KpiData,
-      );
+
+      if (kpiRes.data?.data) {
+        setKpi(kpiRes.data.data);
+      } else {
+        setKpi({
+          date: new Date().toISOString().split("T")[0],
+        } as KpiData);
+      }
+
       if (branchRes.data?.data) setBranches(branchRes.data.data);
       if (growthRes.data?.data) setGrowth(growthRes.data.data);
       if (alertRes.data?.data) setAlerts(alertRes.data.data);
-      setLastSynced(new Date().toLocaleTimeString());
-      if (silent) showSuccessToast("Dashboard synced");
-    } catch { /* silent */ } finally { setLoading(false); setRefreshing(false); }
+
+      setLastSynced(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      if (silent) showSuccessToast("Operations command center synced");
+    } catch (err) {
+      console.error("Dashboard fetch error:", err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    fetchAll();
+    // Auto sync every 60 seconds
+    const timer = setInterval(() => {
+      fetchAll(true);
+    }, 60000);
+    return () => clearInterval(timer);
+  }, [fetchAll]);
+
+  // Calculations for pipeline progress
+  const pipelineMetrics = useMemo(() => {
+    if (!kpi) return null;
+    const total = kpi.today_total || 0;
+    const delivered = kpi.today_delivered || 0;
+    const onRoad = kpi.today_out_for_delivery || 0;
+    const packed = kpi.today_packed || 0;
+    const confirmed = kpi.today_confirmed || 0;
+    const pending = kpi.today_pending || 0;
+    const cancelled = kpi.today_cancelled || 0;
+
+    const completionRate = total > 0 ? Math.round((delivered / Math.max(total - cancelled, 1)) * 100) : 0;
+    const inProgressRate = total > 0 ? Math.round(((delivered + onRoad + packed) / Math.max(total - cancelled, 1)) * 100) : 0;
+
+    return {
+      total,
+      delivered,
+      onRoad,
+      packed,
+      confirmed,
+      pending,
+      cancelled,
+      completionRate,
+      inProgressRate,
+    };
+  }, [kpi]);
+
+  const displayedGrowth = useMemo(() => growth.slice(-7), [growth]);
+  const maxGrowthValue = useMemo(() => {
+    if (displayedGrowth.length === 0) return 1;
+    if (chartMetric === "revenue") return Math.max(...displayedGrowth.map((g) => g.revenue), 1);
+    if (chartMetric === "orders") return Math.max(...displayedGrowth.map((g) => g.orders), 1);
+    if (chartMetric === "subscriptions") return Math.max(...displayedGrowth.map((g) => g.new_subscriptions), 1);
+    return Math.max(...displayedGrowth.map((g) => g.new_customers), 1);
+  }, [displayedGrowth, chartMetric]);
+
+  const maxBranchRevenue = useMemo(() => {
+    return Math.max(...branches.map((b) => b.revenue), 1);
+  }, [branches]);
 
   if (loading && !kpi) {
     return (
-      <div className="flex flex-col items-center justify-center h-[70vh] gap-6">
+      <div className="flex flex-col items-center justify-center min-h-[75vh] gap-6">
         <div className="relative">
-          <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            className="w-20 h-20 border-[6px] border-[#388e3c]/10 border-t-[#388e3c] rounded-full" />
-          <Orbit className="absolute inset-0 m-auto text-[#388e3c] animate-pulse" size={32} />
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="w-20 h-20 border-[6px] border-emerald-100 border-t-emerald-600 rounded-full"
+          />
+          <Orbit className="absolute inset-0 m-auto text-emerald-600 animate-pulse" size={32} />
         </div>
-        <div className="text-center space-y-2">
-          <p className="text-sm font-black text-slate-900 uppercase tracking-[0.3em]">F2H COMMAND</p>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] animate-pulse">Loading Dashboard...</p>
+        <div className="text-center space-y-1.5">
+          <p className="text-sm font-black text-slate-900 uppercase tracking-[0.25em]">F2H COMMAND CENTER</p>
+          <p className="text-xs font-semibold text-slate-400 animate-pulse">Aggregating real-time fleet &amp; order telemetry...</p>
         </div>
       </div>
     );
   }
 
-  if (!kpi) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[70vh] gap-4">
-        <AlertTriangle className="text-rose-500 w-12 h-12 opacity-50" />
-        <p className="text-slate-600 font-medium">Failed to load dashboard data.</p>
-        <button onClick={() => fetchAll()} className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-bold shadow-sm hover:bg-slate-800 transition-colors">
-          Retry
-        </button>
-      </div>
-    );
-  }
-
-  const k = kpi;
-  if (!k) {
-    return null;
-  }
-  const displayedGrowth = growth.slice(-7);
-  const maxGrowthOrders = Math.max(...displayedGrowth.map(g => g.orders), 1);
-  const maxBranchRevenue = Math.max(...branches.map(b => b.revenue), 1);
+  const k = kpi || ({} as KpiData);
+  const runsSummary = k.today_runs_summary || { total_runs: 0, in_progress_runs: 0, assigned_runs: 0, completed_runs: 0 };
+  const recentRuns = k.today_recent_runs || [];
+  const unassignedOrders = k.today_unassigned_orders || 0;
+  const insightsList = k.insights || [];
 
   return (
-    <div className="max-w-[1440px] w-full mx-auto px-4 sm:px-6 space-y-5 pb-12 animate-in fade-in slide-in-from-bottom-6 duration-700">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#388e3c]/10 border border-[#388e3c]/20 mb-2">
-            <Sparkles size={12} className="text-[#388e3c]" />
-            <span className="text-[10px] font-bold text-[#388e3c] uppercase tracking-widest">{getGreeting()}, {user?.first_name || "Admin"}</span>
+    <div className="max-w-[1520px] w-full mx-auto px-4 sm:px-6 lg:px-8 space-y-6 pb-16 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* ══════════════════════════════════════════════════════════════════════
+          1. HERO COMMAND HEADER
+      ══════════════════════════════════════════════════════════════════════ */}
+      <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-800 relative overflow-hidden">
+        {/* Background decorative elements */}
+        <div className="absolute right-0 top-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
+        <div className="absolute left-1/3 bottom-0 w-64 h-64 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping"></span>
+              <span>LIVE OPERATIONS PULSE • {k.date}</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white">
+              {getGreeting()}, {user?.first_name || "Admin"} 👋
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">
+              Real-time route dispatches, delivery partner allocation, fulfillment pipeline, and automated subscriptions intelligence.
+            </p>
           </div>
-          <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Command Center</h1>
-          <p className="text-xs text-slate-400 mt-1">Real-time operational intelligence for {k.date}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => fetchAll(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs font-bold shadow-sm hover:bg-slate-50 transition-all">
-            <RefreshCw size={14} className={refreshing ? "animate-spin text-[#388e3c]" : ""} />
-            Sync
-          </button>
-          <span className="text-[9px] text-slate-300 font-bold">{lastSynced}</span>
+
+          {/* Quick Header Telemetry & Sync */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 text-center min-w-[120px]">
+              <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest block">Today Orders</span>
+              <span className="text-xl font-black text-white">{k.today_total || 0}</span>
+            </div>
+            <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 text-center min-w-[120px]">
+              <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-widest block">Today Revenue</span>
+              <span className="text-xl font-black text-emerald-400">{formatMoney(k.today_revenue)}</span>
+            </div>
+            <button
+              onClick={() => fetchAll(true)}
+              disabled={refreshing}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-900/30 transition active:scale-95 border border-emerald-400/30"
+            >
+              <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+              <span>{refreshing ? "Syncing..." : "Sync Live"}</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Today's Operations HUD */}
-      <section>
-        <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Today&apos;s Operations</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-8 gap-2">
-          <KpiCard label="Total Orders" value={k.today_total} icon={ShoppingCart} color="blue" href="/admin/orders/today" />
-          <KpiCard label="Pending" value={k.today_pending} icon={Clock} color="amber" href="/admin/orders/today" />
-          {/* <KpiCard label="Placed" value={k.today_placed} icon={ShoppingCart} color="amber" href="/admin/orders/today" /> */}
-          <KpiCard label="Confirmed" value={k.today_confirmed} icon={CheckCircle2} color="teal" />
-          <KpiCard label="Packed" value={k.today_packed} icon={Package} color="indigo" />
-          <KpiCard label="Out for Delivery" value={k.today_out_for_delivery} icon={Truck} color="sky" href="/admin/delivery-tracking" />
-          <KpiCard label="Delivered" value={k.today_delivered} icon={CheckCircle2} color="green" />
-          <KpiCard label="Cancelled" value={k.today_cancelled} icon={AlertTriangle} color="rose" />
-          <KpiCard label="Revenue" value={formatMoney(k.today_revenue)} icon={IndianRupee} color="green" sub={`Sub: ${k.today_subscription_orders} | OT: ${k.today_onetime_orders}`} />
+      {/* ══════════════════════════════════════════════════════════════════════
+          2. SHORTCUTS & FAST ACTION LAUNCHER (ASSIGN & RUN FOCUSED)
+      ══════════════════════════════════════════════════════════════════════ */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+            <Zap size={14} className="text-amber-500" />
+            <span>Fast Operational Launchers &amp; Shortcuts</span>
+          </h2>
+          <span className="text-[11px] text-slate-400 font-medium">1-Click Dispatch Actions</span>
         </div>
-      </section>
 
-      {/* Main KPIs */}
-      <section>
-        <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Key Performance Indicators</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <KpiCard label="Customers" value={k.total_customers} sub={`+${k.new_customers_7d} this week`} icon={Users} color="blue" href="/admin/customers/allcustomers" />
-          <KpiCard label="Active Subscriptions" value={k.active_subscriptions} sub={`${k.paused_subscriptions} paused`} icon={RefreshCw} color="purple" href="/admin/subscriptions/status" />
-          <KpiCard label="Revenue (30d)" value={formatMoney(k.revenue_30d)} sub={`7d: ${formatMoney(k.revenue_7d)}`} icon={TrendingUp} color="green" href="/admin/reports/revenue" />
-          <KpiCard label="Pending Deliveries" value={k.pending_delivery_count} sub={`${k.active_delivery_partners} partners active`} icon={Truck} color="sky" href="/admin/delivery/assign" />
-          <KpiCard label="Wallet Balance" value={formatMoney(k.total_wallet_balance)} sub={`${k.wallets_with_balance} wallets`} icon={Wallet} color="amber" href="/admin/finance/wallet" />
-        </div>
-      </section>
-
-      {/* Two Column Layout */}
-      <div className="grid grid-cols-12 gap-4">
-        {/* Left: Growth + Branch Performance */}
-        <div className="col-span-12 lg:col-span-8 space-y-4">
-          {/* 7-Day Growth */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-500"><BarChart2 size={16} /></div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">7-Day Growth</h3>
-                  <p className="text-[10px] text-slate-400">Orders, customers, subscriptions</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {/* Shortcut 1: Auto-Assign Deliveries */}
+          <Link
+            href="/admin/delivery/assign"
+            className="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-sky-50/60 p-4 rounded-2xl border border-slate-200 hover:border-sky-300 shadow-sm hover:shadow-md transition-all flex items-start justify-between"
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="p-3 rounded-xl bg-sky-50 group-hover:bg-sky-500 text-sky-600 group-hover:text-white transition-colors border border-sky-100">
+                <Truck size={20} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-900 group-hover:text-sky-900 transition-colors">
+                    Assign Deliveries
+                  </h3>
+                  {unassignedOrders > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white animate-pulse">
+                      {unassignedOrders} Unassigned
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">Auto cluster &amp; route optimization</p>
+                <div className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-600 mt-2">
+                  <span>Open Assign Studio</span>
+                  <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
                 </div>
               </div>
-              <Link href="/admin/reports/revenue" className="text-[10px] font-bold text-emerald-600 hover:underline flex items-center gap-1">
-                View Reports <ArrowRight size={12} />
+            </div>
+          </Link>
+
+          {/* Shortcut 2: Live Delivery Runs */}
+          <Link
+            href="/admin/delivery-tracking"
+            className="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-emerald-50/60 p-4 rounded-2xl border border-slate-200 hover:border-emerald-300 shadow-sm hover:shadow-md transition-all flex items-start justify-between"
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="p-3 rounded-xl bg-emerald-50 group-hover:bg-emerald-600 text-emerald-600 group-hover:text-white transition-colors border border-emerald-100">
+                <Navigation size={20} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-900 group-hover:text-emerald-900 transition-colors">
+                    Live Delivery Runs
+                  </h3>
+                  {runsSummary.in_progress_runs > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-600 text-white">
+                      {runsSummary.in_progress_runs} On Road
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">GPS telemetry &amp; live stop tracking</p>
+                <div className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 mt-2">
+                  <span>Track Fleet Live</span>
+                  <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </div>
+          </Link>
+
+          {/* Shortcut 3: Dispatch & Packaging Center */}
+          <Link
+            href="/admin/dispatch"
+            className="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-indigo-50/60 p-4 rounded-2xl border border-slate-200 hover:border-indigo-300 shadow-sm hover:shadow-md transition-all flex items-start justify-between"
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="p-3 rounded-xl bg-indigo-50 group-hover:bg-indigo-600 text-indigo-600 group-hover:text-white transition-colors border border-indigo-100">
+                <Box size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 group-hover:text-indigo-900 transition-colors">
+                  Dispatch &amp; Crates
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">Barcode scanning &amp; crate handover</p>
+                <div className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 mt-2">
+                  <span>Open Dispatch Hub</span>
+                  <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </div>
+          </Link>
+
+          {/* Shortcut 4: Partner Support & Requests */}
+          <Link
+            href="/admin/delivery/partner-requests"
+            className="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-amber-50/60 p-4 rounded-2xl border border-slate-200 hover:border-amber-300 shadow-sm hover:shadow-md transition-all flex items-start justify-between"
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="p-3 rounded-xl bg-amber-50 group-hover:bg-amber-600 text-amber-600 group-hover:text-white transition-colors border border-amber-100">
+                <Ticket size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 group-hover:text-amber-900 transition-colors">
+                  Partner Helpdesk &amp; Inquiries
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">Support tickets &amp; onboarding requests</p>
+                <div className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 mt-2">
+                  <span>View Partner Queue</span>
+                  <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </div>
+          </Link>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          3. SMART HEURISTIC INSIGHTS & AI PULSE
+      ══════════════════════════════════════════════════════════════════════ */}
+      {insightsList.length > 0 && (
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+              <Sparkles size={14} className="text-emerald-600" />
+              <span>Operational Insights &amp; Intelligence</span>
+            </h2>
+            <span className="text-[11px] text-slate-400 font-medium">Auto-generated recommendations</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {insightsList.map((ins) => {
+              const bgColors = {
+                success: "bg-emerald-50/70 border-emerald-200 text-emerald-950",
+                warning: "bg-amber-50/80 border-amber-200 text-amber-950",
+                info: "bg-blue-50/70 border-blue-200 text-blue-950",
+                critical: "bg-rose-50/80 border-rose-200 text-rose-950",
+              };
+              const iconColors = {
+                success: "text-emerald-600 bg-emerald-100",
+                warning: "text-amber-600 bg-amber-100",
+                info: "text-blue-600 bg-blue-100",
+                critical: "text-rose-600 bg-rose-100",
+              };
+
+              return (
+                <div
+                  key={ins.id}
+                  className={`p-4 rounded-2xl border ${bgColors[ins.type] || bgColors.info} shadow-sm flex flex-col justify-between`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-xl shrink-0 ${iconColors[ins.type]}`}>
+                      {ins.type === "critical" ? (
+                        <Flame size={16} />
+                      ) : ins.type === "warning" ? (
+                        <AlertTriangle size={16} />
+                      ) : ins.type === "success" ? (
+                        <CheckCircle2 size={16} />
+                      ) : (
+                        <Activity size={16} />
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-extrabold">{ins.title}</h4>
+                      <p className="text-[11.5px] opacity-80 mt-0.5 leading-relaxed">{ins.description}</p>
+                    </div>
+                  </div>
+                  {ins.actionText && ins.actionHref && (
+                    <div className="mt-3 pt-2.5 border-t border-black/5 flex justify-end">
+                      <Link
+                        href={ins.actionHref}
+                        className="inline-flex items-center gap-1 text-xs font-bold underline hover:opacity-80 transition"
+                      >
+                        <span>{ins.actionText}</span>
+                        <ArrowUpRight size={13} />
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          4. FULFILLMENT PIPELINE FUNNEL GAUGE
+      ══════════════════════════════════════════════════════════════════════ */}
+      {pipelineMetrics && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Compass size={18} className="text-emerald-600" />
+                <span>Today&apos;s Order Fulfillment Pipeline</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Lifecycle progression from order confirmation to final door-step delivery drop.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500">Delivered Rate:</span>
+              <span className="text-sm font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200">
+                {pipelineMetrics.completionRate}% Done
+              </span>
+            </div>
+          </div>
+
+          {/* Segmented Pipeline Bar */}
+          <div className="space-y-2">
+            <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden flex gap-0.5 p-0.5">
+              {pipelineMetrics.delivered > 0 && (
+                <div
+                  style={{ width: `${(pipelineMetrics.delivered / Math.max(pipelineMetrics.total, 1)) * 100}%` }}
+                  className="bg-emerald-500 rounded-full transition-all duration-500"
+                  title={`Delivered: ${pipelineMetrics.delivered}`}
+                />
+              )}
+              {pipelineMetrics.onRoad > 0 && (
+                <div
+                  style={{ width: `${(pipelineMetrics.onRoad / Math.max(pipelineMetrics.total, 1)) * 100}%` }}
+                  className="bg-sky-500 rounded-full transition-all duration-500"
+                  title={`Out for Delivery: ${pipelineMetrics.onRoad}`}
+                />
+              )}
+              {pipelineMetrics.packed > 0 && (
+                <div
+                  style={{ width: `${(pipelineMetrics.packed / Math.max(pipelineMetrics.total, 1)) * 100}%` }}
+                  className="bg-indigo-500 rounded-full transition-all duration-500"
+                  title={`Packed: ${pipelineMetrics.packed}`}
+                />
+              )}
+              {pipelineMetrics.confirmed > 0 && (
+                <div
+                  style={{ width: `${(pipelineMetrics.confirmed / Math.max(pipelineMetrics.total, 1)) * 100}%` }}
+                  className="bg-amber-400 rounded-full transition-all duration-500"
+                  title={`Confirmed: ${pipelineMetrics.confirmed}`}
+                />
+              )}
+            </div>
+
+            {/* Pipeline Stage Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-2">
+              <Link
+                href="/admin/orders/today"
+                className="p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 transition text-center group"
+              >
+                <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider block">Total Scheduled</span>
+                <span className="text-lg font-black text-slate-900 mt-0.5 block">{pipelineMetrics.total}</span>
+                <span className="text-[10.5px] text-slate-500 font-medium">All Orders</span>
+              </Link>
+
+              <Link
+                href="/admin/orders/today"
+                className="p-3 rounded-xl bg-amber-50/70 hover:bg-amber-100/70 border border-amber-200/80 transition text-center group"
+              >
+                <span className="text-[10px] font-bold uppercase text-amber-700 tracking-wider block">Confirmed</span>
+                <span className="text-lg font-black text-amber-900 mt-0.5 block">{pipelineMetrics.confirmed}</span>
+                <span className="text-[10.5px] text-amber-700/80 font-medium">Ready to Pack</span>
+              </Link>
+
+              <Link
+                href="/admin/dispatch"
+                className="p-3 rounded-xl bg-indigo-50/70 hover:bg-indigo-100/70 border border-indigo-200/80 transition text-center group"
+              >
+                <span className="text-[10px] font-bold uppercase text-indigo-700 tracking-wider block">Packed</span>
+                <span className="text-lg font-black text-indigo-900 mt-0.5 block">{pipelineMetrics.packed}</span>
+                <span className="text-[10.5px] text-indigo-700/80 font-medium">In Crates</span>
+              </Link>
+
+              <Link
+                href="/admin/delivery-tracking"
+                className="p-3 rounded-xl bg-sky-50/70 hover:bg-sky-100/70 border border-sky-200/80 transition text-center group"
+              >
+                <span className="text-[10px] font-bold uppercase text-sky-700 tracking-wider block">On Road</span>
+                <span className="text-lg font-black text-sky-900 mt-0.5 block">{pipelineMetrics.onRoad}</span>
+                <span className="text-[10.5px] text-sky-700/80 font-medium">Out for Delivery</span>
+              </Link>
+
+              <Link
+                href="/admin/orders/today"
+                className="p-3 rounded-xl bg-emerald-50/70 hover:bg-emerald-100/70 border border-emerald-200/80 transition text-center group"
+              >
+                <span className="text-[10px] font-bold uppercase text-emerald-700 tracking-wider block">Delivered</span>
+                <span className="text-lg font-black text-emerald-900 mt-0.5 block">{pipelineMetrics.delivered}</span>
+                <span className="text-[10.5px] text-emerald-700/80 font-medium">Completed</span>
+              </Link>
+
+              <Link
+                href="/admin/orders/failed"
+                className="p-3 rounded-xl bg-rose-50/70 hover:bg-rose-100/70 border border-rose-200/80 transition text-center group"
+              >
+                <span className="text-[10px] font-bold uppercase text-rose-700 tracking-wider block">Cancelled / Fail</span>
+                <span className="text-lg font-black text-rose-900 mt-0.5 block">{pipelineMetrics.cancelled}</span>
+                <span className="text-[10.5px] text-rose-700/80 font-medium">Exceptions</span>
               </Link>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          5. MAIN TWO COLUMN ANALYTICS & LIVE RUNS
+      ══════════════════════════════════════════════════════════════════════ */}
+      <div className="grid grid-cols-12 gap-6">
+        {/* Left 8 Columns: Interactive Graphs & Branch Matrix */}
+        <div className="col-span-12 lg:col-span-8 space-y-6">
+          {/* Interactive 7-Day Growth Trend Graph */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+                  <BarChart2 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">7-Day Performance &amp; Revenue Trends</h3>
+                  <p className="text-xs text-slate-400">Daily business volume telemetry</p>
+                </div>
+              </div>
+
+              {/* Chart Metric Switcher */}
+              <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
+                {(
+                  [
+                    { key: "revenue", label: "Revenue (₹)" },
+                    { key: "orders", label: "Orders" },
+                    { key: "subscriptions", label: "New Subs" },
+                    { key: "customers", label: "Customers" },
+                  ] as const
+                ).map((m) => (
+                  <button
+                    key={m.key}
+                    onClick={() => setChartMetric(m.key)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                      chartMetric === m.key
+                        ? "bg-white text-slate-900 shadow-sm border border-slate-200"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Visual Bar Chart */}
             {displayedGrowth.length > 0 ? (
-              <div className="grid grid-cols-7 gap-2">
-                {displayedGrowth.map((g, i) => (
-                  <div key={i} className="text-center">
-                    <div className="h-16 flex items-end justify-center mb-1">
-                      <motion.div initial={{ height: 0 }} animate={{ height: `${Math.max(8, (g.orders / maxGrowthOrders) * 100)}%` }}
-                        transition={{ delay: i * 0.08, duration: 0.5 }}
-                        className="w-full max-w-[28px] bg-gradient-to-t from-emerald-500 to-emerald-300 rounded-t-md" />
-                    </div>
-                    <p className="text-[9px] font-bold text-slate-500">{new Date(g.day).toLocaleDateString('en-IN', { weekday: 'short' })}</p>
-                    <p className="text-[10px] font-black text-slate-800">{g.orders}</p>
-                    <p className="text-[8px] text-slate-400">+{g.new_customers} cust</p>
-                  </div>
-                ))}
-              </div>
-            ) : <p className="text-xs text-slate-400 text-center py-6">No growth data yet</p>}
-          </div>
+              <div className="pt-2">
+                <div className="grid grid-cols-7 gap-2 sm:gap-4 h-48 items-end pb-2 border-b border-slate-100">
+                  {displayedGrowth.map((g, idx) => {
+                    const value =
+                      chartMetric === "revenue"
+                        ? g.revenue
+                        : chartMetric === "orders"
+                        ? g.orders
+                        : chartMetric === "subscriptions"
+                        ? g.new_subscriptions
+                        : g.new_customers;
 
-          {/* Branch Performance */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500"><Building size={16} /></div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">Branch Performance (30d)</h3>
-                  <p className="text-[10px] text-slate-400">Revenue & delivery rate by branch</p>
+                    const heightPercent = Math.max(10, Math.round((value / maxGrowthValue) * 100));
+
+                    return (
+                      <div key={idx} className="flex flex-col items-center h-full justify-end group cursor-pointer">
+                        <div className="opacity-0 group-hover:opacity-100 transition text-[11px] font-black text-slate-800 mb-1 text-center truncate w-full">
+                          {chartMetric === "revenue" ? formatMoney(value) : value}
+                        </div>
+                        <motion.div
+                          initial={{ height: 0 }}
+                          animate={{ height: `${heightPercent}%` }}
+                          transition={{ delay: idx * 0.05, duration: 0.5 }}
+                          className={`w-full max-w-[38px] rounded-t-xl transition-all group-hover:brightness-110 ${
+                            chartMetric === "revenue"
+                              ? "bg-gradient-to-t from-emerald-600 to-emerald-400"
+                              : chartMetric === "orders"
+                              ? "bg-gradient-to-t from-sky-600 to-sky-400"
+                              : chartMetric === "subscriptions"
+                              ? "bg-gradient-to-t from-purple-600 to-purple-400"
+                              : "bg-gradient-to-t from-amber-600 to-amber-400"
+                          }`}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Day Labels Row */}
+                <div className="grid grid-cols-7 gap-2 sm:gap-4 pt-2 text-center">
+                  {displayedGrowth.map((g, idx) => (
+                    <div key={idx}>
+                      <span className="text-[11px] font-bold text-slate-600 block">
+                        {new Date(g.day).toLocaleDateString("en-IN", { weekday: "short" })}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block">
+                        {new Date(g.day).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <Link href="/admin/reports/branch" className="text-[10px] font-bold text-indigo-600 hover:underline flex items-center gap-1">
-                Full Report <ArrowRight size={12} />
+            ) : (
+              <div className="py-12 text-center text-slate-400 text-xs font-medium">No trend history recorded yet</div>
+            )}
+          </div>
+
+          {/* Branch Performance & Delivery Matrix */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+                  <Building size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Branch Delivery &amp; Revenue Leaderboard</h3>
+                  <p className="text-xs text-slate-400">Hub performance across last 30 days</p>
+                </div>
+              </div>
+              <Link
+                href="/admin/reports/branch"
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+              >
+                <span>Branch Analytics</span>
+                <ArrowRight size={13} />
               </Link>
             </div>
+
             {branches.length > 0 ? (
-              <div className="space-y-3">
-                {branches.slice(0, 5).map((b, i) => (
-                  <div key={b.branch_id} className="flex items-center gap-3">
-                    <span className="text-[10px] font-bold text-slate-400 w-4">{i + 1}</span>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-semibold text-slate-800 truncate">{b.branch_name || b.branch_id}</span>
-                        <span className="text-xs font-bold text-emerald-600">{formatMoney(b.revenue)}</span>
+              <div className="space-y-3.5 pt-2">
+                {branches.slice(0, 5).map((b, idx) => (
+                  <div key={b.branch_id} className="p-3.5 rounded-2xl bg-slate-50/75 border border-slate-200/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-black flex items-center justify-center">
+                          {idx + 1}
+                        </span>
+                        <span className="text-xs font-bold text-slate-900">{b.branch_name || b.branch_id}</span>
                       </div>
-                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <motion.div initial={{ width: 0 }} animate={{ width: `${(b.revenue / maxBranchRevenue) * 100}%` }}
-                          transition={{ delay: i * 0.1, duration: 0.8 }}
-                          className="h-full bg-gradient-to-r from-indigo-400 to-indigo-500 rounded-full" />
-                      </div>
-                      <div className="flex gap-3 mt-1 text-[9px] text-slate-400">
-                        <span>{b.total_orders} orders</span>
-                        <span>{b.delivered_orders} delivered</span>
-                        <span>{b.unique_customers} customers</span>
-                        <span className="text-emerald-500 font-bold">{b.delivery_rate}% rate</span>
-                      </div>
+                      <span className="text-xs font-black text-emerald-700">{formatMoney(b.revenue)}</span>
+                    </div>
+
+                    <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.round((b.revenue / maxBranchRevenue) * 100)}%` }}
+                        transition={{ delay: idx * 0.1, duration: 0.6 }}
+                        className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 rounded-full"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium pt-0.5">
+                      <span>{b.total_orders} Total Orders</span>
+                      <span>{b.delivered_orders} Delivered</span>
+                      <span>{b.unique_customers} Customers</span>
+                      <span className="text-emerald-700 font-bold bg-emerald-100/80 px-2 py-0.5 rounded-md">
+                        {b.delivery_rate}% Success
+                      </span>
                     </div>
                   </div>
                 ))}
               </div>
-            ) : <p className="text-xs text-slate-400 text-center py-6">No branch data</p>}
-          </div>
-
-          {/* Inventory & Quick Actions */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <KpiCard label="Active Products" value={k.total_variants} icon={Package} color="blue" href="/admin/catalog/variants" />
-            <KpiCard label="Low Stock" value={k.low_stock_count} sub={`${k.out_of_stock_count} out of stock`} icon={AlertTriangle} color="rose" href="/admin/inventory/overview" />
-            <KpiCard label="Delivery Partners" value={`${k.active_delivery_partners}/${k.total_delivery_partners}`} sub="Active / Total" icon={Truck} color="sky" href="/admin/delivery/partners" />
+            ) : (
+              <p className="text-xs text-slate-400 text-center py-8">No branch performance records available.</p>
+            )}
           </div>
         </div>
 
-        {/* Right Column: Alerts + Quick Links */}
-        <div className="col-span-12 lg:col-span-4 space-y-4">
-          {/* Alerts */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2"><Bell size={16} className="text-rose-400" />Alerts</h3>
-              {alerts.length > 0 && <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-rose-400 animate-ping" /><span className="text-[9px] font-bold text-rose-500 uppercase tracking-widest">{alerts.length}</span></div>}
+        {/* Right 4 Columns: Live Active Runs, Alerts & Capacity */}
+        <div className="col-span-12 lg:col-span-4 space-y-6">
+          {/* Live Delivery Runs Tracker Card */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-sky-50 text-sky-600 border border-sky-100">
+                  <Truck size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Today&apos;s Active Runs</h3>
+                  <p className="text-[10.5px] text-slate-400">{runsSummary.total_runs} runs scheduled</p>
+                </div>
+              </div>
+              <Link
+                href="/admin/delivery-tracking"
+                className="text-[11px] font-bold text-sky-600 hover:text-sky-700 flex items-center gap-1"
+              >
+                <span>Live Map</span>
+                <ArrowRight size={12} />
+              </Link>
             </div>
-            <div className="space-y-1 max-h-[300px] overflow-y-auto">
-              {alerts.length > 0 ? alerts.map((a, i) => <AlertRow key={i} alert={a} />) : (
-                <div className="flex flex-col items-center py-8 text-slate-300">
-                  <Shield size={28} className="mb-2 opacity-30" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">All Clear</span>
+
+            {/* Live Runs List */}
+            {recentRuns.length > 0 ? (
+              <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">
+                {recentRuns.map((r) => {
+                  const progress =
+                    r.total_addresses > 0 ? Math.round((r.completed_addresses / r.total_addresses) * 100) : 0;
+
+                  return (
+                    <div
+                      key={r.run_id}
+                      className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 hover:border-sky-300 transition space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="font-mono text-xs font-bold text-slate-900">#{r.run_id}</span>
+                          <div className="text-[11px] text-slate-500 font-semibold">{r.partner_name}</div>
+                        </div>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[9.5px] font-extrabold uppercase ${
+                            r.status === "in_progress"
+                              ? "bg-sky-100 text-sky-800"
+                              : r.status === "completed"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-amber-100 text-amber-800"
+                          }`}
+                        >
+                          {r.status}
+                        </span>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] text-slate-400 font-bold">
+                          <span>
+                            {r.completed_addresses} / {r.total_addresses} stops
+                          </span>
+                          <span>{progress}%</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                          <div style={{ width: `${progress}%` }} className="h-full bg-sky-500 rounded-full transition-all" />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-slate-400">
+                <Truck size={28} className="mx-auto mb-1.5 opacity-30" />
+                <p className="text-xs font-semibold">No delivery runs created yet today</p>
+                <Link
+                  href="/admin/delivery/assign"
+                  className="mt-2 inline-block text-[11px] font-bold text-sky-600 underline"
+                >
+                  Create Delivery Runs
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* Operational Alerts Card */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-3.5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Bell size={16} className="text-rose-500" />
+                <span>Attention &amp; Alerts</span>
+              </h3>
+              {alerts.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white">
+                  {alerts.length}
+                </span>
+              )}
+            </div>
+
+            <div className="space-y-2 max-h-[280px] overflow-y-auto">
+              {alerts.length > 0 ? (
+                alerts.map((a, i) => (
+                  <div
+                    key={i}
+                    className="p-3 rounded-2xl bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 transition flex items-start gap-2.5"
+                  >
+                    <div
+                      className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${
+                        a.type === "critical"
+                          ? "bg-rose-100 text-rose-600"
+                          : a.type === "warning"
+                          ? "bg-amber-100 text-amber-600"
+                          : "bg-blue-100 text-blue-600"
+                      }`}
+                    >
+                      <AlertCircle size={14} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900 truncate">{a.title}</span>
+                        <span className="text-[10px] text-slate-400 font-medium shrink-0 ml-1">{a.time}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{a.msg}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="py-8 text-center text-slate-400">
+                  <Shield size={28} className="mx-auto mb-1.5 opacity-30 text-emerald-500" />
+                  <p className="text-xs font-semibold text-emerald-700">All systems operating smoothly</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Quick Actions */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-            <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2"><Zap size={16} className="text-amber-500" />Quick Actions</h3>
-            <div className="space-y-2">
-              {[
-                { name: "Auto-Assign Deliveries", href: "/admin/delivery/assign", icon: Truck, color: "bg-sky-50 text-sky-600" },
-                { name: "Today's Orders", href: "/admin/orders/today", icon: ShoppingCart, color: "bg-blue-50 text-blue-600" },
-                { name: "Generate Sub Orders", href: "/admin/subscriptions/generate-orders", icon: RefreshCw, color: "bg-purple-50 text-purple-600" },
-                { name: "Revenue Reports", href: "/admin/reports/revenue", icon: TrendingUp, color: "bg-emerald-50 text-emerald-600" },
-                { name: "Stock Overview", href: "/admin/inventory/overview", icon: Layers, color: "bg-amber-50 text-amber-600" },
-              ].map(item => (
-                <Link key={item.href} href={item.href}
-                  className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition-all group border border-transparent hover:border-slate-100">
-                  <div className={`w-8 h-8 rounded-lg ${item.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                    <item.icon size={14} />
-                  </div>
-                  <span className="text-xs font-semibold text-slate-700 group-hover:text-slate-900">{item.name}</span>
-                  <ChevronRight size={14} className="ml-auto text-slate-200 group-hover:text-slate-400" />
-                </Link>
-              ))}
-            </div>
-          </div>
+          {/* Key Capacity & Fleet Health Summary */}
+          <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-3xl p-5 border border-slate-700 shadow-md space-y-4">
+            <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <Activity size={14} className="text-emerald-400" />
+              <span>Fleet &amp; Wallet Capacity</span>
+            </h3>
 
-          {/* Revenue Sparkline */}
-          <div className="bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-2xl p-4 shadow-lg text-white">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-200">Total Revenue</p>
-                <p className="text-2xl font-black tracking-tight">{formatMoney(k.total_revenue)}</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Active Partners</span>
+                <span className="text-lg font-black text-white mt-0.5 block">
+                  {k.active_delivery_partners} / {k.total_delivery_partners}
+                </span>
+                <span className="text-[10px] text-emerald-400 font-semibold">Available on Road</span>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center"><IndianRupee size={20} /></div>
+
+              <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Customer Wallets</span>
+                <span className="text-lg font-black text-amber-400 mt-0.5 block">
+                  {formatMoney(k.total_wallet_balance)}
+                </span>
+                <span className="text-[10px] text-slate-300 font-semibold">{k.wallets_with_balance} Wallets</span>
+              </div>
             </div>
-            <MiniBar data={displayedGrowth.map(g => g.revenue)} maxVal={Math.max(...displayedGrowth.map(g => g.revenue), 1)} />
-            <div className="flex justify-between mt-2 text-[9px] text-emerald-200 font-bold">
-              <span>7d: {formatMoney(k.revenue_7d)}</span>
-              <span>30d: {formatMoney(k.revenue_30d)}</span>
+
+            <div className="pt-1 flex items-center justify-between text-xs">
+              <span className="text-slate-400">30-Day Total Revenue:</span>
+              <span className="font-extrabold text-emerald-400">{formatMoney(k.revenue_30d)}</span>
             </div>
           </div>
         </div>

@@ -98,6 +98,13 @@ export class DashboardService {
           FROM orders
           WHERE status IN ('out_for_delivery', 'packed', 'confirmed')
             AND scheduled_date = $1
+        ),
+        unassigned_stats AS (
+          SELECT COUNT(*)::int AS unassigned_orders_count
+          FROM orders
+          WHERE scheduled_date = $1 
+            AND (delivery_partner_id IS NULL OR delivery_partner_id = '')
+            AND status IN ('pending', 'placed', 'confirmed', 'packed')
         )
         SELECT
           cs.*,
@@ -107,7 +114,8 @@ export class DashboardService {
           ds.*,
           ws.*,
           invs.*,
-          pd.*
+          pd.*,
+          us.*
         FROM customer_stats cs
         CROSS JOIN subscription_stats ss
         CROSS JOIN today_orders tod
@@ -116,10 +124,129 @@ export class DashboardService {
         CROSS JOIN wallet_stats ws
         CROSS JOIN inventory_stats invs
         CROSS JOIN pending_deliveries pd
+        CROSS JOIN unassigned_stats us
       `;
 
-      const rows = await this.db.query(sql, [today]);
+      const runsSql = `
+        SELECT
+          dr.run_id,
+          dr.run_number,
+          dr.delivery_partner_id,
+          dr.branch_id,
+          dr.run_date,
+          dr.delivery_slot,
+          dr.status,
+          COALESCE(dr.total_addresses, 0)::int AS total_addresses,
+          COALESCE(dr.completed_addresses, 0)::int AS completed_addresses,
+          COALESCE(dr.failed_addresses, 0)::int AS failed_addresses,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Partner') AS partner_name,
+          COALESCE(u.phone, '') AS partner_phone,
+          COALESCE(b.branch_name, dr.branch_id) AS branch_name
+        FROM delivery_runs dr
+        LEFT JOIN users u ON u.user_id = dr.delivery_partner_id
+        LEFT JOIN branches b ON b.branch_id = dr.branch_id
+        WHERE dr.run_date = $1 AND dr.deleted_at IS NULL
+        ORDER BY 
+          CASE 
+            WHEN dr.status = 'in_progress' THEN 1
+            WHEN dr.status = 'assigned' THEN 2
+            WHEN dr.status = 'completed' THEN 3
+            ELSE 4
+          END ASC,
+          dr.created_at DESC
+        LIMIT 10
+      `;
+
+      const runsSummarySql = `
+        SELECT
+          COUNT(*)::int AS total_runs,
+          COUNT(*) FILTER (WHERE status = 'in_progress')::int AS in_progress_runs,
+          COUNT(*) FILTER (WHERE status = 'assigned')::int AS assigned_runs,
+          COUNT(*) FILTER (WHERE status = 'completed')::int AS completed_runs
+        FROM delivery_runs
+        WHERE run_date = $1 AND deleted_at IS NULL
+      `;
+
+      const [rows, runsRows, runsSummaryRes] = await Promise.all([
+        this.db.query(sql, [today]),
+        this.db.query(runsSql, [today]),
+        this.db.query(runsSummarySql, [today]),
+      ]);
+
       const kpi = rows[0] ?? {};
+      const runsSummary = runsSummaryRes[0] ?? {
+        total_runs: 0,
+        in_progress_runs: 0,
+        assigned_runs: 0,
+        completed_runs: 0,
+      };
+
+      // Generate heuristic operational insights
+      const insights: Array<{
+        id: string;
+        type: 'success' | 'warning' | 'info' | 'critical';
+        title: string;
+        description: string;
+        actionText?: string;
+        actionHref?: string;
+      }> = [];
+
+      const unassigned = kpi.unassigned_orders_count ?? 0;
+      if (unassigned > 0) {
+        insights.push({
+          id: 'unassigned_orders',
+          type: 'warning',
+          title: `${unassigned} Unassigned Orders for Today`,
+          description: `Orders are confirmed and packed. Run the automatic route optimizer to assign delivery partners.`,
+          actionText: 'Assign Now',
+          actionHref: '/admin/delivery/assign',
+        });
+      } else if ((kpi.today_total ?? 0) > 0) {
+        insights.push({
+          id: 'all_assigned',
+          type: 'success',
+          title: `All Today's Orders Assigned`,
+          description: `All ${kpi.today_total} orders are mapped to delivery partners and active runs.`,
+          actionText: 'View Runs',
+          actionHref: '/admin/delivery/assign',
+        });
+      }
+
+      if (runsSummary.in_progress_runs > 0) {
+        insights.push({
+          id: 'active_runs',
+          type: 'info',
+          title: `${runsSummary.in_progress_runs} Delivery Runs Live on Road`,
+          description: `Partners are actively executing route stops. Monitor real-time GPS locations and delivery drop proofs.`,
+          actionText: 'Live Tracking',
+          actionHref: '/admin/delivery-tracking',
+        });
+      }
+
+      const lowStock = kpi.low_stock_count ?? 0;
+      const outOfStock = kpi.out_of_stock_count ?? 0;
+      if (outOfStock > 0 || lowStock > 0) {
+        insights.push({
+          id: 'inventory_alert',
+          type: outOfStock > 0 ? 'critical' : 'warning',
+          title: `${outOfStock} Out of Stock & ${lowStock} Low Stock Variants`,
+          description: `Restocking needed before next delivery cycle to avoid subscription fulfillment failures.`,
+          actionText: 'View Inventory',
+          actionHref: '/admin/inventory/overview',
+        });
+      }
+
+      const activeSubs = kpi.active_subscriptions ?? 0;
+      if (activeSubs > 0) {
+        insights.push({
+          id: 'subscription_health',
+          type: 'success',
+          title: `${activeSubs} Active Subscriptions`,
+          description: `Recurring daily & alternate day milk subscriptions driving ${kpi.today_subscription_orders ?? 0} deliveries today.`,
+          actionText: 'Manage Subscriptions',
+          actionHref: '/admin/subscriptions/status',
+        });
+      }
 
       return {
         status: true,
@@ -148,6 +275,7 @@ export class DashboardService {
           today_revenue: Number(kpi.today_revenue ?? 0),
           today_subscription_orders: kpi.today_subscription_orders ?? 0,
           today_onetime_orders: kpi.today_onetime_orders ?? 0,
+          today_unassigned_orders: unassigned,
 
           // Revenue
           total_revenue: Number(kpi.total_revenue ?? 0),
@@ -158,6 +286,8 @@ export class DashboardService {
           total_delivery_partners: kpi.total_delivery_partners ?? 0,
           active_delivery_partners: kpi.active_delivery_partners ?? 0,
           pending_delivery_count: kpi.pending_delivery_count ?? 0,
+          today_runs_summary: runsSummary,
+          today_recent_runs: runsRows || [],
 
           // Wallet
           total_wallet_balance: Number(kpi.total_wallet_balance ?? 0),
@@ -167,6 +297,9 @@ export class DashboardService {
           total_variants: kpi.total_variants ?? 0,
           low_stock_count: kpi.low_stock_count ?? 0,
           out_of_stock_count: kpi.out_of_stock_count ?? 0,
+
+          // Insights
+          insights,
 
           // Meta
           date: today,

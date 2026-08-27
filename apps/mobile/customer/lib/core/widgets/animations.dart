@@ -1156,46 +1156,43 @@ class InitialLoadingScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Column(
-            children: [
-              const Spacer(flex: 3),
+        child: Center(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Cow Drinking Milk Animation
+                  const CowLoadingWidget(size: 220),
 
-              // Big Cow Drinking Milk Animation
-              const Flexible(
-                flex: 6,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: CowLoadingWidget(size: 320),
-                ),
+                  const SizedBox(height: 12),
+
+                  // F2H Fresh Brand Title & Subtitle
+                  const Text(
+                    'F2H Fresh',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      color: kPrimary,
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Fresh Daily Essentials',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: kTextSub,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ],
               ),
-
-              const SizedBox(height: 16),
-
-              // F2H Fresh Text & Subtitle below cow animation
-              const Text(
-                'F2H Fresh',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  color: kPrimary,
-                  letterSpacing: -0.4,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Fresh Daily Essentials',
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
-                  color: kTextSub,
-                  letterSpacing: 0.8,
-                ),
-              ),
-
-              const Spacer(flex: 4),
-            ],
+            ),
           ),
         ),
       ),
