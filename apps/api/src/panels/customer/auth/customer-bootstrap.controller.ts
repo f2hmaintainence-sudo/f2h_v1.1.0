@@ -225,8 +225,7 @@ export class CustomerBootstrapController {
         u.user_name,
         u.email,
         u.phone,
-        u.phone AS mobile,
-        u.referral_code
+        u.phone AS mobile
       FROM customers c
       JOIN users u ON u.user_id = c.customer_id
       WHERE c.customer_id = $1 OR (u.email IS NOT NULL AND u.email = $2 AND u.email != '')
@@ -289,24 +288,11 @@ export class CustomerBootstrapController {
         });
         const hasDeliveredOrder = (deliveredCheck?.data?.length || 0) > 0;
         const isUnlocked = Boolean(customer.first_order_completed || hasDeliveredOrder || customer.referral_status === 'active');
-        const computedStatus = isUnlocked ? 'active' : 'locked';
 
         if (isUnlocked) {
           customer.referral_code = customer.customer_id || userId;
           customer.referral_status = 'active';
           customer.first_order_completed = true;
-
-          const userUpdatePayload = await this.filterValidFields('users', {
-            referral_code: customer.referral_code,
-            referral_status: 'active',
-            first_order_completed: true,
-            updated_at: new Date(),
-          });
-          await this.Data.update(
-            'users',
-            userUpdatePayload,
-            [{ column: 'user_id', operator: '=', value: customer.customer_id || userId }],
-          );
         } else {
           customer.referral_code = null;
           customer.referral_status = 'locked';
@@ -314,7 +300,6 @@ export class CustomerBootstrapController {
         }
 
         const updatePayload = await this.filterValidFields('customers', {
-          referral_code: customer.referral_code,
           referral_status: customer.referral_status,
           first_order_completed: customer.first_order_completed,
           updated_at: new Date(),
@@ -337,11 +322,7 @@ export class CustomerBootstrapController {
           limit: 1,
         });
         if (!existingRef?.data?.length) {
-          const referrerCustRows = await this.db.query(
-            `SELECT u.referral_code FROM users u WHERE u.user_id = $1 LIMIT 1`,
-            [customer.referred_by],
-          );
-          const refCode = referrerCustRows?.[0]?.referral_code || customer.referred_by || 'F2HREF';
+          const refCode = customer.referred_by || 'F2HREF';
           const ts = Math.floor(Date.now() / 1000).toString(36).toUpperCase();
           const rnd = Math.floor(Math.random() * 9000 + 1000);
           const referralData = await this.filterValidFields('referrals', {

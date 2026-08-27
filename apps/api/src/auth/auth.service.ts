@@ -763,13 +763,11 @@ export class AuthService {
 
     // 1. Direct Search by user_id in users or customer_id in customers (case-insensitive)
     const directUserRes = await this.DataBase.query(
-      `SELECT c.*, u.user_id, u.first_name, u.last_name, u.user_name, u.email, u.phone, u.referral_code
+      `SELECT c.*, u.user_id, u.first_name, u.last_name, u.user_name, u.email, u.phone
        FROM users u
        LEFT JOIN customers c ON c.customer_id = u.user_id
        WHERE UPPER(u.user_id) = $1
           OR UPPER(COALESCE(c.customer_id, '')) = $1
-          OR UPPER(COALESCE(u.referral_code, '')) = $1
-          OR UPPER(COALESCE(c.referral_code, '')) = $1
        LIMIT 1`,
       [cleanCode],
     );

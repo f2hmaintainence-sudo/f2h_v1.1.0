@@ -76,16 +76,14 @@ export class ReferralRepository implements IReferralRepository {
 
     const variations = Array.from(new Set([raw, noHyphen, withHyphen]));
 
-    // 1. Search users and customers table by user_id, customer_id, or referral_code variations
+    // 1. Search users and customers table by user_id or customer_id variations
     for (const varCode of variations) {
       const userRes = await this.db.query(
-        `SELECT c.*, u.user_id, u.first_name, u.last_name, u.user_name, u.email, u.phone, u.referral_code
+        `SELECT c.*, u.user_id, u.first_name, u.last_name, u.user_name, u.email, u.phone
          FROM users u
          LEFT JOIN customers c ON c.customer_id = u.user_id
          WHERE UPPER(u.user_id) = $1
             OR UPPER(COALESCE(c.customer_id, '')) = $1
-            OR UPPER(COALESCE(u.referral_code, '')) = $1
-            OR UPPER(COALESCE(c.referral_code, '')) = $1
          LIMIT 1`,
         [varCode],
       );
@@ -99,7 +97,7 @@ export class ReferralRepository implements IReferralRepository {
     if (digitsOnly.length >= 3) {
       const lastDigits = digitsOnly.length >= 4 ? digitsOnly.slice(-4) : digitsOnly;
       const phoneMatch = await this.db.query(
-        `SELECT c.*, u.user_id, u.first_name, u.last_name, u.user_name, u.email, u.phone, u.referral_code
+        `SELECT c.*, u.user_id, u.first_name, u.last_name, u.user_name, u.email, u.phone
          FROM users u
          LEFT JOIN customers c ON c.customer_id = u.user_id
          WHERE u.phone LIKE $1 LIMIT 1`,
@@ -208,7 +206,7 @@ export class ReferralRepository implements IReferralRepository {
   async getCustomerByCustomerId(customerId: string): Promise<any | null> {
     try {
       const query = `
-        SELECT c.*, u.first_name, u.last_name, u.user_name, u.phone, u.email, u.referral_code
+        SELECT c.*, u.first_name, u.last_name, u.user_name, u.phone, u.email
         FROM customers c
         JOIN users u ON u.user_id = c.customer_id
         WHERE c.customer_id = $1 OR u.email = $1 OR u.phone = $1

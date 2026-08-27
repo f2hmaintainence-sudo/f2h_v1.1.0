@@ -41,7 +41,6 @@ export class ProfileService {
           u.first_name,
           u.last_name,
           u.first_name || ' ' || u.last_name AS full_name,
-          u.referral_code,
           u.profile_image_url,
           u.last_login_at,
           u.account_status,
@@ -80,15 +79,7 @@ export class ProfileService {
         this.developerService.error('[Profile] Failed to query referral stats', { error: err });
       }
 
-      let referralCode = profile.referral_code;
-      if (!referralCode || !referralCode.trim()) {
-        // Fallback: generate referral code from user name + phone
-        const cleanName = (profile.first_name || profile.last_name || 'DP').replace(/[^a-zA-Z]/g, '').toUpperCase();
-        const prefix = cleanName.length >= 3 ? cleanName.slice(0, 3) : 'DP';
-        const cleanPhone = (profile.phone || '').replace(/\D/g, '');
-        const phoneSuffix = cleanPhone.length >= 4 ? cleanPhone.slice(-4) : '7500';
-        referralCode = `F2HDR-${prefix}${phoneSuffix}`;
-      }
+      const referralCode = profile.delivery_partner_id || partnerUserId || deliveryPartnerId;
 
       let branchName = profile.branch_name;
       if (!branchName && profile.branch_id) {
@@ -881,7 +872,7 @@ export class ProfileService {
   async getDeliveryPartnerReferrals(deliveryPartnerId: string) {
     try {
       const [partnerUser] = await this.db.query(
-        `SELECT u.user_id, u.first_name, u.last_name, u.phone, u.referral_code, dp.delivery_partner_id
+        `SELECT u.user_id, u.first_name, u.last_name, u.phone, dp.delivery_partner_id
          FROM delivery_partners dp
          LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
          WHERE dp.delivery_partner_id = $1
@@ -893,14 +884,7 @@ export class ProfileService {
         throw new NotFoundException('Delivery partner not found');
       }
 
-      let referralCode = partnerUser.referral_code;
-      if (!referralCode || !referralCode.trim()) {
-        const cleanName = (partnerUser.first_name || partnerUser.last_name || 'DP').replace(/[^a-zA-Z]/g, '').toUpperCase();
-        const prefix = cleanName.length >= 3 ? cleanName.slice(0, 3) : 'DP';
-        const cleanPhone = (partnerUser.phone || '').replace(/\D/g, '');
-        const phoneSuffix = cleanPhone.length >= 4 ? cleanPhone.slice(-4) : '7500';
-        referralCode = `F2HDR-${prefix}${phoneSuffix}`;
-      }
+      const referralCode = partnerUser.delivery_partner_id || partnerUser.user_id || deliveryPartnerId;
 
       // Fetch all referral records
       let referrals: any[] = [];

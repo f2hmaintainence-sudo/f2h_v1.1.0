@@ -35,7 +35,7 @@ export class ReferralRewardEngineService {
 
       // 1. Fetch Referee Customer Profile via JOIN users
       const refereeRes = await client.query(
-        `SELECT c.*, u.first_name, u.last_name, u.user_name, u.phone, u.email, u.referral_code
+        `SELECT c.*, u.first_name, u.last_name, u.user_name, u.phone, u.email
          FROM customers c
          JOIN users u ON u.user_id = c.customer_id
          WHERE c.customer_id = $1 OR u.email = $1 OR u.phone = $1 LIMIT 1`,
@@ -77,12 +77,7 @@ export class ReferralRewardEngineService {
         const ts = Math.floor(Date.now() / 1000).toString(36).toUpperCase();
         const rnd = Math.floor(Math.random() * 9000 + 1000);
         const referId = `REF${ts}${rnd}`;
-
-        const referrerRows = await client.query(
-          `SELECT referral_code FROM users WHERE user_id = $1 LIMIT 1`,
-          [referrerId],
-        );
-        const refCode = referrerRows.rows?.[0]?.referral_code || referrerId || 'F2HREF';
+        const refCode = referrerId || 'F2HREF';
 
         // Detect DP referrer
         const dpCheck = await client.query(
