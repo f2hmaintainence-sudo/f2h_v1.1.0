@@ -555,23 +555,25 @@ export class NotificationService {
   }
 
   /**
-   * Dismiss/soft delete a notification (set status to 'dismissed')
+   * Dismiss/soft delete a notification (set status to 'dismissed' and deleted_at = NOW())
    */
   async dismissNotification(
     userId: string,
-    recipientId: number,
+    recipientId: number | string,
   ): Promise<void> {
     try {
-      await this.dataService.update(
-        'notification_recipients',
-        {
-          status: 'dismissed',
-          updated_at: new Date(),
-        },
-        [
-          { column: 'user_id', operator: '=', value: userId },
-          { column: 'id', operator: '=', value: recipientId },
-        ],
+      const num = Number(recipientId);
+      const isNum = !isNaN(num) && Number.isInteger(num);
+
+      await this.db.query(
+        `UPDATE notification_recipients
+         SET status = 'dismissed', deleted_at = NOW(), updated_at = NOW()
+         WHERE user_id = $1
+         AND (
+           id = $2
+           OR notification_id = $3
+         )`,
+        [userId, isNum ? num : -1, String(recipientId)],
       );
 
       this.logger.log(
@@ -588,13 +590,12 @@ export class NotificationService {
    */
   async dismissAllNotifications(userId: string): Promise<void> {
     try {
-      await this.dataService.update(
-        'notification_recipients',
-        {
-          status: 'dismissed',
-          updated_at: new Date(),
-        },
-        [{ column: 'user_id', operator: '=', value: userId }],
+      await this.db.query(
+        `UPDATE notification_recipients
+         SET status = 'dismissed', deleted_at = NOW(), updated_at = NOW()
+         WHERE user_id = $1
+         AND status != 'dismissed'`,
+        [userId],
       );
 
       this.logger.log(`Dismissed all notifications for user ${userId}`);

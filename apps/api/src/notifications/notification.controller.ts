@@ -221,17 +221,7 @@ export class NotificationController {
     @Param('recipientId') recipientId: string,
   ) {
     const user = req.user as any;
-    const id = parseInt(recipientId, 10);
-
-    if (isNaN(id)) {
-      await this.notificationService.markAsRead(user.user_id, [recipientId]);
-      return {
-        success: true,
-        message: 'Notification dismissed',
-      };
-    }
-
-    await this.notificationService.dismissNotification(user.user_id, id);
+    await this.notificationService.dismissNotification(user.user_id, recipientId);
 
     return {
       success: true,
