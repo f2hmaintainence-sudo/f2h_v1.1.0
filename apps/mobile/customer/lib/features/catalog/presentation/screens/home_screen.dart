@@ -2703,82 +2703,17 @@ class _CategorySection extends StatelessWidget {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(14),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Banner image
-                    Image.network(
-                      formatImageUrl(banner!['imageUrl']?.toString() ?? ''),
-                      fit: BoxFit.fill,
-                      width: double.infinity,
-                      errorBuilder: (_, __, ___) => Container(
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF15803D), Color(0xFF22C55E)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    banner!['title']?.toString() ?? categoryName,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                  if ((banner!['subtitle'] ?? '').toString().isNotEmpty)
-                                    Text(
-                                      banner!['subtitle'].toString(),
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 11,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                banner!['cta']?.toString() ?? 'Shop Now',
-                                style: const TextStyle(
-                                  color: Color(0xFF15803D),
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    // Tap ripple overlay
-                    Positioned.fill(
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(14),
-                          onTap: () => _onBannerTap(context),
-                        ),
-                      ),
-                    ),
-                  ],
+                child: Image.network(
+                  formatImageUrl(banner!['imageUrl']?.toString() ?? ''),
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                  errorBuilder: (_, __, ___) => Image.asset(
+                    'assets/splash/splash.png',
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                  ),
                 ),
               ),
             ),

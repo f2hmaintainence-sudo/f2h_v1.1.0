@@ -91,8 +91,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// Discount the server granted for [_appliedCouponCode], in rupees.
   double _couponDiscount = 0;
 
-  /// Server-calculated payable amount while a coupon is applied. Falls back to
-  /// the client subtotal minus [_couponDiscount] when the preview call fails.
+  /// Discount the server granted for auto-applied promotions (e.g. 50% off First Milk Order).
+  double _autoPromotionDiscount = 0;
+
+  /// Server-calculated payable amount while a coupon/promotion is applied.
   double? _couponPreviewTotal;
 
   /// Cart subtotal the applied coupon was priced against — when the customer
@@ -110,6 +112,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _loadingAvailableCoupons = false;
   double _couponsListedForSubtotal = -1;
   bool _couponsExpanded = true;
+  String _lastPreviewKey = '';
+  bool _isPreviewingDiscounts = false;
 
   // ===== Checkout Item Filtering =====
 
@@ -313,23 +317,71 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _couponPricedForSubtotal = 0;
       _couponError = null;
       _couponController.clear();
+      _lastPreviewKey = '';
     });
   }
 
-  /// Re-prices the applied coupon after the cart subtotal changes.
+  /// Automatically requests preview from server to calculate auto-applied promotions & coupon discounts.
   void _repriceCouponIfNeeded(
     List<CartItemEntity> checkoutItems,
     double subtotal,
     String userId,
   ) {
-    if (_appliedCouponCode == null || _isCouponLoading) return;
-    if ((subtotal - _couponPricedForSubtotal).abs() < 0.01) return;
+    if (_isCouponLoading || _isPreviewingDiscounts) return;
+    final itemKey = checkoutItems.map((e) => '${e.variantId}_${e.quantity}').join(',');
+    final key = '$userId-$subtotal-$itemKey-${_appliedCouponCode ?? "none"}';
+    if (_lastPreviewKey == key) return;
 
-    _couponPricedForSubtotal = subtotal;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _appliedCouponCode == null) return;
-      _couponController.text = _appliedCouponCode!;
-      _applyCoupon(checkoutItems, subtotal, userId);
+    _lastPreviewKey = key;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      _isPreviewingDiscounts = true;
+      try {
+        final repository = sl<CheckoutRepository>();
+        final preview = await repository.previewDiscounts(
+          CheckoutRequestEntity(
+            userId: userId,
+            items: checkoutItems,
+            addressId: _defaultAddressId(),
+            paymentMethod: _selectedPayment,
+            paymentType: _selectedPayment == 'cod' ? 'postpaid' : 'prepaid',
+            couponCode: _appliedCouponCode,
+          ),
+        );
+        if (!mounted) return;
+
+        final summary = preview['coupon_summary'];
+        double promoDiscount = 0;
+        double couponDisc = 0;
+        double? previewTotal;
+
+        if (summary is Map) {
+          promoDiscount = _toDouble(summary['promotion_discount']);
+          couponDisc = _toDouble(summary['coupon_discount']);
+        } else if (preview['discount_amount'] != null) {
+          if (_appliedCouponCode != null && _appliedCouponCode!.isNotEmpty) {
+            couponDisc = _toDouble(preview['discount_amount']);
+          } else {
+            promoDiscount = _toDouble(preview['discount_amount']);
+          }
+        }
+
+        if (preview['total_amount'] != null) {
+          previewTotal = _toDouble(preview['total_amount']);
+        }
+
+        setState(() {
+          _autoPromotionDiscount = promoDiscount;
+          if (_appliedCouponCode != null && _appliedCouponCode!.isNotEmpty) {
+            _couponDiscount = couponDisc;
+          }
+          _couponPreviewTotal = previewTotal;
+          _couponPricedForSubtotal = subtotal;
+        });
+      } catch (_) {
+      } finally {
+        _isPreviewingDiscounts = false;
+      }
     });
   }
 
@@ -344,11 +396,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return calculateOneTimeTotal(checkoutItems);
   }
 
-  /// Subtotal after the applied coupon. Prefers the server's preview total so
-  /// what is shown matches what the checkout API will charge.
+  /// Subtotal after auto-applied promotion and applied coupon. Prefers server total.
   double _payableFor(double subtotal) {
-    if (_appliedCouponCode == null) return subtotal;
-    final total = _couponPreviewTotal ?? (subtotal - _couponDiscount);
+    if (_couponPreviewTotal != null) return _couponPreviewTotal!;
+    final total = subtotal - _autoPromotionDiscount - _couponDiscount;
     return total < 0 ? 0 : total;
   }
 
@@ -1114,7 +1165,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                         value:
                                             '₹${onetimeTotal.toStringAsFixed(0)}',
                                       ),
-                                      if (_appliedCouponCode != null) ...[
+                                      if (_autoPromotionDiscount > 0) ...[
+                                        const SizedBox(height: 8),
+                                        SummaryRow(
+                                          label: 'Promotion Discount',
+                                          value:
+                                              '-₹${_autoPromotionDiscount.toStringAsFixed(0)}',
+                                          valueColor: kPrimaryLt,
+                                        ),
+                                      ],
+                                      if (_appliedCouponCode != null && _couponDiscount > 0) ...[
                                         const SizedBox(height: 8),
                                         SummaryRow(
                                           label: 'Coupon ($_appliedCouponCode)',

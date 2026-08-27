@@ -30,24 +30,42 @@ export class CartController {
     return this.cartService.checkout(body, req);
   }
 
+  private extractCustomerId(req: Request): string | undefined {
+    const user = (req.user as any)?.user_id;
+    if (user) return user;
+    const authHeader = req.headers['authorization'];
+    if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+      try {
+        const raw = authHeader.substring(7);
+        const parts = raw.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+          return payload.sub || payload.user_id;
+        }
+      } catch (_) {}
+    }
+    return undefined;
+  }
+
   @Public()
   @Post('/coupon/validate')
   async validateCoupon(@Req() req: Request, @Body() body: { coupon_code: string; subtotal?: number }) {
-    const customerId = (req.user as any)?.user_id;
-    return this.cartService.validateCoupon(customerId, body.coupon_code, Number(body.subtotal || 0));
+    const customerId = this.extractCustomerId(req);
+    return this.cartService.validateCoupon(customerId || '', body.coupon_code, Number(body.subtotal || 0));
   }
 
   /** Coupons this customer can pick from, priced against the cart subtotal. */
   @Public()
   @Get('/coupons')
   async listCoupons(@Req() req: Request, @Query('subtotal') subtotal?: string) {
-    const customerId = (req.user as any)?.user_id;
-    return this.cartService.listCoupons(customerId, Number(subtotal || 0));
+    const customerId = this.extractCustomerId(req);
+    return this.cartService.listCoupons(customerId || '', Number(subtotal || 0));
   }
 
+  @Public()
   @Post('/checkout/preview-discounts')
   async previewDiscounts(@Req() req: Request, @Body() body: CheckOutDto) {
-    const customerId = (req.user as any)?.user_id;
-    return this.cartService.previewDiscounts(customerId, body);
+    const customerId = this.extractCustomerId(req);
+    return this.cartService.previewDiscounts(customerId || '', body);
   }
 }

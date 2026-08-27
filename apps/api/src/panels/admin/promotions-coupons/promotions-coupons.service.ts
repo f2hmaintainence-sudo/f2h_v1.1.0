@@ -69,6 +69,25 @@ export class PromotionsCouponsService implements OnModuleInit {
         [row.variant_id],
       );
     }
+
+    // 3. Ensure MILK50 coupon exists and links to PROMO_FIRST_MILK
+    await this.db.query(
+      `INSERT INTO coupons (
+         coupon_id, promotion_id, code, name, description, status,
+         usage_limit, usage_limit_per_customer, created_at, updated_at
+       ) VALUES (
+         'CPN_FIRST_MILK_50', 'PROMO_FIRST_MILK', 'MILK50', 'First Milk Order - 50% Off',
+         '50% off on your first fresh milk purchase', 'active',
+         10000, 1, NOW(), NOW()
+       )
+       ON CONFLICT (code) DO UPDATE SET
+         promotion_id = 'PROMO_FIRST_MILK',
+         name = EXCLUDED.name,
+         description = EXCLUDED.description,
+         status = 'active',
+         usage_limit_per_customer = 1,
+         updated_at = NOW()`,
+    );
   }
 
   // ── PROMOTIONS ───────────────────────────────────────────────────────────────
