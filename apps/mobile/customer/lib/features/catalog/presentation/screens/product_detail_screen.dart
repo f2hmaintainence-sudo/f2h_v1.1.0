@@ -400,32 +400,46 @@ class _SidebarItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── CLEAN GLASS CIRCLE BADGE (No Heavy Glow) ──────────
+            // ── LIGHT SOFT GLASS CIRCLE BADGE ──────────
             AnimatedScale(
               scale: isSelected ? 1.08 : 1.0,
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeOutBack,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOutBack,
-                width: 58,
-                height: 58,
-                padding: EdgeInsets.all(isSelected ? 2.5 : 0),
+                curve: Curves.easeOutCubic,
+                width: 60,
+                height: 60,
+                padding: EdgeInsets.all(isSelected ? 3 : 0),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isSelected ? Colors.white : Colors.transparent,
+                  gradient: isSelected
+                      ? const LinearGradient(
+                          colors: [Color(0xFFFFFFFF), Color(0xFFECFDF5), Color(0xFFD1FAE5)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : null,
+                  color: isSelected ? null : Colors.transparent,
                   border: isSelected
                       ? Border.all(
-                          color: const Color(0xFF10B981),
-                          width: 2.2,
+                          color: const Color(0xFF6EE7B7),
+                          width: 1.8,
                         )
                       : Border.all(color: Colors.transparent, width: 0),
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.07),
-                            blurRadius: 8,
+                            color: const Color(0xFF10B981).withValues(alpha: 0.14),
+                            blurRadius: 12,
+                            spreadRadius: 1,
                             offset: const Offset(0, 3),
+                          ),
+                          BoxShadow(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            blurRadius: 4,
+                            spreadRadius: -1,
+                            offset: const Offset(0, -1),
                           ),
                         ]
                       : null,
@@ -435,26 +449,30 @@ class _SidebarItem extends StatelessWidget {
                     shape: BoxShape.circle,
                     gradient: isAll
                         ? const LinearGradient(
-                            colors: [Color(0xFF047857), Color(0xFF10B981)],
+                            colors: [Color(0xFF10B981), Color(0xFF34D399)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           )
                         : null,
                     color: isAll
                         ? null
-                        : (isSelected ? const Color(0xFFECFDF5) : Colors.white),
+                        : (isSelected ? const Color(0xFFF0FDF4) : Colors.white),
                     border: Border.all(
                       color: isAll
                           ? Colors.white
                           : (isSelected
-                              ? const Color(0xFF059669).withValues(alpha: 0.3)
+                              ? const Color(0xFFA7F3D0)
                               : const Color(0xFFE2E8F0)),
-                      width: isSelected ? 1.5 : 1.2,
+                      width: isSelected ? 1.4 : 1.2,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 4,
+                        color: isAll
+                            ? const Color(0xFF10B981).withValues(alpha: 0.25)
+                            : (isSelected
+                                ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                                : Colors.black.withValues(alpha: 0.03)),
+                        blurRadius: isSelected ? 6 : 3,
                         offset: const Offset(0, 2),
                       ),
                     ],
@@ -501,7 +519,7 @@ class _SidebarItem extends StatelessWidget {
                   fontSize: 10.5,
                   fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
                   color: isSelected
-                      ? const Color(0xFF047857)
+                      ? const Color(0xFF059669)
                       : const Color(0xFF475569),
                   height: 1.18,
                   letterSpacing: isSelected ? -0.1 : 0,
