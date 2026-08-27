@@ -1161,39 +1161,23 @@ class InitialLoadingScreen extends StatelessWidget {
           child: Column(
             children: [
               const Spacer(flex: 3),
-              // Brand Logo & Title Header
-              Container(
-                width: 86,
-                height: 86,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: kBorderLt),
-                  boxShadow: [
-                    BoxShadow(
-                      color: kPrimary.withValues(alpha: 0.10),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(21),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: Image.asset(
-                      'assets/icon/app_icon.png',
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, _, _) => const Icon(Icons.spa, color: kPrimary, size: 40),
-                    ),
-                  ),
+
+              // Big Cow Drinking Milk Animation
+              const Flexible(
+                flex: 6,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: CowLoadingWidget(size: 320),
                 ),
               ),
-              const SizedBox(height: 18),
+
+              const SizedBox(height: 16),
+
+              // F2H Fresh Text & Subtitle below cow animation
               const Text(
                 'F2H Fresh',
                 style: TextStyle(
-                  fontSize: 26,
+                  fontSize: 28,
                   fontWeight: FontWeight.w900,
                   color: kPrimary,
                   letterSpacing: -0.4,
@@ -1203,24 +1187,14 @@ class InitialLoadingScreen extends StatelessWidget {
               const Text(
                 'Fresh Daily Essentials',
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 13.5,
                   fontWeight: FontWeight.w600,
                   color: kTextSub,
                   letterSpacing: 0.8,
                 ),
               ),
-              const Spacer(flex: 1),
 
-              // Extra Large Cow Drinking Milk Animation further down
-              const Flexible(
-                flex: 5,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: CowLoadingWidget(size: 340),
-                ),
-              ),
-
-              const Spacer(flex: 2),
+              const Spacer(flex: 4),
             ],
           ),
         ),
