@@ -38,7 +38,7 @@ class F2hHeroHeader extends StatelessWidget {
         minHeight: topInset + 185,
       ),
       decoration: const BoxDecoration(
-        color: Color(0xFF0F172A),
+        color: Colors.white,
       ),
       child: Stack(
         clipBehavior: Clip.none,
@@ -55,9 +55,9 @@ class F2hHeroHeader extends StatelessWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      Color(0xFF064E3B),
-                      Color(0xFF065F46),
-                      Color(0xFF0F172A),
+                      Color(0xFFDCFCE7),
+                      Color(0xFFF0FDF4),
+                      Color(0xFFE2E8F0),
                     ],
                   ),
                 ),
@@ -65,23 +65,7 @@ class F2hHeroHeader extends StatelessWidget {
             ),
           ),
 
-          // 2. Elegant dark/emerald gradient overlay for text readability & contrast
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.35),
-                    Colors.black.withValues(alpha: 0.75),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // 3. Top Header Content (Greeting, Bell, Profile Avatar, Online Pill)
+          // 2. Top Header Content (Greeting, Bell, Profile Avatar, Online Pill)
           Padding(
             padding: EdgeInsets.fromLTRB(16, topInset + 16, 16, 28),
             child: Column(
@@ -104,7 +88,7 @@ class F2hHeroHeader extends StatelessWidget {
                             style: GoogleFonts.poppins(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
-                              color: Colors.white,
+                              color: const Color(0xFF0F172A),
                               letterSpacing: -0.3,
                             ),
                           ),
@@ -115,8 +99,8 @@ class F2hHeroHeader extends StatelessWidget {
                                 'Ready to deliver amazing today',
                                 style: GoogleFonts.poppins(
                                   fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: const Color(0xFFE2E8F0),
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF475569),
                                 ),
                               ),
                               const SizedBox(width: 3),
@@ -144,9 +128,16 @@ class F2hHeroHeader extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.35),
+                      color: Colors.white.withValues(alpha: 0.90),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                      border: Border.all(color: const Color(0xFFDCFCE7), width: 1.5),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x0F000000),
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
@@ -164,11 +155,11 @@ class F2hHeroHeader extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                addressLabel ?? 'CURRENT LOCATION',
+                                addressLabel ?? 'NEXT DELIVERY ADDRESS',
                                 style: GoogleFonts.poppins(
                                   fontSize: 9.5,
                                   fontWeight: FontWeight.w800,
-                                  color: const Color(0xFF86EFAC),
+                                  color: const Color(0xFF15803D),
                                   letterSpacing: 0.5,
                                 ),
                               ),
@@ -178,7 +169,7 @@ class F2hHeroHeader extends StatelessWidget {
                                 style: GoogleFonts.poppins(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
-                                  color: Colors.white,
+                                  color: const Color(0xFF0F172A),
                                 ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
