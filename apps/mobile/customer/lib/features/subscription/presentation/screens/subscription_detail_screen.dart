@@ -1730,9 +1730,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   _buildDeliveryAddressCard(defaultAddress, addressString),
                   const SizedBox(height: 12),
 
-                  // ── 4. Postpaid Summary Card (if Postpaid) ─────
-                  if (s.paymentType == 'postpaid')
-                    _buildPostpaidSummaryCard(sessionState),
+                  // ── 4. Postpaid Summary Card (Hidden per user request) ─────
 
                   // ── 5. Subscription Details (collapsible, includes Delivery Details) ──
                   _buildSubscriptionDetailsSection(s),
