@@ -144,7 +144,7 @@ class _BrowseState extends State<BrowseScreen> {
               curve: Curves.easeOutCubic,
               left: 0,
               right: 0,
-              bottom: 12,
+              bottom: widget.isNavVisible ? 74 : 16,
               child: const FloatingCartBar(),
             ),
           ],
