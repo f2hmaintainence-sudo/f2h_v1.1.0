@@ -536,7 +536,7 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
         centerTitle: false,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: kPrimary))
+          ? const CowLoadingWidget(size: 180)
           : _error != null
               ? Center(
                   child: Column(

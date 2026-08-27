@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
+import 'package:f2h_customer/core/widgets/cow_loading_widget.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
   final String orderId;
@@ -73,7 +74,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         elevation: 0,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const CowLoadingWidget(size: 180)
           : _error != null
               ? Center(
                   child: Column(
