@@ -447,10 +447,9 @@ export class AuthService {
       if (existingUser) {
         // Update placeholder user created during OTP verification
         const incomingFcmToken = body.fcm_token || (body as any).fcmToken;
-        this.developer.debug('userUpdatePayload', body);
+        this.developer.debug('userUpdatePayload', { ...body, password: '[REDACTED]' });
         const userUpdatePayload: any = {
           email,
-          phone,
           user_name: userName,
           first_name: firstName,
           last_name: lastName,
@@ -458,6 +457,11 @@ export class AuthService {
           role_id: roleId,
           updated_at: now,
         };
+        // Always write phone when provided — the placeholder created during OTP
+        // verification has phone=null, and the UPDATE must fill it in.
+        if (phone) {
+          userUpdatePayload.phone = phone;
+        }
         if (incomingFcmToken) {
           userUpdatePayload.fcm_token = incomingFcmToken;
         }
@@ -468,6 +472,18 @@ export class AuthService {
           [{ column: 'user_id', operator: '=', value: userId }],
           { transaction },
         );
+
+        // Belt-and-suspenders: if phone still NULL in DB, force a raw update.
+        if (phone) {
+          try {
+            await this.DataBase.query(
+              `UPDATE users SET phone = $1 WHERE user_id = $2 AND (phone IS NULL OR phone = '')`,
+              [phone, userId],
+            );
+          } catch (phoneErr) {
+            this.developer.warn(`[AuthService] belt-and-suspenders phone update failed for ${userId}`, { phoneErr });
+          }
+        }
       } else {
         const incomingFcmToken = body.fcm_token || (body as any).fcmToken;
         const userInsertPayload: any = {
@@ -798,7 +814,7 @@ export class AuthService {
     if (digitsOnly.length >= 3) {
       const lastDigits = digitsOnly.length >= 4 ? digitsOnly.slice(-4) : digitsOnly;
       const phoneMatch = await this.DataBase.query(
-        `SELECT user_id, referral_code FROM users WHERE phone LIKE $1 LIMIT 1`,
+        `SELECT user_id FROM users WHERE phone LIKE $1 LIMIT 1`,
         [`%${lastDigits}`]
       );
       if (phoneMatch?.length) return phoneMatch[0];
@@ -814,10 +830,8 @@ export class AuthService {
       });
       if (existing?.data?.length) return existing.data[0];
 
-      const custData = {
+      const custData: any = {
         customer_id: newCustId,
-        referral_code: cleanCode,
-        referral_status: 'active',
         created_at: new Date(),
         updated_at: new Date(),
       };
@@ -829,7 +843,7 @@ export class AuthService {
           error,
         });
       }
-      return custData;
+      return { ...custData, referral_code: cleanCode };
     }
 
     return null;
