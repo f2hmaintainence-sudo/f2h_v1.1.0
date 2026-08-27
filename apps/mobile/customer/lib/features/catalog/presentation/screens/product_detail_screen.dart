@@ -24,7 +24,7 @@ import '../../../../core/widgets/cow_loading_widget.dart';
 
 /// Space kept clear at the bottom of scrollable content for the app shell's
 /// navigation bar and the floating cart pill.
-const double _kBottomInset = 104;
+const double _kBottomInset = 160;
 
 /// How far above the navigation bar the floating cart pill sits.
 const double _kCartBarLift = 12;
