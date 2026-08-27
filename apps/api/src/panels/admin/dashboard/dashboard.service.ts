@@ -164,7 +164,9 @@ export class DashboardService {
       const runsSql = `
         SELECT
           dr.run_id,
-          dr.run_number,
+          -- delivery_runs has no run_number column; run_id already holds the
+          -- human-readable RUN-<date>-<slot>-<seq> value the UI shows.
+          dr.run_id AS run_number,
           dr.delivery_partner_id,
           dr.branch_id,
           dr.run_date,

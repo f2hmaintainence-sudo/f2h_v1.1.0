@@ -1006,11 +1006,44 @@ export class DeliveryOrderService {
           `UPDATE delivery_run_addresses
            SET delivery_status = $1,
                delivered_at = NOW(),
-               failed_reason = '',
-               delivery_image = COALESCE($2, delivery_image),
+               failed_reason = $2,
+               delivery_image = COALESCE($3, delivery_image),
                updated_at = NOW()
-           WHERE run_id = ANY($3) AND address_id = $4`,
-          [status, norm.deliveryImage, runIds, addressId],
+           WHERE run_id = ANY($4) AND address_id = $5`,
+          [status, status === 'failed' ? (norm.notes || 'Delivery failed') : '', norm.deliveryImage, runIds, addressId],
+        );
+
+        // Synchronize delivery_runs stop counters, times, and completion status
+        await client.query(
+          `UPDATE delivery_runs dr
+           SET completed_addresses = COALESCE(sub.completed_stops, 0),
+               failed_addresses    = COALESCE(sub.failed_stops, 0),
+               total_addresses     = GREATEST(COALESCE(dr.total_addresses, 0), COALESCE(sub.total_stops, 0)),
+               status              = CASE
+                                       WHEN dr.status = 'handed_over' THEN dr.status
+                                       WHEN COALESCE(sub.pending_stops, 0) = 0 AND COALESCE(sub.total_stops, 0) > 0 THEN 'completed'
+                                       WHEN dr.status = 'assigned' THEN 'in_progress'
+                                       ELSE dr.status
+                                     END,
+               actual_start_time   = COALESCE(dr.actual_start_time, NOW()),
+               actual_end_time     = CASE
+                                       WHEN COALESCE(sub.pending_stops, 0) = 0 AND COALESCE(sub.total_stops, 0) > 0 THEN COALESCE(dr.actual_end_time, NOW())
+                                       ELSE dr.actual_end_time
+                                     END,
+               updated_at          = NOW()
+           FROM (
+             SELECT
+               dra.run_id,
+               COUNT(*)::int AS total_stops,
+               COUNT(*) FILTER (WHERE dra.delivery_status = 'delivered')::int AS completed_stops,
+               COUNT(*) FILTER (WHERE dra.delivery_status = 'failed')::int AS failed_stops,
+               COUNT(*) FILTER (WHERE dra.delivery_status NOT IN ('delivered', 'failed', 'cancelled'))::int AS pending_stops
+             FROM delivery_run_addresses dra
+             WHERE dra.run_id = ANY($1)
+             GROUP BY dra.run_id
+           ) sub
+           WHERE (dr.run_id = sub.run_id OR dr.id::text = sub.run_id OR dr.run_id = ANY($1) OR dr.id::text = ANY($1))`,
+          [runIds],
         );
 
         // Update delivery_dispatch_items delivered quantities
@@ -1063,14 +1096,6 @@ export class DeliveryOrderService {
            WHERE (id::text = ANY($1) OR run_id = ANY($1)) AND status != 'handed_over'`,
           [runIds],
         );
-        // When all orders are finished, update dispatch status to 'return_pending'
-        // await client.query(
-        //   `UPDATE delivery_dispatch
-        //    SET status = 'return_pending', updated_at = NOW()
-        //    WHERE delivery_run_id = ANY($1)
-        //      AND status IN ('in_progress', 'collected', 'loaded')`,
-        //   [runIds],
-        // );
       }
     });
 
@@ -1397,8 +1422,60 @@ export class DeliveryOrderService {
         [order.order_id, status, norm.notes || `Order marked as ${status} by driver`, boy.full_name],
       );
 
-      // Auto-complete the run if all orders are delivered or failed
+      // Auto-complete and update delivery_runs if order belongs to a run
       if (order.delivery_run_id) {
+        if (order.address_id) {
+          await client.query(
+            `UPDATE delivery_run_addresses dra
+             SET delivery_status = $1,
+                 delivered_at = NOW(),
+                 delivery_image = COALESCE($2, delivery_image),
+                 updated_at = NOW()
+             WHERE (dra.run_id = $3 OR dra.run_id IN (SELECT run_id FROM delivery_runs WHERE id::text = $3 OR run_id = $3))
+               AND dra.address_id = $4
+               AND NOT EXISTS (
+                 SELECT 1 FROM orders o
+                 WHERE o.delivery_run_id = dra.run_id
+                   AND o.address_id = dra.address_id
+                   AND o.status NOT IN ('delivered', 'failed', 'completed', 'cancelled')
+               )`,
+            [status, norm.deliveryImage, order.delivery_run_id, order.address_id],
+          );
+        }
+
+        // Synchronize delivery_runs stop counters, times, and completion status
+        await client.query(
+          `UPDATE delivery_runs dr
+           SET completed_addresses = COALESCE(sub.completed_stops, 0),
+               failed_addresses    = COALESCE(sub.failed_stops, 0),
+               total_addresses     = GREATEST(COALESCE(dr.total_addresses, 0), COALESCE(sub.total_stops, 0)),
+               status              = CASE
+                                       WHEN dr.status = 'handed_over' THEN dr.status
+                                       WHEN COALESCE(sub.pending_stops, 0) = 0 AND COALESCE(sub.total_stops, 0) > 0 THEN 'completed'
+                                       WHEN dr.status = 'assigned' THEN 'in_progress'
+                                       ELSE dr.status
+                                     END,
+               actual_start_time   = COALESCE(dr.actual_start_time, NOW()),
+               actual_end_time     = CASE
+                                       WHEN COALESCE(sub.pending_stops, 0) = 0 AND COALESCE(sub.total_stops, 0) > 0 THEN COALESCE(dr.actual_end_time, NOW())
+                                       ELSE dr.actual_end_time
+                                     END,
+               updated_at          = NOW()
+           FROM (
+             SELECT
+               dra.run_id,
+               COUNT(*)::int AS total_stops,
+               COUNT(*) FILTER (WHERE dra.delivery_status = 'delivered')::int AS completed_stops,
+               COUNT(*) FILTER (WHERE dra.delivery_status = 'failed')::int AS failed_stops,
+               COUNT(*) FILTER (WHERE dra.delivery_status NOT IN ('delivered', 'failed', 'cancelled'))::int AS pending_stops
+             FROM delivery_run_addresses dra
+             WHERE dra.run_id = $1 OR dra.run_id IN (SELECT run_id FROM delivery_runs WHERE id::text = $1 OR run_id = $1)
+             GROUP BY dra.run_id
+           ) sub
+           WHERE (dr.run_id = sub.run_id OR dr.id::text = sub.run_id OR dr.run_id = $1 OR dr.id::text = $1)`,
+          [order.delivery_run_id],
+        );
+
         const pendingRes = await client.query(
           `SELECT COUNT(*)::int AS count FROM orders
            WHERE delivery_run_id = $1

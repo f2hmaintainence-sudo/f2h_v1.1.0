@@ -536,7 +536,75 @@ export default function AdminDashboard() {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
-          3. FULFILLMENT PIPELINE FUNNEL GAUGE
+          3. SMART HEURISTIC INSIGHTS & AI PULSE
+      ══════════════════════════════════════════════════════════════════════ */}
+      {insightsList.length > 0 && (
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+              <Sparkles size={14} className="text-emerald-600" />
+              <span>Operational Insights &amp; Intelligence</span>
+            </h2>
+            <span className="text-[11px] text-slate-400 font-medium">Auto-generated recommendations</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {insightsList.map((ins) => {
+              const bgColors = {
+                success: "bg-emerald-50/70 border-emerald-200 text-emerald-950",
+                warning: "bg-amber-50/80 border-amber-200 text-amber-950",
+                info: "bg-blue-50/70 border-blue-200 text-blue-950",
+                critical: "bg-rose-50/80 border-rose-200 text-rose-950",
+              };
+              const iconColors = {
+                success: "text-emerald-600 bg-emerald-100",
+                warning: "text-amber-600 bg-amber-100",
+                info: "text-blue-600 bg-blue-100",
+                critical: "text-rose-600 bg-rose-100",
+              };
+
+              return (
+                <div
+                  key={ins.id}
+                  className={`p-4 rounded-2xl border ${bgColors[ins.type] || bgColors.info} shadow-sm flex flex-col justify-between`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-xl shrink-0 ${iconColors[ins.type]}`}>
+                      {ins.type === "critical" ? (
+                        <Flame size={16} />
+                      ) : ins.type === "warning" ? (
+                        <AlertTriangle size={16} />
+                      ) : ins.type === "success" ? (
+                        <CheckCircle2 size={16} />
+                      ) : (
+                        <Activity size={16} />
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-extrabold">{ins.title}</h4>
+                      <p className="text-[11.5px] opacity-80 mt-0.5 leading-relaxed">{ins.description}</p>
+                    </div>
+                  </div>
+                  {ins.actionText && ins.actionHref && (
+                    <div className="mt-3 pt-2.5 border-t border-black/5 flex justify-end">
+                      <Link
+                        href={ins.actionHref}
+                        className="inline-flex items-center gap-1 text-xs font-bold underline hover:opacity-80 transition"
+                      >
+                        <span>{ins.actionText}</span>
+                        <ArrowUpRight size={13} />
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          4. FULFILLMENT PIPELINE FUNNEL GAUGE
       ══════════════════════════════════════════════════════════════════════ */}
       {pipelineMetrics && (
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
@@ -683,11 +751,10 @@ export default function AdminDashboard() {
                   <button
                     key={m.key}
                     onClick={() => setChartMetric(m.key)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                      chartMetric === m.key
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${chartMetric === m.key
                         ? "bg-white text-slate-900 shadow-sm border border-slate-200"
                         : "text-slate-500 hover:text-slate-800"
-                    }`}
+                      }`}
                   >
                     {m.label}
                   </button>
@@ -704,10 +771,10 @@ export default function AdminDashboard() {
                       chartMetric === "revenue"
                         ? g.revenue
                         : chartMetric === "orders"
-                        ? g.orders
-                        : chartMetric === "subscriptions"
-                        ? g.new_subscriptions
-                        : g.new_customers;
+                          ? g.orders
+                          : chartMetric === "subscriptions"
+                            ? g.new_subscriptions
+                            : g.new_customers;
 
                     const heightPercent = Math.max(10, Math.round((value / maxGrowthValue) * 100));
 
@@ -720,15 +787,14 @@ export default function AdminDashboard() {
                           initial={{ height: 0 }}
                           animate={{ height: `${heightPercent}%` }}
                           transition={{ delay: idx * 0.05, duration: 0.5 }}
-                          className={`w-full max-w-[38px] rounded-t-xl transition-all group-hover:brightness-110 ${
-                            chartMetric === "revenue"
+                          className={`w-full max-w-[38px] rounded-t-xl transition-all group-hover:brightness-110 ${chartMetric === "revenue"
                               ? "bg-gradient-to-t from-emerald-600 to-emerald-400"
                               : chartMetric === "orders"
-                              ? "bg-gradient-to-t from-sky-600 to-sky-400"
-                              : chartMetric === "subscriptions"
-                              ? "bg-gradient-to-t from-purple-600 to-purple-400"
-                              : "bg-gradient-to-t from-amber-600 to-amber-400"
-                          }`}
+                                ? "bg-gradient-to-t from-sky-600 to-sky-400"
+                                : chartMetric === "subscriptions"
+                                  ? "bg-gradient-to-t from-purple-600 to-purple-400"
+                                  : "bg-gradient-to-t from-amber-600 to-amber-400"
+                            }`}
                         />
                       </div>
                     );
@@ -856,13 +922,12 @@ export default function AdminDashboard() {
                           <div className="text-[11px] text-slate-500 font-semibold">{r.partner_name}</div>
                         </div>
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[9.5px] font-extrabold uppercase ${
-                            r.status === "in_progress"
+                          className={`px-2 py-0.5 rounded-full text-[9.5px] font-extrabold uppercase ${r.status === "in_progress"
                               ? "bg-sky-100 text-sky-800"
                               : r.status === "completed"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-amber-100 text-amber-800"
-                          }`}
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-amber-100 text-amber-800"
+                            }`}
                         >
                           {r.status}
                         </span>
@@ -942,13 +1007,12 @@ export default function AdminDashboard() {
                         </span>
                       </div>
                       <span
-                        className={`px-2 py-0.5 rounded-full text-[9.5px] font-extrabold uppercase shrink-0 ${
-                          l.status === "pending"
+                        className={`px-2 py-0.5 rounded-full text-[9.5px] font-extrabold uppercase shrink-0 ${l.status === "pending"
                             ? "bg-purple-100 text-purple-800"
                             : l.status === "approved"
-                            ? "bg-emerald-100 text-emerald-800"
-                            : "bg-rose-100 text-rose-800"
-                        }`}
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-rose-100 text-rose-800"
+                          }`}
                       >
                         {l.status}
                       </span>
@@ -1006,13 +1070,12 @@ export default function AdminDashboard() {
                     className="p-3 rounded-2xl bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 transition flex items-start gap-2.5"
                   >
                     <div
-                      className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${
-                        a.type === "critical"
+                      className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${a.type === "critical"
                           ? "bg-rose-100 text-rose-600"
                           : a.type === "warning"
-                          ? "bg-amber-100 text-amber-600"
-                          : "bg-blue-100 text-blue-600"
-                      }`}
+                            ? "bg-amber-100 text-amber-600"
+                            : "bg-blue-100 text-blue-600"
+                        }`}
                     >
                       <AlertCircle size={14} />
                     </div>
