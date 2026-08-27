@@ -202,7 +202,7 @@ export class DashboardService {
           COALESCE(u.phone, '') AS partner_phone,
           COALESCE(b.branch_name, dp.branch_id, 'Main Branch') AS branch_name
         FROM delivery_leave_requests dlr
-        LEFT JOIN delivery_partners dp ON dp.id = dlr.delivery_partner_id
+        LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dlr.delivery_partner_id
         LEFT JOIN users u ON u.user_id = dlr.delivery_partner_id
         LEFT JOIN branches b ON b.branch_id = dp.branch_id
         WHERE dlr.deleted_at IS NULL

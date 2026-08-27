@@ -73,6 +73,22 @@ interface DeliveryRunItem {
   branch_name: string;
 }
 
+interface LeaveRequestItem {
+  id: number;
+  delivery_partner_id: string;
+  leave_date: string;
+  end_date?: string;
+  leave_type: string;
+  half_day_shift?: string;
+  reason: string;
+  status: "pending" | "approved" | "rejected" | "cancelled";
+  admin_remarks?: string;
+  created_at: string;
+  partner_name: string;
+  partner_phone: string;
+  branch_name: string;
+}
+
 interface OperationalInsight {
   id: string;
   type: "success" | "warning" | "info" | "critical";
@@ -95,6 +111,7 @@ interface KpiData {
   today_pending: number;
   today_placed: number;
   today_confirmed: number;
+  today_assigned?: number;
   today_packed: number;
   today_out_for_delivery: number;
   today_delivered: number;
@@ -122,6 +139,8 @@ interface KpiData {
   low_stock_count: number;
   out_of_stock_count: number;
   pending_leave_requests_count?: number;
+  unreviewed_leave_requests_count?: number;
+  today_recent_leave_requests?: LeaveRequestItem[];
   total_outstandings_amount?: number;
   pending_outstandings_count?: number;
   insights?: OperationalInsight[];
@@ -222,19 +241,20 @@ export default function AdminDashboard() {
     if (!kpi) return null;
     const total = kpi.today_total || 0;
     const delivered = kpi.today_delivered || 0;
-    const onRoad = kpi.today_out_for_delivery || 0;
+    const assigned = (kpi.today_assigned || 0) + (kpi.today_out_for_delivery || 0);
     const packed = kpi.today_packed || 0;
     const confirmed = kpi.today_confirmed || 0;
-    const pending = kpi.today_pending || 0;
+    const pending = (kpi.today_pending || 0) + (kpi.today_placed || 0);
     const cancelled = kpi.today_cancelled || 0;
 
     const completionRate = total > 0 ? Math.round((delivered / Math.max(total - cancelled, 1)) * 100) : 0;
-    const inProgressRate = total > 0 ? Math.round(((delivered + onRoad + packed) / Math.max(total - cancelled, 1)) * 100) : 0;
+    const inProgressRate = total > 0 ? Math.round(((delivered + assigned + packed) / Math.max(total - cancelled, 1)) * 100) : 0;
 
     return {
       total,
       delivered,
-      onRoad,
+      assigned,
+      onRoad: assigned,
       packed,
       confirmed,
       pending,
@@ -279,6 +299,8 @@ export default function AdminDashboard() {
   const k = kpi || ({} as KpiData);
   const runsSummary = k.today_runs_summary || { total_runs: 0, in_progress_runs: 0, assigned_runs: 0, completed_runs: 0 };
   const recentRuns = k.today_recent_runs || [];
+  const recentLeaves = k.today_recent_leave_requests || [];
+  const unreviewedLeavesCount = k.unreviewed_leave_requests_count ?? k.pending_leave_requests_count ?? 0;
   const unassignedOrders = k.today_unassigned_orders || 0;
   const insightsList = k.insights || [];
 
@@ -940,6 +962,92 @@ export default function AdminDashboard() {
                 >
                   Create Delivery Runs
                 </Link>
+              </div>
+            )}
+          </div>
+
+          {/* Latest Partner Leave Requests Card */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-purple-50 text-purple-600 border border-purple-100">
+                  <Calendar size={16} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-slate-900">Partner Leave Requests</h3>
+                    {unreviewedLeavesCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-black bg-purple-600 text-white animate-pulse">
+                        {unreviewedLeavesCount} Pending
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10.5px] text-slate-400">Time-off &amp; duty roster adjustments</p>
+                </div>
+              </div>
+              <Link
+                href="/admin/delivery/leave-requests"
+                className="text-[11px] font-bold text-purple-600 hover:text-purple-700 flex items-center gap-1"
+              >
+                <span>Review All</span>
+                <ArrowRight size={12} />
+              </Link>
+            </div>
+
+            {/* Leave Requests List */}
+            {recentLeaves.length > 0 ? (
+              <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+                {recentLeaves.map((l) => (
+                  <div
+                    key={l.id}
+                    className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 hover:border-purple-300 transition space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0 flex-1">
+                        <span className="text-xs font-bold text-slate-900 truncate block">{l.partner_name}</span>
+                        <span className="text-[10.5px] text-slate-400 font-medium">
+                          {l.branch_name} • {l.leave_type || "Leave"}
+                        </span>
+                      </div>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[9.5px] font-extrabold uppercase shrink-0 ${
+                          l.status === "pending"
+                            ? "bg-purple-100 text-purple-800"
+                            : l.status === "approved"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-rose-100 text-rose-800"
+                        }`}
+                      >
+                        {l.status}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10.5px] text-slate-600 font-semibold bg-white p-2 rounded-xl border border-slate-100">
+                      <span>
+                        📅 {new Date(l.leave_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                        {l.end_date && l.end_date !== l.leave_date ? ` - ${new Date(l.end_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}
+                        {l.half_day_shift ? ` (${l.half_day_shift})` : ""}
+                      </span>
+                      <Link
+                        href="/admin/delivery/leave-requests"
+                        className="text-[10px] font-bold text-purple-600 hover:underline"
+                      >
+                        Take Action →
+                      </Link>
+                    </div>
+
+                    {l.reason && (
+                      <p className="text-[10.5px] text-slate-500 italic truncate px-0.5">
+                        &ldquo;{l.reason}&rdquo;
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-6 text-center text-slate-400">
+                <Calendar size={24} className="mx-auto mb-1.5 opacity-30 text-purple-500" />
+                <p className="text-xs font-semibold">No recent leave requests</p>
               </div>
             )}
           </div>
