@@ -209,22 +209,46 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                     alignment: Alignment.center,
                                     children: [
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                         decoration: BoxDecoration(
-                                          color: on ? kPrimary.withValues(alpha: 0.12) : const Color(0xFFF1F5F9),
+                                          gradient: on
+                                              ? const LinearGradient(
+                                                  colors: [
+                                                    Color(0xFF0F172A),
+                                                    Color(0xFF1E293B),
+                                                    Color(0xFF064E3B),
+                                                  ],
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                )
+                                              : null,
+                                          color: on ? null : const Color(0xFFF1F5F9),
                                           borderRadius: BorderRadius.circular(10),
                                           border: Border.all(
-                                            color: on ? kPrimary.withValues(alpha: 0.35) : const Color(0xFFE2E8F0),
+                                            color: on
+                                                ? const Color(0xFF22C55E).withValues(alpha: 0.5)
+                                                : const Color(0xFFE2E8F0),
                                             width: 1.2,
                                           ),
+                                          boxShadow: on
+                                              ? [
+                                                  BoxShadow(
+                                                    color: const Color(0xFF064E3B).withValues(alpha: 0.25),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 2),
+                                                  ),
+                                                ]
+                                              : null,
                                         ),
                                         child: Text(
                                           'REFERRAL',
                                           style: GoogleFonts.poppins(
-                                            fontSize: 14,
+                                            fontSize: 13,
                                             fontWeight: FontWeight.w900,
                                             letterSpacing: -0.4,
-                                            color: on ? kPrimary : (isTabEnabled ? kPrimary.withValues(alpha: 0.75) : kMuted),
+                                            color: on
+                                                ? const Color(0xFF4ADE80)
+                                                : (isTabEnabled ? const Color(0xFF16A34A) : kMuted),
                                           ),
                                         ),
                                       ),
@@ -234,11 +258,23 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                         child: Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFFEC4899),
+                                            gradient: const LinearGradient(
+                                              colors: [
+                                                Color(0xFF0F172A),
+                                                Color(0xFF1E293B),
+                                                Color(0xFF064E3B),
+                                              ],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            ),
                                             borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: const Color(0xFF22C55E).withValues(alpha: 0.7),
+                                              width: 0.8,
+                                            ),
                                             boxShadow: const [
                                               BoxShadow(
-                                                color: Color(0x33EC4899),
+                                                color: Color(0x33064E3B),
                                                 blurRadius: 4,
                                                 offset: Offset(0, 1.5),
                                               ),
@@ -249,7 +285,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                             style: GoogleFonts.poppins(
                                               fontSize: 8.5,
                                               fontWeight: FontWeight.w900,
-                                              color: Colors.white,
+                                              color: const Color(0xFF4ADE80),
                                             ),
                                           ),
                                         ),

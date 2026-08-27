@@ -476,6 +476,12 @@ class ProductCardV extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!isBrowse) {
+      return SizedBox(
+        width: 165,
+        child: ProductGridCard(p),
+      );
+    }
     final colorIndex = p.id.hashCode.abs() % 5;
     final borderColor = [
       const Color(0xFFC8E6C9), // soft green

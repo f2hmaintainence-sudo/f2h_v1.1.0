@@ -30,6 +30,7 @@ import '../bloc/catalog_state.dart';
 import '../bloc/catalog_event.dart';
 import '../helpers/cart_helpers.dart';
 import '../widgets/cart_widgets.dart';
+import '../widgets/product_grid_card.dart';
 import 'home_screen.dart';
 
 
@@ -935,7 +936,10 @@ class _CartScreenState extends State<CartScreen> {
                   .map(
                     (p) => Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: oneTimeProductCard(context, p),
+                      child: SizedBox(
+                        width: 165,
+                        child: ProductGridCard(p),
+                      ),
                     ),
                   )
                   .toList(),
