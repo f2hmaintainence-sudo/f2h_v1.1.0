@@ -420,7 +420,12 @@ class _SidebarItem extends StatelessWidget {
                         )
                       : (isSelected
                           ? const LinearGradient(
-                              colors: [Color(0xFFA7F3D0), Color(0xFFECFDF5), Color(0xFFFFFFFF)],
+                              colors: [
+                                Color(0xFF34D399),
+                                Color(0xFFA7F3D0),
+                                Colors.white,
+                              ],
+                              stops: [0.0, 0.55, 1.0],
                               begin: Alignment.bottomCenter,
                               end: Alignment.topCenter,
                             )
