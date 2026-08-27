@@ -374,6 +374,13 @@ class _EmptyResults extends StatelessWidget {
   );
 }
 
+/// Cleans category display names by stripping 'F2H ' / 'f2h ' prefixes.
+String cleanCategoryName(String name) {
+  if (name.isEmpty) return name;
+  final cleaned = name.replaceAll(RegExp(r'\bf2h\b\s*', caseSensitive: false), '').trim();
+  return cleaned.isNotEmpty ? cleaned : name;
+}
+
 // ══════════════════════════════════════════════════════════
 //  GLASSIE SIDEBAR ITEM — Glossy glassmorphic indicator UI
 // ══════════════════════════════════════════════════════════
@@ -390,6 +397,7 @@ class _SidebarItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final catName = cat['name'] as String? ?? '';
+    final displayCatName = cleanCategoryName(catName);
     final imagePath = cat['image_path'] as String?;
     final isAll = catName == 'All';
 
@@ -504,7 +512,7 @@ class _SidebarItem extends StatelessWidget {
                   letterSpacing: isSelected ? -0.1 : 0,
                 ),
                 child: Text(
-                  catName,
+                  displayCatName,
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,

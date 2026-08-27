@@ -1094,7 +1094,7 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             const SizedBox(height: 6),
             Text(
-              label,
+              cleanCategoryName(label),
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -2646,7 +2646,7 @@ class _CategorySection extends StatelessWidget {
           child: Row(
             children: [
               Text(
-                categoryName,
+                cleanCategoryName(categoryName),
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
