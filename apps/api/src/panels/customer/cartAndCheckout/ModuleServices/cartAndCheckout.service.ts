@@ -186,6 +186,7 @@ export class CartService {
 
   async checkout(body: CheckOutDto, req?: any) {
     const plan = await this.buildCheckoutPlan(body, req);
+    let consumedOnlineTxn: any = null;
 
     // ── Online payment gate ──
     // When the customer paid via Razorpay (payment_method 'online' or 'upi'),
@@ -201,7 +202,7 @@ export class CartService {
       }
       // consumeOrderPayment verifies the signature (if not yet verified) and
       // atomically marks the payment row as fulfilled so it can only be used once.
-      await this.customerPaymentService.consumeOrderPayment({
+      consumedOnlineTxn = await this.customerPaymentService.consumeOrderPayment({
         customerId: plan.customerId,
         razorpayOrderId: body.razorpay_order_id,
         razorpayPaymentId: body.razorpay_payment_id,
@@ -436,6 +437,15 @@ export class CartService {
 
       return { referenceId, orderedProductNames, createdOrderIds };
     });
+
+    if (['online', 'upi', 'razorpay'].includes(plan.paymentMethod)) {
+      if (consumedOnlineTxn?.transaction_id && result.referenceId) {
+        await this.customerPaymentService.attachOrderReference(
+          consumedOnlineTxn.transaction_id,
+          result.referenceId,
+        );
+      }
+    }
 
     // Side effects run only after the commit. Broadcasting mid-loop showed admins
     // orders that a later failure would have rolled back, and an FCM timeout used

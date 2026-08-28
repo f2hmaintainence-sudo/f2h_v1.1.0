@@ -528,13 +528,13 @@ export class DeliveryOrderService {
         `INSERT INTO delivery_container_reconciliation (
            warehouse_id, run_id, container_id,
            collected_quantity, submitted_quantity,
-           damaged_quantity, lost_quantity, discrepancy_quantity,
+           damaged_quantity, lost_quantity,
            status, collection_notes, submitted_by,
            created_at, updated_at
          ) VALUES (
            $1, $2, $3,
            $4, 0,
-           $5, $6, 0,
+           $5, $6,
            'pending', $7, $8,
            NOW(), NOW()
          )`,

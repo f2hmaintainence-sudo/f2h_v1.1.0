@@ -106,8 +106,8 @@ export class LocationController {
           );
 
           const insertHistoryQuery = `
-            INSERT INTO delivery_location_logs (user_id, latitude, longitude, speed, battery, recorded_at)
-            VALUES ($1, $2, $3, $4, $5, NOW())`;
+            INSERT INTO delivery_location_logs (delivery_partner_id, user_id, latitude, longitude, speed, battery, recorded_at)
+            VALUES ($1, $1, $2, $3, $4, $5, NOW())`;
           await this.db.query(insertHistoryQuery, [
             userId,
             Number(body.latitude),

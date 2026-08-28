@@ -7,6 +7,7 @@ import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/order_detail_screen.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/delivery_confirmation_sheet.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/warehouse_handover_screen.dart';
+import 'package:f2h_delivery/features/orders/presentation/widgets/containers_tracker_modal.dart';
 import 'package:f2h_delivery/features/tracking/presentation/screens/map_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_delivery/services/location_service.dart';
@@ -785,7 +786,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                       ),
                       SizedBox(height: 2),
                       Text(
-                        'Proceed to Warehouse to return empty bottles and undelivered items.',
+                        'Proceed to container reconciliation to return empty bottles and containers.',
                         style: TextStyle(
                           fontSize: 12,
                           color: kTextSub,
@@ -800,13 +801,16 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
             const SizedBox(height: 14),
             ElevatedButton(
               onPressed: () {
-                Navigator.push(
+                final sessionState = context.read<DeliverySessionBloc>().state;
+                final stops = sessionState is DeliverySessionLoaded ? sessionState.groupedStops : <GroupedStop>[];
+                ContainersTrackerModal.show(
                   context,
-                  MaterialPageRoute(builder: (_) => const WarehouseHandoverScreen()),
+                  stops,
+                  currentRun: currentRun,
                 );
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: kDanger,
+                backgroundColor: kPrimary,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 12),
@@ -817,10 +821,10 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.directions_walk_rounded, size: 16),
+                  Icon(Icons.inventory_2_outlined, size: 16),
                   SizedBox(width: 6),
                   Text(
-                    'GO TO WAREHOUSE HANDOVER',
+                    'CONTAINER RECONCILIATION',
                     style: TextStyle(
                       fontWeight: FontWeight.w900,
                       fontSize: 13,

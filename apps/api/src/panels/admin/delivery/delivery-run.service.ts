@@ -676,16 +676,15 @@ export class DeliveryRunService {
 
       const sql = `
         SELECT
-          dr.id, dr.run_id, dr.delivery_partner_id, dr.branch_id,
+          dr.id, dr.run_id, dr.run_id AS run_number, dr.delivery_partner_id, dr.branch_id,
           dr.run_date, dr.delivery_slot, dr.status, dr.assignment_method,
           dr.total_addresses, dr.completed_addresses, dr.failed_addresses,
           dr.actual_start_time, dr.actual_end_time,
           COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Partner') AS partner_name,
           COALESCE(u.phone, '') AS partner_phone,
           b.branch_name,
-          -- Runs do not have warehouse_id; get warehouse_id via branch_id join
-          w.warehouse_id AS warehouse_id,
-          COALESCE(w.name, b.branch_name) AS warehouse_name,
+          COALESCE(w.warehouse_id, (SELECT warehouse_id FROM warehouses WHERE is_active = true AND deleted_at IS NULL LIMIT 1)) AS warehouse_id,
+          COALESCE(w.name, b.branch_name, 'Main Warehouse') AS warehouse_name,
           COALESCE(
             (SELECT SUM(o.total_amount) FROM orders o WHERE o.delivery_run_id = dr.run_id), 0
           )::numeric AS run_value
@@ -737,13 +736,17 @@ export class DeliveryRunService {
       const runSql = `
         SELECT
           dr.*,
+          dr.run_id AS run_number,
           COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Partner') AS partner_name,
           COALESCE(u.phone, '') AS partner_phone,
-          b.branch_name
+          b.branch_name,
+          COALESCE(w.warehouse_id, (SELECT warehouse_id FROM warehouses WHERE is_active = true AND deleted_at IS NULL LIMIT 1)) AS warehouse_id,
+          COALESCE(w.name, b.branch_name, 'Main Warehouse') AS warehouse_name
         FROM delivery_runs dr
         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
         LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
         LEFT JOIN branches b ON b.branch_id = dr.branch_id
+        LEFT JOIN warehouses w ON w.branch_id = dr.branch_id AND w.is_active = true AND w.deleted_at IS NULL
         WHERE dr.run_id = $1 OR dr.id::varchar = $1
       `;
       const runRows = await this.db.query(runSql, [runId]);
@@ -2720,6 +2723,8 @@ export class DeliveryRunService {
           dr.status,
           dr.branch_id,
           b.branch_name,
+          COALESCE(w.warehouse_id, (SELECT warehouse_id FROM warehouses WHERE is_active = true AND deleted_at IS NULL LIMIT 1)) AS warehouse_id,
+          COALESCE(w.name, b.branch_name, 'Main Warehouse') AS warehouse_name,
           dr.delivery_partner_id,
           COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Partner') AS partner_name,
           COALESCE(u.phone, '') AS partner_phone,
@@ -2801,6 +2806,7 @@ export class DeliveryRunService {
           ) AS orders
         FROM delivery_runs dr
         LEFT JOIN branches b ON b.branch_id = dr.branch_id
+        LEFT JOIN warehouses w ON w.branch_id = dr.branch_id AND w.is_active = true AND w.deleted_at IS NULL
         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
         LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
         WHERE ${whereClause}
@@ -2836,6 +2842,8 @@ export class DeliveryRunService {
           COALESCE(u.phone, '') AS partner_phone,
           dp.branch_id,
           b.branch_name,
+          COALESCE(w.warehouse_id, (SELECT warehouse_id FROM warehouses WHERE is_active = true AND deleted_at IS NULL LIMIT 1)) AS warehouse_id,
+          COALESCE(w.name, b.branch_name, 'Main Warehouse') AS warehouse_name,
           dp.is_active,
           dp.is_available,
           dr.id AS run_db_id,
@@ -2896,6 +2904,7 @@ export class DeliveryRunService {
         FROM delivery_partners dp
         LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
         LEFT JOIN branches b ON b.branch_id = dp.branch_id
+        LEFT JOIN warehouses w ON w.branch_id = dp.branch_id AND w.is_active = true AND w.deleted_at IS NULL
         LEFT JOIN delivery_runs dr ON (
           dr.delivery_partner_id = dp.delivery_partner_id
           AND dr.run_date = $1

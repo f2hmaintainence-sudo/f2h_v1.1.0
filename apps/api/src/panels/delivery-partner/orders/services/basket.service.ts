@@ -4,7 +4,7 @@ import { isDispatchHandedOver } from '../dispatch-status';
 
 @Injectable()
 export class BasketService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly db: DatabaseService) { }
 
   /**
    * Resolves or creates an active delivery basket for a partner/run.
@@ -273,7 +273,7 @@ export class BasketService {
     const currentSlot = kolkataHour < 12 ? 'morning' : 'evening';
 
     const runRes = await this.db.query(
-      `SELECT dr.id, dr.run_id, dr.delivery_partner_id, w.warehouse_id, dr.delivery_slot, dr.status AS run_status,
+      `SELECT dr.id, dr.run_id, dr.delivery_partner_id, COALESCE(w.warehouse_id, (SELECT warehouse_id FROM warehouses WHERE is_active = true AND deleted_at IS NULL LIMIT 1)) AS warehouse_id, dr.delivery_slot, dr.status AS run_status,
               dd.dispatch_id, dd.status AS dispatch_status
        FROM delivery_runs dr
        LEFT JOIN warehouses w ON w.branch_id = dr.branch_id AND w.is_active = true AND w.deleted_at IS NULL
@@ -737,14 +737,14 @@ export class BasketService {
               `INSERT INTO delivery_container_reconciliation (
                  warehouse_id, run_id, container_id,
                  collected_quantity, submitted_quantity,
-                 damaged_quantity, lost_quantity, discrepancy_quantity,
+                 damaged_quantity, lost_quantity,
                  status, collection_notes, submitted_by,
                  created_at, updated_at
                ) VALUES (
                  (SELECT COALESCE(w.warehouse_id, 'WH-MAIN') FROM delivery_runs dr LEFT JOIN warehouses w ON w.branch_id = dr.branch_id AND w.is_active = true AND w.deleted_at IS NULL WHERE dr.id::text = $1 OR dr.run_id = $1 LIMIT 1),
                  $1, $2,
                  0, 0,
-                 0, 0, 0,
+                 0, 0,
                  'pending', 'Auto-tracked container for delivery run', $3,
                  NOW(), NOW()
                )`,
@@ -752,7 +752,7 @@ export class BasketService {
             );
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // Summary metrics come straight from delivery_container_reconciliation.

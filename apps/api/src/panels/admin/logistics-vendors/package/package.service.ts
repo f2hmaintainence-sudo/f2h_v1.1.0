@@ -40,7 +40,7 @@ export class PackageService {
     private readonly db: DatabaseService,
     private readonly formHelper: FormHelper,
     private readonly developer: DeveloperService,
-  ) {}
+  ) { }
 
   async dashboard(query: any) {
     try {
@@ -225,8 +225,8 @@ export class PackageService {
       await this.db.transaction(async (client) => {
         const col =
           action === 'returned' ? 'returned_quantity' :
-          action === 'damaged' ? 'damaged_quantity' :
-          'lost_quantity';
+            action === 'damaged' ? 'damaged_quantity' :
+              'lost_quantity';
 
         // (customer_id, container_id) is unique, so this upserts atomically.
         // `balance_quantity` is a generated column and is never written directly.
@@ -487,19 +487,17 @@ export class PackageService {
            SET submitted_quantity = $1,
                damaged_quantity = $2,
                lost_quantity = $3,
-               discrepancy_quantity = $4,
-               status = $5,
-               review_by = $6,
+               status = $4,
+               review_by = $5,
                reviewed_at = NOW(),
-               submission_notes = COALESCE($7, submission_notes),
+               submission_notes = COALESCE($6, submission_notes),
                updated_at = NOW()
-           WHERE id = $8
+           WHERE id = $7
            RETURNING *`,
           [
             submittedQty,
             damagedQty,
             lostQty,
-            discrepancyQty,
             newStatus,
             adminId,
             notes,
@@ -572,14 +570,14 @@ export class PackageService {
           `INSERT INTO delivery_container_reconciliation (
             warehouse_id, run_id, container_id,
             collected_quantity, submitted_quantity,
-            damaged_quantity, lost_quantity, discrepancy_quantity,
+            damaged_quantity, lost_quantity,
             status, review_by, reviewed_at,
             collection_notes, submission_notes,
             created_by, submitted_by, created_at, updated_at
           ) VALUES (
             $1, $2, $3,
             $4, $4,
-            $5, $6, 0,
+            $5, $6,
             'closed', $7, NOW(),
             $8, $8,
             $7, $9, NOW(), NOW()
@@ -656,6 +654,7 @@ export class PackageService {
         `
         SELECT
           dr.run_id,
+          dr.run_id AS run_number,
           dr.run_date,
           dr.delivery_slot,
           dr.status AS run_status,
@@ -666,7 +665,7 @@ export class PackageService {
             'Delivery Partner'
           ) AS delivery_partner_name,
           COALESCE(NULLIF(TRIM(u.phone), ''), NULLIF(TRIM(dp.phone), ''), 'N/A') AS delivery_partner_phone,
-          w.warehouse_id,
+          COALESCE(w.warehouse_id, (SELECT warehouse_id FROM warehouses WHERE is_active = true AND deleted_at IS NULL LIMIT 1)) AS warehouse_id,
           COALESCE(w.name, b.branch_name, 'Main Warehouse') AS warehouse_name
         FROM delivery_runs dr
         LEFT JOIN delivery_partners dp ON (dp.delivery_partner_id = dr.delivery_partner_id OR dp.id::varchar = dr.delivery_partner_id)

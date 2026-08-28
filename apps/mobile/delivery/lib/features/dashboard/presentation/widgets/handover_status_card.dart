@@ -4,6 +4,7 @@ import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/warehouse_handover_screen.dart';
+import 'package:f2h_delivery/features/orders/presentation/widgets/containers_tracker_modal.dart';
 
 /// Displays a contextual status banner when the delivery run is [completed]
 /// (needs warehouse handover) or [handed_over] (shift fully done).
@@ -78,7 +79,7 @@ class HandoverStatusCard extends StatelessWidget {
                       ),
                       SizedBox(height: 2),
                       Text(
-                        'Proceed to Warehouse to return empty bottles and undelivered items.',
+                        'Proceed to container reconciliation to return empty bottles and containers.',
                         style: TextStyle(
                           fontSize: 12,
                           color: kTextSub,
@@ -92,14 +93,17 @@ class HandoverStatusCard extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             ElevatedButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const WarehouseHandoverScreen(),
-                ),
-              ),
+              onPressed: () {
+                final sessionState = context.read<DeliverySessionBloc>().state;
+                final stops = sessionState is DeliverySessionLoaded ? sessionState.groupedStops : <GroupedStop>[];
+                ContainersTrackerModal.show(
+                  context,
+                  stops,
+                  currentRun: run,
+                );
+              },
               style: ElevatedButton.styleFrom(
-                backgroundColor: kDanger,
+                backgroundColor: kPrimary,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 12),
@@ -110,10 +114,10 @@ class HandoverStatusCard extends StatelessWidget {
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.directions_walk_rounded, size: 16),
+                  Icon(Icons.inventory_2_outlined, size: 16),
                   SizedBox(width: 6),
                   Text(
-                    'GO TO WAREHOUSE HANDOVER',
+                    'CONTAINER RECONCILIATION',
                     style: TextStyle(
                       fontWeight: FontWeight.w900,
                       fontSize: 13,

@@ -17,7 +17,7 @@ export class DeliveryDispatchService {
     private readonly db: DatabaseService,
     private readonly developer: DeveloperService,
     private readonly stockCore: StockMovementCoreService,
-  ) {}
+  ) { }
 
   // ────────────────────────────────────────────────
   // Dispatch stock to delivery boy for a run
@@ -534,7 +534,7 @@ WHERE ${where.join(' AND ')}
 
     if (query.run_id) {
       const rows = await this.db.query(
-        `SELECT w.warehouse_id AS warehouse_id
+        `SELECT COALESCE(w.warehouse_id, (SELECT warehouse_id FROM warehouses WHERE is_active = true AND deleted_at IS NULL LIMIT 1)) AS warehouse_id
          FROM delivery_runs dr
          LEFT JOIN warehouses w
            ON w.branch_id = dr.branch_id AND w.is_active = true AND w.deleted_at IS NULL
@@ -699,7 +699,6 @@ WHERE ${where.join(' AND ')}
 
       if (warehouse_id) {
         params.push(warehouse_id);
-        // Runs don't have warehouse_id — match the one serving the branch
         where.push(`w.warehouse_id = $${params.length}`);
       }
       if (delivery_slot) {
@@ -711,13 +710,13 @@ WHERE ${where.join(' AND ')}
         SELECT
           dr.id,
           dr.run_id,
-          dr.run_number,
+          dr.run_id AS run_number,
           dr.delivery_slot,
           dr.run_date,
           dr.status AS run_status,
           COALESCE(dd.status, 'draft') AS dispatch_status,
-          w.warehouse_id AS warehouse_id,
-          COALESCE(w.name, b.branch_name) AS warehouse_name,
+          COALESCE(w.warehouse_id, (SELECT warehouse_id FROM warehouses WHERE is_active = true AND deleted_at IS NULL LIMIT 1)) AS warehouse_id,
+          COALESCE(w.name, b.branch_name, 'Main Warehouse') AS warehouse_name,
           COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Delivery Partner') AS delivery_partner_name,
           dp.delivery_partner_id,
           COUNT(ddi.id)::int AS total_items,
@@ -735,7 +734,7 @@ WHERE ${where.join(' AND ')}
         WHERE ${where.join(' AND ')}
           AND dr.deleted_at IS NULL
         GROUP BY
-          dr.id, dr.run_id, dr.run_number, dr.delivery_slot, dr.run_date, dr.status,
+          dr.id, dr.run_id, dr.delivery_slot, dr.run_date, dr.status,
           dd.status,
           w.warehouse_id, dd.warehouse_id, w.name, b.branch_name,
           u.first_name, u.last_name, u.user_name, dp.delivery_partner_id
@@ -796,8 +795,9 @@ WHERE ${where.join(' AND ')}
 
       const runSql = `
         SELECT dr.*,
-               w.warehouse_id AS resolved_warehouse_id,
-               COALESCE(w.name, b.branch_name) AS warehouse_name,
+               dr.run_id AS run_number,
+               COALESCE(w.warehouse_id, (SELECT warehouse_id FROM warehouses WHERE is_active = true AND deleted_at IS NULL LIMIT 1)) AS resolved_warehouse_id,
+               COALESCE(w.name, b.branch_name, 'Main Warehouse') AS warehouse_name,
                COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Delivery Partner') AS delivery_partner_name
         FROM delivery_runs dr
         LEFT JOIN branches b ON b.branch_id = dr.branch_id
@@ -857,7 +857,7 @@ WHERE ${where.join(' AND ')}
           ddi.dispatch_id,
           dd.delivery_run_id,
           dr.run_id,
-          dr.run_number,
+          dr.run_id AS run_number,
           dr.run_date,
           dr.delivery_slot,
           dr.status AS run_status,
@@ -943,7 +943,7 @@ WHERE ${where.join(' AND ')}
           COALESCE(u.phone, '') AS delivery_partner_phone,
           ddi.dispatch_id,
           dr.run_id,
-          dr.run_number,
+          dr.run_id AS run_number,
           dr.run_date,
           dr.delivery_slot,
           dr.status AS run_status,
@@ -966,7 +966,7 @@ WHERE ${where.join(' AND ')}
         WHERE ${where.join(' AND ')}
         GROUP BY
           dr.delivery_partner_id, u.first_name, u.last_name, u.user_name, u.phone,
-          ddi.dispatch_id, dr.run_id, dr.run_number,
+          ddi.dispatch_id, dr.run_id,
           dr.run_date, dr.delivery_slot, dr.status,
           dd.warehouse_id, w.name
         ORDER BY dr.run_date DESC, delivery_partner_name, dr.delivery_slot
