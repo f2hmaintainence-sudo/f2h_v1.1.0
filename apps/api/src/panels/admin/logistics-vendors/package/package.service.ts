@@ -649,7 +649,7 @@ export class PackageService {
       let whClause = '';
       if (warehouseId && warehouseId !== 'all') {
         params.push(warehouseId);
-        whClause = `AND (dr.warehouse_id = $${params.length} OR dr.branch_id = $${params.length})`;
+        whClause = `AND (w.warehouse_id = $${params.length} OR dr.branch_id = $${params.length})`;
       }
 
       const rows = await this.db.query(
@@ -667,11 +667,11 @@ export class PackageService {
           ) AS delivery_partner_name,
           COALESCE(NULLIF(TRIM(u.phone), ''), NULLIF(TRIM(dp.phone), ''), 'N/A') AS delivery_partner_phone,
           w.warehouse_id,
-          COALESCE(w.name, b.name, 'Main Warehouse') AS warehouse_name
+          COALESCE(w.name, b.branch_name, 'Main Warehouse') AS warehouse_name
         FROM delivery_runs dr
         LEFT JOIN delivery_partners dp ON (dp.delivery_partner_id = dr.delivery_partner_id OR dp.id::varchar = dr.delivery_partner_id)
         LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
-        LEFT JOIN warehouses w ON (w.warehouse_id = dr.warehouse_id OR w.id::varchar = dr.warehouse_id)
+        LEFT JOIN warehouses w ON (w.branch_id = dr.branch_id AND w.is_active = true AND w.deleted_at IS NULL)
         LEFT JOIN branches b ON (b.branch_id = dr.branch_id OR b.id::varchar = dr.branch_id)
         WHERE dr.deleted_at IS NULL
           AND dr.run_date >= ($1::date - INTERVAL '7 days')

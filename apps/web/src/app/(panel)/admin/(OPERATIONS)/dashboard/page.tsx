@@ -423,7 +423,7 @@ export default function AdminDashboard() {
 
           {/* Shortcut 3: Dispatch & Crates */}
           <Link
-            href="/admin/dispatch"
+            href="/admin/warehouse/dispatch"
             className="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-indigo-50/60 p-4 rounded-2xl border border-slate-200 hover:border-indigo-300 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
           >
             <div className="space-y-3">
@@ -680,7 +680,7 @@ export default function AdminDashboard() {
               </Link>
 
               <Link
-                href="/admin/dispatch"
+                href="/admin/warehouse/dispatch"
                 className="p-3 rounded-xl bg-indigo-50/70 hover:bg-indigo-100/70 border border-indigo-200/80 transition text-center group"
               >
                 <span className="text-[10px] font-bold uppercase text-indigo-700 tracking-wider block">Packed</span>
@@ -752,8 +752,8 @@ export default function AdminDashboard() {
                     key={m.key}
                     onClick={() => setChartMetric(m.key)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${chartMetric === m.key
-                        ? "bg-white text-slate-900 shadow-sm border border-slate-200"
-                        : "text-slate-500 hover:text-slate-800"
+                      ? "bg-white text-slate-900 shadow-sm border border-slate-200"
+                      : "text-slate-500 hover:text-slate-800"
                       }`}
                   >
                     {m.label}
@@ -788,12 +788,12 @@ export default function AdminDashboard() {
                           animate={{ height: `${heightPercent}%` }}
                           transition={{ delay: idx * 0.05, duration: 0.5 }}
                           className={`w-full max-w-[38px] rounded-t-xl transition-all group-hover:brightness-110 ${chartMetric === "revenue"
-                              ? "bg-gradient-to-t from-emerald-600 to-emerald-400"
-                              : chartMetric === "orders"
-                                ? "bg-gradient-to-t from-sky-600 to-sky-400"
-                                : chartMetric === "subscriptions"
-                                  ? "bg-gradient-to-t from-purple-600 to-purple-400"
-                                  : "bg-gradient-to-t from-amber-600 to-amber-400"
+                            ? "bg-gradient-to-t from-emerald-600 to-emerald-400"
+                            : chartMetric === "orders"
+                              ? "bg-gradient-to-t from-sky-600 to-sky-400"
+                              : chartMetric === "subscriptions"
+                                ? "bg-gradient-to-t from-purple-600 to-purple-400"
+                                : "bg-gradient-to-t from-amber-600 to-amber-400"
                             }`}
                         />
                       </div>
@@ -923,10 +923,10 @@ export default function AdminDashboard() {
                         </div>
                         <span
                           className={`px-2 py-0.5 rounded-full text-[9.5px] font-extrabold uppercase ${r.status === "in_progress"
-                              ? "bg-sky-100 text-sky-800"
-                              : r.status === "completed"
-                                ? "bg-emerald-100 text-emerald-800"
-                                : "bg-amber-100 text-amber-800"
+                            ? "bg-sky-100 text-sky-800"
+                            : r.status === "completed"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-amber-100 text-amber-800"
                             }`}
                         >
                           {r.status}
@@ -1008,10 +1008,10 @@ export default function AdminDashboard() {
                       </div>
                       <span
                         className={`px-2 py-0.5 rounded-full text-[9.5px] font-extrabold uppercase shrink-0 ${l.status === "pending"
-                            ? "bg-purple-100 text-purple-800"
-                            : l.status === "approved"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-rose-100 text-rose-800"
+                          ? "bg-purple-100 text-purple-800"
+                          : l.status === "approved"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-rose-100 text-rose-800"
                           }`}
                       >
                         {l.status}
@@ -1071,10 +1071,10 @@ export default function AdminDashboard() {
                   >
                     <div
                       className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${a.type === "critical"
-                          ? "bg-rose-100 text-rose-600"
-                          : a.type === "warning"
-                            ? "bg-amber-100 text-amber-600"
-                            : "bg-blue-100 text-blue-600"
+                        ? "bg-rose-100 text-rose-600"
+                        : a.type === "warning"
+                          ? "bg-amber-100 text-amber-600"
+                          : "bg-blue-100 text-blue-600"
                         }`}
                     >
                       <AlertCircle size={14} />

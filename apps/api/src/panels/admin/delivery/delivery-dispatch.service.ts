@@ -534,7 +534,7 @@ WHERE ${where.join(' AND ')}
 
     if (query.run_id) {
       const rows = await this.db.query(
-        `SELECT COALESCE(dr.warehouse_id, w.warehouse_id) AS warehouse_id
+        `SELECT w.warehouse_id AS warehouse_id
          FROM delivery_runs dr
          LEFT JOIN warehouses w
            ON w.branch_id = dr.branch_id AND w.is_active = true AND w.deleted_at IS NULL
@@ -699,9 +699,8 @@ WHERE ${where.join(' AND ')}
 
       if (warehouse_id) {
         params.push(warehouse_id);
-        // Runs rarely carry a warehouse of their own — match the one serving
-        // the branch as well, or the filter silently returns nothing.
-        where.push(`COALESCE(dr.warehouse_id, w.warehouse_id) = $${params.length}`);
+        // Runs don't have warehouse_id — match the one serving the branch
+        where.push(`w.warehouse_id = $${params.length}`);
       }
       if (delivery_slot) {
         params.push(delivery_slot);
@@ -717,7 +716,7 @@ WHERE ${where.join(' AND ')}
           dr.run_date,
           dr.status AS run_status,
           COALESCE(dd.status, 'draft') AS dispatch_status,
-          COALESCE(dr.warehouse_id, w.warehouse_id) AS warehouse_id,
+          w.warehouse_id AS warehouse_id,
           COALESCE(w.name, b.branch_name) AS warehouse_name,
           COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Delivery Partner') AS delivery_partner_name,
           dp.delivery_partner_id,
@@ -728,10 +727,7 @@ WHERE ${where.join(' AND ')}
           COALESCE(SUM(ddi.loaded_qty - COALESCE(ddi.delivered_qty,0) - COALESCE(ddi.returned_qty,0) - COALESCE(ddi.damaged_qty,0)), 0) AS pending_return_qty
         FROM delivery_runs dr
         LEFT JOIN branches b ON b.branch_id = dr.branch_id
-        LEFT JOIN warehouses w ON (
-          w.warehouse_id = dr.warehouse_id
-          OR (dr.warehouse_id IS NULL AND w.branch_id = dr.branch_id AND w.is_active = true)
-        ) AND w.deleted_at IS NULL
+        LEFT JOIN warehouses w ON w.branch_id = dr.branch_id AND w.is_active = true AND w.deleted_at IS NULL
         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
         LEFT JOIN users u ON u.user_id = dr.delivery_partner_id
         LEFT JOIN delivery_dispatch dd ON (dd.delivery_run_id = dr.run_id OR dd.delivery_run_id = dr.id::text)
@@ -741,7 +737,7 @@ WHERE ${where.join(' AND ')}
         GROUP BY
           dr.id, dr.run_id, dr.run_number, dr.delivery_slot, dr.run_date, dr.status,
           dd.status,
-          dr.warehouse_id, w.warehouse_id, dd.warehouse_id, w.name, b.branch_name,
+          w.warehouse_id, dd.warehouse_id, w.name, b.branch_name,
           u.first_name, u.last_name, u.user_name, dp.delivery_partner_id
         HAVING COUNT(ddi.id) > 0
         ORDER BY (COALESCE(dd.status, 'draft') = 'return_pending') DESC, dr.delivery_slot, dr.run_date DESC
@@ -800,15 +796,12 @@ WHERE ${where.join(' AND ')}
 
       const runSql = `
         SELECT dr.*,
-               COALESCE(dr.warehouse_id, w.warehouse_id) AS resolved_warehouse_id,
+               w.warehouse_id AS resolved_warehouse_id,
                COALESCE(w.name, b.branch_name) AS warehouse_name,
                COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Delivery Partner') AS delivery_partner_name
         FROM delivery_runs dr
         LEFT JOIN branches b ON b.branch_id = dr.branch_id
-        LEFT JOIN warehouses w ON (
-          w.warehouse_id = dr.warehouse_id
-          OR (dr.warehouse_id IS NULL AND w.branch_id = dr.branch_id AND w.is_active = true)
-        ) AND w.deleted_at IS NULL
+        LEFT JOIN warehouses w ON w.branch_id = dr.branch_id AND w.is_active = true AND w.deleted_at IS NULL
         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = dr.delivery_partner_id
         LEFT JOIN users u ON u.user_id = dr.delivery_partner_id
         WHERE dr.id::varchar = $1 OR dr.run_id = $1

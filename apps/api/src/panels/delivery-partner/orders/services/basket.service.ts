@@ -273,9 +273,10 @@ export class BasketService {
     const currentSlot = kolkataHour < 12 ? 'morning' : 'evening';
 
     const runRes = await this.db.query(
-      `SELECT dr.id, dr.run_id, dr.delivery_partner_id, dr.warehouse_id, dr.delivery_slot, dr.status AS run_status,
+      `SELECT dr.id, dr.run_id, dr.delivery_partner_id, w.warehouse_id, dr.delivery_slot, dr.status AS run_status,
               dd.dispatch_id, dd.status AS dispatch_status
        FROM delivery_runs dr
+       LEFT JOIN warehouses w ON w.branch_id = dr.branch_id AND w.is_active = true AND w.deleted_at IS NULL
        LEFT JOIN delivery_dispatch dd ON (dd.delivery_run_id = dr.run_id OR dd.delivery_run_id = dr.id::text)
        WHERE (dr.delivery_partner_id = ANY($1) OR dr.run_id = $2 OR dr.id::text = $2)
          AND (dr.run_date::date = CURRENT_DATE OR DATE(dr.run_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE OR dr.run_date IS NULL)
@@ -740,7 +741,7 @@ export class BasketService {
                  status, collection_notes, submitted_by,
                  created_at, updated_at
                ) VALUES (
-                 (SELECT COALESCE(warehouse_id, 'WH-MAIN') FROM delivery_runs WHERE id::text = $1 OR run_id = $1 LIMIT 1),
+                 (SELECT COALESCE(w.warehouse_id, 'WH-MAIN') FROM delivery_runs dr LEFT JOIN warehouses w ON w.branch_id = dr.branch_id AND w.is_active = true AND w.deleted_at IS NULL WHERE dr.id::text = $1 OR dr.run_id = $1 LIMIT 1),
                  $1, $2,
                  0, 0,
                  0, 0, 0,

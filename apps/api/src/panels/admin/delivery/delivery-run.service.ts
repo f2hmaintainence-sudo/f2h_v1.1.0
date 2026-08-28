@@ -683,9 +683,8 @@ export class DeliveryRunService {
           COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Partner') AS partner_name,
           COALESCE(u.phone, '') AS partner_phone,
           b.branch_name,
-          -- Runs seldom carry a warehouse of their own; fall back to the one
-          -- serving the branch so stock can be scoped correctly downstream.
-          COALESCE(dr.warehouse_id, w.warehouse_id) AS warehouse_id,
+          -- Runs do not have warehouse_id; get warehouse_id via branch_id join
+          w.warehouse_id AS warehouse_id,
           COALESCE(w.name, b.branch_name) AS warehouse_name,
           COALESCE(
             (SELECT SUM(o.total_amount) FROM orders o WHERE o.delivery_run_id = dr.run_id), 0
@@ -2715,7 +2714,7 @@ export class DeliveryRunService {
         SELECT
           dr.id,
           dr.run_id,
-          dr.run_number,
+          dr.run_id AS run_number,
           dr.run_date,
           dr.delivery_slot,
           dr.status,
@@ -2841,7 +2840,7 @@ export class DeliveryRunService {
           dp.is_available,
           dr.id AS run_db_id,
           dr.run_id,
-          dr.run_number,
+          dr.run_id AS run_number,
           dr.run_date,
           COALESCE(dr.delivery_slot, $2) AS delivery_slot,
           dr.status AS run_status,
