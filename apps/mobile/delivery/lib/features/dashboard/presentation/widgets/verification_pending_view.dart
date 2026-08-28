@@ -19,7 +19,7 @@ class VerificationPendingView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -106,7 +106,7 @@ class VerificationPendingView extends StatelessWidget {
                   onTap: () async {
                     final Uri emailLaunchUri = Uri(
                       scheme: 'mailto',
-                      path: 'admin@f2hfresh.com',
+                      path: 'support@f2hfresh.com',
                       queryParameters: {
                         'subject': 'F2H Support Request',
                       },
@@ -146,7 +146,7 @@ class VerificationPendingView extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           if (isUnverified)
             ElevatedButton(
               onPressed: onRedirectToProfile,
