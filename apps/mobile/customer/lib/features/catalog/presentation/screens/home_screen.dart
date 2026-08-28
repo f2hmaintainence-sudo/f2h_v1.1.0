@@ -478,11 +478,13 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                   ),
 
+                  // 8B. Promotional Offer Cards (Live Preview Style)
+                  const SliverToBoxAdapter(child: _HomeBottomPromoBanners()),
+
                   // 8. Referral Banner (Invite Friends, Earn Rewards!)
                   const SliverToBoxAdapter(child: ReferralInviteCard()),
 
-                  // 8B. Promotional Offer Cards (Live Preview Style)
-                  const SliverToBoxAdapter(child: _HomeBottomPromoBanners()),
+                 
 
                   // 9. The F2H Promise
                   SliverToBoxAdapter(child: _promiseStrip()),

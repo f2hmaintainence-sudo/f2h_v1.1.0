@@ -1661,10 +1661,9 @@ export default function PromotionsCouponsOffersPage() {
                 <thead className="bg-slate-50/80 border-b border-slate-100 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
                   <tr>
                     <th className="p-4">Banner &amp; Title</th>
-                    <th className="p-4">Placement / Scope</th>
+                    <th className="p-4">Banner Type</th>
                     <th className="p-4">Discount Tag</th>
                     <th className="p-4">Target / Action</th>
-                    <th className="p-4">Banner Type</th>
                     <th className="p-4">Status</th>
                     <th className="p-4 text-right">Actions</th>
                   </tr>
@@ -1672,14 +1671,13 @@ export default function PromotionsCouponsOffersPage() {
                 <tbody className="divide-y divide-slate-100">
                   {filteredOffers.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="p-12 text-center text-slate-400">
+                      <td colSpan={6} className="p-12 text-center text-slate-400">
                         No offer banners matching your filters. Click "+ New Offer Banner" to create one.
                       </td>
                     </tr>
                   ) : (
                     filteredOffers.map((o) => {
                       const bannerType = o.banner_type || (o.is_popup ? "popup" : (o.category_id ? "category_slide" : "home_carousel"));
-                      const isPopup = bannerType === "popup" || Boolean(o.is_popup);
                       const cleanTableSrc = getImageSrc(o.image_url);
 
                       return (
@@ -1715,24 +1713,24 @@ export default function PromotionsCouponsOffersPage() {
                           </td>
                           <td className="p-4 space-y-1">
                             {bannerType === "category_slide" || o.category_id ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 font-bold text-xs">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 font-extrabold text-xs border border-purple-200/70">
                                 <FolderTree size={12} />
-                                {getCategoryName(o.category_id)}
+                                Category Slide
                               </span>
                             ) : bannerType === "popup" || o.is_popup ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 font-bold text-xs">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 font-extrabold text-xs border border-rose-200/70">
                                 <Smartphone size={12} />
-                                App Open Modal
+                                App Launch Popup
                               </span>
                             ) : bannerType === "checkout_banner" ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-bold text-xs">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-extrabold text-xs border border-amber-200/70">
                                 <ShoppingBag size={12} />
-                                Checkout Screen
+                                Checkout Promo
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-extrabold text-xs border border-indigo-200/70">
                                 <Tag size={12} />
-                                Home Top Slider
+                                Home Carousel
                               </span>
                             )}
                             <div className="text-[10px] text-slate-400 font-mono">Order #{o.display_order || 1}</div>
@@ -1743,32 +1741,11 @@ export default function PromotionsCouponsOffersPage() {
                             </span>
                           </td>
                           <td className="p-4 font-semibold text-slate-800">
-                            <div className="font-bold">{o.action_type || "BROWSE"}</div>
-                            {o.action_value && (
-                              <div className="text-[10px] text-slate-400 font-mono">{o.action_value}</div>
-                            )}
-                          </td>
-                          <td className="p-4">
-                            {bannerType === "category_slide" || o.category_id ? (
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[11px] font-extrabold">
-                                <FolderTree size={12} />
-                                Category Slide
-                              </span>
-                            ) : bannerType === "popup" || o.is_popup ? (
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-extrabold">
-                                <Smartphone size={12} />
-                                App Launch Popup
-                              </span>
-                            ) : bannerType === "checkout_banner" ? (
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-extrabold">
-                                <ShoppingBag size={12} />
-                                Checkout Promo
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-extrabold">
-                                <Tag size={12} />
-                                Home Carousel
-                              </span>
+                            <div className="font-bold">{o.action_type || (o.category_id ? "CATEGORY" : "BROWSE")}</div>
+                            {(o.category_id || o.action_value) && (
+                              <div className="text-[10px] text-slate-400 font-mono">
+                                {o.category_id ? getCategoryName(o.category_id) : o.action_value}
+                              </div>
                             )}
                           </td>
                           <td className="p-4">
