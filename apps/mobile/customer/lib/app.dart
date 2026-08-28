@@ -269,6 +269,8 @@ class AppShellState extends State<AppShell> {
   int _i = AppShell.activeTab;
   late final PageController _pageController;
   String? _pendingCategory;
+  String? _pendingProductId;
+  String? _pendingProductName;
   bool _showNav = true;
   bool _isTransitioning = false;
 
@@ -276,9 +278,15 @@ class AppShellState extends State<AppShell> {
   bool get isHomeScreen => _i == 0;
   int get currentTab => _i;
 
-  void setTab(int index, {String? category}) {
+  void setTab(int index, {String? category, String? productId, String? productName}) {
     if (category != null) {
       _pendingCategory = category;
+    }
+    if (productId != null) {
+      _pendingProductId = productId;
+    }
+    if (productName != null) {
+      _pendingProductName = productName;
     }
     AppShell.activeTab = index;
     setState(() {
@@ -307,6 +315,18 @@ class AppShellState extends State<AppShell> {
     final cat = _pendingCategory;
     _pendingCategory = null;
     return cat;
+  }
+
+  Map<String, String?> consumePendingNavigation() {
+    final res = {
+      'category': _pendingCategory,
+      'productId': _pendingProductId,
+      'productName': _pendingProductName,
+    };
+    _pendingCategory = null;
+    _pendingProductId = null;
+    _pendingProductName = null;
+    return res;
   }
 
   List<Widget> get _screens => [

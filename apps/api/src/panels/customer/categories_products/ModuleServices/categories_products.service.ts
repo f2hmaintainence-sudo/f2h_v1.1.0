@@ -47,6 +47,20 @@ export class CategoriesProductsService {
                        AND (COALESCE(pb.is_popup, FALSE) = TRUE OR pb.banner_type = 'popup')
                      ORDER BY pb.display_order ASC, pb.id DESC`;
         params = [];
+      } else if (bannerTypes && bannerTypes.length > 0) {
+        // Filter strictly by the given banner_type values
+        queryStr = `SELECT pb.id, pb.title, pb.description, pb.discount_text, pb.action_type, pb.action_value,
+                           pb.category_id, pb.cta_label, pb.background_color, pb.banner_type,
+                           pb.is_popup, pb.display_order, pb.image_url, pb.image_path,
+                           c.name AS category_name
+                      FROM product_banner pb
+                      LEFT JOIN categories c ON (c.category_id = pb.category_id OR c.id::text = pb.category_id)
+                      WHERE pb.deleted_at IS NULL
+                        AND (pb.is_active IS TRUE OR pb.is_active IS NULL OR pb.is_active::text = 'true' OR pb.is_active::text = '1')
+                        AND COALESCE(pb.is_popup, FALSE) = FALSE
+                        AND pb.banner_type = ANY($1::text[])
+                     ORDER BY pb.display_order ASC, pb.id DESC`;
+        params = [bannerTypes];
       } else {
         queryStr = `SELECT pb.id, pb.title, pb.description, pb.discount_text, pb.action_type, pb.action_value,
                            pb.category_id, pb.cta_label, pb.background_color, pb.banner_type,
@@ -64,6 +78,58 @@ export class CategoriesProductsService {
       return rows ?? [];
     } catch (error) {
       this.developer.error('getManagedBanners failed', { error, bannerTypes, isPopup });
+      return [];
+    }
+  }
+
+  /**
+   * Returns only active `category_slide` banners with their category_id and category_name.
+   */
+  async getCategorySlideBanners(): Promise<any[]> {
+    try {
+      const rows = await this.db.query(
+        `SELECT pb.id, pb.title, pb.description, pb.discount_text, pb.action_type, pb.action_value,
+                pb.category_id, pb.cta_label, pb.background_color, pb.banner_type,
+                pb.display_order, pb.image_url, pb.image_path,
+                c.name AS category_name, c.category_id AS resolved_category_id
+           FROM product_banner pb
+           LEFT JOIN categories c ON (c.category_id = pb.category_id OR c.id::text = pb.category_id)
+          WHERE pb.deleted_at IS NULL
+            AND (pb.is_active IS TRUE OR pb.is_active IS NULL OR pb.is_active::text = 'true' OR pb.is_active::text = '1')
+            AND pb.banner_type = 'category_slide'
+            AND COALESCE(pb.is_popup, FALSE) = FALSE
+          ORDER BY pb.display_order ASC, pb.id DESC`,
+        [],
+      );
+      return rows ?? [];
+    } catch (error) {
+      this.developer.error('getCategorySlideBanners failed', { error });
+      return [];
+    }
+  }
+
+  /**
+   * Returns only active `checkout_banner` banners.
+   */
+  async getCheckoutBanners(): Promise<any[]> {
+    try {
+      const rows = await this.db.query(
+        `SELECT pb.id, pb.title, pb.description, pb.discount_text, pb.action_type, pb.action_value,
+                pb.category_id, pb.cta_label, pb.background_color, pb.banner_type,
+                pb.display_order, pb.image_url, pb.image_path,
+                c.name AS category_name
+           FROM product_banner pb
+           LEFT JOIN categories c ON (c.category_id = pb.category_id OR c.id::text = pb.category_id)
+          WHERE pb.deleted_at IS NULL
+            AND (pb.is_active IS TRUE OR pb.is_active IS NULL OR pb.is_active::text = 'true' OR pb.is_active::text = '1')
+            AND pb.banner_type = 'checkout_banner'
+            AND COALESCE(pb.is_popup, FALSE) = FALSE
+          ORDER BY pb.display_order ASC, pb.id DESC`,
+        [],
+      );
+      return rows ?? [];
+    } catch (error) {
+      this.developer.error('getCheckoutBanners failed', { error });
       return [];
     }
   }
@@ -215,7 +281,9 @@ export class CategoriesProductsService {
           p.is_subscribable,
           p.is_one_time,
           pv.subscription_price,
+          COALESCE(c.category_id, p.category_id) AS category_id,
           c.name AS category,
+          c.name AS category_name,
           c.image_path AS product_image,
           (
             SELECT pi.storage_key FROM product_images pi
@@ -325,7 +393,9 @@ export class CategoriesProductsService {
           p.is_subscribable,
           p.is_one_time,
           pv.subscription_price,
+          COALESCE(c.category_id, p.category_id) AS category_id,
           c.name AS category,
+          c.name AS category_name,
           c.image_path AS product_image,
           (
             SELECT pi.storage_key FROM product_images pi

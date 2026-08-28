@@ -42,6 +42,8 @@ class BrowseScreen extends StatefulWidget {
 class _BrowseState extends State<BrowseScreen> {
   late String _cat;
   String _searchQuery = '';
+  String? _targetProductId;
+  String? _targetProductName;
   final TextEditingController _searchController = TextEditingController();
 
   bool get _isSearching => _searchQuery.trim().isNotEmpty;
@@ -81,7 +83,11 @@ class _BrowseState extends State<BrowseScreen> {
 
   void _selectCat(String name, String id) {
     HapticFeedback.selectionClick();
-    setState(() => _cat = name);
+    setState(() {
+      _cat = name;
+      _targetProductId = null;
+      _targetProductName = null;
+    });
 
     // Dispatch bloc event to load products from backend
     context.read<CatalogBloc>().add(LoadProductsByCategory(id));
@@ -99,6 +105,21 @@ class _BrowseState extends State<BrowseScreen> {
             p.category.toLowerCase().contains(q);
       }).toList();
     }
+
+    if (_targetProductId != null && _targetProductId!.isNotEmpty) {
+      final matched = list.where((p) {
+        if (p.id == _targetProductId || p.productId == _targetProductId) return true;
+        if (p.variants.any((v) => v.id == _targetProductId || v.label.toLowerCase().contains(_targetProductId!.toLowerCase()))) return true;
+        if (_targetProductName != null && _targetProductName!.isNotEmpty) {
+          if (p.name.toLowerCase().contains(_targetProductName!.toLowerCase()) || _targetProductName!.toLowerCase().contains(p.name.toLowerCase())) return true;
+        }
+        return false;
+      }).toList();
+      if (matched.isNotEmpty) {
+        return matched;
+      }
+    }
+
     list.sort((a, b) {
       if (a.isOutOfStock == b.isOutOfStock) return 0;
       return a.isOutOfStock ? 1 : -1;
@@ -108,21 +129,35 @@ class _BrowseState extends State<BrowseScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final pending = AppShell.of(context)?.consumePendingCategory();
-    if (pending != null) {
+    final pendingNav = AppShell.of(context)?.consumePendingNavigation();
+    if (pendingNav != null && (pendingNav['category'] != null || pendingNav['productId'] != null)) {
+      final pendingCat = pendingNav['category'];
+      final pendingPid = pendingNav['productId'];
+      final pendingPname = pendingNav['productName'];
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        final state = context.read<CatalogBloc>().state;
-        if (state is CatalogLoaded) {
-          final cat = state.categories.firstWhere(
-            (c) => c['name'] == pending || c['category_id'] == pending || c['categoryId'] == pending,
-            orElse: () => <String, dynamic>{},
-          );
-          final catId = cat['category_id']?.toString() ?? pending;
-          final catName = cat['name']?.toString() ?? pending;
-          _selectCat(catName, catId);
-        } else {
-          _selectCat(pending, pending);
+        if (pendingPid != null && pendingPid.isNotEmpty) {
+          setState(() {
+            _targetProductId = pendingPid;
+            _targetProductName = pendingPname;
+          });
+        }
+        if (pendingCat != null && pendingCat.isNotEmpty) {
+          final state = context.read<CatalogBloc>().state;
+          if (state is CatalogLoaded) {
+            final cat = state.categories.firstWhere(
+              (c) => c['name'] == pendingCat || c['category_id'] == pendingCat || c['categoryId'] == pendingCat,
+              orElse: () => <String, dynamic>{},
+            );
+            final catId = cat['category_id']?.toString() ?? pendingCat;
+            final catName = cat['name']?.toString() ?? pendingCat;
+            setState(() => _cat = catName);
+            context.read<CatalogBloc>().add(LoadProductsByCategory(catId));
+          } else {
+            setState(() => _cat = pendingCat);
+            context.read<CatalogBloc>().add(LoadProductsByCategory(pendingCat));
+          }
         }
       });
     }
@@ -415,9 +450,9 @@ class _SidebarItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── SINGLE CLEAN CIRCLE BADGE (Down-to-Top Gradient Fade) ──────────
+            // ── CATEGORY SQUARE BADGE (Card Radius) ──────────
             AnimatedScale(
-              scale: isSelected ? 1.08 : 1.0,
+              scale: isSelected ? 1.05 : 1.0,
               duration: const Duration(milliseconds: 250),
               curve: Curves.easeOutBack,
               child: AnimatedContainer(
@@ -426,7 +461,7 @@ class _SidebarItem extends StatelessWidget {
                 width: 58,
                 height: 58,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(14),
                   gradient: isAll
                       ? const LinearGradient(
                           colors: [Color(0xFF047857), Color(0xFF10B981), Color(0xFF34D399)],
@@ -469,34 +504,36 @@ class _SidebarItem extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: isAll
-                    ? const Center(
-                        child: Icon(
-                          Icons.grid_view_rounded,
-                          color: Colors.white,
-                          size: 26,
-                        ),
-                      )
-                    : (imagePath != null && imagePath.isNotEmpty
-                          ? ClipOval(
-                              child: Padding(
-                                padding: const EdgeInsets.all(2),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: isAll
+                      ? const Center(
+                          child: Icon(
+                            Icons.grid_view_rounded,
+                            color: Colors.white,
+                            size: 26,
+                          ),
+                        )
+                      : (imagePath != null && imagePath.isNotEmpty
+                            ? SizedBox(
+                                width: double.infinity,
+                                height: double.infinity,
                                 child: buildProductImage(
                                   catName,
                                   imageAsset: imagePath,
                                   fit: BoxFit.cover,
                                 ),
-                              ),
-                            )
-                          : Center(
-                              child: Icon(
-                                Icons.water_drop_rounded,
-                                color: isSelected
-                                    ? const Color(0xFF059669)
-                                    : const Color(0xFF64748B),
-                                size: 24,
-                              ),
-                            )),
+                              )
+                            : Center(
+                                child: Icon(
+                                  Icons.water_drop_rounded,
+                                  color: isSelected
+                                      ? const Color(0xFF059669)
+                                      : const Color(0xFF64748B),
+                                  size: 24,
+                                ),
+                              )),
+                ),
               ),
             ),
             const SizedBox(height: 6),

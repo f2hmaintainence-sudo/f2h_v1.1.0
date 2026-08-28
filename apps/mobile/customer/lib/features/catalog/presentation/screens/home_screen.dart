@@ -467,6 +467,7 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
 
                   // 7. Per-category product groups with inline banners
+                  // 7. Per-category product groups with inline banners
                   SliverToBoxAdapter(
                     child: BlocBuilder<CatalogBloc, CatalogState>(
                       builder: (context, state) {
@@ -478,13 +479,24 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                   ),
 
+                  // Spacing before Referral
+                  const SliverToBoxAdapter(child: SizedBox(height: 14)),
+
+                  // 8. Referral Banner (Invite Friends, Earn Rewards!)
+                  const SliverToBoxAdapter(
+                    child: ReferralInviteCard(
+                      margin: EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                  ),
+
+                  // Spacing between Referral and Promo Banners
+                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
                   // 8B. Promotional Offer Cards (Live Preview Style)
                   const SliverToBoxAdapter(child: _HomeBottomPromoBanners()),
 
-                  // 8. Referral Banner (Invite Friends, Earn Rewards!)
-                  const SliverToBoxAdapter(child: ReferralInviteCard()),
-
-                 
+                  // Spacing before Promise Strip
+                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
                   // 9. The F2H Promise
                   SliverToBoxAdapter(child: _promiseStrip()),
@@ -1060,7 +1072,7 @@ class _HomeScreenState extends State<HomeScreen>
                     : (isMore
                           ? const Color(0xFFECEFF1)
                           : (bgColor ?? Colors.white)),
-                shape: BoxShape.circle,
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: isAll
                       ? Colors.transparent
@@ -1078,28 +1090,32 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 ],
               ),
-              child: Center(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(13),
                 child: icon != null
-                    ? Icon(
-                        icon,
-                        color: isAll ? Colors.white : const Color(0xFF16653A),
-                        size: 30,
+                    ? Center(
+                        child: Icon(
+                          icon,
+                          color: isAll ? Colors.white : const Color(0xFF16653A),
+                          size: 28,
+                        ),
                       )
                     : (imagePath != null && imagePath.isNotEmpty
-                          ? ClipOval(
-                              child: Padding(
-                                padding: const EdgeInsets.all(4.0),
-                                child: buildProductImage(
-                                  label,
-                                  imageAsset: imagePath,
-                                  fit: BoxFit.contain,
-                                ),
+                          ? SizedBox(
+                              width: double.infinity,
+                              height: double.infinity,
+                              child: buildProductImage(
+                                label,
+                                imageAsset: imagePath,
+                                fit: BoxFit.cover,
                               ),
                             )
-                          : const Icon(
-                              Icons.shopping_bag_outlined,
-                              color: Color(0xFF16653A),
-                              size: 26,
+                          : const Center(
+                              child: Icon(
+                                Icons.shopping_bag_outlined,
+                                color: Color(0xFF16653A),
+                                size: 26,
+                              ),
                             )),
               ),
             ),
@@ -1440,7 +1456,7 @@ class _HomeScreenState extends State<HomeScreen>
     ];
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+      margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -2513,8 +2529,8 @@ class _CategoryProductGroups extends StatefulWidget {
 }
 
 class _CategoryProductGroupsState extends State<_CategoryProductGroups> {
-  /// Map from lowercase category name → banner data from promo-banners API.
-  final Map<String, Map<String, dynamic>> _categoryBanners = {};
+  List<Map<String, dynamic>> _categorySlideBanners = [];
+  final Map<String, List<Product>> _categoryProductsMap = {};
   bool _bannersLoaded = false;
 
   @override
@@ -2525,51 +2541,65 @@ class _CategoryProductGroupsState extends State<_CategoryProductGroups> {
 
   Future<void> _fetchCategoryBanners() async {
     try {
-      final resp = await DioClient().dio.get(ApiEndpoints.promoBanners);
-      dynamic data = resp.data;
+      dynamic data;
+      try {
+        final resp = await DioClient().dio.get(ApiEndpoints.categorySlideBanners);
+        data = resp.data;
+      } catch (_) {
+        final resp = await DioClient().dio.get(ApiEndpoints.promoBanners);
+        data = resp.data;
+      }
+
       if (data is String) data = jsonDecode(data);
       if (data is Map && data['status'] == true && data['data'] is List) {
-        for (final b in data['data'] as List) {
-          final bannerMap = Map<String, dynamic>.from(b as Map);
-          final isActive = b['isActive'] ?? b['is_active'] ?? true;
-          if (isActive == false) continue;
+        final list = (data['data'] as List)
+            .where((b) {
+              final isActive = b['isActive'] ?? b['is_active'] ?? true;
+              if (isActive == false) return false;
+              final bType = (b['bannerType'] ?? b['banner_type'] ?? '').toString().toLowerCase();
+              return bType == 'category_slide' || bType == 'category';
+            })
+            .map((b) => Map<String, dynamic>.from(b as Map))
+            .toList();
 
-          final bannerType = (b['bannerType'] ?? b['banner_type'] ?? '').toString().toLowerCase();
-          final actionType = (b['actionType'] ?? b['action_type'] ?? '').toString().toUpperCase();
-          final actionVal = (b['actionValue'] ?? b['action_value'] ?? '').toString();
-          final catId = (b['categoryId'] ?? b['category_id'] ?? '').toString();
-          final catName = (b['categoryName'] ?? b['category_name'] ?? '').toString();
+        if (mounted) {
+          setState(() {
+            _categorySlideBanners = list;
+            _bannersLoaded = true;
+          });
 
-          final isCategoryBanner = bannerType == 'category_slide' ||
-              bannerType == 'category' ||
-              actionType == 'CATEGORY' ||
-              catId.isNotEmpty ||
-              catName.isNotEmpty;
-
-          if (isCategoryBanner) {
-            final keys = <String>{};
-            if (actionVal.isNotEmpty) {
-              keys.add(actionVal.toLowerCase());
-              keys.add(cleanCategoryName(actionVal).toLowerCase());
-            }
-            if (catId.isNotEmpty) {
-              keys.add(catId.toLowerCase());
-            }
-            if (catName.isNotEmpty) {
-              keys.add(catName.toLowerCase());
-              keys.add(cleanCategoryName(catName).toLowerCase());
-            }
-
-            for (final k in keys) {
-              _categoryBanners[k] = bannerMap;
+          // Fetch products specifically for each category slide banner
+          for (final banner in list) {
+            final catId = (banner['categoryId'] ?? banner['category_id'] ?? banner['actionValue'] ?? banner['action_value'] ?? '').toString();
+            if (catId.isNotEmpty && !_categoryProductsMap.containsKey(catId)) {
+              _fetchProductsForCategory(catId);
             }
           }
+          return;
         }
       }
     } catch (e) {
       debugPrint('Error fetching category banners: $e');
     }
     if (mounted) setState(() => _bannersLoaded = true);
+  }
+
+  Future<void> _fetchProductsForCategory(String categoryId) async {
+    try {
+      final resp = await DioClient().dio.get('${ApiEndpoints.customerCategory}/$categoryId');
+      dynamic data = resp.data;
+      if (data is String) data = jsonDecode(data);
+      if (data is Map && data['data'] is List) {
+        final prods = (data['data'] as List)
+            .map((item) => Product.fromJson(Map<String, dynamic>.from(item as Map)))
+            .toList();
+        if (mounted && prods.isNotEmpty) {
+          setState(() {
+            _categoryProductsMap[categoryId] = prods;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   String _formatImageUrl(String rawUrl) {
@@ -2596,58 +2626,59 @@ class _CategoryProductGroupsState extends State<_CategoryProductGroups> {
     return 'https://f2hfresh.com$clean';
   }
 
-  /// Group in-stock products by category.
-  Map<String, List<Product>> _groupByCategory() {
-    final eligible = widget.allProducts
-        .where((p) => !p.isOutOfStock)
-        .toList()
-      ..sort((a, b) => b.rating.compareTo(a.rating));
-
-    final Map<String, List<Product>> groups = {};
-    for (final p in eligible) {
-      final cat = p.category.isNotEmpty ? p.category : 'Other';
-      groups.putIfAbsent(cat, () => []).add(p);
-    }
-    // Keep groups with products; sort groups by name
-    final filtered = Map.fromEntries(
-      groups.entries
-          .where((e) => e.value.isNotEmpty)
-          .toList()
-        ..sort((a, b) => a.key.compareTo(b.key)),
-    );
-    return filtered;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final groups = _groupByCategory();
-    if (groups.isEmpty) return const SizedBox.shrink();
+    if (!_bannersLoaded || _categorySlideBanners.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final entry in groups.entries) ...[
-          _CategorySection(
-            categoryName: entry.key,
-            products: entry.value,
-            banner: _bannersLoaded
-                ? (_categoryBanners[entry.key.toLowerCase()] ??
-                    _categoryBanners[cleanCategoryName(entry.key).toLowerCase()] ??
-                    _categoryBanners.entries
-                        .where((e) =>
-                            entry.key
-                                .toLowerCase()
-                                .contains(e.key.toLowerCase()) ||
-                            e.key
-                                .toLowerCase()
-                                .contains(entry.key.toLowerCase()))
-                        .map((e) => e.value)
-                        .firstOrNull)
-                : null,
-            formatImageUrl: _formatImageUrl,
-          ),
+        for (final banner in _categorySlideBanners) ...[
+          _buildBannerCategorySection(banner),
         ],
       ],
+    );
+  }
+
+  Widget _buildBannerCategorySection(Map<String, dynamic> banner) {
+    final catId = (banner['categoryId'] ?? banner['category_id'] ?? banner['actionValue'] ?? banner['action_value'] ?? '').toString();
+    final catName = (banner['categoryName'] ?? banner['category_name'] ?? banner['title'] ?? 'Category').toString();
+    final cleanTitle = cleanCategoryName(catName);
+
+    // 1. First check if products were loaded directly for this category
+    var products = <Product>[];
+    if (catId.isNotEmpty && _categoryProductsMap.containsKey(catId)) {
+      products = _categoryProductsMap[catId]!;
+    }
+
+    // 2. Otherwise filter from widget.allProducts
+    if (products.isEmpty) {
+      products = widget.allProducts.where((p) {
+        if (catId.isNotEmpty && (p.categoryId == catId || p.category == catId || p.id == catId || p.productId == catId)) {
+          return true;
+        }
+        if (catName.isNotEmpty && (p.category.toLowerCase() == catName.toLowerCase() || cleanCategoryName(p.category).toLowerCase() == cleanCategoryName(catName).toLowerCase())) {
+          return true;
+        }
+        if (catName.toLowerCase().contains('dry fruit') && p.category.toLowerCase().contains('dry')) {
+          return true;
+        }
+        return false;
+      }).toList();
+    }
+
+    // 3. Fallback matching
+    if (products.isEmpty) {
+      products = widget.allProducts.where((p) => p.category.toLowerCase().contains(cleanTitle.toLowerCase())).toList();
+    }
+
+    return _CategorySection(
+      categoryName: catName,
+      products: products,
+      banner: banner,
+      formatImageUrl: _formatImageUrl,
     );
   }
 }
@@ -2669,49 +2700,45 @@ class _CategorySection extends StatelessWidget {
   });
 
   void _onBannerTap(BuildContext context) {
-    if (banner != null) {
-      final actionType = (banner!['actionType'] ?? banner!['action_type'] ?? banner!['type'] ?? '').toString().toUpperCase();
-      final actionVal = (banner!['actionValue'] ?? banner!['action_value'] ?? banner!['productId'] ?? banner!['product_id'] ?? '').toString();
-      final categoryId = (banner!['categoryId'] ?? banner!['category_id'] ?? '').toString();
-      final bannerType = (banner!['bannerType'] ?? banner!['banner_type'] ?? '').toString().toLowerCase();
+    if (banner == null) return;
 
-      final isProduct = actionType == 'PRODUCT' ||
-          actionType == 'PRD' ||
-          bannerType == 'product' ||
-          actionVal.startsWith('PRD') ||
-          banner!['productId'] != null ||
-          banner!['product_id'] != null;
+    final actionType = (banner!['actionType'] ?? banner!['action_type'] ?? banner!['type'] ?? '').toString().toUpperCase();
+    final actionVal = (banner!['actionValue'] ?? banner!['action_value'] ?? '').toString();
+    final categoryId = (banner!['categoryId'] ?? banner!['category_id'] ?? '').toString();
+    final productId = (banner!['productId'] ?? banner!['product_id'] ?? '').toString();
+    final bannerType = (banner!['bannerType'] ?? banner!['banner_type'] ?? '').toString().toLowerCase();
 
-      if (isProduct && actionVal.isNotEmpty) {
-        final title = banner!['title']?.toString() ?? banner!['name']?.toString() ?? 'Product';
-        final product = getProductById(actionVal, name: title);
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ProductDetailViewScreen(product: product),
-          ),
-        );
-        return;
-      }
+    // 0. Explicit NONE action -> no-op
+    if (actionType == 'NONE' && categoryId.isEmpty && productId.isEmpty) {
+      return;
+    }
 
-      final targetCategory = categoryId.isNotEmpty
-          ? categoryId
-          : (actionVal.isNotEmpty && actionType == 'CATEGORY' ? actionVal : categoryName);
+    // 1. PRODUCT action
+    final isProduct = actionType == 'PRODUCT' ||
+        actionType == 'PRD' ||
+        bannerType == 'product' ||
+        productId.isNotEmpty ||
+        (actionVal.isNotEmpty && actionVal.startsWith('PRD'));
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => BrowseScreen(initialCategory: targetCategory),
-        ),
+    final targetPid = productId.isNotEmpty ? productId : (isProduct ? actionVal : '');
+    if (targetPid.isNotEmpty) {
+      final title = banner!['title']?.toString() ?? banner!['name']?.toString() ?? 'Product';
+      final cat = categoryId.isNotEmpty ? categoryId : (products.firstOrNull?.categoryId ?? categoryName);
+      AppShell.of(context)?.setTab(
+        1,
+        category: cat,
+        productId: targetPid,
+        productName: title,
       );
       return;
     }
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => BrowseScreen(initialCategory: categoryName),
-      ),
-    );
+
+    // 2. CATEGORY action
+    final targetCategory = categoryId.isNotEmpty
+        ? categoryId
+        : (actionVal.isNotEmpty && actionType == 'CATEGORY' ? actionVal : categoryName);
+
+    AppShell.of(context)?.setTab(1, category: targetCategory);
   }
 
   @override
@@ -2735,13 +2762,11 @@ class _CategorySection extends StatelessWidget {
               ),
               const Spacer(),
               GestureDetector(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        BrowseScreen(initialCategory: categoryName),
-                  ),
-                ),
+                onTap: () {
+                  final catId = products.firstOrNull?.categoryId ?? (banner != null ? (banner!['categoryId'] ?? banner!['category_id']) : null);
+                  final target = (catId != null && catId.toString().isNotEmpty) ? catId.toString() : categoryName;
+                  AppShell.of(context)?.setTab(1, category: target);
+                },
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -2762,32 +2787,43 @@ class _CategorySection extends StatelessWidget {
           ),
         ),
 
-        // ── Inline category banner (Image ONLY - pure and clean) ─────
+        // ── Inline category banner (Image ONLY - full width, uncropped) ─────
         if (banner != null) ...[
           GestureDetector(
             onTap: () => _onBannerTap(context),
             child: Container(
               margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              height: 100,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(14),
-                color: const Color(0xFFF1F5F9),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                color: Colors.white,
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Image.network(
-                  formatImageUrl(banner!['imageUrl']?.toString() ?? ''),
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  height: double.infinity,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              child: AspectRatio(
+                aspectRatio: 2.0,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Image.network(
+                    formatImageUrl(banner!['imageUrl']?.toString() ?? banner!['image_url']?.toString() ?? ''),
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                    loadingBuilder: (_, child, progress) {
+                      if (progress == null) return child;
+                      return Container(
+                        color: const Color(0xFFF1F5F9),
+                        child: const Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFF16A34A),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
                 ),
               ),
             ),
@@ -2795,19 +2831,21 @@ class _CategorySection extends StatelessWidget {
         ],
 
         // ── Horizontal product scroll for this category ──────────────────────
-        SizedBox(
-          height: 285,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: products.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (ctx, i) => SizedBox(
-              width: 165,
-              child: ProductGridCard(products[i]),
+        if (products.isNotEmpty) ...[
+          SizedBox(
+            height: 285,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: products.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (ctx, i) => SizedBox(
+                width: 165,
+                child: ProductGridCard(products[i]),
+              ),
             ),
           ),
-        ),
+        ],
 
         const SizedBox(height: 8),
       ],
@@ -2883,6 +2921,8 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
     final categoryId = (banner['categoryId'] ?? banner['category_id'] ?? '').toString();
     final bannerType = (banner['bannerType'] ?? banner['banner_type'] ?? '').toString().toLowerCase();
 
+    if (actionType == 'NONE') return;
+
     final isProduct = actionType == 'PRODUCT' ||
         actionType == 'PRD' ||
         bannerType == 'product' ||
@@ -2892,24 +2932,18 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
 
     if (isProduct && actionVal.isNotEmpty) {
       final title = banner['title']?.toString() ?? banner['name']?.toString() ?? 'Product';
-      final product = getProductById(actionVal, name: title);
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ProductDetailViewScreen(product: product),
-        ),
+      AppShell.of(context)?.setTab(
+        1,
+        category: categoryId.isNotEmpty ? categoryId : null,
+        productId: actionVal,
+        productName: title,
       );
       return;
     }
 
     if (actionType == 'CATEGORY' || categoryId.isNotEmpty) {
       final cat = categoryId.isNotEmpty ? categoryId : actionVal;
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => BrowseScreen(initialCategory: cat),
-        ),
-      );
+      AppShell.of(context)?.setTab(1, category: cat);
       return;
     }
 
@@ -2943,17 +2977,13 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
         final discountText = banner['discountText']?.toString() ?? banner['discount_text']?.toString();
         final ctaLabel = banner['ctaLabel']?.toString() ?? banner['cta_label']?.toString() ?? banner['cta']?.toString() ?? 'Grab Offer';
         final imageUrl = _formatImg(banner['imageUrl']?.toString() ?? banner['image_url']?.toString() ?? '');
-
-        Color accentColor = const Color(0xFF16A34A);
-        if (banner['backgroundColor'] != null || banner['background_color'] != null) {
-          try {
-            final hex = (banner['backgroundColor'] ?? banner['background_color']).toString().replaceAll('#', '');
-            if (hex.length == 6) accentColor = Color(int.parse('0xFF$hex'));
-          } catch (_) {}
-        }
+        final bType = (banner['bannerType'] ?? banner['banner_type'] ?? '').toString().toLowerCase();
+        final tagLabel = bType == 'checkout_banner' || bType == 'checkout_promo'
+            ? 'CHECKOUT PROMO'
+            : (discountText?.isNotEmpty == true ? discountText!.toUpperCase() : 'SPECIAL OFFER');
 
         return Container(
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: const Color(0xFFF0FDF4),
@@ -2962,18 +2992,11 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
               color: const Color(0xFF86EFAC),
               width: 1.2,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: accentColor.withValues(alpha: 0.06),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top tag
+              // Top tag badge
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -2983,14 +3006,14 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.shopping_bag_outlined, size: 12, color: Color(0xFFB45309)),
+                    const Icon(Icons.shopping_bag_outlined, size: 12, color: Color(0xFF92400E)),
                     const SizedBox(width: 4),
                     Text(
-                      discountText?.isNotEmpty == true ? discountText!.toUpperCase() : 'SPECIAL OFFER',
+                      tagLabel,
                       style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
-                        color: Color(0xFFB45309),
+                        color: Color(0xFF92400E),
                         letterSpacing: 0.4,
                       ),
                     ),
@@ -2999,7 +3022,7 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
               ),
               const SizedBox(height: 10),
 
-              // Content Row: Thumbnail -> Text -> CTA Button
+              // Content Row: Thumbnail -> Text (Title + Discount Pill) -> CTA Button
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -3033,16 +3056,40 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900,
-                            color: kText,
-                            height: 1.2,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                title,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                  color: kText,
+                                  height: 1.2,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (discountText != null && discountText.isNotEmpty) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFDCFCE7),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  discountText.toUpperCase(),
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF16653A),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         if (description.isNotEmpty) ...[
                           const SizedBox(height: 3),
@@ -3066,12 +3113,12 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
                   ElevatedButton(
                     onPressed: () => _onPromoTap(context, banner),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: accentColor,
+                      backgroundColor: const Color(0xFF00875A),
                       foregroundColor: Colors.white,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(20),
                       ),
                     ),
                     child: Row(

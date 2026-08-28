@@ -127,6 +127,8 @@ class ProductVariant {
 
 class Product {
   final String id, name, vendor, unit, category, emoji, badge;
+  final String? categoryId;
+  final String? productId;
   final String? unitValue;
   final String? unitType;
   final double price, originalPrice, rating;
@@ -149,6 +151,8 @@ class Product {
     this.unitValue,
     this.unitType,
     required this.category,
+    this.categoryId,
+    this.productId,
     required this.emoji,
     required this.price,
     required this.originalPrice,
@@ -232,6 +236,8 @@ class Product {
       'unit_value': unitValue,
       'unit_type': unitType,
       'category': category,
+      'category_id': categoryId,
+      'product_id': productId,
       'emoji': emoji,
       'badge': badge,
       'price': price,
@@ -278,7 +284,9 @@ class Product {
       unitValue:
           json['unit_value']?.toString() ?? json['unitValue']?.toString(),
       unitType: json['unit_type']?.toString() ?? json['unitType']?.toString(),
-      category: json['category']?.toString() ?? '',
+      category: json['category']?.toString() ?? json['category_name']?.toString() ?? '',
+      categoryId: json['category_id']?.toString() ?? json['categoryId']?.toString(),
+      productId: json['product_id']?.toString() ?? json['productId']?.toString(),
       emoji: json['emoji']?.toString() ?? '',
       badge: json['badge']?.toString() ?? '',
       price: priceVal,

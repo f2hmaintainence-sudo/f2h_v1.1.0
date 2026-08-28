@@ -194,19 +194,16 @@ export class CategoriesController {
     };
   }
 
+
   /**
-   * Popup banners the admin flagged with `is_popup`. The app reads the raw
-   * column names here, so the row shape is kept as-is apart from the image
-   * URL, which is made absolute.
+   * Popup banners only — `banner_type = 'popup'` or `is_popup = TRUE`.
+   * Returns empty banners array if none found — no fallback.
    */
   @Public()
   @Get('popup-banner')
   async getPopupBanner(@Req() req: Request) {
     const host = `${req.protocol}://${req.get('host')}`;
-    const rows = await this.service.getManagedBanners(
-      ['popup', 'home_carousel'],
-      true,
-    );
+    const rows = await this.service.getManagedBanners([], true);
 
     const banners = rows.map((row) => {
       const rawImage = row.image_url || row.image_path || '';
@@ -220,14 +217,47 @@ export class CategoriesController {
           : `${host}${rawImage.startsWith('/') ? '' : '/'}${rawImage}`,
         action_type: (row.action_type || 'NONE').toUpperCase(),
         action_value: row.action_value || row.category_id || null,
+        category_id: row.category_id || null,
         cta_label: row.cta_label || 'Shop Now',
         background_color: row.background_color || null,
+        banner_type: row.banner_type || 'popup',
       };
     });
 
     return {
       status: true,
       banners,
+    };
+  }
+
+  /**
+   * Only `category_slide` banners — used by Home screen to build
+   * per-category product sections matched by category_id.
+   */
+  @Public()
+  @Get('category-slide-banners')
+  async getCategorySlideBanners(@Req() req: Request) {
+    const host = `${req.protocol}://${req.get('host')}`;
+    const rows = await this.service.getCategorySlideBanners();
+
+    return {
+      status: true,
+      data: rows.map((row) => this.mapManagedBanner(row, host)),
+    };
+  }
+
+  /**
+   * Only `checkout_banner` banners — shown at top of checkout screen.
+   */
+  @Public()
+  @Get('checkout-banners')
+  async getCheckoutBanners(@Req() req: Request) {
+    const host = `${req.protocol}://${req.get('host')}`;
+    const rows = await this.service.getCheckoutBanners();
+
+    return {
+      status: true,
+      data: rows.map((row) => this.mapManagedBanner(row, host)),
     };
   }
 

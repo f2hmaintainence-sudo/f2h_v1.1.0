@@ -84,6 +84,9 @@ class ApiEndpoints {
   static const String categories = '$_customer/categories';
   static const String banners = '$_customer/banners';
   static const String promoBanners = '$_customer/promo-banners';
+  static const String categorySlideBanners = '$_customer/category-slide-banners';
+  static const String checkoutBanners = '$_customer/checkout-banners';
+  static const String popupBanner = '$_customer/popup-banner';
   static const String customerCategory = '$_customer/category';
   static const String products = '$_customer/products';
   static const String orders = '$_customer/orders';

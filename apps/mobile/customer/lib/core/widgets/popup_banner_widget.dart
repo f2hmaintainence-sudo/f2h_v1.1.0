@@ -43,21 +43,6 @@ class PopupBannerWidget {
       } catch (_) {
         // Ignore network errors on launch
       }
-
-      if (_bannerList.isEmpty) {
-        _bannerList = [
-          {
-            'id': 1,
-            'title': 'Fresh Farm Pure Milk',
-            'discount_text': 'Flat 10% OFF & Free Delivery',
-            'description': 'Enjoy fresh, farm-sourced pure milk delivered right to your doorstep every morning with hassle-free subscription.',
-            'action_type': 'CATEGORY',
-            'action_value': 'milk',
-            'cta_label': 'Subscribe Now',
-            'background_color': '#16A34A',
-          },
-        ];
-      }
     }
 
     if (_bannerList.isEmpty || _isBannerShowing) return;
@@ -389,18 +374,14 @@ class PopupBannerWidget {
   }
 
   static void _handleRedirection(BuildContext context, String actionType, String? actionValue) {
-    if (actionType == 'PRODUCT' && actionValue != null && actionValue.startsWith('PRD')) {
-      final p = getProductById(actionValue);
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ProductDetailViewScreen(product: p),
-        ),
-      );
-    } else {
+    if (actionType == 'NONE') {
+      return;
+    }
+
+    if (actionType == 'PRODUCT' && actionValue != null && actionValue.isNotEmpty) {
       final appShell = AppShell.of(context);
       if (appShell != null) {
-        appShell.setTab(1, category: actionValue);
+        appShell.setTab(1, productId: actionValue);
       } else {
         AppShell.activeTab = 1;
         Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
@@ -408,6 +389,23 @@ class PopupBannerWidget {
           (route) => false,
         );
       }
+      return;
+    }
+
+    if (actionType == 'SUBSCRIPTION') {
+      AppShell.of(context)?.setTab(2);
+      return;
+    }
+
+    final appShell = AppShell.of(context);
+    if (appShell != null) {
+      appShell.setTab(1, category: actionValue);
+    } else {
+      AppShell.activeTab = 1;
+      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AppShell()),
+        (route) => false,
+      );
     }
   }
 }

@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/app.dart';
-import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
-import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_view_screen.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/referral_screen.dart';
 import 'package:f2h_customer/features/wallet/presentation/screens/wallet_screen.dart';
 
@@ -119,26 +117,31 @@ class _PromoBannerState extends State<PromoBanner> {
   }
 
   void _onBannerTap(Map<String, dynamic> banner) {
-    final actionType = (banner['actionType'] ?? banner['action_type'] ?? banner['type'] ?? banner['route'] ?? '').toString().toUpperCase();
+    final actionType = (banner['actionType'] ?? banner['action_type'] ?? banner['type'] ?? '').toString().toUpperCase();
     final actionValue = (banner['actionValue'] ?? banner['action_value'] ?? '').toString();
     final categoryId = (banner['categoryId'] ?? banner['category_id'] ?? '').toString();
     final productId = (banner['productId'] ?? banner['product_id'] ?? '').toString();
     final route = banner['route']?.toString().toLowerCase() ?? '';
     final bannerType = (banner['bannerType'] ?? banner['banner_type'] ?? '').toString().toLowerCase();
 
-    // 1. PRODUCT REDIRECTION
+    // 0. EXPLICIT NONE
+    if (actionType == 'NONE' && categoryId.isEmpty && productId.isEmpty && route.isEmpty) {
+      return;
+    }
+
+    // 1. PRODUCT REDIRECTION (Open Shop screen, select category, filter to this product)
     final targetProductId = productId.isNotEmpty
         ? productId
         : (actionType == 'PRODUCT' || actionType == 'PRD' || bannerType == 'product' || actionValue.startsWith('PRD') ? actionValue : '');
 
     if (targetProductId.isNotEmpty) {
       final title = banner['title']?.toString() ?? banner['name']?.toString() ?? 'Product';
-      final product = getProductById(targetProductId, name: title);
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ProductDetailViewScreen(product: product),
-        ),
+      final targetCat = categoryId.isNotEmpty ? categoryId : (banner['category_id']?.toString() ?? '');
+      AppShell.of(context)?.setTab(
+        1,
+        category: targetCat.isNotEmpty ? targetCat : null,
+        productId: targetProductId,
+        productName: title,
       );
       return;
     }
@@ -177,8 +180,10 @@ class _PromoBannerState extends State<PromoBanner> {
       return;
     }
 
-    // Default fallback to Shop tab
-    AppShell.of(context)?.setTab(1);
+    // If NONE action, do not perform navigation
+    if (actionType == 'NONE') {
+      return;
+    }
   }
 
   String _formatImageUrl(String rawUrl) {
@@ -217,7 +222,7 @@ class _PromoBannerState extends State<PromoBanner> {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: AspectRatio(
-            aspectRatio: 3.10,
+            aspectRatio: 2.0,
             child: Container(
               color: Colors.grey.shade200,
               child: const Center(
@@ -238,7 +243,7 @@ class _PromoBannerState extends State<PromoBanner> {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: AspectRatio(
-        aspectRatio: 2.65,
+        aspectRatio: 2.0,
         child: PageView.builder(
           controller: _pageController,
           itemCount: 100000,
@@ -252,13 +257,7 @@ class _PromoBannerState extends State<PromoBanner> {
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.12),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  color: Colors.white,
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
@@ -273,14 +272,14 @@ class _PromoBannerState extends State<PromoBanner> {
                             loadingBuilder: (_, child, progress) {
                               if (progress == null) return child;
                               return Container(
-                                color: const Color(0xFF16A34A),
+                                color: const Color(0xFFF1F5F9),
                                 child: const Center(
                                   child: SizedBox(
                                     width: 24,
                                     height: 24,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      color: Colors.white,
+                                      color: Color(0xFF16A34A),
                                     ),
                                   ),
                                 ),
@@ -304,7 +303,7 @@ class _PromoBannerState extends State<PromoBanner> {
   Widget _buildOfferCard(Map<String, dynamic> banner, String imageUrl) {
     return Image.asset(
       'assets/splash/splash.png',
-      fit: BoxFit.cover,
+      fit: BoxFit.contain,
       width: double.infinity,
       height: double.infinity,
     );
