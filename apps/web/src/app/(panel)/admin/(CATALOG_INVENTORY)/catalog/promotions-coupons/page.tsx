@@ -1664,7 +1664,7 @@ export default function PromotionsCouponsOffersPage() {
                     <th className="p-4">Placement / Scope</th>
                     <th className="p-4">Discount Tag</th>
                     <th className="p-4">Target / Action</th>
-                    <th className="p-4">Launch Popup?</th>
+                    <th className="p-4">Banner Type</th>
                     <th className="p-4">Status</th>
                     <th className="p-4 text-right">Actions</th>
                   </tr>
@@ -1722,17 +1722,17 @@ export default function PromotionsCouponsOffersPage() {
                             ) : bannerType === "popup" || o.is_popup ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 font-bold text-xs">
                                 <Smartphone size={12} />
-                                App Popup
+                                App Open Modal
                               </span>
                             ) : bannerType === "checkout_banner" ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-bold text-xs">
                                 <ShoppingBag size={12} />
-                                Checkout Promo
+                                Checkout Screen
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs">
                                 <Tag size={12} />
-                                Home Carousel
+                                Home Top Slider
                               </span>
                             )}
                             <div className="text-[10px] text-slate-400 font-mono">Order #{o.display_order || 1}</div>
@@ -1749,16 +1749,27 @@ export default function PromotionsCouponsOffersPage() {
                             )}
                           </td>
                           <td className="p-4">
-                            <button
-                              onClick={() => togglePopupStatus(o.id, isPopup)}
-                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold transition ${isPopup
-                                ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                                }`}
-                            >
-                              <Smartphone size={12} />
-                              {isPopup ? "Active Popup" : "Enable Popup"}
-                            </button>
+                            {bannerType === "category_slide" || o.category_id ? (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[11px] font-extrabold">
+                                <FolderTree size={12} />
+                                Category Slide
+                              </span>
+                            ) : bannerType === "popup" || o.is_popup ? (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-extrabold">
+                                <Smartphone size={12} />
+                                App Launch Popup
+                              </span>
+                            ) : bannerType === "checkout_banner" ? (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-extrabold">
+                                <ShoppingBag size={12} />
+                                Checkout Promo
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-extrabold">
+                                <Tag size={12} />
+                                Home Carousel
+                              </span>
+                            )}
                           </td>
                           <td className="p-4">
                             <span
