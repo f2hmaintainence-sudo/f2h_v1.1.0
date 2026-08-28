@@ -805,7 +805,7 @@ export default function PromotionsCouponsOffersPage() {
   const openEditOffer = (o: OfferBanner) => {
     setEditingOffer(o);
     const cleanUrl = cleanImageUrl(o.image_url);
-    const resolvedType = (o.banner_type as any) || (o.is_popup ? "popup" : (o.category_id ? "category_slide" : "home_carousel"));
+    const resolvedType = (o.banner_type as any) || (o.is_popup ? "popup" : "home_carousel");
     setEditOfferForm({
       title: o.title || "",
       discount_text: o.discount_text || "",
@@ -1131,7 +1131,7 @@ export default function PromotionsCouponsOffersPage() {
           <div>
             <div className="text-xs text-slate-500 font-medium">Category Slide Banners</div>
             <div className="text-2xl font-black text-slate-900">
-              {offers.filter((o) => o.is_active && (o.banner_type === "category_slide" || o.category_id)).length}
+              {offers.filter((o) => o.is_active && o.banner_type === "category_slide").length}
             </div>
             <div className="text-[11px] text-slate-400 mt-0.5">Targeted Category Slides</div>
           </div>
@@ -1477,7 +1477,7 @@ export default function PromotionsCouponsOffersPage() {
                     }`}
                 >
                   <FolderTree size={13} />
-                  Category Slides ({offers.filter((o) => o.banner_type === "category_slide" || o.category_id).length})
+                  Category Slides ({offers.filter((o) => o.banner_type === "category_slide").length})
                 </button>
                 <button
                   onClick={() => setOfferPlacementFilter("popup")}
@@ -1533,9 +1533,9 @@ export default function PromotionsCouponsOffersPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {filteredOffers.filter((o) => o.is_active).map((offer) => {
-                  const bannerType = offer.banner_type || (offer.is_popup ? "popup" : (offer.category_id ? "category_slide" : "home_carousel"));
+                  const bannerType = offer.banner_type || (offer.is_popup ? "popup" : "home_carousel");
                   const isPopup = bannerType === "popup" || Boolean(offer.is_popup);
-                  const isCatSlide = bannerType === "category_slide" || Boolean(offer.category_id);
+                  const isCatSlide = bannerType === "category_slide";
                   const isCheckout = bannerType === "checkout_banner";
                   const src = getImageSrc(offer.image_url);
 
@@ -1712,7 +1712,7 @@ export default function PromotionsCouponsOffersPage() {
                             </div>
                           </td>
                           <td className="p-4 space-y-1">
-                            {bannerType === "category_slide" || o.category_id ? (
+                            {bannerType === "category_slide" ? (
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 font-extrabold text-xs border border-purple-200/70">
                                 <FolderTree size={12} />
                                 Category Slide
@@ -1741,9 +1741,12 @@ export default function PromotionsCouponsOffersPage() {
                             </span>
                           </td>
                           <td className="p-4 font-semibold text-slate-800">
-                            <div className="font-bold">{o.action_type || (o.category_id ? "CATEGORY" : "BROWSE")}</div>
+                            <div className="font-bold flex items-center gap-1">
+                              {o.category_id && <FolderTree size={12} className="text-purple-600 shrink-0" />}
+                              {o.action_type || (o.category_id ? "CATEGORY" : "BROWSE")}
+                            </div>
                             {(o.category_id || o.action_value) && (
-                              <div className="text-[10px] text-slate-400 font-mono">
+                              <div className="text-[10px] text-slate-500 font-mono">
                                 {o.category_id ? getCategoryName(o.category_id) : o.action_value}
                               </div>
                             )}
