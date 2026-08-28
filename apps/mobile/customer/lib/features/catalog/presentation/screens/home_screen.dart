@@ -35,6 +35,7 @@ import '../../../notifications/presentation/bloc/notifications_bloc.dart';
 import '../../../notifications/presentation/bloc/notifications_state.dart';
 import '../../../notifications/presentation/bloc/notifications_event.dart';
 import '../../../notifications/presentation/screens/notifications_screen.dart';
+import '../../../wallet/presentation/screens/wallet_screen.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
 import '../../../../core/widgets/popup_banner_widget.dart';
 
