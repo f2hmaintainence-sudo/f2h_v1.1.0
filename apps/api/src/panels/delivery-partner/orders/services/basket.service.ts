@@ -869,7 +869,7 @@ export class BasketService {
       `SELECT dd.dispatch_id FROM delivery_dispatch dd
        LEFT JOIN delivery_runs dr ON (dd.delivery_run_id = dr.run_id OR dd.delivery_run_id = dr.id::text)
        WHERE (dd.delivery_run_id = $1 OR dr.run_id = $1 OR dr.id::text = $1 OR dr.delivery_partner_id = $2)
-         AND dd.status != 'cancelled'`,
+         AND dd.deleted_at IS NULL`,
       [activeRunId, partnerId],
     );
     const dispatchIds = (dispatchRes || []).map((d: any) => d.dispatch_id);

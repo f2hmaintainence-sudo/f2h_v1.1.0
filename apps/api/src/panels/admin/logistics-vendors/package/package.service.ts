@@ -111,9 +111,9 @@ export class PackageService {
       if (search) {
         params.push(`%${search}%`);
         searchClause = `AND (
-          CAST(c.customer_id AS TEXT) ILIKE $${params.length}
-          OR COALESCE(c.full_name, CONCAT(c.first_name, ' ', c.last_name)) ILIKE $${params.length}
-          OR c.phone ILIKE $${params.length}
+          CAST(ccb.customer_id AS TEXT) ILIKE $${params.length}
+          OR CONCAT_WS(' ', u.first_name, u.last_name) ILIKE $${params.length}
+          OR u.phone ILIKE $${params.length}
           OR cnt.name ILIKE $${params.length}
           OR cnt.container_id ILIKE $${params.length}
         )`;
@@ -125,14 +125,11 @@ export class PackageService {
           COALESCE(
             NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''),
             NULLIF(TRIM(u.user_name), ''),
-            NULLIF(TRIM(c.full_name), ''),
-            NULLIF(TRIM(CONCAT_WS(' ', c.first_name, c.last_name)), ''),
             NULLIF(TRIM(latest_ord.customer_name), ''),
             CONCAT('Customer #', ccb.customer_id)
           ) AS customer_name,
           COALESCE(
             NULLIF(TRIM(u.phone), ''),
-            NULLIF(TRIM(c.phone), ''),
             'N/A'
           ) AS phone,
           ccb.container_id AS container_type_id,
@@ -151,18 +148,17 @@ export class PackageService {
           latest_ord.delivered_at AS latest_delivery_date
         FROM customer_container_balances ccb
         LEFT JOIN users u ON u.user_id = ccb.customer_id
-        LEFT JOIN customers c ON (c.customer_id = ccb.customer_id OR c.id::text = ccb.customer_id)
         LEFT JOIN containers cnt ON cnt.container_id = ccb.container_id AND cnt.deleted_at IS NULL
         LEFT JOIN LATERAL (
           SELECT 
             o.order_id,
             o.customer_name,
-            dp.full_name AS delivery_partner_name,
-            dp.phone AS delivery_partner_phone,
+            COALESCE(NULLIF(TRIM(CONCAT_WS(' ', dpu.first_name, dpu.last_name)), ''), 'Delivery Partner') AS delivery_partner_name,
+            COALESCE(NULLIF(TRIM(dpu.phone), ''), 'N/A') AS delivery_partner_phone,
             COALESCE(o.updated_at, o.created_at) AS delivered_at
           FROM orders o
-          LEFT JOIN delivery_partners dp ON (dp.delivery_partner_id = o.delivery_partner_id OR dp.id::text = o.delivery_partner_id)
-          WHERE o.customer_id = ccb.customer_id OR o.customer_id = c.customer_id
+          LEFT JOIN users dpu ON dpu.user_id = o.delivery_partner_id
+          WHERE o.customer_id = ccb.customer_id
           ORDER BY o.created_at DESC
           LIMIT 1
         ) latest_ord ON true
@@ -338,8 +334,7 @@ export class PackageService {
           OR dcr.container_id ILIKE $${pIdx}
           OR u.first_name ILIKE $${pIdx}
           OR u.last_name ILIKE $${pIdx}
-          OR dp.full_name ILIKE $${pIdx}
-          OR w.name ILIKE $${pIdx}
+          OR w.warehouse_name ILIKE $${pIdx}
         )`);
       }
 
@@ -350,8 +345,7 @@ export class PackageService {
         LEFT JOIN containers cnt ON cnt.container_id = dcr.container_id AND cnt.deleted_at IS NULL
         LEFT JOIN warehouses w ON (w.warehouse_id = dcr.warehouse_id OR w.id::varchar = dcr.warehouse_id) AND w.deleted_at IS NULL
         LEFT JOIN delivery_runs dr ON (dr.run_id = dcr.run_id OR dr.id::varchar = dcr.run_id)
-        LEFT JOIN delivery_partners dp ON (dp.delivery_partner_id = dr.delivery_partner_id OR dp.delivery_partner_id = dcr.submitted_by OR dp.id::varchar = dr.delivery_partner_id)
-        LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
+        LEFT JOIN users u ON (u.user_id = dr.delivery_partner_id OR u.user_id = dcr.submitted_by)
         LEFT JOIN users ru ON ru.user_id = dcr.review_by
         ${whereSql}
       `;
@@ -360,17 +354,16 @@ export class PackageService {
         SELECT
           dcr.id,
           dcr.warehouse_id,
-          COALESCE(w.name, 'Main Warehouse') AS warehouse_name,
+          COALESCE(w.warehouse_name, 'Main Warehouse') AS warehouse_name,
           dcr.run_id,
           dr.run_date,
           dr.delivery_slot,
           COALESCE(dr.delivery_partner_id, dcr.submitted_by) AS delivery_partner_id,
           COALESCE(
             NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''),
-            NULLIF(TRIM(dp.full_name), ''),
             'Delivery Partner'
           ) AS delivery_partner_name,
-          COALESCE(NULLIF(TRIM(u.phone), ''), NULLIF(TRIM(dp.phone), ''), 'N/A') AS delivery_partner_phone,
+          COALESCE(NULLIF(TRIM(u.phone), ''), 'N/A') AS delivery_partner_phone,
           dcr.container_id,
           COALESCE(cnt.name, dcr.container_id) AS container_name,
           COALESCE(dcr.collected_quantity, 0) AS collected_quantity,
@@ -661,15 +654,13 @@ export class PackageService {
           dr.delivery_partner_id,
           COALESCE(
             NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''),
-            NULLIF(TRIM(dp.full_name), ''),
             'Delivery Partner'
           ) AS delivery_partner_name,
-          COALESCE(NULLIF(TRIM(u.phone), ''), NULLIF(TRIM(dp.phone), ''), 'N/A') AS delivery_partner_phone,
+          COALESCE(NULLIF(TRIM(u.phone), ''), 'N/A') AS delivery_partner_phone,
           COALESCE(w.warehouse_id, (SELECT warehouse_id FROM warehouses WHERE is_active = true AND deleted_at IS NULL LIMIT 1)) AS warehouse_id,
-          COALESCE(w.name, b.branch_name, 'Main Warehouse') AS warehouse_name
+          COALESCE(w.warehouse_name, b.branch_name, 'Main Warehouse') AS warehouse_name
         FROM delivery_runs dr
-        LEFT JOIN delivery_partners dp ON (dp.delivery_partner_id = dr.delivery_partner_id OR dp.id::varchar = dr.delivery_partner_id)
-        LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
+        LEFT JOIN users u ON u.user_id = dr.delivery_partner_id
         LEFT JOIN warehouses w ON (w.branch_id = dr.branch_id AND w.is_active = true AND w.deleted_at IS NULL)
         LEFT JOIN branches b ON (b.branch_id = dr.branch_id OR b.id::varchar = dr.branch_id)
         WHERE dr.deleted_at IS NULL
