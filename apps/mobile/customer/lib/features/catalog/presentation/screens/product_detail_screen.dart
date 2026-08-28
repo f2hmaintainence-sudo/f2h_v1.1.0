@@ -59,10 +59,12 @@ class _BrowseState extends State<BrowseScreen> {
       final state = context.read<CatalogBloc>().state;
       if (state is CatalogLoaded) {
         final cat = state.categories.firstWhere(
-          (c) => c['name'] == _cat,
+          (c) => c['name'] == _cat || c['category_id'] == _cat || c['categoryId'] == _cat,
           orElse: () => <String, dynamic>{},
         );
-        final catId = cat['category_id']?.toString() ?? 'All';
+        final catId = cat['category_id']?.toString() ?? (state.categories.any((c) => c['name'] == _cat) ? _cat : 'All');
+        final catName = cat['name']?.toString() ?? _cat;
+        setState(() => _cat = catName);
         context.read<CatalogBloc>().add(LoadProductsByCategory(catId));
       } else {
         // Fallback/bootstrap loading if catalog is not fully loaded yet
@@ -78,7 +80,6 @@ class _BrowseState extends State<BrowseScreen> {
   }
 
   void _selectCat(String name, String id) {
-    if (_cat == name) return;
     HapticFeedback.selectionClick();
     setState(() => _cat = name);
 
@@ -110,16 +111,19 @@ class _BrowseState extends State<BrowseScreen> {
     final pending = AppShell.of(context)?.consumePendingCategory();
     if (pending != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
         final state = context.read<CatalogBloc>().state;
-        String catId = 'All';
         if (state is CatalogLoaded) {
           final cat = state.categories.firstWhere(
-            (c) => c['name'] == pending,
+            (c) => c['name'] == pending || c['category_id'] == pending || c['categoryId'] == pending,
             orElse: () => <String, dynamic>{},
           );
-          catId = cat['category_id']?.toString() ?? 'All';
+          final catId = cat['category_id']?.toString() ?? pending;
+          final catName = cat['name']?.toString() ?? pending;
+          _selectCat(catName, catId);
+        } else {
+          _selectCat(pending, pending);
         }
-        _selectCat(pending, catId);
       });
     }
 

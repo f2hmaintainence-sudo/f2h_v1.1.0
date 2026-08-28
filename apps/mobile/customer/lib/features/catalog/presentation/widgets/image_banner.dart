@@ -121,21 +121,20 @@ class _ImageBannerState extends State<ImageBanner> {
 
   void _onBannerTap(Map<String, dynamic> banner) {
     final actionType = (banner['actionType'] ?? banner['action_type'] ?? banner['type'] ?? banner['route'] ?? '').toString().toUpperCase();
-    final actionValue = (banner['actionValue'] ?? banner['action_value'] ?? banner['productId'] ?? banner['product_id'] ?? banner['categoryId'] ?? banner['category_id'] ?? '').toString();
+    final actionValue = (banner['actionValue'] ?? banner['action_value'] ?? '').toString();
+    final categoryId = (banner['categoryId'] ?? banner['category_id'] ?? '').toString();
+    final productId = (banner['productId'] ?? banner['product_id'] ?? '').toString();
     final route = banner['route']?.toString().toLowerCase() ?? '';
     final bannerType = (banner['bannerType'] ?? banner['banner_type'] ?? '').toString().toLowerCase();
 
     // 1. PRODUCT REDIRECTION
-    final isProduct = actionType == 'PRODUCT' ||
-        actionType == 'PRD' ||
-        bannerType == 'product' ||
-        actionValue.startsWith('PRD') ||
-        banner['productId'] != null ||
-        banner['product_id'] != null;
+    final targetProductId = productId.isNotEmpty
+        ? productId
+        : (actionType == 'PRODUCT' || actionType == 'PRD' || bannerType == 'product' || actionValue.startsWith('PRD') ? actionValue : '');
 
-    if (isProduct && actionValue.isNotEmpty) {
+    if (targetProductId.isNotEmpty) {
       final title = banner['title']?.toString() ?? banner['name']?.toString() ?? 'Product';
-      final product = getProductById(actionValue, name: title);
+      final product = getProductById(targetProductId, name: title);
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -146,8 +145,12 @@ class _ImageBannerState extends State<ImageBanner> {
     }
 
     // 2. CATEGORY REDIRECTION
-    if ((actionType == 'CATEGORY' || route == 'category' || bannerType == 'category_slide' || bannerType == 'category') && actionValue.isNotEmpty) {
-      AppShell.of(context)?.setTab(1, category: actionValue);
+    final targetCatId = categoryId.isNotEmpty
+        ? categoryId
+        : (actionType == 'CATEGORY' || actionType == 'CAT' || route == 'category' || bannerType == 'category_slide' || bannerType == 'category' || actionValue.startsWith('CAT') ? actionValue : '');
+
+    if (targetCatId.isNotEmpty) {
+      AppShell.of(context)?.setTab(1, category: targetCatId);
       return;
     }
 
