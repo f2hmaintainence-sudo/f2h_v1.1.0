@@ -34,12 +34,12 @@ export class DeliveryManagementService {
   async notifyPartner(partnerId: string, title: string, messageBody: string): Promise<void> {
     try {
       const boyRows = await this.db.query(
-        `SELECT delivery_partner_id FROM delivery_partners WHERE delivery_partner_id = $1 OR user_id = $1`,
+        `SELECT delivery_partner_id FROM delivery_partners WHERE delivery_partner_id = $1 `,
         [partnerId],
       );
       if (!boyRows || boyRows.length === 0) return;
       const targetBoy = boyRows[0];
-      const userId = targetBoy.user_id || targetBoy.delivery_partner_id || partnerId;
+      const userId = targetBoy.delivery_partner_id || partnerId;
 
       // 1. Send In-App & Database Notification
       try {
@@ -319,7 +319,7 @@ export class DeliveryManagementService {
           b.branch_name
         FROM delivery_partners db
         LEFT JOIN branches b ON b.branch_id = db.branch_id
-        WHERE db.delivery_partner_id = $1 OR db.user_id = $1
+        WHERE db.delivery_partner_id = $1
       `;
       const boyRows = await this.db.query(boySql, [partnerId]);
       const partnerObj = boyRows[0] ?? null;
@@ -1420,20 +1420,20 @@ export class DeliveryManagementService {
         `SELECT o.order_id, o.customer_id, COALESCE(cu.first_name || ' ' || cu.last_name, cu.user_name) as customer_name, o.total_amount, o.status, o.delivery_slot, o.created_at, o.scheduled_date
          FROM orders o
          LEFT JOIN users cu ON cu.user_id = o.customer_id
-         WHERE o.delivery_partner_id = $1 OR o.delivery_partner_id = $2
+         WHERE o.delivery_partner_id = $1
          ORDER BY o.created_at DESC
          LIMIT 20`,
-        [partnerId, partner.user_id || partnerId],
+        [partnerId],
       ).catch(() => []);
 
       const docs = await this.db.query(
-        `SELECT * FROM delivery_partner_documents WHERE delivery_partner_id = $1 OR delivery_partner_id = $2`,
-        [partnerId, partner.user_id || partnerId],
+        `SELECT * FROM delivery_partner_documents WHERE delivery_partner_id = $1`,
+        [partnerId],
       ).catch(() => []);
 
       const banks = await this.db.query(
-        `SELECT * FROM delivery_partner_bank_accounts WHERE delivery_partner_id = $1 OR delivery_partner_id = $2`,
-        [partnerId, partner.user_id || partnerId],
+        `SELECT * FROM delivery_partner_bank_accounts WHERE delivery_partner_id = $1`,
+        [partnerId],
       ).catch(() => []);
 
       // Vehicle details live on delivery_partners itself.
@@ -1453,9 +1453,9 @@ export class DeliveryManagementService {
                 admin_u.first_name || ' ' || COALESCE(admin_u.last_name, '') AS paid_by_name
          FROM delivery_partner_referral_bonuses dpb
          LEFT JOIN users admin_u ON admin_u.user_id = dpb.paid_by
-         WHERE dpb.partner_id = $1 OR dpb.partner_id = $2
+         WHERE dpb.partner_id = $1
          ORDER BY dpb.created_at DESC`,
-        [partnerId, partner.user_id || partnerId],
+        [partnerId],
       ).catch(() => []);
 
       const rawReferrals = await this.db.query(
@@ -1464,9 +1464,9 @@ export class DeliveryManagementService {
                 u.phone AS referee_phone
          FROM referrals r
          LEFT JOIN users u ON u.user_id = r.referred_customer_id
-         WHERE r.referrer_customer_id = $1 OR r.referrer_customer_id = $2
+         WHERE r.referrer_customer_id = $1
          ORDER BY r.created_at DESC`,
-        [partnerId, partner.user_id || partnerId],
+        [partnerId],
       ).catch(() => []);
 
       const totalReferralsCount = Math.max((rawReferrals || []).length, (refBonuses || []).length);
