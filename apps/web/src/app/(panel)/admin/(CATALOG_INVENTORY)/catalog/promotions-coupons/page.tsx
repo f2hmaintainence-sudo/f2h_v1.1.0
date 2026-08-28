@@ -1013,6 +1013,51 @@ export default function PromotionsCouponsOffersPage() {
     });
   }, [offers, search, statusFilter, offerPlacementFilter, selectedCategoryFilter]);
 
+  // Deduplicate products into unique main products (excluding variant repetitions)
+  const uniqueProducts = useMemo(() => {
+    const map = new Map<string, { product_id: string; product_name: string; category_id?: string; category?: string }>();
+    for (const p of catalogProducts) {
+      const pId = p.product_id || p.variant_id;
+      if (pId && !map.has(pId)) {
+        map.set(pId, {
+          product_id: pId,
+          product_name: p.product_name || p.variant_name || pId,
+          category_id: (p as any).category_id || (p as any).categoryId,
+          category: p.category,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.product_name.localeCompare(b.product_name));
+  }, [catalogProducts]);
+
+  // Filter products by selected category for Create Offer modal
+  const createFilteredProducts = useMemo(() => {
+    if (!offerForm.category_id) return uniqueProducts;
+    const filtered = uniqueProducts.filter((p) => {
+      if (p.category_id && p.category_id === offerForm.category_id) return true;
+      if (p.category) {
+        const catObj = categories.find((c) => c.category_id === offerForm.category_id);
+        if (catObj && (p.category === catObj.name || p.category === catObj.category_id)) return true;
+      }
+      return false;
+    });
+    return filtered.length > 0 ? filtered : uniqueProducts;
+  }, [uniqueProducts, offerForm.category_id, categories]);
+
+  // Filter products by selected category for Edit Offer modal
+  const editFilteredProducts = useMemo(() => {
+    if (!editOfferForm.category_id) return uniqueProducts;
+    const filtered = uniqueProducts.filter((p) => {
+      if (p.category_id && p.category_id === editOfferForm.category_id) return true;
+      if (p.category) {
+        const catObj = categories.find((c) => c.category_id === editOfferForm.category_id);
+        if (catObj && (p.category === catObj.name || p.category === catObj.category_id)) return true;
+      }
+      return false;
+    });
+    return filtered.length > 0 ? filtered : uniqueProducts;
+  }, [uniqueProducts, editOfferForm.category_id, categories]);
+
   return (
     <div className="space-y-6 p-2 md:p-4 max-w-7xl mx-auto animate-in fade-in duration-300">
       {/* Breadcrumbs */}
@@ -2285,9 +2330,9 @@ export default function PromotionsCouponsOffersPage() {
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     >
                       <option value="">— Select Product —</option>
-                      {catalogProducts.map((p) => (
-                        <option key={p.variant_id} value={p.product_id || p.variant_id}>
-                          {p.product_name} - {p.variant_name}
+                      {createFilteredProducts.map((p) => (
+                        <option key={p.product_id} value={p.product_id}>
+                          {p.product_name}
                         </option>
                       ))}
                     </select>
@@ -2603,9 +2648,9 @@ export default function PromotionsCouponsOffersPage() {
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
                     >
                       <option value="">— Select Product —</option>
-                      {catalogProducts.map((p) => (
-                        <option key={p.variant_id} value={p.product_id || p.variant_id}>
-                          {p.product_name} - {p.variant_name}
+                      {editFilteredProducts.map((p) => (
+                        <option key={p.product_id} value={p.product_id}>
+                          {p.product_name}
                         </option>
                       ))}
                     </select>
