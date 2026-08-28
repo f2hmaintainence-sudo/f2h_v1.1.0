@@ -12,9 +12,9 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async toggleShiftStatus(
     @Req() req: Request,
-    @Body() body: { is_active?: boolean },
+    @Body() body: { is_online?: boolean; is_active?: boolean },
   ) {
     const userId = (req.user as any)?.user_id;
-    return this.authService.toggleShiftStatus(userId, body.is_active);
+    return this.authService.toggleShiftStatus(userId, body.is_online ?? body.is_active);
   }
 }

@@ -90,9 +90,9 @@ class DeliverySessionBloc
     dynamic profileError;
     if (profileRes is ProfileModel) {
       driverName = profileRes.fullName;
-      isOnline = profileRes.isActive;
+      isOnline = profileRes.isOnline;
       isVerified = profileRes.isVerified;
-      accountStatus = profileRes.accountStatus ?? 'active';
+      accountStatus = profileRes.accountStatus ?? (profileRes.isActive ? 'active' : 'inactive');
 
       // Sync location tracking
       try {
@@ -185,7 +185,7 @@ class DeliverySessionBloc
       final dioClient = sl<DioClient>();
       await dioClient.dio.post(
         '/DeliveryPartner/auth/shift-toggle',
-        data: {'is_active': event.val},
+        data: {'is_online': event.val, 'is_active': event.val},
       );
 
       final trackingService = sl<LocationTrackingService>();

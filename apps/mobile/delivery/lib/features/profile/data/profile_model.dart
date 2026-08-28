@@ -12,6 +12,7 @@ class ProfileModel {
   final String? accountHolderName;
   final bool isVerified;
   final bool isActive;
+  final bool isOnline;
   final String? accountStatus;
   final String? joinedDate;
   final int? sectorIndex;
@@ -51,6 +52,7 @@ class ProfileModel {
     this.accountHolderName,
     required this.isVerified,
     required this.isActive,
+    this.isOnline = false,
     this.accountStatus,
     this.joinedDate,
     this.sectorIndex,
@@ -98,6 +100,7 @@ class ProfileModel {
       vehicleNumber: '',
       isVerified: false,
       isActive: false,
+      isOnline: false,
     );
   }
 
@@ -115,6 +118,7 @@ class ProfileModel {
       accountHolderName: json['account_holder_name']?.toString(),
       isVerified: json['is_verified'] == true || json['is_verified'] == 1 || json['is_verified'] == 'true',
       isActive: json['is_active'] == 1 || json['is_active'] == true || json['is_active']?.toString().toLowerCase() == 'true',
+      isOnline: json['is_online'] == 1 || json['is_online'] == true || json['is_online']?.toString().toLowerCase() == 'true',
       accountStatus: json['account_status']?.toString(),
       joinedDate: json['joined_date']?.toString(),
       sectorIndex: json['sector_index'] != null ? int.tryParse(json['sector_index'].toString()) : null,
