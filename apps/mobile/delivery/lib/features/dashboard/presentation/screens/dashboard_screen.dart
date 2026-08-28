@@ -483,9 +483,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ] else ...[
                         if (!session.isOnline) ...[
-                          Container(
-                            margin: const EdgeInsets.symmetric(vertical: 16),
-                            padding: const EdgeInsets.all(24),
+                        Container(
+                          margin: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(24),
