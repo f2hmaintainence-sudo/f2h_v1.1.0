@@ -241,8 +241,7 @@ export class DeliveryRunService {
         LEFT JOIN users u ON u.user_id = db.delivery_partner_id
         LEFT JOIN branches b ON b.branch_id = db.branch_id
         WHERE db.is_active = true
-          AND db.is_available = true
-          AND (db.is_online = true OR db.duty_status = 'on_duty')
+          AND (db.is_online = true OR db.is_available = true)
           ${branchId ? 'AND db.branch_id = $2' : ''}
           AND NOT EXISTS (
             SELECT 1 FROM delivery_leave_requests dlr
@@ -1169,8 +1168,8 @@ export class DeliveryRunService {
           b.branch_name,
           COUNT(db.delivery_partner_id)::int AS total,
           COUNT(db.delivery_partner_id) FILTER (
-            WHERE db.is_available = true
-              AND (db.is_online = true OR db.duty_status = 'on_duty')
+            WHERE db.is_active = true
+              AND (db.is_online = true OR db.is_available = true)
               AND NOT EXISTS (
                 SELECT 1 FROM delivery_leave_requests dlr
                 WHERE dlr.delivery_partner_id = db.delivery_partner_id

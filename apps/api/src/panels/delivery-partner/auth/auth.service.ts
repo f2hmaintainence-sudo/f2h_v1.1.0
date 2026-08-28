@@ -11,7 +11,7 @@ export class AuthService {
     }
 
     const boyRes = await this.db.query(
-      `SELECT is_active, is_online, is_available, duty_status, delivery_partner_id
+      `SELECT is_active, is_online, is_available, delivery_partner_id
        FROM delivery_partners
        WHERE delivery_partner_id = $1
        LIMIT 1`,
@@ -42,23 +42,19 @@ export class AuthService {
       }
     }
 
-    const dutyStatus = newStatus ? 'on_duty' : 'off_duty';
-
     await this.db.query(
       `UPDATE delivery_partners
        SET is_online = $1,
            is_available = $1,
-           duty_status = $2,
            updated_at = NOW()
-       WHERE delivery_partner_id = $3`,
-      [newStatus, dutyStatus, boyRes[0].delivery_partner_id],
+       WHERE delivery_partner_id = $2`,
+      [newStatus, boyRes[0].delivery_partner_id],
     );
 
     return {
       success: true,
       is_active: boyRes[0].is_active,
       is_online: newStatus,
-      duty_status: dutyStatus,
       message: `Shift status updated to ${newStatus ? 'online' : 'offline'}`,
     };
   }

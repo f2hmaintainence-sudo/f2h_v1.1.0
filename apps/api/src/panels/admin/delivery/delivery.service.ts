@@ -604,7 +604,7 @@ export class DeliveryManagementService {
           u.email                                            AS email,
           dp.profile_photo_url,
           dp.is_online, dp.is_available, dp.is_active, dp.is_verified,
-          dp.duty_status,
+          CASE WHEN dp.is_online = true THEN 'on_duty' ELSE 'off_duty' END AS duty_status,
           dp.current_lat, dp.current_lng, dp.last_location_at,
           EXTRACT(EPOCH FROM (NOW() - dp.last_location_at))::int AS location_age_seconds,
           dp.vehicle_type, dp.vehicle_number,

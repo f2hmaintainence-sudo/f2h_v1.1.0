@@ -99,7 +99,7 @@ export class LocationController {
                  current_lng = $2,
                  last_location_at = NOW(),
                  is_online = true,
-                 duty_status = 'on_duty',
+                 is_available = true,
                  updated_at = NOW()
              WHERE delivery_partner_id = $3`,
             [Number(body.latitude), Number(body.longitude), userId]
