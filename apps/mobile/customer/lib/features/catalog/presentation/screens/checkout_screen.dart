@@ -183,8 +183,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _couponsListedForSubtotal = subtotal;
       });
     } catch (_) {
-      if (mounted && _availableCoupons.isNotEmpty) {
-        setState(() => _availableCoupons = const []);
+      if (mounted) {
+        setState(() {
+          _availableCoupons = const [];
+          _couponsListedForSubtotal = subtotal;
+        });
       }
     } finally {
       if (mounted) {
@@ -195,7 +198,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   /// Fetches the coupon list on first build and after the subtotal changes.
   void _refreshAvailableCouponsIfNeeded(double subtotal) {
-    if ((subtotal - _couponsListedForSubtotal).abs() < 0.01 && _availableCoupons.isNotEmpty) return;
+    if ((subtotal - _couponsListedForSubtotal).abs() < 0.01) return;
     if (_loadingAvailableCoupons) return;
     _couponsListedForSubtotal = subtotal;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1239,7 +1242,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                         value:
                                             '₹${payableNow.toStringAsFixed(0)}',
                                         isBold: true,
-                                        fontSize: 20,
+                                        fontSize: 22,
+                                        valueColor: kText,
                                       ),
                                     ],
                                   ),
@@ -2019,7 +2023,7 @@ class _SlideToPayButtonState extends State<SlideToPayButton> {
                   child: Text(
                     '₹${widget.amount!.toStringAsFixed(0)}',
                     style: const TextStyle(
-                      fontSize: 16,
+                      fontSize: 20,
                       fontWeight: FontWeight.w900,
                       color: kPrimary,
                     ),

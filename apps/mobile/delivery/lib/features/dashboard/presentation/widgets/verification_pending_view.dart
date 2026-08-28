@@ -146,22 +146,22 @@ class VerificationPendingView extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 20),
-          if (isUnverified)
-            ElevatedButton(
-              onPressed: onRedirectToProfile,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kPrimary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                elevation: 0,
-              ),
-              child: const Text(
-                'Update Documents / Profile',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
-              ),
-            ),
+          // const SizedBox(height: 20),
+          // if (isUnverified)
+          //   ElevatedButton(
+          //     onPressed: onRedirectToProfile,
+          //     style: ElevatedButton.styleFrom(
+          //       backgroundColor: kPrimary,
+          //       foregroundColor: Colors.white,
+          //       padding: const EdgeInsets.symmetric(vertical: 16),
+          //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          //       elevation: 0,
+          //     ),
+          //     child: const Text(
+          //       'Update Documents / Profile',
+          //       style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+          //     ),
+          //   ),
         ],
       ),
     );
