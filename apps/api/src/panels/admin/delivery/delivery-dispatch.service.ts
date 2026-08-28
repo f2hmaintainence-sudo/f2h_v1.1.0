@@ -644,7 +644,7 @@ WHERE ${where.join(' AND ')}
         if (!grouped[wid]) {
           grouped[wid] = {
             warehouse_id: wid,
-            warehouse_name: row.warehouse_name,
+            warehouse_name: row.name,
             slots: {},
           };
         }

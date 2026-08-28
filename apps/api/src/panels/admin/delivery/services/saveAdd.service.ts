@@ -16,7 +16,7 @@ export class DeliverySaveAddService {
     private readonly dataService: DataService,
     private readonly developer: DeveloperService,
     private readonly showAddService: DeliveryShowAddService,
-  ) {}
+  ) { }
 
   async savePartner(body: any, adminId: string) {
     try {

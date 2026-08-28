@@ -6,7 +6,7 @@ import { AuthService } from './auth.service';
 @Controller({ path: ['delivery-partner/auth', 'DeliveryPartner/auth'], version: '1' })
 @UseGuards(AuthGuard('jwt'))
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Post('shift-toggle')
   @HttpCode(HttpStatus.OK)

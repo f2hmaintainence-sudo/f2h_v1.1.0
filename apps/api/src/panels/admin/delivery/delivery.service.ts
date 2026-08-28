@@ -104,7 +104,7 @@ export class DeliveryManagementService {
           b.branch_name,
           db.is_active,
           db.is_available,
-          CASE WHEN (to_jsonb(db)->>'is_online') IS NOT NULL THEN ((to_jsonb(db)->>'is_online')::boolean) ELSE db.is_available END AS is_online,
+          db.is_online,
           db.daily_salary,
           db.max_daily_orders,
           db.current_lat,
@@ -781,7 +781,7 @@ export class DeliveryManagementService {
           r.duty_status === 'on_duty' ||
           r.duty_status === 'in_transit'
         );
-        
+
         let status: 'ONLINE' | 'OFFLINE' | 'ON_LEAVE' = 'OFFLINE';
         if (onLeaveToday) {
           status = 'ON_LEAVE';
@@ -835,13 +835,13 @@ export class DeliveryManagementService {
           utilization_rate: utilizationRate,
           current_run: r.run_id
             ? {
-                run_id: r.run_id,
-                run_status: r.run_status,
-                slot: r.slot,
-                assigned_stops: r.latest_run_assigned_stops,
-                completed_stops: r.latest_run_completed_stops,
-                failed_stops: r.latest_run_failed_stops,
-              }
+              run_id: r.run_id,
+              run_status: r.run_status,
+              slot: r.slot,
+              assigned_stops: r.latest_run_assigned_stops,
+              completed_stops: r.latest_run_completed_stops,
+              failed_stops: r.latest_run_failed_stops,
+            }
             : null,
           vehicle_type: r.vehicle_type,
           vehicle_number: r.vehicle_number,
@@ -856,14 +856,14 @@ export class DeliveryManagementService {
           on_leave_today: onLeaveToday,
           today_leave_details: r.leave_id
             ? {
-                id: r.leave_id,
-                leave_type: r.leave_type,
-                leave_from: r.leave_from,
-                leave_to: r.leave_to,
-                half_day_shift: r.half_day_shift,
-                reason: r.leave_reason,
-                status: r.leave_status,
-              }
+              id: r.leave_id,
+              leave_type: r.leave_type,
+              leave_from: r.leave_from,
+              leave_to: r.leave_to,
+              half_day_shift: r.half_day_shift,
+              reason: r.leave_reason,
+              status: r.leave_status,
+            }
             : null,
           has_pending_leave: Number(r.pending_leave_requests) > 0,
           pending_leave_requests: Number(r.pending_leave_requests),
@@ -925,7 +925,7 @@ export class DeliveryManagementService {
         } else if (
           todayUnassignedOrders > 0 &&
           (totalAvailableCapacity <= todayUnassignedOrders * 1.25 ||
-           (totalUsedCapacity + todayUnassignedOrders) >= totalCapacity * 0.85)
+            (totalUsedCapacity + todayUnassignedOrders) >= totalCapacity * 0.85)
         ) {
           requirementStatus = 'Near Capacity';
         } else if (onlinePartners === 0 && todayTotalDeliveryAddresses > 0) {
@@ -1439,11 +1439,11 @@ export class DeliveryManagementService {
       // Vehicle details live on delivery_partners itself.
       const vehicles = partner?.vehicle_type
         ? [{
-            id: 1,
-            vehicle_type: partner.vehicle_type,
-            vehicle_number: partner.vehicle_number,
-            verification_status: partner.is_verified ? 'verified' : 'pending',
-          }]
+          id: 1,
+          vehicle_type: partner.vehicle_type,
+          vehicle_number: partner.vehicle_number,
+          verification_status: partner.is_verified ? 'verified' : 'pending',
+        }]
         : [];
 
       // Referral stats and bonuses for Delivery Partner
@@ -1701,7 +1701,7 @@ export class DeliveryManagementService {
         paid_bonuses: targetBonusIds,
       };
     } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
+      await client.query('ROLLBACK').catch(() => { });
       if (error instanceof BadRequestException) throw error;
       this.developer.error('markReferralBonusesPaid error', { error, dto });
       throw new InternalServerErrorException('Failed to process offline referral payment');

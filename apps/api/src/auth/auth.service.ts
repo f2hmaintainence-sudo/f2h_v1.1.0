@@ -1190,8 +1190,7 @@ export class AuthService {
       if (redisError instanceof UnauthorizedException) throw redisError;
       // A Redis fault must not read as a revocation.
       this.logger.warn(
-        `[verifyAndValidateRefreshToken] Redis check skipped for ${userPrefix}: ${
-          (redisError as Error)?.message || redisError
+        `[verifyAndValidateRefreshToken] Redis check skipped for ${userPrefix}: ${(redisError as Error)?.message || redisError
         }`,
       );
     }

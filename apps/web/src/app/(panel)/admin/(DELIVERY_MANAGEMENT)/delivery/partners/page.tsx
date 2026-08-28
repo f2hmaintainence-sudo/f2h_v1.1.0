@@ -100,7 +100,7 @@ const PartnerCard = React.memo(({ partner: p, leaveInfo, onOpenEditModal, onOpen
         <div className="bg-slate-50/80 rounded-xl p-3 my-3 border border-slate-100 space-y-2">
           <div className="flex items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-1.5 font-semibold text-slate-700 min-w-0 truncate"><Phone size={12} className="text-slate-400 shrink-0" /><span className="truncate">{p.phone || "N/A"}</span></div>
-            <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${leaveInfo ? "bg-amber-50 text-amber-800 border border-amber-200" : p.is_active ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-slate-200/80 text-slate-600 border border-slate-300"}`}>
+            <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${leaveInfo ? "bg-amber-50 text-amber-800 border border-amber-200" : p.is_online ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-slate-200/80 text-slate-600 border border-slate-300"}`}>
               {leaveInfo ? (
                 <>
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
@@ -108,8 +108,8 @@ const PartnerCard = React.memo(({ partner: p, leaveInfo, onOpenEditModal, onOpen
                 </>
               ) : (
                 <>
-                  {p.is_active && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
-                  <span>{p.is_active ? "Active" : "Inactive"}</span>
+                  {p.is_online && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                  <span>{p.is_online ? "Online" : "Offline"}</span>
                 </>
               )}
             </span>
@@ -678,10 +678,10 @@ export default function DeliveryPartnersPage() {
                               }
                               return (
                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold ${
-                                  p.is_active ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-slate-100 text-slate-600 border border-slate-200"
+                                  p.is_online ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-slate-100 text-slate-600 border border-slate-200"
                                 }`}>
-                                  {p.is_active && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
-                                  {p.is_active ? "Active" : "Inactive"}
+                                  {p.is_online && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                                  {p.is_online ? "Online" : "Offline"}
                                 </span>
                               );
                             })()}

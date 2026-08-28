@@ -3,7 +3,7 @@ import { DatabaseService } from '../../../shared/database/Database.service';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly db: DatabaseService) { }
 
   async toggleShiftStatus(userId: string, requestedActiveState?: boolean) {
     if (!userId) {
@@ -46,8 +46,7 @@ export class AuthService {
 
     await this.db.query(
       `UPDATE delivery_partners
-       SET is_active = $1,
-           is_online = $1,
+       SET is_online = $1,
            is_available = $1,
            duty_status = $2,
            updated_at = NOW()
@@ -57,10 +56,10 @@ export class AuthService {
 
     return {
       success: true,
-      is_active: newStatus,
+      is_active: boyRes[0].is_active,
       is_online: newStatus,
       duty_status: dutyStatus,
-      message: `Shift status updated to ${newStatus ? 'active' : 'inactive'}`,
+      message: `Shift status updated to ${newStatus ? 'online' : 'offline'}`,
     };
   }
 

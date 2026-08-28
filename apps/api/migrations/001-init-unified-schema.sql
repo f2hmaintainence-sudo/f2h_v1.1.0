@@ -1108,7 +1108,6 @@ CREATE TABLE public.delivery_partners (
     is_active boolean DEFAULT false,
     is_verified boolean DEFAULT false,
     is_available boolean DEFAULT true,
-    duty_status character varying(30) DEFAULT 'off_duty'::character varying,
     is_online boolean DEFAULT false,
     vehicle_type character varying(50),
     vehicle_number character varying(30),

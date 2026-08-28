@@ -28,7 +28,7 @@ export class BranchConfigService {
     private readonly developer: DeveloperService,
     private readonly deliveryService: DeliveryManagementService,
     private readonly coverageOverlapService: BranchCoverageOverlapService,
-  ) {}
+  ) { }
 
   // ────────────────────────────────────────────────
   // Radius Configuration
@@ -310,7 +310,7 @@ export class BranchConfigService {
         const keyCity = String(w.city || '').toLowerCase();
         const keyName = String(w.name || '').toLowerCase();
         const keyId = String(w.warehouse_id || '').toLowerCase();
-        
+
         [keyCity, keyName, keyId].forEach(k => {
           if (k) {
             if (!warehousesListMap.has(k)) warehousesListMap.set(k, []);

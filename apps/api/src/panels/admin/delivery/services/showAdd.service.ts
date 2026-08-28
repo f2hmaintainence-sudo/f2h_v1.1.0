@@ -11,7 +11,7 @@ export class DeliveryShowAddService {
   constructor(
     private readonly formHelper: FormHelper,
     private readonly dataService: DataService,
-  ) {}
+  ) { }
 
   async getPartnerAddForm(): Promise<FormResponse> {
     const branchesResult = await this.dataService.query('branches', {
