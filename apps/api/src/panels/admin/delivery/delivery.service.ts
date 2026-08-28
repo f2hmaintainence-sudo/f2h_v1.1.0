@@ -386,7 +386,7 @@ export class DeliveryManagementService {
         const boySql = `
           UPDATE delivery_partners
           SET is_verified = $1, updated_at = NOW()
-          WHERE delivery_partner_id = $2 OR user_id = $2 OR id::text = $2
+          WHERE delivery_partner_id = $2 
           RETURNING delivery_partner_id, is_verified, is_active
         `;
         await this.db.query(boySql, [body.is_verified, partnerId]);

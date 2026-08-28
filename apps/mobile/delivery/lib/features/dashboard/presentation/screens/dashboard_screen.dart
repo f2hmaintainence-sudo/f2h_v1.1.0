@@ -370,8 +370,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             body: VerificationPendingView(
               isUnverified: !isVerified,
               onRedirectToProfile: () {
-                MockDataService().shouldOpenKycOnProfile = true;
-                MockDataService().tabNavigationNotifier.value = 3;
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                );
               },
             ),
           );
