@@ -334,7 +334,7 @@ export class PackageService {
           OR dcr.container_id ILIKE $${pIdx}
           OR u.first_name ILIKE $${pIdx}
           OR u.last_name ILIKE $${pIdx}
-          OR w.warehouse_name ILIKE $${pIdx}
+          OR w.name ILIKE $${pIdx}
         )`);
       }
 
@@ -354,7 +354,7 @@ export class PackageService {
         SELECT
           dcr.id,
           dcr.warehouse_id,
-          COALESCE(w.warehouse_name, 'Main Warehouse') AS warehouse_name,
+          COALESCE(w.name, 'Main Warehouse') AS warehouse_name,
           dcr.run_id,
           dr.run_date,
           dr.delivery_slot,
@@ -658,7 +658,7 @@ export class PackageService {
           ) AS delivery_partner_name,
           COALESCE(NULLIF(TRIM(u.phone), ''), 'N/A') AS delivery_partner_phone,
           COALESCE(w.warehouse_id, (SELECT warehouse_id FROM warehouses WHERE is_active = true AND deleted_at IS NULL LIMIT 1)) AS warehouse_id,
-          COALESCE(w.warehouse_name, b.branch_name, 'Main Warehouse') AS warehouse_name
+          COALESCE(w.name, b.branch_name, 'Main Warehouse') AS warehouse_name
         FROM delivery_runs dr
         LEFT JOIN users u ON u.user_id = dr.delivery_partner_id
         LEFT JOIN warehouses w ON (w.branch_id = dr.branch_id AND w.is_active = true AND w.deleted_at IS NULL)
