@@ -346,18 +346,18 @@ export class DeliveryOrderService {
     const timeMinutes = h * 60 + m;
 
     // Delivery Partner Slot Closing Rules:
-    // 1. Morning Delivery closes at Evening Customer Cutoff (14:00 / 2:00 PM).
-    // 2. Evening Delivery closes at Morning Customer Cutoff (20:00 / 8:00 PM).
+    // 1. Morning Delivery closes at Evening Customer Cutoff (16:00 / 4:00 PM = 960 mins).
+    // 2. Evening Delivery closes at Morning Customer Cutoff (23:00 / 11:00 PM = 1380 mins).
     let targetSlot = slotParam;
     let targetDate = dateParam || kolkataDateStr;
 
     if (!targetSlot) {
-      if (timeMinutes < 14 * 60) {
+      if (timeMinutes < 16 * 60) {
         targetSlot = 'morning';
-      } else if (timeMinutes < 20 * 60) {
+      } else if (timeMinutes < 23 * 60) {
         targetSlot = 'evening';
       } else {
-        // After 20:00, advance target date to next day's morning preparation if no date was passed
+        // After 23:00, advance target date to next day's morning preparation if no date was passed
         if (!dateParam) {
           const nextDay = new Date();
           nextDay.setDate(nextDay.getDate() + 1);

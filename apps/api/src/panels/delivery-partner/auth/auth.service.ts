@@ -74,8 +74,7 @@ export class AuthService {
       hour12: false,
     }).formatToParts(new Date());
     const h = parseInt(timeParts.find((p) => p.type === 'hour')?.value || '0', 10);
-    const m = parseInt(timeParts.find((p) => p.type === 'minute')?.value || '0', 10);
-    const targetSlot = h < 13 || (h === 13 && m < 30) ? 'morning' : 'evening';
+    const targetSlot = h < 16 ? 'morning' : 'evening';
 
     return { targetDate: kolkataDateStr, targetSlot };
   }
