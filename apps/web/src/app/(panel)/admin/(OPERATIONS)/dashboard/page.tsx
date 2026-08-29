@@ -535,73 +535,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          3. SMART HEURISTIC INSIGHTS & AI PULSE
-      ══════════════════════════════════════════════════════════════════════ */}
-      {insightsList.length > 0 && (
-        <div className="space-y-2.5">
-          <div className="flex items-center justify-between px-1">
-            <h2 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-              <Sparkles size={14} className="text-emerald-600" />
-              <span>Operational Insights &amp; Intelligence</span>
-            </h2>
-            <span className="text-[11px] text-slate-400 font-medium">Auto-generated recommendations</span>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {insightsList.map((ins) => {
-              const bgColors = {
-                success: "bg-emerald-50/70 border-emerald-200 text-emerald-950",
-                warning: "bg-amber-50/80 border-amber-200 text-amber-950",
-                info: "bg-blue-50/70 border-blue-200 text-blue-950",
-                critical: "bg-rose-50/80 border-rose-200 text-rose-950",
-              };
-              const iconColors = {
-                success: "text-emerald-600 bg-emerald-100",
-                warning: "text-amber-600 bg-amber-100",
-                info: "text-blue-600 bg-blue-100",
-                critical: "text-rose-600 bg-rose-100",
-              };
-
-              return (
-                <div
-                  key={ins.id}
-                  className={`p-4 rounded-2xl border ${bgColors[ins.type] || bgColors.info} shadow-sm flex flex-col justify-between`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-xl shrink-0 ${iconColors[ins.type]}`}>
-                      {ins.type === "critical" ? (
-                        <Flame size={16} />
-                      ) : ins.type === "warning" ? (
-                        <AlertTriangle size={16} />
-                      ) : ins.type === "success" ? (
-                        <CheckCircle2 size={16} />
-                      ) : (
-                        <Activity size={16} />
-                      )}
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-extrabold">{ins.title}</h4>
-                      <p className="text-[11.5px] opacity-80 mt-0.5 leading-relaxed">{ins.description}</p>
-                    </div>
-                  </div>
-                  {ins.actionText && ins.actionHref && (
-                    <div className="mt-3 pt-2.5 border-t border-black/5 flex justify-end">
-                      <Link
-                        href={ins.actionHref}
-                        className="inline-flex items-center gap-1 text-xs font-bold underline hover:opacity-80 transition"
-                      >
-                        <span>{ins.actionText}</span>
-                        <ArrowUpRight size={13} />
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* ══════════════════════════════════════════════════════════════════════
           4. FULFILLMENT PIPELINE FUNNEL GAUGE

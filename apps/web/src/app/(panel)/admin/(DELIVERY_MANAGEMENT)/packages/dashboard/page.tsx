@@ -84,8 +84,7 @@ export default function ContainersPage() {
   // Add/Edit Container Form State
   const [containerId, setContainerId] = useState('');
   const [containerName, setContainerName] = useState('');
-  const [warehouseId, setWarehouseId] = useState('');
-  const [quantity, setQuantity] = useState('100');
+  const [warehouseQuantities, setWarehouseQuantities] = useState<Record<string, string | number>>({});
   const [isReturnable, setIsReturnable] = useState(true);
   const [status, setStatus] = useState('active');
   const [savingContainer, setSavingContainer] = useState(false);
@@ -279,8 +278,12 @@ export default function ContainersPage() {
     setEditingContainer(null);
     setContainerId(`CONT-${Math.floor(1000 + Math.random() * 9000)}`);
     setContainerName('');
-    setWarehouseId(warehousesList.length > 0 ? (warehousesList[0].warehouse_id || warehousesList[0].id) : '');
-    setQuantity('100');
+    const initialQuantities: Record<string, number> = {};
+    for (const w of warehousesList) {
+      const wId = w.warehouse_id || w.id;
+      initialQuantities[wId] = 0;
+    }
+    setWarehouseQuantities(initialQuantities);
     setIsReturnable(true);
     setStatus('active');
     setContainerFormError('');
@@ -292,8 +295,13 @@ export default function ContainersPage() {
     setEditingContainer(container);
     setContainerId(container.container_id);
     setContainerName(container.name);
-    setWarehouseId(container.warehouse_id || '');
-    setQuantity(String(container.quantity || 0));
+    const initialQuantities: Record<string, number> = {};
+    for (const w of warehousesList) {
+      const wId = w.warehouse_id || w.id;
+      const found = (container.warehouses || []).find((sw: any) => sw.warehouse_id === wId);
+      initialQuantities[wId] = found ? Number(found.quantity || 0) : 0;
+    }
+    setWarehouseQuantities(initialQuantities);
     setIsReturnable(container.is_returnable ?? true);
     setStatus(container.status || 'active');
     setContainerFormError('');
@@ -304,32 +312,38 @@ export default function ContainersPage() {
   const handleSaveContainer = async (e: React.FormEvent) => {
     e.preventDefault();
     setContainerFormError('');
-    if (!containerName.trim() || !quantity) {
-      setContainerFormError('Container name and valid quantity are required');
+    if (!containerName.trim()) {
+      setContainerFormError('Container Type name is required');
       return;
     }
+
+    const warehouse_quantities = Object.entries(warehouseQuantities).map(([wId, q]) => ({
+      warehouse_id: wId,
+      quantity: Math.max(0, Number(q) || 0),
+    }));
+    const totalAllocated = warehouse_quantities.reduce((acc, curr) => acc + curr.quantity, 0);
 
     setSavingContainer(true);
     try {
       if (editingContainer) {
         await api.put(`/admin/catalog/containers/${editingContainer.id || editingContainer.container_id}`, {
           name: containerName,
-          quantity: Number(quantity),
-          warehouse_id: warehouseId || null,
+          warehouse_quantities,
+          quantity: totalAllocated,
           is_returnable: isReturnable,
           status,
         });
-        showToast('Container updated successfully!', true);
+        showToast('Container Type updated successfully!', true);
       } else {
         await api.post('/admin/catalog/containers', {
           container_id: containerId,
           name: containerName,
-          quantity: Number(quantity),
-          warehouse_id: warehouseId || null,
+          warehouse_quantities,
+          quantity: totalAllocated,
           is_returnable: isReturnable,
           status,
         });
-        showToast('Container created successfully!', true);
+        showToast('Container Type created successfully!', true);
       }
       setIsContainerModalOpen(false);
       fetchMasterContainers();
@@ -721,9 +735,9 @@ export default function ContainersPage() {
                 <thead className="bg-emerald-50/50 text-emerald-950 uppercase font-extrabold tracking-wider border-b border-emerald-100">
                   <tr>
                     <th className="px-4 py-3.5">Container ID</th>
-                    <th className="px-4 py-3.5">Name</th>
-                    <th className="px-4 py-3.5">Warehouse</th>
-                    <th className="px-4 py-3.5 text-right">Quantity</th>
+                    <th className="px-4 py-3.5">Container Type Name</th>
+                    <th className="px-4 py-3.5 text-center">Total Stock</th>
+                    <th className="px-4 py-3.5">Warehouse Allocation</th>
                     <th className="px-4 py-3.5 text-center">Returnable</th>
                     <th className="px-4 py-3.5 text-center">Status</th>
                     <th className="px-4 py-3.5 text-right">Actions</th>
@@ -734,14 +748,35 @@ export default function ContainersPage() {
                     <tr key={item.id || item.container_id} className="hover:bg-emerald-50/30 transition-colors">
                       <td className="px-4 py-3.5 font-mono font-bold text-emerald-800">{item.container_id}</td>
                       <td className="px-4 py-3.5 font-bold text-gray-900 text-sm">{item.name}</td>
-                      <td className="px-4 py-3.5 font-semibold text-slate-700">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-lg text-xs">
-                          <Building size={13} className="text-slate-500" />
-                          {item.warehouse_name || 'Default Warehouse'}
+                      <td className="px-4 py-3.5 text-center">
+                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-50 border border-emerald-200 text-emerald-800 font-black text-xs rounded-lg shadow-2xs">
+                          <Box size={13} className="text-emerald-600" />
+                          {Number(item.quantity || 0).toLocaleString()} units
                         </span>
                       </td>
-                      <td className="px-4 py-3.5 text-right font-black text-slate-900 text-sm">
-                        {Number(item.quantity || 0).toLocaleString()} units
+                      <td className="px-4 py-3.5">
+                        <div className="flex flex-wrap items-center gap-1.5 max-w-md">
+                          {Array.isArray(item.warehouses) && item.warehouses.length > 0 ? (
+                            item.warehouses.map((wh: any) => (
+                              <span
+                                key={wh.warehouse_id}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
+                                  wh.quantity > 0
+                                    ? 'bg-slate-50 border-slate-200 text-slate-800'
+                                    : 'bg-gray-50 border-gray-100 text-gray-400'
+                                }`}
+                              >
+                                <Building size={11} className={wh.quantity > 0 ? 'text-emerald-600' : 'text-gray-300'} />
+                                <span>{wh.warehouse_name || wh.warehouse_code || wh.warehouse_id}:</span>
+                                <strong className={wh.quantity > 0 ? 'text-slate-900 font-black' : 'text-gray-400'}>
+                                  {wh.quantity}
+                                </strong>
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-gray-400 italic text-[11px]">No warehouse stock</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3.5 text-center">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[10px] uppercase ${
@@ -760,10 +795,10 @@ export default function ContainersPage() {
                       <td className="px-4 py-3.5 text-right">
                         <button
                           onClick={() => openEditContainerModal(item)}
-                          className="p-1.5 text-emerald-700 hover:bg-emerald-100 rounded-lg transition-colors cursor-pointer"
-                          title="Edit Container"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-800 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                          title="Edit Container Type"
                         >
-                          <Edit2 size={15} />
+                          <Edit2 size={13} /> Edit
                         </button>
                       </td>
                     </tr>
@@ -1753,39 +1788,61 @@ export default function ContainersPage() {
               />
             </div>
 
-            {/* Dynamic Warehouse Select Dropdown */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Warehouse
-              </label>
-              <select
-                value={warehouseId}
-                onChange={(e) => setWarehouseId(e.target.value)}
-                className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold focus:outline-none focus:border-emerald-600 cursor-pointer"
-              >
-                <option value="">-- Select Warehouse --</option>
-                {warehousesList.map((w: any) => (
-                  <option key={w.id || w.warehouse_id} value={w.warehouse_id || w.id}>
-                    {w.name} ({w.warehouse_id || 'ID: ' + w.id})
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Warehouse Stock Allocation Section */}
+            <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Building size={14} className="text-emerald-600" />
+                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Warehouse Stock Allocation
+                  </span>
+                </div>
+                <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-md">
+                  Total: {Object.values(warehouseQuantities).reduce((s: number, q) => s + (Number(q) || 0), 0)} Units
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Set container stock quantity available for each warehouse:
+              </p>
 
-            {/* Simplified Quantity Field */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Quantity
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                placeholder="Enter container quantity"
-                className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold focus:outline-none focus:border-emerald-600"
-                required
-              />
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {warehousesList.map((w: any) => {
+                  const wId = w.warehouse_id || w.id;
+                  const currentQty = warehouseQuantities[wId] ?? 0;
+                  return (
+                    <div
+                      key={wId}
+                      className="flex items-center justify-between gap-3 bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-900 truncate">
+                          {w.name}
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-mono">
+                          {w.code ? `Code: ${w.code} · ` : ''}{w.warehouse_id || w.id}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <input
+                          type="number"
+                          min="0"
+                          value={currentQty}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setWarehouseQuantities((prev) => ({
+                              ...prev,
+                              [wId]: val,
+                            }));
+                          }}
+                          placeholder="0"
+                          className="w-24 py-1.5 px-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs font-bold text-right focus:outline-none focus:border-emerald-600"
+                        />
+                        <span className="text-[11px] text-slate-500 font-semibold">units</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="flex items-center justify-between py-2 border-t border-b border-slate-100">

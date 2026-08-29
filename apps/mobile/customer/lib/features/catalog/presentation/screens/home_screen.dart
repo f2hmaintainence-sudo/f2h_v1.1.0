@@ -345,7 +345,12 @@ class _HomeScreenState extends State<HomeScreen>
                   //   ),
                   // ),
 
-                  const SliverToBoxAdapter(child: HomeCouponBanner()),
+                  // const SliverToBoxAdapter(child: HomeCouponBanner()),
+                  
+                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+                  // 8B. Promotional Offer Cards (Live Preview Style)
+                  const SliverToBoxAdapter(child: _HomeBottomPromoBanners()),
 
                   // 6. Popular Product
                   SliverToBoxAdapter(
@@ -489,11 +494,7 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                   ),
 
-                  // Spacing between Referral and Promo Banners
-                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
-                  // 8B. Promotional Offer Cards (Live Preview Style)
-                  const SliverToBoxAdapter(child: _HomeBottomPromoBanners()),
 
                   // Spacing before Promise Strip
                   const SliverToBoxAdapter(child: SizedBox(height: 16)),

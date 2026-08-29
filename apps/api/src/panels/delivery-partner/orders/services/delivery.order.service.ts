@@ -634,10 +634,68 @@ export class DeliveryOrderService {
   ): Promise<void> {
     if (params.quantity <= 0) return;
 
+    // 1. Update customer running balance
     await this.applyBalanceDelta(executor, params.customerId, params.containerId, {
       issued: params.quantity,
     });
 
+    // 2. Resolve source warehouse
+    let warehouseId = params.warehouseId;
+    if (!warehouseId && params.runId) {
+      const whRes = await executor.query(
+        `SELECT dd.warehouse_id 
+         FROM delivery_dispatch dd
+         WHERE (dd.delivery_run_id = $1 OR dd.delivery_run_id IN (SELECT run_id FROM delivery_runs WHERE id::text = $1 OR run_id = $1))
+           AND dd.deleted_at IS NULL
+         LIMIT 1`,
+        [params.runId],
+      );
+      warehouseId = whRes.rows?.[0]?.warehouse_id || whRes[0]?.warehouse_id;
+      if (!warehouseId) {
+        const runWh = await executor.query(
+          `SELECT w.warehouse_id 
+           FROM delivery_runs dr 
+           LEFT JOIN warehouses w ON (w.branch_id = dr.branch_id OR w.warehouse_id = dr.warehouse_id) AND w.deleted_at IS NULL 
+           WHERE dr.id::text = $1 OR dr.run_id = $1 
+           LIMIT 1`,
+          [params.runId],
+        );
+        warehouseId = runWh.rows?.[0]?.warehouse_id || runWh[0]?.warehouse_id;
+      }
+    }
+
+    if (!warehouseId) {
+      const defWh = await executor.query(
+        `SELECT warehouse_id FROM warehouses WHERE deleted_at IS NULL ORDER BY id ASC LIMIT 1`
+      );
+      warehouseId = defWh.rows?.[0]?.warehouse_id || defWh[0]?.warehouse_id;
+    }
+
+    // 3. Deduct from warehouse container stock
+    if (warehouseId) {
+      await executor.query(
+        `INSERT INTO warehouse_containers (warehouse_id, container_id, quantity, created_at, updated_at)
+         VALUES ($1, $2, 0, NOW(), NOW())
+         ON CONFLICT (warehouse_id, container_id) DO UPDATE
+         SET quantity = GREATEST(0, warehouse_containers.quantity - $3),
+             updated_at = NOW()`,
+        [warehouseId, params.containerId, params.quantity],
+      );
+
+      // 4. Sync total quantity on master containers table
+      await executor.query(
+        `UPDATE containers 
+         SET quantity = (
+           SELECT COALESCE(SUM(quantity), 0)::int 
+           FROM warehouse_containers 
+           WHERE container_id = $1 AND deleted_at IS NULL
+         ), updated_at = NOW()
+         WHERE container_id = $1`,
+        [params.containerId],
+      );
+    }
+
+    // 5. Upsert reconciliation
     if (params.runId) {
       await this.upsertContainerReconciliation(executor, {
         runId: params.runId,
@@ -647,7 +705,7 @@ export class DeliveryOrderService {
         lost: 0,
         remarks: 'Delivered returnable container on route',
         submittedBy: params.partnerId || params.createdBy,
-        warehouseId: params.warehouseId,
+        warehouseId: warehouseId,
       });
     }
   }

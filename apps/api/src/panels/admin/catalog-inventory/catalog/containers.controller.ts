@@ -33,6 +33,11 @@ export class ContainersController {
     return this.containersService.createContainer(body);
   }
 
+  @Post('warehouse-stock')
+  async adjustWarehouseStock(@Body() body: any) {
+    return this.containersService.adjustWarehouseStock(body);
+  }
+
   @Put(':id')
   async updateContainer(@Param('id') id: string, @Body() body: any) {
     return this.containersService.updateContainer(id, body);

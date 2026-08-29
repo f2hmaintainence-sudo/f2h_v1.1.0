@@ -502,12 +502,25 @@ export class PackageService {
 
         // Restock warehouse container inventory with good accepted units
         if (submittedQty > 0 && existing.container_id) {
+          const targetWarehouseId = existing.warehouse_id || 'WH-MRXD13W8PWMMON';
           await client.query(
-            `UPDATE containers
-             SET quantity = quantity + $1,
-                 updated_at = NOW()
-             WHERE container_id = $2 AND deleted_at IS NULL`,
-            [submittedQty, existing.container_id],
+            `INSERT INTO warehouse_containers (warehouse_id, container_id, quantity, created_at, updated_at)
+             VALUES ($1, $2, $3, NOW(), NOW())
+             ON CONFLICT (warehouse_id, container_id) DO UPDATE
+             SET quantity = warehouse_containers.quantity + $3,
+                 updated_at = NOW()`,
+            [targetWarehouseId, existing.container_id, submittedQty],
+          );
+
+          await client.query(
+            `UPDATE containers 
+             SET quantity = (
+               SELECT COALESCE(SUM(quantity), 0)::int 
+               FROM warehouse_containers 
+               WHERE container_id = $1 AND deleted_at IS NULL
+             ), updated_at = NOW()
+             WHERE container_id = $1`,
+            [existing.container_id],
           );
         }
       });
@@ -605,13 +618,26 @@ export class PackageService {
           );
         }
 
-        // 3. Restock container inventory
+        // 3. Restock warehouse container inventory & sync total
+        const targetWarehouseId = warehouseId || 'WH-MRXD13W8PWMMON';
         await client.query(
-          `UPDATE containers
-           SET quantity = quantity + $1,
-               updated_at = NOW()
-           WHERE container_id = $2 AND deleted_at IS NULL`,
-          [qty, containerId],
+          `INSERT INTO warehouse_containers (warehouse_id, container_id, quantity, created_at, updated_at)
+           VALUES ($1, $2, $3, NOW(), NOW())
+           ON CONFLICT (warehouse_id, container_id) DO UPDATE
+           SET quantity = warehouse_containers.quantity + $3,
+               updated_at = NOW()`,
+          [targetWarehouseId, containerId, qty],
+        );
+
+        await client.query(
+          `UPDATE containers 
+           SET quantity = (
+             SELECT COALESCE(SUM(quantity), 0)::int 
+             FROM warehouse_containers 
+             WHERE container_id = $1 AND deleted_at IS NULL
+           ), updated_at = NOW()
+           WHERE container_id = $1`,
+          [containerId],
         );
       });
 
