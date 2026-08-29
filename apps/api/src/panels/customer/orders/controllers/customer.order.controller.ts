@@ -243,7 +243,7 @@ export class CustomerOrderController {
 
   // ─────────────────────────────────────────────────────────────────────────────
   // GET /customer/orders/bills
-  // Returns all bills for the logged-in customer from customer_bills table + orders.
+  // Returns subscription bills for the logged-in customer from customer_bills table.
   // ─────────────────────────────────────────────────────────────────────────────
   @Get('bills')
   async getBills(@Req() req: Request) {
@@ -255,7 +255,7 @@ export class CustomerOrderController {
         return { status: true, bills: [] };
       }
 
-      // 1. Fetch all bills for this customer from customer_bills
+      // 1. Fetch strictly subscription bills for this customer from customer_bills
       const billRows = await this.db.query(
         `SELECT bill_id, customer_id, bill_type, reference_id, payment_type, payment_method,
                 billing_from, billing_to, due_date,
@@ -263,6 +263,15 @@ export class CustomerOrderController {
                 paid_amount, due_amount, status, remarks, created_at, updated_at
          FROM customer_bills
          WHERE customer_id = $1
+           AND (
+             LOWER(bill_type) = 'subscription'
+             OR reference_id LIKE 'SUB%'
+             OR reference_id LIKE 'MSH%'
+             OR bill_id LIKE 'BILL_MS%'
+             OR bill_id LIKE 'BILL_MT%'
+             OR remarks ILIKE '%subscription%'
+           )
+           AND (reference_id NOT LIKE 'Ord%' AND reference_id NOT LIKE 'ORD%')
          ORDER BY created_at DESC`,
         [userId],
       );
@@ -273,7 +282,7 @@ export class CustomerOrderController {
 
       const bills = billRows.map((r: any) => ({
         ...r,
-        bill_type: (r.bill_type || 'order').toLowerCase(),
+        bill_type: 'subscription',
         total_amount: Number(r.total_amount || 0),
         subtotal: Number(r.subtotal || r.total_amount || 0),
         discount_amount: Number(r.discount_amount || 0),
@@ -284,62 +293,10 @@ export class CustomerOrderController {
         item_name: '',
       }));
 
-      // 2. Fetch item descriptions from order_items for order bills
-      const orderRefIds = bills
-        .filter(b => b.reference_id && (b.bill_type === 'order' || b.reference_id.startsWith('Ord') || b.reference_id.startsWith('ORD')))
-        .map(b => b.reference_id);
-
-      if (orderRefIds.length > 0) {
-        try {
-          const orderItems = await this.db.query(
-            `SELECT oi.order_id,
-                    COALESCE(
-                      NULLIF(TRIM(CONCAT(p.name, ' - ', pv.name)), ' - '),
-                      oi.product_name,
-                      p.name,
-                      pv.name,
-                      'Order Item'
-                    ) AS item_name,
-                    COALESCE(oi.product_name, p.name, '') AS product_name,
-                    COALESCE(pv.name, '') AS variant_name,
-                    COALESCE(oi.quantity, 1) AS quantity,
-                    COALESCE(oi.unit_price, 0) AS unit_price,
-                    COALESCE(oi.original_price, oi.unit_price, 0) AS original_price,
-                    COALESCE(oi.discount_amount, 0) AS discount_amount,
-                    COALESCE(oi.total_price, oi.final_price, 0) AS total_amount
-             FROM order_items oi
-             LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
-             LEFT JOIN products p ON p.product_id = pv.product_id
-             WHERE oi.order_id = ANY($1::text[])
-               AND oi.deleted_at IS NULL`,
-            [orderRefIds],
-          );
-
-          if (orderItems && orderItems.length > 0) {
-            const orderItemsMap = new Map<string, any[]>();
-            for (const item of orderItems) {
-              const list = orderItemsMap.get(item.order_id) || [];
-              list.push(item);
-              orderItemsMap.set(item.order_id, list);
-            }
-
-            for (const bill of bills) {
-              if (orderItemsMap.has(bill.reference_id)) {
-                const items = orderItemsMap.get(bill.reference_id)!;
-                bill.items = items;
-                bill.item_name = items.map(i => i.item_name).join(', ');
-              }
-            }
-          }
-        } catch (err) {
-          console.error('getBills: Error fetching order items', err);
-        }
-      }
-
-      // 3. Fetch item descriptions from subscription_items for subscription bills
+      // 2. Fetch item descriptions from subscription_items for all subscription bills
       const subRefIds = bills
-        .filter(b => b.reference_id && (b.bill_type === 'subscription' || b.reference_id.startsWith('SUB') || b.reference_id.startsWith('MSH')))
-        .map(b => b.reference_id);
+        .map(b => b.reference_id || b.bill_id)
+        .filter(id => typeof id === 'string' && (id.startsWith('SUB_') || id.startsWith('MSH') || id.startsWith('BILL_MS') || id.startsWith('BILL_MT')));
 
       if (subRefIds.length > 0) {
         try {
@@ -360,8 +317,12 @@ export class CustomerOrderController {
              FROM subscription_items si
              LEFT JOIN product_variants pv ON pv.variant_id = si.product_variant_id
              LEFT JOIN products p ON p.product_id = pv.product_id
-             WHERE (si.subscription_id = ANY($1::text[]) OR ('SUB_' || si.subscription_id) = ANY($1::text[]))
-               AND si.deleted_at IS NULL`,
+             WHERE (
+               si.subscription_id = ANY($1::text[])
+               OR ('SUB_' || si.subscription_id) = ANY($1::text[])
+               OR ('BILL_' || si.subscription_id) = ANY($1::text[])
+             )
+             AND si.deleted_at IS NULL`,
             [subRefIds],
           );
 
@@ -374,7 +335,10 @@ export class CustomerOrderController {
             }
 
             for (const bill of bills) {
-              const matched = subItemsMap.get(bill.reference_id) || subItemsMap.get(String(bill.reference_id).replace(/^SUB_/, ''));
+              const refId = bill.reference_id || bill.bill_id;
+              const matched = subItemsMap.get(refId) ||
+                subItemsMap.get(String(refId).replace(/^SUB_/, '')) ||
+                subItemsMap.get(String(refId).replace(/^BILL_/, ''));
               if (matched && matched.length > 0) {
                 bill.items = matched;
                 bill.item_name = matched.map(i => i.item_name).join(', ');
