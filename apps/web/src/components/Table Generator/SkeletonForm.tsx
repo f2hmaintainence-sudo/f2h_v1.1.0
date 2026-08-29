@@ -54,6 +54,8 @@ interface FieldDef {
   group?: string;
   description?: string;
   prefix?: string;
+  allowNegative?: boolean;
+  step?: string | number;
   toggleOptions?: { onLabel?: string; offLabel?: string; pill?: boolean };
   url?: string;
   action?: 'redirect';
@@ -78,6 +80,7 @@ interface FormResponse {
   message: string;
   stepper?: boolean;
   script?: string;
+  isStepperLayout?: boolean;
 }
 
 interface SkeletonFormProps {
@@ -107,6 +110,12 @@ function validateField(field: FieldDef, value: any, formData?: Record<string, an
   }
   if (isEmpty) return null;
 
+  if (field.type === 'number') {
+    const num = Number(value);
+    if (isNaN(num)) return `${field.label} must be a number`;
+    if (!field.allowNegative && num < 0) return `${field.label} cannot be negative`;
+  }
+
   if (field.name === 'price' && formData && formData.original_price) {
     const orig = parseFloat(formData.original_price);
     const sell = parseFloat(value);
@@ -129,7 +138,6 @@ function validateField(field: FieldDef, value: any, formData?: Record<string, an
 
   if (field.type === 'number') {
     const num = Number(value);
-    if (isNaN(num)) return `${field.label} must be a number`;
     if (v.min !== undefined && num < v.min) return v.message ?? `Minimum is ${v.min}`;
     if (v.max !== undefined && num > v.max) return v.message ?? `Maximum is ${v.max}`;
   }
@@ -1512,7 +1520,21 @@ export default function SkeletonForm({
   }, [scriptToRun, loading, currentStep]);
 
   // ── Field change handler ───────────────────────────────────
-  const handleChange = (name: string, value: any) => {
+  const handleChange = (name: string, rawValue: any) => {
+    const flatList: FieldDef[] = isStepper ? (fields as any[]).flat() : (fields as FieldDef[]);
+    const fieldDef = flatList.find((f: FieldDef) => f.name === name);
+    const isNumField = fieldDef?.type === 'number';
+
+    let value = rawValue;
+    // Strip minus signs and exponential notation on all number fields
+    if ((isNumField || (!isNaN(Number(rawValue)) && rawValue !== '')) && !fieldDef?.allowNegative) {
+      if (typeof value === 'string') {
+        value = value.replace(/-/g, '').replace(/[eE]/g, '');
+      } else if (typeof value === 'number' && value < 0) {
+        value = Math.max(0, value);
+      }
+    }
+
     setFormData((prev) => {
       const next = { ...prev, [name]: value };
 
@@ -1527,7 +1549,10 @@ export default function SkeletonForm({
       if (name === 'price') {
         const orig = parseFloat(next.original_price);
         const sell = parseFloat(value);
-        if (!isNaN(orig) && !isNaN(sell) && orig > 0 && sell > orig) {
+        if (isNaN(sell) || sell < 0) {
+          next.discount_percent = 0;
+          next.discount = 0;
+        } else if (!isNaN(orig) && !isNaN(sell) && orig > 0 && sell > orig) {
           next.price = orig;
           next.discount_percent = 0;
           next.discount = 0;
@@ -1537,8 +1562,8 @@ export default function SkeletonForm({
               price: `Selling Price cannot exceed Original Price (MRP: ₹${orig})`,
             }));
           }, 0);
-        } else if (!isNaN(orig) && !isNaN(sell) && orig > 0 && orig >= sell) {
-          const disc = Math.round(((orig - sell) / orig) * 100 * 10) / 10;
+        } else if (!isNaN(orig) && !isNaN(sell) && orig > 0 && orig >= sell && sell >= 0) {
+          const disc = Math.min(100, Math.max(0, Math.round(((orig - sell) / orig) * 100 * 10) / 10));
           next.discount_percent = disc;
           next.discount = disc;
         } else {
@@ -1548,7 +1573,10 @@ export default function SkeletonForm({
       } else if (name === 'original_price') {
         const orig = parseFloat(value);
         const sell = parseFloat(next.price);
-        if (!isNaN(orig) && !isNaN(sell) && orig > 0 && sell > orig) {
+        if (isNaN(orig) || orig < 0) {
+          next.discount_percent = 0;
+          next.discount = 0;
+        } else if (!isNaN(orig) && !isNaN(sell) && orig > 0 && sell > orig) {
           next.price = orig;
           next.discount_percent = 0;
           next.discount = 0;
@@ -1558,8 +1586,8 @@ export default function SkeletonForm({
               price: `Selling Price adjusted to match Original Price (MRP: ₹${orig})`,
             }));
           }, 0);
-        } else if (!isNaN(orig) && !isNaN(sell) && orig > 0 && orig >= sell) {
-          const disc = Math.round(((orig - sell) / orig) * 100 * 10) / 10;
+        } else if (!isNaN(orig) && !isNaN(sell) && orig > 0 && orig >= sell && sell >= 0) {
+          const disc = Math.min(100, Math.max(0, Math.round(((orig - sell) / orig) * 100 * 10) / 10));
           next.discount_percent = disc;
           next.discount = disc;
         } else {
@@ -1894,11 +1922,34 @@ export default function SkeletonForm({
 
       default: {
         const isFile = field.type === 'file';
+        const isNumber = field.type === 'number';
+        const minVal = field.validation?.min !== undefined ? (field.allowNegative ? field.validation.min : Math.max(0, field.validation.min)) : (isNumber && !field.allowNegative ? 0 : undefined);
+        const maxVal = field.validation?.max;
+        const stepVal = field.step || (isNumber ? 'any' : undefined);
+
         const inputElement = (
           <input
             className={`skf-input${errorClass}${field.prefix ? ' !pl-8' : ''}`}
             type={field.type === 'phone' ? 'tel' : field.type}
             placeholder={field.placeholder}
+            min={minVal}
+            max={maxVal}
+            step={stepVal}
+            onKeyDown={(e) => {
+              if (isNumber && !field.allowNegative && (e.key === '-' || e.key === 'Subtract' || e.key === 'Minus' || e.key === 'e' || e.key === 'E')) {
+                e.preventDefault();
+              }
+            }}
+            onPaste={(e) => {
+              if (isNumber && !field.allowNegative) {
+                const pasted = e.clipboardData.getData('text');
+                if (pasted.includes('-') || pasted.includes('e') || pasted.includes('E')) {
+                  e.preventDefault();
+                  const sanitized = pasted.replace(/[-eE]/g, '');
+                  handleChange(field.name, sanitized);
+                }
+              }
+            }}
             // File inputs cannot have a 'value' prop (except empty string)
             value={isFile ? undefined : (formData[field.name] ?? '')}
             accept={field.accept}
@@ -1916,9 +1967,13 @@ export default function SkeletonForm({
                   handleChange(field.name, null);
                 }
               } else {
+                let val = e.target.value;
+                if (isNumber && !field.allowNegative && typeof val === 'string') {
+                  val = val.replace(/[-eE]/g, '');
+                }
                 handleChange(
                   field.name,
-                  e.target.value
+                  val
                 );
               }
             }}
