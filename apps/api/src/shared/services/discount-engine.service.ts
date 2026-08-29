@@ -164,9 +164,16 @@ export class DiscountEngineService {
         }
       }
 
-      // Apply max_discount_amount cap for coupon across items if configured
-      if (couponPromo.max_discount_amount != null && couponPromo.max_discount_amount > 0 && resolvedCouponId) {
-        this.applyCouponMaxDiscountCap(couponPromo.max_discount_amount, resolvedCouponId, itemResults, items);
+      // Apply max_discount_amount cap for coupon across items if configured, or fixed_amount cap
+      const couponCap =
+        couponPromo.max_discount_amount != null && couponPromo.max_discount_amount > 0
+          ? couponPromo.max_discount_amount
+          : couponPromo.promotion_type === 'fixed_amount'
+            ? couponPromo.discount_value
+            : null;
+
+      if (couponCap != null && couponCap > 0 && resolvedCouponId) {
+        this.applyCouponMaxDiscountCap(couponCap, resolvedCouponId, itemResults, items);
       }
     }
 
@@ -223,7 +230,19 @@ export class DiscountEngineService {
     if (!result.valid) {
       return { valid: false, message: result.message };
     }
-    const preview = result.promotion ? this.calcRawItemDiscount(result.promotion, subtotal) : 0;
+    let preview = 0;
+    if (result.promotion) {
+      if (result.promotion.promotion_type === 'percentage') {
+        const raw = (subtotal * result.promotion.discount_value) / 100;
+        preview =
+          result.promotion.max_discount_amount != null && result.promotion.max_discount_amount > 0
+            ? Math.min(raw, result.promotion.max_discount_amount)
+            : raw;
+      } else {
+        preview = Math.min(result.promotion.discount_value, subtotal);
+      }
+      preview = Math.round(preview * 100) / 100;
+    }
     return {
       valid: true,
       message: result.message,
@@ -347,28 +366,39 @@ export class DiscountEngineService {
       const appliesToWholeCart =
         row.apply_to_all_products || (row.product_variant_ids || []).length === 0;
 
-      available.push({
-        code: row.code,
-        name: row.name || row.promo_name || null,
-        description: row.description || null,
-        label:
-          row.promotion_type === 'percentage'
-            ? `${Number(row.discount_value)}% OFF`
-            : `₹${Number(row.discount_value).toFixed(0)} OFF`,
-        promotion_type: row.promotion_type,
-        discount_value: Number(row.discount_value),
-        max_discount_amount: row.max_discount_amount != null ? Number(row.max_discount_amount) : null,
-        minimum_order_amount: minAmount,
-        applies_to_all_products: appliesToWholeCart,
-        end_at: row.end_at ? new Date(row.end_at).toISOString() : null,
-        first_order_only: !!row.first_order_only,
-        eligible: true,
-        reason: null,
-        discount_preview:
-          isEligible && appliesToWholeCart
-            ? this.calcRawItemDiscount(promo, subtotal)
-            : 0,
-      });
+        let discountPreview = 0;
+        if (isEligible && appliesToWholeCart) {
+          if (row.promotion_type === 'percentage') {
+            const raw = (subtotal * Number(row.discount_value)) / 100;
+            discountPreview =
+              row.max_discount_amount != null && Number(row.max_discount_amount) > 0
+                ? Math.min(raw, Number(row.max_discount_amount))
+                : raw;
+          } else {
+            discountPreview = Math.min(Number(row.discount_value), subtotal);
+          }
+          discountPreview = Math.round(discountPreview * 100) / 100;
+        }
+
+        available.push({
+          code: row.code,
+          name: row.name || row.promo_name || null,
+          description: row.description || null,
+          label:
+            row.promotion_type === 'percentage'
+              ? `${Number(row.discount_value)}% OFF`
+              : `₹${Number(row.discount_value).toFixed(0)} OFF`,
+          promotion_type: row.promotion_type,
+          discount_value: Number(row.discount_value),
+          max_discount_amount: row.max_discount_amount != null ? Number(row.max_discount_amount) : null,
+          minimum_order_amount: minAmount,
+          applies_to_all_products: appliesToWholeCart,
+          end_at: row.end_at ? new Date(row.end_at).toISOString() : null,
+          first_order_only: !!row.first_order_only,
+          eligible: true,
+          reason: null,
+          discount_preview: discountPreview,
+        });
     }
 
     return available;
