@@ -283,13 +283,20 @@ class _TopupDrawerState extends State<TopupDrawer> {
                         final isLoggedIn = authState is Authenticated || sessionState.profile != null;
 
                         if (!isLoggedIn) {
-                          F2HToast.error(
-                              context, 'Please login to add money to wallet');
-                          Navigator.push(
+                          F2HToast.info(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => const LoginScreen(),
-                            ),
+                            'Please sign in to add money to wallet.',
+                            title: 'Sign In Required',
+                            actionText: 'Sign In',
+                            onAction: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const LoginScreen(popOnSuccess: true),
+                                ),
+                              );
+                            },
                           );
                           return;
                         }

@@ -3,11 +3,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
-import 'package:f2h_customer/core/session/customer_session_state.dart';
 import 'package:f2h_customer/features/wallet/presentation/widgets/transaction_tile.dart';
 // import 'package:f2h_customer/features/orders/data/models/order_model.dart';
 // import 'package:f2h_customer/features/orders/presentation/widgets/order_tile.dart';
 import 'package:f2h_customer/features/wallet/presentation/widgets/topup_drawer.dart';
+import 'package:f2h_customer/core/widgets/hot_toast.dart';
+import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
+import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
+import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
 // ══════════════════════════════════════════════════════════
 //  WALLET SCREEN — Clean white unique redesign
 // ══════════════════════════════════════════════════════════
@@ -381,6 +384,28 @@ class _WalletScreenState extends State<WalletScreen> {
           GestureDetector(
             onTap: () {
               HapticFeedback.lightImpact();
+              final authState = context.read<AuthBloc>().state;
+              final sessionState = context.read<CustomerSessionCubit>().state;
+              final isLoggedIn = authState is Authenticated || sessionState.profile != null;
+
+              if (!isLoggedIn) {
+                F2HToast.info(
+                  context,
+                  'Please sign in to add money to wallet.',
+                  title: 'Sign In Required',
+                  actionText: 'Sign In',
+                  onAction: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const LoginScreen(popOnSuccess: true),
+                      ),
+                    );
+                  },
+                );
+                return;
+              }
+
               showModalBottomSheet(
                 context: context,
                 isScrollControlled: true,

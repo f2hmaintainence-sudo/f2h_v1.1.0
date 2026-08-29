@@ -5,6 +5,7 @@ import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:f2h_customer/core/session/customer_session_state.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
+import 'package:f2h_customer/core/guards/auth_guard.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
@@ -39,10 +40,19 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
     final sessionState = context.read<CustomerSessionCubit>().state;
     final isLoggedIn = authState is Authenticated || sessionState.profile != null;
     if (!isLoggedIn) {
-      F2HToast.error(context, 'Please log in to manage addresses.');
-      Navigator.push(
+      F2HToast.info(
         context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        'Please sign in to manage addresses.',
+        title: 'Sign In Required',
+        actionText: 'Sign In',
+        onAction: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const LoginScreen(popOnSuccess: true),
+            ),
+          );
+        },
       );
       return;
     }
@@ -440,6 +450,27 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
   }
 
   void _editAddress(BuildContext context, AddressModel addr) {
+    final authState = context.read<AuthBloc>().state;
+    final sessionState = context.read<CustomerSessionCubit>().state;
+    final isLoggedIn = authState is Authenticated || sessionState.profile != null;
+    if (!isLoggedIn) {
+      F2HToast.info(
+        context,
+        'Please sign in to manage addresses.',
+        title: 'Sign In Required',
+        actionText: 'Sign In',
+        onAction: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const LoginScreen(popOnSuccess: true),
+            ),
+          );
+        },
+      );
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(

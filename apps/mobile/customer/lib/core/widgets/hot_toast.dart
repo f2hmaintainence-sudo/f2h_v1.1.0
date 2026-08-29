@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 
+enum ToastType { success, error, info }
+
 class F2HToast {
   static OverlayEntry? _currentEntry;
 
@@ -8,7 +10,12 @@ class F2HToast {
     BuildContext context,
     String message, {
     bool isError = false,
-    Duration duration = const Duration(milliseconds: 3000),
+    bool isInfo = false,
+    ToastType? type,
+    String? title,
+    String? actionText,
+    VoidCallback? onAction,
+    Duration duration = const Duration(milliseconds: 3500),
   }) {
     final overlay = Overlay.maybeOf(context);
     if (overlay == null) return;
@@ -16,14 +23,51 @@ class F2HToast {
     _currentEntry?.remove();
     _currentEntry = null;
 
+    final resolvedType = type ??
+        (isError
+            ? ToastType.error
+            : (isInfo ? ToastType.info : ToastType.success));
+
     _currentEntry = OverlayEntry(
       builder: (context) {
-        final iconBgColor = isError ? const Color(0xFFFEE2E2) : const Color(0xFFDCFCE7);
-        final iconColor = isError ? const Color(0xFFDC2626) : const Color(0xFF16A34A);
-        final titleText = isError ? 'Action Failed' : 'Success!';
-        final titleColor = isError ? const Color(0xFF991B1B) : const Color(0xFF166534);
-        final btnColor = isError ? const Color(0xFFDC2626) : kPrimary;
-        final btnText = isError ? 'Got it' : 'Awesome';
+        final Color iconBgColor;
+        final Color iconColor;
+        final IconData iconData;
+        final String titleText;
+        final Color titleColor;
+        final Color btnColor;
+        final String btnText;
+
+        switch (resolvedType) {
+          case ToastType.error:
+            iconBgColor = const Color(0xFFFEE2E2);
+            iconColor = const Color(0xFFDC2626);
+            iconData = Icons.close_rounded;
+            titleText = title ?? 'Action Failed';
+            titleColor = const Color(0xFF991B1B);
+            btnColor = const Color(0xFFDC2626);
+            btnText = actionText ?? 'Got it';
+            break;
+          case ToastType.info:
+            iconBgColor = const Color(0xFFDCFCE7);
+            iconColor = kPrimary;
+            iconData = Icons.info_outline_rounded;
+            titleText = title ?? 'Sign In Required';
+            titleColor = const Color(0xFF166534);
+            btnColor = kPrimary;
+            btnText = actionText ?? 'Sign In';
+            break;
+          case ToastType.success:
+          default:
+            iconBgColor = const Color(0xFFDCFCE7);
+            iconColor = const Color(0xFF16A34A);
+            iconData = Icons.check_rounded;
+            titleText = title ?? 'Success!';
+            titleColor = const Color(0xFF166534);
+            btnColor = kPrimary;
+            btnText = actionText ?? 'Awesome';
+            break;
+        }
 
         return Material(
           color: Colors.black.withValues(alpha: 0.4),
@@ -59,7 +103,7 @@ class F2HToast {
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      isError ? Icons.close_rounded : Icons.check_rounded,
+                      iconData,
                       size: 32,
                       color: iconColor,
                     ),
@@ -69,6 +113,7 @@ class F2HToast {
                   // Title
                   Text(
                     titleText,
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
@@ -98,6 +143,7 @@ class F2HToast {
                       onPressed: () {
                         _currentEntry?.remove();
                         _currentEntry = null;
+                        onAction?.call();
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: btnColor,
@@ -142,16 +188,57 @@ class F2HToast {
   static void success(
     BuildContext context,
     String message, {
+    String? title,
+    String? actionText,
+    VoidCallback? onAction,
     Duration duration = const Duration(milliseconds: 2500),
   }) {
-    show(context, message, isError: false, duration: duration);
+    show(
+      context,
+      message,
+      type: ToastType.success,
+      title: title,
+      actionText: actionText,
+      onAction: onAction,
+      duration: duration,
+    );
   }
 
   static void error(
     BuildContext context,
     String message, {
+    String? title,
+    String? actionText,
+    VoidCallback? onAction,
     Duration duration = const Duration(milliseconds: 2500),
   }) {
-    show(context, message, isError: true, duration: duration);
+    show(
+      context,
+      message,
+      type: ToastType.error,
+      title: title,
+      actionText: actionText,
+      onAction: onAction,
+      duration: duration,
+    );
+  }
+
+  static void info(
+    BuildContext context,
+    String message, {
+    String? title,
+    String? actionText,
+    VoidCallback? onAction,
+    Duration duration = const Duration(milliseconds: 3000),
+  }) {
+    show(
+      context,
+      message,
+      type: ToastType.info,
+      title: title,
+      actionText: actionText,
+      onAction: onAction,
+      duration: duration,
+    );
   }
 }
