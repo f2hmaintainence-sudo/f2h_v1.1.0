@@ -46,17 +46,47 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     setState(() => _isLoading = true);
     try {
       final repository = sl<OrdersRepository>();
+      final cleanId = orderId.replaceAll('#F2H-', '').replaceAll('F2H-', '').trim();
+
+      // 1. First attempt direct single-order fetch from API
+      try {
+        final orderRes = await repository.getOrderById(cleanId);
+        if (orderRes['status'] == true && orderRes['order'] != null) {
+          final rawOrder = Map<String, dynamic>.from(orderRes['order'] as Map);
+          if (orderRes['items'] != null) {
+            rawOrder['items'] = orderRes['items'];
+          }
+          final parsed = Order.fromJson(rawOrder);
+          if (mounted) {
+            setState(() {
+              _currentOrder = parsed;
+              _selectedRating = parsed.rating ?? 0;
+              _feedbackController.text = parsed.ratingFeedback ?? '';
+              _isLoading = false;
+            });
+            return;
+          }
+        }
+      } catch (_) {
+        // Fallback to searching in all customer orders
+      }
+
+      // 2. Fallback: search across all customer orders and subscriptions
       final data = await repository.getOrdersAndSubscriptions();
-      final oneTime = (data['one_time_orders'] as List<dynamic>? ?? [])
+      final rawOrders = (data['orders'] as List<dynamic>? ??
+          data['one_time_orders'] as List<dynamic>? ??
+          []);
+      final rawSubOrders = (data['subscription_orders'] as List<dynamic>? ?? []);
+      final all = [...rawOrders, ...rawSubOrders]
           .map((e) => Order.fromJson(e as Map<String, dynamic>))
           .toList();
-      final subOrders = (data['subscription_orders'] as List<dynamic>? ?? [])
-          .map((e) => Order.fromJson(e as Map<String, dynamic>))
-          .toList();
-      final all = [...oneTime, ...subOrders];
-      final cleanId = orderId.replaceAll('#F2H-', '').trim();
+
       final found = all.firstWhere(
-        (o) => o.id == cleanId || o.id.contains(cleanId) || cleanId.contains(o.id),
+        (o) =>
+            o.id.toLowerCase() == cleanId.toLowerCase() ||
+            o.id.toLowerCase() == orderId.toLowerCase() ||
+            (cleanId.isNotEmpty && o.id.toLowerCase().contains(cleanId.toLowerCase())) ||
+            (o.id.isNotEmpty && cleanId.toLowerCase().contains(o.id.toLowerCase())),
         orElse: () => all.isNotEmpty ? all.first : throw Exception('Order not found'),
       );
       if (mounted) {

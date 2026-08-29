@@ -11,6 +11,11 @@ class OrdersRepositoryImpl implements OrdersRepository {
   }
 
   @override
+  Future<Map<String, dynamic>> getOrderById(String orderId) {
+    return remoteDataSource.getOrderById(orderId);
+  }
+
+  @override
   Future<Map<String, dynamic>> cancelOrder(String orderId) {
     return remoteDataSource.cancelOrder(orderId);
   }

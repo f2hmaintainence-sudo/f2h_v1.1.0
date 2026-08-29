@@ -369,13 +369,14 @@ export class CustomerOrderController {
     const email = user?.email;
     const userId = user?.user_id;
 
-    const orderResult = await this.data.query('orders', {
-      where: [
-        { column: 'order_id', operator: '=', value: orderId },
-      ],
-      limit: 1,
-    });
-    const order = orderResult?.data?.[0];
+    const cleanId = (orderId || '').replace(/^#?F2H-/, '').trim();
+    const isNumeric = /^\d+$/.test(cleanId);
+
+    const orderRows = await this.db.query(
+      `SELECT * FROM orders WHERE order_id = $1 OR order_id = $2 OR (order_id ILIKE $3) ${isNumeric ? 'OR id = $4' : ''} LIMIT 1`,
+      isNumeric ? [cleanId, orderId, `%${cleanId}%`, parseInt(cleanId, 10)] : [cleanId, orderId, `%${cleanId}%`],
+    );
+    const order = orderRows?.[0];
 
     if (!order) {
       throw new BadRequestException('Order not found');
@@ -412,10 +413,10 @@ export class CustomerOrderController {
           ) pi ON true
          WHERE oi.order_id = $1
          ORDER BY oi.id, oi.order_id, oi.variant_id`,
-        [orderId],
+        [order.order_id],
       );
 
-      const baseUrl = process.env.BACKEND_URL || 'http://localhost:8000';
+      const baseUrl = process.env.MOBILE_BACKEND_URL || process.env.BACKEND_URL || 'https://f2hfresh.com';
       const mapImagePath = (imagePath: string | null) => {
         if (!imagePath) return null;
         if (imagePath.startsWith('http')) return imagePath;
