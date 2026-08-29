@@ -130,7 +130,7 @@ export default function SystemConfigPage() {
   const fetchConfigs = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get<any>("/api/v1/admin/developer/config");
+      const res = await api.get<any>("/admin/developer/config");
       const root = res?.data || res;
       const configMap = root?.data || root || {};
 
@@ -162,15 +162,16 @@ export default function SystemConfigPage() {
   const handleSaveSection = async (key: string, data: any, sectionName: string) => {
     try {
       setSaving(true);
-      const res = await api.put<any>(`/api/v1/admin/developer/config/${key}`, {
+      const res = await api.put<any>(`/admin/developer/config/${key}`, {
         config_data: data,
       });
       const root = res?.data || res;
-      if (root?.status || res?.status) {
+      if (!res?.error && (root?.status === true || res?.status === 200 || res?.status === 201)) {
         showSuccessToast(`${sectionName} updated successfully`);
         setLastSaved(new Date().toISOString());
+        await fetchConfigs();
       } else {
-        showErrorToast(root?.message || "Failed to update configuration");
+        showErrorToast(root?.message || res?.error || "Failed to update configuration");
       }
     } catch (err: any) {
       showErrorToast(err?.message || "Failed to save configuration");
@@ -183,13 +184,14 @@ export default function SystemConfigPage() {
     try {
       setSaving(true);
       await Promise.all([
-        api.put("/api/v1/admin/developer/config/slot_timings", { config_data: slotTimings }),
-        api.put("/api/v1/admin/developer/config/cron_schedules", { config_data: cronSchedules }),
-        api.put("/api/v1/admin/developer/config/delivery_rules", { config_data: deliveryRules }),
-        api.put("/api/v1/admin/developer/config/order_rules", { config_data: orderRules }),
+        api.put("/admin/developer/config/slot_timings", { config_data: slotTimings }),
+        api.put("/admin/developer/config/cron_schedules", { config_data: cronSchedules }),
+        api.put("/admin/developer/config/delivery_rules", { config_data: deliveryRules }),
+        api.put("/admin/developer/config/order_rules", { config_data: orderRules }),
       ]);
       showSuccessToast("All system configurations saved successfully");
       setLastSaved(new Date().toISOString());
+      await fetchConfigs();
     } catch (err: any) {
       showErrorToast(err?.message || "Failed to save configurations");
     } finally {

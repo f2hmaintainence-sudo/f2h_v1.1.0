@@ -235,10 +235,15 @@ class ApiClient {
    * Execute request with all interceptors
    */
   private async executeRequest(endpoint: string, options: RequestConfig = {}): Promise<Response> {
-    const baseUrl = this.getBaseUrl();
+    const baseUrl = this.getBaseUrl().replace(/\/+$/, '');
     let cleanEndpoint = endpoint;
-    if (baseUrl.endsWith('/v1') && cleanEndpoint.startsWith('/v1/')) {
+    if (cleanEndpoint.startsWith('/api/v1/')) {
+      cleanEndpoint = cleanEndpoint.substring(7);
+    } else if (cleanEndpoint.startsWith('/v1/')) {
       cleanEndpoint = cleanEndpoint.substring(3);
+    }
+    if (!cleanEndpoint.startsWith('/') && !cleanEndpoint.startsWith('http')) {
+      cleanEndpoint = `/${cleanEndpoint}`;
     }
     const url = buildUrl(
       cleanEndpoint.startsWith('http') ? cleanEndpoint : `${baseUrl}${cleanEndpoint}`,
