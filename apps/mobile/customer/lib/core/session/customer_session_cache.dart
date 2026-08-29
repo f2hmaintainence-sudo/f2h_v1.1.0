@@ -9,6 +9,7 @@ class CustomerSessionCache {
   static const _addressesKey = 'customer_session_addresses';
   static const _walletKey = 'customer_session_wallet'; 
   static const _deliveryRulesKey = 'customer_session_delivery_rules';
+  static const _slotTimingsKey = 'customer_session_slot_timings';
 
   Future<void> save(CustomerSessionState session) async {
     final prefs = await SharedPreferences.getInstance();
@@ -24,6 +25,7 @@ class CustomerSessionCache {
     );
     await prefs.setString(_walletKey, jsonEncode(session.wallet));
     await prefs.setString(_deliveryRulesKey, jsonEncode(session.deliveryRules));
+    await prefs.setString(_slotTimingsKey, jsonEncode(session.slotTimings));
   }
 
   Future<CustomerSessionState?> read() async {
@@ -55,12 +57,18 @@ class CustomerSessionCache {
         ? <String, dynamic>{}
         : Map<String, dynamic>.from(jsonDecode(deliveryRulesJson) as Map);
 
+    final slotTimingsJson = prefs.getString(_slotTimingsKey);
+    final slotTimings = slotTimingsJson == null
+        ? <String, dynamic>{}
+        : Map<String, dynamic>.from(jsonDecode(slotTimingsJson) as Map);
+
     return CustomerSessionState(
       status: CustomerSessionStatus.cached,
       profile: profile,
       addresses: addresses,
       wallet: wallet,
       deliveryRules: deliveryRules,
+      slotTimings: slotTimings,
     );
   }
 
@@ -70,6 +78,7 @@ class CustomerSessionCache {
     await prefs.remove(_addressesKey);
     await prefs.remove(_walletKey);
     await prefs.remove(_deliveryRulesKey);
+    await prefs.remove(_slotTimingsKey);
   }
 
   Map<String, dynamic> _profileToJson(ProfileModel profile) {

@@ -20,6 +20,7 @@ class CustomerSessionState extends Equatable {
   final List<dynamic> branches;
   final int notificationsCount;
   final Map<String, dynamic> deliveryRules;
+  final Map<String, dynamic> slotTimings;
   final String? error;
 
   const CustomerSessionState({
@@ -31,6 +32,7 @@ class CustomerSessionState extends Equatable {
     this.branches = const [],
     this.notificationsCount = 0,
     this.deliveryRules = const {},
+    this.slotTimings = const {},
     this.error,
   });
 
@@ -48,6 +50,7 @@ class CustomerSessionState extends Equatable {
     List<dynamic>? branches,
     int? notificationsCount,
     Map<String, dynamic>? deliveryRules,
+    Map<String, dynamic>? slotTimings,
     String? error,
   }) {
     return CustomerSessionState(
@@ -59,6 +62,7 @@ class CustomerSessionState extends Equatable {
       branches: branches ?? this.branches,
       notificationsCount: notificationsCount ?? this.notificationsCount,
       deliveryRules: deliveryRules ?? this.deliveryRules,
+      slotTimings: slotTimings ?? this.slotTimings,
       error: error,
     );
   }
@@ -73,6 +77,7 @@ class CustomerSessionState extends Equatable {
         branches,
         notificationsCount,
         deliveryRules,
+        slotTimings,
         error,
       ];
 }

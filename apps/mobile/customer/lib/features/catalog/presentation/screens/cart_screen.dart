@@ -196,16 +196,18 @@ class _CartScreenState extends State<CartScreen> {
                     _globalOnetimeSlot = firstOnetime.deliverySlot!;
                   }
                   // Apply time-based default from helpers
-                  _globalOnetimeDate ??= getDefaultDeliveryDate(now);
+                  _globalOnetimeDate ??= getDefaultDeliveryDate(now, sessionState.slotTimings);
                   // Ensure slot is valid for the selected date
                   final availableSlots = getAvailableSlots(
                     _globalOnetimeDate!,
                     now,
+                    sessionState.slotTimings,
                   );
                   if (!availableSlots.contains(_globalOnetimeSlot)) {
                     _globalOnetimeSlot = getDefaultSlot(
                       _globalOnetimeDate!,
                       now,
+                      sessionState.slotTimings,
                     );
                   }
                 }
@@ -697,7 +699,8 @@ class _CartScreenState extends State<CartScreen> {
     List<CartItemEntity> filteredItems,
   ) {
     final now = DateTime.now();
-    final date = _globalOnetimeDate ?? getDefaultDeliveryDate(now);
+    final sessionState = context.watch<CustomerSessionCubit>().state;
+    final date = _globalOnetimeDate ?? getDefaultDeliveryDate(now, sessionState.slotTimings);
     final slot = _globalOnetimeSlot;
     final dateFormatted = '${date.day}/${date.month}/${date.year}';
     final slotInitial = slot.isNotEmpty ? ' (${slot[0]})' : '';
@@ -728,23 +731,21 @@ class _CartScreenState extends State<CartScreen> {
                   onTap: () => _selectGlobalDate(context, filteredItems),
                   child: Container(
                     height: 50,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
-                      color: kPrimaryPl.withValues(alpha: 0.55),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: kPrimary.withValues(alpha: 0.3),
-                      ),
+                      color: kSurface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: kBorderLt),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Icon(
-                          Icons.local_shipping_rounded,
-                          size: 15,
+                          Icons.calendar_today_rounded,
+                          size: 16,
                           color: kPrimary,
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 6),
                         Flexible(
                           child: Text(
                             '$dateFormatted$slotInitial',
@@ -841,7 +842,8 @@ class _CartScreenState extends State<CartScreen> {
     List<CartItemEntity> items,
   ) async {
     final now = DateTime.now();
-    final firstDate = getFirstAllowedDate(now);
+    final sessionState = context.read<CustomerSessionCubit>().state;
+    final firstDate = getFirstAllowedDate(now, sessionState.slotTimings);
 
     final DateSlotResult? result = await showCustomDateAndSlotPicker(
       context: context,

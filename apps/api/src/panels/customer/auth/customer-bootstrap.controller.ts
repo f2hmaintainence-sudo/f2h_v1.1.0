@@ -172,6 +172,35 @@ export class CustomerBootstrapController {
       this.Developer.error('[CustomerBootstrapController] Failed to load delivery_rules', err);
     }
 
+    let slotTimings: any = {
+      morning_slot: {
+        slot_key: 'morning',
+        slot_name: 'Morning',
+        customer_cutoff_time: '20:00',
+        customer_cutoff_day_offset: -1,
+        delivery_window_start: '06:00',
+        delivery_window_end: '08:30',
+      },
+      evening_slot: {
+        slot_key: 'evening',
+        slot_name: 'Evening',
+        customer_cutoff_time: '14:00',
+        customer_cutoff_day_offset: 0,
+        delivery_window_start: '17:00',
+        delivery_window_end: '20:00',
+      },
+    };
+    try {
+      const slotTimingsRes = await this.db.query(
+        `SELECT config_data FROM system_configurations WHERE config_key = 'slot_timings' LIMIT 1`,
+      );
+      if (slotTimingsRes?.[0]?.config_data) {
+        slotTimings = slotTimingsRes[0].config_data;
+      }
+    } catch (err) {
+      this.Developer.error('[CustomerBootstrapController] Failed to load slot_timings', err);
+    }
+
     return {
       profile,
       addresses: (addressesResult?.data || []).map((addr: any) => this.normalizeAddress(addr)),
@@ -185,6 +214,7 @@ export class CustomerBootstrapController {
       branches: branchesResult?.data || [],
       firebase_config: firebaseConfig,
       delivery_rules: deliveryRules,
+      slot_timings: slotTimings,
     };
   }
 

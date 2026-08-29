@@ -39,23 +39,39 @@ double getEffectivePrice(CartItemEntity item) {
 
 // ===== One-Time Delivery Date Rules =====
 
-/// Returns the list of allowed delivery dates based on current time.
+int _parseCutoffMinutes(dynamic timeStr, int defaultMinutes) {
+  if (timeStr == null || timeStr is! String) return defaultMinutes;
+  final parts = timeStr.split(':');
+  if (parts.length < 2) return defaultMinutes;
+  final h = int.tryParse(parts[0]) ?? 0;
+  final m = int.tryParse(parts[1]) ?? 0;
+  return h * 60 + m;
+}
+
+/// Returns the list of allowed delivery dates based on current time and slot cutoffs.
 ///
 /// RULES:
-///   - Before 12:00 PM (noon):
+///   - Before Evening Customer Cutoff (default 14:00 / 2:00 PM):
 ///       • Today is allowed (Evening slot only — enforced by [getAvailableSlots])
 ///       • Tomorrow and next 30 days
-///   - 12:00 PM onwards:
+///   - After Evening Customer Cutoff (14:00 onwards):
 ///       • Today is NOT allowed
 ///       • Tomorrow (default) and next 30 days
 ///
 /// Returns a list of [DateTime] objects (date-only, no time component).
-List<DateTime> getAllowedDeliveryDates(DateTime now) {
+List<DateTime> getAllowedDeliveryDates(DateTime now, [Map<String, dynamic>? slotTimings]) {
   final List<DateTime> dates = [];
-  final isBeforeNoon = now.hour < 12;
+  final nowMinutes = now.hour * 60 + now.minute;
 
-  // If before noon, include Today
-  if (isBeforeNoon) {
+  final eveningCutoffMinutes = _parseCutoffMinutes(
+    slotTimings?['evening_slot']?['customer_cutoff_time'],
+    14 * 60, // 14:00 (2:00 PM)
+  );
+
+  final isBeforeEveningCutoff = nowMinutes < eveningCutoffMinutes;
+
+  // If before evening cutoff (14:00), include Today
+  if (isBeforeEveningCutoff) {
     dates.add(DateTime(now.year, now.month, now.day));
   }
 
@@ -70,10 +86,16 @@ List<DateTime> getAllowedDeliveryDates(DateTime now) {
 
 /// Returns the default delivery date based on current time.
 ///
-/// - Before noon → Today (user can get Evening delivery same day)
-/// - After noon → Tomorrow
-DateTime getDefaultDeliveryDate(DateTime now) {
-  if (now.hour < 12) {
+/// - Before Evening Cutoff (14:00) → Today (user can get Evening delivery same day)
+/// - After Evening Cutoff → Tomorrow
+DateTime getDefaultDeliveryDate(DateTime now, [Map<String, dynamic>? slotTimings]) {
+  final nowMinutes = now.hour * 60 + now.minute;
+  final eveningCutoffMinutes = _parseCutoffMinutes(
+    slotTimings?['evening_slot']?['customer_cutoff_time'],
+    14 * 60, // 14:00
+  );
+
+  if (nowMinutes < eveningCutoffMinutes) {
     return DateTime(now.year, now.month, now.day); // Today
   }
   final tomorrow = now.add(const Duration(days: 1));
@@ -82,10 +104,10 @@ DateTime getDefaultDeliveryDate(DateTime now) {
 
 /// Returns the first allowed date (used as `firstDate` in date pickers).
 ///
-/// - Before noon → Today
-/// - After noon → Tomorrow
-DateTime getFirstAllowedDate(DateTime now) {
-  return getDefaultDeliveryDate(now);
+/// - Before Evening Cutoff (14:00) → Today
+/// - After Evening Cutoff → Tomorrow
+DateTime getFirstAllowedDate(DateTime now, [Map<String, dynamic>? slotTimings]) {
+  return getDefaultDeliveryDate(now, slotTimings);
 }
 
 // ===== One-Time Delivery Slot Rules =====
@@ -93,34 +115,56 @@ DateTime getFirstAllowedDate(DateTime now) {
 /// Returns available delivery slots for the given [selectedDate].
 ///
 /// RULES:
-///   - If [selectedDate] == Today → only ['Evening']
-///   - If [selectedDate] == Tomorrow or future → ['Morning', 'Evening']
+///   - If [selectedDate] == Today → ['Evening'] if before Evening Cutoff (14:00), else []
+///   - If [selectedDate] == Tomorrow → ['Morning', 'Evening'] if before Morning Cutoff (20:00), else ['Evening']
+///   - If [selectedDate] >= Day+2 → ['Morning', 'Evening']
 ///
 /// Compares date-only (ignores time component).
-List<String> getAvailableSlots(DateTime selectedDate, DateTime now) {
+List<String> getAvailableSlots(DateTime selectedDate, DateTime now, [Map<String, dynamic>? slotTimings]) {
   final today = DateTime(now.year, now.month, now.day);
+  final tomorrow = today.add(const Duration(days: 1));
   final selected = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+  final nowMinutes = now.hour * 60 + now.minute;
+
+  final eveningCutoffMinutes = _parseCutoffMinutes(
+    slotTimings?['evening_slot']?['customer_cutoff_time'],
+    14 * 60, // 14:00
+  );
+
+  final morningCutoffMinutes = _parseCutoffMinutes(
+    slotTimings?['morning_slot']?['customer_cutoff_time'],
+    20 * 60, // 20:00
+  );
 
   if (selected.isAtSameMomentAs(today)) {
-    // Today: only Evening slot available
+    // Today: only Evening slot available if before evening cutoff (14:00)
+    if (nowMinutes < eveningCutoffMinutes) {
+      return ['Evening'];
+    }
+    return [];
+  }
+
+  if (selected.isAtSameMomentAs(tomorrow)) {
+    // Tomorrow: Morning slot available only before morning cutoff (20:00 today)
+    if (nowMinutes < morningCutoffMinutes) {
+      return ['Morning', 'Evening'];
+    }
+    // After 20:00, tomorrow morning is closed, only tomorrow evening is available
     return ['Evening'];
   }
 
-  // Tomorrow or future: both slots available
+  // Tomorrow+ or future: both slots available
   return ['Morning', 'Evening'];
 }
 
 /// Returns the default slot for a given date.
 ///
-/// - Today → 'Evening' (Morning is not available for same-day delivery)
-/// - Tomorrow+ → 'Morning'
-String getDefaultSlot(DateTime selectedDate, DateTime now) {
-  final today = DateTime(now.year, now.month, now.day);
-  final selected = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
-
-  if (selected.isAtSameMomentAs(today)) {
-    return 'Evening';
-  }
+/// - Today → 'Evening'
+/// - Tomorrow+ → 'Morning' (or 'Evening' if morning is closed after 20:00)
+String getDefaultSlot(DateTime selectedDate, DateTime now, [Map<String, dynamic>? slotTimings]) {
+  final available = getAvailableSlots(selectedDate, now, slotTimings);
+  if (available.contains('Morning')) return 'Morning';
+  if (available.contains('Evening')) return 'Evening';
   return 'Morning';
 }
 

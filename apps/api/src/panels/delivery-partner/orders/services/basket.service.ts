@@ -56,7 +56,7 @@ export class BasketService {
    */
   async syncRunOrdersToBasket(basketId: string, partnerId: string, runId?: string): Promise<void> {
     const kolkataHour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getHours();
-    const currentSlot = kolkataHour < 12 ? 'morning' : 'evening';
+    const currentSlot = kolkataHour < 14 ? 'morning' : 'evening';
 
     // 0. Purge any stale basket items not belonging to today's active orders
     await this.db.query(
@@ -270,7 +270,7 @@ export class BasketService {
 
     // 2. Fetch active delivery_run for this partner on today's date
     const kolkataHour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getHours();
-    const currentSlot = kolkataHour < 12 ? 'morning' : 'evening';
+    const currentSlot = kolkataHour < 14 ? 'morning' : 'evening';
 
     const runRes = await this.db.query(
       `SELECT dr.id, dr.run_id, dr.delivery_partner_id, COALESCE(w.warehouse_id, (SELECT warehouse_id FROM warehouses WHERE is_active = true AND deleted_at IS NULL LIMIT 1)) AS warehouse_id, dr.delivery_slot, dr.status AS run_status,
