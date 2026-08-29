@@ -1426,7 +1426,7 @@ export default function SkeletonForm({
           initial[field.name] = field.type === 'toggle' ? false : '';
         }
       }
-      // Auto-calculate discount_percent on initial load if original_price & price exist
+      // Auto-calculate discount / discount_percent on initial load if original_price & price exist
       if (initial.original_price && initial.price) {
         const orig = parseFloat(initial.original_price);
         const sell = parseFloat(initial.price);
@@ -1434,6 +1434,9 @@ export default function SkeletonForm({
           const calculatedDisc = Math.round(((orig - sell) / orig) * 100 * 10) / 10;
           if (!initial.discount_percent && initial.discount_percent !== 0) {
             initial.discount_percent = calculatedDisc;
+          }
+          if (!initial.discount && initial.discount !== 0) {
+            initial.discount = calculatedDisc;
           }
         }
       }
@@ -1527,6 +1530,7 @@ export default function SkeletonForm({
         if (!isNaN(orig) && !isNaN(sell) && orig > 0 && sell > orig) {
           next.price = orig;
           next.discount_percent = 0;
+          next.discount = 0;
           setTimeout(() => {
             setErrors((prevErr) => ({
               ...prevErr,
@@ -1534,7 +1538,12 @@ export default function SkeletonForm({
             }));
           }, 0);
         } else if (!isNaN(orig) && !isNaN(sell) && orig > 0 && orig >= sell) {
-          next.discount_percent = Math.round(((orig - sell) / orig) * 100 * 10) / 10;
+          const disc = Math.round(((orig - sell) / orig) * 100 * 10) / 10;
+          next.discount_percent = disc;
+          next.discount = disc;
+        } else {
+          next.discount_percent = 0;
+          next.discount = 0;
         }
       } else if (name === 'original_price') {
         const orig = parseFloat(value);
@@ -1542,6 +1551,7 @@ export default function SkeletonForm({
         if (!isNaN(orig) && !isNaN(sell) && orig > 0 && sell > orig) {
           next.price = orig;
           next.discount_percent = 0;
+          next.discount = 0;
           setTimeout(() => {
             setErrors((prevErr) => ({
               ...prevErr,
@@ -1549,7 +1559,12 @@ export default function SkeletonForm({
             }));
           }, 0);
         } else if (!isNaN(orig) && !isNaN(sell) && orig > 0 && orig >= sell) {
-          next.discount_percent = Math.round(((orig - sell) / orig) * 100 * 10) / 10;
+          const disc = Math.round(((orig - sell) / orig) * 100 * 10) / 10;
+          next.discount_percent = disc;
+          next.discount = disc;
+        } else {
+          next.discount_percent = 0;
+          next.discount = 0;
         }
       }
 

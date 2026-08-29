@@ -248,6 +248,7 @@ export class CatalogShowEditService {
       // product_id is VARCHAR — keep as string for the select field
       const formattedData = {
         ...variant,
+        discount: discPercent,
         discount_percent: discPercent,
         product_id: String(variant.product_id || ''),
         packaging_type_id: String(variant.packaging_type_id || ''),
