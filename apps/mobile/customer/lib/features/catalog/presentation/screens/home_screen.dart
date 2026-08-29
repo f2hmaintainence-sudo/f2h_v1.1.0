@@ -562,176 +562,30 @@ class _HomeScreenState extends State<HomeScreen>
 
         final bool hasBranch = branchId != null && branchId.isNotEmpty;
 
-        return PopupMenuButton<dynamic>(
-          offset: const Offset(0, 40),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          color: Colors.white,
-          elevation: 8,
-          onSelected: (value) async {
+        return GestureDetector(
+          onTap: () async {
             final sessionCubit = context.read<CustomerSessionCubit>();
             final catalogBloc = context.read<CatalogBloc>();
 
-            if (value is AddressModel) {
-              final addrId = (value.addressId != null && value.addressId!.isNotEmpty)
-                  ? value.addressId!
-                  : ((value.id != null && value.id!.isNotEmpty) ? value.id! : value.uniqueId);
-
-              await sessionCubit.updateDefaultAddress(addrId);
-              if (context.mounted) {
-                final labelName = value.area.isNotEmpty
-                    ? value.area
-                    : (value.city.isNotEmpty ? value.city : value.name);
-                F2HToast.success(context, 'Delivery address set to $labelName');
-                final latestSession = sessionCubit.state;
-                AddressModel? activeAddr;
+            final chosen = await AddressSelectorDrawer.show(context);
+            if (context.mounted) {
+              await sessionCubit.refreshSilently();
+              final latestSession = sessionCubit.state;
+              AddressModel? activeAddr = chosen;
+              if (latestSession.addresses.isNotEmpty) {
                 try {
                   activeAddr = latestSession.addresses.firstWhere((a) => a.isDefault);
-                } catch (_) {}
-                final targetBranchId = (activeAddr?.branchId.isNotEmpty == true)
-                    ? activeAddr!.branchId
-                    : (value.branchId.isNotEmpty ? value.branchId : (latestSession.profile?.branchId ?? ''));
-                if (targetBranchId.isNotEmpty) {
-                  catalogBloc.add(LoadCatalog(branchId: targetBranchId));
+                } catch (_) {
+                  activeAddr ??= latestSession.addresses.first;
                 }
               }
-            } else if (value == 'manage') {
-              final chosen = await AddressSelectorDrawer.show(context);
-              if (context.mounted) {
-                await sessionCubit.refreshSilently();
-                final latestSession = sessionCubit.state;
-                AddressModel? activeAddr = chosen;
-                if (latestSession.addresses.isNotEmpty) {
-                  try {
-                    activeAddr = latestSession.addresses.firstWhere((a) => a.isDefault);
-                  } catch (_) {
-                    activeAddr ??= latestSession.addresses.first;
-                  }
-                }
-                final targetBranchId = (activeAddr?.branchId.isNotEmpty == true)
-                    ? activeAddr!.branchId
-                    : (latestSession.profile?.branchId ?? '');
-                if (targetBranchId.isNotEmpty) {
-                  catalogBloc.add(LoadCatalog(branchId: targetBranchId));
-                }
+              final targetBranchId = (activeAddr?.branchId.isNotEmpty == true)
+                  ? activeAddr!.branchId
+                  : (latestSession.profile?.branchId ?? '');
+              if (targetBranchId.isNotEmpty) {
+                catalogBloc.add(LoadCatalog(branchId: targetBranchId));
               }
             }
-          },
-          itemBuilder: (context) {
-            return [
-              if (session.addresses.isNotEmpty) ...[
-                const PopupMenuItem<dynamic>(
-                  enabled: false,
-                  height: 28,
-                  child: Text(
-                    'SELECT DELIVERY ADDRESS',
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
-                      color: kTextSub,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ),
-                ...session.addresses.map((addr) {
-                  final isSelected = defaultAddr != null && addr.addressId == defaultAddr.addressId;
-                  final label = addr.area.isNotEmpty
-                      ? addr.area
-                      : (addr.city.isNotEmpty ? addr.city : addr.name);
-                  final subLabel = addr.detail;
-                  final typeBadge = addr.addressType.toUpperCase();
-
-                  return PopupMenuItem<dynamic>(
-                    value: addr,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 22,
-                            height: 22,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: isSelected ? const Color(0xFF16653A) : const Color(0xFFF3F4F6),
-                            ),
-                            child: Icon(
-                              isSelected ? Icons.check : Icons.location_on_outlined,
-                              color: isSelected ? Colors.white : kTextSub,
-                              size: 13,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        label,
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                          color: isSelected ? const Color(0xFF16653A) : kText,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                      decoration: BoxDecoration(
-                                        color: kPrimaryPl,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        typeBadge,
-                                        style: const TextStyle(
-                                          fontSize: 8,
-                                          fontWeight: FontWeight.w600,
-                                          color: kPrimary,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  subLabel,
-                                  style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w400, color: kTextSub),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
-                const PopupMenuDivider(),
-              ],
-              PopupMenuItem<dynamic>(
-                value: 'manage',
-                child: Row(
-                  children: const [
-                    Icon(Icons.add_location_alt_rounded, color: kPrimary, size: 16),
-                    SizedBox(width: 8),
-                    Text(
-                      'Manage / Add New Address',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: kPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ];
           },
           child: Container(
             height: 36,
@@ -2009,7 +1863,7 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
           Positioned(
             top: topPadding + 10,
             left: 12,
-            right: 12,
+            right: 8,
             child: Opacity(
               opacity: (1.0 - shrinkFactor * 1.8).clamp(0.0, 1.0),
               child: Row(
