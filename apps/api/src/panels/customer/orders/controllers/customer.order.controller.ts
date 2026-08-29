@@ -249,64 +249,101 @@ export class CustomerOrderController {
   async getBills(@Req() req: Request) {
     try {
       const user = req.user as any;
-      const userId = user?.user_id;
-      const email = user?.email;
+      const userId = user?.user_id || user?.userId || user?.id || user?.customer_id;
 
-      // Resolve customer IDs
-      let allCustomerIds = [userId].filter(Boolean);
-      if (email || userId) {
-        const cRes = await this.db.query(
-          `SELECT customer_id FROM customers WHERE customer_id = $1 OR (email IS NOT NULL AND email = $2 AND email != '')`,
-          [userId || '', email || ''],
-        );
-        if (cRes && cRes.length > 0) {
-          allCustomerIds = Array.from(new Set([...allCustomerIds, ...cRes.map((r: any) => r.customer_id)]));
-        }
-      }
-
-      if (!allCustomerIds.length) {
+      if (!userId) {
         return { status: true, bills: [] };
       }
 
-      const bills: any[] = [];
+      // 1. Fetch all bills for this customer from customer_bills
+      const billRows = await this.db.query(
+        `SELECT bill_id, customer_id, bill_type, reference_id, payment_type, payment_method,
+                billing_from, billing_to, due_date,
+                subtotal, discount_amount, tax_amount, total_amount,
+                paid_amount, due_amount, status, remarks, created_at, updated_at
+         FROM customer_bills
+         WHERE customer_id = $1
+         ORDER BY created_at DESC`,
+        [userId],
+      );
 
-      // 1. Fetch from customer_bills table (strictly subscription bills only)
-      try {
-        const billRows = await this.db.query(
-          `SELECT bill_id, bill_type, reference_id, payment_type, payment_method,
-                  billing_from, billing_to, due_date,
-                  subtotal, discount_amount, tax_amount, total_amount,
-                  paid_amount, due_amount, status, remarks, created_at
-           FROM customer_bills
-           WHERE customer_id = ANY($1::text[])
-             AND (
-               LOWER(bill_type) = 'subscription' 
-               OR reference_id LIKE 'SUB%' 
-               OR reference_id LIKE 'MSH%' 
-               OR remarks ILIKE '%subscription%'
-             )
-             AND (reference_id NOT LIKE 'Ord%' AND reference_id NOT LIKE 'ORD%')
-           ORDER BY created_at DESC`,
-          [allCustomerIds],
-        );
-        if (billRows && billRows.length > 0) {
-          bills.push(...billRows.map((r: any) => ({
-            ...r,
-            bill_type: 'subscription',
-          })));
-        }
-      } catch (err) {
-        console.error('getBills: Error querying customer_bills table', err);
+      if (!billRows || billRows.length === 0) {
+        return { status: true, bills: [] };
       }
 
-      // 2. Fetch item descriptions from subscription_items for all subscription bills
-      try {
-        const subIds = bills
-          .map(b => b.reference_id || b.bill_id)
-          .filter(id => typeof id === 'string' && (id.startsWith('SUB_') || id.startsWith('MSH') || id.startsWith('BILL_MSH')));
-        
-        if (subIds.length > 0) {
-          const subItemRows = await this.db.query(
+      const bills = billRows.map((r: any) => ({
+        ...r,
+        bill_type: (r.bill_type || 'order').toLowerCase(),
+        total_amount: Number(r.total_amount || 0),
+        subtotal: Number(r.subtotal || r.total_amount || 0),
+        discount_amount: Number(r.discount_amount || 0),
+        tax_amount: Number(r.tax_amount || 0),
+        paid_amount: Number(r.paid_amount || 0),
+        due_amount: Number(r.due_amount || 0),
+        items: [] as any[],
+        item_name: '',
+      }));
+
+      // 2. Fetch item descriptions from order_items for order bills
+      const orderRefIds = bills
+        .filter(b => b.reference_id && (b.bill_type === 'order' || b.reference_id.startsWith('Ord') || b.reference_id.startsWith('ORD')))
+        .map(b => b.reference_id);
+
+      if (orderRefIds.length > 0) {
+        try {
+          const orderItems = await this.db.query(
+            `SELECT oi.order_id,
+                    COALESCE(
+                      NULLIF(TRIM(CONCAT(p.name, ' - ', pv.name)), ' - '),
+                      oi.product_name,
+                      p.name,
+                      pv.name,
+                      'Order Item'
+                    ) AS item_name,
+                    COALESCE(oi.product_name, p.name, '') AS product_name,
+                    COALESCE(pv.name, '') AS variant_name,
+                    COALESCE(oi.quantity, 1) AS quantity,
+                    COALESCE(oi.unit_price, 0) AS unit_price,
+                    COALESCE(oi.original_price, oi.unit_price, 0) AS original_price,
+                    COALESCE(oi.discount_amount, 0) AS discount_amount,
+                    COALESCE(oi.total_price, oi.final_price, 0) AS total_amount
+             FROM order_items oi
+             LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
+             LEFT JOIN products p ON p.product_id = pv.product_id
+             WHERE oi.order_id = ANY($1::text[])
+               AND oi.deleted_at IS NULL`,
+            [orderRefIds],
+          );
+
+          if (orderItems && orderItems.length > 0) {
+            const orderItemsMap = new Map<string, any[]>();
+            for (const item of orderItems) {
+              const list = orderItemsMap.get(item.order_id) || [];
+              list.push(item);
+              orderItemsMap.set(item.order_id, list);
+            }
+
+            for (const bill of bills) {
+              if (orderItemsMap.has(bill.reference_id)) {
+                const items = orderItemsMap.get(bill.reference_id)!;
+                bill.items = items;
+                bill.item_name = items.map(i => i.item_name).join(', ');
+              }
+            }
+          }
+        } catch (err) {
+          console.error('getBills: Error fetching order items', err);
+        }
+      }
+
+      // 3. Fetch item descriptions from subscription_items for subscription bills
+      const subRefIds = bills
+        .filter(b => b.reference_id && (b.bill_type === 'subscription' || b.reference_id.startsWith('SUB') || b.reference_id.startsWith('MSH')))
+        .map(b => b.reference_id);
+
+      if (subRefIds.length > 0) {
+        try {
+          const subItems = await this.db.query(
             `SELECT si.subscription_id,
                     COALESCE(
                       NULLIF(TRIM(CONCAT(p.name, ' - ', pv.name)), ' - '),
@@ -317,36 +354,36 @@ export class CustomerOrderController {
                     COALESCE(p.name, '') AS product_name,
                     COALESCE(pv.name, '') AS variant_name,
                     1 AS quantity,
-                    COALESCE(si.final_price, si.unit_price, 0) AS unit_price,
+                    COALESCE(si.unit_price, 0) AS unit_price,
+                    COALESCE(si.discount_amount, 0) AS discount_amount,
                     COALESCE(si.final_price, si.unit_price, 0) AS total_amount
-             FROM public.subscription_items si
-             LEFT JOIN public.product_variants pv ON pv.variant_id = si.product_variant_id
-             LEFT JOIN public.products p ON p.product_id = pv.product_id
+             FROM subscription_items si
+             LEFT JOIN product_variants pv ON pv.variant_id = si.product_variant_id
+             LEFT JOIN products p ON p.product_id = pv.product_id
              WHERE (si.subscription_id = ANY($1::text[]) OR ('SUB_' || si.subscription_id) = ANY($1::text[]))
                AND si.deleted_at IS NULL`,
-            [subIds],
+            [subRefIds],
           );
 
-          if (subItemRows && subItemRows.length > 0) {
+          if (subItems && subItems.length > 0) {
             const subItemsMap = new Map<string, any[]>();
-            for (const r of subItemRows) {
-              const list = subItemsMap.get(r.subscription_id) || [];
-              list.push(r);
-              subItemsMap.set(r.subscription_id, list);
+            for (const item of subItems) {
+              const list = subItemsMap.get(item.subscription_id) || [];
+              list.push(item);
+              subItemsMap.set(item.subscription_id, list);
             }
 
             for (const bill of bills) {
-              const refId = bill.reference_id || bill.bill_id;
-              const matched = subItemsMap.get(refId) || subItemsMap.get(String(refId).replace(/^BILL_/, ''));
+              const matched = subItemsMap.get(bill.reference_id) || subItemsMap.get(String(bill.reference_id).replace(/^SUB_/, ''));
               if (matched && matched.length > 0) {
                 bill.items = matched;
-                bill.item_name = matched.map(m => m.item_name).join(', ');
+                bill.item_name = matched.map(i => i.item_name).join(', ');
               }
             }
           }
+        } catch (err) {
+          console.error('getBills: Error fetching subscription items', err);
         }
-      } catch (err) {
-        console.error('getBills: Error enriching subscription items', err);
       }
 
       // Sort combined by created_at DESC
