@@ -62,7 +62,7 @@ export class CustomersService {
 
       if (status) {
         params.push(status);
-        whereClauses.push(`c.is_active = $${params.length}`);
+        whereClauses.push(`u.account_status = $${params.length}`);
       }
 
       if (branchId) {
@@ -164,7 +164,7 @@ export class CustomersService {
           c.gender,
           c.dob,
           u.profile_image_url as profile_image,
-          c.is_active as customer_status,
+          u.account_status as customer_status,
           c.customer_type,
           COALESCE(c.wallet_balance, 0)::numeric as wallet_balance,
           COALESCE(c.reward_points, 0)::int as reward_points,
@@ -215,10 +215,11 @@ export class CustomersService {
           COUNT(DISTINCT c.customer_id)::int as total_customers,
           COUNT(DISTINCT CASE WHEN s.status = 'active' THEN c.customer_id END)::int as active_subscribers,
           COUNT(DISTINCT CASE WHEN c.is_postpaid_enabled = true THEN c.customer_id END)::int as postpaid_accounts,
-          COUNT(DISTINCT CASE WHEN c.is_blocked = true THEN c.customer_id END)::int as blocked_accounts,
+          COUNT(DISTINCT CASE WHEN c.is_blocked = true OR u.account_status = 'blocked' THEN c.customer_id END)::int as blocked_accounts,
           COALESCE((SELECT SUM(total_amount) FROM orders WHERE status = 'delivered'), 0)::numeric as total_revenue,
           COALESCE((SELECT SUM(due_amount) FROM customer_bills WHERE status != 'paid' AND status != 'cancelled'), 0)::numeric as total_due
         FROM customers c
+        JOIN users u ON u.user_id = c.customer_id
         LEFT JOIN subscriptions s ON s.customer_id = c.customer_id AND s.status = 'active'
         WHERE c.deleted_at IS NULL
       `;
@@ -259,6 +260,7 @@ export class CustomersService {
     try {
       const custRes = await this.databaseService.query(
         `SELECT c.*, 
+                u.account_status as customer_status,
                 COALESCE(u.first_name, '') as first_name,
                 COALESCE(u.last_name, '') as last_name,
                 COALESCE(u.phone, '') as phone,
@@ -940,7 +942,7 @@ export class CustomersService {
         email: ['users.email', true],
         joined: ['customers.created_at', true],
         wallet_balance: ['customers.wallet_balance', true],
-        status: ['customers.customer_status', true],
+        status: ['users.account_status', true],
       };
 
       const joins: JoinDef[] = [
@@ -955,7 +957,7 @@ export class CustomersService {
 
       if (query.status) {
         conditions.push({
-          column: 'customers.customer_status',
+          column: 'users.account_status',
           operator: '=',
           value: query.status,
         });
@@ -1021,50 +1023,24 @@ export class CustomersService {
 
   async getSegments() {
     try {
-      const active = await this.dataService.query('customers', {
-        select: { count: true },
-        where: [
-          {
-            column: 'customers.customer_status',
-            operator: '=',
-            value: 'active',
-          },
-        ],
-      });
-      const dormant = await this.dataService.query('customers', {
-        select: { count: true },
-        where: [
-          {
-            column: 'customers.customer_status',
-            operator: '=',
-            value: 'dormant',
-          },
-        ],
-      });
-      const paused = await this.dataService.query('customers', {
-        select: { count: true },
-        where: [
-          {
-            column: 'customers.customer_status',
-            operator: '=',
-            value: 'paused',
-          },
-        ],
-      });
-      const blocked = await this.dataService.query('customers', {
-        select: { count: true },
-        where: [
-          { column: 'customers.customer_status', operator: '=', value: 'blocked' },
-        ],
-      });
-
+      const segRes = await this.databaseService.query(`
+        SELECT 
+          COUNT(CASE WHEN u.account_status = 'active' AND (c.is_blocked IS NOT TRUE) THEN 1 END)::int as active,
+          COUNT(CASE WHEN u.account_status = 'dormant' THEN 1 END)::int as dormant,
+          COUNT(CASE WHEN u.account_status = 'paused' THEN 1 END)::int as paused,
+          COUNT(CASE WHEN u.account_status = 'blocked' OR c.is_blocked = true THEN 1 END)::int as blocked
+        FROM customers c
+        JOIN users u ON u.user_id = c.customer_id
+        WHERE c.deleted_at IS NULL
+      `);
+      const row = segRes[0] || {};
       return {
         status: true,
         data: {
-          active: active?.data?.[0]?.count ?? 0,
-          dormant: dormant?.data?.[0]?.count ?? 0,
-          paused: paused?.data?.[0]?.count ?? 0,
-          blocked: blocked?.data?.[0]?.count ?? 0,
+          active: row.active ?? 0,
+          dormant: row.dormant ?? 0,
+          paused: row.paused ?? 0,
+          blocked: row.blocked ?? 0,
         },
       };
     } catch (error) {
@@ -1436,8 +1412,8 @@ export class CustomersService {
   async freezeWallet(customerId: string, adminId: string) {
     try {
       await this.databaseService.query(
-        `UPDATE customers SET customer_status = 'paused', updated_at = NOW() WHERE customer_id = ? OR id::text = ?`,
-        [customerId, customerId]
+        `UPDATE users SET account_status = 'paused', updated_at = NOW() WHERE user_id = $1`,
+        [customerId]
       );
 
       return { status: true, message: 'Wallet/Account paused successfully' };
@@ -1531,9 +1507,13 @@ export class CustomersService {
 
     try {
       await this.databaseService.query(
-        `UPDATE customers SET is_blocked = true, block_reason = ?, customer_status = 'blocked', updated_at = NOW()
-         WHERE customer_id = ? OR id::text = ?`,
-        [reason, customerId, customerId]
+        `UPDATE customers SET is_blocked = true, block_reason = $1, updated_at = NOW()
+         WHERE customer_id = $2`,
+        [reason, customerId]
+      );
+      await this.databaseService.query(
+        `UPDATE users SET account_status = 'blocked', updated_at = NOW() WHERE user_id = $1`,
+        [customerId]
       );
 
       return { status: true, message: 'Customer blocked successfully' };
@@ -1546,9 +1526,13 @@ export class CustomersService {
   async unblockCustomer(customerId: string, adminId: string) {
     try {
       await this.databaseService.query(
-        `UPDATE customers SET is_blocked = false, block_reason = NULL, customer_status = 'active', updated_at = NOW()
-         WHERE customer_id = ? OR id::text = ?`,
-        [customerId, customerId]
+        `UPDATE customers SET is_blocked = false, block_reason = NULL, updated_at = NOW()
+         WHERE customer_id = $1`,
+        [customerId]
+      );
+      await this.databaseService.query(
+        `UPDATE users SET account_status = 'active', updated_at = NOW() WHERE user_id = $1`,
+        [customerId]
       );
 
       return { status: true, message: 'Customer unblocked successfully' };

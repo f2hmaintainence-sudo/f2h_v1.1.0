@@ -255,7 +255,7 @@ export class CustomerTableService {
 
       if (query.frozen === 'true' || query.wallet === 'frozen') {
         conditions.push({
-          column: 'customers.customer_status',
+          column: 'users.account_status',
           operator: '!=',
           value: 'active',
         });
@@ -330,6 +330,11 @@ export class CustomerTableService {
             type: 'left',
             table: 'customers',
             on: [['customer_wallet_transactions.customer_id', 'customers.customer_id']],
+          },
+          {
+            type: 'left',
+            table: 'users',
+            on: [['customer_wallet_transactions.customer_id', 'users.user_id']],
           },
         ],
 
