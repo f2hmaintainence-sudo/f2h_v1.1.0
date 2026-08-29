@@ -73,7 +73,7 @@ export class CartService {
     }
 
     return {
-      billSummary: await this.calculateBillSummary(itemsSubtotal),
+      billSummary: await this.calculateBillSummary(itemsSubtotal, customerId),
     };
   }
 
@@ -157,7 +157,7 @@ export class CartService {
 
     return {
       items: formattedItems,
-      billSummary: await this.calculateBillSummary(itemsSubtotal),
+      billSummary: await this.calculateBillSummary(itemsSubtotal, userId),
     };
   }
 
@@ -171,9 +171,10 @@ export class CartService {
     return price * qty;
   }
 
-  private async calculateBillSummary(itemsSubtotal: number) {
+  private async calculateBillSummary(itemsSubtotal: number, customerId?: string) {
     let baseDeliveryFee = 60.0;
     let freeDeliveryThreshold = 199.0;
+    let freeDeliveryFirstOrder = true;
     let taxesAndHandling = 10.0;
     try {
       const rows = await this.db.query(
@@ -183,11 +184,23 @@ export class CartService {
         const rules = rows[0].config_data;
         if (rules.base_delivery_fee != null) baseDeliveryFee = Number(rules.base_delivery_fee);
         if (rules.free_delivery_threshold != null) freeDeliveryThreshold = Number(rules.free_delivery_threshold);
+        if (rules.free_delivery_first_order != null) freeDeliveryFirstOrder = rules.free_delivery_first_order !== false;
         if (rules.taxes_and_handling_fee != null) taxesAndHandling = Number(rules.taxes_and_handling_fee);
       }
     } catch (_) {}
 
-    const isFreeDelivery = itemsSubtotal >= freeDeliveryThreshold && freeDeliveryThreshold > 0;
+    let isFirstOrder = false;
+    if (customerId && freeDeliveryFirstOrder) {
+      try {
+        const custRows = await this.db.query(
+          `SELECT first_order_completed FROM customers WHERE customer_id = $1 LIMIT 1`,
+          [customerId],
+        );
+        isFirstOrder = custRows?.[0]?.first_order_completed !== true;
+      } catch (_) {}
+    }
+
+    const isFreeDelivery = (itemsSubtotal >= freeDeliveryThreshold && freeDeliveryThreshold > 0) || isFirstOrder;
     const deliveryPartnerFee = itemsSubtotal > 0 ? (isFreeDelivery ? 0.0 : baseDeliveryFee) : 0.0;
     const effectiveTaxes = itemsSubtotal > 0 ? taxesAndHandling : 0.0;
     const grandTotal = itemsSubtotal > 0 ? itemsSubtotal + deliveryPartnerFee + effectiveTaxes : 0.0;

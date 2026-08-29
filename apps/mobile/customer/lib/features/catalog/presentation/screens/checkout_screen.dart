@@ -382,8 +382,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         double? previewTotal;
 
         if (summary is Map) {
+          final isCouponValid = summary['coupon_valid'] == true;
           final summaryCoupon = _toDouble(summary['coupon_discount']);
-          couponDisc = summaryCoupon > 0 ? summaryCoupon : _toDouble(summary['total_discount']);
+          couponDisc = (isCouponValid && summaryCoupon > 0) ? summaryCoupon : 0.0;
+          if (!isCouponValid && _appliedCouponCode != null) {
+            _appliedCouponCode = null;
+            _couponError = summary['coupon_message']?.toString() ?? 'Coupon requirements not met';
+          }
         } else if (preview['discount_amount'] != null) {
           couponDisc = _toDouble(preview['discount_amount']);
         }
@@ -702,12 +707,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     final double payableItems = _payableFor(subtotal);
                     final double couponSavings = subtotal - payableItems;
 
-                    final int activeSubCount = (sessionState.subscriptionSummary['active'] as num?)?.toInt() ?? 0;
                     final bool isFirstOrder = sessionState.profile?.firstOrderCompleted != true;
 
-                    // Check if free delivery applies
+                    // Check if free delivery applies for this one-time order
                     final bool isFreeDelivery = (subtotal >= freeDeliveryThreshold && freeDeliveryThreshold > 0) ||
-                        (freeDeliveryForSubscriptions && activeSubCount > 0) ||
                         (freeDeliveryFirstOrder && isFirstOrder);
 
                     final double deliveryFee = subtotal > 0 ? baseDeliveryFee : 0.0;
