@@ -62,12 +62,12 @@ graph TB
 
 ## 2. Documentation Architecture & Directory Structure
 
-The complete test coverage is divided into 13 modular specification documents located in `.claude/test/`:
+The complete test coverage is divided into 12 modular specification documents located in `.claude/test/29-08-2026/test-plan/`:
 
 ```
-.claude/test/
+.claude/test/29-08-2026/test-plan/
 ├── README.md                          # Master Test Plan Overview & Execution Guide (This File)
-├── 01-admin-panel.md                  # Test Cases for 30+ Admin Modules & Web Operations
+├── 01-admin-panel.md                  # Test Cases for 30+ Admin Modules & Web Operations (Single ADMIN Role)
 ├── 02-customer-app.md                 # Complete Customer App Mobile Journey & Catalog Tests
 ├── 03-delivery-partner-app.md         # Delivery Partner App Runs, Shifts, Delivery Proof & Handover
 ├── 04-subscriptions.md                # In-Depth Subscription Lifecycle, Weekly Matrix, Pauses & Crons
@@ -76,7 +76,6 @@ The complete test coverage is divided into 13 modular specification documents lo
 ├── 07-delivery-dispatch.md            # Dispatch Plans, Hub Pickups, Baskets, Containers & Reconciliations
 ├── 08-inventory-warehouse.md          # Warehouses, Stock Movements, Transfers, Intakes & Forecasts
 ├── 09-referrals.md                    # Customer & Partner Referral Engines, Rewards & Fraud Defenses
-├── 10-roles-permissions.md            # Multi-Role RBAC, Branch Scoping & IDOR Security Audits
 ├── 11-end-to-end-flows.md             # 12 Comprehensive Cross-Surface Integrated Business Scenarios
 ├── 12-edge-cases.md                   # 25 High-Stress Race Conditions, Concurrency & Boundary Cases
 └── 13-test-data-requirements.md       # Golden Test Fixtures, Accounts, Branches, Warehouses & Catalogs
@@ -104,14 +103,14 @@ Every test specification across all documentation files follows the strict stand
 
 ## 4. Test Persona & Account Configuration
 
-| Persona | Primary Identifier | Role | Credentials Source / Method |
-|---|---|---|---|
-| **Super Admin** | `admin@f2hfresh.com` / `f2hmaintainence@gmail.com` | `ADMIN` | Provided by project owner / seeded master account |
-| **Branch Manager** | `bm.kuppam@f2hfresh.com` | `BRANCH_MANAGER` | Assigned to `BRANCH_KUPPAM_01` in `role_assignments` |
-| **Warehouse Manager** | `wh.kuppam@f2hfresh.com` | `WAREHOUSE_MANAGER` | Assigned to `WH-KUPPAM-MAIN` in `management_staff` |
-| **Delivery Partner** | `dp.driver1@f2hfresh.com` / Phone `+91 9876543210` | `DELIVERY_PARTNER` | `delivery_partners` table + `vehicle_type = 'bike'` |
-| **Prepaid Customer** | `cust.prepaid@f2hfresh.com` / Phone `+91 9123456780` | `CUSTOMER` | Created via Customer App signup flow |
-| **Postpaid Customer** | `cust.postpaid@f2hfresh.com` / Phone `+91 9123456781` | `CUSTOMER` | Customer profile with `is_postpaid_enabled = true` |
+> **Note on Panel Access:** In the Admin Panel, there is **only one role: `ADMIN`** (Super Admin). All back-office modules, branches, warehouses, finance, and settings are managed under this single role. The platform operates across 3 client account types:
+
+| Persona | Primary Identifier | Role | Platform / Surface | Credentials Source / Method |
+|---|---|---|---|---|
+| **Super Admin** | `admin@f2hfresh.com` / `f2hmaintainence@gmail.com` | `ADMIN` | Admin Web Panel (`/admin/*`) | Provided by project owner / seeded master account |
+| **Delivery Partner** | `dp.driver1@f2hfresh.com` / Phone `+91 9876543210` | `DELIVERY_PARTNER` | Delivery Partner App | `delivery_partners` table + `vehicle_type = 'bike'` |
+| **Prepaid Customer** | `cust.prepaid@f2hfresh.com` / Phone `+91 9123456780` | `CUSTOMER` | Customer Mobile App | Created via Customer App signup flow |
+| **Postpaid Customer** | `cust.postpaid@f2hfresh.com` / Phone `+91 9123456781` | `CUSTOMER` | Customer Mobile App | Customer profile with `is_postpaid_enabled = true` |
 
 ---
 
@@ -134,8 +133,7 @@ gantt
     Dispatch & Delivery (07)      :active, c1, 0, 26
     Inventory & Warehouses (08)   :active, c2, 0, 24
     Referral Engine (09)          :active, c3, 0, 20
-    section Security & Integration
-    RBAC & Branch Scoping (10)    :crit, d1, 0, 22
+    section System Resilience
     End-to-End Scenarios (11)     :crit, d2, 0, 12
     Edge Cases & Races (12)       :crit, d3, 0, 25
     Test Data Master Setup (13)   :active, d4, 0, 15

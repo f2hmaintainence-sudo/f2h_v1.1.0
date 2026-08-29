@@ -2,7 +2,7 @@
 
 > **Application Surface:** Next.js 16 App Router Admin Panel (`f2hfresh.com/admin/*` or `:5002`)  
 > **API Controllers:** `src/panels/admin/*`, `src/auth/*`, `src/users/*`  
-> **Target Audience:** Super Admin, Branch Managers, Warehouse Managers, Delivery Dispatchers, Finance Officers
+> **Target Audience:** Super Admin (Single `ADMIN` Role for all Admin Panel Modules)
 
 ---
 

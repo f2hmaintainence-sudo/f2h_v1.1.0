@@ -86,8 +86,7 @@ ON CONFLICT (variant_id) DO NOTHING;
 
 | Persona | `user_id` | `email` | `phone` | Roles | Password Hash (bcrypt) | Satellite Setup |
 |---|---|---|---|---|---|---|
-| **Super Admin** | `USR_ADMIN_01` | `admin@f2hfresh.com` | `9876500000` | `ADMIN` | `$2b$10$MasterAdminHash` | Superuser permissions |
-| **Branch Manager** | `USR_BM_01` | `bm.kuppam@f2hfresh.com` | `9876500001` | `BRANCH_MANAGER` | `$2b$10$BranchManagerHash` | `branch_id = 'BRANCH_KUPPAM_01'` |
+| **Super Admin** | `USR_ADMIN_01` | `admin@f2hfresh.com` | `9876500000` | `ADMIN` | `$2b$10$MasterAdminHash` | Superuser permissions (manages all modules) |
 | **Delivery Partner** | `USR_DP_01` | `dp.ramesh@f2hfresh.com` | `9876543210` | `DELIVERY_PARTNER` | `$2b$10$DeliveryBoyHash` | `delivery_partners` table + `is_verified = true` |
 | **Prepaid Customer** | `USR_CUST_PRE` | `cust.prepaid@f2hfresh.com` | `9123456780` | `CUSTOMER` | `$2b$10$PrepaidCustomerHash` | `wallet_balance = 2500.00` |
 | **Postpaid Customer** | `USR_CUST_POST` | `cust.postpaid@f2hfresh.com` | `9123456781` | `CUSTOMER` | `$2b$10$PostpaidCustomerHash` | `is_postpaid_enabled = true`, `limit = 5000.00` |
