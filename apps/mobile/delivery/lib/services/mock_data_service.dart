@@ -101,8 +101,10 @@ class MockDataService extends ChangeNotifier {
 
     // Optimistic local update for all orders at the same address/customer stop.
     for (int i = 0; i < _orders.length; i++) {
-      if ((_orders[i].addressId == targetAddressId && targetAddressId.isNotEmpty) ||
-          (_orders[i].customerId == targetCustomerId && targetCustomerId.isNotEmpty)) {
+      final matches = targetAddressId.isNotEmpty
+          ? (_orders[i].addressId == targetAddressId)
+          : (_orders[i].customerId == targetCustomerId && targetCustomerId.isNotEmpty);
+      if (matches) {
         _orders[i] = _orders[i].copyWith(
           status: newStatus,
           emptyBottlesCollected: emptyBottles,

@@ -228,9 +228,9 @@ class DeliverySessionBloc
     final targetCustomerId = existing.customerId;
 
     final updated = current.orders.asMap().map((i, o) {
-      final matches =
-          (o.addressId == targetAddressId && targetAddressId.isNotEmpty) ||
-              (o.customerId == targetCustomerId && targetCustomerId.isNotEmpty);
+      final matches = targetAddressId.isNotEmpty
+          ? (o.addressId == targetAddressId)
+          : (o.customerId == targetCustomerId && targetCustomerId.isNotEmpty);
       if (!matches) return MapEntry(i, o);
       return MapEntry(
           i,

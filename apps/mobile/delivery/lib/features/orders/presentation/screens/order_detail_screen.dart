@@ -196,7 +196,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final sessionState = context.watch<DeliverySessionBloc>().state;
     if (sessionState is DeliverySessionLoaded) {
       final updated = sessionState.groupedStops.firstWhere(
-        (s) => s.customerId == _currentStop.customerId,
+        (s) => (_currentStop.addressId.isNotEmpty && s.addressId == _currentStop.addressId) ||
+               (s.stop != 0 && s.stop == _currentStop.stop) ||
+               (s.customerId == _currentStop.customerId && s.address == _currentStop.address),
         orElse: () => _currentStop,
       );
       _currentStop = updated;

@@ -347,7 +347,7 @@ class _HomeScreenState extends State<HomeScreen>
 
                   // const SliverToBoxAdapter(child: HomeCouponBanner()),
                   
-                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
                   // 8B. Promotional Offer Cards (Live Preview Style)
                   const SliverToBoxAdapter(child: _HomeBottomPromoBanners()),
@@ -470,8 +470,7 @@ class _HomeScreenState extends State<HomeScreen>
                       },
                     ),
                   ),
-
-                  // 7. Per-category product groups with inline banners
+                  const SliverToBoxAdapter(child: SizedBox(height: 20)),
                   // 7. Per-category product groups with inline banners
                   SliverToBoxAdapter(
                     child: BlocBuilder<CatalogBloc, CatalogState>(
@@ -485,7 +484,7 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
 
                   // Spacing before Referral
-                  const SliverToBoxAdapter(child: SizedBox(height: 14)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
                   // 8. Referral Banner (Invite Friends, Earn Rewards!)
                   const SliverToBoxAdapter(
@@ -497,7 +496,7 @@ class _HomeScreenState extends State<HomeScreen>
 
 
                   // Spacing before Promise Strip
-                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
                   // 9. The F2H Promise
                   SliverToBoxAdapter(child: _promiseStrip()),
