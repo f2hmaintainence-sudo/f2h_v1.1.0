@@ -298,7 +298,9 @@ class _TransactionDetaildScreenState extends State<TransactionDetaildScreen> {
                   ),
                   _buildDetailRow(
                     label: 'Transaction ID',
-                    value: '#TXN${widget.transaction.id}',
+                    value: (widget.transaction.transactionId != null && widget.transaction.transactionId!.trim().isNotEmpty)
+                        ? widget.transaction.transactionId!
+                        : '#TXN${widget.transaction.id}',
                   ),
                   if (widget.transaction.referenceType != null && widget.transaction.referenceType!.isNotEmpty)
                     _buildDetailRow(

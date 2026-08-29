@@ -17,6 +17,7 @@ final mockTx = [
 
 class CustomerWalletTransaction {
   final int id;
+  final String? transactionId;
   final String customerId;
   final String transactionType;
   final double amount;
@@ -29,6 +30,7 @@ class CustomerWalletTransaction {
 
   CustomerWalletTransaction({
     required this.id,
+    this.transactionId,
     required this.customerId,
     required this.transactionType,
     required this.amount,
@@ -45,6 +47,9 @@ class CustomerWalletTransaction {
   ) {
     return CustomerWalletTransaction(
       id: int.tryParse(json['id'].toString()) ?? 0,
+      transactionId: json['transaction_id']?.toString() ??
+          json['transactionId']?.toString() ??
+          json['tx_id']?.toString(),
       customerId: json['customer_id']?.toString() ?? '',
       transactionType:
           (json['transaction_type'] ?? json['direction'])
@@ -80,6 +85,7 @@ class CustomerWalletTransaction {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'transaction_id': transactionId,
       'customer_id': customerId,
       'transaction_type': transactionType,
       'direction': transactionType,
