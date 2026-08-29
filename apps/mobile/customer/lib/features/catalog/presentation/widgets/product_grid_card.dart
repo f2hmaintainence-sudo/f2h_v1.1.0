@@ -547,11 +547,8 @@ class _CardAction extends StatelessWidget {
             quantity: 1,
             deliveryDate:
                 matched?.deliveryDate ??
-                DateTime.now()
-                    .add(const Duration(days: 1))
-                    .toString()
-                    .split(' ')[0],
-            deliverySlot: matched?.deliverySlot ?? 'Morning',
+                getDefaultDeliveryDate(DateTime.now()).toString().split(' ')[0],
+            deliverySlot: matched?.deliverySlot ?? getDefaultSlot(getDefaultDeliveryDate(DateTime.now()), DateTime.now()),
           ),
         ),
       );

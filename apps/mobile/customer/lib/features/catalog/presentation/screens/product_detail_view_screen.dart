@@ -1002,11 +1002,8 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
             purchaseType: 'onetime',
             quantity: 1,
             schedules: null,
-            deliveryDate: DateTime.now()
-                .add(const Duration(days: 1))
-                .toString()
-                .split(' ')[0],
-            deliverySlot: 'Morning',
+            deliveryDate: getDefaultDeliveryDate(DateTime.now()).toString().split(' ')[0],
+            deliverySlot: getDefaultSlot(getDefaultDeliveryDate(DateTime.now()), DateTime.now()),
             imageAsset: p.imageAsset,
             isSubscribable: p.isSubscribable,
             isOneTime: p.isOneTime,
@@ -1045,12 +1042,9 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                 ? [SubscriptionSchedule(day: 0, mQuantity: 1, eQuantity: 0)]
                 : null,
             deliveryDate: !isSub
-                ? DateTime.now()
-                      .add(const Duration(days: 1))
-                      .toString()
-                      .split(' ')[0]
+                ? getDefaultDeliveryDate(DateTime.now()).toString().split(' ')[0]
                 : null,
-            deliverySlot: !isSub ? 'Morning' : null,
+            deliverySlot: !isSub ? getDefaultSlot(getDefaultDeliveryDate(DateTime.now()), DateTime.now()) : null,
             imageAsset: p.imageAsset,
             isSubscribable: p.isSubscribable,
             isOneTime: p.isOneTime,

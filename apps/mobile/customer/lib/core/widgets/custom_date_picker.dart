@@ -10,6 +10,7 @@ class CustomDatePickerDialog extends StatefulWidget {
   final bool highlightMonthEnd;
   final bool showSlots;
   final String? initialSlot;
+  final Map<String, dynamic>? slotTimings;
 
   const CustomDatePickerDialog({
     super.key,
@@ -20,6 +21,7 @@ class CustomDatePickerDialog extends StatefulWidget {
     this.highlightMonthEnd = false,
     this.showSlots = false,
     this.initialSlot,
+    this.slotTimings,
   });
 
   @override
@@ -46,9 +48,9 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
     _currentMonth = DateTime(_selectedDate.year, _selectedDate.month);
     _selectedSlot = widget.initialSlot ?? 'Morning';
     if (widget.showSlots) {
-      final available = getAvailableSlots(_selectedDate, DateTime.now());
+      final available = getAvailableSlots(_selectedDate, DateTime.now(), widget.slotTimings);
       if (!available.contains(_selectedSlot)) {
-        _selectedSlot = getDefaultSlot(_selectedDate, DateTime.now());
+        _selectedSlot = getDefaultSlot(_selectedDate, DateTime.now(), widget.slotTimings);
       }
     }
   }
@@ -312,9 +314,9 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
                   setState(() {
                     _selectedDate = date;
                     if (widget.showSlots) {
-                      final available = getAvailableSlots(date, DateTime.now());
+                      final available = getAvailableSlots(date, DateTime.now(), widget.slotTimings);
                       if (!available.contains(_selectedSlot)) {
-                        _selectedSlot = getDefaultSlot(date, DateTime.now());
+                        _selectedSlot = getDefaultSlot(date, DateTime.now(), widget.slotTimings);
                       }
                     }
                   });
@@ -363,7 +365,7 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
             const Text(
               'DELIVERY SLOT',
               style: TextStyle(
-                fontSize: 10,
+                 fontSize: 10,
                 fontWeight: FontWeight.w900,
                 color: kTextSub,
                 letterSpacing: 0.5,
@@ -373,7 +375,7 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
             Builder(
               builder: (context) {
                 final now = DateTime.now();
-                final availableSlots = getAvailableSlots(_selectedDate, now);
+                final availableSlots = getAvailableSlots(_selectedDate, now, widget.slotTimings);
                 return Row(
                   children: [
                     if (availableSlots.contains('Morning')) ...[
@@ -492,6 +494,7 @@ Future<DateSlotResult?> showCustomDateAndSlotPicker({
   required DateTime firstDate,
   required DateTime lastDate,
   String title = 'Select Delivery Date',
+  Map<String, dynamic>? slotTimings,
 }) {
   return showDialog<DateSlotResult>(
     context: context,
@@ -512,6 +515,7 @@ Future<DateSlotResult?> showCustomDateAndSlotPicker({
           title: title,
           showSlots: true,
           initialSlot: initialSlot,
+          slotTimings: slotTimings,
         ),
       );
     },

@@ -177,8 +177,8 @@ class _CartScreenState extends State<CartScreen> {
                 // Uses time-based rules:
                 //   Before noon → Today (Evening only)
                 //   After noon → Tomorrow (both slots)
+                final now = DateTime.now();
                 if (_globalOnetimeDate == null) {
-                  final now = DateTime.now();
                   CartItemEntity? firstOnetime;
                   try {
                     firstOnetime = state.items.firstWhere(
@@ -197,19 +197,20 @@ class _CartScreenState extends State<CartScreen> {
                   }
                   // Apply time-based default from helpers
                   _globalOnetimeDate ??= getDefaultDeliveryDate(now, sessionState.slotTimings);
-                  // Ensure slot is valid for the selected date
-                  final availableSlots = getAvailableSlots(
+                }
+
+                // Ensure slot is valid for the selected date
+                final availableSlots = getAvailableSlots(
+                  _globalOnetimeDate!,
+                  now,
+                  sessionState.slotTimings,
+                );
+                if (!availableSlots.contains(_globalOnetimeSlot)) {
+                  _globalOnetimeSlot = getDefaultSlot(
                     _globalOnetimeDate!,
                     now,
                     sessionState.slotTimings,
                   );
-                  if (!availableSlots.contains(_globalOnetimeSlot)) {
-                    _globalOnetimeSlot = getDefaultSlot(
-                      _globalOnetimeDate!,
-                      now,
-                      sessionState.slotTimings,
-                    );
-                  }
                 }
 
                 // ===== Sync One-Time Items to Global Settings =====
@@ -852,6 +853,7 @@ class _CartScreenState extends State<CartScreen> {
       firstDate: firstDate,
       lastDate: now.add(const Duration(days: 30)),
       title: 'Select Delivery Date',
+      slotTimings: sessionState.slotTimings,
     );
 
     if (result != null) {

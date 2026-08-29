@@ -213,6 +213,9 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
               final displayPrice = _selected.price;
 
               void dispatchAdd({int quantity = 1}) {
+                final now = DateTime.now();
+                final defDate = getDefaultDeliveryDate(now);
+                final defSlot = getDefaultSlot(defDate, now);
                 final cartItem = CartItemEntity(
                   productId: p.id,
                   variantId: _selected.id,
@@ -221,8 +224,8 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                   unitPrice: _selected.price,
                   purchaseType: 'onetime',
                   quantity: quantity,
-                  deliveryDate: DateTime.now().add(const Duration(days: 1)).toString().split(' ')[0],
-                  deliverySlot: 'Morning',
+                  deliveryDate: defDate.toString().split(' ')[0],
+                  deliverySlot: defSlot,
                   imageAsset: p.imageAsset,
                   isSubscribable: p.isSubscribable,
                   isOneTime: p.isOneTime,
@@ -230,8 +233,11 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                 );
                 ctx.read<CartBloc>().add(AddToCartEvent(cartItem));
               }
- 
+
               void dispatchRemove() {
+                final now = DateTime.now();
+                final defDate = getDefaultDeliveryDate(now);
+                final defSlot = getDefaultSlot(defDate, now);
                 final cartItem = CartItemEntity(
                   productId: p.id,
                   variantId: _selected.id,
@@ -240,8 +246,8 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                   unitPrice: _selected.price,
                   purchaseType: 'onetime',
                   quantity: 1,
-                  deliveryDate: DateTime.now().add(const Duration(days: 1)).toString().split(' ')[0],
-                  deliverySlot: 'Morning',
+                  deliveryDate: defDate.toString().split(' ')[0],
+                  deliverySlot: defSlot,
                   imageAsset: p.imageAsset,
                   isSubscribable: p.isSubscribable,
                   isOneTime: p.isOneTime,
