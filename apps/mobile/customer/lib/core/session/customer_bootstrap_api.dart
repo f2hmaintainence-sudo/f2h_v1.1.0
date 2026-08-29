@@ -33,6 +33,9 @@ class CustomerBootstrapApi {
             data['notifications_count']?.toString() ?? '',
           ) ??
           0,
+      deliveryRules: Map<String, dynamic>.from(
+        data['delivery_rules'] as Map? ?? {},
+      ),
     );
   }
 

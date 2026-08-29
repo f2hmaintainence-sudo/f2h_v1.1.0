@@ -73,7 +73,7 @@ export class CartService {
     }
 
     return {
-      billSummary: this.calculateBillSummary(itemsSubtotal),
+      billSummary: await this.calculateBillSummary(itemsSubtotal),
     };
   }
 
@@ -157,7 +157,7 @@ export class CartService {
 
     return {
       items: formattedItems,
-      billSummary: this.calculateBillSummary(itemsSubtotal),
+      billSummary: await this.calculateBillSummary(itemsSubtotal),
     };
   }
 
@@ -171,15 +171,31 @@ export class CartService {
     return price * qty;
   }
 
-  private calculateBillSummary(itemsSubtotal: number) {
-    const deliveryPartnerFee = itemsSubtotal > 0 ? 29.0 : 0.0;
-    const taxesAndHandling = itemsSubtotal > 0 ? 12.0 : 0.0;
-    const grandTotal = itemsSubtotal > 0 ? itemsSubtotal + deliveryPartnerFee + taxesAndHandling : 0.0;
+  private async calculateBillSummary(itemsSubtotal: number) {
+    let baseDeliveryFee = 60.0;
+    let freeDeliveryThreshold = 199.0;
+    let taxesAndHandling = 10.0;
+    try {
+      const rows = await this.db.query(
+        `SELECT config_data FROM system_configurations WHERE config_key = 'delivery_rules' LIMIT 1`,
+      );
+      if (rows?.[0]?.config_data) {
+        const rules = rows[0].config_data;
+        if (rules.base_delivery_fee != null) baseDeliveryFee = Number(rules.base_delivery_fee);
+        if (rules.free_delivery_threshold != null) freeDeliveryThreshold = Number(rules.free_delivery_threshold);
+        if (rules.taxes_and_handling_fee != null) taxesAndHandling = Number(rules.taxes_and_handling_fee);
+      }
+    } catch (_) {}
+
+    const isFreeDelivery = itemsSubtotal >= freeDeliveryThreshold && freeDeliveryThreshold > 0;
+    const deliveryPartnerFee = itemsSubtotal > 0 ? (isFreeDelivery ? 0.0 : baseDeliveryFee) : 0.0;
+    const effectiveTaxes = itemsSubtotal > 0 ? taxesAndHandling : 0.0;
+    const grandTotal = itemsSubtotal > 0 ? itemsSubtotal + deliveryPartnerFee + effectiveTaxes : 0.0;
 
     return {
       itemsSubtotal,
       deliveryPartnerFee,
-      taxesAndHandling,
+      taxesAndHandling: effectiveTaxes,
       grandTotal,
     };
   }

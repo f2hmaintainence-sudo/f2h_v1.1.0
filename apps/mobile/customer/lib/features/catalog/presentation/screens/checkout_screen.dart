@@ -679,9 +679,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     }
 
                     // ===== Bill Calculations =====
-                    final double deliveryFee = 0.0;
-                    final double taxes = 0.0;
-                    final double donation = 0.0;
+                    final deliveryRules = sessionState.deliveryRules;
+                    final double baseDeliveryFee = _toDouble(deliveryRules['base_delivery_fee'] ?? 60.0);
+                    final double freeDeliveryThreshold = _toDouble(deliveryRules['free_delivery_threshold'] ?? 199.0);
+                    final bool freeDeliveryForSubscriptions = deliveryRules['free_delivery_for_subscriptions'] != false;
+                    final bool freeDeliveryFirstOrder = deliveryRules['free_delivery_first_order'] != false;
+                    final double taxesAndHandling = _toDouble(deliveryRules['taxes_and_handling_fee'] ?? 0.0);
+                    final double donation = _donating ? 2.0 : 0.0;
 
                     final double onetimeTotal = calculateOneTimeTotal(
                       checkoutItems,
@@ -697,8 +701,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
                     final double payableItems = _payableFor(subtotal);
                     final double couponSavings = subtotal - payableItems;
+
+                    final int activeSubCount = (sessionState.subscriptionSummary['active'] as num?)?.toInt() ?? 0;
+                    final bool isFirstOrder = sessionState.profile?.firstOrderCompleted != true;
+
+                    // Check if free delivery applies
+                    final bool isFreeDelivery = (subtotal >= freeDeliveryThreshold && freeDeliveryThreshold > 0) ||
+                        (freeDeliveryForSubscriptions && activeSubCount > 0) ||
+                        (freeDeliveryFirstOrder && isFirstOrder);
+
+                    final double deliveryFee = subtotal > 0 ? baseDeliveryFee : 0.0;
+                    final double deliveryDiscount = (subtotal > 0 && isFreeDelivery) ? deliveryFee : 0.0;
+                    final double effectiveDeliveryFee = deliveryFee - deliveryDiscount;
+                    final double effectiveTaxes = subtotal > 0 ? taxesAndHandling : 0.0;
+
                     final double grandTotal =
-                        payableItems + deliveryFee + taxes + donation;
+                        payableItems + effectiveDeliveryFee + effectiveTaxes + donation;
                     final double payableNow = grandTotal;
 
                     return Column(
@@ -1190,7 +1208,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                           value:
                                               checkoutItems.first.deliverySlot!,
                                         ),
-                                        const SizedBox(height: 4),
                                       ],
                                       SummaryRow(
                                         label: 'Total Items',
@@ -1217,22 +1234,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                           valueColor: kPrimaryLt,
                                         ),
                                       ],
-                                      const SizedBox(height: 8),
-                                      const SummaryRow(
-                                        label: 'Delivery Fee',
-                                        value: '₹39',
-                                      ),
-                                      const SizedBox(height: 8),
-                                      const SummaryRow(
-                                        label: 'Delivery Discount',
-                                        value: '-₹39',
-                                        valueColor: kPrimaryLt,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      const SummaryRow(
-                                        label: 'Taxes & Handling Charges',
-                                        value: '₹0',
-                                      ),
+                                      if (deliveryFee > 0) ...[
+                                        const SizedBox(height: 8),
+                                        SummaryRow(
+                                          label: 'Delivery Fee',
+                                          value: '₹${deliveryFee.toStringAsFixed(0)}',
+                                        ),
+                                      ],
+                                       if (deliveryDiscount > 0) ...[
+                                         const SizedBox(height: 8),
+                                         SummaryRow(
+                                           label: 'Delivery Discount',
+                                           value: '-₹${deliveryDiscount.toStringAsFixed(0)}',
+                                           valueColor: kPrimaryLt,
+                                         ),
+                                       ],
+                                       const SizedBox(height: 8),
+                                       SummaryRow(
+                                         label: 'Taxes & Handling Charges',
+                                         value: '₹' + effectiveTaxes.toStringAsFixed(0),
+                                       ),
                                       if (_donating) ...[
                                         const SizedBox(height: 8),
                                         const SummaryRow(

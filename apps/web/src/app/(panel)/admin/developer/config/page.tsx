@@ -942,7 +942,7 @@ export default function SystemConfigPage() {
                 </div>
                 <div className="border-t border-slate-200 pt-2 flex justify-between text-sm font-extrabold text-slate-900">
                   <span>To Pay</span>
-                  <span className="text-emerald-700">₹40</span>
+                  <span className="text-emerald-700">₹{(40 + deliveryRules.taxes_and_handling_fee).toFixed(0)}</span>
                 </div>
               </div>
 
