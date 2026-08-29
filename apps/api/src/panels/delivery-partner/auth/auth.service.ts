@@ -26,7 +26,7 @@ export class AuthService {
     const newStatus = typeof requestedActiveState === 'boolean' ? requestedActiveState : !currentStatus;
 
     if (newStatus === false) {
-      const { targetDate, targetSlot } = this.getKolkataDateAndSlot();
+      const { targetDate, targetSlot } = await this.getKolkataDateAndSlot();
       const pendingRes = await this.db.query(
         `SELECT COUNT(*)::int AS pending_count
          FROM orders
@@ -59,7 +59,7 @@ export class AuthService {
     };
   }
 
-  private getKolkataDateAndSlot(): { targetDate: string; targetSlot: string } {
+  private async getKolkataDateAndSlot(): Promise<{ targetDate: string; targetSlot: string }> {
     const kolkataDateStr = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Kolkata',
       year: 'numeric',
@@ -74,8 +74,24 @@ export class AuthService {
       hour12: false,
     }).formatToParts(new Date());
     const h = parseInt(timeParts.find((p) => p.type === 'hour')?.value || '0', 10);
-    const targetSlot = h < 16 ? 'morning' : 'evening';
+    const m = parseInt(timeParts.find((p) => p.type === 'minute')?.value || '0', 10);
+    const timeMinutes = h * 60 + m;
 
+    let morningClosingMinutes = 16 * 60;
+    try {
+      const rows = await this.db.query(
+        `SELECT config_data FROM system_configurations WHERE config_key = 'slot_timings' LIMIT 1`,
+      );
+      const timings = rows?.[0]?.config_data;
+      if (timings?.evening_slot?.customer_cutoff_time) {
+        const parts = timings.evening_slot.customer_cutoff_time.split(':');
+        if (parts.length >= 2) {
+          morningClosingMinutes = (parseInt(parts[0], 10) || 0) * 60 + (parseInt(parts[1], 10) || 0);
+        }
+      }
+    } catch (_) {}
+
+    const targetSlot = timeMinutes < morningClosingMinutes ? 'morning' : 'evening';
     return { targetDate: kolkataDateStr, targetSlot };
   }
 }

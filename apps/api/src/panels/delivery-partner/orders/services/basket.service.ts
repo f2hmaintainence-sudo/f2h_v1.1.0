@@ -45,18 +45,55 @@ export class BasketService {
       [basketId, partnerId, runId || null, today],
     );
 
-    await this.syncRunOrdersToBasket(basketId, partnerId, runId);
-
     const newBasketRes = await this.db.query(`SELECT * FROM delivery_baskets WHERE id = $1`, [basketId]);
     return newBasketRes[0];
+  }
+
+  private cachedSlotTimings: any = null;
+  private lastSlotTimingsFetch = 0;
+
+  async getCurrentSlot(): Promise<string> {
+    const now = Date.now();
+    let timings = this.cachedSlotTimings;
+    if (!timings || now - this.lastSlotTimingsFetch > 15000) {
+      try {
+        const rows = await this.db.query(
+          `SELECT config_data FROM system_configurations WHERE config_key = 'slot_timings' LIMIT 1`,
+        );
+        if (rows?.[0]?.config_data) {
+          this.cachedSlotTimings = rows[0].config_data;
+          this.lastSlotTimingsFetch = now;
+          timings = this.cachedSlotTimings;
+        }
+      } catch (_) {}
+    }
+
+    const timeParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+    }).formatToParts(new Date());
+    const h = parseInt(timeParts.find((p) => p.type === 'hour')?.value || '0', 10);
+    const m = parseInt(timeParts.find((p) => p.type === 'minute')?.value || '0', 10);
+    const timeMinutes = h * 60 + m;
+
+    let morningClosingMinutes = 16 * 60;
+    if (timings?.evening_slot?.customer_cutoff_time) {
+      const parts = timings.evening_slot.customer_cutoff_time.split(':');
+      if (parts.length >= 2) {
+        morningClosingMinutes = (parseInt(parts[0], 10) || 0) * 60 + (parseInt(parts[1], 10) || 0);
+      }
+    }
+
+    return timeMinutes < morningClosingMinutes ? 'morning' : 'evening';
   }
 
   /**
    * Synchronizes assigned run order items into physical basket_items.
    */
   async syncRunOrdersToBasket(basketId: string, partnerId: string, runId?: string): Promise<void> {
-    const kolkataHour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getHours();
-    const currentSlot = kolkataHour < 16 ? 'morning' : 'evening';
+    const currentSlot = await this.getCurrentSlot();
 
     // 0. Purge any stale basket items not belonging to today's active orders
     await this.db.query(
@@ -269,8 +306,7 @@ export class BasketService {
     )];
 
     // 2. Fetch active delivery_run for this partner on today's date
-    const kolkataHour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getHours();
-    const currentSlot = kolkataHour < 16 ? 'morning' : 'evening';
+    const currentSlot = await this.getCurrentSlot();
 
     const runRes = await this.db.query(
       `SELECT dr.id, dr.run_id, dr.delivery_partner_id, COALESCE(w.warehouse_id, (SELECT warehouse_id FROM warehouses WHERE is_active = true AND deleted_at IS NULL LIMIT 1)) AS warehouse_id, dr.delivery_slot, dr.status AS run_status,

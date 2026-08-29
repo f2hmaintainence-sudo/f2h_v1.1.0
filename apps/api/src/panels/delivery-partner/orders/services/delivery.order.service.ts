@@ -327,7 +327,38 @@ export class DeliveryOrderService {
     return runRes[0];
   }
 
-  getKolkataDateAndSlot(dateParam?: string, slotParam?: string): { targetDate: string; targetSlot: string } {
+  private cachedSlotTimings: any = null;
+  private lastSlotTimingsFetch = 0;
+
+  async getSlotTimingsConfig(): Promise<any> {
+    const now = Date.now();
+    if (this.cachedSlotTimings && now - this.lastSlotTimingsFetch < 15000) {
+      return this.cachedSlotTimings;
+    }
+    try {
+      const rows = await this.db.query(
+        `SELECT config_data FROM system_configurations WHERE config_key = 'slot_timings' AND is_active = true LIMIT 1`,
+      );
+      if (rows?.[0]?.config_data) {
+        this.cachedSlotTimings = rows[0].config_data;
+        this.lastSlotTimingsFetch = now;
+        return this.cachedSlotTimings;
+      }
+    } catch (_) {}
+    return this.cachedSlotTimings || {};
+  }
+
+  private parseCutoffMinutes(timeStr?: string, defaultMinutes = 960): number {
+    if (!timeStr || typeof timeStr !== 'string') return defaultMinutes;
+    const parts = timeStr.split(':');
+    if (parts.length < 2) return defaultMinutes;
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if (isNaN(h) || isNaN(m)) return defaultMinutes;
+    return h * 60 + m;
+  }
+
+  async getKolkataDateAndSlot(dateParam?: string, slotParam?: string): Promise<{ targetDate: string; targetSlot: string }> {
     const kolkataDateStr = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Kolkata',
       year: 'numeric',
@@ -345,19 +376,22 @@ export class DeliveryOrderService {
     const m = parseInt(timeParts.find((p) => p.type === 'minute')?.value || '0', 10);
     const timeMinutes = h * 60 + m;
 
-    // Delivery Partner Slot Closing Rules:
-    // 1. Morning Delivery closes at Evening Customer Cutoff (16:00 / 4:00 PM = 960 mins).
-    // 2. Evening Delivery closes at Morning Customer Cutoff (23:00 / 11:00 PM = 1380 mins).
+    const timings = await this.getSlotTimingsConfig();
+    // Morning delivery closes at Evening Slot Customer Order Cutoff Time (read directly from system_configurations table)
+    const morningClosingMinutes = this.parseCutoffMinutes(timings?.evening_slot?.customer_cutoff_time, 16 * 60);
+    // Evening delivery closes at Morning Slot Customer Order Cutoff Time (read directly from system_configurations table)
+    const eveningClosingMinutes = this.parseCutoffMinutes(timings?.morning_slot?.customer_cutoff_time, 23 * 60);
+
     let targetSlot = slotParam;
     let targetDate = dateParam || kolkataDateStr;
 
     if (!targetSlot) {
-      if (timeMinutes < 16 * 60) {
+      if (timeMinutes < morningClosingMinutes) {
         targetSlot = 'morning';
-      } else if (timeMinutes < 23 * 60) {
+      } else if (timeMinutes < eveningClosingMinutes) {
         targetSlot = 'evening';
       } else {
-        // After 23:00, advance target date to next day's morning preparation if no date was passed
+        // After evening closing, advance target date to next day's morning preparation if no date was passed
         if (!dateParam) {
           const nextDay = new Date();
           nextDay.setDate(nextDay.getDate() + 1);
@@ -739,7 +773,7 @@ export class DeliveryOrderService {
 
   async getTodayRun(userId: string, dateParam?: string, status?: string) {
     const boy = await this.resolveDeliveryPartner(userId);
-    const { targetDate, targetSlot } = this.getKolkataDateAndSlot(dateParam);
+    const { targetDate, targetSlot } = await this.getKolkataDateAndSlot(dateParam);
 
     const runs = await this.db.query(
       `SELECT id, run_id, status, delivery_slot, run_date
@@ -1596,7 +1630,7 @@ export class DeliveryOrderService {
 
   async getPickupItems(userId: string, dateParam?: string) {
     const boy = await this.resolveDeliveryPartner(userId);
-    const { targetDate, targetSlot } = this.getKolkataDateAndSlot(dateParam);
+    const { targetDate, targetSlot } = await this.getKolkataDateAndSlot(dateParam);
 
     const runs = await this.db.query(
       `SELECT id, run_id, status, delivery_slot AS slot, run_date FROM delivery_runs
@@ -1839,7 +1873,7 @@ export class DeliveryOrderService {
     const runIds = this.getRunIdentifiers(run);
     const runIdentifier = run.run_id || String(run.id);
     const runSlot = run.slot || run.delivery_slot || 'morning';
-    const { targetDate } = this.getKolkataDateAndSlot();
+    const { targetDate } = await this.getKolkataDateAndSlot();
 
     const dispatch = await this.findActiveDispatchForRun(runIds);
 
