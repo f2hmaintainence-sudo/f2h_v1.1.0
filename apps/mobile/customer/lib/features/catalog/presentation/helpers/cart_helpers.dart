@@ -165,11 +165,12 @@ List<String> getAvailableSlots(DateTime selectedDate, DateTime now, [Map<String,
 String getDefaultSlot(DateTime selectedDate, DateTime now, [Map<String, dynamic>? slotTimings]) {
   final today = DateTime(now.year, now.month, now.day);
   final selected = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+  final available = getAvailableSlots(selectedDate, now, slotTimings);
+
   if (selected.isAtSameMomentAs(today)) {
-    return 'Evening';
+    return available.contains('Evening') ? 'Evening' : '';
   }
 
-  final available = getAvailableSlots(selectedDate, now, slotTimings);
   if (available.contains('Morning')) return 'Morning';
   if (available.contains('Evening')) return 'Evening';
   return 'Morning';

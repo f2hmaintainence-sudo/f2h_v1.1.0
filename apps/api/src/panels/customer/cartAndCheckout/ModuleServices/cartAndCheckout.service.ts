@@ -673,6 +673,64 @@ export class CartService {
     }
 
     const groups = Array.from(groupsByKey.values());
+
+    // Validate deliveryDate & deliverySlot against system_configurations.slot_timings table
+    let slotTimingsConfig: any = null;
+    try {
+      const rows = await this.db.query(
+        `SELECT config_data FROM system_configurations WHERE config_key = 'slot_timings' AND is_active = true LIMIT 1`,
+      );
+      if (rows?.[0]?.config_data) {
+        slotTimingsConfig = rows[0].config_data;
+      }
+    } catch (_) {}
+
+    const kolkataDateStr = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+
+    const timeParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+    }).formatToParts(new Date());
+    const kolkataH = parseInt(timeParts.find((p) => p.type === 'hour')?.value || '0', 10);
+    const kolkataM = parseInt(timeParts.find((p) => p.type === 'minute')?.value || '0', 10);
+    const currentMinutes = kolkataH * 60 + kolkataM;
+
+    const parseCutoff = (timeStr?: string, defaultMin = 960) => {
+      if (!timeStr || typeof timeStr !== 'string') return defaultMin;
+      const parts = timeStr.split(':');
+      if (parts.length < 2) return defaultMin;
+      const h = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      return isNaN(h) || isNaN(m) ? defaultMin : h * 60 + m;
+    };
+
+    const eveningCutoffMinutes = parseCutoff(slotTimingsConfig?.evening_slot?.customer_cutoff_time, 16 * 60);
+
+    for (const group of groups) {
+      const slotLower = group.deliverySlot.toLowerCase();
+      // If delivery is for today
+      if (group.deliveryDate === kolkataDateStr) {
+        if (slotLower === 'morning') {
+          throw new BadRequestException(
+            `Morning delivery slot for today (${kolkataDateStr}) is closed. Please select a future date or evening slot.`,
+          );
+        }
+        if (slotLower === 'evening' && currentMinutes >= eveningCutoffMinutes) {
+          const cutoffDesc = slotTimingsConfig?.evening_slot?.customer_cutoff_time || 'the cutoff time';
+          throw new BadRequestException(
+            `Evening delivery slot for today (${kolkataDateStr}) closed at ${cutoffDesc}. Please select tomorrow or a later date.`,
+          );
+        }
+      }
+    }
+
     const onetimeTotal = groups.reduce((sum, group) => sum + group.totalAmount, 0);
     const walletBalance = Number(customer.wallet_balance || 0);
 

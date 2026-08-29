@@ -48,9 +48,16 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
     _currentMonth = DateTime(_selectedDate.year, _selectedDate.month);
     _selectedSlot = widget.initialSlot ?? 'Morning';
     if (widget.showSlots) {
-      final available = getAvailableSlots(_selectedDate, DateTime.now(), widget.slotTimings);
+      final now = DateTime.now();
+      var available = getAvailableSlots(_selectedDate, now, widget.slotTimings);
+      if (available.isEmpty) {
+        // If selected date has no available slots (e.g. today after evening cutoff), move to first allowed date
+        _selectedDate = DateTime(widget.firstDate.year, widget.firstDate.month, widget.firstDate.day);
+        _currentMonth = DateTime(_selectedDate.year, _selectedDate.month);
+        available = getAvailableSlots(_selectedDate, now, widget.slotTimings);
+      }
       if (!available.contains(_selectedSlot)) {
-        _selectedSlot = getDefaultSlot(_selectedDate, DateTime.now(), widget.slotTimings);
+        _selectedSlot = getDefaultSlot(_selectedDate, now, widget.slotTimings);
       }
     }
   }
@@ -166,8 +173,11 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
 
     for (int i = 1; i <= daysInCurrent; i++) {
       final date = DateTime(_currentMonth.year, _currentMonth.month, i);
-      final isEnabled = (date.isAfter(firstAvailableNormalized) || date.isAtSameMomentAs(firstAvailableNormalized)) &&
-          (date.isBefore(lastAvailableNormalized) || date.isAtSameMomentAs(lastAvailableNormalized));
+      final dateOnly = DateTime(date.year, date.month, date.day);
+      final isWithinRange = (dateOnly.isAfter(firstAvailableNormalized) || dateOnly.isAtSameMomentAs(firstAvailableNormalized)) &&
+          (dateOnly.isBefore(lastAvailableNormalized) || dateOnly.isAtSameMomentAs(lastAvailableNormalized));
+      final hasSlots = !widget.showSlots || getAvailableSlots(dateOnly, DateTime.now(), widget.slotTimings).isNotEmpty;
+      final isEnabled = isWithinRange && hasSlots;
 
       gridItems.add({
         'date': date,

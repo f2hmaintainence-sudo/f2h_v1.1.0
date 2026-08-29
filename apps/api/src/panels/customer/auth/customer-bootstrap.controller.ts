@@ -225,6 +225,24 @@ export class CustomerBootstrapController {
     return { status: true, firebase_config: config };
   }
 
+  /** Public endpoint — returns live slot timings from database table. */
+  @Get('slot-timings')
+  async getSlotTimings() {
+    let slotTimings: any = null;
+    try {
+      const res = await this.db.query(
+        `SELECT config_data FROM system_configurations WHERE config_key = 'slot_timings' AND is_active = true LIMIT 1`,
+      );
+      if (res?.[0]?.config_data) {
+        slotTimings = res[0].config_data;
+      }
+    } catch (_) {}
+    return {
+      status: true,
+      slot_timings: slotTimings,
+    };
+  }
+
   private async loadFirebaseClientConfig(configKey: string): Promise<any | null> {
     const now = Date.now();
     const cached = _firebaseConfigCache[configKey];

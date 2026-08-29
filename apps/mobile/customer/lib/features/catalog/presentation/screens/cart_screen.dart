@@ -63,8 +63,9 @@ class _CartScreenState extends State<CartScreen> {
   @override
   void initState() {
     super.initState();
-    // Load cart on first build if not already loaded
+    // Load cart on first build if not already loaded and refresh session/slot timings
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<CustomerSessionCubit>().refreshSilently();
       final bloc = context.read<CartBloc>();
       final sessionState = context.read<CustomerSessionCubit>().state;
       final customerId = sessionState.profile?.customerId;
@@ -178,6 +179,8 @@ class _CartScreenState extends State<CartScreen> {
                 //   Before noon → Today (Evening only)
                 //   After noon → Tomorrow (both slots)
                 final now = DateTime.now();
+                final firstAllowedDate = getFirstAllowedDate(now, sessionState.slotTimings);
+
                 if (_globalOnetimeDate == null) {
                   CartItemEntity? firstOnetime;
                   try {
@@ -195,8 +198,11 @@ class _CartScreenState extends State<CartScreen> {
                       firstOnetime.deliverySlot != null) {
                     _globalOnetimeSlot = firstOnetime.deliverySlot!;
                   }
-                  // Apply time-based default from helpers
-                  _globalOnetimeDate ??= getDefaultDeliveryDate(now, sessionState.slotTimings);
+                }
+
+                // If selected date is before firstAllowedDate (e.g. today's cutoff has passed), move to firstAllowedDate
+                if (_globalOnetimeDate == null || _globalOnetimeDate!.isBefore(firstAllowedDate)) {
+                  _globalOnetimeDate = firstAllowedDate;
                 }
 
                 // Ensure slot is valid for the selected date
