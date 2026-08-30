@@ -1666,12 +1666,9 @@ export class AuthService {
 
           await this.Data.insert('customers', {
             customer_id: userId,
-            first_name: identity.name || email.split('@')[0],
-            last_name: '',
-            mobile: null,
-            phone: null,
-            email: email.toLowerCase().trim(),
             branch_id: targetBranchId,
+            wallet_balance: 0,
+            first_order_completed: false,
             created_at: now,
             updated_at: now,
           });

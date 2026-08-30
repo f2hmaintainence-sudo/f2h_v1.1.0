@@ -125,20 +125,44 @@ export class ReferralRepository implements IReferralRepository {
       });
       if (existing?.data?.length) return existing.data[0];
 
+      // Single source of truth: write identity to users table first
+      try {
+        const userExists = await this.dataService.query('users', {
+          where: [{ column: 'user_id', operator: '=', value: newCustId }],
+          limit: 1,
+        });
+        if (!userExists?.data?.length) {
+          await this.dataService.insert('users', {
+            user_id: newCustId,
+            first_name: firstName,
+            last_name: lastName,
+            email: placeholderEmail,
+            phone: placeholderPhone,
+            role_id: 'CUSTOMER',
+            account_status: 'active',
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
+        }
+      } catch (_) {}
+
+      // Satellite domain data in customers table (only valid satellite columns)
       const custData = {
         customer_id: newCustId,
-        first_name: firstName,
-        last_name: lastName,
-        email: placeholderEmail,
-        mobile: placeholderPhone,
-        phone: placeholderPhone,
-        referral_code: newCustId,
-        referral_status: 'active',
+        wallet_balance: 0,
+        first_order_completed: false,
         created_at: new Date(),
         updated_at: new Date(),
       };
       await this.dataService.insert('customers', custData);
-      return custData;
+      return {
+        ...custData,
+        first_name: firstName,
+        last_name: lastName,
+        email: placeholderEmail,
+        phone: placeholderPhone,
+        referral_code: raw,
+      };
     }
 
     return null;
