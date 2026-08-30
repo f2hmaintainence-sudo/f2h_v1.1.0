@@ -66,7 +66,6 @@ export class CustomerBillingRepository {
     periodEnd: string,
     isPostpaid = true,
   ): Promise<any[]> {
-    const statusFilter = isPostpaid ? `AND orders.status = 'delivered'` : '';
     const sql = `
       SELECT orders.id, orders.order_id, orders.subscription_id, orders.scheduled_date,
         orders.total_amount,
@@ -81,8 +80,14 @@ export class CustomerBillingRepository {
         ) AS order_name
       FROM public.orders
       WHERE orders.customer_id = $1
-        ${statusFilter}
+        AND orders.status = 'delivered'
+        AND orders.subscription_id IS NOT NULL
         AND orders.scheduled_date::date BETWEEN $2::date AND $3::date
+        AND EXISTS (
+          SELECT 1 FROM public.subscriptions s
+          WHERE s.subscription_id = orders.subscription_id
+            AND s.payment_type = 'postpaid'
+        )
         AND NOT EXISTS (
           SELECT 1 FROM public.customer_bill_items cbi
           WHERE cbi.reference_type = 'order' AND cbi.reference_id = orders.order_id
