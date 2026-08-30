@@ -19,72 +19,12 @@ export class PromotionsCouponsService implements OnModuleInit {
   constructor(
     private readonly db: DatabaseService,
     private readonly Data: DataService,
-  ) {}
+  ) { }
 
   async onModuleInit() {
     // Deprecated: First order 50% off promotion is removed.
   }
 
-  private async bootstrapFirstMilkPromotion() {
-    // 1. Ensure PROMO_FIRST_MILK exists
-    await this.db.query(
-      `INSERT INTO promotions (
-         promotion_id, name, description, promotion_type, discount_value,
-         max_discount_amount, minimum_order_amount, status, first_order_only,
-         usage_limit, usage_limit_per_customer, auto_apply, allow_subscription_orders,
-         stackable, apply_to_all_products, created_at, updated_at
-       ) VALUES (
-         'PROMO_FIRST_MILK', 'First Milk Order - 50% Off', '50% off on your first fresh milk purchase',
-         'percentage', 50.00, NULL, 0, 'active', true,
-         NULL, 1, true, false, false, false, NOW(), NOW()
-       )
-       ON CONFLICT (promotion_id) DO UPDATE SET
-         name = EXCLUDED.name,
-         promotion_type = EXCLUDED.promotion_type,
-         discount_value = EXCLUDED.discount_value,
-         first_order_only = true,
-         auto_apply = true,
-         allow_subscription_orders = false,
-         apply_to_all_products = false,
-         updated_at = NOW()`,
-    );
-
-    // 2. Link all active Milk product variants
-    const milkVariants = await this.db.query(
-      `SELECT pv.variant_id
-       FROM product_variants pv
-       JOIN products p ON p.product_id = pv.product_id
-       WHERE LOWER(p.name) LIKE '%milk%' AND pv.deleted_at IS NULL AND p.deleted_at IS NULL`,
-    );
-
-    for (const row of milkVariants || []) {
-      await this.db.query(
-        `INSERT INTO promotion_products (promotion_id, product_variant_id, created_at)
-         VALUES ('PROMO_FIRST_MILK', $1, NOW())
-         ON CONFLICT (promotion_id, product_variant_id) DO NOTHING`,
-        [row.variant_id],
-      );
-    }
-
-    // 3. Ensure MILK50 coupon exists and links to PROMO_FIRST_MILK
-    await this.db.query(
-      `INSERT INTO coupons (
-         coupon_id, promotion_id, code, name, description, status,
-         usage_limit, usage_limit_per_customer, created_at, updated_at
-       ) VALUES (
-         'CPN_FIRST_MILK_50', 'PROMO_FIRST_MILK', 'MILK50', 'First Milk Order - 50% Off',
-         '50% off on your first fresh milk purchase', 'active',
-         10000, 1, NOW(), NOW()
-       )
-       ON CONFLICT (code) DO UPDATE SET
-         promotion_id = 'PROMO_FIRST_MILK',
-         name = EXCLUDED.name,
-         description = EXCLUDED.description,
-         status = 'active',
-         usage_limit_per_customer = 1,
-         updated_at = NOW()`,
-    );
-  }
 
   // ── PROMOTIONS ───────────────────────────────────────────────────────────────
 
