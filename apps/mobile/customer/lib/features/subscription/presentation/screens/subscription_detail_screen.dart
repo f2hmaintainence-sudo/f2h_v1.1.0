@@ -1445,7 +1445,6 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
             final addressString = defaultAddress.id == null
                 ? 'No saved address'
                 : [
-                    if (contactInfo.isNotEmpty) contactInfo,
                     if (defaultAddress.flatNo.isNotEmpty) defaultAddress.flatNo,
                     if (defaultAddress.buildingName.isNotEmpty)
                       defaultAddress.buildingName,
@@ -1537,7 +1536,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                                   ),
                                   const SizedBox(height: 3),
                                   Text(
-                                    '${s.qty > 1 ? '${s.qty} Units' : (firstItem?.variantName.isNotEmpty == true ? firstItem!.variantName : '1 Unit')} • ${s.frequency}',
+                                    '${firstItem != null && firstItem.unitValue > 0 ? '${firstItem.unitValue % 1 == 0 ? firstItem.unitValue.toInt() : firstItem.unitValue} ${firstItem.unitType.isNotEmpty ? firstItem.unitType : 'Unit'}' : (firstItem?.variantName.isNotEmpty == true ? firstItem!.variantName : '1 Unit')}${s.qty > 1 ? ' x${s.qty}' : ''} • ${s.frequency}',
                                     style: const TextStyle(
                                       fontSize: 12.5,
                                       color: kTextSub,

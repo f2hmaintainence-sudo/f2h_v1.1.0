@@ -351,6 +351,8 @@ class SubscriptionItemModel {
   final String? startDate;
   final String? endDate;
   final String? imageUrl;
+  final double unitValue;
+  final String unitType;
   final List<SubscriptionScheduleModel> weeklySchedules;
   final List<SubscriptionCustomDateModel> customDates;
 
@@ -371,6 +373,8 @@ class SubscriptionItemModel {
     this.startDate,
     this.endDate,
     this.imageUrl,
+    this.unitValue = 0,
+    this.unitType = '',
     this.weeklySchedules = const [],
     this.customDates = const [],
   });
@@ -418,6 +422,8 @@ class SubscriptionItemModel {
       imageUrl: _asString(
         json['url'] ?? json['image_url'] ?? json['imagePath'],
       ),
+      unitValue: _asDouble(json['unit_value'] ?? json['unitValue']),
+      unitType: _asString(json['unit_type'] ?? json['unitType']) ?? '',
       weeklySchedules: _asListOfMaps(
         json['weekly_schedules'] ?? json['weeklySchedules'],
       ).map(SubscriptionScheduleModel.fromJson).toList(),
