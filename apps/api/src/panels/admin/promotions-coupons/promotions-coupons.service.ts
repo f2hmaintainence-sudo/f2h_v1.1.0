@@ -22,11 +22,7 @@ export class PromotionsCouponsService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    try {
-      await this.bootstrapFirstMilkPromotion();
-    } catch (e) {
-      // Non-blocking on startup if DB not ready
-    }
+    // Deprecated: First order 50% off promotion is removed.
   }
 
   private async bootstrapFirstMilkPromotion() {

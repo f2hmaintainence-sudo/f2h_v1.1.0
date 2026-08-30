@@ -1213,7 +1213,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                         SummaryRow(
                                           label: _appliedCouponCode != null
                                               ? 'Coupon ($_appliedCouponCode)'
-                                              : 'Promotion Discount (50% Off)',
+                                              : 'Promotion Discount',
                                           value:
                                               '-₹${couponSavings.toStringAsFixed(0)}',
                                           valueColor: kPrimaryLt,

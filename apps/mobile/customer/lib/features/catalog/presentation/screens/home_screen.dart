@@ -995,10 +995,10 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _quickFeatures() {
     final list = [
       (
-        icon: Icons.local_offer_outlined,
-        title: 'First Order',
-        sub: '50% OFF',
-        color: Colors.redAccent,
+        icon: Icons.eco_outlined,
+        title: 'Farm Fresh',
+        sub: '100% Pure',
+        color: const Color(0xFF16A34A),
       ),
       (
         icon: Icons.local_shipping_outlined,

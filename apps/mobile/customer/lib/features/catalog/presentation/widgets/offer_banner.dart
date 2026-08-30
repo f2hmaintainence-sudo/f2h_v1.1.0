@@ -107,9 +107,9 @@ class _OfferBannerState extends State<OfferBanner> {
       _offers = [
         {
           'imageUrl': serverAssetPaths[0],
-          'tag': 'FLAT 50% OFF',
-          'title': 'First Order Special',
-          'subtitle': 'Get 50% cashback on your first milk subscription order.',
+          'tag': 'FARM FRESH MILK',
+          'title': 'Pure Cow & Buffalo Milk',
+          'subtitle': 'Delivered fresh from farm to home every morning.',
           'gradient': [const Color(0xFF16A34A), const Color(0xFF059669)],
         },
         {
