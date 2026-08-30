@@ -66,9 +66,16 @@ export class CustomerBillingRepository {
     periodEnd: string,
     isPostpaid = true,
   ): Promise<any[]> {
-    const statusFilter = isPostpaid ? `AND status = 'delivered'` : '';
+    const statusFilter = isPostpaid ? `AND orders.status = 'delivered'` : '';
     const sql = `
-      SELECT id, order_id, subscription_id, scheduled_date, total_amount, status, order_source, payment_status,
+      SELECT orders.id, orders.order_id, orders.subscription_id, orders.scheduled_date,
+        COALESCE(
+          (SELECT SUM(COALESCE(NULLIF(oi.final_price, 0), oi.unit_price, 0) * COALESCE(oi.quantity, 1))
+           FROM public.order_items oi
+           WHERE oi.order_id = orders.order_id),
+          orders.total_amount
+        ) AS total_amount,
+        orders.status, orders.order_source, orders.payment_status,
         COALESCE(
           (SELECT STRING_AGG(COALESCE(pv.name, pr.name), ', ') 
            FROM public.order_items oi 
@@ -78,14 +85,14 @@ export class CustomerBillingRepository {
           'Standard Order'
         ) AS order_name
       FROM public.orders
-      WHERE customer_id = $1
+      WHERE orders.customer_id = $1
         ${statusFilter}
-        AND scheduled_date::date BETWEEN $2::date AND $3::date
+        AND orders.scheduled_date::date BETWEEN $2::date AND $3::date
         AND NOT EXISTS (
           SELECT 1 FROM public.customer_bill_items cbi
           WHERE cbi.reference_type = 'order' AND cbi.reference_id = orders.order_id
         )
-      ORDER BY scheduled_date ASC
+      ORDER BY orders.scheduled_date ASC
     `;
     return await this.databaseService.query(sql, [customerId, periodStart, periodEnd]);
   }
@@ -139,7 +146,7 @@ export class CustomerBillingRepository {
       if (orders && orders.length > 0) {
         for (const ord of orders) {
           const orderItems = await client.query(
-            `SELECT variant_id, quantity, unit_price FROM public.order_items WHERE order_id = $1`,
+            `SELECT variant_id, quantity, COALESCE(NULLIF(final_price, 0), unit_price) AS unit_price FROM public.order_items WHERE order_id = $1`,
             [ord.order_id],
           );
           const items = orderItems.rows || [];

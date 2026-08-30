@@ -17,7 +17,8 @@ double _asDouble(dynamic value) {
   if (value == null) return 0.0;
   if (value is double) return value;
   if (value is int) return value.toDouble();
-  return double.tryParse(value.toString()) ?? 0.0;
+  final cleaned = value.toString().replaceAll(RegExp(r'[^0-9.-]'), '');
+  return double.tryParse(cleaned) ?? 0.0;
 }
 
 bool _isTruthy(dynamic value) {
@@ -555,8 +556,9 @@ class Subscription {
       final dayQtys = getSelectedDayQuantities();
       final totalWeeklyQty = dayQtys.fold<int>(0, (sum, dq) => sum + dq.quantity);
       if (totalWeeklyQty > 0) {
-        final unitPrice = (items.isNotEmpty && items.first.unitPrice > 0)
-            ? items.first.unitPrice
+        final firstItem = items.isNotEmpty ? items.first : null;
+        final unitPrice = (firstItem != null && (firstItem.finalPrice > 0 ? firstItem.finalPrice : firstItem.unitPrice) > 0)
+            ? (firstItem.finalPrice > 0 ? firstItem.finalPrice : firstItem.unitPrice)
             : (pricePerDay > 0 ? pricePerDay : 0.0);
         return (unitPrice * totalWeeklyQty * 52) / 12;
       }
@@ -804,6 +806,7 @@ class Subscription {
       frequency: frequencyLabel.isEmpty ? 'Weekly' : frequencyLabel,
       slot: slotLabel,
       qty: quantityTotal,
+      monthlyEstimate: _asDouble(json['monthly_estimate'] ?? json['monthlyEstimate']),
     );
   }
 }

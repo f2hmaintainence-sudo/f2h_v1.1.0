@@ -1455,12 +1455,12 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   ].join(', ');
 
             final firstItem = s.items.isNotEmpty ? s.items.first : null;
-            final unitPrice = (firstItem != null && firstItem.unitPrice > 0)
-                ? firstItem.unitPrice
+            final unitPrice = (firstItem != null && (firstItem.finalPrice > 0 ? firstItem.finalPrice : firstItem.unitPrice) > 0)
+                ? (firstItem.finalPrice > 0 ? firstItem.finalPrice : firstItem.unitPrice)
                 : (s.pricePerDay > 0 ? s.pricePerDay : 0.0);
             final originalPrice = (firstItem != null && firstItem.originalPrice > 0)
                 ? firstItem.originalPrice
-                : 0.0;
+                : (firstItem != null && firstItem.unitPrice > unitPrice ? firstItem.unitPrice : 0.0);
             final discount = (firstItem != null && firstItem.discount > 0)
                 ? firstItem.discount
                 : (originalPrice > unitPrice && originalPrice > 0
@@ -1537,7 +1537,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                                   ),
                                   const SizedBox(height: 3),
                                   Text(
-                                    '${s.qty > 1 ? '${s.qty} Units' : '1 Litre'} • ${s.frequency}',
+                                    '${s.qty > 1 ? '${s.qty} Units' : (firstItem?.variantName.isNotEmpty == true ? firstItem!.variantName : '1 Unit')} • ${s.frequency}',
                                     style: const TextStyle(
                                       fontSize: 12.5,
                                       color: kTextSub,

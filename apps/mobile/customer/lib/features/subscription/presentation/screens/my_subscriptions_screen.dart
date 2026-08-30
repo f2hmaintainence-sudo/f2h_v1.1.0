@@ -569,7 +569,7 @@ class _SubsScreenState extends State<SubsScreen> {
         final creditLimit = sessionState.profile?.postpaidCreditLimit ?? 0.0;
         final usedLimit = _subscriptions
             .where((s) => s.isActive && s.paymentType == 'postpaid')
-            .fold<double>(0.0, (sum, s) => sum + (s.totalMonthlyCost > 0 ? s.totalMonthlyCost : (s.monthlyEstimate ?? 0.0)));
+            .fold<double>(0.0, (sum, s) => sum + (s.monthlyEstimate != null && s.monthlyEstimate! > 0 ? s.monthlyEstimate! : s.totalMonthlyCost));
 
         return Align(
           alignment: Alignment.center,

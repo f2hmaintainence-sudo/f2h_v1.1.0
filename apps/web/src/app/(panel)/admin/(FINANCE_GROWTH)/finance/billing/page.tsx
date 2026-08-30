@@ -108,17 +108,17 @@ export default function CustomerBillingPage() {
   const [genCustomerId, setGenCustomerId] = useState<string>("ALL");
   const [genPeriodStart, setGenPeriodStart] = useState<string>(() => {
     const d = new Date();
-    d.setMonth(d.getMonth() - 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
   });
   const [genPeriodEnd, setGenPeriodEnd] = useState<string>(() => {
     const d = new Date();
-    const lastDay = new Date(d.getFullYear(), d.getMonth(), 0);
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
     return `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`;
   });
   const [genDueDate, setGenDueDate] = useState<string>(() => {
     const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-05`;
+    const nextMonth = new Date(d.getFullYear(), d.getMonth() + 1, 5);
+    return `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-05`;
   });
   const [simulatingPreview, setSimulatingPreview] = useState(false);
   const [simulatedData, setSimulatedData] = useState<any | null>(null);
@@ -1527,6 +1527,66 @@ export default function CustomerBillingPage() {
 
             {/* Config & Parameter Controls */}
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+              {/* Quick Period Presets */}
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Presets:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const d = new Date();
+                    const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+                    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+                    const end = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`;
+                    const nextMonth = new Date(d.getFullYear(), d.getMonth() + 1, 5);
+                    const due = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-05`;
+                    setGenPeriodStart(start);
+                    setGenPeriodEnd(end);
+                    setGenDueDate(due);
+                    handleRunPreviewSimulation(genCustomerId, start, end, due);
+                  }}
+                  className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-bold rounded-lg border border-emerald-200 transition-colors cursor-pointer"
+                >
+                  🌟 Current Month
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const d = new Date();
+                    d.setMonth(d.getMonth() - 1);
+                    const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+                    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+                    const end = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`;
+                    const now = new Date();
+                    const due = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-05`;
+                    setGenPeriodStart(start);
+                    setGenPeriodEnd(end);
+                    setGenDueDate(due);
+                    handleRunPreviewSimulation(genCustomerId, start, end, due);
+                  }}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg border border-slate-200 transition-colors cursor-pointer"
+                >
+                  📅 Previous Month
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const d = new Date();
+                    const end = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                    const startD = new Date(d.getTime() - 30 * 24 * 60 * 60 * 1000);
+                    const start = `${startD.getFullYear()}-${String(startD.getMonth() + 1).padStart(2, '0')}-${String(startD.getDate()).padStart(2, '0')}`;
+                    const nextMonth = new Date(d.getFullYear(), d.getMonth() + 1, 5);
+                    const due = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-05`;
+                    setGenPeriodStart(start);
+                    setGenPeriodEnd(end);
+                    setGenDueDate(due);
+                    handleRunPreviewSimulation(genCustomerId, start, end, due);
+                  }}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg border border-slate-200 transition-colors cursor-pointer"
+                >
+                  🕒 Last 30 Days
+                </button>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                 <div className="sm:col-span-1">
                   <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">

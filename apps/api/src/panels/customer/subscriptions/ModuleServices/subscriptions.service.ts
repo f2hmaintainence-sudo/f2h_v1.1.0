@@ -747,7 +747,7 @@ export class SubscriptionsService {
         s.status,
         s.pause_from_date,
         s.pause_to_date,
-        s.monthly_estimate,
+        COALESCE(s.monthly_estimate::numeric, 0)::numeric AS monthly_estimate,
         s.created_at,
         s.updated_at,
         COALESCE(si.subscription_item_id, si.id::text) AS subscription_item_id,

@@ -123,7 +123,7 @@ export class SubscriptionSnapshotRepository {
           ca.contact_name,
           ca.contact_mobile,
           ca.address_line,
-          SUM(si.unit_price * ${qtyExpr}) AS subtotal
+          SUM(COALESCE(NULLIF(si.final_price, 0), si.unit_price) * ${qtyExpr}) AS subtotal
         FROM subscriptions s
         JOIN subscription_items si
           ON si.subscription_id = s.subscription_id
@@ -231,7 +231,8 @@ export class SubscriptionSnapshotRepository {
           si.id                  AS subscription_item_id,
           si.product_variant_id  AS variant_id,
           ${qtyExpr}             AS quantity,
-          si.unit_price,
+          COALESCE(NULLIF(si.final_price, 0), si.unit_price) AS unit_price,
+          (COALESCE(NULLIF(si.final_price, 0), si.unit_price) * ${qtyExpr}) AS total_price,
           si.is_free
         FROM orders o
         JOIN subscription_items si
@@ -250,8 +251,8 @@ export class SubscriptionSnapshotRepository {
           )
       ),
       inserted AS (
-        INSERT INTO order_items (order_id, subscription_item_id, variant_id, quantity, unit_price, is_free)
-        SELECT order_id, subscription_item_id, variant_id, quantity, unit_price, is_free
+        INSERT INTO order_items (order_id, subscription_item_id, variant_id, quantity, unit_price, total_price, is_free)
+        SELECT order_id, subscription_item_id, variant_id, quantity, unit_price, total_price, is_free
         FROM items_to_insert
         RETURNING 1
       )
