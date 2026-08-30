@@ -57,17 +57,13 @@ export class ReferralRewardEngineService {
       const refRes = await client.query(
         `SELECT * FROM referrals
          WHERE (
-           referred_user_id = $1 OR
-           referrer_user_id = $1 OR
            referred_customer_id = $1 OR
-           referred_customer_id = $2 OR
-           (referee_phone = $3 AND $3 != '')
+           referred_customer_id = $2
          )
-         AND status != 'rewarded'
-         AND rewarded_at IS NULL
+         AND (status = 'pending' OR (status != 'rewarded' AND rewarded_at IS NULL))
          LIMIT 1
          FOR UPDATE`,
-        [realRefereeId, refereeCustomerId, refereePhone],
+        [realRefereeId, refereeCustomerId],
       );
 
       let referralRecord = refRes.rows?.[0];
@@ -192,36 +188,6 @@ export class ReferralRewardEngineService {
             now,
           ],
         );
-
-        // Send Notification to Referrer
-        try {
-          const notifId1 = `NTF-${Date.now()}-R1`;
-          await client.query(
-            `INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-            [
-              notifId1,
-              '🎉 Referral Bonus Received!',
-              `₹${referrerRewardAmount} credited to your wallet! Your friend ${referee.first_name || 'a customer'} completed their 1st delivered order.`,
-              'push',
-              'referral_bonus',
-              'high',
-              'sent',
-              now,
-              now,
-            ],
-          );
-          await client.query(
-            `INSERT INTO notification_recipients (notification_id, user_id, status, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [notifId1, targetReferrerId, 'unread', now, now],
-          );
-        } catch (error) {
-          this.developer.warn('Referrer reward notification insert failed', {
-            targetReferrerId,
-            error,
-          });
-        }
       }
 
       // ── B. Update Referee (Unlock referral code as user_id) ──────────────────
@@ -232,7 +198,6 @@ export class ReferralRewardEngineService {
           `UPDATE customers
            SET wallet_balance = COALESCE(wallet_balance, 0) + $1,
                first_order_completed = true,
-               referral_status = 'active',
                updated_at = NOW()
            WHERE customer_id = $2 OR customer_id = $3
            RETURNING wallet_balance`,
@@ -262,7 +227,6 @@ export class ReferralRewardEngineService {
         await client.query(
           `UPDATE customers
            SET first_order_completed = true,
-               referral_status = 'active',
                updated_at = NOW()
            WHERE customer_id = $1 OR customer_id = $2`,
           [realRefereeId, refereeCustomerId],
@@ -284,39 +248,22 @@ export class ReferralRewardEngineService {
         ],
       );
 
-      // ── D. Notify Referee ───────────────────────────────────────────────────────
-      try {
-        const notifId2 = `NTF-${Date.now()}-R2`;
-        const notifMsg = `Your 1st order has been delivered! Your personal referral code (${realRefereeId}) is now unlocked 🔓. Share with friends to earn ₹100 on their first order!`;
+      await client.query('COMMIT');
 
-        await client.query(
-          `INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-          [
-            notifId2,
-            '🎉 Referral Code Unlocked!',
-            notifMsg,
-            'push',
-            'referral_bonus',
-            'high',
-            'sent',
-            now,
-            now,
-          ],
-        );
-        await client.query(
-          `INSERT INTO notification_recipients (notification_id, user_id, status, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [notifId2, realRefereeId, 'unread', now, now],
-        );
-      } catch (error) {
-        this.developer.warn('Referee reward notification insert failed', {
-          realRefereeId,
-          error,
-        });
+      // ── D. Send Notifications Post-Commit (Non-blocking) ───────────────────────
+      if (!referrerIsDP) {
+        this.sendNotificationSafe(
+          targetReferrerId,
+          '🎉 Referral Bonus Received!',
+          `₹${referrerRewardAmount} credited to your wallet! Your friend ${referee.first_name || 'a customer'} completed their 1st delivered order.`,
+        ).catch(() => {});
       }
 
-      await client.query('COMMIT');
+      this.sendNotificationSafe(
+        realRefereeId,
+        '🎉 Referral Code Unlocked!',
+        `Your 1st order has been delivered! Your personal referral code (${realRefereeId}) is now unlocked 🔓. Share with friends to earn ₹100 on their first order!`,
+      ).catch(() => {});
 
       this.logger.log(
         `REFERRAL_REWARDED - referralId: ${referralRecord.refer_id || referralRecord.id}, referrerId: ${targetReferrerId}, refereeId: ${realRefereeId}, referrerAmount: ${referrerRewardAmount}, refereeAmount: ${referredRewardAmount}`,
@@ -343,4 +290,23 @@ export class ReferralRewardEngineService {
       client.release();
     }
   }
+
+  private async sendNotificationSafe(userId: string, title: string, message: string): Promise<void> {
+    try {
+      const notifId = `NTF-${Date.now()}-${Math.floor(Math.random() * 9000 + 1000)}`;
+      await this.db.query(
+        `INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_by, created_at, updated_at)
+         VALUES ($1, $2, $3, 'push', 'referral_bonus', 'high', 'sent', 'system', NOW(), NOW())`,
+        [notifId, title, message],
+      );
+      await this.db.query(
+        `INSERT INTO notification_recipients (notification_id, user_id, status, created_by, created_at, updated_at)
+         VALUES ($1, $2, 'unread', 'system', NOW(), NOW())`,
+        [notifId, userId],
+      );
+    } catch (e) {
+      this.developer.warn('sendNotificationSafe failed:', { userId, title, error: e });
+    }
+  }
 }
+
