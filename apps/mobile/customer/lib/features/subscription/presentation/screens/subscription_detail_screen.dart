@@ -891,8 +891,8 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
   // ─── Subscription details (collapsible) ─────────────────────
 
   Widget _buildSubscriptionDetailsSection(Subscription s) {
-    final unitPrice = (s.items.isNotEmpty && s.items.first.unitPrice > 0)
-        ? s.items.first.unitPrice
+    final unitPrice = (s.items.isNotEmpty && (s.items.first.finalPrice > 0 ? s.items.first.finalPrice : s.items.first.unitPrice) > 0)
+        ? (s.items.first.finalPrice > 0 ? s.items.first.finalPrice : s.items.first.unitPrice)
         : (s.pricePerDay > 0 ? s.pricePerDay : 0.0);
     final isCancelled = s.status == 'cancelled';
     final isPostpaid = s.paymentType == 'postpaid';
