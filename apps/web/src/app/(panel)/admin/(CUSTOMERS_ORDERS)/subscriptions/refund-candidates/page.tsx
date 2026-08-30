@@ -48,6 +48,8 @@ import {
   PauseCircle,
   Truck,
   RotateCcw,
+  User,
+  Phone,
 } from 'lucide-react';
 import { getApiBaseUrl } from '@/lib/api-config';
 
@@ -166,7 +168,18 @@ export default function RefundCandidatesPage() {
   // Developer Testing Preview Modal
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewData, setPreviewData] = useState<{ range: { from: string; to: string }; rows: any[] } | null>(null);
+  const [previewData, setPreviewData] = useState<{
+    range: { from: string; to: string };
+    rows: any[];
+    grouped?: any[];
+    count?: number;
+    total_amount?: number;
+  } | null>(null);
+  const [previewViewMode, setPreviewViewMode] = useState<'grouped' | 'flat'>('grouped');
+  const [previewSourceFilter, setPreviewSourceFilter] = useState<'all' | 'pause' | 'order'>('all');
+  const [previewSearch, setPreviewSearch] = useState('');
+  const [expandedPreviewCustomers, setExpandedPreviewCustomers] = useState<Set<string>>(new Set());
+  const [expandedPreviewSubs, setExpandedPreviewSubs] = useState<Set<string>>(new Set());
 
   // Single Action Confirm / Reject Modals
   const [singleRejectTarget, setSingleRejectTarget] = useState<string | null>(null);
@@ -451,6 +464,9 @@ export default function RefundCandidatesPage() {
   const handlePreviewScan = async () => {
     setPreviewOpen(true);
     setPreviewLoading(true);
+    setPreviewSearch('');
+    setPreviewSourceFilter('all');
+    setPreviewViewMode('grouped');
     try {
       const res = await fetch(`${API}/subscriptions/refund-candidates/scan/preview?${buildQuery()}`, {
         credentials: 'include',
@@ -458,6 +474,14 @@ export default function RefundCandidatesPage() {
       const json = await res.json();
       if (json.status && json.data) {
         setPreviewData(json.data);
+        const custIds = new Set<string>();
+        const subIds = new Set<string>();
+        (json.data.rows || []).forEach((r: any) => {
+          if (r.customer_id) custIds.add(r.customer_id);
+          if (r.subscription_id) subIds.add(r.subscription_id);
+        });
+        setExpandedPreviewCustomers(custIds);
+        setExpandedPreviewSubs(subIds);
       } else {
         setPreviewData(null);
         showToast('error', json.message || 'Failed to calculate scan preview');
@@ -1371,80 +1395,490 @@ export default function RefundCandidatesPage() {
                 <Loader2 size={24} className="animate-spin text-emerald-600" />
                 <p className="text-xs font-bold">Calculating refundable paused days &amp; undelivered orders...</p>
               </div>
-            ) : previewData ? (
-              <div className="space-y-4 text-xs">
-                <div className="grid grid-cols-3 gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200">
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">Analyzed Date Window</span>
-                    <p className="font-bold text-slate-800">
-                      {previewData.range?.from} &rarr; {previewData.range?.to}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">Detected Refund Items</span>
-                    <p className="font-black text-slate-900 text-sm">{previewData.rows?.length ?? 0} candidates</p>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">Calculated Total Valuation</span>
-                    <p className="font-black text-emerald-700 text-sm">
-                      {fmtAmount((previewData.rows || []).reduce((acc: number, r: any) => acc + Number(r.refund_amount || 0), 0))}
-                    </p>
-                  </div>
-                </div>
+            ) : previewData ? (() => {
+                const allRows = previewData.rows || [];
+                const pausedCount = allRows.filter((r: any) => r.source === 'pause').length;
+                const failedCount = allRows.filter((r: any) => r.source === 'order').length;
+                const uniqueCustomerCount = new Set(allRows.map((r: any) => r.customer_id)).size;
+                const uniqueSubCount = new Set(allRows.map((r: any) => r.subscription_id)).size;
 
-                {!previewData.rows || previewData.rows.length === 0 ? (
-                  <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-500 font-medium">
-                    No paused days or failed deliveries found for the selected filter criteria.
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-72">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-100 text-slate-600 font-bold border-b border-slate-200 sticky top-0">
-                        <tr>
-                          <th className="p-2.5">Date &amp; Slot</th>
-                          <th className="p-2.5">Customer / Sub</th>
-                          <th className="p-2.5">Product &amp; Variant</th>
-                          <th className="p-2.5">Reason</th>
-                          <th className="p-2.5 text-right">Qty</th>
-                          <th className="p-2.5 text-right">Subscribed Price</th>
-                          <th className="p-2.5 text-right">Refund Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                        {previewData.rows.map((row: any, idx: number) => (
-                          <tr key={idx} className="hover:bg-slate-50">
-                            <td className="p-2.5 font-bold text-slate-900 whitespace-nowrap">
-                              {row.scheduled_date} <span className="text-[10px] text-slate-400">({row.slot})</span>
-                            </td>
-                            <td className="p-2.5 whitespace-nowrap">
-                              <span className="font-bold text-slate-800">{row.customer_id}</span>
-                              <div className="text-[10px] text-slate-400 font-mono">{row.subscription_id}</div>
-                            </td>
-                            <td className="p-2.5">
-                              {row.product_name || 'Product'} {row.variant_name ? `(${row.variant_name})` : ''}
-                            </td>
-                            <td className="p-2.5">
-                              <span
-                                className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                  row.source === 'pause' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
-                                }`}
+                // Filter rows based on search and source filter
+                const filteredRows = allRows.filter((r: any) => {
+                  if (previewSourceFilter !== 'all' && r.source !== previewSourceFilter) return false;
+                  if (previewSearch.trim()) {
+                    const q = previewSearch.toLowerCase().trim();
+                    const matchCustId = (r.customer_id || '').toLowerCase().includes(q);
+                    const matchCustName = (r.customer_name || '').toLowerCase().includes(q);
+                    const matchCustPhone = (r.customer_phone || '').toLowerCase().includes(q);
+                    const matchSubId = (r.subscription_id || '').toLowerCase().includes(q);
+                    const matchProd = (r.product_name || '').toLowerCase().includes(q);
+                    const matchVar = (r.variant_name || '').toLowerCase().includes(q);
+                    const matchDate = (r.scheduled_date || '').toLowerCase().includes(q);
+                    if (!matchCustId && !matchCustName && !matchCustPhone && !matchSubId && !matchProd && !matchVar && !matchDate) {
+                      return false;
+                    }
+                  }
+                  return true;
+                });
+
+                // Build filtered grouped structure
+                const custMap = new Map<string, any>();
+                for (const row of filteredRows) {
+                  const cId = row.customer_id;
+                  if (!custMap.has(cId)) {
+                    custMap.set(cId, {
+                      customer_id: cId,
+                      customer_name: row.customer_name || 'Customer',
+                      customer_phone: row.customer_phone || '',
+                      total_candidates: 0,
+                      total_refund_amount: 0,
+                      pause_count: 0,
+                      failed_count: 0,
+                      subsMap: new Map<string, any>(),
+                    });
+                  }
+                  const cust = custMap.get(cId);
+                  cust.total_candidates++;
+                  cust.total_refund_amount = Math.round((cust.total_refund_amount + Number(row.refund_amount || 0)) * 100) / 100;
+                  if (row.source === 'pause') cust.pause_count++;
+                  else cust.failed_count++;
+
+                  const sId = row.subscription_id;
+                  if (!cust.subsMap.has(sId)) {
+                    cust.subsMap.set(sId, {
+                      subscription_id: sId,
+                      product_name: row.product_name || 'Product',
+                      variant_name: row.variant_name || '',
+                      total_candidates: 0,
+                      total_refund_amount: 0,
+                      pause_count: 0,
+                      failed_count: 0,
+                      items: [],
+                    });
+                  }
+                  const sub = cust.subsMap.get(sId);
+                  sub.total_candidates++;
+                  sub.total_refund_amount = Math.round((sub.total_refund_amount + Number(row.refund_amount || 0)) * 100) / 100;
+                  if (row.source === 'pause') sub.pause_count++;
+                  else sub.failed_count++;
+                  sub.items.push(row);
+                }
+
+                const groupedCustomers = Array.from(custMap.values()).map((c) => ({
+                  ...c,
+                  subscriptions: Array.from(c.subsMap.values()),
+                }));
+
+                const toggleCustomer = (cId: string) => {
+                  setExpandedPreviewCustomers((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(cId)) next.delete(cId);
+                    else next.add(cId);
+                    return next;
+                  });
+                };
+
+                const toggleSub = (sId: string) => {
+                  setExpandedPreviewSubs((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(sId)) next.delete(sId);
+                    else next.add(sId);
+                    return next;
+                  });
+                };
+
+                const expandAll = () => {
+                  const custIds = new Set<string>();
+                  const subIds = new Set<string>();
+                  filteredRows.forEach((r: any) => {
+                    if (r.customer_id) custIds.add(r.customer_id);
+                    if (r.subscription_id) subIds.add(r.subscription_id);
+                  });
+                  setExpandedPreviewCustomers(custIds);
+                  setExpandedPreviewSubs(subIds);
+                };
+
+                const collapseAll = () => {
+                  setExpandedPreviewCustomers(new Set());
+                  setExpandedPreviewSubs(new Set());
+                };
+
+                return (
+                  <div className="space-y-4 text-xs">
+                    {/* Top KPI Metrics Banner */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-gradient-to-r from-slate-50 to-emerald-50/40 rounded-2xl border border-slate-200 shadow-2xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold">Analyzed Window</span>
+                        <p className="font-extrabold text-slate-800">
+                          {previewData.range?.from} &rarr; {previewData.range?.to}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold">Customers &amp; Subs</span>
+                        <p className="font-extrabold text-slate-900">
+                          {uniqueCustomerCount} customers <span className="text-slate-400 font-normal">({uniqueSubCount} subs)</span>
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold">Detected Refund Items</span>
+                        <p className="font-black text-slate-900 text-sm">
+                          {allRows.length} candidates <span className="text-[10px] text-slate-500 font-medium">({pausedCount}P / {failedCount}F)</span>
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold">Calculated Valuation</span>
+                        <p className="font-black text-emerald-700 text-base">
+                          {fmtAmount(allRows.reduce((acc: number, r: any) => acc + Number(r.refund_amount || 0), 0))}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Toolbar: View mode switch, Filter Pills, Search box, Expand/Collapse */}
+                    <div className="flex flex-wrap items-center justify-between gap-2.5 p-2 bg-slate-50 rounded-2xl border border-slate-200">
+                      {/* Left: View Mode Toggle */}
+                      <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200/80 shadow-2xs">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewViewMode('grouped')}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            previewViewMode === 'grouped'
+                              ? 'bg-emerald-600 text-white shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                          }`}
+                        >
+                          <Users size={14} />
+                          Group by Customer &amp; Subscriptions
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewViewMode('flat')}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            previewViewMode === 'flat'
+                              ? 'bg-emerald-600 text-white shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                          }`}
+                        >
+                          <Receipt size={14} />
+                          Flat Item List
+                        </button>
+                      </div>
+
+                      {/* Middle: Source Filter Pills */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewSourceFilter('all')}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
+                            previewSourceFilter === 'all'
+                              ? 'bg-slate-800 text-white'
+                              : 'bg-white text-slate-600 hover:bg-slate-200/60 border border-slate-200'
+                          }`}
+                        >
+                          All ({allRows.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewSourceFilter('pause')}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
+                            previewSourceFilter === 'pause'
+                              ? 'bg-amber-600 text-white'
+                              : 'bg-white text-amber-700 hover:bg-amber-50 border border-slate-200'
+                          }`}
+                        >
+                          Paused Days ({pausedCount})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewSourceFilter('order')}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
+                            previewSourceFilter === 'order'
+                              ? 'bg-rose-600 text-white'
+                              : 'bg-white text-rose-700 hover:bg-rose-50 border border-slate-200'
+                          }`}
+                        >
+                          Failed Deliveries ({failedCount})
+                        </button>
+                      </div>
+
+                      {/* Right: Search Input & Expand/Collapse Toggle */}
+                      <div className="flex items-center gap-2">
+                        <div className="relative">
+                          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="Filter customer, sub, product..."
+                            value={previewSearch}
+                            onChange={(e) => setPreviewSearch(e.target.value)}
+                            className="pl-7 pr-2.5 py-1 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 w-44 placeholder:text-slate-400"
+                          />
+                        </div>
+
+                        {previewViewMode === 'grouped' && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={expandAll}
+                              className="px-2 py-1 text-[10px] font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg cursor-pointer"
+                              title="Expand all customer accordions"
+                            >
+                              Expand All
+                            </button>
+                            <button
+                              type="button"
+                              onClick={collapseAll}
+                              className="px-2 py-1 text-[10px] font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg cursor-pointer"
+                              title="Collapse all customer accordions"
+                            >
+                              Collapse All
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {filteredRows.length === 0 ? (
+                      <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-500 font-medium">
+                        No refund candidates match your search and filter criteria.
+                      </div>
+                    ) : previewViewMode === 'grouped' ? (
+                      /* ── GROUPED VIEW: Customer -> Subscription -> Schedule Items ── */
+                      <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
+                        {groupedCustomers.map((cust) => {
+                          const isCustExpanded = expandedPreviewCustomers.has(cust.customer_id);
+                          return (
+                            <div
+                              key={cust.customer_id}
+                              className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden transition-all"
+                            >
+                              {/* Customer Header Bar */}
+                              <div
+                                onClick={() => toggleCustomer(cust.customer_id)}
+                                className="flex items-center justify-between p-3.5 bg-slate-50/80 hover:bg-slate-100/80 cursor-pointer select-none transition-colors border-b border-slate-100"
                               >
-                                {row.source === 'pause' ? 'Paused Day' : 'Delivery Failed'}
-                              </span>
-                            </td>
-                            <td className="p-2.5 text-right font-bold">{row.quantity}</td>
-                            <td className="p-2.5 text-right">{fmtAmount(row.final_price || row.unit_price)}</td>
-                            <td className="p-2.5 text-right font-black text-emerald-700">
-                              {fmtAmount(row.refund_amount)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                                <div className="flex items-center gap-3">
+                                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-black text-xs shadow-2xs">
+                                    {cust.customer_name ? cust.customer_name.charAt(0).toUpperCase() : 'C'}
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-extrabold text-sm text-slate-900">
+                                        {cust.customer_name || 'Customer'}
+                                      </span>
+                                      <span className="font-mono text-[10px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                                        {cust.customer_id}
+                                      </span>
+                                      {cust.customer_phone && (
+                                        <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
+                                          <Phone size={11} className="text-slate-400" />
+                                          {cust.customer_phone}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-[11px] text-slate-500 font-medium mt-0.5 flex items-center gap-2">
+                                      <span>{cust.subscriptions.length} active subscription(s)</span>
+                                      <span>&bull;</span>
+                                      <span>{cust.total_candidates} candidate item(s)</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-1.5">
+                                    {cust.pause_count > 0 && (
+                                      <span className="px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200/60 rounded-full text-[10px] font-bold">
+                                        {cust.pause_count} Paused
+                                      </span>
+                                    )}
+                                    {cust.failed_count > 0 && (
+                                      <span className="px-2 py-0.5 bg-rose-50 text-rose-800 border border-rose-200/60 rounded-full text-[10px] font-bold">
+                                        {cust.failed_count} Failed
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="text-right">
+                                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Customer Total</span>
+                                    <span className="font-black text-sm text-emerald-700">
+                                      {fmtAmount(cust.total_refund_amount)}
+                                    </span>
+                                  </div>
+
+                                  <div className="p-1 text-slate-400 hover:text-slate-700 rounded-lg transition-transform">
+                                    {isCustExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Customer Subscriptions Container */}
+                              {isCustExpanded && (
+                                <div className="p-3.5 space-y-3 bg-white">
+                                  {cust.subscriptions.map((sub: any) => {
+                                    const isSubExpanded = expandedPreviewSubs.has(sub.subscription_id);
+                                    return (
+                                      <div
+                                        key={sub.subscription_id}
+                                        className="rounded-xl border border-slate-200/90 overflow-hidden bg-slate-50/40"
+                                      >
+                                        {/* Subscription Sub-Header */}
+                                        <div
+                                          onClick={() => toggleSub(sub.subscription_id)}
+                                          className="flex items-center justify-between p-2.5 bg-slate-100/60 hover:bg-slate-100 cursor-pointer select-none transition-colors border-b border-slate-200/60"
+                                        >
+                                          <div className="flex items-center gap-2.5">
+                                            <div className="p-1.5 bg-white text-emerald-700 rounded-lg border border-slate-200 shadow-2xs">
+                                              <Package size={14} />
+                                            </div>
+                                            <div>
+                                              <div className="flex items-center gap-2">
+                                                <span className="font-mono text-xs font-black text-slate-800">
+                                                  {sub.subscription_id}
+                                                </span>
+                                                <span className="text-xs font-bold text-slate-700">
+                                                  {sub.product_name} {sub.variant_name ? `(${sub.variant_name})` : ''}
+                                                </span>
+                                              </div>
+                                              <div className="text-[10px] text-slate-400 font-medium">
+                                                {sub.total_candidates} days missed &bull; {sub.pause_count} paused, {sub.failed_count} delivery failures
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          <div className="flex items-center gap-3">
+                                            <div className="text-right">
+                                              <span className="font-extrabold text-xs text-emerald-700">
+                                                {fmtAmount(sub.total_refund_amount)}
+                                              </span>
+                                            </div>
+                                            <div className="p-1 text-slate-400">
+                                              {isSubExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* Subscription Line Items Sub-Table */}
+                                        {isSubExpanded && (
+                                          <div className="overflow-x-auto bg-white">
+                                            <table className="w-full text-left text-xs">
+                                              <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100 text-[11px]">
+                                                <tr>
+                                                  <th className="py-2 px-3">Date &amp; Slot</th>
+                                                  <th className="py-2 px-3">Refund Reason / Source</th>
+                                                  <th className="py-2 px-3 text-right">Qty</th>
+                                                  <th className="py-2 px-3 text-right">Subscribed Unit Price</th>
+                                                  <th className="py-2 px-3 text-right">Calculated Refund</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                                                {sub.items.map((row: any, idx: number) => (
+                                                  <tr key={idx} className="hover:bg-slate-50/60">
+                                                    <td className="py-2 px-3 font-bold text-slate-900 whitespace-nowrap">
+                                                      {row.scheduled_date}{' '}
+                                                      <span className="text-[10px] text-slate-400 font-normal">
+                                                        ({row.slot})
+                                                      </span>
+                                                    </td>
+                                                    <td className="py-2 px-3">
+                                                      <div className="flex items-center gap-2">
+                                                        <span
+                                                          className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                            row.source === 'pause'
+                                                              ? 'bg-amber-100 text-amber-800'
+                                                              : 'bg-rose-100 text-rose-800'
+                                                          }`}
+                                                        >
+                                                          {row.source === 'pause' ? 'Paused Day' : 'Delivery Failed'}
+                                                        </span>
+                                                        {row.note && (
+                                                          <span className="text-[10px] text-slate-400 font-normal">
+                                                            {row.note}
+                                                          </span>
+                                                        )}
+                                                      </div>
+                                                    </td>
+                                                    <td className="py-2 px-3 text-right font-bold text-slate-800">
+                                                      {row.quantity}
+                                                    </td>
+                                                    <td className="py-2 px-3 text-right text-slate-600">
+                                                      {fmtAmount(row.final_price || row.unit_price)}
+                                                    </td>
+                                                    <td className="py-2 px-3 text-right font-black text-emerald-700 whitespace-nowrap">
+                                                      {fmtAmount(row.refund_amount)}
+                                                    </td>
+                                                  </tr>
+                                                ))}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      /* ── FLAT VIEW TABLE ── */
+                      <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-[55vh]">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-100 text-slate-600 font-bold border-b border-slate-200 sticky top-0">
+                            <tr>
+                              <th className="p-2.5">Date &amp; Slot</th>
+                              <th className="p-2.5">Customer</th>
+                              <th className="p-2.5">Subscription &amp; Product</th>
+                              <th className="p-2.5">Reason</th>
+                              <th className="p-2.5 text-right">Qty</th>
+                              <th className="p-2.5 text-right">Subscribed Price</th>
+                              <th className="p-2.5 text-right">Refund Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                            {filteredRows.map((row: any, idx: number) => (
+                              <tr key={idx} className="hover:bg-slate-50">
+                                <td className="p-2.5 font-bold text-slate-900 whitespace-nowrap">
+                                  {row.scheduled_date}{' '}
+                                  <span className="text-[10px] text-slate-400">({row.slot})</span>
+                                </td>
+                                <td className="p-2.5 whitespace-nowrap">
+                                  <span className="font-bold text-slate-800">
+                                    {row.customer_name || row.customer_id}
+                                  </span>
+                                  <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                                    <span>{row.customer_id}</span>
+                                    {row.customer_phone && <span>&bull; {row.customer_phone}</span>}
+                                  </div>
+                                </td>
+                                <td className="p-2.5">
+                                  <div className="font-bold text-slate-800">
+                                    {row.product_name || 'Product'} {row.variant_name ? `(${row.variant_name})` : ''}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 font-mono">{row.subscription_id}</div>
+                                </td>
+                                <td className="p-2.5">
+                                  <span
+                                    className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                      row.source === 'pause' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                                    }`}
+                                  >
+                                    {row.source === 'pause' ? 'Paused Day' : 'Delivery Failed'}
+                                  </span>
+                                </td>
+                                <td className="p-2.5 text-right font-bold">{row.quantity}</td>
+                                <td className="p-2.5 text-right">{fmtAmount(row.final_price || row.unit_price)}</td>
+                                <td className="p-2.5 text-right font-black text-emerald-700">
+                                  {fmtAmount(row.refund_amount)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ) : null}
+                );
+              })() : null}
 
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
               <button

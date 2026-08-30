@@ -42,6 +42,8 @@ export interface EligibleRow {
   subscription_id: string;
   subscription_item_id: string;
   customer_id: string;
+  customer_name?: string | null;
+  customer_phone?: string | null;
   order_id: string | null;
   scheduled_date: string;
   slot: 'morning' | 'evening';
@@ -159,9 +161,12 @@ export class RefundEligibilityService {
         SELECT pd.*, si.subscription_item_id,
                COALESCE(si.final_price, si.unit_price - COALESCE(si.discount_amount, 0) - COALESCE(si.coupon_amount, 0), si.unit_price) AS final_price,
                si.unit_price,
-               s.customer_id, pv.name AS variant_name, p.name AS product_name
+               s.customer_id, pv.name AS variant_name, p.name AS product_name,
+               COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, u.phone, s.customer_id) AS customer_name,
+               u.phone AS customer_phone
         FROM paused_days pd
         JOIN subscriptions s ON s.subscription_id = pd.subscription_id
+        LEFT JOIN users u ON u.user_id = s.customer_id
         JOIN subscription_items si
           ON si.subscription_id = pd.subscription_id
          AND si.deleted_at IS NULL
@@ -184,7 +189,7 @@ export class RefundEligibilityService {
          AND COALESCE(ws.effective_from, i.scheduled_date) <= i.scheduled_date
          AND COALESCE(ws.effective_to, i.scheduled_date) >= i.scheduled_date
       )
-      SELECT subscription_id, subscription_item_id, customer_id,
+      SELECT subscription_id, subscription_item_id, customer_id, customer_name, customer_phone,
              scheduled_date::text AS scheduled_date, slot,
              quantity::numeric AS quantity,
              unit_price::numeric AS unit_price,
@@ -213,6 +218,8 @@ export class RefundEligibilityService {
       subscription_id: r.subscription_id,
       subscription_item_id: r.subscription_item_id,
       customer_id: r.customer_id,
+      customer_name: r.customer_name ?? null,
+      customer_phone: r.customer_phone ?? null,
       order_id: null,
       scheduled_date: r.scheduled_date,
       slot: r.slot,
@@ -259,6 +266,8 @@ export class RefundEligibilityService {
         o.subscription_id,
         oi.subscription_item_id,
         o.customer_id,
+        COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, u.phone, o.customer_id) AS customer_name,
+        u.phone AS customer_phone,
         o.order_id,
         o.scheduled_date::text AS scheduled_date,
         o.delivery_slot AS slot,
@@ -271,6 +280,7 @@ export class RefundEligibilityService {
         oi.item_status::text AS item_status,
         dra.failed_reason
       FROM orders o
+      LEFT JOIN users u ON u.user_id = o.customer_id
       JOIN order_items oi
         ON oi.order_id = o.order_id
        AND oi.deleted_at IS NULL
@@ -318,6 +328,8 @@ export class RefundEligibilityService {
         subscription_id: r.subscription_id,
         subscription_item_id: r.subscription_item_id,
         customer_id: r.customer_id,
+        customer_name: r.customer_name ?? null,
+        customer_phone: r.customer_phone ?? null,
         order_id: r.order_id,
         scheduled_date: r.scheduled_date,
         slot: (r.slot ?? 'morning') as 'morning' | 'evening',

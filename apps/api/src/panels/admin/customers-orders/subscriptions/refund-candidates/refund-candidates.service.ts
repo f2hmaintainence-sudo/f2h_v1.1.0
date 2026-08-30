@@ -161,6 +161,61 @@ export class RefundCandidatesService {
   /** Same calculation, nothing written — used to preview before scanning. */
   async previewScan(filters: any) {
     const { range, rows } = await this.eligibility.preview(filters ?? {});
+
+    // Group rows by customer -> subscriptions -> line items
+    const customerMap = new Map<string, any>();
+    for (const row of rows) {
+      const cId = row.customer_id;
+      if (!customerMap.has(cId)) {
+        customerMap.set(cId, {
+          customer_id: cId,
+          customer_name: row.customer_name || 'Customer',
+          customer_phone: row.customer_phone || '',
+          total_candidates: 0,
+          total_refund_amount: 0,
+          pause_count: 0,
+          failed_count: 0,
+          subscriptions_map: new Map<string, any>(),
+        });
+      }
+      const cust = customerMap.get(cId);
+      cust.total_candidates++;
+      cust.total_refund_amount = Math.round((cust.total_refund_amount + row.refund_amount) * 100) / 100;
+      if (row.source === 'pause') cust.pause_count++;
+      else cust.failed_count++;
+
+      const subId = row.subscription_id;
+      if (!cust.subscriptions_map.has(subId)) {
+        cust.subscriptions_map.set(subId, {
+          subscription_id: subId,
+          product_name: row.product_name || 'Product',
+          variant_name: row.variant_name || '',
+          total_candidates: 0,
+          total_refund_amount: 0,
+          pause_count: 0,
+          failed_count: 0,
+          items: [],
+        });
+      }
+      const sub = cust.subscriptions_map.get(subId);
+      sub.total_candidates++;
+      sub.total_refund_amount = Math.round((sub.total_refund_amount + row.refund_amount) * 100) / 100;
+      if (row.source === 'pause') sub.pause_count++;
+      else sub.failed_count++;
+      sub.items.push(row);
+    }
+
+    const grouped = Array.from(customerMap.values()).map((c) => ({
+      customer_id: c.customer_id,
+      customer_name: c.customer_name,
+      customer_phone: c.customer_phone,
+      total_candidates: c.total_candidates,
+      total_refund_amount: c.total_refund_amount,
+      pause_count: c.pause_count,
+      failed_count: c.failed_count,
+      subscriptions: Array.from(c.subscriptions_map.values()),
+    }));
+
     return {
       status: true,
       data: {
@@ -168,6 +223,7 @@ export class RefundCandidatesService {
         count: rows.length,
         total_amount: Math.round(rows.reduce((s, r) => s + r.refund_amount, 0) * 100) / 100,
         rows,
+        grouped,
       },
     };
   }
