@@ -92,14 +92,14 @@ export class AuthService {
 
     try {
       if (appRole === 'CUSTOMER') {
-        // Customer app: check customers table
+        // Customer app: check customers table (is_blocked)
         const rows = await this.DataBase.query(
-          `SELECT is_active FROM customers WHERE customer_id = $1 LIMIT 1`,
+          `SELECT is_blocked FROM customers WHERE customer_id = $1 LIMIT 1`,
           [userId],
         );
         if (rows && rows.length > 0) {
-          const val = rows[0].is_active;
-          if (val === false || val === 0 || val === 'false') return false;
+          const val = rows[0].is_blocked;
+          if (val === true || val === 1 || val === 'true') return false;
         }
         return true;
       }
@@ -398,7 +398,7 @@ export class AuthService {
     let existingUser: any = null;
     if (email) {
       const emailRes = await this.Data.query('users', {
-        select: ['user_id', 'email', 'phone', 'password', 'role_id'],
+        select: ['user_id', 'email', 'phone', 'password', 'role_id', 'first_name', 'last_name', 'user_name'],
         where: [{ column: 'email', operator: '=', value: email.toLowerCase().trim() }],
         limit: 1,
       });
@@ -406,7 +406,7 @@ export class AuthService {
     }
     if (!existingUser && phone) {
       const phoneRes = await this.Data.query('users', {
-        select: ['user_id', 'email', 'phone', 'password', 'role_id'],
+        select: ['user_id', 'email', 'phone', 'password', 'role_id', 'first_name', 'last_name', 'user_name'],
         where: [{ column: 'phone', operator: '=', value: phone.trim() }],
         limit: 1,
       });
@@ -472,18 +472,6 @@ export class AuthService {
           [{ column: 'user_id', operator: '=', value: userId }],
           { transaction },
         );
-
-        // Belt-and-suspenders: if phone still NULL in DB, force a raw update.
-        if (phone) {
-          try {
-            await this.DataBase.query(
-              `UPDATE users SET phone = $1 WHERE user_id = $2 AND (phone IS NULL OR phone = '')`,
-              [phone, userId],
-            );
-          } catch (phoneErr) {
-            this.developer.warn(`[AuthService] belt-and-suspenders phone update failed for ${userId}`, { phoneErr });
-          }
-        }
       } else {
         const incomingFcmToken = body.fcm_token || (body as any).fcmToken;
         const userInsertPayload: any = {
@@ -531,9 +519,6 @@ export class AuthService {
           const custPayload: any = {
             updated_at: now,
           };
-          if (referrerId) {
-            custPayload.referred_by = referrerId;
-          }
           await this.Data.update(
             'customers',
             custPayload,
@@ -573,12 +558,9 @@ export class AuthService {
                 refer_id: referId,
                 referrer_customer_id: referrerId,
                 referred_customer_id: userId,
-                referrer_user_id: referrerId,
-                referred_user_id: userId,
                 referral_code: refCode,
                 referrer_reward_amount: isDpRef ? 75.00 : 100.00,
                 referred_reward_amount: 0.00,
-                reward_amount: isDpRef ? '75.00' : '100.00',
                 status: 'pending',
                 remarks: isDpRef ? 'DP referral registered - ₹75 for DP on 1st delivered order' : 'Referral registered - pending first delivered order',
                 created_at: now,
@@ -727,26 +709,22 @@ export class AuthService {
     });
 
     if (email) {
-      try {
-        const name = (firstName || userName || 'Customer').trim();
-        await this.mailService.sendWelcomeWithPasswordEmail(email, name, rawPassword);
-      } catch (err) {
+      const name = (firstName || userName || 'Customer').trim();
+      this.mailService.sendWelcomeWithPasswordEmail(email, name, rawPassword).catch((err) => {
         this.developer.warn(`Failed to send welcome credentials email to ${email}`, { err, rawPassword });
         console.warn(`[AUTH] Welcome credentials email for ${email} (Password: ${rawPassword}):`, err);
-      }
+      });
     }
 
-    try {
-      const name = (body.first_name || body.user_name || 'User').trim();
-      await this.notificationService.sendNotification({
-        recipientIds: [userId],
-        title: 'Welcome to F2H Fresh! 🎉',
-        message: `Hi ${name}, welcome to F2H Fresh! Your account has been created successfully.`,
-        type: 'success',
-      });
-    } catch (err) {
+    const notifName = (body.first_name || body.user_name || 'User').trim();
+    this.notificationService.sendNotification({
+      recipientIds: [userId],
+      title: 'Welcome to F2H Fresh! 🎉',
+      message: `Hi ${notifName}, welcome to F2H Fresh! Your account has been created successfully.`,
+      type: 'success',
+    }).catch((err) => {
       this.developer.error(`Failed to send welcome notification to user ${userId}`, { err });
-    }
+    });
 
     return {
       message: 'Registration successful',
